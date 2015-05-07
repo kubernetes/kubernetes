@@ -54,8 +54,9 @@ func (c *Container) RecoverHandler(handler RecoverHandleFunction) {
 }
 
 // ServiceErrorHandleFunction declares functions that can be used to handle a service error situation.
-// The first argument is the service error. The second must be used to communicate an error response.
-type ServiceErrorHandleFunction func(ServiceError, *Response)
+// The first argument is the service error, the second is the request that resulted in the error and
+// the third must be used to communicate an error response.
+type ServiceErrorHandleFunction func(ServiceError, *Request, *Response)
 
 // ServiceErrorHandler changes the default function (writeServiceError) to be called
 // when a ServiceError is detected.
@@ -143,7 +144,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 // writeServiceError is the default ServiceErrorHandleFunction and is called
 // when a ServiceError is returned during route selection. Default implementation
 // calls resp.WriteErrorString(err.Code, err.Message)
-func writeServiceError(err ServiceError, resp *Response) {
+func writeServiceError(err ServiceError, req *Request, resp *Response) {
 	resp.WriteErrorString(err.Code, err.Message)
 }
 
@@ -194,7 +195,7 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 			switch err.(type) {
 			case ServiceError:
 				ser := err.(ServiceError)
-				c.serviceErrorHandleFunc(ser, resp)
+				c.serviceErrorHandleFunc(ser, req, resp)
 			}
 			// TODO
 		}}

@@ -1,6 +1,6 @@
-/etc/kubernetes/manifests/fluentd-gcp.manifest:
+/etc/kubernetes/manifests/fluentd-gcp.json:
   file.managed:
-    - source: salt://fluentd-gcp/fluentd-gcp.manifest
+    - source: salt://fluentd-gcp/fluentd-gcp.json
     - user: root
     - group: root
     - mode: 644

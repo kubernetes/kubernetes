@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,16 +31,17 @@ type registry struct {
 
 // NewEtcdRegistry returns a registry which will store LimitRange in the given helper
 func NewEtcdRegistry(h tools.EtcdHelper) generic.Registry {
+	prefix := "/limitranges"
 	return registry{
 		Etcd: &etcdgeneric.Etcd{
 			NewFunc:      func() runtime.Object { return &api.LimitRange{} },
 			NewListFunc:  func() runtime.Object { return &api.LimitRangeList{} },
 			EndpointName: "limitranges",
 			KeyRootFunc: func(ctx api.Context) string {
-				return etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/limitranges")
+				return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 			},
 			KeyFunc: func(ctx api.Context, id string) (string, error) {
-				return etcdgeneric.NamespaceKeyFunc(ctx, "/registry/limitranges", id)
+				return etcdgeneric.NamespaceKeyFunc(ctx, prefix, id)
 			},
 			Helper: h,
 		},

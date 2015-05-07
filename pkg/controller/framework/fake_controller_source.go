@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -128,7 +128,7 @@ func (f *FakeControllerSource) List() (runtime.Object, error) {
 	for _, obj := range f.items {
 		// Must make a copy to allow clients to modify the object.
 		// Otherwise, if they make a change and write it back, they
-		// will inadvertantly change the our canonical copy (in
+		// will inadvertently change the our canonical copy (in
 		// addition to racing with other clients).
 		objCopy, err := conversion.DeepCopy(obj)
 		if err != nil {
@@ -164,7 +164,7 @@ func (f *FakeControllerSource) Watch(resourceVersion string) (watch.Interface, e
 		for _, c := range f.changes[rc:] {
 			// Must make a copy to allow clients to modify the
 			// object.  Otherwise, if they make a change and write
-			// it back, they will inadvertantly change the our
+			// it back, they will inadvertently change the our
 			// canonical copy (in addition to racing with other
 			// clients).
 			objCopy, err := conversion.DeepCopy(c.Object)

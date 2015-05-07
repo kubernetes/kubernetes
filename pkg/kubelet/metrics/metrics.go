@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,13 +28,6 @@ import (
 const kubeletSubsystem = "kubelet"
 
 var (
-	ImagePullLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
-			Subsystem: kubeletSubsystem,
-			Name:      "image_pull_latency_microseconds",
-			Help:      "Image pull latency in microseconds.",
-		},
-	)
 	ContainersPerPodCount = prometheus.NewSummary(
 		prometheus.SummaryOpts{
 			Subsystem: kubeletSubsystem,
@@ -73,7 +66,6 @@ var registerMetrics sync.Once
 func Register(containerCache kubecontainer.RuntimeCache) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(ImagePullLatency)
 		prometheus.MustRegister(SyncPodLatency)
 		prometheus.MustRegister(DockerOperationsLatency)
 		prometheus.MustRegister(SyncPodsLatency)
@@ -90,8 +82,8 @@ const (
 	SyncPodSync
 )
 
-func (self SyncPodType) String() string {
-	switch self {
+func (sp SyncPodType) String() string {
+	switch sp {
 	case SyncPodCreate:
 		return "create"
 	case SyncPodUpdate:
@@ -132,13 +124,13 @@ var (
 		nil, nil)
 )
 
-func (self *podAndContainerCollector) Describe(ch chan<- *prometheus.Desc) {
+func (pc *podAndContainerCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- runningPodCountDesc
 	ch <- runningContainerCountDesc
 }
 
-func (self *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
-	runningPods, err := self.containerCache.GetPods()
+func (pc *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
+	runningPods, err := pc.containerCache.GetPods()
 	if err != nil {
 		glog.Warning("Failed to get running container information while collecting metrics: %v", err)
 		return

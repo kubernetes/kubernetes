@@ -1,7 +1,7 @@
 // +build !linux
 
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,16 +18,13 @@ limitations under the License.
 
 package mount
 
-const FlagBind = 0
-const FlagReadOnly = 0
-
 type Mounter struct{}
 
-func (mounter *Mounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	return nil
 }
 
-func (mounter *Mounter) Unmount(target string, flags int) error {
+func (mounter *Mounter) Unmount(target string) error {
 	return nil
 }
 

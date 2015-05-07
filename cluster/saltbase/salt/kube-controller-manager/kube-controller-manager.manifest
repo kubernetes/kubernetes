@@ -1,0 +1,151 @@
+{% set machines = ""-%}
+{% set cluster_name = "" -%}
+{% set cluster_cidr = "" -%}
+{% set allocate_node_cidrs = "" -%}
+{% set minion_regexp = "--minion_regexp=.*" -%}
+{% set sync_nodes = "--sync_nodes=true" -%}
+
+{% if pillar['node_instance_prefix'] is defined -%}
+  {% set minion_regexp = "--minion_regexp='" + pillar['node_instance_prefix'] + ".*'" -%}
+{% endif -%}
+{% if pillar['instance_prefix'] is defined -%}
+  {% set cluster_name = "--cluster_name=" + pillar['instance_prefix'] -%}
+{% endif -%}
+{% if pillar['cluster_cidr'] is defined and pillar['cluster_cidr'] != "" -%}
+  {% set cluster_cidr = "--cluster-cidr=" + pillar['cluster_cidr'] -%}
+{% endif -%}
+{% if pillar['allocate_node_cidrs'] is defined -%}
+  {% set allocate_node_cidrs = "--allocate-node-cidrs=" + pillar['allocate_node_cidrs'] -%}
+{% endif -%}
+
+{% set cloud_provider = "" -%}
+{% set cloud_config = "" -%}
+
+{% if grains.cloud is defined -%}
+{% set cloud_provider = "--cloud_provider=" + grains.cloud -%}
+
+{% if grains.cloud == 'gce' -%}
+  {% if grains.cloud_config is defined -%}
+    {% set cloud_config = "--cloud_config=" + grains.cloud_config -%}
+  {% endif -%}
+
+{% elif grains.cloud == 'aws' -%}
+  {% if grains.cloud_config is defined -%}
+    {% set cloud_config = "--cloud_config=" + grains.cloud_config -%}
+  {% endif -%}
+  {% set machines = "--machines=" + ','.join(salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').keys()) -%}
+
+{% elif grains.cloud == 'azure' -%}
+  {% set machines = "--machines=" + salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').values()|join(',', attribute='hostnamef') -%}
+
+{% elif grains.cloud == 'vsphere' -%}
+  # Collect IPs of minions as machines list.
+  {% set machines= "" -%}
+  {% for addrs in salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').values() -%}
+    {% if loop.first -%}
+      machines="--machines=";
+    {% endif -%}
+    {% set machines = machines + addrs[0] %}
+    {% if not loop.last -%}
+      {% set machines = machines + "," %}
+    {% endif -%}
+  {% endfor -%}
+  {% set minion_regexp = "" -%}
+
+{% endif -%}
+{% endif -%}
+
+{% set params = "--master=127.0.0.1:8080" + " " + machines + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + minion_regexp + " " + cloud_provider  + " " + sync_nodes + " " + cloud_config + " " + pillar['log_level'] -%}
+
+{
+"apiVersion": "v1beta3",
+"kind": "Pod",
+"metadata": {"name":"kube-controller-manager"},
+"spec":{
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "kube-controller-manager",
+    "image": "gcr.io/google_containers/kube-controller-manager:{{pillar['kube-controller-manager_docker_tag']}}",
+    "command": [
+                 "/bin/sh",
+                 "-c",
+                 "/usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
+               ],
+    "volumeMounts": [
+        { "name": "srvkube",
+        "mountPath": "/srv/kubernetes",
+        "readOnly": true},
+        { "name": "logfile",
+        "mountPath": "/var/log/kube-controller-manager.log",
+        "readOnly": false},
+        { "name": "etcssl",
+        "mountPath": "/etc/ssl",
+        "readOnly": true},
+        { "name": "usrsharessl",
+        "mountPath": "/usr/share/ssl",
+        "readOnly": true},
+        { "name": "varssl",
+        "mountPath": "/var/ssl",
+        "readOnly": true},
+        { "name": "usrssl",
+        "mountPath": "/usr/ssl",
+        "readOnly": true},
+        { "name": "usrlibssl",
+        "mountPath": "/usr/lib/ssl",
+        "readOnly": true},
+        { "name": "usrlocalopenssl",
+        "mountPath": "/usr/local/openssl",
+        "readOnly": true},
+        { "name": "etcopenssl",
+        "mountPath": "/etc/openssl",
+        "readOnly": true},
+        { "name": "etcpkitls",
+        "mountPath": "/etc/pki/tls",
+        "readOnly": true}
+      ]
+    }
+],
+"volumes":[
+  { "name": "srvkube",
+    "hostPath": {
+        "path": "/srv/kubernetes"}
+  },
+  { "name": "logfile",
+    "hostPath": {
+        "path": "/var/log/kube-controller-manager.log"}
+  },
+  { "name": "etcssl",
+    "hostPath": {
+        "path": "/etc/ssl"}
+  },
+  { "name": "usrsharessl",
+    "hostPath": {
+        "path": "/usr/share/ssl"}
+  },
+  { "name": "varssl",
+    "hostPath": {
+        "path": "/var/ssl"}
+  },
+  { "name": "usrssl",
+    "hostPath": {
+        "path": "/usr/ssl"}
+  },
+  { "name": "usrlibssl",
+    "hostPath": {
+        "path": "/usr/lib/ssl"}
+  },
+  { "name": "usrlocalopenssl",
+    "hostPath": {
+        "path": "/usr/local/openssl"}
+  },
+  { "name": "etcopenssl",
+    "hostPath": {
+        "path": "/etc/openssl"}
+  },
+  { "name": "etcpkitls",
+    "hostPath": {
+        "path": "/etc/pki/tls"}
+  }
+]
+}}

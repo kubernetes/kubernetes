@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,6 +35,11 @@ func (c *Mock) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest)
 	return args.Get(0).(*cadvisorApi.ContainerInfo), args.Error(1)
 }
 
+func (c *Mock) SubcontainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+	args := c.Called(name, req)
+	return args.Get(0).(map[string]*cadvisorApi.ContainerInfo), args.Error(1)
+}
+
 // DockerContainer is a mock implementation of Interface.DockerContainer.
 func (c *Mock) DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error) {
 	args := c.Called(name, req)
@@ -57,7 +62,7 @@ func (c *Mock) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	return args.Get(0).(cadvisorApiV2.FsInfo), args.Error(1)
 }
 
-func (c *Mock) GetPastEvents(request *events.Request) ([]*cadvisorApi.Event, error) {
+func (c *Mock) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	args := c.Called()
-	return args.Get(0).([]*cadvisorApi.Event), args.Error(1)
+	return args.Get(0).(*events.EventChannel), args.Error(1)
 }

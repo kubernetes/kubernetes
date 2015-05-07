@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package cloudprovider
 
 import (
 	"net"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
@@ -44,17 +45,23 @@ type Clusters interface {
 
 // TODO(#6812): Use a shorter name that's less likely to be longer than cloud
 // providers' name length limits.
-func GetLoadBalancerName(clusterName, serviceNamespace, serviceName string) string {
-	return clusterName + "-" + serviceNamespace + "-" + serviceName
+func GetLoadBalancerName(service *api.Service) string {
+	//GCE requires that the name of a load balancer starts with a lower case letter.
+	ret := "a" + string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	//AWS requires that the name of a load balancer is shorter than 32 bytes.
+	if len(ret) > 32 {
+		ret = ret[:32]
+	}
+	return ret
 }
 
 // TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.
 type TCPLoadBalancer interface {
-	// TCPLoadBalancerExists returns whether the specified load balancer exists.
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
-	// TODO: This should really return the details of the load balancer so we can
-	// determine if it matches the needs of a service rather than if it exists.
-	TCPLoadBalancerExists(name, region string) (bool, error)
+	// GetTCPLoadBalancer returns whether the specified load balancer exists, and
+	// if so, what its IP address or hostname is.
+	GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error)
 	// CreateTCPLoadBalancer creates a new tcp load balancer. Returns the IP address or hostname of the balancer
 	CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error)
 	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
@@ -73,6 +80,10 @@ type Instances interface {
 	List(filter string) ([]string, error)
 	// GetNodeResources gets the resources for a particular node
 	GetNodeResources(name string) (*api.NodeResources, error)
+	// Configure the specified instance using the spec
+	Configure(name string, spec *api.NodeSpec) error
+	// Delete all the configuration related to the instance, including other cloud resources
+	Release(name string) error
 }
 
 // Zone represents the location of a particular machine.

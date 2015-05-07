@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ grains:
   roles:
     - kubernetes-pool
   cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
-  minion_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
+  hostname_override: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
 EOF
 
 # we will run provision to update code each time we test, so we do not want to do salt install each time

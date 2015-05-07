@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,6 +45,12 @@ var _ = Describe("Shell", func() {
 	for _, file := range files {
 		fileName := file.Name() // Make a copy
 		It(fmt.Sprintf("tests that %v passes", fileName), func() {
+			// A number of scripts only work on gce
+			if !providerIs("gce", "gke") {
+				By(fmt.Sprintf("Skipping Shell test %s, which is only supported for provider gce and gke (not %s)",
+					fileName, testContext.Provider))
+				return
+			}
 			runCmdTest(filepath.Join(bashE2ERoot, fileName))
 		})
 	}

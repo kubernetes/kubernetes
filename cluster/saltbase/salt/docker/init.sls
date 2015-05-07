@@ -40,17 +40,6 @@ cbr0:
     - cidr: {{ grains['cbr-cidr'] }}
     - mtu: 1460
 
-purge-old-docker:
-  pkg.removed:
-    - pkgs:
-      - lxc-docker-1.2.0
-      - lxc-docker-1.3.0
-      - lxc-docker-1.3.1
-      - lxc-docker-1.3.2
-      - lxc-docker-1.3.3
-      - lxc-docker-1.4.0
-      - lxc-docker-1.4.1
-
 {{ environment_file }}:
   file.managed:
     - source: salt://docker/docker-defaults
@@ -60,8 +49,12 @@ purge-old-docker:
     - mode: 644
     - makedirs: true
 
-# We are caching the Docker deb file in GCS for reliability and speed.  To
-# update this to a new version of docker, do the following:
+# Docker is on the ContainerVM image by default. The following
+# variables are provided for other cloud providers, and for testing and dire circumstances, to allow
+# overriding the Docker version that's in a ContainerVM image.
+#
+# To change:
+#
 # 1. Find new deb name with:
 #    curl https://get.docker.com/ubuntu/dists/docker/main/binary-amd64/Packages
 # 2. Download based on that:
@@ -72,18 +65,26 @@ purge-old-docker:
 #    gsutil acl ch -R -g all:R gs://kubernetes-release/docker/<deb>
 # 5. Get a hash of the deb:
 #    shasum <deb>
-# 6. Update this file with new deb name, new hash and new version
-# 7. Add the old version to purge-old-docker above.
+# 6. Update override_deb, override_deb_sha1, override_docker_ver with new
+#    deb name, new hash and new version
 
 {% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
-{% set deb='lxc-docker-1.5.0_1.5.0_amd64.deb' %}
-{% set deb_hash='sha1=ba4db088a741c15311406780d828fa6a6341fb40' %}
-{% set docker_ver='1.5.0' %}
 
-/var/cache/docker-install/{{ deb }}:
+{% set override_deb='lxc-docker-1.6.0_1.6.0_amd64.deb' %}
+{% set override_deb_sha1='fdfd749362256877668e13e152d17fe22c64c420' %}
+{% set override_docker_ver='1.6.0' %}
+
+{% if grains.cloud is defined and grains.cloud == 'gce' %}
+{% set override_deb='' %}
+{% set override_deb_sha1='' %}
+{% set override_docker_ver='' %}
+{% endif %}
+
+{% if override_docker_ver != '' %}
+/var/cache/docker-install/{{ override_deb }}:
   file.managed:
-    - source: {{ storage_base }}{{ deb }}
-    - source_hash: {{ deb_hash }}
+    - source: {{ storage_base }}{{ override_deb }}
+    - source_hash: sha1={{ override_deb_sha1 }}
     - user: root
     - group: root
     - mode: 644
@@ -99,19 +100,21 @@ purge-old-docker:
     - mode: 644
     - makedirs: true
 
-lxc-docker-{{ docker_ver }}:
+lxc-docker-{{ override_docker_ver }}:
   pkg.installed:
     - sources:
-      - lxc-docker-{{ docker_ver }}: /var/cache/docker-install/{{ deb }}
+      - lxc-docker-{{ override_docker_ver }}: /var/cache/docker-install/{{ override_deb }}
+{% endif %}
 
 docker:
   service.running:
     - enable: True
-    - require:
-      - pkg: lxc-docker-{{ docker_ver }}
     - watch:
       - file: {{ environment_file }}
       - container_bridge: cbr0
-      - pkg: lxc-docker-{{ docker_ver }}
+{% if override_docker_ver != '' %}
+    - require:
+      - pkg: lxc-docker-{{ override_docker_ver }}
+{% endif %}
 
 {% endif %}

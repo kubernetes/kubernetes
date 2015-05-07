@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,25 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
+
+//TODO:
+// Storage interfaces need to be separated into two groups; those that operate
+// on collections and those that operate on individually named items.
+// Collection interfaces:
+// (Method: Current -> Proposed)
+//    GET: Lister -> CollectionGetter
+//    WATCH: Watcher -> CollectionWatcher
+//    CREATE: Creater -> CollectionCreater
+//    DELETE: (n/a) -> CollectionDeleter
+//    UPDATE: (n/a) -> CollectionUpdater
+//
+// Single item interfaces:
+// (Method: Current -> Proposed)
+//    GET: Getter -> NamedGetter
+//    WATCH: (n/a) -> NamedWatcher
+//    CREATE: (n/a) -> NamedCreater
+//    DELETE: Deleter -> NamedDeleter
+//    UPDATE: Update -> NamedUpdater
 
 // Storage is a generic interface for RESTful storage services.
 // Resources which are exported to the RESTful API of apiserver need to implement this interface. It is expected
@@ -117,6 +136,18 @@ type Creater interface {
 	Create(ctx api.Context, obj runtime.Object) (runtime.Object, error)
 }
 
+// NamedCreater is an object that can create an instance of a RESTful object using a name parameter.
+type NamedCreater interface {
+	// New returns an empty object that can be used with Create after request data has been put into it.
+	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
+	New() runtime.Object
+
+	// Create creates a new version of a resource. It expects a name parameter from the path.
+	// This is needed for create operations on subresources which include the name of the parent
+	// resource in the path.
+	Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error)
+}
+
 // Updater is an object that can update an instance of a RESTful object.
 type Updater interface {
 	// New returns an empty object that can be used with Update after request data has been put into it.
@@ -169,6 +200,32 @@ type StandardStorage interface {
 type Redirector interface {
 	// ResourceLocation should return the remote location of the given resource, and an optional transport to use to request it, or an error.
 	ResourceLocation(ctx api.Context, id string) (remoteLocation *url.URL, transport http.RoundTripper, err error)
+}
+
+// ConnectHandler is a handler for HTTP connection requests. It extends the standard
+// http.Handler interface by adding a method that returns an error object if an error
+// occurred during the handling of the request.
+type ConnectHandler interface {
+	http.Handler
+
+	// RequestError returns an error if one occurred during handling of an HTTP request
+	RequestError() error
+}
+
+// Connecter is a storage object that responds to a connection request
+type Connecter interface {
+	// Connect returns a ConnectHandler that will handle the request/response for a request
+	Connect(ctx api.Context, id string, options runtime.Object) (ConnectHandler, error)
+
+	// NewConnectOptions returns an empty options object that will be used to pass
+	// options to the Connect method. If nil, then a nil options object is passed to
+	// Connect. It may return a bool and a string. If true, the value of the request
+	// path below the object will be included as the named string in the serialization
+	// of the runtime object.
+	NewConnectOptions() (runtime.Object, bool, string)
+
+	// ConnectMethods returns the list of HTTP methods handled by Connect
+	ConnectMethods() []string
 }
 
 // ResourceStreamer is an interface implemented by objects that prefer to be streamed from the server

@@ -221,7 +221,7 @@ go run hack/e2e.go -build -pushup -test -down
 # seeing the output of failed commands.
 
 # -ctl can be used to quickly call kubectl against your e2e cluster. Useful for
-# cleaning up after a failed test or viewing logs. Use -v to avoid supressing
+# cleaning up after a failed test or viewing logs. Use -v to avoid suppressing
 # kubectl output.
 go run hack/e2e.go -v -ctl='get events'
 go run hack/e2e.go -v -ctl='delete pod foobar'
@@ -254,6 +254,13 @@ Then each time you want to sync to upstream:
 ```
 git fetch upstream
 git rebase upstream/master
+```
+
+If you have write access to the main repository, you should modify your git configuration so that
+you can't accidentally push to upstream:
+
+```
+git remote set-url --push upstream no_push
 ```
 
 ## Regenerating the CLI documentation

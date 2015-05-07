@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -250,7 +250,7 @@ func NewTimeoutError(message string, retryAfterSeconds int) error {
 }
 
 // NewGenericServerResponse returns a new error for server responses that are not in a recognizable form.
-func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, retryAfterSeconds int) error {
+func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, retryAfterSeconds int, isUnexpectedResponse bool) error {
 	reason := api.StatusReasonUnknown
 	message := fmt.Sprintf("the server responded with the status code %d but did not return more information", code)
 	switch code {
@@ -273,6 +273,9 @@ func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, 
 	case http.StatusForbidden:
 		reason = api.StatusReasonForbidden
 		message = "the server does not allow access to the requested resource"
+	case http.StatusMethodNotAllowed:
+		reason = api.StatusReasonMethodNotAllowed
+		message = "the server does not allow this method on the requested resource"
 	case StatusUnprocessableEntity:
 		reason = api.StatusReasonInvalid
 		message = "the server rejected our request due to an error in our request"
@@ -294,6 +297,17 @@ func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, 
 	case len(kind) > 0:
 		message = fmt.Sprintf("%s (%s %s)", message, strings.ToLower(verb), kind)
 	}
+	var causes []api.StatusCause
+	if isUnexpectedResponse {
+		causes = []api.StatusCause{
+			{
+				Type:    api.CauseTypeUnexpectedServerResponse,
+				Message: serverMessage,
+			},
+		}
+	} else {
+		causes = nil
+	}
 	return &StatusError{api.Status{
 		Status: api.StatusFailure,
 		Code:   code,
@@ -302,13 +316,7 @@ func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, 
 			Kind: kind,
 			ID:   name,
 
-			Causes: []api.StatusCause{
-				{
-					Type:    api.CauseTypeUnexpectedServerResponse,
-					Message: serverMessage,
-				},
-			},
-
+			Causes:            causes,
 			RetryAfterSeconds: retryAfterSeconds,
 		},
 		Message: message,

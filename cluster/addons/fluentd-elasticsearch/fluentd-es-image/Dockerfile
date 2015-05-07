@@ -14,6 +14,9 @@ MAINTAINER Satnam Singh "satnam@google.com"
 # Ensure there are enough file descriptors for running Fluentd.
 RUN ulimit -n 65536
 
+# Disable prompts from apt.
+ENV DEBIAN_FRONTEND noninteractive
+
 # Install prerequisites.
 RUN apt-get update && \
     apt-get install -y curl && \
@@ -29,6 +32,9 @@ RUN sed -i -e "s/USER=td-agent/USER=root/" -e "s/GROUP=td-agent/GROUP=root/" /et
 
 # Install the Elasticsearch Fluentd plug-in.
 RUN /usr/sbin/td-agent-gem install fluent-plugin-elasticsearch
+
+# Install the record reformer plugin.
+RUN /usr/sbin/td-agent-gem install fluent-plugin-record-reformer
 
 # Copy the Fluentd configuration file.
 COPY td-agent.conf /etc/td-agent/td-agent.conf

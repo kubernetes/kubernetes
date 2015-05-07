@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -153,7 +153,7 @@ func TestNewBuilder(t *testing.T) {
 	}
 
 	for _, item := range tests {
-		o := testclient.NewObjects(api.Scheme)
+		o := testclient.NewObjects(api.Scheme, api.Scheme)
 		o.Add(item.pv)
 		o.Add(item.claim)
 		client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
@@ -169,7 +169,7 @@ func TestNewBuilder(t *testing.T) {
 			Name:         "vol1",
 			VolumeSource: item.podVolume,
 		}
-		builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{})
+		builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{}, nil)
 		if err != nil {
 			t.Errorf("Failed to make a new Builder: %v", err)
 		}
@@ -182,6 +182,56 @@ func TestNewBuilder(t *testing.T) {
 				t.Errorf("Unexpected error %+v", err)
 			}
 		}
+	}
+}
+
+func TestNewBuilderClaimNotBound(t *testing.T) {
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pvC",
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+			},
+			ClaimRef: nil,
+		},
+	}
+	claim := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "claimC",
+			Namespace: "nsA",
+		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase:     api.ClaimBound,
+			VolumeRef: nil,
+		},
+	}
+	podVolume := api.VolumeSource{
+		PersistentVolumeClaimVolumeSource: &api.PersistentVolumeClaimVolumeSource{
+			ReadOnly:  false,
+			ClaimName: "claimC",
+		},
+	}
+	o := testclient.NewObjects(api.Scheme, api.Scheme)
+	o.Add(pv)
+	o.Add(claim)
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(testProbeVolumePlugins(), newTestHost(t, client))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/persistent-claim")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	spec := &volume.Spec{
+		Name:         "vol1",
+		VolumeSource: podVolume,
+	}
+	builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{}, nil)
+	if builder != nil {
+		t.Errorf("Expected a nil builder if the claim wasn't bound")
 	}
 }
 

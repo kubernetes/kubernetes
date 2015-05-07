@@ -118,7 +118,7 @@ coreos:
         Documentation=https://github.com/kelseyhightower/kube-register
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kube-register
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes/kube-register
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register
         ExecStart=/opt/bin/kube-register \
         --metadata=kubernetes_role=minion \

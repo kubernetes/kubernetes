@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ type EndpointsInterface interface {
 	Create(endpoints *api.Endpoints) (*api.Endpoints, error)
 	List(selector labels.Selector) (*api.EndpointsList, error)
 	Get(name string) (*api.Endpoints, error)
+	Delete(name string) error
 	Update(endpoints *api.Endpoints) (*api.Endpoints, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
@@ -74,6 +75,11 @@ func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
 	err = c.r.Get().Namespace(c.ns).Resource("endpoints").Name(name).Do().Into(result)
 	return
+}
+
+// Delete takes the name of the endpoint, and returns an error if one occurs
+func (c *endpoints) Delete(name string) error {
+	return c.r.Delete().Namespace(c.ns).Resource("endpoints").Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints for a service.

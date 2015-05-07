@@ -71,7 +71,7 @@ partition
 The first example selects all resources with key equal to `environment` and value equal to `production` or `qa`.
 The second example selects all resources with key equal to `tier` and value other than `frontend` and `backend`.
 The third example selects all resources including a label with key `partition`; no values are checked.
-Similary the comma separator acts as an _AND_ operator for example filtering resource with a `partition` key (not matter the value) and with `environment` different than  `qa`. For example: `partition,environment notin (qa)`.
+Similarly the comma separator acts as an _AND_ operator for example filtering resource with a `partition` key (not matter the value) and with `environment` different than  `qa`. For example: `partition,environment notin (qa)`.
 The _set-based_ label selector is a general form of equality since `environment=production` is equivalent to `environment in (production)`; similarly for `!=` and `notin`.
 
 _Set-based_ requirements can be mixed with _equality-based_ requirements. For example: `partition in (customerA, customerB),environment!=qa`.
@@ -80,8 +80,8 @@ _Set-based_ requirements can be mixed with _equality-based_ requirements. For ex
 ## API
 
 LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter. Both requirements are permitted:
-   - _equality-based_ requirements: `?labels=key1%3Dvalue1,key2%3Dvalue2`
-   - _set-based_ requirements: `?labels=key+in+%28value1%2Cvalue2%29%2Ckey2+notin+%28value3`
+   - _equality-based_ requirements: `?label-selector=key1%3Dvalue1,key2%3Dvalue2`
+   - _set-based_ requirements: `?label-selector=key+in+%28value1%2Cvalue2%29%2Ckey2+notin+%28value3`
 
 Kubernetes also currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationController`s:
 - `service`: A [service](/docs/services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.

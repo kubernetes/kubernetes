@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -50,11 +49,11 @@ type exists struct {
 func (e *exists) Admit(a admission.Attributes) (err error) {
 	defaultVersion, kind, err := latest.RESTMapper.VersionAndKindForResource(a.GetResource())
 	if err != nil {
-		return err
+		return admission.NewForbidden(a, err)
 	}
 	mapping, err := latest.RESTMapper.RESTMapping(kind, defaultVersion)
 	if err != nil {
-		return err
+		return admission.NewForbidden(a, err)
 	}
 	if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 		return nil
@@ -68,17 +67,12 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	}
 	_, exists, err := e.store.Get(namespace)
 	if err != nil {
-		return err
+		return admission.NewForbidden(a, err)
 	}
 	if exists {
 		return nil
 	}
-	obj := a.GetObject()
-	name := "Unknown"
-	if obj != nil {
-		name, _ = meta.NewAccessor().Name(obj)
-	}
-	return apierrors.NewForbidden(kind, name, fmt.Errorf("Namespace %s does not exist", a.GetNamespace()))
+	return admission.NewForbidden(a, fmt.Errorf("Namespace %s does not exist", a.GetNamespace()))
 }
 
 func NewExists(c client.Interface) admission.Interface {

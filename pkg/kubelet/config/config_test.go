@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
@@ -39,7 +40,7 @@ func expectEmptyChannel(t *testing.T, ch <-chan interface{}) {
 	}
 }
 
-type sortedPods []api.Pod
+type sortedPods []*api.Pod
 
 func (s sortedPods) Len() int {
 	return len(s)
@@ -51,8 +52,8 @@ func (s sortedPods) Less(i, j int) bool {
 	return s[i].Namespace < s[j].Namespace
 }
 
-func CreateValidPod(name, namespace, source string) api.Pod {
-	return api.Pod{
+func CreateValidPod(name, namespace, source string) *api.Pod {
+	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:         types.UID(name), // for the purpose of testing, this is unique enough
 			Name:        name,
@@ -62,17 +63,20 @@ func CreateValidPod(name, namespace, source string) api.Pod {
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers: []api.Container{
+				{
+					Name:            "ctr",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
+				},
+			},
 		},
 	}
 }
 
-func CreatePodUpdate(op kubelet.PodOperation, source string, pods ...api.Pod) kubelet.PodUpdate {
-	newPods := make([]api.Pod, len(pods))
-	for i := range pods {
-		newPods[i] = pods[i]
-	}
-	return kubelet.PodUpdate{newPods, op, source}
+func CreatePodUpdate(op kubelet.PodOperation, source string, pods ...*api.Pod) kubelet.PodUpdate {
+	return kubelet.PodUpdate{Pods: pods, Op: op, Source: source}
 }
 
 func createPodConfigTester(mode PodConfigNotificationMode) (chan<- interface{}, <-chan kubelet.PodUpdate, *PodConfig) {
@@ -162,7 +166,7 @@ func TestInvalidPodFiltered(t *testing.T) {
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, NoneSource, CreateValidPod("foo", "new", "test")))
 
 	// add an invalid update
-	podUpdate = CreatePodUpdate(kubelet.UPDATE, NoneSource, api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	podUpdate = CreatePodUpdate(kubelet.UPDATE, NoneSource, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 	channel <- podUpdate
 	expectNoPodUpdate(t, ch)
 }
@@ -179,10 +183,10 @@ func TestNewPodAddedSnapshotAndUpdates(t *testing.T) {
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.SET, kubelet.AllSource, CreateValidPod("foo", "new", "test")))
 
 	// container updates are separated as UPDATE
-	pod := podUpdate.Pods[0]
+	pod := *podUpdate.Pods[0]
 	pod.Spec.Containers = []api.Container{{Name: "bar", Image: "test", ImagePullPolicy: api.PullIfNotPresent}}
-	channel <- CreatePodUpdate(kubelet.ADD, NoneSource, pod)
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
+	channel <- CreatePodUpdate(kubelet.ADD, NoneSource, &pod)
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, &pod))
 }
 
 func TestNewPodAddedSnapshot(t *testing.T) {
@@ -197,10 +201,10 @@ func TestNewPodAddedSnapshot(t *testing.T) {
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.SET, kubelet.AllSource, CreateValidPod("foo", "new", "test")))
 
 	// container updates are separated as UPDATE
-	pod := podUpdate.Pods[0]
+	pod := *podUpdate.Pods[0]
 	pod.Spec.Containers = []api.Container{{Name: "bar", Image: "test", ImagePullPolicy: api.PullIfNotPresent}}
-	channel <- CreatePodUpdate(kubelet.ADD, NoneSource, pod)
-	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.SET, TestSource, pod))
+	channel <- CreatePodUpdate(kubelet.ADD, NoneSource, &pod)
+	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.SET, TestSource, &pod))
 }
 
 func TestNewPodAddedUpdatedRemoved(t *testing.T) {
@@ -221,7 +225,7 @@ func TestNewPodAddedUpdatedRemoved(t *testing.T) {
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, NoneSource, pod))
 
-	podUpdate = CreatePodUpdate(kubelet.REMOVE, NoneSource, api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "new"}})
+	podUpdate = CreatePodUpdate(kubelet.REMOVE, NoneSource, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "new"}})
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.REMOVE, NoneSource, pod))
 }

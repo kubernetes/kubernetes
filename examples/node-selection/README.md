@@ -23,37 +23,34 @@ You can verify that it worked by re-running `kubectl get nodes` and checking tha
 Take whatever pod config file you want to run, and add a nodeSelector section to it, like this. For example, if this is my pod config:
 
 <pre>
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    containers:
-      - image: nginx
-        name: nginx
-    id: nginx
-    version: v1beta1
-id: nginx
+apiVersion: v1beta3
 kind: Pod
-labels:
-  env: test
+metadata:
+  labels:
+    env: test
+  name: nginx
+spec:
+  containers:
+  - image: nginx
+    name: nginx
 </pre>
 
 Then add a nodeSelector like so:
 
 <pre>
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    containers:
-      - image: nginx
-        name: nginx
-    id: nginx
-    version: v1beta1
-id: nginx
+apiVersion: v1beta3
 kind: Pod
-labels:
-  env: test
-<b>nodeSelector:
-  disktype: ssd</b>
+metadata:
+  labels:
+    env: test
+  name: nginx
+spec:
+  containers:
+  - image: nginx
+    imagePullPolicy: IfNotPresent
+    name: nginx
+  <b>nodeSelector:
+    disktype: ssd</b>
 </pre>
 
 When you then run `kubectl create -f pod.yaml`, the pod will get scheduled on the node that you attached the label to! You can verify that it worked by running `kubectl get pods` and looking at the "host" that the pod was assigned to.

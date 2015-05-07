@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,19 +21,25 @@ import (
 )
 
 type attributesRecord struct {
+	kind      string
 	namespace string
 	resource  string
 	operation string
 	object    runtime.Object
 }
 
-func NewAttributesRecord(object runtime.Object, namespace, resource, operation string) Attributes {
+func NewAttributesRecord(object runtime.Object, kind, namespace, resource, operation string) Attributes {
 	return &attributesRecord{
+		kind:      kind,
 		namespace: namespace,
 		resource:  resource,
 		operation: operation,
 		object:    object,
 	}
+}
+
+func (record *attributesRecord) GetKind() string {
+	return record.kind
 }
 
 func (record *attributesRecord) GetNamespace() string {

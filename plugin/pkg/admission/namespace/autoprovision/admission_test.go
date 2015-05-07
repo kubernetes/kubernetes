@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ func TestAdmission(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, namespace, "pods", "CREATE"))
+	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", "CREATE"))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
@@ -72,7 +72,7 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, namespace, "pods", "CREATE"))
+	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", "CREATE"))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
@@ -96,7 +96,7 @@ func TestIgnoreAdmission(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, namespace, "pods", "UPDATE"))
+	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", "UPDATE"))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
@@ -123,7 +123,7 @@ func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, namespace, "pods", "CREATE"))
+	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", "CREATE"))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}

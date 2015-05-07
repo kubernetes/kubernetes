@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -95,6 +95,7 @@ kube::log::status "Starting kube-apiserver"
   --public_address_override="127.0.0.1" \
   --kubelet_port=${KUBELET_PORT} \
   --runtime_config=api/v1beta3 \
+  --cert_dir="${TMPDIR:-/tmp/}" \
   --portal_net="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
@@ -108,7 +109,7 @@ kube::log::status "Starting CONTROLLER-MANAGER"
 CTLRMGR_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager: "
-kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta1/minions/127.0.0.1" "apiserver(minions): " 0.2 25
+kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta3/nodes/127.0.0.1" "apiserver(nodes): " 0.2 25
 
 # Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
@@ -125,25 +126,29 @@ for version in "${kube_api_versions[@]}"; do
       -s "http://127.0.0.1:${API_PORT}"
       --match-server-version
     )
-    [ "$(kubectl get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "v1beta3" ]
+    [ "$(kubectl get minions -t '{{ .apiVersion }}' "${kube_flags[@]}")" == "v1beta3" ]
   else
     kube_flags=(
       -s "http://127.0.0.1:${API_PORT}"
       --match-server-version
       --api-version="${version}"
     )
-    [ "$(kubectl get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "${version}" ]
+    [ "$(kubectl get minions -t '{{ .apiVersion }}' "${kube_flags[@]}")" == "${version}" ]
   fi
   id_field=".metadata.name"
   labels_field=".metadata.labels"
   service_selector_field=".spec.selector"
   rc_replicas_field=".spec.replicas"
+  rc_status_replicas_field=".status.replicas"
+  rc_container_image_field=".spec.template.spec.containers"
   port_field="(index .spec.ports 0).port"
   if [ "${version}" = "v1beta1" ] || [ "${version}" = "v1beta2" ]; then
     id_field=".id"
     labels_field=".labels"
     service_selector_field=".selector"
     rc_replicas_field=".desiredState.replicas"
+    rc_status_replicas_field=".currentState.replicas"
+    rc_container_image_field=".desiredState.podTemplate.desiredState.manifest.containers"
     port_field=".port"
   fi
 
@@ -162,6 +167,7 @@ for version in "${kube_api_versions[@]}"; do
   # Command
   kubectl create "${kube_flags[@]}" -f examples/limitrange/valid-pod.json
   # Post-condition: valid-pod POD is running
+  kubectl get "${kube_flags[@]}" pods -o json
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   kube::test::get_object_assert 'pod valid-pod' "{{$id_field}}" 'valid-pod'
   kube::test::get_object_assert 'pod/valid-pod' "{{$id_field}}" 'valid-pod'
@@ -170,7 +176,7 @@ for version in "${kube_api_versions[@]}"; do
   kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image(s):" "Host:" "Labels:" "Status:" "Replication Controllers"
 
   ### Dump current valid-pod POD
-  output_pod=$(kubectl get pod valid-pod -o yaml --output-version=v1beta1 "${kube_flags[@]}")
+  output_pod=$(kubectl get pod valid-pod -o yaml --output-version=v1beta3 "${kube_flags[@]}")
 
   ### Delete POD valid-pod by id
   # Pre-condition: valid-pod POD is running
@@ -356,6 +362,34 @@ for version in "${kube_api_versions[@]}"; do
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''
 
 
+  #################
+  # Pod templates #
+  #################
+
+  # Note: pod templates exist only in v1beta3 and above, so output will always be in that form
+
+  ### Create PODTEMPLATE
+  # Pre-condition: no PODTEMPLATE
+  kube::test::get_object_assert podtemplates "{{range.items}}{{.metadata.name}}:{{end}}" ''
+  # Command
+  kubectl create -f examples/walkthrough/podtemplate.json "${kube_flags[@]}"
+  # Post-condition: nginx PODTEMPLATE is available
+  kube::test::get_object_assert podtemplates "{{range.items}}{{.metadata.name}}:{{end}}" 'nginx:'
+
+  ### Printing pod templates works
+  kubectl get podtemplates "${kube_flags[@]}"
+  ### Display of an object which doesn't existing in v1beta1 and v1beta2 works
+  [[ "$(kubectl get podtemplates -o yaml "${kube_flags[@]}" | grep nginx)" ]]
+
+  ### Delete nginx pod template by name
+  # Pre-condition: nginx pod template is available
+  kube::test::get_object_assert podtemplates "{{range.items}}{{.metadata.name}}:{{end}}" 'nginx:'
+  # Command
+  kubectl delete podtemplate nginx "${kube_flags[@]}"
+  # Post-condition: No templates exist
+  kube::test::get_object_assert podtemplate "{{range.items}}{{.metadata.name}}:{{end}}" ''
+
+
   ############
   # Services #
   ############
@@ -396,22 +430,29 @@ for version in "${kube_api_versions[@]}"; do
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:kubernetes-ro:redis-master:'
   # Command
   kubectl create -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "Service",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "service-${version}-test"
+  },
+  "spec": {
+    "ports": [
       {
-          "kind": "Service",
-          "apiVersion": "v1beta1",
-          "id": "service-${version}-test",
-          "port": 80,
-          "protocol": "TCP"
+        "protocol": "TCP",
+        "port": 80,
+        "targetPort": 80
       }
+    ]
+  }
+}
 __EOF__
   # Post-condition:redis-master-service service is running
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:kubernetes-ro:redis-master:service-.*-test:'
 
   # Command
-  kubectl update service "${kube_flags[@]}" service-${version}-test --patch="{\"selector\":{\"my\":\"test-label\"},\"apiVersion\":\"v1beta1\"}"
-  # Post-condition: selector.version == ${version}
-  # This test works only in v1beta1 and v1beta2
-  # https://github.com/GoogleCloudPlatform/kubernetes/issues/4771
+  kubectl update service "${kube_flags[@]}" service-${version}-test --patch="{\"spec\":{\"selector\":{\"my\":\"test-label\"}},\"apiVersion\":\"v1beta3\"}" --api-version=v1beta3
+  # Post-condition: selector has "test-label" label.
   kube::test::get_object_assert "service service-${version}-test" "{{range$service_selector_field}}{{.}}{{end}}" "test-label"
 
   ### Identity
@@ -456,59 +497,65 @@ __EOF__
   # Command
   kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
   # Post-condition: frontend replication controller is running
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend-controller:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # Describe command should print detailed information
-  kube::test::describe_object_assert rc 'frontend-controller' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  kube::test::describe_object_assert rc 'frontend' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
 
   ### Resize replication controller frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '3'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
   # Command
-  kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend-controller "${kube_flags[@]}"
+  kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: 2 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
 
   ### Resize replication controller frontend with (wrong) current-replicas and replicas
   # Pre-condition: 2 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
   # Command
-  ! kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend-controller "${kube_flags[@]}"
+  ! kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: nothing changed
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
 
   ### Resize replication controller frontend with replicas only
   # Pre-condition: 2 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
   # Command
-  kubectl resize  --replicas=3 replicationcontrollers frontend-controller "${kube_flags[@]}"
+  kubectl resize  --replicas=3 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '3'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
 
   ### Expose replication controller as service
   # Pre-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '3'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
   # Command
-  kubectl expose rc frontend-controller --port=80 "${kube_flags[@]}"
+  kubectl expose rc frontend --port=80 "${kube_flags[@]}"
   # Post-condition: service exists
-  kube::test::get_object_assert 'service frontend-controller' "{{$port_field}}" '80'
+  kube::test::get_object_assert 'service frontend' "{{$port_field}}" '80'
   # Command
-  kubectl expose service frontend-controller --port=443 --service-name=frontend-controller-2 "${kube_flags[@]}"
+  kubectl expose service frontend --port=443 --service-name=frontend-2 "${kube_flags[@]}"
   # Post-condition: service exists
-  kube::test::get_object_assert 'service frontend-controller-2' "{{$port_field}}" '443'
+  kube::test::get_object_assert 'service frontend-2' "{{$port_field}}" '443'
   # Command
   kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
-  kubectl expose pod valid-pod --port=444 --service-name=frontend-controller-3 "${kube_flags[@]}"
+  kubectl expose pod valid-pod --port=444 --service-name=frontend-3 "${kube_flags[@]}"
   # Post-condition: service exists
-  kube::test::get_object_assert 'service frontend-controller-3' "{{$port_field}}" '444'
+  kube::test::get_object_assert 'service frontend-3' "{{$port_field}}" '444'
   # Cleanup services
   kubectl delete pod valid-pod "${kube_flags[@]}"
-  kubectl delete service frontend-controller{,-2,-3} "${kube_flags[@]}"
+  kubectl delete service frontend{,-2,-3} "${kube_flags[@]}"
+
+  ### Perform a rolling update with --image
+  # Command
+  kubectl rolling-update frontend --image=kubernetes/pause --update-period=10ns --poll-interval=10ms "${kube_flags[@]}"
+  # Post-condition: current image IS kubernetes/pause
+  kube::test::get_object_assert 'rc frontend' '{{range \$c:=$rc_container_image_field}} {{\$c.image}} {{end}}' ' +kubernetes/pause +'
 
   ### Delete replication controller with id
   # Pre-condition: frontend replication controller is running
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend-controller:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # Command
-  kubectl stop rc frontend-controller "${kube_flags[@]}"
+  kubectl stop rc frontend "${kube_flags[@]}"
   # Post-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -519,13 +566,13 @@ __EOF__
   kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
   kubectl create -f examples/guestbook/redis-slave-controller.json "${kube_flags[@]}"
   # Post-condition: frontend and redis-slave
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend-controller:redis-slave-controller:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
 
   ### Delete multiple controllers at once
   # Pre-condition: frontend and redis-slave
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend-controller:redis-slave-controller:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
   # Command
-  kubectl stop rc frontend-controller redis-slave-controller "${kube_flags[@]}" # delete multiple controllers at once
+  kubectl stop rc frontend redis-slave "${kube_flags[@]}" # delete multiple controllers at once
   # Post-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -588,7 +635,7 @@ __EOF__
   # Minions #
   ###########
 
-  if [[ "${version}" != "v1beta3" ]]; then
+  if [[ "${version}" = "v1beta1" ]] || [[ "${version}" = "v1beta2" ]]; then
     kube::log::status "Testing kubectl(${version}:minions)"
 
     kube::test::get_object_assert minions "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
@@ -606,6 +653,18 @@ __EOF__
 
   kube::log::status "Testing kubectl(${version}:multiget)"
   kube::test::get_object_assert 'nodes/127.0.0.1 service/kubernetes' "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:kubernetes:'
+
+
+  #####################
+  # Resource aliasing #
+  #####################
+
+  kube::log::status "Testing resource aliasing"
+  kubectl create -f examples/cassandra/cassandra.yaml "${kube_flags[@]}"
+  kubectl create -f examples/cassandra/cassandra-controller.yaml "${kube_flags[@]}"
+  kubectl create -f examples/cassandra/cassandra-service.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert "all -l'name=cassandra'" "{{range.items}}{{$id_field}}:{{end}}" 'cassandra:cassandra:cassandra:'
+  kubectl delete all -l name=cassandra "${kube_flags[@]}"
 
 
   ###########

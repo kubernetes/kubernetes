@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,17 +17,11 @@ limitations under the License.
 package client
 
 import (
-	"time"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
-
-// TODO(a-robinson): Remove this explicit timeout and the calls to
-// request.Timeout() that use it once #5180 is in.
-const extendedTimeout = 4 * time.Minute
 
 // ServicesNamespacer has methods to work with Service resources in a namespace
 type ServicesNamespacer interface {
@@ -77,20 +71,20 @@ func (c *services) Get(name string) (result *api.Service, err error) {
 // Create creates a new service.
 func (c *services) Create(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Post().Timeout(extendedTimeout).Namespace(c.ns).Resource("services").Body(svc).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource("services").Body(svc).Do().Into(result)
 	return
 }
 
 // Update updates an existing service.
 func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Put().Timeout(extendedTimeout).Timeout(extendedTimeout).Namespace(c.ns).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing service.
 func (c *services) Delete(name string) error {
-	return c.r.Delete().Timeout(extendedTimeout).Namespace(c.ns).Resource("services").Name(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource("services").Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested services.

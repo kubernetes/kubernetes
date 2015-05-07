@@ -11,6 +11,12 @@ import (
 var _ = fmt.Println
 var _ = os.Stderr
 
+func checkOmit(t *testing.T, found, unexpected string) {
+	if strings.Contains(found, unexpected) {
+		t.Errorf("Unexpected response.\nGot: %q\nBut should not have!\n", unexpected)
+	}
+}
+
 func check(t *testing.T, found, expected string) {
 	if !strings.Contains(found, expected) {
 		t.Errorf("Unexpected response.\nExpecting to contain: \n %q\nGot:\n %q\n", expected, found)
@@ -28,7 +34,7 @@ COMPREPLY=( "hello" )
 func TestBashCompletions(t *testing.T) {
 	c := initializeWithRootCmd()
 	cmdEcho.AddCommand(cmdTimes)
-	c.AddCommand(cmdEcho, cmdPrint)
+	c.AddCommand(cmdEcho, cmdPrint, cmdDeprecated)
 
 	// custom completion function
 	c.BashCompletionFunction = bash_completion_func
@@ -70,5 +76,7 @@ func TestBashCompletions(t *testing.T) {
 	// check for required nouns
 	check(t, str, `must_have_one_noun+=("pods")`)
 	// check for filename extention flags
-	check(t, str, `flags_completion+=("_filedir '@(json|yaml|yml)'")`)
+	check(t, str, `flags_completion+=("__handle_filename_extension_flag json|yaml|yml")`)
+
+	checkOmit(t, str, cmdDeprecated.Name())
 }

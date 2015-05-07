@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -633,23 +633,108 @@ func TestValidateEnv(t *testing.T) {
 		{Name: "ABC", Value: "value"},
 		{Name: "AbC_123", Value: "value"},
 		{Name: "abc", Value: ""},
+		{
+			Name: "abc",
+			ValueFrom: &api.EnvVarSource{
+				FieldRef: &api.ObjectFieldSelector{
+					APIVersion: "v1beta3",
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
 	}
 	if errs := validateEnv(successCase); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	errorCases := map[string][]api.EnvVar{
-		"zero-length name":        {{Name: ""}},
-		"name not a C identifier": {{Name: "a.b.c"}},
+	errorCases := []struct {
+		name          string
+		envs          []api.EnvVar
+		expectedError string
+	}{
+		{
+			name:          "zero-length name",
+			envs:          []api.EnvVar{{Name: ""}},
+			expectedError: "[0].name: required value",
+		},
+		{
+			name:          "name not a C identifier",
+			envs:          []api.EnvVar{{Name: "a.b.c"}},
+			expectedError: "[0].name: invalid value 'a.b.c': must match regex [A-Za-z_][A-Za-z0-9_]*",
+		},
+		{
+			name: "value and valueFrom specified",
+			envs: []api.EnvVar{{
+				Name:  "abc",
+				Value: "foo",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: "v1beta3",
+						FieldPath:  "metadata.name",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom: invalid value '': sources cannot be specified when value is not empty",
+		},
+		{
+			name: "missing FieldPath on ObjectFieldSelector",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						APIVersion: "v1beta3",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: required value",
+		},
+		{
+			name: "missing APIVersion on ObjectFieldSelector",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						FieldPath: "metadata.name",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldRef.apiVersion: required value",
+		},
+		{
+			name: "invalid fieldPath",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						FieldPath:  "metadata.whoops",
+						APIVersion: "v1beta3",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: invalid value 'metadata.whoops': error converting fieldPath",
+		},
+		{
+			name: "unsupported fieldPath",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldRef: &api.ObjectFieldSelector{
+						FieldPath:  "status.phase",
+						APIVersion: "v1beta3",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'status.phase'",
+		},
 	}
-	for k, v := range errorCases {
-		if errs := validateEnv(v); len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
+	for _, tc := range errorCases {
+		if errs := validateEnv(tc.envs); len(errs) == 0 {
+			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
-				detail := errs[i].(*errors.ValidationError).Detail
-				if detail != "" && detail != cIdentifierErrorMsg {
-					t.Errorf("%s: expected error detail either empty or %s, got %s", k, cIdentifierErrorMsg, detail)
+				str := errs[i].(*errors.ValidationError).Error()
+				if str != "" && str != tc.expectedError {
+					t.Errorf("%s: expected error detail either empty or %s, got %s", tc.name, tc.expectedError, str)
 				}
 			}
 		}
@@ -816,7 +901,7 @@ func TestValidateContainers(t *testing.T) {
 			},
 			ImagePullPolicy: "IfNotPresent",
 		},
-		{Name: "abc-1234", Image: "image", Privileged: true, ImagePullPolicy: "IfNotPresent"},
+		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", SecurityContext: fakeValidSecurityContext(true)},
 	}
 	if errs := validateContainers(successCase, volumes); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -930,7 +1015,7 @@ func TestValidateContainers(t *testing.T) {
 			},
 		},
 		"privilege disabled": {
-			{Name: "abc", Image: "image", Privileged: true},
+			{Name: "abc", Image: "image", SecurityContext: fakeValidSecurityContext(true)},
 		},
 		"invalid compute resource": {
 			{
@@ -950,6 +1035,16 @@ func TestValidateContainers(t *testing.T) {
 				Image: "image",
 				Resources: api.ResourceRequirements{
 					Limits: getResourceLimits("-10", "0"),
+				},
+				ImagePullPolicy: "IfNotPresent",
+			},
+		},
+		"Resource Requests CPU invalid": {
+			{
+				Name:  "abc-123",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: getResourceLimits("-10", "0"),
 				},
 				ImagePullPolicy: "IfNotPresent",
 			},
@@ -1666,7 +1761,7 @@ func TestValidateService(t *testing.T) {
 func TestValidateReplicationControllerUpdate(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
 				Labels: validSelector,
 			},
@@ -1678,7 +1773,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
 				Labels: validSelector,
 			},
@@ -1692,7 +1787,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -1712,7 +1807,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1720,7 +1815,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 3,
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 		},
@@ -1729,7 +1824,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1737,7 +1832,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
 					Selector: validSelector,
-					Template: &readWriteVolumePodTemplate.Spec,
+					Template: &readWriteVolumePodTemplate.Template,
 				},
 			},
 		},
@@ -1755,7 +1850,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1763,7 +1858,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
 					Selector: validSelector,
-					Template: &readWriteVolumePodTemplate.Spec,
+					Template: &readWriteVolumePodTemplate.Template,
 				},
 			},
 		},
@@ -1772,7 +1867,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1780,7 +1875,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
 					Selector: invalidSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 		},
@@ -1789,7 +1884,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1797,7 +1892,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
 					Selector: validSelector,
-					Template: &invalidPodTemplate.Spec,
+					Template: &invalidPodTemplate.Template,
 				},
 			},
 		},
@@ -1806,7 +1901,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
@@ -1814,7 +1909,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				Spec: api.ReplicationControllerSpec{
 					Replicas: -1,
 					Selector: validSelector,
-					Template: &validPodTemplate.Spec,
+					Template: &validPodTemplate.Template,
 				},
 			},
 		},
@@ -1830,7 +1925,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 func TestValidateReplicationController(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
 				Labels: validSelector,
 			},
@@ -1842,7 +1937,7 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
 				Labels: validSelector,
 			},
@@ -1856,7 +1951,7 @@ func TestValidateReplicationController(t *testing.T) {
 	}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
-		Spec: api.PodTemplateSpec{
+		Template: api.PodTemplateSpec{
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -1871,14 +1966,14 @@ func TestValidateReplicationController(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		{
@@ -1886,7 +1981,7 @@ func TestValidateReplicationController(t *testing.T) {
 			Spec: api.ReplicationControllerSpec{
 				Replicas: 1,
 				Selector: validSelector,
-				Template: &readWriteVolumePodTemplate.Spec,
+				Template: &readWriteVolumePodTemplate.Template,
 			},
 		},
 	}
@@ -1901,27 +1996,27 @@ func TestValidateReplicationController(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"empty selector": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"selector_doesnt_match": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: map[string]string{"foo": "bar"},
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"invalid manifest": {
@@ -1935,7 +2030,7 @@ func TestValidateReplicationController(t *testing.T) {
 			Spec: api.ReplicationControllerSpec{
 				Replicas: 2,
 				Selector: validSelector,
-				Template: &readWriteVolumePodTemplate.Spec,
+				Template: &readWriteVolumePodTemplate.Template,
 			},
 		},
 		"negative_replicas": {
@@ -1955,7 +2050,7 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"invalid_label 2": {
@@ -1967,7 +2062,20 @@ func TestValidateReplicationController(t *testing.T) {
 				},
 			},
 			Spec: api.ReplicationControllerSpec{
-				Template: &invalidPodTemplate.Spec,
+				Template: &invalidPodTemplate.Template,
+			},
+		},
+		"invalid_annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc-123",
+				Namespace: api.NamespaceDefault,
+				Annotations: map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				},
+			},
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		"invalid restart policy 1": {
@@ -2032,7 +2140,7 @@ func TestValidateReplicationController(t *testing.T) {
 	}
 }
 
-func TestValidateMinion(t *testing.T) {
+func TestValidateNode(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	successCases := []api.Node{
@@ -2074,7 +2182,7 @@ func TestValidateMinion(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateMinion(&successCase); len(errs) != 0 {
+		if errs := ValidateNode(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -2125,7 +2233,7 @@ func TestValidateMinion(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateMinion(&v)
+		errs := ValidateNode(&v)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -2145,11 +2253,11 @@ func TestValidateMinion(t *testing.T) {
 	}
 }
 
-func TestValidateMinionUpdate(t *testing.T) {
+func TestValidateNodeUpdate(t *testing.T) {
 	tests := []struct {
-		oldMinion api.Node
-		minion    api.Node
-		valid     bool
+		oldNode api.Node
+		node    api.Node
+		valid   bool
 	}{
 		{api.Node{}, api.Node{}, true},
 		{api.Node{
@@ -2277,14 +2385,50 @@ func TestValidateMinionUpdate(t *testing.T) {
 				Unschedulable: true,
 			},
 		}, true},
+		{api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				Unschedulable: false,
+			},
+		}, api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Status: api.NodeStatus{
+				Addresses: []api.NodeAddress{
+					{Type: api.NodeExternalIP, Address: "1.1.1.1"},
+					{Type: api.NodeExternalIP, Address: "1.1.1.1"},
+				},
+			},
+		}, false},
+		{api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				Unschedulable: false,
+			},
+		}, api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Status: api.NodeStatus{
+				Addresses: []api.NodeAddress{
+					{Type: api.NodeExternalIP, Address: "1.1.1.1"},
+					{Type: api.NodeInternalIP, Address: "10.1.1.1"},
+				},
+			},
+		}, true},
 	}
 	for i, test := range tests {
-		test.oldMinion.ObjectMeta.ResourceVersion = "1"
-		test.minion.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateMinionUpdate(&test.oldMinion, &test.minion)
+		test.oldNode.ObjectMeta.ResourceVersion = "1"
+		test.node.ObjectMeta.ResourceVersion = "1"
+		errs := ValidateNodeUpdate(&test.oldNode, &test.node)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
-			t.Logf("%#v vs %#v", test.oldMinion.ObjectMeta, test.minion.ObjectMeta)
+			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
 		}
 		if !test.valid && len(errs) == 0 {
 			t.Errorf("%d: Unexpected non-error", i)
@@ -3034,5 +3178,91 @@ func TestValidateEndpoints(t *testing.T) {
 		if errs := ValidateEndpoints(&v.endpoints); len(errs) == 0 || errs[0].(*errors.ValidationError).Type != v.errorType || errs[0].(*errors.ValidationError).Detail != v.errorDetail {
 			t.Errorf("Expected error type %s with detail %s for %s, got %v", v.errorType, v.errorDetail, k, errs)
 		}
+	}
+}
+
+func TestValidateSecurityContext(t *testing.T) {
+	priv := false
+	var runAsUser int64 = 1
+	fullValidSC := func() *api.SecurityContext {
+		return &api.SecurityContext{
+			Privileged: &priv,
+			Capabilities: &api.Capabilities{
+				Add:  []api.CapabilityType{"foo"},
+				Drop: []api.CapabilityType{"bar"},
+			},
+			SELinuxOptions: &api.SELinuxOptions{
+				User:  "user",
+				Role:  "role",
+				Type:  "type",
+				Level: "level",
+			},
+			RunAsUser: &runAsUser,
+		}
+	}
+
+	//setup data
+	allSettings := fullValidSC()
+	noCaps := fullValidSC()
+	noCaps.Capabilities = nil
+
+	noSELinux := fullValidSC()
+	noSELinux.SELinuxOptions = nil
+
+	noPrivRequest := fullValidSC()
+	noPrivRequest.Privileged = nil
+
+	noRunAsUser := fullValidSC()
+	noRunAsUser.RunAsUser = nil
+
+	successCases := map[string]struct {
+		sc *api.SecurityContext
+	}{
+		"all settings":    {allSettings},
+		"no capabilities": {noCaps},
+		"no selinux":      {noSELinux},
+		"no priv request": {noPrivRequest},
+		"no run as user":  {noRunAsUser},
+	}
+	for k, v := range successCases {
+		if errs := ValidateSecurityContext(v.sc); len(errs) != 0 {
+			t.Errorf("Expected success for %s, got %v", k, errs)
+		}
+	}
+
+	privRequestWithGlobalDeny := fullValidSC()
+	requestPrivileged := true
+	privRequestWithGlobalDeny.Privileged = &requestPrivileged
+
+	negativeRunAsUser := fullValidSC()
+	var negativeUser int64 = -1
+	negativeRunAsUser.RunAsUser = &negativeUser
+
+	errorCases := map[string]struct {
+		sc          *api.SecurityContext
+		errorType   fielderrors.ValidationErrorType
+		errorDetail string
+	}{
+		"request privileged when capabilities forbids": {
+			sc:          privRequestWithGlobalDeny,
+			errorType:   "FieldValueForbidden",
+			errorDetail: "",
+		},
+		"negative RunAsUser": {
+			sc:          negativeRunAsUser,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "runAsUser cannot be negative",
+		},
+	}
+	for k, v := range errorCases {
+		if errs := ValidateSecurityContext(v.sc); len(errs) == 0 || errs[0].(*errors.ValidationError).Type != v.errorType || errs[0].(*errors.ValidationError).Detail != v.errorDetail {
+			t.Errorf("Expected error type %s with detail %s for %s, got %v", v.errorType, v.errorDetail, k, errs)
+		}
+	}
+}
+
+func fakeValidSecurityContext(priv bool) *api.SecurityContext {
+	return &api.SecurityContext{
+		Privileged: &priv,
 	}
 }

@@ -21,7 +21,7 @@ There are 4 ways that a container manifest can be provided to the Kubelet:
 .nf
 File Path passed as a flag on the command line. This file is rechecked every 20 seconds (configurable with a flag).
 HTTP endpoint HTTP endpoint passed as a parameter on the command line. This endpoint is checked every 20 seconds (also configurable with a flag).
-etcd server The Kubelet will reach out and do a watch on an etcd server. The etcd path that is watched is /registry/hosts/\$(hostname \-f). As this is a watch, changes are noticed and acted upon very quickly.
+etcd server The Kubelet will reach out and do a watch on an etcd server. The etcd path that is watched is /registry/hosts/\$(uname \-n). As this is a watch, changes are noticed and acted upon very quickly.
 HTTP server The kubelet can also listen for HTTP and respond to a simple API (underspec'd currently) to submit a new manifest.
 
 .fi

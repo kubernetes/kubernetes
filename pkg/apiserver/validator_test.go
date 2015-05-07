@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -65,8 +65,7 @@ func TestValidate(t *testing.T) {
 				StatusCode: test.code,
 			},
 		}
-		fake := &http.Client{Transport: fakeRT}
-		status, data, err := s.check(fake)
+		status, data, err := s.DoServerCheck(fakeRT)
 		expect := fmt.Sprintf("http://%s:%d/healthz", s.Addr, s.Port)
 		if fakeRT.url != expect {
 			t.Errorf("expected %s, got %s", expect, fakeRT.url)

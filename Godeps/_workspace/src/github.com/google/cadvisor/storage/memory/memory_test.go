@@ -47,7 +47,7 @@ func getRecentStats(t *testing.T, memoryStorage *InMemoryStorage, numStats int) 
 }
 
 func TestAddStats(t *testing.T) {
-	memoryStorage := New(60, nil)
+	memoryStorage := New(60*time.Second, nil)
 
 	assert := assert.New(t)
 	assert.Nil(memoryStorage.AddStats(containerRef, makeStat(0)))
@@ -70,7 +70,7 @@ func TestRecentStatsNoRecentStats(t *testing.T) {
 
 // Make an instance of InMemoryStorage with n stats.
 func makeWithStats(n int) *InMemoryStorage {
-	memoryStorage := New(60, nil)
+	memoryStorage := New(60*time.Second, nil)
 
 	for i := 0; i < n; i++ {
 		memoryStorage.AddStats(containerRef, makeStat(i))

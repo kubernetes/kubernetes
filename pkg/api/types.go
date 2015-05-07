@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -317,6 +317,8 @@ const (
 type PersistentVolumePhase string
 
 const (
+	// used for PersistentVolumes that are not available
+	VolumePending PersistentVolumePhase = "Pending"
 	// used for PersistentVolumes that are not yet bound
 	VolumeAvailable PersistentVolumePhase = "Available"
 	// used for PersistentVolumes that are bound
@@ -506,8 +508,27 @@ type VolumeMount struct {
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
 	Name string `json:"name"`
-	// Optional: defaults to "".
+	// Optional: no more than one of the following may be specified.
+	// Optional: Defaults to "".
 	Value string `json:"value,omitempty"`
+	// Optional: Specifies a source the value of this var should come from.
+	ValueFrom *EnvVarSource `json:"valueFrom,omitempty"`
+}
+
+// EnvVarSource represents a source for the value of an EnvVar.
+type EnvVarSource struct {
+	// Required: Selects a field of the pod; only name and namespace are supported.
+	FieldRef *ObjectFieldSelector `json:"fieldRef"`
+}
+
+// ObjectFieldSelector selects an APIVersioned field of an object.
+type ObjectFieldSelector struct {
+	// Required: Version of the schema the FieldPath is written in terms of.
+	// If no value is specified, it will be defaulted to the APIVersion of the
+	// enclosing object.
+	APIVersion string `json:"apiVersion"`
+	// Required: Path of the field to select in the specified API version
+	FieldPath string `json:"fieldPath"`
 }
 
 // HTTPGetAction describes an action based on HTTP Get requests.
@@ -573,6 +594,9 @@ type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources required.
 	Limits ResourceList `json:"limits,omitempty"`
 	// Requests describes the minimum amount of compute resources required.
+	// Note: 'Requests' are honored only for Persistent Volumes as of now.
+	// TODO: Update the scheduler to use 'Requests' in addition to 'Limits'. If Request is omitted for a container,
+	// it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value
 	Requests ResourceList `json:"requests,omitempty"`
 }
 
@@ -599,12 +623,10 @@ type Container struct {
 	Lifecycle      *Lifecycle           `json:"lifecycle,omitempty"`
 	// Required.
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty"`
-	// Optional: Default to false.
-	Privileged bool `json:"privileged,omitempty"`
 	// Required: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy"`
-	// Optional: Capabilities for container.
-	Capabilities Capabilities `json:"capabilities,omitempty"`
+	// Optional: SecurityContext defines the security options the pod should be run with
+	SecurityContext *SecurityContext `json:"securityContext,omitempty" description:"security options the pod should run with"`
 }
 
 // Handler defines a specific action that should be taken
@@ -778,6 +800,13 @@ type PodSpec struct {
 	// Required: there must be at least one container in a pod.
 	Containers    []Container   `json:"containers"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
+	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
+	// Value must be non-negative integer. The value zero indicates delete immediately.
+	// If this value is nil, the default grace period will be used instead.
+	// The grace period is the duration in seconds after the processes running in the pod are sent
+	// a termination signal and the time when the processes are forcibly halted with a kill signal.
+	// Set this value longer than the expected cleanup time for your process.
+	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 	// Required: Set DNS policy.
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
@@ -848,8 +877,8 @@ type PodTemplate struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec defines the pods that will be created from this template
-	Spec PodTemplateSpec `json:"spec,omitempty"`
+	// Template defines the pods that will be created from this pod template
+	Template PodTemplateSpec `json:"template,omitempty"`
 }
 
 // PodTemplateList is a list of PodTemplates.
@@ -1165,8 +1194,7 @@ type NodeAddress struct {
 }
 
 // NodeResources is an object for conveying resource information about a node.
-// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
-// TODO: Use ResourceList instead?
+// see http://docs.k8s.io/resources.md for more details.
 type NodeResources struct {
 	// Capacity represents the available resources of a node
 	Capacity ResourceList `json:"capacity,omitempty"`
@@ -1302,6 +1330,37 @@ type PodLogOptions struct {
 
 	// If true, follow the logs for the pod
 	Follow bool
+}
+
+// PodExecOptions is the query options to a Pod's remote exec call
+type PodExecOptions struct {
+	TypeMeta
+
+	// Stdin if true indicates that stdin is to be redirected for the exec call
+	Stdin bool
+
+	// Stdout if true indicates that stdout is to be redirected for the exec call
+	Stdout bool
+
+	// Stderr if true indicates that stderr is to be redirected for the exec call
+	Stderr bool
+
+	// TTY if true indicates that a tty will be allocated for the exec call
+	TTY bool
+
+	// Container in which to execute the command.
+	Container string
+
+	// Command is the remote command to execute; argv array; not executed within a shell.
+	Command []string
+}
+
+// PodProxyOptions is the query options to a Pod's proxy call
+type PodProxyOptions struct {
+	TypeMeta
+
+	// Path is the URL path to use for the current proxy request
+	Path string
 }
 
 // Status is a return value for calls that don't return other objects.
@@ -1532,6 +1591,11 @@ type ObjectReference struct {
 	FieldPath string `json:"fieldPath,omitempty"`
 }
 
+type SerializedReference struct {
+	TypeMeta  `json:",inline"`
+	Reference ObjectReference `json:"reference,omitempty" description:"the reference to an object in the system"`
+}
+
 type EventSource struct {
 	// Component from which the event is generated.
 	Component string `json:"component,omitempty"`
@@ -1592,10 +1656,11 @@ type ContainerManifest struct {
 	// TODO: UUID on Manifest is deprecated in the future once we are done
 	// with the API refactoring. It is required for now to determine the instance
 	// of a Pod.
-	UUID          types.UID     `json:"uuid,omitempty"`
-	Volumes       []Volume      `json:"volumes"`
-	Containers    []Container   `json:"containers"`
-	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
+	UUID                          types.UID     `json:"uuid,omitempty"`
+	Volumes                       []Volume      `json:"volumes"`
+	Containers                    []Container   `json:"containers"`
+	RestartPolicy                 RestartPolicy `json:"restartPolicy,omitempty"`
+	TerminationGracePeriodSeconds *int64        `json:"terminationGracePeriodSeconds,omitempty"`
 	// Required: Set DNS policy.
 	DNSPolicy   DNSPolicy `json:"dnsPolicy"`
 	HostNetwork bool      `json:"hostNetwork,omitempty"`
@@ -1674,6 +1739,10 @@ const (
 	ResourceReplicationControllers ResourceName = "replicationcontrollers"
 	// ResourceQuotas, number
 	ResourceQuotas ResourceName = "resourcequotas"
+	// ResourceSecrets, number
+	ResourceSecrets ResourceName = "secrets"
+	// ResourcePersistentVolumeClaims, number
+	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
@@ -1781,18 +1850,66 @@ const (
 	StrategicMergePatchType PatchType = "application/strategic-merge-patch+json"
 )
 
-// Appends the NodeAddresses to the passed-by-pointer slice, only if they do not already exist
-func AddToNodeAddresses(addresses *[]NodeAddress, addAddresses ...NodeAddress) {
-	for _, add := range addAddresses {
-		exists := false
-		for _, existing := range *addresses {
-			if existing.Address == add.Address && existing.Type == add.Type {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			*addresses = append(*addresses, add)
-		}
-	}
+// Type and constants for component health validation.
+type ComponentConditionType string
+
+// These are the valid conditions for the component.
+const (
+	ComponentHealthy ComponentConditionType = "Healthy"
+)
+
+type ComponentCondition struct {
+	Type    ComponentConditionType `json:"type"`
+	Status  ConditionStatus        `json:"status"`
+	Message string                 `json:"message,omitempty"`
+	Error   string                 `json:"error,omitempty"`
+}
+
+// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
+type ComponentStatus struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	Conditions []ComponentCondition `json:"conditions,omitempty"`
+}
+
+type ComponentStatusList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []ComponentStatus `json:"items"`
+}
+
+// SecurityContext holds security configuration that will be applied to a container.  SecurityContext
+// contains duplication of some existing fields from the Container resource.  These duplicate fields
+// will be populated based on the Container configuration if they are not set.  Defining them on
+// both the Container AND the SecurityContext will result in an error.
+type SecurityContext struct {
+	// Capabilities are the capabilities to add/drop when running the container
+	Capabilities *Capabilities `json:"capabilities,omitempty" description:"the linux capabilites that should be added or removed"`
+
+	// Run the container in privileged mode
+	Privileged *bool `json:"privileged,omitempty" description:"run the container in privileged mode"`
+
+	// SELinuxOptions are the labels to be applied to the container
+	// and volumes
+	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" description:"options that control the SELinux labels applied"`
+
+	// RunAsUser is the UID to run the entrypoint of the container process.
+	RunAsUser *int64 `json:"runAsUser,omitempty" description:"the user id that runs the first process in the container"`
+}
+
+// SELinuxOptions are the labels to be applied to the container.
+type SELinuxOptions struct {
+	// SELinux user label
+	User string `json:"user,omitempty" description:"the user label to apply to the container"`
+
+	// SELinux role label
+	Role string `json:"role,omitempty" description:"the role label to apply to the container"`
+
+	// SELinux type label
+	Type string `json:"type,omitempty" description:"the type label to apply to the container"`
+
+	// SELinux level label.
+	Level string `json:"level,omitempty" description:"the level label to apply to the container"`
 }

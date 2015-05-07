@@ -66,5 +66,4 @@ func main() {
 
 You can run the tests with:
 
-    go get -d ./...
-    go test ./...
+    make test

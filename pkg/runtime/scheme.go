@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +17,12 @@ limitations under the License.
 package runtime
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"net/url"
 	"reflect"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
 // Scheme defines methods for serializing and deserializing API objects. It
@@ -34,6 +36,10 @@ type Scheme struct {
 
 // Function to convert a field selector to internal representation.
 type FieldLabelConversionFunc func(label, value string) (internalLabel, internalValue string, err error)
+
+func (self *Scheme) Raw() *conversion.Scheme {
+	return self.raw
+}
 
 // fromScope gets the input version, desired output version, and desired Scheme
 // from a conversion.Scope.
@@ -147,8 +153,9 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 }
 
 // runtimeObjectToRawExtensionArray takes a list of objects and encodes them as RawExtension in the output version
-// defined by the conversion.Scope. If objects must be encoded to different schema versions you should set them as
-// runtime.Unknown in the internal version instead.
+// defined by the conversion.Scope. If objects must be encoded to different schema versions than the default, you
+// should encode them yourself with runtime.Unknown, or convert the object prior to invoking conversion. Objects
+// outside of the current scheme must be added as runtime.Unknown.
 func (self *Scheme) runtimeObjectToRawExtensionArray(in *[]Object, out *[]RawExtension, s conversion.Scope) error {
 	src := *in
 	dest := make([]RawExtension, len(src))
@@ -158,9 +165,22 @@ func (self *Scheme) runtimeObjectToRawExtensionArray(in *[]Object, out *[]RawExt
 	for i := range src {
 		switch t := src[i].(type) {
 		case *Unknown:
+			// TODO: this should be decoupled from the scheme (since it is JSON specific)
 			dest[i].RawJSON = t.RawJSON
+		case *Unstructured:
+			// TODO: this should be decoupled from the scheme (since it is JSON specific)
+			data, err := json.Marshal(t.Object)
+			if err != nil {
+				return err
+			}
+			dest[i].RawJSON = data
 		default:
-			data, err := scheme.EncodeToVersion(src[i], outVersion)
+			version := outVersion
+			// if the object exists
+			if inVersion, _, err := scheme.ObjectVersionAndKind(src[i]); err == nil && len(inVersion) != 0 {
+				version = inVersion
+			}
+			data, err := scheme.EncodeToVersion(src[i], version)
 			if err != nil {
 				return err
 			}
@@ -181,24 +201,17 @@ func (self *Scheme) rawExtensionToRuntimeObjectArray(in *[]RawExtension, out *[]
 
 	for i := range src {
 		data := src[i].RawJSON
-		obj, err := scheme.Decode(data)
+		version, kind, err := scheme.raw.DataVersionAndKind(data)
 		if err != nil {
-			if !IsNotRegisteredError(err) {
-				return err
-			}
-			version, kind, err := scheme.raw.DataVersionAndKind(data)
-			if err != nil {
-				return err
-			}
-			obj = &Unknown{
-				TypeMeta: TypeMeta{
-					APIVersion: version,
-					Kind:       kind,
-				},
-				RawJSON: data,
-			}
+			return err
 		}
-		dest[i] = obj
+		dest[i] = &Unknown{
+			TypeMeta: TypeMeta{
+				APIVersion: version,
+				Kind:       kind,
+			},
+			RawJSON: data,
+		}
 	}
 	*out = dest
 	return nil
@@ -264,6 +277,12 @@ func (s *Scheme) ObjectVersionAndKind(obj Object) (version, kind string, err err
 	return s.raw.ObjectVersionAndKind(obj)
 }
 
+// Recognizes returns true if the scheme is able to handle the provided version and kind
+// of an object.
+func (s *Scheme) Recognizes(version, kind string) bool {
+	return s.raw.Recognizes(version, kind)
+}
+
 // New returns a new API object of the given version ("" for internal
 // representation) and name, or an error if it hasn't been registered.
 func (s *Scheme) New(versionName, typeName string) (Object, error) {
@@ -294,6 +313,12 @@ func (s *Scheme) Log(l conversion.DebugLogger) {
 // function for things with changed/removed fields.
 func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	return s.raw.AddConversionFuncs(conversionFuncs...)
+}
+
+// Similar to AddConversionFuncs, but registers conversion functions that were
+// automatically generated.
+func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) error {
+	return s.raw.AddGeneratedConversionFuncs(conversionFuncs...)
 }
 
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors

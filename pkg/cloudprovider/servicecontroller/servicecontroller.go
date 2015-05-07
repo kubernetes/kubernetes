@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,7 +79,9 @@ func New(cloud cloudprovider.Interface, kubeClient client.Interface, clusterName
 // Run starts a background goroutine that watches for changes to services that
 // have (or had) externalLoadBalancers=true and ensures that they have external
 // load balancers created and deleted appropriately.
-func (s *ServiceController) Run() error {
+// nodeSyncPeriod controls how often we check the cluster's nodes to determine
+// if external load balancers need to be updated to point to a new set.
+func (s *ServiceController) Run(nodeSyncPeriod time.Duration) error {
 	if err := s.init(); err != nil {
 		return err
 	}
@@ -101,6 +103,11 @@ func (s *ServiceController) Run() error {
 	for i := 0; i < workerGoroutines; i++ {
 		go s.watchServices(serviceQueue)
 	}
+
+	nodeLister := &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
+	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "nodes", api.NamespaceAll, fields.Everything())
+	cache.NewReflector(nodeLW, &api.Node{}, nodeLister.Store, 0).Run()
+	go s.nodeSyncLoop(nodeLister, nodeSyncPeriod)
 	return nil
 }
 
@@ -228,26 +235,25 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 			}
 		}
 	} else {
-		// If we don't have any cached memory of the load balancer and it already
-		// exists, optimistically consider our work done.
-		// TODO: If we could read the spec of the existing load balancer, we could
-		// determine if an update is necessary.
-		exists, err := s.balancer.TCPLoadBalancerExists(s.loadBalancerName(service), s.zone.Region)
+		// If we don't have any cached memory of the load balancer, we have to ask
+		// the cloud provider for what it knows about it.
+		endpoint, exists, err := s.balancer.GetTCPLoadBalancer(s.loadBalancerName(service), s.zone.Region)
 		if err != nil {
 			return fmt.Errorf("Error getting LB for service %s", namespacedName), retryable
 		}
-		if exists && len(service.Spec.PublicIPs) == 0 {
-			// The load balancer exists, but we apparently don't know about its public
-			// IPs, so just delete it and recreate it to get back to a sane state.
-			// TODO: Ideally the cloud provider interface would return the IP for us.
-			glog.Infof("Deleting old LB for service with no public IPs %s", namespacedName)
+		if exists && stringSlicesEqual(service.Spec.PublicIPs, []string{endpoint}) {
+			// TODO: If we could read more of the spec (ports, affinityType) of the
+			// existing load balancer, we could better determine if an update is
+			// necessary in more cases. For now, we optimistically assume that a
+			// matching IP suffices.
+			glog.Infof("LB already exists with endpoint %s for previously uncached service %s", endpoint, namespacedName)
+			return nil, notRetryable
+		} else if exists {
+			glog.Infof("Deleting old LB for previously uncached service %s whose endpoint %s doesn't match the service's desired IPs %v",
+				namespacedName, endpoint, service.Spec.PublicIPs)
 			if err := s.ensureLBDeleted(service); err != nil {
 				return err, retryable
 			}
-		} else if exists {
-			// TODO: Better handle updates for non-cached services, this is optimistic.
-			glog.Infof("LB already exists for service %s", namespacedName)
-			return nil, notRetryable
 		}
 	}
 
@@ -343,7 +349,7 @@ func (s *ServiceController) createExternalLoadBalancer(service *api.Service) err
 func (s *ServiceController) ensureLBDeleted(service *api.Service) error {
 	// This is only needed because not all delete load balancer implementations
 	// are currently idempotent to the LB not existing.
-	if exists, err := s.balancer.TCPLoadBalancerExists(s.loadBalancerName(service), s.zone.Region); err != nil {
+	if _, exists, err := s.balancer.GetTCPLoadBalancer(s.loadBalancerName(service), s.zone.Region); err != nil {
 		return err
 	} else if !exists {
 		return nil
@@ -365,6 +371,18 @@ func (s *serviceCache) ListKeys() []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// ListKeys implements the interface required by DeltaFIFO to list the keys we
+// already know about.
+func (s *serviceCache) allServices() []*cachedService {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	services := make([]*cachedService, 0, len(s.serviceMap))
+	for _, v := range s.serviceMap {
+		services = append(services, v)
+	}
+	return services
 }
 
 func (s *serviceCache) get(serviceName string) (*cachedService, bool) {
@@ -419,7 +437,7 @@ func needsUpdate(oldService *api.Service, newService *api.Service) bool {
 }
 
 func (s *ServiceController) loadBalancerName(service *api.Service) string {
-	return cloudprovider.GetLoadBalancerName(s.clusterName, service.Namespace, service.Name)
+	return cloudprovider.GetLoadBalancerName(service)
 }
 
 func getTCPPorts(service *api.Service) ([]int, error) {
@@ -445,13 +463,39 @@ func portsEqual(x, y *api.Service) bool {
 	if err != nil {
 		return false
 	}
-	if len(xPorts) != len(yPorts) {
+	return intSlicesEqual(xPorts, yPorts)
+}
+
+func intSlicesEqual(x, y []int) bool {
+	if len(x) != len(y) {
 		return false
 	}
-	sort.Ints(xPorts)
-	sort.Ints(yPorts)
-	for i := range xPorts {
-		if xPorts[i] != yPorts[i] {
+	if !sort.IntsAreSorted(x) {
+		sort.Ints(x)
+	}
+	if !sort.IntsAreSorted(y) {
+		sort.Ints(y)
+	}
+	for i := range x {
+		if x[i] != y[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func stringSlicesEqual(x, y []string) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	if !sort.StringsAreSorted(x) {
+		sort.Strings(x)
+	}
+	if !sort.StringsAreSorted(y) {
+		sort.Strings(y)
+	}
+	for i := range x {
+		if x[i] != y[i] {
 			return false
 		}
 	}
@@ -464,4 +508,79 @@ func hostsFromNodeList(list *api.NodeList) []string {
 		result[ix] = list.Items[ix].Name
 	}
 	return result
+}
+
+// nodeSyncLoop handles updating the hosts pointed to by all external load
+// balancers whenever the set of nodes in the cluster changes.
+func (s *ServiceController) nodeSyncLoop(nodeLister *cache.StoreToNodeLister, period time.Duration) {
+	var prevHosts []string
+	var servicesToUpdate []*cachedService
+	// TODO: Eliminate the unneeded now variable once we stop compiling in go1.3.
+	// It's needed at the moment because go1.3 requires ranges to be assigned to
+	// something to compile, and gofmt1.4 complains about using `_ = range`.
+	for now := range time.Tick(period) {
+		_ = now
+		nodes, err := nodeLister.List()
+		if err != nil {
+			glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
+			continue
+		}
+		newHosts := hostsFromNodeList(&nodes)
+		if stringSlicesEqual(newHosts, prevHosts) {
+			// The set of nodes in the cluster hasn't changed, but we can retry
+			// updating any services that we failed to update last time around.
+			servicesToUpdate = s.updateLoadBalancerHosts(servicesToUpdate, newHosts)
+			continue
+		}
+		glog.Infof("Detected change in list of current cluster nodes. New node set: %v", newHosts)
+
+		// Try updating all services, and save the ones that fail to try again next
+		// round.
+		servicesToUpdate = s.cache.allServices()
+		numServices := len(servicesToUpdate)
+		servicesToUpdate = s.updateLoadBalancerHosts(servicesToUpdate, newHosts)
+		glog.Infof("Successfully updated %d out of %d external load balancers to direct traffic to the updated set of nodes",
+			numServices-len(servicesToUpdate), numServices)
+
+		prevHosts = newHosts
+	}
+}
+
+// updateLoadBalancerHosts updates all existing external load balancers so that
+// they will match the list of hosts provided.
+// Returns the list of services that couldn't be updated.
+func (s *ServiceController) updateLoadBalancerHosts(services []*cachedService, hosts []string) (servicesToRetry []*cachedService) {
+	for _, service := range services {
+		func() {
+			service.mu.Lock()
+			defer service.mu.Unlock()
+			if err := s.lockedUpdateLoadBalancerHosts(service.service, hosts); err != nil {
+				glog.Errorf("External error while updating TCP load balancer: %v.", err)
+				servicesToRetry = append(servicesToRetry, service)
+			}
+		}()
+	}
+	return servicesToRetry
+}
+
+// Updates the external load balancer of a service, assuming we hold the mutex
+// associated with the service.
+func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, hosts []string) error {
+	if !service.Spec.CreateExternalLoadBalancer {
+		return nil
+	}
+
+	name := cloudprovider.GetLoadBalancerName(service)
+	err := s.balancer.UpdateTCPLoadBalancer(name, s.zone.Region, hosts)
+	if err == nil {
+		return nil
+	}
+
+	// It's only an actual error if the load balancer still exists.
+	if _, exists, err := s.balancer.GetTCPLoadBalancer(name, s.zone.Region); err != nil {
+		glog.Errorf("External error while checking if TCP load balancer %q exists: name, %v")
+	} else if !exists {
+		return nil
+	}
+	return err
 }

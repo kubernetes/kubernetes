@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,16 +30,16 @@ const (
 	run_long = `Create and run a particular image, possibly replicated.
 Creates a replication controller to manage the created container(s).`
 	run_example = `// Starts a single instance of nginx.
-$ kubectl run-container nginx --image=dockerfile/nginx
+$ kubectl run-container nginx --image=nginx
 
 // Starts a replicated instance of nginx.
-$ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
+$ kubectl run-container nginx --image=nginx --replicas=5
 
 // Dry run. Print the corresponding API objects without creating them.
-$ kubectl run-container nginx --image=dockerfile/nginx --dry-run
+$ kubectl run-container nginx --image=nginx --dry-run
 
 // Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON.
-$ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'`
+$ kubectl run-container nginx --image=nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'`
 )
 
 func NewCmdRunContainer(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -56,10 +56,12 @@ func NewCmdRunContainer(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().String("generator", "run-container/v1", "The name of the API generator to use.  Default is 'run-container-controller/v1'.")
 	cmd.Flags().String("image", "", "The image for the container to run.")
+	cmd.MarkFlagRequired("image")
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().Int("port", -1, "The port that this container exposes.")
+	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s) created by this call to run-container.")
 	return cmd
 }
@@ -80,7 +82,7 @@ func RunRunContainer(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	}
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generator, found := kubectl.Generators[generatorName]
+	generator, found := f.Generator(generatorName)
 	if !found {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not found.", generator))
 	}

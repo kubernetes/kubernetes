@@ -1,28 +1,31 @@
 {
-  "id": "authenticator-controller",
   "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "replicas": 1,
-    "replicaSelector": {"name": "authenticator"},
-    "podTemplate": {
-      "desiredState": {
-        "manifest": {
-          "version": "v1beta1",
-          "id": "authenticator-pod",
-          "containers": [{
-            "name": "authenticator",
-            "image": "fgrzadkowski/example-cloudsql-authenticator",
-            "env": [
-              {"name": "SELECTOR", "value": "name=phabricator"},
-              {"name": "CLOUDSQL_DB", "value": "phabricator-db"}
-            ],
-            "imagePullPolicy": "Always"
-          }]
-        }
-      },
-      "labels": { "name": "authenticator" }
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "authenticator-controller",
+    "labels": {
+      "name": "authenticator"
     }
   },
-  "labels": {"name": "authenticator"}
+  "spec": {
+    "replicas": 1,
+    "selector": {
+      "name": "authenticator"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "authenticator"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "authenticator",
+            "image": "fgrzadkowski/example-cloudsql-authenticator"
+          }
+        ]
+      }
+    }
+  }
 }

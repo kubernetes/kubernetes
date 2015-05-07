@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package factory
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
@@ -299,4 +300,13 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 			glog.Fatalf("Exactly 1 priority argument is required")
 		}
 	}
+}
+
+// ListAlgorithmProviders is called when listing all available algortihm providers in `kube-scheduler --help`
+func ListAlgorithmProviders() string {
+	var availableAlgorithmProviders []string
+	for name := range algorithmProviderMap {
+		availableAlgorithmProviders = append(availableAlgorithmProviders, name)
+	}
+	return strings.Join(availableAlgorithmProviders, " | ")
 }

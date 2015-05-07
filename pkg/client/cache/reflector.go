@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -106,17 +106,24 @@ var (
 	errorStopRequested = errors.New("Stop requested")
 )
 
-// resyncChan returns a channel which will receive something when a resync is required.
-func (r *Reflector) resyncChan() <-chan time.Time {
+// resyncChan returns a channel which will receive something when a resync is
+// required, and a cleanup function.
+func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 	if r.resyncPeriod == 0 {
-		return neverExitWatch
+		return neverExitWatch, func() bool { return false }
 	}
-	return time.After(r.resyncPeriod)
+	// The cleanup function is required: imagine the scenario where watches
+	// always fail so we end up listing frequently. Then, if we don't
+	// manually stop the timer, we could end up with many timers active
+	// concurrently.
+	t := time.NewTimer(r.resyncPeriod)
+	return t.C, t.Stop
 }
 
 func (r *Reflector) listAndWatch(stopCh <-chan struct{}) {
 	var resourceVersion string
-	resyncCh := r.resyncChan()
+	resyncCh, cleanup := r.resyncChan()
+	defer cleanup()
 
 	list, err := r.listerWatcher.List()
 	if err != nil {

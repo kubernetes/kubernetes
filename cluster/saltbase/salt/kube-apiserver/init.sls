@@ -9,12 +9,17 @@
 {% endif %}
 {% endif %}
 
-/usr/local/bin/kube-apiserver:
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce' ]  %}
+/srv/kubernetes/basic_auth.csv:
   file.managed:
-    - source: salt://kube-bins/kube-apiserver
+    - source: salt://kube-apiserver/basic_auth.csv
+{% endif %}
+
+/var/log/kube-apiserver.log:
+  file.managed:
     - user: root
     - group: root
-    - mode: 755
+    - mode: 644
 
 # Copy kube-apiserver manifest to manifests folder for kubelet.
 /etc/kubernetes/manifests/kube-apiserver.manifest:
@@ -27,7 +32,7 @@
     - makedirs: true
     - dir_mode: 755
 
-#stop legacy kube-apiserver service 
+#stop legacy kube-apiserver service
 stop_kube-apiserver:
   service.dead:
     - name: kube-apiserver

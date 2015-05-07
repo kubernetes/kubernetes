@@ -1,7 +1,7 @@
 // +build !cgo !linux
 
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,26 +37,30 @@ func New(port uint) (Interface, error) {
 
 var unsupportedErr = errors.New("cAdvisor is unsupported in this build")
 
-func (self *cadvisorUnsupported) DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error) {
+func (cu *cadvisorUnsupported) DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error) {
 	return cadvisorApi.ContainerInfo{}, unsupportedErr
 }
 
-func (self *cadvisorUnsupported) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+func (cu *cadvisorUnsupported) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	return nil, unsupportedErr
 }
 
-func (self *cadvisorUnsupported) MachineInfo() (*cadvisorApi.MachineInfo, error) {
+func (cu *cadvisorUnsupported) SubcontainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
 	return nil, unsupportedErr
 }
 
-func (self *cadvisorUnsupported) VersionInfo() (*cadvisorApi.VersionInfo, error) {
+func (cu *cadvisorUnsupported) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return nil, unsupportedErr
 }
 
-func (self *cadvisorUnsupported) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
+func (cu *cadvisorUnsupported) VersionInfo() (*cadvisorApi.VersionInfo, error) {
+	return nil, unsupportedErr
+}
+
+func (cu *cadvisorUnsupported) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	return cadvisorApiV2.FsInfo{}, unsupportedErr
 }
 
-func (self *cadvisorUnsupported) GetPastEvents(request *events.Request) ([]*cadvisorApi.Event, error) {
-	return []*cadvisorApi.Event{}, unsupportedErr
+func (cu *cadvisorUnsupported) WatchEvents(request *events.Request) (*events.EventChannel, error) {
+	return nil, unsupportedErr
 }

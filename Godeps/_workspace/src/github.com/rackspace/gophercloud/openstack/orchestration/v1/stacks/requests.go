@@ -111,12 +111,7 @@ func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateResult {
 		return res
 	}
 
-	// Send request to API
-	_, res.Err = c.Request("POST", createURL(c), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{201},
-	})
+	_, res.Err = c.Post(createURL(c), reqBody, &res.Body, nil)
 	return res
 }
 
@@ -221,12 +216,7 @@ func Adopt(c *gophercloud.ServiceClient, opts AdoptOptsBuilder) AdoptResult {
 		return res
 	}
 
-	// Send request to API
-	_, res.Err = c.Request("POST", adoptURL(c), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{201},
-	})
+	_, res.Err = c.Post(adoptURL(c), reqBody, &res.Body, nil)
 	return res
 }
 
@@ -302,12 +292,7 @@ func List(c *gophercloud.ServiceClient, opts ListOptsBuilder) pagination.Pager {
 // Get retreives a stack based on the stack name and stack ID.
 func Get(c *gophercloud.ServiceClient, stackName, stackID string) GetResult {
 	var res GetResult
-
-	// Send request to API
-	_, res.Err = c.Request("GET", getURL(c, stackName, stackID), gophercloud.RequestOpts{
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
-	})
+	_, res.Err = c.Get(getURL(c, stackName, stackID), &res.Body, nil)
 	return res
 }
 
@@ -388,22 +373,14 @@ func Update(c *gophercloud.ServiceClient, stackName, stackID string, opts Update
 		return res
 	}
 
-	// Send request to API
-	_, res.Err = c.Request("PUT", updateURL(c, stackName, stackID), gophercloud.RequestOpts{
-		JSONBody: &reqBody,
-		OkCodes:  []int{202},
-	})
+	_, res.Err = c.Put(updateURL(c, stackName, stackID), reqBody, nil, nil)
 	return res
 }
 
 // Delete deletes a stack based on the stack name and stack ID.
 func Delete(c *gophercloud.ServiceClient, stackName, stackID string) DeleteResult {
 	var res DeleteResult
-
-	// Send request to API
-	_, res.Err = c.Request("DELETE", deleteURL(c, stackName, stackID), gophercloud.RequestOpts{
-		OkCodes: []int{204},
-	})
+	_, res.Err = c.Delete(deleteURL(c, stackName, stackID), nil)
 	return res
 }
 
@@ -498,10 +475,8 @@ func Preview(c *gophercloud.ServiceClient, opts PreviewOptsBuilder) PreviewResul
 	}
 
 	// Send request to API
-	_, res.Err = c.Request("POST", previewURL(c), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
+	_, res.Err = c.Post(previewURL(c), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 	return res
 }
@@ -510,9 +485,7 @@ func Preview(c *gophercloud.ServiceClient, opts PreviewOptsBuilder) PreviewResul
 // resources intact, and returns data describing the stack and its resources.
 func Abandon(c *gophercloud.ServiceClient, stackName, stackID string) AbandonResult {
 	var res AbandonResult
-
-	// Send request to API
-	_, res.Err = c.Request("DELETE", abandonURL(c, stackName, stackID), gophercloud.RequestOpts{
+	_, res.Err = c.Delete(abandonURL(c, stackName, stackID), &gophercloud.RequestOpts{
 		JSONResponse: &res.Body,
 		OkCodes:      []int{200},
 	})

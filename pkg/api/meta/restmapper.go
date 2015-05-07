@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -115,7 +115,9 @@ func NewDefaultRESTMapper(versions []string, f VersionInterfacesFunc) *DefaultRE
 func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, version string, mixedCase bool) {
 	plural, singular := kindToResource(kind, mixedCase)
 	meta := typeMeta{APIVersion: version, Kind: kind}
-	if _, ok := m.mapping[plural]; !ok {
+	_, ok1 := m.mapping[plural]
+	_, ok2 := m.mapping[strings.ToLower(plural)]
+	if !ok1 && !ok2 {
 		m.mapping[plural] = meta
 		m.mapping[singular] = meta
 		if strings.ToLower(plural) != plural {
@@ -138,20 +140,24 @@ func kindToResource(kind string, mixedCase bool) (plural, singular string) {
 	} else {
 		singular = strings.ToLower(kind)
 	}
-	switch string(singular[len(singular)-1]) {
-	case "s":
-		plural = singular
-	case "y":
-		plural = strings.TrimSuffix(singular, "y") + "ies"
-	default:
-		plural = singular + "s"
+	if strings.HasSuffix(singular, "status") {
+		plural = strings.TrimSuffix(singular, "status") + "statuses"
+	} else {
+		switch string(singular[len(singular)-1]) {
+		case "s":
+			plural = singular
+		case "y":
+			plural = strings.TrimSuffix(singular, "y") + "ies"
+		default:
+			plural = singular + "s"
+		}
 	}
 	return
 }
 
 // VersionAndKindForResource implements RESTMapper
 func (m *DefaultRESTMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
-	meta, ok := m.mapping[resource]
+	meta, ok := m.mapping[strings.ToLower(resource)]
 	if !ok {
 		return "", "", fmt.Errorf("no resource %q has been defined", resource)
 	}
@@ -215,7 +221,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		return nil, fmt.Errorf("the provided version %q has no relevant versions", version)
 	}
 
-	return &RESTMapping{
+	retVal := &RESTMapping{
 		Resource:   resource,
 		APIVersion: version,
 		Kind:       kind,
@@ -224,5 +230,65 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		Codec:            interfaces.Codec,
 		ObjectConvertor:  interfaces.ObjectConvertor,
 		MetadataAccessor: interfaces.MetadataAccessor,
-	}, nil
+	}
+
+	return retVal, nil
+}
+
+// aliasToResource is used for mapping aliases to resources
+var aliasToResource = map[string][]string{}
+
+// AddResourceAlias maps aliases to resources
+func (m *DefaultRESTMapper) AddResourceAlias(alias string, resources ...string) {
+	if len(resources) == 0 {
+		return
+	}
+	aliasToResource[alias] = resources
+}
+
+// AliasesForResource returns whether a resource has an alias or not
+func (m *DefaultRESTMapper) AliasesForResource(alias string) ([]string, bool) {
+	if res, ok := aliasToResource[alias]; ok {
+		return res, true
+	}
+	return nil, false
+}
+
+// MultiRESTMapper is a wrapper for multiple RESTMappers.
+type MultiRESTMapper []RESTMapper
+
+// VersionAndKindForResource provides the Version and Kind  mappings for the
+// REST resources. This implementation supports multiple REST schemas and return
+// the first match.
+func (m MultiRESTMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
+	for _, t := range m {
+		defaultVersion, kind, err = t.VersionAndKindForResource(resource)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
+// RESTMapping provides the REST mapping for the resource based on the resource
+// kind and version. This implementation supports multiple REST schemas and
+// return the first match.
+func (m MultiRESTMapper) RESTMapping(kind string, versions ...string) (mapping *RESTMapping, err error) {
+	for _, t := range m {
+		mapping, err = t.RESTMapping(kind, versions...)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
+// AliasesForResource finds the first alias response for the provided mappers.
+func (m MultiRESTMapper) AliasesForResource(alias string) (aliases []string, ok bool) {
+	for _, t := range m {
+		if aliases, ok = t.AliasesForResource(alias); ok {
+			return
+		}
+	}
+	return nil, false
 }

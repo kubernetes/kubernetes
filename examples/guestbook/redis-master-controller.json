@@ -1,30 +1,37 @@
 {
-  "id": "redis-master-controller",
-  "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "replicas": 1,
-    "replicaSelector": {"name": "redis-master"},
-    "podTemplate": {
-      "desiredState": {
-        "manifest": {
-          "version": "v1beta1",
-          "id": "redis-master",
-          "containers": [{
-            "name": "redis-master",
-            "image": "gcr.io/google_containers/redis",
-            "ports": [{"containerPort": 6379}]
-          }]
-        }
-      },
-      "labels": {
-        "name": "redis-master",
-        "app": "redis"
+   "kind":"ReplicationController",
+   "apiVersion":"v1beta3",
+   "metadata":{
+      "name":"redis-master",
+      "labels":{
+         "name":"redis-master"
       }
-    }
-  },
-  "labels": {
-    "name": "redis-master"
-  }
+   },
+   "spec":{
+      "replicas":1,
+      "selector":{
+         "name":"redis-master"
+      },
+      "template":{
+         "metadata":{
+            "labels":{
+               "name":"redis-master"
+            }
+         },
+         "spec":{
+            "containers":[
+               {
+                  "name":"master",
+                  "image":"redis",
+                  "ports":[
+                     {
+                        "containerPort":6379,
+                        "protocol":"TCP"
+                     }
+                  ]
+               }
+            ]
+         }
+      }
+   }
 }
-    

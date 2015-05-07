@@ -42,7 +42,7 @@ Now visit the the [demo website](http://localhost:8001/static).  You won't see a
 Now we will turn up two replicas of an image.  They all serve on internal port 80.
 
 ```bash
-$ ./cluster/kubectl.sh create -f examples/update-demo/v1beta1/nautilus-rc.yaml
+$ ./cluster/kubectl.sh create -f examples/update-demo/nautilus-rc.yaml
 ```
 
 After pulling the image from the Docker Hub to your worker nodes (which may take a minute or so) you'll see a couple of squares in the UI detailing the pods that are running along with the image that they are serving up.  A cute little nautilus.
@@ -61,7 +61,7 @@ If you go back to the [demo website](http://localhost:8001/static/index.html) yo
 We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
 ```bash
-$ ./cluster/kubectl.sh rolling-update update-demo-nautilus --update-period=10s -f examples/update-demo/v1beta1/kitten-rc.yaml
+$ ./cluster/kubectl.sh rolling-update update-demo-nautilus --update-period=10s -f examples/update-demo/kitten-rc.yaml
 ```
 The rolling-update command in kubectl will do 2 things:
 
@@ -106,7 +106,7 @@ $ export DOCKER_HUB_USER=my-docker-id
 $ ./examples/update-demo/build-images.sh
 ```
 
-To use your custom docker image in the above examples, you will need to change the image name in `examples/update-demo/v1beta1/nautilus-rc.yaml` and `examples/update-demo/v1beta1/kitten-rc.yaml`.
+To use your custom docker image in the above examples, you will need to change the image name in `examples/update-demo/nautilus-rc.yaml` and `examples/update-demo/kitten-rc.yaml`.
 
 ### Image Copyright
 

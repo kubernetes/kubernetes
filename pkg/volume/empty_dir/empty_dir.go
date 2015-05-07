@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,21 +30,14 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return ProbeVolumePluginsWithMounter(mount.New())
-}
-
-// ProbePluginsWithMounter is a convenience for testing other plugins which wrap this one.
-//FIXME: alternative: pass mount.Interface to all ProbeVolumePlugins() functions?  Opinions?
-func ProbeVolumePluginsWithMounter(mounter mount.Interface) []volume.VolumePlugin {
 	return []volume.VolumePlugin{
-		&emptyDirPlugin{nil, mounter, false},
-		&emptyDirPlugin{nil, mounter, true},
+		&emptyDirPlugin{nil, false},
+		&emptyDirPlugin{nil, true},
 	}
 }
 
 type emptyDirPlugin struct {
 	host       volume.VolumeHost
-	mounter    mount.Interface
 	legacyMode bool // if set, plugin answers to the legacy name
 }
 
@@ -78,9 +71,8 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
-	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, podRef, plugin.mounter, &realMountDetector{plugin.mounter}, opts)
+func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+	return plugin.newBuilderInternal(spec, podRef, mounter, &realMountDetector{mounter}, opts)
 }
 
 func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Builder, error) {
@@ -104,9 +96,9 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.
 	}, nil
 }
 
-func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, plugin.mounter, &realMountDetector{plugin.mounter})
+	return plugin.newCleanerInternal(volName, podUID, mounter, &realMountDetector{mounter})
 }
 
 func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Cleaner, error) {
@@ -197,6 +189,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 	if isMnt && medium == mediumMemory {
 		return nil
 	}
+
 	// By default a tmpfs mount will receive a different SELinux context
 	// from that of the Kubelet root directory which is not readable from
 	// the SELinux context of a docker container.
@@ -206,15 +199,15 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 	// the container.
 	opts := ed.getTmpfsMountOptions()
 	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v with opts %v", ed.podUID, ed.volName, opts)
-	return ed.mounter.Mount("tmpfs", dir, "tmpfs", 0, opts)
+	return ed.mounter.Mount("tmpfs", dir, "tmpfs", opts)
 }
 
-func (ed *emptyDir) getTmpfsMountOptions() string {
+func (ed *emptyDir) getTmpfsMountOptions() []string {
 	if ed.rootContext == "" {
-		return ""
+		return []string{""}
 	}
 
-	return fmt.Sprintf("rootcontext=\"%v\"", ed.rootContext)
+	return []string{fmt.Sprintf("rootcontext=\"%v\"", ed.rootContext)}
 }
 
 func (ed *emptyDir) GetPath() string {
@@ -261,7 +254,7 @@ func (ed *emptyDir) teardownTmpfs(dir string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
-	if err := ed.mounter.Unmount(dir, 0); err != nil {
+	if err := ed.mounter.Unmount(dir); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(dir); err != nil {

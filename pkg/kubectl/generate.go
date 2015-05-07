@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
@@ -38,13 +37,6 @@ type Generator interface {
 	Generate(params map[string]string) (runtime.Object, error)
 	// ParamNames returns the list of parameters that this generator uses
 	ParamNames() []GeneratorParam
-}
-
-// Generators is a global list of known generators.
-// TODO: Dynamically create this from a list of template files?
-var Generators map[string]Generator = map[string]Generator{
-	"run-container/v1": BasicReplicationController{},
-	"service/v1":       ServiceGenerator{},
 }
 
 // ValidateParams ensures that all required params are present in the params map
@@ -81,19 +73,18 @@ func MakeLabels(labels map[string]string) string {
 }
 
 // ParseLabels turns a string representation of a label set into a map[string]string
-func ParseLabels(labelString string) map[string]string {
+func ParseLabels(labelString string) (map[string]string, error) {
 	if len(labelString) == 0 {
-		return nil
+		return nil, fmt.Errorf("no label spec passed")
 	}
 	labels := map[string]string{}
 	labelSpecs := strings.Split(labelString, ",")
 	for ix := range labelSpecs {
 		labelSpec := strings.Split(labelSpecs[ix], "=")
 		if len(labelSpec) != 2 {
-			glog.Errorf("unexpected label spec: %s", labelSpecs[ix])
-			continue
+			return nil, fmt.Errorf("unexpected label spec: %s", labelSpecs[ix])
 		}
 		labels[labelSpec[0]] = labelSpec[1]
 	}
-	return labels
+	return labels, nil
 }

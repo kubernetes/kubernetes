@@ -162,11 +162,9 @@ func (self *containerData) nextHousekeeping(lastHousekeeping time.Time) time.Tim
 				if self.housekeepingInterval > *maxHousekeepingInterval {
 					self.housekeepingInterval = *maxHousekeepingInterval
 				}
-				glog.V(3).Infof("Raising housekeeping interval for %q to %v", self.info.Name, self.housekeepingInterval)
 			} else if self.housekeepingInterval != *HousekeepingInterval {
 				// Lower interval back to the baseline.
 				self.housekeepingInterval = *HousekeepingInterval
-				glog.V(3).Infof("Lowering housekeeping interval for %q to %v", self.info.Name, self.housekeepingInterval)
 			}
 		}
 	}
@@ -270,7 +268,6 @@ func (c *containerData) updateLoad(newLoad uint64) {
 	} else {
 		c.loadAvg = c.loadAvg*loadDecay + float64(newLoad)*(1.0-loadDecay)
 	}
-	glog.V(3).Infof("New load for %q: %v. latest sample: %d", c.info.Name, c.loadAvg, newLoad)
 }
 
 func (c *containerData) updateStats() error {

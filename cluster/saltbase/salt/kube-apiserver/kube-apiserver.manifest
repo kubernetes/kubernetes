@@ -24,6 +24,7 @@
 
 {% set address = "--address=127.0.0.1" -%}
 
+{% set cluster_name = "" -%}
 {% if pillar['instance_prefix'] is defined -%}
   {% set cluster_name = "--cluster_name=" + pillar['instance_prefix'] -%}
 {% endif -%}
@@ -35,20 +36,32 @@
 
 {% set etcd_servers = "--etcd_servers=http://127.0.0.1:4001" -%}
 
+{% set portal_net = "" -%}
 {% if pillar['portal_net'] is defined -%}
   {% set portal_net = "--portal_net=" + pillar['portal_net'] -%}
 {% endif -%}
 
 {% set cert_file = "--tls_cert_file=/srv/kubernetes/server.cert" -%}
 {% set key_file = "--tls_private_key_file=/srv/kubernetes/server.key" -%}
+{% set client_ca_file = "" -%}
 
-{% set secure_port = "--secure_port=6443" -%}
+{% set secure_port = "6443" -%}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce' ]    %}
+  {% set secure_port = "443" -%}
+  {% set client_ca_file = "--client_ca_file=/srv/kubernetes/ca.crt" -%}
+{% endif -%}
+
 {% set token_auth_file = "--token_auth_file=/dev/null" -%}
+{% set basic_auth_file = "" -%}
 
 {% if grains.cloud is defined -%}
 {% if grains.cloud in [ 'aws', 'gce', 'vagrant' ] -%}
     {% set token_auth_file = "--token_auth_file=/srv/kubernetes/known_tokens.csv" -%}
 {% endif -%}
+{% endif -%}
+
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce' ]  %}
+  {% set basic_auth_file = "--basic_auth_file=/srv/kubernetes/basic_auth.csv" -%}
 {% endif -%}
 
 {% set admission_control = "" -%}
@@ -61,6 +74,10 @@
  {% set runtime_config = "--runtime_config=" + grains.runtime_config -%}
 {% endif -%}
 
+{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + portal_net + " " + client_ca_file + " " + basic_auth_file -%}
+{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure_port=" + secure_port + " " + token_auth_file + " " + publicAddressOverride + " " + pillar['log_level'] -%}
+
+
 {
 "apiVersion": "v1beta3",
 "kind": "Pod",
@@ -72,27 +89,14 @@
     "name": "kube-apiserver",
     "image": "gcr.io/google_containers/kube-apiserver:{{pillar['kube-apiserver_docker_tag']}}",
     "command": [
-                 "/kube-apiserver",
-                 "{{address}}",
-                 "{{etcd_servers}}",
-                 "{{ cloud_provider }}",
-                 "{{ cloud_config }}",
-                 "{{ runtime_config }}",
-                 "{{admission_control}}",
-                 "--allow_privileged={{pillar['allow_privileged']}}",
-                 "{{portal_net}}",
-                 "{{cluster_name}}",
-                 "{{cert_file}}",
-                 "{{key_file}}",
-                 "{{secure_port}}",
-                 "{{token_auth_file}}",
-                 "{{publicAddressOverride}}",
-                 "{{pillar['log_level']}}"
+                 "/bin/sh",
+                 "-c",
+                 "/usr/local/bin/kube-apiserver {{params}} --allow_privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
                ],
     "ports":[
       { "name": "https",
-        "containerPort": 6443,
-        "hostPort": 6443},{
+        "containerPort": {{secure_port}},
+        "hostPort": {{secure_port}}},{
        "name": "http",
         "containerPort": 7080,
         "hostPort": 7080},{
@@ -104,6 +108,9 @@
         { "name": "srvkube",
         "mountPath": "/srv/kubernetes",
         "readOnly": true},
+        { "name": "logfile",
+        "mountPath": "/var/log/kube-apiserver.log",
+        "readOnly": false},
         { "name": "etcssl",
         "mountPath": "/etc/ssl",
         "readOnly": true},
@@ -135,6 +142,10 @@
   { "name": "srvkube",
     "hostPath": {
         "path": "/srv/kubernetes"}
+  },
+  { "name": "logfile",
+    "hostPath": {
+        "path": "/var/log/kube-apiserver.log"}
   },
   { "name": "etcssl",
     "hostPath": {

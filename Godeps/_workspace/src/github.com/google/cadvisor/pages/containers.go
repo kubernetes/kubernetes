@@ -242,6 +242,6 @@ func serveContainersPage(m manager.Manager, w http.ResponseWriter, u *url.URL) e
 		glog.Errorf("Failed to apply template: %s", err)
 	}
 
-	glog.V(1).Infof("Request took %s", time.Since(start))
+	glog.V(5).Infof("Request took %s", time.Since(start))
 	return nil
 }

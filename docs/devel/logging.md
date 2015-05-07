@@ -1,7 +1,7 @@
 Logging Conventions
 ===================
 
-The following conventions for the glog levels to use.  [glog](http://godoc.org/github.com/golang/glog) is globally prefered to [log](http://golang.org/pkg/log/) for better runtime control.
+The following conventions for the glog levels to use.  [glog](http://godoc.org/github.com/golang/glog) is globally preferred to [log](http://golang.org/pkg/log/) for better runtime control.
 
 * glog.Errorf() - Always an error
 * glog.Warningf() - Something unexpected, but probably not an error

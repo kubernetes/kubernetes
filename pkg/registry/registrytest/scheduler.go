@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,11 +23,11 @@ import (
 
 type Scheduler struct {
 	Err     error
-	Pod     api.Pod
+	Pod     *api.Pod
 	Machine string
 }
 
-func (s *Scheduler) Schedule(pod api.Pod, lister scheduler.MinionLister) (string, error) {
+func (s *Scheduler) Schedule(pod *api.Pod, lister scheduler.MinionLister) (string, error) {
 	s.Pod = pod
 	return s.Machine, s.Err
 }

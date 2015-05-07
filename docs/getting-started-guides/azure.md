@@ -19,9 +19,14 @@ The cluster setup scripts can setup Kubernetes for multiple targets. First modif
 
     KUBERNETES_PROVIDER="azure"
 
-Next, specify an existing virtual network in `cluster/azure/config-defualt.sh`:
+Next, specify an existing virtual network and subnet in `cluster/azure/config-default.sh`:
 
     AZ_VNET=<vnet name>
+    AZ_SUBNET=<subnet name>
+
+You can create a virtual network:
+
+    azure network vnet create <vnet name> --subnet=<subnet name> --location "West US" -v
 
 Now you're ready.
 
@@ -41,7 +46,7 @@ The `kubectl.sh` line below spins up two containers running
 [Nginx](http://nginx.org/en/) running on port 80:
 
 ```bash
-cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
+cluster/kubectl.sh run-container my-nginx --image=nginx --replicas=2 --port=80
 ```
 
 To stop the containers:
@@ -80,7 +85,7 @@ Where pod.json contains something like:
       "id": "php",
       "containers": [{
         "name": "nginx",
-        "image": "dockerfile/nginx",
+        "image": "nginx",
         "ports": [{
           "containerPort": 80,
           "hostPort": 8080

@@ -1,0 +1,18 @@
+id: name
+kind: Pod
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    version: v1beta1
+    id: redis-master
+    containers:
+      - name: "master"
+        image: "redis"
+        command:
+                - this
+                - is
+                - an
+                - ok
+                - command
+labels:
+  name: "redis-master"

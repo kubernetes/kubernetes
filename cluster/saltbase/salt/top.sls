@@ -33,7 +33,9 @@ base:
     - kube-controller-manager
     - kube-scheduler
     - monit
+{% if grains['cloud'] is defined and not grains.cloud in [ 'aws', 'gce' ] %}
     - nginx
+{% endif %}
     - cadvisor
     - kube-client-tools
     - kube-master-addons
@@ -56,14 +58,6 @@ base:
 {% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
     - docker
     - kubelet
-{% endif %}
-
-{% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
-  {% if pillar['logging_destination'] == 'elasticsearch' %}
-    - fluentd-es
-  {% elif pillar['logging_destination'] == 'gcp' %}
-    - fluentd-gcp
-  {% endif %}
 {% endif %}
 
   'roles:kubernetes-pool-vsphere':

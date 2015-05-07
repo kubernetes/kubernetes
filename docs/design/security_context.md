@@ -32,7 +32,7 @@ Processes in pods will need to have consistent UID/GID/SELinux category labels i
 * The concept of a security context should not be tied to a particular security mechanism or platform 
   (ie. SELinux, AppArmor)
 * Applying a different security context to a scope (namespace or pod) requires a solution such as the one proposed for
-  [service accounts](https://github.com/GoogleCloudPlatform/kubernetes/pull/2297).
+  [service accounts](./service_accounts.md).
 
 ## Use Cases
 

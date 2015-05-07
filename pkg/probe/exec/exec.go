@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ func (pr execProber) Probe(e uexec.Cmd) (probe.Result, error) {
 	if err != nil {
 		return probe.Unknown, err
 	}
-	if strings.ToLower(string(data)) != defaultHealthyOutput {
+	if !strings.HasPrefix(strings.ToLower(string(data)), defaultHealthyOutput) {
 		return probe.Failure, nil
 	}
 	return probe.Success, nil

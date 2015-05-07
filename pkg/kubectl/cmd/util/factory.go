@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -47,8 +48,9 @@ const (
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
 // commands are decoupled from the factory).
 type Factory struct {
-	clients *clientCache
-	flags   *pflag.FlagSet
+	clients    *clientCache
+	flags      *pflag.FlagSet
+	generators map[string]kubectl.Generator
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
@@ -76,6 +78,8 @@ type Factory struct {
 	Validator func() (validation.Schema, error)
 	// Returns the default namespace to use in cases where no other namespace is specified
 	DefaultNamespace func() (string, error)
+	// Returns the generator for the provided generator name
+	Generator func(name string) (kubectl.Generator, bool)
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -85,6 +89,12 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	mapper := kubectl.ShortcutExpander{latest.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+
+	generators := map[string]kubectl.Generator{
+		"run-container/v1": kubectl.BasicReplicationController{},
+		"service/v1":       kubectl.ServiceGenerator{},
+	}
 
 	clientConfig := optionalClientConfig
 	if optionalClientConfig == nil {
@@ -97,8 +107,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 
 	return &Factory{
-		clients: clients,
-		flags:   flags,
+		clients:    clients,
+		flags:      flags,
+		generators: generators,
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
@@ -148,23 +159,23 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return kubectl.MakeLabels(rc.Spec.Selector), nil
 			case "Pod":
-				rc, err := client.Pods(namespace).Get(name)
+				pod, err := client.Pods(namespace).Get(name)
 				if err != nil {
 					return "", err
 				}
-				if len(rc.Labels) == 0 {
+				if len(pod.Labels) == 0 {
 					return "", fmt.Errorf("the pod has no labels and cannot be exposed")
 				}
-				return kubectl.MakeLabels(rc.Labels), nil
+				return kubectl.MakeLabels(pod.Labels), nil
 			case "Service":
-				rc, err := client.ReplicationControllers(namespace).Get(name)
+				svc, err := client.Services(namespace).Get(name)
 				if err != nil {
 					return "", err
 				}
-				if rc.Spec.Selector == nil {
+				if svc.Spec.Selector == nil {
 					return "", fmt.Errorf("the service has no pod selector set")
 				}
-				return kubectl.MakeLabels(rc.Spec.Selector), nil
+				return kubectl.MakeLabels(svc.Spec.Selector), nil
 			default:
 				return "", fmt.Errorf("it is not possible to get a pod selector from %s", mapping.Kind)
 			}
@@ -197,7 +208,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ResizerFor(mapping.Kind, client)
+			return kubectl.ResizerFor(mapping.Kind, kubectl.NewResizerClient(client))
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)
@@ -219,13 +230,17 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		DefaultNamespace: func() (string, error) {
 			return clientConfig.Namespace()
 		},
+		Generator: func(name string) (kubectl.Generator, bool) {
+			generator, ok := generators[name]
+			return generator, ok
+		},
 	}
 }
 
 // BindFlags adds any flags that are common to all kubectl sub commands.
 func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// any flags defined by external projects (not part of pflags)
-	util.AddAllFlagsToPFlagSet(flags)
+	util.AddFlagSetToPFlagSet(flag.CommandLine, flags)
 
 	// This is necessary as github.com/spf13/cobra doesn't support "global"
 	// pflags currently.  See https://github.com/spf13/cobra/issues/44.
@@ -286,11 +301,11 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
 //   1.  Use the kubeconfig builder.  The number of merges and overrides here gets a little crazy.  Stay with me.
-//       1.  Merge together the kubeconfig itself.  This is done with the following hierarchy and merge rules:
-//           1.  CommandLineLocation - this parsed from the command line, so it must be late bound
-//           2.  EnvVarLocation
-//           3.  CurrentDirectoryLocation
-//           4.  HomeDirectoryLocation
+//       1.  Merge together the kubeconfig itself.  This is done with the following hierarchy rules:
+//           1.  CommandLineLocation - this parsed from the command line, so it must be late bound.  If you specify this,
+//               then no other kubeconfig files are merged.  This file must exist.
+//           2.  If $KUBECONFIG is set, then it is treated as a list of files that should be merged.
+//			 3.  HomeDirectoryLocation
 //           Empty filenames are ignored.  Files with non-deserializable content produced errors.
 //           The first file to set a particular value or map key wins and the value or map key is never changed.
 //           This means that the first file to set CurrentContext will have its context preserved.  It also means

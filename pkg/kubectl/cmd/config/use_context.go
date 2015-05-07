@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,12 +25,12 @@ import (
 )
 
 type useContextOptions struct {
-	pathOptions *PathOptions
-	contextName string
+	configAccess ConfigAccess
+	contextName  string
 }
 
-func NewCmdConfigUseContext(out io.Writer, pathOptions *PathOptions) *cobra.Command {
-	options := &useContextOptions{pathOptions: pathOptions}
+func NewCmdConfigUseContext(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+	options := &useContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:   "use-context CONTEXT_NAME",
@@ -57,14 +57,14 @@ func (o useContextOptions) run() error {
 		return err
 	}
 
-	config, err := o.pathOptions.getStartingConfig()
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
 
 	config.CurrentContext = o.contextName
 
-	if err := o.pathOptions.ModifyConfig(*config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config); err != nil {
 		return err
 	}
 
@@ -87,5 +87,5 @@ func (o useContextOptions) validate() error {
 		return errors.New("You must specify a current-context")
 	}
 
-	return o.pathOptions.Validate()
+	return nil
 }

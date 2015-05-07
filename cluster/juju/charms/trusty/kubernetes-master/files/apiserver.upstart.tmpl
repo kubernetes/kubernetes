@@ -1,0 +1,20 @@
+description "Kubernetes Controller"
+
+start on runlevel [2345]
+stop on runlevel [!2345]
+
+limit nofile 20000 20000
+
+kill timeout 30 # wait 30s between SIGTERM and SIGKILL.
+
+exec /usr/local/bin/apiserver \
+     --address=%(api_bind_address)s \
+     --etcd_servers=%(etcd_servers)s \
+     --logtostderr=true \
+     --portal_net=10.244.240.0/20
+
+
+
+
+
+

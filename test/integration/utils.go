@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,16 @@ package integration
 import (
 	"fmt"
 	"math/rand"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -54,4 +64,28 @@ func deleteAllEtcdKeys() {
 		}
 	}
 
+}
+
+func runAMaster(t *testing.T) (*master.Master, *httptest.Server) {
+	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := master.New(&master.Config{
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableProfiling:   true,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:  admit.NewAlwaysAdmit(),
+	})
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+
+	return m, s
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -249,4 +249,12 @@ func (v *OVirtCloud) List(filter string) ([]string, error) {
 
 func (v *OVirtCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	return nil, nil
+}
+
+func (v *OVirtCloud) Configure(name string, spec *api.NodeSpec) error {
+	return nil
+}
+
+func (v *OVirtCloud) Release(name string) error {
+	return nil
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+
 	"github.com/spf13/cobra"
 )
 
@@ -33,13 +35,13 @@ Looks up a replication controller or service by name and uses the selector for t
 selector for a new Service on the specified port.`
 
 	expose_example = `// Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
-$ kubectl expose nginx --port=80 --target-port=8000
+$ kubectl expose rc nginx --port=80 --target-port=8000
 
 // Creates a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
 $ kubectl expose service nginx --port=443 --target-port=8443 --service-name=nginx-https
 
 // Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
-$ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream`
+$ kubectl expose rc streamer --port=4100 --protocol=udp --service-name=video-stream`
 )
 
 func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -57,6 +59,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("generator", "service/v1", "The name of the API generator to use.  Default is 'service/v1'.")
 	cmd.Flags().String("protocol", "TCP", "The network protocol for the service to be created. Default is 'tcp'.")
 	cmd.Flags().Int("port", -1, "The port that the service should serve on. Required.")
+	cmd.MarkFlagRequired("port")
 	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default is 'false'.")
 	cmd.Flags().String("selector", "", "A label selector to use for this service. If empty (the default) infer the selector from the replication controller.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
@@ -70,10 +73,10 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	var name, resource string
+	var name, res string
 	switch l := len(args); {
 	case l == 2:
-		resource, name = args[0], args[1]
+		res, name = args[0], args[1]
 	default:
 		return cmdutil.UsageError(cmd, "the type and name of a resource to expose are required arguments")
 	}
@@ -82,14 +85,10 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if err != nil {
 		return err
 	}
-	client, err := f.Client()
-	if err != nil {
-		return err
-	}
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 
-	generator, found := kubectl.Generators[generatorName]
+	generator, found := f.Generator(generatorName)
 	if !found {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generator))
 	}
@@ -100,13 +99,14 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	} else {
 		params["name"] = cmdutil.GetFlagString(cmd, "service-name")
 	}
+	var mapping *meta.RESTMapping
 	if s, found := params["selector"]; !found || len(s) == 0 || cmdutil.GetFlagInt(cmd, "port") < 1 {
 		mapper, _ := f.Object()
-		v, k, err := mapper.VersionAndKindForResource(resource)
+		v, k, err := mapper.VersionAndKindForResource(res)
 		if err != nil {
 			return err
 		}
-		mapping, err := mapper.RESTMapping(k, v)
+		mapping, err = mapper.RESTMapping(k, v)
 		if err != nil {
 			return err
 		}
@@ -117,7 +117,14 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			}
 			params["selector"] = s
 		}
-		if cmdutil.GetFlagInt(cmd, "port") < 0 {
+		noPorts := true
+		for _, param := range names {
+			if param.Name == "port" {
+				noPorts = false
+				break
+			}
+		}
+		if cmdutil.GetFlagInt(cmd, "port") < 0 && !noPorts {
 			ports, err := f.PortsForResource(mapping, namespace, name)
 			if err != nil {
 				return err
@@ -140,14 +147,14 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return err
 	}
 
-	service, err := generator.Generate(params)
+	object, err := generator.Generate(params)
 	if err != nil {
 		return err
 	}
 
 	inline := cmdutil.GetFlagString(cmd, "overrides")
 	if len(inline) > 0 {
-		service, err = cmdutil.Merge(service, inline, "Service")
+		object, err = cmdutil.Merge(object, inline, mapping.Kind)
 		if err != nil {
 			return err
 		}
@@ -155,11 +162,21 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 	// TODO: extract this flag to a central location, when such a location exists.
 	if !cmdutil.GetFlagBool(cmd, "dry-run") {
-		service, err = client.Services(namespace).Create(service.(*api.Service))
+		mapper, typer := f.Object()
+		resourceMapper := &resource.Mapper{typer, mapper, f.ClientMapperForCommand()}
+		info, err := resourceMapper.InfoForObject(object)
+		if err != nil {
+			return err
+		}
+		data, err := info.Mapping.Codec.Encode(object)
+		if err != nil {
+			return err
+		}
+		_, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, data)
 		if err != nil {
 			return err
 		}
 	}
 
-	return f.PrintObject(cmd, service, out)
+	return f.PrintObject(cmd, object, out)
 }

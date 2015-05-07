@@ -205,7 +205,7 @@ On of the easiest ways to get readily involved in our project is to let us know
 about your experiences using our SDK. Feedback like this is incredibly useful
 to us, because it allows us to refine and change features based on what our
 users want and expect of us. There are a bunch of ways to get in contact! You
-can [ping us](mailto:sdk-support@rackspace.com) via e-mail, talk to us on irc
+can [ping us](https://developer.rackspace.com/support/) via e-mail, talk to us on irc
 (#rackspace-dev on freenode), [tweet us](https://twitter.com/rackspace), or
 submit an issue on our [bug tracker](/issues). Things you might like to tell us
 are:

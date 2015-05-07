@@ -1,14 +1,22 @@
 {
-  "id": "frontend",
-  "kind": "Service",
-  "apiVersion": "v1beta1",
-  "port": 8000,
-  "containerPort": "http-server",
-  "selector": {
-    "name": "frontend"
-  },
-  "labels": {
-    "name": "frontend"
-  },
-  "createExternalLoadBalancer": true
+   "kind":"Service",
+   "apiVersion":"v1beta3",
+   "metadata":{
+      "name":"frontend",
+      "labels":{
+         "name":"frontend"
+      }
+   },
+   "spec":{
+      "ports": [
+        {
+          "port":80,
+          "targetPort":80,
+          "protocol":"TCP"
+        }
+      ],
+      "selector":{
+         "name":"frontend"
+      }
+   }
 }

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="kubernetesApp">
+<head>
+  <title>Kubernetes UI</title>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="description" content="">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <link rel="stylesheet" href="vendor/angular-material/angular-material.css">
+  <link rel="stylesheet" href="assets/css/app.css" >
+  <link rel="shortcut icon" href="assets/img/icons/favicon.png" type="image/vnd.microsoft.icon" />
+</head>
+<body layout="row">
+  <md-sidenav layout="column"
+              md-is-locked-open="shouldLockOpen()"
+              style="overflow: hidden; display: flex;"
+              class="site-sidenav md-sidenav-left md-whiteframe-z2"
+              md-component-id="left"
+              md-closed>
+    <md-toolbar>
+      <h1 class="md-toolbar-tools">
+        <a ng-href="/" layout="row" flex>
+          <span class="kubernetes-ui-logo"></span>
+          <div style="line-height:40px; text-indent: 15px;">Kubernetes</div>
+        </a>
+      </h1>
+    </md-toolbar>
+    <md-content flex>
+    <div kubernetes-ui-menu role="kubernetes-ui-menu"></div>
+      <div compile="sidenavLeft"></div>
+    </md-content>
+  </md-sidenav>
+  <div layout="column" layout-fill tabIndex="-1" role="main" flex>
+    <md-toolbar>
+      <div class="md-toolbar-tools">
+      <h1 class="md-toolbar-tools">
+        <a ng-href="/" layout="row" flex>
+          <span class="kubernetes-ui-logo"></span>
+          <div style="line-height:40px; text-indent: 15px;">Kubernetes</div>
+        </a>
+      </h1>
+      </div>
+    </md-toolbar>
+    <md-content md-scroll-y flex>
+    <md-whiteframe layout layout-align="center center">
+      <div ng-controller="TabCtrl" class="tabsDefaultTabs">
+        <md-tabs md-selected="0">
+          <md-tab ng-repeat="tab in tabs" md-on-select="switchTab($index)" label="{{tab.title}}">
+            <div class="demo-tab tab{{$index%4}}" layout="column" layout-fill></div>
+          </md-tab>
+        </md-tabs>
+        <div ng-view layout="column" layout-fill role="main"></div>
+      </div>
+    </md-whiteframe>
+    </md-content>
+  </div>
+  <script src="assets/js/base.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 // +build linux
 
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,17 +31,5 @@ func (kl *Kubelet) getRootDirContext() (string, error) {
 	}
 
 	// Get the SELinux context of the rootDir.
-	rootContext, err := selinux.Getfilecon(kl.getRootDir())
-	if err != nil {
-		return "", err
-	}
-
-	// There is a libcontainer bug where the null byte is not stripped from
-	// the result of reading some selinux xattrs; strip it.
-	//
-	// TODO: remove when https://github.com/docker/libcontainer/issues/499
-	// is fixed
-	rootContext = rootContext[:len(rootContext)-1]
-
-	return rootContext, nil
+	return selinux.Getfilecon(kl.getRootDir())
 }

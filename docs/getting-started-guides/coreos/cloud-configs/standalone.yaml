@@ -2,43 +2,29 @@
 
 ---
 write_files:
-- path: /opt/bin/waiter.sh
-  owner: root
-  content: |
-    #! /usr/bin/bash
-    until curl http://127.0.0.1:4001/v2/machines; do sleep 2; done
-hostname: standalone
+hostname: master
 coreos:
-  flannel:
-    interface: eth1
+  etcd2:
+    name: master
+    listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    advertise-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    initial-cluster-token: k8s_etcd
+    listen-peer-urls: http://0.0.0.0:2380,http://0.0.0.0:7001
+    initial-advertise-peer-urls: http://0.0.0.0:2380
+    initial-cluster: master=http://0.0.0.0:2380"
+    initial-cluster-state: new
   units:
     - name: etcd.service
       command: start
     - name: fleet.service
       command: start
-    - name: etcd-waiter.service
-      command: start
-      content: |
-        [Unit]
-        Description=etcd waiter
-        Wants=network-online.target
-        Wants=etcd.service
-        After=etcd.service
-        After=network-online.target
-        Before=flanneld.service
-
-        [Service]
-        ExecStartPre=/usr/bin/chmod +x /opt/bin/waiter.sh
-        ExecStart=/usr/bin/bash /opt/bin/waiter.sh
-        RemainAfterExit=true
-        Type=oneshot
     - name: flanneld.service
       command: start
       drop-ins:
         - name: 50-network-config.conf
           content: |
             [Unit]
-            Requires=etcd.service
+            Requires=etcd2.service
             [Service]
             ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
     - name: docker-cache.service
@@ -86,17 +72,20 @@ coreos:
         [Unit]
         Description=Kubernetes API Server
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=etcd.service
-        After=etcd.service
+        Requires=etcd2.service
+        After=etcd2.service
 
         [Service]
         ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-apiserver
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-apiserver
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
         ExecStart=/opt/bin/kube-apiserver \
-        --address=0.0.0.0 \
+        --allow_privileged=true \
+        --insecure_bind_address=0.0.0.0 \
+        --insecure_port=8080 \
+        --kubelet_https=true \
+        --secure_port=6443 \
         --portal_net=10.100.0.0/16 \
-        --port=8080 \
         --etcd_servers=http://127.0.0.1:4001 \
         --public_address_override=127.0.0.1 \
         --logtostderr=true
@@ -112,7 +101,7 @@ coreos:
         After=kube-apiserver.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-controller-manager
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-controller-manager
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-controller-manager
         ExecStart=/opt/bin/kube-controller-manager \
         --machines=127.0.0.1 \
@@ -130,7 +119,7 @@ coreos:
         After=kube-apiserver.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-scheduler
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-scheduler
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-scheduler
         ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080
         Restart=always
@@ -141,11 +130,11 @@ coreos:
         [Unit]
         Description=Kubernetes Proxy
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=etcd.service
-        After=etcd.service
+        Requires=etcd2.service
+        After=etcd2.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-proxy
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-proxy
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
         ExecStart=/opt/bin/kube-proxy \
         --master=127.0.0.1:8080 \
@@ -158,18 +147,21 @@ coreos:
         [Unit]
         Description=Kubernetes Kubelet
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=etcd.service
-        After=etcd.service
+        Requires=etcd2.service
+        After=etcd2.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kubelet
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kubelet
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet
         ExecStart=/opt/bin/kubelet \
         --address=0.0.0.0 \
         --port=10250 \
         --hostname_override=127.0.0.1 \
         --api_servers=127.0.0.1:8080 \
-        --logtostderr=true
+        --allow_privileged=true \
+        --logtostderr=true \
+        --healthz_bind_address=0.0.0.0 \
+        --healthz_port=10248
         Restart=always
         RestartSec=10
   update:

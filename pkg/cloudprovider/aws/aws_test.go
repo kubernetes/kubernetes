@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -164,12 +164,25 @@ type FakeEC2 struct {
 	instances []ec2.Instance
 }
 
+func contains(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if needle == s {
+			return true
+		}
+	}
+	return false
+}
+
 func (self *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error) {
 	matches := []ec2.Instance{}
 	for _, instance := range self.instances {
-		if filter == nil || filter.Matches(instance) {
-			matches = append(matches, instance)
+		if filter != nil && !filter.Matches(instance) {
+			continue
 		}
+		if instanceIds != nil && !contains(instanceIds, instance.InstanceId) {
+			continue
+		}
+		matches = append(matches, instance)
 	}
 	return &ec2.InstancesResp{"",
 		[]ec2.Reservation{
@@ -267,12 +280,22 @@ func TestList(t *testing.T) {
 	}
 }
 
+func testHasNodeAddress(t *testing.T, addrs []api.NodeAddress, addressType api.NodeAddressType, address string) {
+	for _, addr := range addrs {
+		if addr.Type == addressType && addr.Address == address {
+			return
+		}
+	}
+	t.Errorf("Did not find expected address: %s:%s in %v", addressType, address, addrs)
+}
+
 func TestNodeAddresses(t *testing.T) {
 	// Note these instances have the same name
 	// (we test that this produces an error)
 	instances := make([]ec2.Instance, 2)
 	instances[0].PrivateDNSName = "instance1"
 	instances[0].PrivateIpAddress = "192.168.0.1"
+	instances[0].PublicIpAddress = "1.2.3.4"
 	instances[0].State.Name = "running"
 	instances[1].PrivateDNSName = "instance1"
 	instances[1].PrivateIpAddress = "192.168.0.2"
@@ -295,12 +318,12 @@ func TestNodeAddresses(t *testing.T) {
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
 	}
-	if len(addrs3) != 1 {
-		t.Errorf("Should return exactly one NodeAddress")
+	if len(addrs3) != 3 {
+		t.Errorf("Should return exactly 3 NodeAddresses")
 	}
-	if e, a := instances[0].PrivateIpAddress, addrs3[0].Address; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
+	testHasNodeAddress(t, addrs3, api.NodeInternalIP, "192.168.0.1")
+	testHasNodeAddress(t, addrs3, api.NodeLegacyHostIP, "192.168.0.1")
+	testHasNodeAddress(t, addrs3, api.NodeExternalIP, "1.2.3.4")
 }
 
 func TestGetRegion(t *testing.T) {

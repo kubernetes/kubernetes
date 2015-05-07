@@ -67,10 +67,8 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		return res
 	}
 
-	_, res.Err = client.Request("POST", createURL(client), gophercloud.RequestOpts{
-		OkCodes:      []int{200, 201},
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
+	_, res.Err = client.Post(createURL(client), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 201},
 	})
 	return res
 }
@@ -78,9 +76,7 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 // Delete will delete the existing Snapshot with the provided ID.
 func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = client.Request("DELETE", deleteURL(client, id), gophercloud.RequestOpts{
-		OkCodes: []int{202, 204},
-	})
+	_, res.Err = client.Delete(deleteURL(client, id), nil)
 	return res
 }
 
@@ -88,10 +84,7 @@ func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 // object from the response, call the Extract method on the GetResult.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = client.Request("GET", getURL(client, id), gophercloud.RequestOpts{
-		OkCodes:      []int{200},
-		JSONResponse: &res.Body,
-	})
+	_, res.Err = client.Get(getURL(client, id), &res.Body, nil)
 	return res
 }
 
@@ -173,10 +166,8 @@ func UpdateMetadata(client *gophercloud.ServiceClient, id string, opts UpdateMet
 		return res
 	}
 
-	_, res.Err = client.Request("PUT", updateMetadataURL(client, id), gophercloud.RequestOpts{
-		OkCodes:      []int{200},
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
+	_, res.Err = client.Put(updateMetadataURL(client, id), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 	return res
 }

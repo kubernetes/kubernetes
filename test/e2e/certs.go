@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ var _ = Describe("MasterCerts", func() {
 	})
 
 	It("should have all expected certs on the master", func() {
-		if testContext.Provider != "gce" && testContext.Provider != "gke" {
+		if !providerIs("gce", "gke") {
 			By(fmt.Sprintf("Skipping MasterCerts test for cloud provider %s (only supported for gce and gke)", testContext.Provider))
 			return
 		}
@@ -41,8 +41,8 @@ var _ = Describe("MasterCerts", func() {
 			cmd := exec.Command("gcloud", "compute", "ssh", "--project", testContext.CloudConfig.ProjectID,
 				"--zone", testContext.CloudConfig.Zone, testContext.CloudConfig.MasterName,
 				"--command", fmt.Sprintf("ls /srv/kubernetes/%s", certFile))
-			if _, err := cmd.CombinedOutput(); err != nil {
-				Fail(fmt.Sprintf("Error checking for cert file %s on master: %v", certFile, err))
+			if output, err := cmd.CombinedOutput(); err != nil {
+				Failf("Error checking for cert file %s on master: %v\n%s", certFile, err, string(output))
 			}
 		}
 	})

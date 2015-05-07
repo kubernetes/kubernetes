@@ -67,6 +67,8 @@ func ensureProperEventReturned(t *testing.T, expectedEvent *info.Event, eventObj
 func TestCheckIfIsSubcontainer(t *testing.T) {
 	myRequest := NewRequest()
 	myRequest.ContainerName = "/root"
+	rootRequest := NewRequest()
+	rootRequest.ContainerName = "/"
 
 	sameContainerEvent := &info.Event{
 		ContainerName: "/root",
@@ -78,6 +80,10 @@ func TestCheckIfIsSubcontainer(t *testing.T) {
 		ContainerName: "/root-completely-different-container",
 	}
 
+	if checkIfIsSubcontainer(rootRequest, sameContainerEvent) {
+		t.Errorf("should not have found %v to be a subcontainer of %v",
+			sameContainerEvent, rootRequest)
+	}
 	if !checkIfIsSubcontainer(myRequest, sameContainerEvent) {
 		t.Errorf("should have found %v and %v had the same container name",
 			myRequest, sameContainerEvent)
@@ -87,8 +93,13 @@ func TestCheckIfIsSubcontainer(t *testing.T) {
 			myRequest, subContainerEvent)
 	}
 
+	rootRequest.IncludeSubcontainers = true
 	myRequest.IncludeSubcontainers = true
 
+	if !checkIfIsSubcontainer(rootRequest, sameContainerEvent) {
+		t.Errorf("should have found %v to be a subcontainer of %v",
+			sameContainerEvent.ContainerName, rootRequest.ContainerName)
+	}
 	if !checkIfIsSubcontainer(myRequest, sameContainerEvent) {
 		t.Errorf("should have found %v and %v had the same container",
 			myRequest.ContainerName, sameContainerEvent.ContainerName)

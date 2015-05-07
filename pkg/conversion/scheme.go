@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package conversion
 
 import (
+	"encoding/gob"
 	"fmt"
 	"reflect"
 )
@@ -112,6 +113,10 @@ func (s *Scheme) AddKnownTypes(version string, types ...interface{}) {
 		knownTypes[t.Name()] = t
 		s.typeToVersion[t] = version
 		s.typeToKind[t] = append(s.typeToKind[t], t.Name())
+
+		// Register with gob so that DeepCopy can recognize all of our objects.  This is creating a static list, but it appears that gob itself wants a static list
+		gobName := getGobTypeName(obj)
+		gob.RegisterName(gobName, obj)
 	}
 }
 
@@ -135,6 +140,56 @@ func (s *Scheme) AddKnownTypeWithName(version, kind string, obj interface{}) {
 	knownTypes[kind] = t
 	s.typeToVersion[t] = version
 	s.typeToKind[t] = append(s.typeToKind[t], kind)
+
+	// Register with gob so that DeepCopy can recognize all of our objects.  This is creating a static list, but it appears that gob itself wants a static list
+	gobName := getGobTypeName(obj)
+	gob.RegisterName(gobName, obj)
+}
+
+// getGobTypeName creates a fully unique type name for the object being passed through.  There is a bug in the gob encoder's name mechanism that they are unwilling to fix
+// due to backwards compatibility concerns.  See https://github.com/golang/go/blob/master/src/encoding/gob/type.go#L857 .  This gives us a fully qualified name to avoid
+// conflicts amongst our objects and since we all agree on the names, this should be safe
+func getGobTypeName(value interface{}) string {
+	// mostly copied from gob/type.go
+
+	// Default to printed representation for unnamed types
+	rt := reflect.TypeOf(value)
+	name := rt.String()
+
+	// But for named types (or pointers to them), qualify with import path (but see inner comment).
+	// Dereference one pointer looking for a named type.
+	star := ""
+	if rt.Name() == "" {
+		if pt := rt; pt.Kind() == reflect.Ptr {
+			star = "*"
+			// NOTE: The following line should be rt = pt.Elem() to implement
+			// what the comment above claims, but fixing it would break compatibility
+			// with existing gobs.
+			//
+			// Given package p imported as "full/p" with these definitions:
+			//     package p
+			//     type T1 struct { ... }
+			// this table shows the intended and actual strings used by gob to
+			// name the types:
+			//
+			// Type      Correct string     Actual string
+			//
+			// T1        full/p.T1          full/p.T1
+			// *T1       *full/p.T1         *p.T1
+			//
+			// The missing full path cannot be fixed without breaking existing gob decoders.
+			rt = pt.Elem() // TWEAKED HERE
+		}
+	}
+	if rt.Name() != "" {
+		if rt.PkgPath() == "" {
+			name = star + rt.Name()
+		} else {
+			name = star + rt.PkgPath() + "." + rt.Name()
+		}
+	}
+
+	return name
 }
 
 // KnownTypes returns an array of the types that are known for a particular version.
@@ -201,6 +256,17 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	return nil
 }
 
+// Similar to AddConversionFuncs, but registers conversion functions that were
+// automatically generated.
+func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) error {
+	for _, f := range conversionFuncs {
+		if err := s.converter.RegisterGeneratedConversionFunc(f); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // AddStructFieldConversion allows you to specify a mechanical copy for a moved
 // or renamed struct field without writing an entire conversion function. See
 // the comment in Converter.SetStructFieldCopy for parameter details.
@@ -230,6 +296,17 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 		}
 	}
 	return nil
+}
+
+// Recognizes returns true if the scheme is able to handle the provided version and kind
+// of an object.
+func (s *Scheme) Recognizes(version, kind string) bool {
+	m, ok := s.versionMap[version]
+	if !ok {
+		return false
+	}
+	_, ok = m[kind]
+	return ok
 }
 
 // RegisterInputDefaults sets the provided field mapping function and field matching

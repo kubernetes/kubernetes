@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ __kubectl_get_resource()
     if [[ ${#nouns[@]} -eq 0 ]]; then
         return 1
     fi
-    __kubectl_parse_get ${nouns[${#nouns[@]} -1]}
+    __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
     if [[ $? -eq 0 ]]; then
         return 0
     fi
@@ -55,7 +55,7 @@ __kubectl_get_containers()
 {
     local template
     template="{{ range .desiredState.manifest.containers  }}{{ .name }} {{ end }}"
-    __debug ${FUNCNAME} "nouns are ${nouns[@]}"
+    __debug "${FUNCNAME} nouns are ${nouns[*]}"
 
     local len="${#nouns[@]}"
     if [[ ${len} -ne 1 ]]; then
@@ -81,7 +81,7 @@ __kubectl_require_pod_and_container()
 
 __custom_func() {
     case ${last_command} in
-        kubectl_get | kubectl_describe | kubectl_delete | kubectl_stop)
+        kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop)
 	    __kubectl_get_resource
             return
             ;;

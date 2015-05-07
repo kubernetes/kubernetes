@@ -69,6 +69,14 @@ When a management hook occurs, the management system calls into any registered h
 
 For hooks which have parameters, these parameters are passed to the event handler as a set of key/value pairs.  The details of this parameter passing is handler implementation dependent (see below)
 
+### Hook delivery guarantees
+Hook delivery is "at least one", which means that a hook may be called multiple times for any given event (e.g. "start" or "stop") and it is up to the hook implementer to be able to handle this
+correctly.
+
+We expect double delivery to be rare, but in some cases if the ```kubelet``` restarts in the middle of sending a hook, the hook may be resent after the kubelet comes back up.
+
+Likewise, we only make a single delivery attempt.  If (for example) an http hook receiver is down, and unable to take traffic, we do not make any attempts to resend.
+
 ### Hook Handler Implementations
 Hook handlers are the way that hooks are surfaced to containers.  Containers can select the type of hook handler they would like to implement.  Kubernetes currently supports two different hook handler types:
 

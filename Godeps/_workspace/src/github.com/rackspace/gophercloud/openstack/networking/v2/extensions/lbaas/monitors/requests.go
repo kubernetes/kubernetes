@@ -176,22 +176,14 @@ func Create(c *gophercloud.ServiceClient, opts CreateOpts) CreateResult {
 		AdminStateUp:  opts.AdminStateUp,
 	}}
 
-	_, res.Err = c.Request("POST", rootURL(c), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{201},
-	})
-
+	_, res.Err = c.Post(rootURL(c), reqBody, &res.Body, nil)
 	return res
 }
 
 // Get retrieves a particular health monitor based on its unique ID.
 func Get(c *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = c.Request("GET", resourceURL(c, id), gophercloud.RequestOpts{
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
-	})
+	_, res.Err = c.Get(resourceURL(c, id), &res.Body, nil)
 	return res
 }
 
@@ -258,10 +250,8 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) UpdateResu
 		AdminStateUp:  opts.AdminStateUp,
 	}}
 
-	_, res.Err = c.Request("PUT", resourceURL(c, id), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200, 202},
+	_, res.Err = c.Put(resourceURL(c, id), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 202},
 	})
 
 	return res
@@ -270,8 +260,6 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) UpdateResu
 // Delete will permanently delete a particular monitor based on its unique ID.
 func Delete(c *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = c.Request("DELETE", resourceURL(c, id), gophercloud.RequestOpts{
-		OkCodes: []int{204},
-	})
+	_, res.Err = c.Delete(resourceURL(c, id), nil)
 	return res
 }

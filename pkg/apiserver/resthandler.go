@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/strategicpatch"
 
@@ -116,21 +117,58 @@ func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
 func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, getOptionsKind string, subpath bool, subpathKey string) restful.RouteFunction {
 	return getResourceHandler(scope,
 		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
-			query := req.Request.URL.Query()
-			if subpath {
-				newQuery := make(url.Values)
-				for k, v := range query {
-					newQuery[k] = v
-				}
-				newQuery[subpathKey] = []string{req.PathParameter("path")}
-				query = newQuery
-			}
-			opts, err := queryToObject(query, scope, getOptionsKind)
+			opts, err := getRequestOptions(req, scope, getOptionsKind, subpath, subpathKey)
 			if err != nil {
 				return nil, err
 			}
 			return r.Get(ctx, name, opts)
 		})
+}
+
+func getRequestOptions(req *restful.Request, scope RequestScope, kind string, subpath bool, subpathKey string) (runtime.Object, error) {
+	if len(kind) == 0 {
+		return nil, nil
+	}
+	query := req.Request.URL.Query()
+	if subpath {
+		newQuery := make(url.Values)
+		for k, v := range query {
+			newQuery[k] = v
+		}
+		newQuery[subpathKey] = []string{req.PathParameter("path")}
+		query = newQuery
+	}
+	return queryToObject(query, scope, kind)
+}
+
+// ConnectResource returns a function that handles a connect request on a rest.Storage object.
+func ConnectResource(connecter rest.Connecter, scope RequestScope, connectOptionsKind string, subpath bool, subpathKey string) restful.RouteFunction {
+	return func(req *restful.Request, res *restful.Response) {
+		w := res.ResponseWriter
+		namespace, name, err := scope.Namer.Name(req)
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		ctx := scope.ContextFunc(req)
+		ctx = api.WithNamespace(ctx, namespace)
+		opts, err := getRequestOptions(req, scope, connectOptionsKind, subpath, subpathKey)
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		handler, err := connecter.Connect(ctx, name, opts)
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		handler.ServeHTTP(w, req.Request)
+		err = handler.RequestError()
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+	}
 }
 
 // ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.
@@ -143,6 +181,15 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+
+		// Watches for single objects are routed to this function.
+		// Treat a /name parameter the same as a field selector entry.
+		hasName := true
+		_, name, err := scope.Namer.Name(req)
+		if err != nil {
+			hasName = false
+		}
+
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
@@ -154,6 +201,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		opts := *out.(*api.ListOptions)
 
 		// transform fields
+		// TODO: queryToObject should do this.
 		fn := func(label, value string) (newLabel, newValue string, err error) {
 			return scope.Convertor.ConvertFieldLabel(scope.APIVersion, scope.Kind, label, value)
 		}
@@ -162,6 +210,27 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			err = errors.NewBadRequest(err.Error())
 			errorJSON(err, scope.Codec, w)
 			return
+		}
+
+		if hasName {
+			// metadata.name is the canonical internal name.
+			// generic.SelectionPredicate will notice that this is
+			// a request for a single object and optimize the
+			// storage query accordingly.
+			nameSelector := fields.OneTermEqualSelector("metadata.name", name)
+			if opts.FieldSelector != nil && !opts.FieldSelector.Empty() {
+				// It doesn't make sense to ask for both a name
+				// and a field selector, since just the name is
+				// sufficient to narrow down the request to a
+				// single object.
+				errorJSON(
+					errors.NewBadRequest("both a name and a field selector provided; please provide one or the other."),
+					scope.Codec,
+					w,
+				)
+				return
+			}
+			opts.FieldSelector = nameSelector
 		}
 
 		if (opts.Watch || forceWatch) && rw != nil {
@@ -187,19 +256,27 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 	}
 }
 
-// CreateResource returns a function that will handle a resource creation.
-func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
 
-		namespace, err := scope.Namer.Namespace(req)
+		var (
+			namespace, name string
+			err             error
+		)
+		if includeName {
+			namespace, name, err = scope.Namer.Name(req)
+		} else {
+			namespace, err = scope.Namer.Namespace(req)
+		}
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
@@ -216,14 +293,14 @@ func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(obj, namespace, scope.Resource, "CREATE"))
+		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "CREATE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			out, err := r.Create(ctx, obj)
+			out, err := r.Create(ctx, name, obj)
 			if status, ok := out.(*api.Status); ok && err == nil && status.Code == 0 {
 				status.Code = http.StatusCreated
 			}
@@ -243,8 +320,26 @@ func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectType
 	}
 }
 
+// CreateNamedResource returns a function that will handle a resource creation with name.
+func CreateNamedResource(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+	return createHandler(r, scope, typer, admit, true)
+}
+
+// CreateResource returns a function that will handle a resource creation.
+func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+	return createHandler(&namedCreaterAdapter{r}, scope, typer, admit, false)
+}
+
+type namedCreaterAdapter struct {
+	rest.Creater
+}
+
+func (c *namedCreaterAdapter) Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error) {
+	return c.Creater.Create(ctx, obj)
+}
+
 // PatchResource returns a function that will handle a resource patch
-// TODO: Eventually PatchResource should just use AtomicUpdate and this routine should be a bit cleaner
+// TODO: Eventually PatchResource should just use GuaranteedUpdate and this routine should be a bit cleaner
 func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, converter runtime.ObjectConvertor) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
@@ -262,7 +357,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 
 		obj := r.New()
 		// PATCH requires same permission as UPDATE
-		err = admit.Admit(admission.NewAttributesRecord(obj, namespace, scope.Resource, "UPDATE"))
+		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -362,7 +457,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(obj, namespace, scope.Resource, "UPDATE"))
+		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -423,7 +518,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			}
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(nil, namespace, scope.Resource, "DELETE"))
+		err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, scope.Resource, "DELETE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return

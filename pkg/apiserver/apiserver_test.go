@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -348,6 +348,19 @@ func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, bool,
 	return s, false, s.contentType, s.err
 }
 
+type SimpleConnectHandler struct {
+	response string
+	err      error
+}
+
+func (h *SimpleConnectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	w.Write([]byte(h.response))
+}
+
+func (h *SimpleConnectHandler) RequestError() error {
+	return h.err
+}
+
 func (storage *SimpleRESTStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	if id == "binary" {
@@ -443,6 +456,39 @@ func (storage *SimpleRESTStorage) ResourceLocation(ctx api.Context, id string) (
 	return &locationCopy, nil, nil
 }
 
+// Implement Connecter
+type ConnecterRESTStorage struct {
+	connectHandler         rest.ConnectHandler
+	emptyConnectOptions    runtime.Object
+	receivedConnectOptions runtime.Object
+	receivedID             string
+	takesPath              string
+}
+
+// Implement Connecter
+var _ = rest.Connecter(&ConnecterRESTStorage{})
+
+func (s *ConnecterRESTStorage) New() runtime.Object {
+	return &Simple{}
+}
+
+func (s *ConnecterRESTStorage) Connect(ctx api.Context, id string, options runtime.Object) (rest.ConnectHandler, error) {
+	s.receivedConnectOptions = options
+	s.receivedID = id
+	return s.connectHandler, nil
+}
+
+func (s *ConnecterRESTStorage) ConnectMethods() []string {
+	return []string{"GET", "POST", "PUT", "DELETE"}
+}
+
+func (s *ConnecterRESTStorage) NewConnectOptions() (runtime.Object, bool, string) {
+	if len(s.takesPath) > 0 {
+		return s.emptyConnectOptions, true, s.takesPath
+	}
+	return s.emptyConnectOptions, false, ""
+}
+
 type LegacyRESTStorage struct {
 	*SimpleRESTStorage
 }
@@ -484,6 +530,25 @@ func (r *GetWithOptionsRESTStorage) NewGetOptions() (runtime.Object, bool, strin
 }
 
 var _ rest.GetterWithOptions = &GetWithOptionsRESTStorage{}
+
+type NamedCreaterRESTStorage struct {
+	*SimpleRESTStorage
+	createdName string
+}
+
+func (storage *NamedCreaterRESTStorage) Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error) {
+	storage.checkContext(ctx)
+	storage.created = obj.(*Simple)
+	storage.createdName = name
+	if err := storage.errors["create"]; err != nil {
+		return nil, err
+	}
+	var err error
+	if storage.injectedFunction != nil {
+		obj, err = storage.injectedFunction(obj)
+	}
+	return obj, err
+}
 
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
 	defer response.Body.Close()
@@ -1108,6 +1173,135 @@ func TestGetMissing(t *testing.T) {
 	}
 }
 
+func TestConnect(t *testing.T) {
+	responseText := "Hello World"
+	itemID := "theID"
+	connectStorage := &ConnecterRESTStorage{
+		connectHandler: &SimpleConnectHandler{
+			response: responseText,
+		},
+	}
+	storage := map[string]rest.Storage{
+		"simple/connect": connectStorage,
+	}
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/version/simple/" + itemID + "/connect")
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %#v", resp)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if connectStorage.receivedID != itemID {
+		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
+	}
+	if string(body) != responseText {
+		t.Errorf("Unexpected response. Expected: %s. Actual: %s.", responseText, string(body))
+	}
+}
+
+func TestConnectWithOptions(t *testing.T) {
+	responseText := "Hello World"
+	itemID := "theID"
+	connectStorage := &ConnecterRESTStorage{
+		connectHandler: &SimpleConnectHandler{
+			response: responseText,
+		},
+		emptyConnectOptions: &SimpleGetOptions{},
+	}
+	storage := map[string]rest.Storage{
+		"simple/connect": connectStorage,
+	}
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/version/simple/" + itemID + "/connect?param1=value1&param2=value2")
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %#v", resp)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if connectStorage.receivedID != itemID {
+		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
+	}
+	if string(body) != responseText {
+		t.Errorf("Unexpected response. Expected: %s. Actual: %s.", responseText, string(body))
+	}
+	opts, ok := connectStorage.receivedConnectOptions.(*SimpleGetOptions)
+	if !ok {
+		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
+	}
+	if opts.Param1 != "value1" && opts.Param2 != "value2" {
+		t.Errorf("Unexpected options value: %#v", opts)
+	}
+}
+
+func TestConnectWithOptionsAndPath(t *testing.T) {
+	responseText := "Hello World"
+	itemID := "theID"
+	testPath := "a/b/c/def"
+	connectStorage := &ConnecterRESTStorage{
+		connectHandler: &SimpleConnectHandler{
+			response: responseText,
+		},
+		emptyConnectOptions: &SimpleGetOptions{},
+		takesPath:           "atAPath",
+	}
+	storage := map[string]rest.Storage{
+		"simple/connect": connectStorage,
+	}
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/version/simple/" + itemID + "/connect/" + testPath + "?param1=value1&param2=value2")
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %#v", resp)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if connectStorage.receivedID != itemID {
+		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
+	}
+	if string(body) != responseText {
+		t.Errorf("Unexpected response. Expected: %s. Actual: %s.", responseText, string(body))
+	}
+	opts, ok := connectStorage.receivedConnectOptions.(*SimpleGetOptions)
+	if !ok {
+		t.Errorf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
+	}
+	if opts.Param1 != "value1" && opts.Param2 != "value2" {
+		t.Errorf("Unexpected options value: %#v", opts)
+	}
+	if opts.Path != testPath {
+		t.Errorf("Unexpected path value. Expected: %s. Actual: %s.", testPath, opts.Path)
+	}
+}
+
 func TestDelete(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
@@ -1632,6 +1826,32 @@ func TestCreateChecksDecode(t *testing.T) {
 	}
 	if b, _ := ioutil.ReadAll(response.Body); !strings.Contains(string(b), "must be of type Simple") {
 		t.Errorf("unexpected response: %s", string(b))
+	}
+}
+
+func TestCreateWithName(t *testing.T) {
+	pathName := "helloworld"
+	storage := &NamedCreaterRESTStorage{SimpleRESTStorage: &SimpleRESTStorage{}}
+	handler := handle(map[string]rest.Storage{"simple/sub": storage})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &Simple{Other: "foo"}
+	data, _ := codec.Encode(simple)
+	request, err := http.NewRequest("POST", server.URL+"/api/version/simple/"+pathName+"/sub", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusCreated {
+		t.Errorf("Unexpected response %#v", response)
+	}
+	if storage.createdName != pathName {
+		t.Errorf("Did not get expected name in create context. Got: %s, Expected: %s", storage.createdName, pathName)
 	}
 }
 

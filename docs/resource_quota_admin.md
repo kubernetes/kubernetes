@@ -25,6 +25,8 @@ are supported:
 | services | Total number of services |
 | replicationcontrollers | Total number of replication controllers |
 | resourcequotas | Total number of resource quotas |
+| secrets | Total number of secrets |
+| persistentvolumeclaims | Total number of persistent volume claims |
 
 For example, `pods` quota counts and enforces a maximum on the number of `pods`
 created in a single namespace.

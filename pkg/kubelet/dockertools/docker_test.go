@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
@@ -129,28 +130,22 @@ func TestContainerManifestNaming(t *testing.T) {
 	}
 }
 
-func TestGetDockerServerVersion(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.3", "Server API version=1.15"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
-	version, err := runner.GetDockerServerVersion()
+func TestVersion(t *testing.T) {
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.3", "ApiVersion=1.15"}}
+	manager := &DockerManager{client: fakeDocker}
+	version, err := manager.Version()
 	if err != nil {
 		t.Errorf("got error while getting docker server version - %s", err)
 	}
-	expectedVersion := []uint{1, 15}
-	if len(expectedVersion) != len(version) {
-		t.Errorf("invalid docker server version. expected: %v, got: %v", expectedVersion, version)
-	} else {
-		for idx, val := range expectedVersion {
-			if version[idx] != val {
-				t.Errorf("invalid docker server version. expected: %v, got: %v", expectedVersion, version)
-			}
-		}
+	expectedVersion, _ := docker.NewAPIVersion("1.15")
+	if e, a := expectedVersion.String(), version.String(); e != a {
+		t.Errorf("invalid docker server version. expected: %v, got: %v", e, a)
 	}
 }
 
 func TestExecSupportExists(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.3.0", "Server API version=1.15"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.3.0", "ApiVersion=1.15"}}
+	runner := &DockerManager{client: fakeDocker}
 	useNativeExec, err := runner.nativeExecSupportExists()
 	if err != nil {
 		t.Errorf("got error while checking for exec support - %s", err)
@@ -161,8 +156,8 @@ func TestExecSupportExists(t *testing.T) {
 }
 
 func TestExecSupportNotExists(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.2", "Server API version=1.14"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.2", "ApiVersion=1.14"}}
+	runner := &DockerManager{client: fakeDocker}
 	useNativeExec, _ := runner.nativeExecSupportExists()
 	if useNativeExec {
 		t.Errorf("invalid exec support check output.")
@@ -170,7 +165,7 @@ func TestExecSupportNotExists(t *testing.T) {
 }
 
 func TestDockerContainerCommand(t *testing.T) {
-	runner := dockerContainerCommandRunner{}
+	runner := &DockerManager{}
 	containerID := "1234"
 	command := []string{"ls"}
 	cmd, _ := runner.getRunInContainerCommand(containerID, command)
@@ -395,113 +390,6 @@ func TestIsImagePresent(t *testing.T) {
 	}
 }
 
-func TestGetRunningContainers(t *testing.T) {
-	fakeDocker := &FakeDockerClient{Errors: make(map[string]error)}
-	fakeRecorder := &record.FakeRecorder{}
-	containerManager := NewDockerManager(fakeDocker, fakeRecorder, PodInfraContainerImage, 0, 0)
-	tests := []struct {
-		containers  map[string]*docker.Container
-		inputIDs    []string
-		expectedIDs []string
-		err         error
-	}{
-		{
-			containers: map[string]*docker.Container{
-				"foobar": {
-					ID: "foobar",
-					State: docker.State{
-						Running: false,
-					},
-				},
-				"baz": {
-					ID: "baz",
-					State: docker.State{
-						Running: true,
-					},
-				},
-			},
-			inputIDs:    []string{"foobar", "baz"},
-			expectedIDs: []string{"baz"},
-		},
-		{
-			containers: map[string]*docker.Container{
-				"foobar": {
-					ID: "foobar",
-					State: docker.State{
-						Running: true,
-					},
-				},
-				"baz": {
-					ID: "baz",
-					State: docker.State{
-						Running: true,
-					},
-				},
-			},
-			inputIDs:    []string{"foobar", "baz"},
-			expectedIDs: []string{"foobar", "baz"},
-		},
-		{
-			containers: map[string]*docker.Container{
-				"foobar": {
-					ID: "foobar",
-					State: docker.State{
-						Running: false,
-					},
-				},
-				"baz": {
-					ID: "baz",
-					State: docker.State{
-						Running: false,
-					},
-				},
-			},
-			inputIDs:    []string{"foobar", "baz"},
-			expectedIDs: []string{},
-		},
-		{
-			containers: map[string]*docker.Container{
-				"foobar": {
-					ID: "foobar",
-					State: docker.State{
-						Running: false,
-					},
-				},
-				"baz": {
-					ID: "baz",
-					State: docker.State{
-						Running: false,
-					},
-				},
-			},
-			inputIDs: []string{"foobar", "baz"},
-			err:      fmt.Errorf("test error"),
-		},
-	}
-	for _, test := range tests {
-		fakeDocker.ContainerMap = test.containers
-		if test.err != nil {
-			fakeDocker.Errors["inspect_container"] = test.err
-		}
-		if results, err := containerManager.GetRunningContainers(test.inputIDs); err == nil {
-			resultIDs := []string{}
-			for _, result := range results {
-				resultIDs = append(resultIDs, result.ID)
-			}
-			if !reflect.DeepEqual(resultIDs, test.expectedIDs) {
-				t.Errorf("expected: %#v, saw: %#v", test.expectedIDs, resultIDs)
-			}
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		} else {
-			if err != test.err {
-				t.Errorf("unexpected error: %v", err)
-			}
-		}
-	}
-}
-
 type podsByID []*kubecontainer.Pod
 
 func (b podsByID) Len() int           { return len(b) }
@@ -663,7 +551,8 @@ func TestFindContainersByPod(t *testing.T) {
 		},
 	}
 	fakeClient := &FakeDockerClient{}
-	containerManager := NewDockerManager(fakeClient, &record.FakeRecorder{}, PodInfraContainerImage, 0, 0)
+	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, nil)
 	for i, test := range tests {
 		fakeClient.ContainerList = test.containerList
 		fakeClient.ExitedContainerList = test.exitedContainerList

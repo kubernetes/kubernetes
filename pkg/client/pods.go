@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,9 +30,9 @@ type PodsNamespacer interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	List(selector labels.Selector) (*api.PodList, error)
+	List(label labels.Selector, field fields.Selector) (*api.PodList, error)
 	Get(name string) (*api.Pod, error)
-	Delete(name string) error
+	Delete(name string, options *api.DeleteOptions) error
 	Create(pod *api.Pod) (*api.Pod, error)
 	Update(pod *api.Pod) (*api.Pod, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -54,10 +54,10 @@ func newPods(c *Client, namespace string) *pods {
 	}
 }
 
-// List takes a selector, and returns the list of pods that match that selector.
-func (c *pods) List(selector labels.Selector) (result *api.PodList, err error) {
+// List takes label and field selectors, and returns the list of pods that match those selectors.
+func (c *pods) List(label labels.Selector, field fields.Selector) (result *api.PodList, err error) {
 	result = &api.PodList{}
-	err = c.r.Get().Namespace(c.ns).Resource("pods").LabelsSelectorParam(selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("pods").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 
@@ -69,8 +69,16 @@ func (c *pods) Get(name string) (result *api.Pod, err error) {
 }
 
 // Delete takes the name of the pod, and returns an error if one occurs
-func (c *pods) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Do().Error()
+func (c *pods) Delete(name string, options *api.DeleteOptions) error {
+	// TODO: to make this reusable in other client libraries
+	if options == nil {
+		return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Do().Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
+	if err != nil {
+		return err
+	}
+	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Body(body).Do().Error()
 }
 
 // Create takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.

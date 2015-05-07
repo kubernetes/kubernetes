@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -104,8 +104,7 @@ func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
 func tooManyRequests(w http.ResponseWriter) {
 	// Return a 429 status indicating "Too Many Requests"
 	w.Header().Set("Retry-After", RetryAfter)
-	w.WriteHeader(errors.StatusTooManyRequests)
-	fmt.Fprintf(w, "Too many requests, please try again later.")
+	http.Error(w, "Too many requests, please try again later.", errors.StatusTooManyRequests)
 }
 
 // RecoverPanics wraps an http Handler to recover and log panics.
@@ -113,9 +112,8 @@ func RecoverPanics(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer func() {
 			if x := recover(); x != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, "apis panic. Look in log for details.")
-				glog.Infof("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
+				http.Error(w, "apis panic. Look in log for details.", http.StatusInternalServerError)
+				glog.Errorf("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
 			}
 		}()
 		defer httplog.NewLogged(req, &w).StacktraceWhen(

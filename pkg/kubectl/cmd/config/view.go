@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,10 +32,11 @@ import (
 )
 
 type ViewOptions struct {
-	PathOptions *PathOptions
-	Merge       util.BoolFlag
-	Flatten     bool
-	Minify      bool
+	ConfigAccess ConfigAccess
+	Merge        util.BoolFlag
+	Flatten      bool
+	Minify       bool
+	RawByteData  bool
 }
 
 const (
@@ -52,8 +53,8 @@ $ kubectl config view --local
 $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2e" }}{{ index .user.password }}{{end}}{{end}}'`
 )
 
-func NewCmdConfigView(out io.Writer, PathOptions *PathOptions) *cobra.Command {
-	options := &ViewOptions{PathOptions: PathOptions}
+func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
+	options := &ViewOptions{ConfigAccess: ConfigAccess}
 
 	cmd := &cobra.Command{
 		Use:     "view",
@@ -83,6 +84,7 @@ func NewCmdConfigView(out io.Writer, PathOptions *PathOptions) *cobra.Command {
 
 	options.Merge.Default(true)
 	cmd.Flags().Var(&options.Merge, "merge", "merge together the full hierarchy of kubeconfig files")
+	cmd.Flags().BoolVar(&options.RawByteData, "raw", false, "display raw byte data")
 	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "flatten the resulting kubeconfig file into self contained output (useful for creating portable kubeconfig files)")
 	cmd.Flags().BoolVar(&options.Minify, "minify", false, "remove all information not used by current-context from the output")
 	return cmd
@@ -104,6 +106,8 @@ func (o ViewOptions) Run(out io.Writer, printer kubectl.ResourcePrinter) error {
 		if err := clientcmdapi.FlattenConfig(config); err != nil {
 			return err
 		}
+	} else if !o.RawByteData {
+		clientcmdapi.ShortenConfig(config)
 	}
 
 	err = printer.PrintObj(config, out)
@@ -116,7 +120,7 @@ func (o ViewOptions) Run(out io.Writer, printer kubectl.ResourcePrinter) error {
 
 func (o *ViewOptions) Complete() bool {
 	// if --kubeconfig, --global, or --local is specified, then merging doesn't make sense since you're declaring precise intent
-	if o.PathOptions.Global || o.PathOptions.Local || o.PathOptions.UseEnvVar {
+	if o.ConfigAccess.IsExplicitFile() {
 		if !o.Merge.Provided() {
 			o.Merge.Set("false")
 		}
@@ -136,32 +140,20 @@ func (o ViewOptions) loadConfig() (*clientcmdapi.Config, error) {
 }
 
 func (o ViewOptions) Validate() error {
-	return o.PathOptions.Validate()
+	if !o.Merge.Value() && !o.ConfigAccess.IsExplicitFile() {
+		return errors.New("if merge==false a precise file must to specified")
+	}
+
+	return nil
 }
 
 // getStartingConfig returns the Config object built from the sources specified by the options, the filename read (only if it was a single file), and an error if something goes wrong
 func (o *ViewOptions) getStartingConfig() (*clientcmdapi.Config, error) {
 	switch {
 	case !o.Merge.Value():
-		switch {
-		case len(o.PathOptions.LoadingRules.ExplicitPath) > 0:
-			return clientcmd.LoadFromFile(o.PathOptions.LoadingRules.ExplicitPath)
-
-		case o.PathOptions.Global:
-			return clientcmd.LoadFromFile(o.PathOptions.GlobalFile)
-
-		case o.PathOptions.UseEnvVar:
-			return clientcmd.LoadFromFile(o.PathOptions.EnvVarFile)
-
-		case o.PathOptions.Local:
-			return clientcmd.LoadFromFile(o.PathOptions.LocalFile)
-
-		default:
-			return nil, errors.New("if Merge==false a precise file must to specified")
-
-		}
+		return clientcmd.LoadFromFile(o.ConfigAccess.GetExplicitFile())
 
 	default:
-		return o.PathOptions.getStartingConfig()
+		return o.ConfigAccess.GetStartingConfig()
 	}
 }

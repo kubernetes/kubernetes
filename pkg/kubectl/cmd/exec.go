@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -50,8 +50,10 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 		},
 	}
 	cmd.Flags().StringP("pod", "p", "", "Pod name")
+	cmd.MarkFlagRequired("pod")
 	// TODO support UID
 	cmd.Flags().StringP("container", "c", "", "Container name")
+	cmd.MarkFlagRequired("container")
 	cmd.Flags().BoolP("stdin", "i", false, "Pass stdin to the container")
 	cmd.Flags().BoolP("tty", "t", false, "Stdin is a TTY")
 	return cmd

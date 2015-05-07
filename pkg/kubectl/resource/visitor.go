@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -346,6 +346,12 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		items, err := runtime.ExtractList(info.Object)
 		if err != nil {
 			return fn(info)
+		}
+		if errs := runtime.DecodeList(items, struct {
+			runtime.ObjectTyper
+			runtime.Decoder
+		}{v.Mapper, info.Mapping.Codec}); len(errs) > 0 {
+			return errors.NewAggregate(errs)
 		}
 		for i := range items {
 			item, err := v.InfoForObject(items[i])

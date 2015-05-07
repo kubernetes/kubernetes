@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -112,7 +112,7 @@ func (s *Scheduler) scheduleOne() {
 	defer func() {
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
-	dest, err := s.config.Algorithm.Schedule(*pod, s.config.MinionLister)
+	dest, err := s.config.Algorithm.Schedule(pod, s.config.MinionLister)
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %v", pod)

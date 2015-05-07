@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ type Attributes interface {
 	GetResource() string
 	GetOperation() string
 	GetObject() runtime.Object
+	GetKind() string
 }
 
 // Interface is an abstract, pluggable interface for Admission Control decisions.

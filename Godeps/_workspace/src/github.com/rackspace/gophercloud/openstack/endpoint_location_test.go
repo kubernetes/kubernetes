@@ -1,15 +1,13 @@
 package openstack
 
 import (
-	"fmt"
-	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/rackspace/gophercloud"
 	tokens2 "github.com/rackspace/gophercloud/openstack/identity/v2/tokens"
+	tokens3 "github.com/rackspace/gophercloud/openstack/identity/v3/tokens"
 	th "github.com/rackspace/gophercloud/testhelper"
-	fake "github.com/rackspace/gophercloud/testhelper/client"
 )
 
 // Service catalog fixtures take too much vertical space!
@@ -107,119 +105,124 @@ func TestV2EndpointBadAvailability(t *testing.T) {
 		Region:       "same",
 		Availability: "wat",
 	})
-	th.CheckEquals(t, err.Error(), "Unexpected availability in endpoint query: wat")
+	th.CheckEquals(t, "Unexpected availability in endpoint query: wat", err.Error())
 }
 
-func setupV3Responses(t *testing.T) {
-	// Mock the service query.
-	th.Mux.HandleFunc("/services", func(w http.ResponseWriter, r *http.Request) {
-		th.TestMethod(t, r, "GET")
-		th.TestHeader(t, r, "X-Auth-Token", fake.TokenID)
-
-		w.Header().Add("Content-Type", "application/json")
-		fmt.Fprintf(w, `
-			{
-				"links": {
-					"next": null,
-					"previous": null
+var catalog3 = tokens3.ServiceCatalog{
+	Entries: []tokens3.CatalogEntry{
+		tokens3.CatalogEntry{
+			Type: "same",
+			Name: "same",
+			Endpoints: []tokens3.Endpoint{
+				tokens3.Endpoint{
+					ID:        "1",
+					Region:    "same",
+					Interface: "public",
+					URL:       "https://public.correct.com/",
 				},
-				"services": [
-					{
-						"description": "Correct",
-						"id": "1234",
-						"name": "same",
-						"type": "same"
-					},
-					{
-						"description": "Bad Name",
-						"id": "9876",
-						"name": "different",
-						"type": "same"
-					}
-				]
-			}
-		`)
-	})
-
-	// Mock the endpoint query.
-	th.Mux.HandleFunc("/endpoints", func(w http.ResponseWriter, r *http.Request) {
-		th.TestMethod(t, r, "GET")
-		th.TestHeader(t, r, "X-Auth-Token", fake.TokenID)
-		th.TestFormValues(t, r, map[string]string{
-			"service_id": "1234",
-			"interface":  "public",
-		})
-
-		w.Header().Add("Content-Type", "application/json")
-		fmt.Fprintf(w, `
-			{
-				"endpoints": [
-					{
-						"id": "12",
-						"interface": "public",
-						"name": "the-right-one",
-						"region": "same",
-						"service_id": "1234",
-						"url": "https://correct:9000/"
-					},
-					{
-						"id": "14",
-						"interface": "public",
-						"name": "bad-region",
-						"region": "different",
-						"service_id": "1234",
-						"url": "https://bad-region:9001/"
-					}
-				],
-				"links": {
-					"next": null,
-					"previous": null
-				}
-			}
-    `)
-	})
+				tokens3.Endpoint{
+					ID:        "2",
+					Region:    "same",
+					Interface: "admin",
+					URL:       "https://admin.correct.com/",
+				},
+				tokens3.Endpoint{
+					ID:        "3",
+					Region:    "same",
+					Interface: "internal",
+					URL:       "https://internal.correct.com/",
+				},
+				tokens3.Endpoint{
+					ID:        "4",
+					Region:    "different",
+					Interface: "public",
+					URL:       "https://badregion.com/",
+				},
+			},
+		},
+		tokens3.CatalogEntry{
+			Type: "same",
+			Name: "different",
+			Endpoints: []tokens3.Endpoint{
+				tokens3.Endpoint{
+					ID:        "5",
+					Region:    "same",
+					Interface: "public",
+					URL:       "https://badname.com/",
+				},
+				tokens3.Endpoint{
+					ID:        "6",
+					Region:    "different",
+					Interface: "public",
+					URL:       "https://badname.com/+badregion",
+				},
+			},
+		},
+		tokens3.CatalogEntry{
+			Type: "different",
+			Name: "different",
+			Endpoints: []tokens3.Endpoint{
+				tokens3.Endpoint{
+					ID:        "7",
+					Region:    "same",
+					Interface: "public",
+					URL:       "https://badtype.com/+badname",
+				},
+				tokens3.Endpoint{
+					ID:        "8",
+					Region:    "different",
+					Interface: "public",
+					URL:       "https://badtype.com/+badregion+badname",
+				},
+			},
+		},
+	},
 }
 
 func TestV3EndpointExact(t *testing.T) {
-	th.SetupHTTP()
-	defer th.TeardownHTTP()
-	setupV3Responses(t)
+	expectedURLs := map[gophercloud.Availability]string{
+		gophercloud.AvailabilityPublic:   "https://public.correct.com/",
+		gophercloud.AvailabilityAdmin:    "https://admin.correct.com/",
+		gophercloud.AvailabilityInternal: "https://internal.correct.com/",
+	}
 
-	actual, err := V3EndpointURL(fake.ServiceClient(), gophercloud.EndpointOpts{
+	for availability, expected := range expectedURLs {
+		actual, err := V3EndpointURL(&catalog3, gophercloud.EndpointOpts{
+			Type:         "same",
+			Name:         "same",
+			Region:       "same",
+			Availability: availability,
+		})
+		th.AssertNoErr(t, err)
+		th.CheckEquals(t, expected, actual)
+	}
+}
+
+func TestV3EndpointNone(t *testing.T) {
+	_, err := V3EndpointURL(&catalog3, gophercloud.EndpointOpts{
+		Type:         "nope",
+		Availability: gophercloud.AvailabilityPublic,
+	})
+	th.CheckEquals(t, gophercloud.ErrEndpointNotFound, err)
+}
+
+func TestV3EndpointMultiple(t *testing.T) {
+	_, err := V3EndpointURL(&catalog3, gophercloud.EndpointOpts{
+		Type:         "same",
+		Region:       "same",
+		Availability: gophercloud.AvailabilityPublic,
+	})
+	if !strings.HasPrefix(err.Error(), "Discovered 2 matching endpoints:") {
+		t.Errorf("Received unexpected error: %v", err)
+	}
+}
+
+func TestV3EndpointBadAvailability(t *testing.T) {
+	_, err := V3EndpointURL(&catalog3, gophercloud.EndpointOpts{
 		Type:         "same",
 		Name:         "same",
 		Region:       "same",
-		Availability: gophercloud.AvailabilityPublic,
+		Availability: "wat",
 	})
-	th.AssertNoErr(t, err)
-	th.CheckEquals(t, actual, "https://correct:9000/")
-}
-
-func TestV3EndpointNoService(t *testing.T) {
-	th.SetupHTTP()
-	defer th.TeardownHTTP()
-
-	th.Mux.HandleFunc("/services", func(w http.ResponseWriter, r *http.Request) {
-		th.TestMethod(t, r, "GET")
-		th.TestHeader(t, r, "X-Auth-Token", fake.TokenID)
-
-		w.Header().Add("Content-Type", "application/json")
-		fmt.Fprintf(w, `
-      {
-        "links": {
-          "next": null,
-          "previous": null
-        },
-        "services": []
-      }
-    `)
-	})
-
-	_, err := V3EndpointURL(fake.ServiceClient(), gophercloud.EndpointOpts{
-		Type:         "nope",
-		Name:         "same",
-		Region:       "same",
-		Availability: gophercloud.AvailabilityPublic,
-	})
-	th.CheckEquals(t, gophercloud.ErrServiceNotFound, err)
+	th.CheckEquals(t, "Unexpected availability in endpoint query: wat", err.Error())
 }

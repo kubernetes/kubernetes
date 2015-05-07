@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,23 +19,44 @@
 # managed result is of that. Start everything below that directory.
 KUBECTL=/usr/local/bin/kubectl
 
-function create-kubernetesauth-secret() {
+function create-kubeconfig-secret() {
   local -r token=$1
   local -r username=$2
   local -r safe_username=$(tr -s ':_' '--' <<< "${username}")
 
-  # Make secret with a kubernetes_auth file with a token.
+  # Make a kubeconfig file with the token.
   # TODO(etune): put apiserver certs into secret too, and reference from authfile,
   # so that "Insecure" is not needed.
-  kafile=$(echo "{\"BearerToken\": \"${token}\", \"Insecure\": true }" | base64 -w0)
-  read -r -d '' secretjson <<EOF
+  # Point the kubeconfig file at https://kubernetes:443. Pods/components that
+  # do not have DNS available will have to override the server.
+  read -r -d '' kubeconfig <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: ${username}
+  user:
+    token: ${token}
+clusters:
+- name: local
+  cluster:
+     server: "https://kubernetes:443"
+     insecure-skip-tls-verify: true
+contexts:
+- context:
+    cluster: local
+    user: ${username}
+  name: service-account-context
+current-context: service-account-context
+EOF
+  local -r kubeconfig_base64=$(echo "${kubeconfig}" | base64 -w0)
+  read -r -d '' secretyaml <<EOF
 apiVersion: v1beta1
 kind: Secret 
 id: token-${safe_username}
 data:
-  kubernetes-auth: ${kafile}
+  kubeconfig: ${kubeconfig_base64}
 EOF
-  create-resource-from-string "${secretjson}" 100 10 "Secret-for-token-for-user-${username}" &
+  create-resource-from-string "${secretyaml}" 100 10 "Secret-for-token-for-user-${username}" &
 # TODO: label the secrets with special label so kubectl does not show these?
 }
 
@@ -56,7 +77,7 @@ function start_addon() {
 # $3 name of this object to use when logging about it.
 function create-resource-from-string() {
   local -r config_string=$1;
-  local -r tries=$2;
+  local tries=$2;
   local -r delay=$3;
   local -r config_name=$1;
   while [ ${tries} -gt 0 ]; do
@@ -86,10 +107,10 @@ while read line; do
   IFS=',' read -a parts <<< "${line}"
   token=${parts[0]}
   username=${parts[1]}
-  create-kubernetesauth-secret "${token}" "${username}"
+  create-kubeconfig-secret "${token}" "${username}"
 done < /srv/kubernetes/known_tokens.csv
 
-for obj in $(find /etc/kubernetes/addons -name \*.yaml); do
+for obj in $(find /etc/kubernetes/addons \( -name \*.yaml -o -name \*.json \)); do
   start_addon ${obj} 100 10 &
   echo "++ addon ${obj} starting in pid $! ++"
 done

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,17 +22,19 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-func runLivenessTest(c *client.Client, podDescr *api.Pod) {
+func runLivenessTest(c *client.Client, podDescr *api.Pod, expectRestart bool) {
 	ns := "e2e-test-" + string(util.NewUUID())
 
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
@@ -42,7 +44,7 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		By("deleting the pod")
-		c.Pods(ns).Delete(podDescr.Name)
+		c.Pods(ns).Delete(podDescr.Name, nil)
 	}()
 
 	// Wait until the pod is not pending. (Here we need to check for something other than
@@ -60,7 +62,7 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 	By(fmt.Sprintf("Initial restart count of pod %s is %d", podDescr.Name, initialRestartCount))
 
 	// Wait for at most 48 * 5 = 240s = 4 minutes until restartCount is incremented
-	pass := false
+	restarts := false
 	for i := 0; i < 48; i++ {
 		// Wait until restartCount is incremented.
 		time.Sleep(5 * time.Second)
@@ -70,13 +72,13 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 		By(fmt.Sprintf("Restart count of pod %s in namespace %s is now %d", podDescr.Name, ns, restartCount))
 		if restartCount > initialRestartCount {
 			By(fmt.Sprintf("Restart count of pod %s in namespace %s increased from %d to %d during the test", podDescr.Name, ns, initialRestartCount, restartCount))
-			pass = true
+			restarts = true
 			break
 		}
 	}
 
-	if !pass {
-		Fail(fmt.Sprintf("Did not see the restart count of pod %s in namespace %s increase from %d during the test", podDescr.Name, ns, initialRestartCount))
+	if restarts != expectRestart {
+		Fail(fmt.Sprintf("pod %s in namespace %s - expected restarts: %v, found restarts: %v", podDescr.Name, ns, expectRestart, restarts))
 	}
 }
 
@@ -85,7 +87,7 @@ func testHostIP(c *client.Client, pod *api.Pod) {
 	ns := "e2e-test-" + string(util.NewUUID())
 	podClient := c.Pods(ns)
 	By("creating pod")
-	defer podClient.Delete(pod.Name)
+	defer podClient.Delete(pod.Name, nil)
 	_, err := podClient.Create(pod)
 	if err != nil {
 		Fail(fmt.Sprintf("Failed to create pod: %v", err))
@@ -174,7 +176,7 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("setting up watch")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to query for pods: %v", err))
 		}
@@ -189,14 +191,14 @@ var _ = Describe("Pods", func() {
 		// We call defer here in case there is a problem with
 		// the test so we can ensure that we clean up after
 		// ourselves
-		defer podClient.Delete(pod.Name)
+		defer podClient.Delete(pod.Name, nil)
 		_, err = podClient.Create(pod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
 		}
 
 		By("verifying the pod is in kubernetes")
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to query for pods: %v", err))
 		}
@@ -213,8 +215,8 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("deleting the pod")
-		podClient.Delete(pod.Name)
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		podClient.Delete(pod.Name, nil)
+		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to delete pod: %v", err))
 		}
@@ -276,42 +278,49 @@ var _ = Describe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		defer func() {
 			By("deleting the pod")
-			podClient.Delete(pod.Name)
+			podClient.Delete(pod.Name, nil)
 		}()
-		_, err := podClient.Create(pod)
+		pod, err := podClient.Create(pod)
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to create pod: %v", err))
+			Failf("Failed to create pod: %v", err)
 		}
 
 		expectNoError(waitForPodRunning(c, pod.Name))
 
 		By("verifying the pod is in kubernetes")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		Expect(len(pods.Items)).To(Equal(1))
 
-		By("retrieving the pod")
-		podOut, err := podClient.Get(pod.Name)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to get pod: %v", err))
-		}
-
-		By("updating the pod")
-		value = "time" + value
-		pod.Labels["time"] = value
-		pod.ResourceVersion = podOut.ResourceVersion
-		pod.UID = podOut.UID
-		pod.Spec.Host = podOut.Spec.Host
-		pod, err = podClient.Update(pod)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to update pod: %v", err))
-		}
+		// Standard get, update retry loop
+		expectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
+			By("updating the pod")
+			value = strconv.Itoa(time.Now().Nanosecond())
+			if pod == nil { // on retries we need to re-get
+				pod, err = podClient.Get(name)
+				if err != nil {
+					return false, fmt.Errorf("failed to get pod: %v", err)
+				}
+			}
+			pod.Labels["time"] = value
+			pod, err = podClient.Update(pod)
+			if err == nil {
+				Logf("Successfully updated pod")
+				return true, nil
+			}
+			if errors.IsConflict(err) {
+				Logf("Conflicting update to pod, re-get and re-update: %v", err)
+				pod = nil // re-get it when we retry
+				return false, nil
+			}
+			return false, fmt.Errorf("failed to update pod: %v", err)
+		}))
 
 		expectNoError(waitForPodRunning(c, pod.Name))
 
 		By("verifying the updated pod is in kubernetes")
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		Expect(len(pods.Items)).To(Equal(1))
-		fmt.Println("pod update OK")
+		Logf("Pod update OK")
 	})
 
 	It("should contain environment variables for services", func() {
@@ -333,7 +342,7 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
-		defer c.Pods(api.NamespaceDefault).Delete(serverPod.Name)
+		defer c.Pods(api.NamespaceDefault).Delete(serverPod.Name, nil)
 		_, err := c.Pods(api.NamespaceDefault).Create(serverPod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create serverPod: %v", err))
@@ -424,7 +433,33 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		})
+		}, true)
+	})
+
+	It("should *not* be restarted with a docker exec \"cat /tmp/health\" liveness probe", func() {
+		runLivenessTest(c, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "liveness-exec",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "liveness",
+						Image:   "gcr.io/google_containers/busybox",
+						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								Exec: &api.ExecAction{
+									Command: []string{"cat", "/tmp/health"},
+								},
+							},
+							InitialDelaySeconds: 15,
+						},
+					},
+				},
+			},
+		}, false)
 	})
 
 	It("should be restarted with a /healthz http liveness probe", func() {
@@ -451,7 +486,7 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		})
+		}, true)
 	})
 
 	// The following tests for remote command execution and port forwarding are
@@ -483,7 +518,7 @@ var _ = Describe("Pods", func() {
 					Containers: []api.Container{
 						{
 							Name:  "nginx",
-							Image: "dockerfile/nginx",
+							Image: "nginx",
 						},
 					},
 				},
@@ -555,7 +590,7 @@ var _ = Describe("Pods", func() {
 					Containers: []api.Container{
 						{
 							Name:  "nginx",
-							Image: "dockerfile/nginx",
+							Image: "nginx",
 							Ports: []api.Port{{ContainerPort: 80}},
 						},
 					},

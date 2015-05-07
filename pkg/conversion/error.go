@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,6 +54,10 @@ type missingKindErr struct {
 	data string
 }
 
+func NewMissingKindErr(data string) error {
+	return &missingKindErr{data}
+}
+
 func (k *missingKindErr) Error() string {
 	return fmt.Sprintf("Object 'Kind' is missing in '%s'", k.data)
 }
@@ -68,6 +72,10 @@ func IsMissingKind(err error) bool {
 
 type missingVersionErr struct {
 	data string
+}
+
+func NewMissingVersionErr(data string) error {
+	return &missingVersionErr{data}
 }
 
 func (k *missingVersionErr) Error() string {

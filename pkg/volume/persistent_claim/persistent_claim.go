@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
 )
@@ -50,11 +51,15 @@ func (plugin *persistentClaimPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.PersistentVolumeClaimVolumeSource != nil
 }
 
-func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	claim, err := plugin.host.GetKubeClient().PersistentVolumeClaims(podRef.Namespace).Get(spec.VolumeSource.PersistentVolumeClaimVolumeSource.ClaimName)
 	if err != nil {
 		glog.Errorf("Error finding claim: %+v\n", spec.VolumeSource.PersistentVolumeClaimVolumeSource.ClaimName)
 		return nil, err
+	}
+
+	if claim.Status.VolumeRef == nil {
+		return nil, fmt.Errorf("The claim %+v is not yet bound to a volume", claim.Name)
 	}
 
 	pv, err := plugin.host.GetKubeClient().PersistentVolumes().Get(claim.Status.VolumeRef.Name)
@@ -63,7 +68,7 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, podRef *api.O
 		return nil, err
 	}
 
-	builder, err := plugin.host.NewWrapperBuilder(volume.NewSpecFromPersistentVolume(pv), podRef, opts)
+	builder, err := plugin.host.NewWrapperBuilder(volume.NewSpecFromPersistentVolume(pv), podRef, opts, mounter)
 	if err != nil {
 		glog.Errorf("Error creating builder for claim: %+v\n", claim.Name)
 		return nil, err
@@ -72,6 +77,6 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, podRef *api.O
 	return builder, nil
 }
 
-func (plugin *persistentClaimPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *persistentClaimPlugin) NewCleaner(_ string, _ types.UID, _ mount.Interface) (volume.Cleaner, error) {
 	return nil, fmt.Errorf("This will never be called directly. The PV backing this claim has a cleaner.  Kubelet uses that cleaner, not this one, when removing orphaned volumes.")
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -58,6 +58,8 @@ type Builder struct {
 	flatten bool
 	latest  bool
 
+	requireObject bool
+
 	singleResourceType bool
 	continueOnError    bool
 }
@@ -70,7 +72,8 @@ type resourceTuple struct {
 // NewBuilder creates a builder that operates on generic objects.
 func NewBuilder(mapper meta.RESTMapper, typer runtime.ObjectTyper, clientMapper ClientMapper) *Builder {
 	return &Builder{
-		mapper: &Mapper{typer, mapper, clientMapper},
+		mapper:        &Mapper{typer, mapper, clientMapper},
+		requireObject: true,
 	}
 }
 
@@ -144,7 +147,7 @@ func (b *Builder) Path(paths ...string) *Builder {
 			visitor = &DirectoryVisitor{
 				Mapper:       b.mapper,
 				Path:         p,
-				Extensions:   []string{".json", ".yaml"},
+				Extensions:   []string{".json", ".yaml", ".yml"},
 				Recursive:    false,
 				IgnoreErrors: b.continueOnError,
 			}
@@ -230,6 +233,7 @@ func (b *Builder) SelectAllParam(selectAll bool) *Builder {
 // When two or more arguments are received, they must be a single type and resource name(s).
 // The allowEmptySelector permits to select all the resources (via Everything func).
 func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string) *Builder {
+	args = b.replaceAliases(args)
 	if ok, err := hasCombinedTypeArgs(args); ok {
 		if err != nil {
 			b.errs = append(b.errs, err)
@@ -267,6 +271,18 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 		b.errs = append(b.errs, fmt.Errorf("when passing arguments, must be resource or resource and name"))
 	}
 	return b
+}
+
+func (b *Builder) replaceAliases(args []string) []string {
+	replaced := []string{}
+	for _, arg := range args {
+		if aliases, ok := b.mapper.AliasesForResource(arg); ok {
+			arg = strings.Join(aliases, ",")
+		}
+		replaced = append(replaced, arg)
+	}
+
+	return replaced
 }
 
 func hasCombinedTypeArgs(args []string) (bool, error) {
@@ -311,6 +327,12 @@ func (b *Builder) Flatten() *Builder {
 // Latest will fetch the latest copy of any objects loaded from URLs or files from the server.
 func (b *Builder) Latest() *Builder {
 	b.latest = true
+	return b
+}
+
+// RequireObject ensures that resulting infos have an object set. If false, resulting info may not have an object set.
+func (b *Builder) RequireObject(require bool) *Builder {
+	b.requireObject = require
 	return b
 }
 
@@ -524,9 +546,6 @@ func (b *Builder) visitorResult() *Result {
 		visitors := []Visitor{}
 		for _, name := range b.names {
 			info := NewInfo(client, mapping, selectorNamespace, name)
-			if err := info.Get(); err != nil {
-				return &Result{singular: isSingular, err: err}
-			}
 			visitors = append(visitors, info)
 		}
 		return &Result{singular: isSingular, visitor: VisitorList(visitors), sources: visitors}
@@ -580,15 +599,24 @@ func (b *Builder) Do() *Result {
 		helpers = append(helpers, RequireNamespace(b.namespace))
 	}
 	helpers = append(helpers, FilterNamespace)
-	if b.latest {
+	if b.requireObject {
 		helpers = append(helpers, RetrieveLazy)
 	}
 	r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
 	return r
 }
 
+// SplitResourceArgument splits the argument with commas and returns unique
+// strings in the original order.
 func SplitResourceArgument(arg string) []string {
+	out := []string{}
 	set := util.NewStringSet()
-	set.Insert(strings.Split(arg, ",")...)
-	return set.List()
+	for _, s := range strings.Split(arg, ",") {
+		if set.Has(s) {
+			continue
+		}
+		set.Insert(s)
+		out = append(out, s)
+	}
+	return out
 }

@@ -32,7 +32,7 @@ The values are arbitrary data, encoded using base64.
 This is an example of a pod that uses a secret, in json format:
 ```json
 {
-  "apiVersion":"v1beta3",
+  "apiVersion": "v1beta3",
   "name": "mypod",
   "kind": "Pod",
   "spec": {
@@ -48,10 +48,8 @@ This is an example of a pod that uses a secret, in json format:
       }],
       "volumes": [{
         "name": "foo",
-        "source": {
-          "secret": {
-            "secretName": "mysecret"
-          }
+        "secret": {
+          "secretName": "mysecret"
         }
       }]
     }
@@ -79,7 +77,7 @@ files.  Currently, if a program expects a secret to be stored in an environment
 variable, then the user needs to modify the image to populate the environment
 variable from the file as an step before running the main program.  Future
 versions of Kubernetes are expected to provide more automation for populating
-enviroment variables from files.
+environment variables from files.
 
 
 ## Changes to Secrets
@@ -302,7 +300,7 @@ A secret is only sent to a node if a pod on that node requires it.  It is not
 written to disk.  It is stored in a tmpfs.  It is deleted once the pod that
 depends on it is deleted.
 
-On most Kubernetes-project-maintained distributions, commuication between user
+On most Kubernetes-project-maintained distributions, communication between user
 to the apiserver, and from apiserver to the kubelets, is protected by SSL/TLS.
 Secrets are protected when transmitted over these channels.
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/azure/${KUBE_CONFIG_FILE-"config-default.sh"}"
+source "${KUBE_ROOT}/cluster/common.sh"
 
 function azure_call {
     local -a params=()
@@ -242,44 +243,17 @@ function detect-master () {
 }
 
 # Ensure that we have a password created for validating to the master.  Will
-# read from $HOME/.kubernetres_auth if available.
+# read from kubeconfig current-context if available.
 #
 # Vars set:
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-    local file="$HOME/.kubernetes_auth"
-    if [[ -r "$file" ]]; then
-        KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-        KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
-        return
-    fi
+  get-kubeconfig-basicauth
+  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
     KUBE_USER=admin
     KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-
-    # Remove this code, since in all use cases I can see, we are overwriting this
-    # at cluster creation time.
-    cat << EOF > "$file"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD"
-}
-EOF
-    chmod 0600 "$file"
-}
-
-# Generate authentication token for admin user. Will
-# read from $HOME/.kubernetes_auth if available.
-#
-# Vars set:
-#   KUBE_ADMIN_TOKEN
-function get-admin-token {
-    local file="$HOME/.kubernetes_auth"
-    if [[ -r "$file" ]]; then
-        KUBE_ADMIN_TOKEN=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["BearerToken"]')
-        return
-    fi
-    KUBE_ADMIN_TOKEN=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(32))')
+  fi
 }
 
 # Instantiate a kubernetes cluster
@@ -432,49 +406,40 @@ function kube-up {
     printf "\n"
     echo "Kubernetes cluster created."
 
-    local kube_cert=".kubecfg.crt"
-    local kube_key=".kubecfg.key"
-    local ca_cert=".kubernetes.ca.crt"
+    export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
+    export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
+    export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
+    export CONTEXT="azure_${INSTANCE_PREFIX}"
 
     # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
     # config file.  Distribute the same way the htpasswd is done.
 (umask 077
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
+        sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>/dev/null
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
+        sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>/dev/null
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
+        sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>/dev/null
 
-    cat << EOF > ~/.kubernetes_auth
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD",
-  "CAFile": "$HOME/$ca_cert",
-  "CertFile": "$HOME/$kube_cert",
-  "KeyFile": "$HOME/$kube_key"
-}
-EOF
-
-    chmod 0600 ~/.kubernetes_auth "${HOME}/${kube_cert}" \
-        "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
+    create-kubeconfig
 )
 
-    # Wait for salt on the minions
-    sleep 30
-
     echo "Sanity checking cluster..."
+    echo
+    echo "  This will continually check the minions to ensure docker is"
+    echo "  installed. This is usually a good indicator that salt has"
+    echo "  successfully  provisioned. This might loop forever if there was"
+    echo "  some uncaught error during start up."
+    echo
     # Basic sanity checking
     for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
         # Make sure docker is installed
         echo "--> Making sure docker is installed on ${MINION_NAMES[$i]}."
-        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
-            $AZ_CS.cloudapp.net which docker > /dev/null || {
-            echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
-            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-            echo "cluster. (sorry!)" >&2
-            exit 1
-        }
+        until ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
+            $AZ_CS.cloudapp.net which docker > /dev/null 2>&1; do
+            printf "."
+            sleep 2
+        done
     done
 
     echo
@@ -482,7 +447,7 @@ EOF
     echo
     echo "  https://${KUBE_MASTER_IP}"
     echo
-    echo "The user name and password to use is located in ~/.kubernetes_auth."
+    echo "The user name and password to use is located in ${KUBECONFIG}."
     echo
 }
 

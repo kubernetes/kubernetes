@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ package testapi
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -76,14 +77,21 @@ func SelfLink(resource, name string) string {
 	return fmt.Sprintf("/api/%s/%s/%s", Version(), resource, name)
 }
 
-// Returns the appropriate path for the given resource, namespace and name.
+// Returns the appropriate path for the given prefix (watch, proxy, redirect, etc), resource, namespace and name.
 // For ex, this is of the form:
-// /api/v1beta1/pods/pod0 for v1beta1 and
-// /api/v1beta3/namespaces/foo/pods/pod0 for v1beta3.
-func ResourcePath(resource, namespace, name string) string {
+// /api/v1beta1/watch/pods/pod0 for v1beta1 and
+// /api/v1beta3/watch/namespaces/foo/pods/pod0 for v1beta3.
+func ResourcePathWithPrefix(prefix, resource, namespace, name string) string {
 	path := "/api/" + Version()
-	if !api.PreV1Beta3(Version()) && namespace != "" {
-		path = path + "/namespaces/" + namespace
+	if prefix != "" {
+		path = path + "/" + prefix
+	}
+	if !api.PreV1Beta3(Version()) {
+		if namespace != "" {
+			path = path + "/namespaces/" + namespace
+		}
+		// Resource names in v1beta3 are lower case.
+		resource = strings.ToLower(resource)
 	}
 	if resource != "" {
 		path = path + "/" + resource
@@ -94,14 +102,26 @@ func ResourcePath(resource, namespace, name string) string {
 	return path
 }
 
+// Returns the appropriate path for the given resource, namespace and name.
+// For ex, this is of the form:
+// /api/v1beta1/pods/pod0 for v1beta1 and
+// /api/v1beta3/namespaces/foo/pods/pod0 for v1beta3.
+func ResourcePath(resource, namespace, name string) string {
+	return ResourcePathWithPrefix("", resource, namespace, name)
+}
+
 // Returns the appropriate path along with the query params for the given resource, namespace and name.
 // For ex, this is of the form:
 // /api/v1beta1/pods/pod0?namespace=foo for v1beta1 and
 // /api/v1beta3/namespaces/foo/pods/pod0 for v1beta3.
-func ResourcePathWithQueryParams(resource, namespace, name string) string {
-	path := ResourcePath(resource, namespace, name)
+func ResourcePathWithNamespaceQuery(resource, namespace, name string) string {
+	return ResourcePathWithPrefixAndNamespaceQuery("", resource, namespace, name)
+}
+
+func ResourcePathWithPrefixAndNamespaceQuery(prefix, resource, namespace, name string) string {
+	path := ResourcePathWithPrefix(prefix, resource, namespace, name)
 	// Add namespace as query param for pre v1beta3.
-	if api.PreV1Beta3(Version()) {
+	if api.PreV1Beta3(Version()) && namespace != "" {
 		path = path + "?namespace=" + namespace
 	}
 	return path

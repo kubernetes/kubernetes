@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,7 +79,7 @@ func (v *flagValueWrapper) IsBoolFlag() bool {
 
 // Imports a 'flag.Flag' into a 'pflag.FlagSet'.  The "short" option is unset
 // and the type is inferred using reflection.
-func AddFlagToPFlagSet(f *flag.Flag, fs *pflag.FlagSet) {
+func addFlagToPFlagSet(f *flag.Flag, fs *pflag.FlagSet) {
 	if fs.Lookup(f.Name) == nil {
 		fs.Var(wrapFlagValue(f.Value), f.Name, f.Usage)
 	}
@@ -88,16 +88,11 @@ func AddFlagToPFlagSet(f *flag.Flag, fs *pflag.FlagSet) {
 // Adds all of the flags in a 'flag.FlagSet' package flags to a 'pflag.FlagSet'.
 func AddFlagSetToPFlagSet(fsIn *flag.FlagSet, fsOut *pflag.FlagSet) {
 	fsIn.VisitAll(func(f *flag.Flag) {
-		AddFlagToPFlagSet(f, fsOut)
+		addFlagToPFlagSet(f, fsOut)
 	})
 }
 
-// Adds all of the top level 'flag' package flags to a 'pflag.FlagSet'.
-func AddAllFlagsToPFlagSet(fs *pflag.FlagSet) {
-	AddFlagSetToPFlagSet(flag.CommandLine, fs)
-}
-
-// Add al of the top level 'flag' package flags to the top level 'pflag' flags.
+// Add all of the top level 'flag' package flags to the top level 'pflag' flags.
 func AddAllFlagsToPFlags() {
 	AddFlagSetToPFlagSet(flag.CommandLine, pflag.CommandLine)
 }

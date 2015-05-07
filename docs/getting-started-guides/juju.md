@@ -1,11 +1,16 @@
-## Getting start with Juju
+## Getting started with Juju
 
 Juju handles provisioning machines and deploying complex systems to a
-wide number of clouds.
+wide number of clouds, supporting service orchestration once the bundle of
+services has been deployed.
 
 
 
 ### Prerequisites
+
+> Note: If you're running kube-up, on ubuntu - all of the dependencies
+> will be handled for you. You may safely skip to the section:
+> [Launch Kubernetes Cluster](#launch-kubernetes-cluster)
 
 #### On Ubuntu
 
@@ -39,13 +44,19 @@ interface.
 
 ## Launch Kubernetes cluster
 
-    juju quickstart https://raw.githubusercontent.com/whitmo/bundle-kubernetes/master/bundles.yaml
+You will need to have the Kubernetes tools compiled before launching the cluster
 
-First this command will start a curses based gui allowing you to set
-up credentials and other environmental settings for several different
-providers including Azure and AWS.
+    make all WHAT=cmd/kubectl
+    export KUBERNETES_PROVIDER=juju
+    cluster/kube-up.sh
 
-Next it will deploy the kubernetes master, etcd, 2 minions with flannel networking.
+If this is your first time running the `kube-up.sh` script, it will install
+the required predependencies to get started with Juju, additionally it will
+launch a curses based configuration utility allowing you to select your cloud
+provider and enter the proper access credentials.
+
+Next it will deploy the kubernetes master, etcd, 2 minions with flannel based
+Software Defined Networking.
 
 
 ## Exploring the cluster
@@ -53,14 +64,15 @@ Next it will deploy the kubernetes master, etcd, 2 minions with flannel networki
 Juju status provides information about each unit in the cluster:
 
     juju status --format=oneline
-
-    - etcd/0: 52.0.74.109 (started)
-    - flannel/0: 52.0.149.150 (started)
-    - flannel/1: 52.0.185.81 (started)
-    - juju-gui/0: 52.1.150.81 (started)
-    - kubernetes/0: 52.0.149.150 (started)
-    - kubernetes/1: 52.0.185.81 (started)
-    - kubernetes-master/0: 52.1.120.142 (started)
+    - docker/0: 52.4.92.78 (started)
+      - flannel-docker/0: 52.4.92.78 (started)
+      - kubernetes/0: 52.4.92.78 (started)
+    - docker/1: 52.6.104.142 (started)
+      - flannel-docker/1: 52.6.104.142 (started)
+      - kubernetes/1: 52.6.104.142 (started)
+    - etcd/0: 52.5.216.210 (started) 4001/tcp
+    - juju-gui/0: 52.5.205.174 (started) 80/tcp, 443/tcp
+    - kubernetes-master/0: 52.6.19.238 (started) 8080/tcp
 
 You can use `juju ssh` to access any of the units:
 
@@ -150,8 +162,7 @@ Finally delete the pod:
 
 We can add minion units like so:
 
-    juju add-unit flannel # creates unit flannel/2
-    juju add-unit kubernetes --to flannel/2
+    juju add-unit docker # creates unit docker/2, kubernetes/2, docker-flannel/2
 
 
 ## Tear down cluster
@@ -175,6 +186,16 @@ Kubernetes Bundle on Github
 Juju runs natively against a variety of cloud providers and can be
 made to work against many more using a generic manual provider.
 
+Provider          | v0.15.0
+--------------    | -------
+AWS               | TBD
+HPCloud           | TBD
+OpenStack         | TBD
+Joyent            | TBD
+Azure             | TBD
+Digital Ocean     | TBD
+MAAS (bare metal) | TBD
+GCE               | TBD
 
 
 Provider          | v0.8.1
@@ -187,4 +208,3 @@ Azure             | TBD
 Digital Ocean     | TBD
 MAAS (bare metal) | TBD
 GCE               | TBD
-

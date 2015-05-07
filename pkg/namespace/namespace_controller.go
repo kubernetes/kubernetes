@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -62,14 +62,24 @@ func NewNamespaceManager(kubeClient client.Interface, resyncPeriod time.Duration
 	)
 
 	return &NamespaceManager{
-		controller:     controller,
-		StopEverything: make(chan struct{}),
+		controller: controller,
 	}
 }
 
 // Run begins observing the system.  It starts a goroutine and returns immediately.
 func (nm *NamespaceManager) Run() {
-	go nm.controller.Run(nm.StopEverything)
+	if nm.StopEverything == nil {
+		nm.StopEverything = make(chan struct{})
+		go nm.controller.Run(nm.StopEverything)
+	}
+}
+
+// Stop gracefully shutsdown this controller
+func (nm *NamespaceManager) Stop() {
+	if nm.StopEverything != nil {
+		close(nm.StopEverything)
+		nm.StopEverything = nil
+	}
 }
 
 // finalized returns true if the spec.finalizers is empty list
@@ -236,12 +246,12 @@ func deleteReplicationControllers(kubeClient client.Interface, ns string) error 
 }
 
 func deletePods(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Pods(ns).List(labels.Everything())
+	items, err := kubeClient.Pods(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.Pods(ns).Delete(items.Items[i].Name)
+		err := kubeClient.Pods(ns).Delete(items.Items[i].Name, nil)
 		if err != nil {
 			return err
 		}

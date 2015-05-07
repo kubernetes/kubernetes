@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -130,6 +130,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	// what verbs are supported by the storage, used to know what verbs we support per path
 	creater, isCreater := storage.(rest.Creater)
+	namedCreater, isNamedCreater := storage.(rest.NamedCreater)
 	lister, isLister := storage.(rest.Lister)
 	getter, isGetter := storage.(rest.Getter)
 	getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)
@@ -139,9 +140,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	patcher, isPatcher := storage.(rest.Patcher)
 	watcher, isWatcher := storage.(rest.Watcher)
 	_, isRedirector := storage.(rest.Redirector)
+	connecter, isConnecter := storage.(rest.Connecter)
 	storageMeta, isMetadata := storage.(rest.StorageMetadata)
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
+	}
+
+	if isNamedCreater {
+		isCreater = true
 	}
 
 	var versionedList interface{}
@@ -193,6 +199,22 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		isGetter = true
 	}
 
+	var (
+		connectOptions     runtime.Object
+		connectOptionsKind string
+		connectSubpath     bool
+		connectSubpathKey  string
+	)
+	if isConnecter {
+		connectOptions, connectSubpath, connectSubpathKey = connecter.NewConnectOptions()
+		if connectOptions != nil {
+			_, connectOptionsKind, err = a.group.Typer.ObjectVersionAndKind(connectOptions)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	var ctxFn ContextFunc
 	ctxFn = func(req *restful.Request) api.Context {
 		if ctx, ok := context.Get(req.Request); ok {
@@ -238,6 +260,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
 
 	} else {
 		// v1beta3 format with namespace in path
@@ -275,6 +299,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
+			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
+			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
 
 			// list across namespace.
 			namer = scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), true}
@@ -315,6 +341,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
+			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
+			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
 		}
 	}
 
@@ -413,7 +441,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "POST": // Create a resource.
-			route := ws.POST(action.Path).To(CreateResource(creater, reqScope, a.group.Typer, admit)).
+			var handler restful.RouteFunction
+			if isNamedCreater {
+				handler = CreateNamedResource(namedCreater, reqScope, a.group.Typer, admit)
+			} else {
+				handler = CreateResource(creater, reqScope, a.group.Typer, admit)
+			}
+			route := ws.POST(action.Path).To(handler).
 				Filter(m).
 				Doc("create a "+kind).
 				Operation("create"+kind).
@@ -480,6 +514,23 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
 			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
 			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
+		case "CONNECT":
+			for _, method := range connecter.ConnectMethods() {
+				route := ws.Method(method).Path(action.Path).
+					To(ConnectResource(connecter, reqScope, connectOptionsKind, connectSubpath, connectSubpathKey)).
+					Filter(m).
+					Doc("connect " + method + " requests to " + kind).
+					Operation("connect" + method + kind).
+					Produces("*/*").
+					Consumes("*/*").
+					Writes("string")
+				if connectOptions != nil {
+					if err := addObjectParams(ws, route, connectOptions); err != nil {
+						return err
+					}
+				}
+				ws.Route(route)
+			}
 		default:
 			return fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}

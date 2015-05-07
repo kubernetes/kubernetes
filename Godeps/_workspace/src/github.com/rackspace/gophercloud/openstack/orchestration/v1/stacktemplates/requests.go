@@ -11,7 +11,6 @@ func Get(c *gophercloud.ServiceClient, stackName, stackID string) GetResult {
 	var res GetResult
 	_, res.Err = c.Request("GET", getURL(c, stackName, stackID), gophercloud.RequestOpts{
 		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
 	})
 	return res
 }
@@ -52,10 +51,8 @@ func Validate(c *gophercloud.ServiceClient, opts ValidateOptsBuilder) ValidateRe
 		return res
 	}
 
-	_, res.Err = c.Request("POST", validateURL(c), gophercloud.RequestOpts{
-		JSONBody:     reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
+	_, res.Err = c.Post(validateURL(c), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 	return res
 }

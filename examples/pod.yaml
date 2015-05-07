@@ -1,0 +1,16 @@
+apiVersion: v1beta3
+kind: Pod
+metadata:
+  labels:
+    name: nginx
+  name: nginx
+  namespace: default
+spec:
+  containers:
+  - image: nginx
+    imagePullPolicy: IfNotPresent
+    name: nginx
+    ports:
+    - containerPort: 80
+      protocol: TCP
+  restartPolicy: Always

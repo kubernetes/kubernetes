@@ -3,8 +3,8 @@
 
 **Authorization**
 :Kubernetes does not currently have an authorization system.  Anyone with the cluster password can do anything.  We plan
-to add sophisticated authorization, and to make it pluggable.  See the [access control design doc](./devel/access.md) and
-[this issue](https://github.com/GoogleCloudPlatform/kubernetes/issue/1430).
+to add sophisticated authorization, and to make it pluggable.  See the [access control design doc](./design/access.md) and
+[this issue](https://github.com/GoogleCloudPlatform/kubernetes/issues/1430).
 
 **Annotation**
 : A key/value pair that can hold large (compared to a Label), and possibly not human-readable data.  Intended to store
@@ -34,6 +34,9 @@ for easy scaling of replicated systems, and handles restarting of a Pod when the
 
 **Resource**
 : CPU, memory, and other things that a pod can request.   See [resources](resources.md).
+
+**Secret**
+: An object containing sensitive information, such as authentication tokens, which can be made available to containers upon request. See [secrets](secrets.md).
 
 **Selector**
 : An expression that matches Labels.  Can identify related objects, such as pods which are replicas in a load-balanced

@@ -1,3 +1,7 @@
+# Status: Out Of Date
+
+** Rackspace support is out of date.  Please check back later **
+
 # Rackspace
 In general, the dev-build-and-up.sh workflow for Rackspace is the similar to GCE. The specific implementation is different due to the use of CoreOS, Rackspace Cloud Files and network design. 
 

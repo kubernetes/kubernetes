@@ -1,9 +1,11 @@
 API Conventions
 ===============
 
-The conventions of the Kubernetes API (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
+Updated: 4/16/2015
 
-The general style of the Kubernetes API is RESTful - clients create, update, delete, or retrieve a description of an object via the standard HTTP verbs (POST, PUT, DELETE, and GET) - and those APIs preferentially accept and return JSON. Kubernetes also exposes additional endpoints for non-standard verbs and allows alternative content types. All of the JSON accepted and returned by the server has a schema, identified by the "kind" and "apiVersion" fields.
+The conventions of the [Kubernetes API](api.md) (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
+
+The general style of the Kubernetes API is RESTful - clients create, update, delete, or retrieve a description of an object via the standard HTTP verbs (POST, PUT, DELETE, and GET) - and those APIs preferentially accept and return JSON. Kubernetes also exposes additional endpoints for non-standard verbs and allows alternative content types. All of the JSON accepted and returned by the server has a schema, identified by the "kind" and "apiVersion" fields. Where relevant HTTP header fields exist, they should mirror the content of JSON fields, but the information should not be represented only in the HTTP header.
 
 The following terms are defined:
 
@@ -13,6 +15,8 @@ The following terms are defined:
   * Elements - an individual resource, addressable via a URL
 
 Each resource typically accepts and returns data of a single kind.  A kind may be accepted or returned by multiple resources that reflect specific use cases. For instance, the kind "pod" is exposed as a "pods" resource that allows end users to create, update, and delete pods, while a separate "pod status" resource (that acts on "pod" kind) allows automated processes to update a subset of the fields in that resource. A "restart" resource might be exposed for a number of different resources to allow the same action to have different results for each object.
+
+Resource collections should be all lowercase and plural, whereas kinds are CamelCase and singular.
 
 
 Types (Kinds)
@@ -50,6 +54,7 @@ Kinds are grouped into three categories:
 
 The standard REST verbs (defined below) MUST return singular JSON objects. Some API endpoints may deviate from the strict REST pattern and return resources that are not singular JSON objects, such as streams of JSON objects or unstructured text log data.
 
+The term "kind" is reserved for these "top-level" API types. The term "type" should be used for distinguishing sub-categories within objects or subobjects.
 
 ### Resources
 
@@ -58,6 +63,7 @@ All JSON objects returned by an API MUST have the following fields:
 * kind: a string that identifies the schema this object should have
 * apiVersion: a string that identifies the version of the schema the object should have
 
+These fields are required for proper decoding of the object. They may be populated by the server by default from the specified URL path, but the client likely needs to know the values in order to construct the URL path.
 
 ### Objects
 
@@ -73,24 +79,50 @@ Every object SHOULD have the following metadata in a nested object field called 
 
 * resourceVersion: a string that identifies the internal version of this object that can be used by clients to determine when objects have changed. This value MUST be treated as opaque by clients and passed unmodified back to the server. Clients should not assume that the resource version has meaning across namespaces, different kinds of resources, or different servers. (see [concurrency control](#concurrency-control-and-consistency), below, for more details)
 * creationTimestamp: a string representing an RFC 3339 date of the date and time an object was created
+* deletionTimestamp: a string representing an RFC 3339 date of the date and time after which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource will be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field. Once set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time.
 * labels: a map of string keys and values that can be used to organize and categorize objects (see [labels.md](labels.md))
 * annotations: a map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about this object (see [annotations.md](annotations.md))
 
-Labels are intended for organizational purposes by end users (select the pods that match this label query). Annotations enable third party automation and tooling to decorate objects with additional metadata for their own use.
+Labels are intended for organizational purposes by end users (select the pods that match this label query). Annotations enable third-party automation and tooling to decorate objects with additional metadata for their own use.
 
 #### Spec and Status
 
-By convention, the Kubernetes API makes a distinction between the specification of the desired state of an object (a nested object field called "spec") and the status of the object at the current time (a nested object field called "status"). The specification is persisted in stable storage with the API object and reflects user input. The status is summarizes the current state of the object in the system, and is usually persisted with the object by an automated processes (but may be created on the fly).
+By convention, the Kubernetes API makes a distinction between the specification of the desired state of an object (a nested object field called "spec") and the status of the object at the current time (a nested object field called "status"). The specification is a complete description of the desired state, including configuration settings provided by the user, [default values](#defaulting) expanded by the system, and properties initialized or otherwise changed after creation by other ecosystem components (e.g., schedulers, auto-scalers), and is persisted in stable storage with the API object. If the specification is deleted, the object will be purged from the system. The status summarizes the current state of the object in the system, and is usually persisted with the object by an automated processes but may be generated on the fly. At some cost and perhaps some temporary degradation in behavior, the status could be reconstructed by observation if it were lost.
 
-For example, a pod object has a "spec" object field that defines how the pod should be run. The pod also has a "status" object field that shows details about what is happening on the host that is running the containers in the pod (if available) and a summarized "phase" string that indicates where the pod is in its lifecycle.
+When a new version of an object is POSTed or PUT, the "spec" is updated and available immediately. Over time the system will work to bring the "status" into line with the "spec". The system will drive toward the most recent "spec" regardless of previous versions of that stanza. In other words, if a value is changed from 2 to 5 in one PUT and then back down to 3 in another PUT the system is not required to 'touch base' at 5 before changing the "status" to 3. In other words, the system's behavior is *level-based* rather than *edge-based*. This enables robust behavior in the presence of missed intermediate state changes.
 
-When a new version of an object is POSTed or PUT, the "spec" is updated and available immediately. Over time the system will work to bring the "status" into line with the "spec". The system will drive toward the most recent "spec" regardless of previous versions of that stanza. In other words, if a value is changed from 2 to 5 in one PUT and then back down to 3 in another PUT the system is not required to 'touch base' at 5 before changing the "status" to 3.
+The Kubernetes API also serves as the foundation for the declarative configuration schema for the system. In order to facilitate level-based operation and expression of declarative configuration, fields in the specification should have declarative rather than imperative names and semantics -- they represent the desired state, not actions intended to yield the desired state.
 
-The PUT and POST verbs on objects will ignore the "status" values. Otherwise, PUT expects the whole object to be specified. Therefore, if a field is omitted it is assumed that the client wants to clear that field's value.
+The PUT and POST verbs on objects will ignore the "status" values. A `/status` subresource is provided to enable system components to update statuses of resources they manage.
 
-The PUT verb does not accept partial updates. Modification of just part of an object may be achieved by GETting the resource, modifying part of the spec, labels, or annotations, and then PUTting it back. See [concurrency control](#concurrency-control-and-consistency), below, regarding read-modify-write consistency when using this pattern. Some objects may expose alternative resource representations that allow mutation of the status, or performing custom actions on the object.
+Otherwise, PUT expects the whole object to be specified. Therefore, if a field is omitted it is assumed that the client wants to clear that field's value. The PUT verb does not accept partial updates. Modification of just part of an object may be achieved by GETting the resource, modifying part of the spec, labels, or annotations, and then PUTting it back. See [concurrency control](#concurrency-control-and-consistency), below, regarding read-modify-write consistency when using this pattern. Some objects may expose alternative resource representations that allow mutation of the status, or performing custom actions on the object.
 
 All objects that represent a physical resource whose state may vary from the user's desired intent SHOULD have a "spec" and a "status".  Objects whose state cannot vary from the user's desired intent MAY have only "spec", and MAY rename "spec" to a more appropriate name.
+
+Objects that contain both spec and status should not contain additional top-level fields other than the standard metadata fields.
+
+##### Typical status properties
+
+* **phase**: The phase is a simple, high-level summary of the phase of the lifecycle of an object. The phase should progress monotonically. Typical phase values are `Pending` (not yet fully physically realized), `Running` or `Active` (fully realized and active, but not necessarily operating correctly), and `Terminated` (no longer active), but may vary slightly for different types of objects. New phase values should not be added to existing objects in the future. Like other status fields, it must be possible to ascertain the lifecycle phase by observation. Additional details regarding the current phase may be contained in other fields.
+* **conditions**: Conditions represent orthogonal observations of an object's current state. Objects may report multiple conditions, and new types of conditions may be added in the future. Condition status values may be `True`, `False`, or `Unknown`. Unlike the phase, conditions are not expected to be monotonic -- their values may change back and forth. A typical condition type is `Ready`, which indicates the object was believed to be fully operational at the time it was last probed. Conditions may carry additional information, such as the last probe time or last transition time. 
+
+TODO(@vishh): Reason and Message.
+
+Phases and conditions are observations and not, themselves, state machines, nor do we define comprehensive state machines for objects with behaviors associated with state transitions. The system is level-based and should assume an Open World. Additionally, new observations and details about these observations may be added over time. 
+
+In order to preserve extensibility, in the future, we intend to explicitly convey properties that users and components care about rather than requiring those properties to be inferred from observations.
+
+Note that historical information status (e.g., last transition time, failure counts) is only provided at best effort, and is not guaranteed to not be lost.
+
+Status information that may be large (especially unbounded in size, such as lists of references to other objects -- see below) and/or rapidly changing, such as [resource usage](resources.md#usage-data), should be put into separate objects, with possibly a reference from the original object. This helps to ensure that GETs and watch remain reasonably efficient for the majority of clients, which may not need that data.
+
+#### References to related objects
+
+References to loosely coupled sets of objects, such as [pods](pods.md) overseen by a [replication controller](replication-controller.md), are usually best referred to using a [label selector](labels.md). In order to ensure that GETs of individual objects remain bounded in time and space, these sets may be queried via separate API queries, but will not be expanded in the referring object's status.
+
+References to specific objects, especially specific resource versions and/or specific fields of those objects, are specified using the `ObjectReference` type. Unlike partial URLs, the ObjectReference type facilitates flexible defaulting of fields from the referring object or other contextual information.
+
+References in the status of the referee to the referrer may be permitted, when the references are one-to-one and do not need to be frequently updated, particularly in an edge-based manner.
 
 #### Lists of named subobjects preferred over maps
 
@@ -143,8 +175,8 @@ API resources should use the traditional REST pattern:
 
 * GET /&lt;resourceNamePlural&gt; - Retrieve a list of type &lt;resourceName&gt;, e.g. GET /pods returns a list of Pods.
 * POST /&lt;resourceNamePlural&gt; - Create a new resource from the JSON object provided by the client.
-* GET /&lt;resourceNamePlural&gt;/&lt;name&gt; - Retrieves a single resource with the given name, e.g. GET /pods/first returns a Pod named 'first'.
-* DELETE /&lt;resourceNamePlural&gt;/&lt;name&gt;  - Delete the single resource with the given name.
+* GET /&lt;resourceNamePlural&gt;/&lt;name&gt; - Retrieves a single resource with the given name, e.g. GET /pods/first returns a Pod named 'first'. Should be constant time, and the resource should be bounded in size.
+* DELETE /&lt;resourceNamePlural&gt;/&lt;name&gt;  - Delete the single resource with the given name. DeleteOptions may specify gracePeriodSeconds, the optional duration in seconds before the object should be deleted. Individual kinds may declare fields which provide a default grace period, and different kinds may have differing kind-wide default grace periods. A user provided grace period overrides a default grace period, including the zero grace period ("now").
 * PUT /&lt;resourceNamePlural&gt;/&lt;name&gt; - Update or create the resource with the given name with the JSON object provided by the client.
 * PATCH /&lt;resourceNamePlural&gt;/&lt;name&gt; - Selectively modify the specified fields of the resource. See more information [below](#patch).
 
@@ -248,19 +280,45 @@ Idempotency
 
 All compatible Kubernetes APIs MUST support "name idempotency" and respond with an HTTP status code 409 when a request is made to POST an object that has the same name as an existing object in the system. See [identifiers.md](identifiers.md) for details.
 
-TODO: name generation
+Names generated by the system may be requested using `metadata.generateName`. GenerateName indicates that the name should be made unique by the server prior to persisting it. A non-empty value for the field indicates the name will be made unique (and the name returned to the client will be different than the name passed). The value of this field will be combined with a unique suffix on the server if the Name field has not been provided. The provided value must be valid within the rules for Name, and may be truncated by the length of the suffix required to make the value unique on the server. If this field is specified, and Name is not present, the server will NOT return a 409 if the generated name exists - instead, it will either return 201 Created or 504 with Reason `ServerTimeout` indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).
 
 Defaulting
 ----------
 
 Default resource values are API version-specific, and they are applied during
 the conversion from API-versioned declarative configuration to internal objects
-representing the desired state (`Spec`) of the resource.
+representing the desired state (`Spec`) of the resource. Subsequent GETs of the
+resource will include the default values explicitly.
 
 Incorporating the default values into the `Spec` ensures that `Spec` depicts the
 full desired state so that it is easier for the system to determine how to
 achieve the state, and for the user to know what to anticipate.
 
+API version-specific default values are set by the API server.
+
+Late Initialization
+-------------------
+Late initialization is when resource fields are set by a system controller
+after an object is created/updated.
+
+For example, the scheduler sets the pod.spec.host field after the pod is created.
+
+Late-initializers should only make the following types of modifications:
+  - Setting previously unset fields
+  - Adding keys to maps
+  - Adding values to arrays which have mergeable semantics (`patchStrategy:"merge"` attribute in
+  go definition of type).
+These conventions:
+ 1. allow a user (with sufficient privilege) to override any system-default behaviors by setting
+    the fields that would otherwise have been defaulted.
+ 1. enables updates from users to be merged with changes made during late initialization, using
+    strategic merge patch, as opposed to clobbering the change.
+ 1. allow the component which does the late-initialization to use strategic merge patch, which
+    facilitates composition and concurrency of such components.
+
+Although the apiserver Admission Control stage acts prior to object creation,
+Admission Control plugins should follow the Late Initialization conventions
+too, to allow their implementation to be later moved to a controller, or to client libraries.
 
 Concurrency Control and Consistency
 -----------------------------------
@@ -297,6 +355,12 @@ Serialization Format
 APIs may return alternative representations of any resource in response to an Accept header or under alternative endpoints, but the default serialization for input and output of API responses MUST be JSON.
 
 All dates should be serialized as RFC3339 strings.
+
+
+Units
+-----
+
+Units must either be explicit in the field name (e.g., `timeoutSeconds`), or must be specified as part of the value (e.g., `resource.Quantity`). Which approach is preferred is TBD.
 
 
 Selecting Fields
@@ -512,11 +576,5 @@ Events
 ------
 
 TODO: Document events (refer to another doc for details)
-
-
-API Documentation
------------------
-
-API documentation can be found at [http://kubernetes.io/third_party/swagger-ui/](http://kubernetes.io/third_party/swagger-ui/).
 
 

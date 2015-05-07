@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package glusterfs
 import (
 	"math/rand"
 	"os"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -65,16 +64,16 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	ep_name := spec.VolumeSource.Glusterfs.EndpointsName
-	ns := api.NamespaceDefault
+	ns := podRef.Namespace
 	ep, err := plugin.host.GetKubeClient().Endpoints(ns).Get(ep_name)
 	if err != nil {
 		glog.Errorf("Glusterfs: failed to get endpoints %s[%v]", ep_name, err)
 		return nil, err
 	}
 	glog.V(1).Infof("Glusterfs: endpoints %v", ep)
-	return plugin.newBuilderInternal(spec, ep, podRef, mount.New(), exec.New())
+	return plugin.newBuilderInternal(spec, ep, podRef, mounter, exec.New())
 }
 
 func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.Endpoints, podRef *api.ObjectReference, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
@@ -90,8 +89,8 @@ func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.End
 	}, nil
 }
 
-func (plugin *glusterfsPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return plugin.newCleanerInternal(volName, podUID, mount.New())
+func (plugin *glusterfsPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+	return plugin.newCleanerInternal(volName, podUID, mounter)
 }
 
 func (plugin *glusterfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
@@ -129,16 +128,15 @@ func (glusterfsVolume *glusterfs) SetUpAt(dir string) error {
 	if mountpoint {
 		return nil
 	}
-	path := glusterfsVolume.path
+
 	os.MkdirAll(dir, 0750)
-	err = glusterfsVolume.execMount(glusterfsVolume.hosts, path, dir, glusterfsVolume.readonly)
+	err = glusterfsVolume.setUpAtInternal(dir)
 	if err == nil {
 		return nil
 	}
 
-	// cleanup upon failure
+	// Cleanup upon failure.
 	glusterfsVolume.cleanup(dir)
-	// return error
 	return err
 }
 
@@ -165,7 +163,7 @@ func (glusterfsVolume *glusterfs) cleanup(dir string) error {
 		return os.RemoveAll(dir)
 	}
 
-	if err := glusterfsVolume.mounter.Unmount(dir, 0); err != nil {
+	if err := glusterfsVolume.mounter.Unmount(dir); err != nil {
 		glog.Errorf("Glusterfs: Unmounting failed: %v", err)
 		return err
 	}
@@ -183,30 +181,21 @@ func (glusterfsVolume *glusterfs) cleanup(dir string) error {
 	return nil
 }
 
-func (glusterfsVolume *glusterfs) execMount(hosts *api.Endpoints, path string, mountpoint string, readonly bool) error {
+func (glusterfsVolume *glusterfs) setUpAtInternal(dir string) error {
 	var errs error
-	var command exec.Cmd
-	var mountArgs []string
-	var opt []string
 
-	// build option array
-	if readonly == true {
-		opt = []string{"-o", "ro"}
-	} else {
-		opt = []string{"-o", "rw"}
+	options := []string{}
+	if glusterfsVolume.readonly {
+		options = append(options, "ro")
 	}
 
-	l := len(hosts.Subsets)
-	// avoid mount storm, pick a host randomly
+	l := len(glusterfsVolume.hosts.Subsets)
+	// Avoid mount storm, pick a host randomly.
 	start := rand.Int() % l
-	// iterate all hosts until mount succeeds.
+	// Iterate all hosts until mount succeeds.
 	for i := start; i < start+l; i++ {
-		arg := []string{"-t", "glusterfs", hosts.Subsets[i%l].Addresses[0].IP + ":" + path, mountpoint}
-		mountArgs = append(arg, opt...)
-		glog.V(1).Infof("Glusterfs: mount cmd: mount %v", strings.Join(mountArgs, " "))
-		command = glusterfsVolume.exe.Command("mount", mountArgs...)
-
-		_, errs = command.CombinedOutput()
+		hostIP := glusterfsVolume.hosts.Subsets[i%l].Addresses[0].IP
+		errs = glusterfsVolume.mounter.Mount(hostIP+":"+glusterfsVolume.path, dir, "glusterfs", options)
 		if errs == nil {
 			return nil
 		}

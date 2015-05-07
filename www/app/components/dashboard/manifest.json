@@ -1,0 +1,60 @@
+{
+  "description": "The basic kubernetes ui dashboard... ",
+  "routes": [
+    {
+      "description": "Dashboard visualization.",
+      "url": "/",
+      "templateUrl": "components/dashboard/pages/home.html"
+    },
+    {
+      "description": "Pods",
+      "url": "/pods",
+      "templateUrl": "components/dashboard/views/listPods.html"
+    },
+    {
+      "description": "Pod Visualizer",
+      "url": "/visualpods",
+      "templateUrl": "components/dashboard/views/listPodsVisualizer.html"
+    },
+    {
+      "description": "Services",
+      "url": "/services",
+      "templateUrl": "components/dashboard/views/listServices.html"
+    },
+    {
+      "description": "Replication Controllers",
+      "url": "/replicationcontrollers",
+      "templateUrl": "components/dashboard/views/listReplicationControllers.html"
+    },
+    {
+      "description": "Events",
+      "url": "/events",
+      "templateUrl": "components/dashboard/views/listEvents.html"
+    },
+    {
+      "description": "Minions",
+      "url": "/minions",
+      "templateUrl": "components/dashboard/views/listMinions.html"
+    },
+    {
+      "description": "Replication Controller",
+      "url": "/replicationcontrollers/:replicationControllerId",
+      "templateUrl": "components/dashboard/views/replication.html"
+    },
+    {
+      "description": "Service",
+      "url": "/services/:serviceId",
+      "templateUrl": "components/dashboard/views/service.html"
+    },
+    {
+      "description": "Explore",
+      "url": "/groups/:grouping*?/selector/:selector*?",
+      "templateUrl": "components/dashboard/views/groups.html"
+    },
+    {
+      "description": "Pod",
+      "url": "/pods/:podId",
+      "templateUrl": "components/dashboard/views/pod.html"
+    }
+  ]
+}

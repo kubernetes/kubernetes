@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -80,6 +80,8 @@ var standardResources = util.NewStringSet(
 	string(ResourceQuotas),
 	string(ResourceServices),
 	string(ResourceReplicationControllers),
+	string(ResourceSecrets),
+	string(ResourcePersistentVolumeClaims),
 	string(ResourceStorage))
 
 func IsStandardResourceName(str string) bool {
@@ -110,4 +112,21 @@ var standardFinalizers = util.NewStringSet(
 
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
+}
+
+// AddToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,
+// only if they do not already exist
+func AddToNodeAddresses(addresses *[]NodeAddress, addAddresses ...NodeAddress) {
+	for _, add := range addAddresses {
+		exists := false
+		for _, existing := range *addresses {
+			if existing.Address == add.Address && existing.Type == add.Type {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			*addresses = append(*addresses, add)
+		}
+	}
 }

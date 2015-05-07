@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,9 +29,12 @@ import (
 
 	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	kclientcmd "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
+	kclientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	kfields "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	klabels "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	tools "github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	kwatch "github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	etcd "github.com/coreos/go-etcd/etcd"
 	skymsg "github.com/skynetservices/skydns/msg"
@@ -42,6 +45,7 @@ var (
 	etcd_mutation_timeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
 	etcd_server           = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
 	verbose               = flag.Bool("verbose", false, "log extra information")
+	kubecfg_file          = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes service")
 )
 
 func removeDNS(record string, etcdClient *etcd.Client) error {
@@ -103,7 +107,7 @@ func mutateEtcdOrDie(mutator func() error) {
 func newEtcdClient() (client *etcd.Client) {
 	maxConnectRetries := 12
 	for maxConnectRetries > 0 {
-		if _, _, err := tools.GetEtcdVersion(*etcd_server); err != nil {
+		if _, err := tools.GetEtcdVersion(*etcd_server); err != nil {
 			log.Fatalf("Failed to connect to etcd server: %v, error: %v", *etcd_server, err)
 			if maxConnectRetries > 0 {
 				log.Println("Retrying request after 5 second sleep.")
@@ -117,33 +121,60 @@ func newEtcdClient() (client *etcd.Client) {
 			break
 		}
 	}
-	client = etcd.NewClient([]string{*etcd_server})
-	if client == nil {
-		return nil
+	// loop until we have > 0 machines && machines[0] != ""
+	poll, timeout := 1*time.Second, 10*time.Second
+	if err := wait.Poll(poll, timeout, func() (bool, error) {
+		if client = etcd.NewClient([]string{*etcd_server}); client == nil {
+			log.Fatal("etcd.NewClient returned nil")
+		}
+		client.SyncCluster()
+		machines := client.GetCluster()
+		if len(machines) == 0 || len(machines[0]) == 0 {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		log.Fatalf("Timed out after %s waiting for at least 1 synchronized etcd server in the cluster", timeout)
 	}
-	client.SyncCluster()
-
 	return client
 }
 
 // TODO: evaluate using pkg/client/clientcmd
 func newKubeClient() (*kclient.Client, error) {
-	config := &kclient.Config{}
-
-	masterHost := os.Getenv("KUBERNETES_RO_SERVICE_HOST")
-	if masterHost == "" {
-		log.Fatalf("KUBERNETES_RO_SERVICE_HOST is not defined")
+	var config *kclient.Config
+	if *kubecfg_file == "" {
+		// No kubecfg file provided. Use kubernetes_ro service.
+		masterHost := os.Getenv("KUBERNETES_RO_SERVICE_HOST")
+		if masterHost == "" {
+			log.Fatalf("KUBERNETES_RO_SERVICE_HOST is not defined")
+		}
+		masterPort := os.Getenv("KUBERNETES_RO_SERVICE_PORT")
+		if masterPort == "" {
+			log.Fatalf("KUBERNETES_RO_SERVICE_PORT is not defined")
+		}
+		config = &kclient.Config{
+			Host:    fmt.Sprintf("http://%s:%s", masterHost, masterPort),
+			Version: "v1beta1",
+		}
+	} else {
+		masterHost := os.Getenv("KUBERNETES_SERVICE_HOST")
+		if masterHost == "" {
+			log.Fatalf("KUBERNETES_SERVICE_HOST is not defined")
+		}
+		masterPort := os.Getenv("KUBERNETES_SERVICE_PORT")
+		if masterPort == "" {
+			log.Fatalf("KUBERNETES_SERVICE_PORT is not defined")
+		}
+		master := fmt.Sprintf("https://%s:%s", masterHost, masterPort)
+		var err error
+		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+			&kclientcmd.ClientConfigLoadingRules{ExplicitPath: *kubecfg_file},
+			&kclientcmd.ConfigOverrides{ClusterInfo: kclientcmdapi.Cluster{Server: master}}).ClientConfig(); err != nil {
+			return nil, err
+		}
 	}
-	masterPort := os.Getenv("KUBERNETES_RO_SERVICE_PORT")
-	if masterPort == "" {
-		log.Fatalf("KUBERNETES_RO_SERVICE_PORT is not defined")
-	}
-	config.Host = fmt.Sprintf("http://%s:%s", masterHost, masterPort)
 	log.Printf("Using %s for kubernetes master", config.Host)
-
-	config.Version = "v1beta1"
 	log.Printf("Using kubernetes API %s", config.Version)
-
 	return kclient.New(config)
 }
 

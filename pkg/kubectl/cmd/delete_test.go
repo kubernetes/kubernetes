@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
-func TestDeleteObject(t *testing.T) {
+func TestDeleteObjectByTuple(t *testing.T) {
 	_, _, rc := testData()
 
 	f, tf, codec := NewAPIFactory()
@@ -37,6 +37,68 @@ func TestDeleteObject(t *testing.T) {
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+			default:
+				// Ensures no GET is performed when deleting by name
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdDelete(f, buf)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("cascade", "false")
+	cmd.Run(cmd, []string{"replicationcontrollers/redis-master-controller"})
+
+	if buf.String() != "replicationcontrollers/redis-master-controller\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestDeleteNamedObject(t *testing.T) {
+	_, _, rc := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+			default:
+				// Ensures no GET is performed when deleting by name
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdDelete(f, buf)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("cascade", "false")
+	cmd.Run(cmd, []string{"replicationcontrollers", "redis-master-controller"})
+
+	if buf.String() != "replicationcontrollers/redis-master-controller\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestDeleteObject(t *testing.T) {
+	_, _, rc := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -49,10 +111,11 @@ func TestDeleteObject(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "replicationControllers/redis-master-controller\n" {
+	if buf.String() != "replicationcontrollers/redis-master\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -64,7 +127,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
 				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -77,6 +140,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "" {
@@ -93,7 +157,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/services/frontend" && m == "DELETE":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
@@ -109,9 +173,10 @@ func TestDeleteMultipleObject(t *testing.T) {
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationControllers/redis-master-controller\nservices/frontend\n" {
+	if buf.String() != "replicationcontrollers/redis-master\nservices/frontend\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -125,7 +190,7 @@ func TestDeleteMultipleObjectIgnoreMissing(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
 				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
 			case p == "/namespaces/test/services/frontend" && m == "DELETE":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
@@ -141,6 +206,7 @@ func TestDeleteMultipleObjectIgnoreMissing(t *testing.T) {
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "services/frontend\n" {
@@ -172,9 +238,10 @@ func TestDeleteDirectory(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationControllers/frontend-controller\nservices/frontend\nreplicationControllers/redis-master-controller\nservices/redis-master\nreplicationControllers/redis-slave-controller\nservices/redis-slave\n" {
+	if buf.String() != "replicationcontrollers/frontend\nservices/frontend\nreplicationcontrollers/redis-master\nservices/redis-master\nreplicationcontrollers/redis-slave\nservices/redis-slave\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -213,6 +280,7 @@ func TestDeleteMultipleSelector(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("selector", "a=b")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{"pods,services"})
 
 	if buf.String() != "pods/foo\npods/bar\nservices/baz\n" {

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ type FakeDockerClient struct {
 	Removed             []string
 	RemovedImages       util.StringSet
 	VersionInfo         docker.Env
+	Information         docker.Env
 }
 
 func (f *FakeDockerClient) ClearCalls() {
@@ -139,7 +140,7 @@ func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) 
 	if options.All {
 		return append(f.ContainerList, f.ExitedContainerList...), err
 	}
-	return f.ContainerList, err
+	return append([]docker.APIContainers{}, f.ContainerList...), err
 }
 
 // InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
@@ -270,6 +271,10 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 
 func (f *FakeDockerClient) Version() (*docker.Env, error) {
 	return &f.VersionInfo, nil
+}
+
+func (f *FakeDockerClient) Info() (*docker.Env, error) {
+	return &f.Information, nil
 }
 
 func (f *FakeDockerClient) CreateExec(_ docker.CreateExecOptions) (*docker.Exec, error) {

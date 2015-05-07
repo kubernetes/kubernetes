@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,13 @@ import (
 type FakeAPIObject struct{}
 
 func (*FakeAPIObject) IsAnAPIObject() {}
+
+type ExtensionAPIObject struct {
+	TypeMeta
+	ObjectMeta
+}
+
+func (*ExtensionAPIObject) IsAnAPIObject() {}
 
 func TestGetReference(t *testing.T) {
 	table := map[string]struct {
@@ -66,6 +73,26 @@ func TestGetReference(t *testing.T) {
 				ResourceVersion: "42",
 			},
 		},
+		"extensionAPIObject": {
+			obj: &ExtensionAPIObject{
+				TypeMeta: TypeMeta{
+					Kind: "ExtensionAPIObject",
+				},
+				ObjectMeta: ObjectMeta{
+					Name:            "foo",
+					UID:             "bar",
+					ResourceVersion: "42",
+					SelfLink:        "/custom_prefix/version1/extensions/foo",
+				},
+			},
+			ref: &ObjectReference{
+				Kind:            "ExtensionAPIObject",
+				APIVersion:      "version1",
+				Name:            "foo",
+				UID:             "bar",
+				ResourceVersion: "42",
+			},
+		},
 		"badSelfLink": {
 			obj: &ServiceList{
 				ListMeta: ListMeta{
@@ -90,7 +117,7 @@ func TestGetReference(t *testing.T) {
 	for name, item := range table {
 		ref, err := GetPartialReference(item.obj, item.fieldPath)
 		if e, a := item.shouldErr, (err != nil); e != a {
-			t.Errorf("%v: expected %v, got %v", name, e, a)
+			t.Errorf("%v: expected %v, got %v, err %v", name, e, a, err)
 			continue
 		}
 		if e, a := item.ref, ref; !reflect.DeepEqual(e, a) {

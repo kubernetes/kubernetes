@@ -241,6 +241,24 @@ func TestCreateContainerInvalidBody(t *testing.T) {
 	}
 }
 
+func TestCreateContainerInvalidName(t *testing.T) {
+	server := DockerServer{}
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	body := `{"Hostname":"", "User":"", "Memory":0, "MemorySwap":0, "AttachStdin":false, "AttachStdout":true, "AttachStderr":true,
+"PortSpecs":null, "Tty":false, "OpenStdin":false, "StdinOnce":false, "Env":null, "Cmd":["date"],
+"Image":"base", "Volumes":{}, "VolumesFrom":""}`
+	request, _ := http.NewRequest("POST", "/containers/create?name=myapp/container1", strings.NewReader(body))
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusInternalServerError {
+		t.Errorf("CreateContainer: wrong status. Want %d. Got %d.", http.StatusInternalServerError, recorder.Code)
+	}
+	expectedBody := "Invalid container name\n"
+	if got := recorder.Body.String(); got != expectedBody {
+		t.Errorf("CreateContainer: wrong body. Want %q. Got %q.", expectedBody, got)
+	}
+}
+
 func TestCreateContainerImageNotFound(t *testing.T) {
 	server := DockerServer{}
 	server.buildMuxer()

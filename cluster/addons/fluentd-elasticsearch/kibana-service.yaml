@@ -1,10 +1,15 @@
-apiVersion: v1beta1
+
+apiVersion: v1beta3
 kind: Service
-id: kibana-logging
-containerPort: 80
-port: 5601
-labels:
+metadata:
+  labels:
+    name: kibana-logging
+    kubernetes.io/cluster-service: "true"
   name: kibana-logging
-  kubernetes.io/cluster-service: "true"
-selector:
-  name: kibana-logging
+spec:
+  ports:
+  - port: 5601
+    protocol: TCP
+    targetPort: kibana-port
+  selector:
+    name: kibana-logging

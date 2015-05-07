@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ const (
 )
 
 type setOptions struct {
-	pathOptions   *PathOptions
+	configAccess  ConfigAccess
 	propertyName  string
 	propertyValue string
 }
@@ -41,8 +41,8 @@ const set_long = `Sets an individual value in a kubeconfig file
 PROPERTY_NAME is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
 PROPERTY_VALUE is the new value you wish to set.`
 
-func NewCmdConfigSet(out io.Writer, pathOptions *PathOptions) *cobra.Command {
-	options := &setOptions{pathOptions: pathOptions}
+func NewCmdConfigSet(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+	options := &setOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:   "set PROPERTY_NAME PROPERTY_VALUE",
@@ -69,7 +69,7 @@ func (o setOptions) run() error {
 		return err
 	}
 
-	config, err := o.pathOptions.getStartingConfig()
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (o setOptions) run() error {
 		return err
 	}
 
-	if err := o.pathOptions.ModifyConfig(*config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config); err != nil {
 		return err
 	}
 
@@ -110,7 +110,7 @@ func (o setOptions) validate() error {
 		return errors.New("You must specify a property")
 	}
 
-	return o.pathOptions.Validate()
+	return nil
 }
 
 func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue string, unset bool) error {

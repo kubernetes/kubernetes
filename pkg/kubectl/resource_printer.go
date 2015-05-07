@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/docker/docker/pkg/units"
 	"github.com/ghodss/yaml"
@@ -243,9 +244,10 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 	return keys
 }
 
-var podColumns = []string{"POD", "IP", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABELS", "STATUS", "CREATED"}
+var podColumns = []string{"POD", "IP", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABELS", "STATUS", "CREATED", "MESSAGE"}
+var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
-var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT(S)"}
+var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP(S)", "PORT(S)"}
 var endpointColumns = []string{"NAME", "ENDPOINTS"}
 var nodeColumns = []string{"NAME", "LABELS", "STATUS"}
 var statusColumns = []string{"STATUS"}
@@ -253,14 +255,17 @@ var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "S
 var limitRangeColumns = []string{"NAME"}
 var resourceQuotaColumns = []string{"NAME"}
 var namespaceColumns = []string{"NAME", "LABELS", "STATUS"}
-var secretColumns = []string{"NAME", "DATA"}
+var secretColumns = []string{"NAME", "TYPE", "DATA"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"}
+var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(podColumns, printPod)
 	h.Handler(podColumns, printPodList)
+	h.Handler(podTemplateColumns, printPodTemplate)
+	h.Handler(podTemplateColumns, printPodTemplateList)
 	h.Handler(replicationControllerColumns, printReplicationController)
 	h.Handler(replicationControllerColumns, printReplicationControllerList)
 	h.Handler(serviceColumns, printService)
@@ -284,6 +289,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaimList)
 	h.Handler(persistentVolumeColumns, printPersistentVolume)
 	h.Handler(persistentVolumeColumns, printPersistentVolumeList)
+	h.Handler(componentStatusColumns, printComponentStatus)
+	h.Handler(componentStatusColumns, printComponentStatusList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -298,7 +305,8 @@ func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) er
 	return nil
 }
 
-func formatEndpoints(endpoints *api.Endpoints) string {
+// Pass ports=nil for all ports.
+func formatEndpoints(endpoints *api.Endpoints, ports util.StringSet) string {
 	if len(endpoints.Subsets) == 0 {
 		return "<none>"
 	}
@@ -310,7 +318,7 @@ Loop:
 		ss := &endpoints.Subsets[i]
 		for i := range ss.Ports {
 			port := &ss.Ports[i]
-			if port.Name == "" { // TODO: add multi-port support.
+			if ports == nil || ports.Has(port.Name) {
 				for i := range ss.Addresses {
 					if len(list) == max {
 						more = true
@@ -336,32 +344,92 @@ func podHostString(host, ip string) string {
 	return host + "/" + ip
 }
 
+// translateTimestamp returns the elapsed time since timestamp in
+// human-readable approximation.
+func translateTimestamp(timestamp util.Time) string {
+	return units.HumanDuration(time.Now().Sub(timestamp.Time))
+}
+
+// interpretContainerStatus interprets the container status and returns strings
+// associated with columns "STATUS", "CREATED", and "MESSAGE".
+// The meaning of MESSAGE varies based on the context of STATUS:
+//     STATUS: Waiting; MESSAGE: reason for waiting
+//     STATUS: Running; MESSAGE: reason for the last termination
+//     STATUS: Terminated; MESSAGE: reason for this termination
+func interpretContainerStatus(status *api.ContainerStatus) (string, string, string, error) {
+	// Helper function to compose a meaning message from terminate state.
+	getTermMsg := func(state *api.ContainerStateTerminated) string {
+		var message string
+		if state != nil {
+			message = fmt.Sprintf("exit code %d", state.ExitCode)
+			if state.Reason != "" {
+				message = fmt.Sprintf("%s, reason: %s", state.Reason)
+			}
+		}
+		return message
+	}
+
+	state := &status.State
+	if state.Waiting != nil {
+		return "Waiting", "", state.Waiting.Reason, nil
+	} else if state.Running != nil {
+		// Get the information of the last termination state. This is useful if
+		// a container is stuck in a crash loop.
+		message := getTermMsg(status.LastTerminationState.Termination)
+		if message != "" {
+			message = "last termination: " + message
+		}
+		return "Running", translateTimestamp(state.Running.StartedAt), message, nil
+	} else if state.Termination != nil {
+		return "Terminated", translateTimestamp(state.Termination.StartedAt), getTermMsg(state.Termination), nil
+	}
+	return "", "", "", fmt.Errorf("unknown container state %#v", *state)
+}
+
 func printPod(pod *api.Pod, w io.Writer) error {
-	// TODO: remove me when pods are converted
-	spec := &api.PodSpec{}
-	if err := api.Scheme.Convert(&pod.Spec, spec); err != nil {
-		glog.Errorf("Unable to convert pod manifest: %v", err)
-	}
-	containers := spec.Containers
-	var firstContainer api.Container
-	if len(containers) > 0 {
-		firstContainer, containers = containers[0], containers[1:]
-	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 		pod.Name,
 		pod.Status.PodIP,
-		firstContainer.Name,
-		firstContainer.Image,
+		"", "",
 		podHostString(pod.Spec.Host, pod.Status.HostIP),
 		formatLabels(pod.Labels),
 		pod.Status.Phase,
-		units.HumanDuration(time.Now().Sub(pod.CreationTimestamp.Time)))
+		translateTimestamp(pod.CreationTimestamp),
+		pod.Status.Message,
+	)
 	if err != nil {
 		return err
 	}
-	// Lay out all the other containers on separate lines.
-	for _, container := range containers {
-		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", "", "", container.Name, container.Image, "", "", "", "")
+	// Lay out all containers on separate lines.
+	statuses := pod.Status.ContainerStatuses
+	if len(statuses) == 0 {
+		// Container status has not been reported yet. Print basic information
+		// of the containers and exit the function.
+		for _, container := range pod.Spec.Containers {
+			_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				"", "", container.Name, container.Image, "", "", "", "")
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// Print the actual container statuses.
+	for _, status := range statuses {
+		state, created, message, err := interpretContainerStatus(&status)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			"", "",
+			status.Name,
+			status.Image,
+			"", "",
+			state,
+			created,
+			message,
+		)
 		if err != nil {
 			return err
 		}
@@ -372,6 +440,40 @@ func printPod(pod *api.Pod, w io.Writer) error {
 func printPodList(podList *api.PodList, w io.Writer) error {
 	for _, pod := range podList.Items {
 		if err := printPod(&pod, w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printPodTemplate(pod *api.PodTemplate, w io.Writer) error {
+	containers := pod.Template.Spec.Containers
+	var firstContainer api.Container
+	if len(containers) > 0 {
+		firstContainer, containers = containers[0], containers[1:]
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		pod.Name,
+		firstContainer.Name,
+		firstContainer.Image,
+		formatLabels(pod.Template.Labels),
+	)
+	if err != nil {
+		return err
+	}
+	// Lay out all the other containers on separate lines.
+	for _, container := range containers {
+		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printPodTemplateList(podList *api.PodTemplateList, w io.Writer) error {
+	for _, pod := range podList.Items {
+		if err := printPodTemplate(&pod, w); err != nil {
 			return err
 		}
 	}
@@ -454,7 +556,7 @@ func printServiceList(list *api.ServiceList, w io.Writer) error {
 }
 
 func printEndpoints(endpoints *api.Endpoints, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\n", endpoints.Name, formatEndpoints(endpoints))
+	_, err := fmt.Fprintf(w, "%s\t%s\n", endpoints.Name, formatEndpoints(endpoints, nil))
 	return err
 }
 
@@ -482,7 +584,7 @@ func printNamespaceList(list *api.NamespaceList, w io.Writer) error {
 }
 
 func printSecret(item *api.Secret, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%v\n", item.Name, len(item.Data))
+	_, err := fmt.Fprintf(w, "%s\t%s\t%v\n", item.Name, item.Type, len(item.Data))
 	return err
 }
 
@@ -503,12 +605,6 @@ func printNode(node *api.Node, w io.Writer) error {
 		cond := node.Status.Conditions[i]
 		conditionMap[cond.Type] = &cond
 	}
-	var schedulable string
-	if node.Spec.Unschedulable {
-		schedulable = "Unschedulable"
-	} else {
-		schedulable = "Schedulable"
-	}
 	var status []string
 	for _, validCondition := range NodeAllConditions {
 		if condition, ok := conditionMap[validCondition]; ok {
@@ -522,7 +618,10 @@ func printNode(node *api.Node, w io.Writer) error {
 	if len(status) == 0 {
 		status = append(status, "Unknown")
 	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", node.Name, schedulable, formatLabels(node.Labels), strings.Join(status, ","))
+	if node.Spec.Unschedulable {
+		status = append(status, "SchedulingDisabled")
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", node.Name, formatLabels(node.Labels), strings.Join(status, ","))
 	return err
 }
 
@@ -644,6 +743,36 @@ func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func printComponentStatus(item *api.ComponentStatus, w io.Writer) error {
+	status := "Unknown"
+	message := ""
+	error := ""
+	for _, condition := range item.Conditions {
+		if condition.Type == api.ComponentHealthy {
+			if condition.Status == api.ConditionTrue {
+				status = "Healthy"
+			} else {
+				status = "Unhealthy"
+			}
+			message = condition.Message
+			error = condition.Error
+			break
+		}
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", item.Name, status, message, error)
+	return err
+}
+
+func printComponentStatusList(list *api.ComponentStatusList, w io.Writer) error {
+	for _, item := range list.Items {
+		if err := printComponentStatus(&item, w); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

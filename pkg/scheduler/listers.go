@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,14 +39,14 @@ func (f FakeMinionLister) List() (api.NodeList, error) {
 // PodLister interface represents anything that can list pods for a scheduler.
 type PodLister interface {
 	// TODO: make this exactly the same as client's Pods(ns).List() method, by returning a api.PodList
-	List(labels.Selector) ([]api.Pod, error)
+	List(labels.Selector) ([]*api.Pod, error)
 }
 
 // FakePodLister implements PodLister on an []api.Pods for test purposes.
-type FakePodLister []api.Pod
+type FakePodLister []*api.Pod
 
-// List returns []api.Pod matching a query.
-func (f FakePodLister) List(s labels.Selector) (selected []api.Pod, err error) {
+// List returns []*api.Pod matching a query.
+func (f FakePodLister) List(s labels.Selector) (selected []*api.Pod, err error) {
 	for _, pod := range f {
 		if s.Matches(labels.Set(pod.Labels)) {
 			selected = append(selected, pod)
@@ -60,7 +60,7 @@ type ServiceLister interface {
 	// Lists all the services
 	List() (api.ServiceList, error)
 	// Gets the services for the given pod
-	GetPodServices(api.Pod) ([]api.Service, error)
+	GetPodServices(*api.Pod) ([]api.Service, error)
 }
 
 // FakeServiceLister implements ServiceLister on []api.Service for test purposes.
@@ -72,7 +72,7 @@ func (f FakeServiceLister) List() (api.ServiceList, error) {
 }
 
 // GetPodServices gets the services that have the selector that match the labels on the given pod
-func (f FakeServiceLister) GetPodServices(pod api.Pod) (services []api.Service, err error) {
+func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []api.Service, err error) {
 	var selector labels.Selector
 
 	for _, service := range f {

@@ -211,7 +211,6 @@ func Create(c *gophercloud.ServiceClient, containerName, objectName string, cont
 	ropts := gophercloud.RequestOpts{
 		RawBody:     content,
 		MoreHeaders: h,
-		OkCodes:     []int{201, 202},
 	}
 
 	resp, err := c.Request("PUT", url, ropts)
@@ -310,9 +309,7 @@ func Delete(c *gophercloud.ServiceClient, containerName, objectName string, opts
 		url += query
 	}
 
-	resp, err := c.Request("DELETE", url, gophercloud.RequestOpts{
-		OkCodes: []int{204},
-	})
+	resp, err := c.Delete(url, nil)
 	res.Header = resp.Header
 	res.Err = err
 	return res
@@ -412,7 +409,6 @@ func Update(c *gophercloud.ServiceClient, containerName, objectName string, opts
 	url := updateURL(c, containerName, objectName)
 	resp, err := c.Request("POST", url, gophercloud.RequestOpts{
 		MoreHeaders: h,
-		OkCodes:     []int{202},
 	})
 	res.Header = resp.Header
 	res.Err = err

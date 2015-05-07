@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +48,9 @@ readonly KUBE_TEST_TARGETS=(
   cmd/integration
   cmd/gendocs
   cmd/genman
+  cmd/genbashcomp
   examples/k8petstore/web-server
+  github.com/onsi/ginkgo/ginkgo
 )
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
@@ -59,6 +61,7 @@ readonly KUBE_TEST_PORTABLE=(
   hack/e2e-suite
   hack/e2e-internal
   hack/ginkgo-e2e.sh
+  hack/lib
 )
 
 # If we update this we need to also update the set of golang compilers we build
@@ -88,6 +91,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-apiserver
   kube-controller-manager
   kube-scheduler
+  hyperkube
 )
 
 kube::golang::is_statically_linked_library() {
@@ -101,7 +105,14 @@ kube::golang::is_statically_linked_library() {
 kube::golang::binaries_from_targets() {
   local target
   for target; do
-    echo "${KUBE_GO_PACKAGE}/${target}"
+    # If the target starts with what looks like a domain name, assume it has a
+    # fully-qualified package name rather than one that needs the Kubernetes
+    # package prepended.
+    if [[ "${target}" =~ ^([[:alnum:]]+".")+[[:alnum:]]+"/" ]]; then
+      echo "${target}"
+    else
+      echo "${KUBE_GO_PACKAGE}/${target}"
+    fi
   done
 }
 
@@ -238,20 +249,29 @@ kube::golang::place_bins() {
       platform_src=""
     fi
 
-    local full_binpath_src="${KUBE_GOPATH}/bin${platform_src}"
-    if [[ -d "${full_binpath_src}" ]]; then
-      mkdir -p "${KUBE_OUTPUT_BINPATH}/${platform}"
-      find "${full_binpath_src}" -maxdepth 1 -type f -exec \
-        rsync -pt {} "${KUBE_OUTPUT_BINPATH}/${platform}" \;
+    local gopaths=("${KUBE_GOPATH}")
+    # If targets were built inside Godeps, then we need to sync from there too.
+    if [[ -z ${KUBE_NO_GODEPS:-} ]]; then
+      gopaths+=("${KUBE_ROOT}/Godeps/_workspace")
     fi
+    local gopath
+    for gopath in "${gopaths[@]}"; do
+      local full_binpath_src="${gopath}/bin${platform_src}"
+      if [[ -d "${full_binpath_src}" ]]; then
+        mkdir -p "${KUBE_OUTPUT_BINPATH}/${platform}"
+        find "${full_binpath_src}" -maxdepth 1 -type f -exec \
+          rsync -pt {} "${KUBE_OUTPUT_BINPATH}/${platform}" \;
+      fi
+    done
   done
 }
 
-kube::golang::exit_if_stdlib_not_installed() {
+kube::golang::fallback_if_stdlib_not_installable() {
   local go_root_dir=$(go env GOROOT);
   local go_host_os=$(go env GOHOSTOS);
   local go_host_arch=$(go env GOHOSTARCH);
   local cgo_pkg_dir=${go_root_dir}/pkg/${go_host_os}_${go_host_arch}_cgo;
+
   if [ -e ${cgo_pkg_dir} ]; then
     return 0;
   fi
@@ -260,12 +280,13 @@ kube::golang::exit_if_stdlib_not_installed() {
     return 0;
   fi
 
-  kube::log::status "+++ Error. stdlib pkg with cgo flag not found."; 
-  kube::log::status "+++ Error. stdlib pkg cannot be rebuilt since ${go_root_dir}/pkg is not writable by `whoami`"; 
-  kube::log::status "+++ Error. Make ${go_root_dir}/pkg writable for `whoami` for a one-time stdlib install, Or"
-  kube::log::status "+++ Error. Rebuild stdlib using the command 'CGO_ENABLED=0 go install -a -installsuffix cgo std'";
-  
-  exit 0;
+  kube::log::status "+++ Warning: stdlib pkg with cgo flag not found.";
+  kube::log::status "+++ Warning: stdlib pkg cannot be rebuilt since ${go_root_dir}/pkg is not writable by `whoami`";
+  kube::log::status "+++ Warning: Make ${go_root_dir}/pkg writable for `whoami` for a one-time stdlib install, Or"
+  kube::log::status "+++ Warning: Rebuild stdlib using the command 'CGO_ENABLED=0 go install -a -installsuffix cgo std'";
+  kube::log::status "+++ Falling back to go build, which is slower";
+
+  use_go_build=true
 }
 
 kube::golang::build_binaries_for_platform() {
@@ -276,12 +297,14 @@ kube::golang::build_binaries_for_platform() {
   local -a nonstatics=()
   for binary in "${binaries[@]}"; do
     if kube::golang::is_statically_linked_library "${binary}"; then
-      kube::golang::exit_if_stdlib_not_installed;
       statics+=($binary)
     else
       nonstatics+=($binary)
     fi
   done
+  if [[ "${#statics[@]}" != 0 ]]; then
+      kube::golang::fallback_if_stdlib_not_installable;
+  fi
 
   if [[ -n ${use_go_build:-} ]]; then
     # Try and replicate the native binary placement of go install without
@@ -291,6 +314,7 @@ kube::golang::build_binaries_for_platform() {
       output_path="${output_path}/${platform//\//_}"
     fi
 
+    kube::log::progress "    "
     for binary in "${binaries[@]}"; do
       local bin=$(basename "${binary}")
       if [[ ${GOOS} == "windows" ]]; then
@@ -298,8 +322,7 @@ kube::golang::build_binaries_for_platform() {
       fi
 
       if kube::golang::is_statically_linked_library "${binary}"; then
-        kube::golang::exit_if_stdlib_not_installed;
-        CGO_ENABLED=0 go build -installsuffix cgo -o "${output_path}/${bin}" \
+        CGO_ENABLED=0 go build -o "${output_path}/${bin}" \
           "${goflags[@]:+${goflags[@]}}" \
           -ldflags "${version_ldflags}" \
           "${binary}"
@@ -309,7 +332,9 @@ kube::golang::build_binaries_for_platform() {
           -ldflags "${version_ldflags}" \
           "${binary}"
       fi
+      kube::log::progress "*"
     done
+    kube::log::progress "\n"
   else
     # Use go install.
     if [[ "${#nonstatics[@]}" != 0 ]]; then

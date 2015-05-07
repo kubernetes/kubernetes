@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ type FakePods struct {
 	Namespace string
 }
 
-func (c *FakePods) List(selector labels.Selector) (*api.PodList, error) {
+func (c *FakePods) List(label labels.Selector, field fields.Selector) (*api.PodList, error) {
 	obj, err := c.Fake.Invokes(FakeAction{Action: "list-pods"}, &api.PodList{})
 	return obj.(*api.PodList), err
 }
@@ -40,7 +40,7 @@ func (c *FakePods) Get(name string) (*api.Pod, error) {
 	return obj.(*api.Pod), err
 }
 
-func (c *FakePods) Delete(name string) error {
+func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.Invokes(FakeAction{Action: "delete-pod", Value: name}, &api.Pod{})
 	return err
 }

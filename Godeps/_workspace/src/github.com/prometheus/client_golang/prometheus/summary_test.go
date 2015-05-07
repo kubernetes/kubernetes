@@ -289,6 +289,11 @@ func TestSummaryVecConcurrency(t *testing.T) {
 }
 
 func TestSummaryDecay(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode.")
+		// More because it depends on timing than because it is particularly long...
+	}
+
 	sum := NewSummary(SummaryOpts{
 		Name:       "test_summary",
 		Help:       "helpless",
@@ -315,6 +320,12 @@ func TestSummaryDecay(t *testing.T) {
 		}
 	}
 	tick.Stop()
+	// Wait for MaxAge without observations and make sure quantiles are NaN.
+	time.Sleep(100 * time.Millisecond)
+	sum.Write(m)
+	if got := *m.Summary.Quantile[0].Value; !math.IsNaN(got) {
+		t.Errorf("got %f, want NaN after expiration", got)
+	}
 }
 
 func getBounds(vars []float64, q, ε float64) (min, max float64) {

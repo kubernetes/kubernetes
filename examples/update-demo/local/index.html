@@ -22,9 +22,9 @@ limitations under the License.
 </head>
 <body ng-controller="ButtonsCtrl">
   <div ng-repeat="server in servers" class="pod">
-    <img src="http://localhost:8001/api/v1beta1/proxy/pods/{{server.podId}}/{{server.image}}" height="100px" width="100px" />
-    <b>ID:</b> {{server.podId}}<br>
-    <b>Host:</b> <a href="http://localhost:8001/api/v1beta1/proxy/pods/{{server.podId}}/data.json">{{server.host}}</a><br>
+    <img src="http://localhost:8001/api/v1beta3/proxy/namespaces/default/pods/{{server.podName}}/{{server.image}}" height="100px" width="100px" />
+    <b>ID:</b> {{server.podName}}<br>
+    <b>Host:</b> <a href="http://localhost:8001/api/v1beta3/proxy/namespaces/default/pods/{{server.podName}}/data.json">{{server.host}}</a><br>
     <b>Status:</b> {{server.status}}<br>
     <b>Image:</b> {{server.dockerImage}}<br>
     <b>Labels:</b>

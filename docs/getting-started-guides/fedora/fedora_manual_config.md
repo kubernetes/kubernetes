@@ -2,7 +2,7 @@
 
 This is a getting started guide for Fedora.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...
 
-This guide will only get ONE node (previously minion) working.  Multiple nodes require a functional [networking configuration](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
+This guide will only get ONE node (previously minion) working.  Multiple nodes require a functional [networking configuration](http://docs.k8s.io/networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
 
 The kubernetes package provides a few services: kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, kube-proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes.  We will break the services up between the hosts.  The first host, fed-master, will be the kubernetes master.  This host will run the kube-apiserver, kube-controller-manager, and kube-scheduler.  In addition, the master will also run _etcd_ (not needed if _etcd_ runs on a different host but this guide assumes that _etcd_ and kubernetes master run on the same host).  The remaining host, fed-node will be the node and run kubelet, proxy and docker.
 
@@ -16,7 +16,7 @@ fed-node = 192.168.121.65
 
 **Prepare the hosts:**
     
-* Install kubernetes on all hosts - fed-{master,node}.  This will also pull in etcd and docker.  This guide has been tested with kubernetes-0.12.0 but should work with later versions too.
+* Install kubernetes on all hosts - fed-{master,node}.  This will also pull in docker. Also install etcd on fed-master.  This guide has been tested with kubernetes-0.15.0 but should work with other versions too.
 * The [--enablerepo=update-testing](https://fedoraproject.org/wiki/QA:Updates_Testing) directive in the yum command below will ensure that the most recent Kubernetes version that is scheduled for pre-release will be installed. This should be a more recent version than the Fedora "stable" release for Kubernetes that you would get without adding the directive. 
 * If you want the very latest Kubernetes release [you can download and yum install the RPM directly from Fedora Koji](http://koji.fedoraproject.org/koji/packageinfo?packageID=19202) instead of using the yum install command below.
 
@@ -77,6 +77,20 @@ KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
 KUBE_API_ARGS=""
 ```
 
+* *Optional* Edit /etc/kubernetes/controller-manager and remove --machines=127.0.0.1 from the KUBELET_ADDRESSES. Leaving this in won't hurt anything but it will cause the output to note that the 127.0.0.1 node is NotReady because we will not be configuring one in this guide.
+
+```
+KUBELET_ADDRESSES=""
+
+KUBE_CONTROLLER_MANAGER_ARGS=""
+```
+
+
+* Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1,if not ,you will get the error like "connection refused"
+```
+ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
+```
+
 * Start the appropriate services on master:
 
 ```
@@ -96,7 +110,8 @@ done
     "apiVersion": "v1beta3",
     "kind": "Node",
     "metadata": {
-        "name": "fed-node"
+        "name": "fed-node",
+        "labels":{ "name": "fed-node-label"}
     },
     "spec": {
         "externalID": "fed-node"
@@ -117,7 +132,7 @@ fed-node           name=fed-node-label     Unknown
 
 Please note that in the above, it only creates a representation for the node
 _fed-node_ internally. It does not provision the actual _fed-node_. Also, it
-is assumed that _fed-node_ (as specified in `id`) can be resolved and is
+is assumed that _fed-node_ (as specified in `name`) can be resolved and is
 reachable from kubernetes master node. This guide will discuss how to provision
 a kubernetes node (fed-node) below.
 

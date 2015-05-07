@@ -1,0 +1,32 @@
+#!/bin/bash
+
+set -ex
+
+# Install is guaranteed to run once per rootfs
+
+echo "Installing kubernetes-node on $JUJU_UNIT_NAME"
+
+apt-get update -qq
+apt-get install -q -y \
+    bridge-utils \
+    python-dev \
+    python-pip \
+    wget
+
+pip install path.py
+
+# Create the necessary kubernetes group.
+groupadd kubernetes
+useradd -d /var/lib/kubernetes \
+    -g kubernetes \
+    -s /sbin/nologin \
+    --system \
+    kubernetes
+
+install -d -m 0744 -o kubernetes -g kubernetes /var/lib/kubernetes
+install -d -m 0744 -o kubernetes -g kubernetes /etc/kubernetes/manifests
+
+# wait for the world, depends on where we installed it from distro
+#sudo service docker.io stop
+# or upstream archive
+#sudo service docker stop

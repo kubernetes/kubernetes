@@ -33,7 +33,7 @@ install:
 script:
   - KUBE_RACE="-race" KUBE_COVER="y" KUBE_GOVERALLS_BIN="$HOME/gopath/bin/goveralls" KUBE_TIMEOUT='-timeout 300s' KUBE_COVERPROCS=8 KUBE_TEST_API_VERSIONS=$KUBE_TEST_API_VERSIONS ./hack/test-go.sh -- -p=2
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-cmd.sh
-  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH KUBE_TEST_API_VERSIONS=$KUBE_TEST_API_VERSIONS KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4 ./hack/test-integration.sh
+  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH KUBE_TEST_API_VERSIONS=$KUBE_TEST_API_VERSIONS KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4 LOG_LEVEL=4 ./hack/test-integration.sh
 
 notifications:
   irc: "chat.freenode.net#google-containers"

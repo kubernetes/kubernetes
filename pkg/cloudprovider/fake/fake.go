@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -94,9 +94,9 @@ func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
 	return f, true
 }
 
-// TCPLoadBalancerExists is a stub implementation of TCPLoadBalancer.TCPLoadBalancerExists.
-func (f *FakeCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
-	return f.Exists, f.Err
+// GetTCPLoadBalancer is a stub implementation of TCPLoadBalancer.GetTCPLoadBalancer.
+func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error) {
+	return f.ExternalIP.String(), f.Exists, f.Err
 }
 
 // CreateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
@@ -158,4 +158,14 @@ func (f *FakeCloud) GetZone() (cloudprovider.Zone, error) {
 func (f *FakeCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	f.addCall("get-node-resources")
 	return f.NodeResources, f.Err
+}
+
+func (f *FakeCloud) Configure(name string, spec *api.NodeSpec) error {
+	f.addCall("configure")
+	return f.Err
+}
+
+func (f *FakeCloud) Release(name string) error {
+	f.addCall("release")
+	return f.Err
 }

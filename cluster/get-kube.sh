@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ function create_cluster {
   (
     cd kubernetes
     ./cluster/kube-up.sh
-    echo "Kubernetes binaries at ${PWD}/kubernetes/cluster/"
+    echo "Kubernetes binaries at ${PWD}/cluster/"
     echo "You may want to add this directory to your PATH in \$HOME/.profile"
 
     echo "Installation successful!"

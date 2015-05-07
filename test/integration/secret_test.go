@@ -1,7 +1,7 @@
 // +build integration,!no-etcd
 
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,9 +26,11 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 )
 
@@ -37,8 +39,8 @@ func init() {
 }
 
 func deletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {
-	if err := c.Pods(ns).Delete(name); err != nil {
-		t.Errorf("unable to delete pods %v: %v", name, err)
+	if err := c.Pods(ns).Delete(name, nil); err != nil {
+		t.Errorf("unable to delete pod %v: %v", name, err)
 	}
 }
 func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
@@ -49,7 +51,7 @@ func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
 
 // TestSecrets tests apiserver-side behavior of creation of secret objects and their use by pods.
 func TestSecrets(t *testing.T) {
-	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
+	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,16 +73,9 @@ func TestSecrets(t *testing.T) {
 		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
-	testCases := []string{
-		"v1beta1",
-		"v1beta2",
-	}
-
-	for _, apiVersion := range testCases {
-		deleteAllEtcdKeys()
-		client := client.NewOrDie(&client.Config{Host: s.URL, Version: apiVersion})
-		DoTestSecrets(t, client, apiVersion)
-	}
+	deleteAllEtcdKeys()
+	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
+	DoTestSecrets(t, client, testapi.Version())
 }
 
 // DoTestSecrets test secrets for one api version.
@@ -142,7 +137,7 @@ func DoTestSecrets(t *testing.T, client *client.Client, apiVersion string) {
 	defer deletePodOrErrorf(t, client, ns, pod.Name)
 
 	// Create a pod that consumes non-existent secret.
-	pod.ObjectMeta.Name = "uses-non-existant-secret"
+	pod.ObjectMeta.Name = "uses-non-existent-secret"
 	if _, err := client.Pods(ns).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}

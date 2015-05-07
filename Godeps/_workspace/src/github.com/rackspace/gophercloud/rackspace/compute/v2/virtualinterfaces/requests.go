@@ -28,10 +28,8 @@ func Create(c *gophercloud.ServiceClient, instanceID, networkID string) CreateRe
 	}
 
 	// Send request to API
-	_, res.Err = c.Request("POST", createURL(c, instanceID), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200, 201, 202},
+	_, res.Err = c.Post(createURL(c, instanceID), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 201, 202},
 	})
 	return res
 }
@@ -40,7 +38,7 @@ func Create(c *gophercloud.ServiceClient, instanceID, networkID string) CreateRe
 // instanceID.
 func Delete(c *gophercloud.ServiceClient, instanceID, interfaceID string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = c.Request("DELETE", deleteURL(c, instanceID, interfaceID), gophercloud.RequestOpts{
+	_, res.Err = c.Delete(deleteURL(c, instanceID, interfaceID), &gophercloud.RequestOpts{
 		OkCodes: []int{200, 204},
 	})
 	return res

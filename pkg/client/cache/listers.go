@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,17 +39,49 @@ type StoreToPodLister struct {
 	Store
 }
 
-// TODO Get rid of the selector because that is confusing because the user might not realize that there has already been
-// some selection at the caching stage.  Also, consistency will facilitate code generation.  However, the pkg/client
-// is inconsistent too.
-func (s *StoreToPodLister) List(selector labels.Selector) (pods []api.Pod, err error) {
+// Please note that selector is filtering among the pods that have gotten into
+// the store; there may have been some filtering that already happened before
+// that.
+//
+// TODO: converge on the interface in pkg/client.
+func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err error) {
+	// TODO: it'd be great to just call
+	// s.Pods(api.NamespaceAll).List(selector), however then we'd have to
+	// remake the list.Items as a []*api.Pod. So leave this separate for
+	// now.
 	for _, m := range s.Store.List() {
 		pod := m.(*api.Pod)
 		if selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, *pod)
+			pods = append(pods, pod)
 		}
 	}
 	return pods, nil
+}
+
+// Pods is taking baby steps to be more like the api in pkg/client
+func (s *StoreToPodLister) Pods(namespace string) storePodsNamespacer {
+	return storePodsNamespacer{s.Store, namespace}
+}
+
+type storePodsNamespacer struct {
+	store     Store
+	namespace string
+}
+
+// Please note that selector is filtering among the pods that have gotten into
+// the store; there may have been some filtering that already happened before
+// that.
+func (s storePodsNamespacer) List(selector labels.Selector) (pods api.PodList, err error) {
+	list := api.PodList{}
+	for _, m := range s.store.List() {
+		pod := m.(*api.Pod)
+		if s.namespace == api.NamespaceAll || s.namespace == pod.Namespace {
+			if selector.Matches(labels.Set(pod.Labels)) {
+				list.Items = append(list.Items, *pod)
+			}
+		}
+	}
+	return list, nil
 }
 
 // Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
@@ -91,6 +123,59 @@ func (s *StoreToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
 	return minion.(*api.Node), nil
 }
 
+// StoreToControllerLister gives a store List and Exists methods. The store must contain only ReplicationControllers.
+type StoreToControllerLister struct {
+	Store
+}
+
+// Exists checks if the given rc exists in the store.
+func (s *StoreToControllerLister) Exists(controller *api.ReplicationController) (bool, error) {
+	_, exists, err := s.Store.Get(controller)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StoreToControllerLister lists all controllers in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToControllerLister) List() (controllers []api.ReplicationController, err error) {
+	for _, c := range s.Store.List() {
+		controllers = append(controllers, *(c.(*api.ReplicationController)))
+	}
+	return controllers, nil
+}
+
+// GetPodControllers returns a list of controllers managing a pod. Returns an error only if no matching controllers are found.
+func (s *StoreToControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+	var selector labels.Selector
+	var rc api.ReplicationController
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("No controllers found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		rc = *m.(*api.ReplicationController)
+		if rc.Namespace != pod.Namespace {
+			continue
+		}
+		labelSet := labels.Set(rc.Spec.Selector)
+		selector = labels.Set(rc.Spec.Selector).AsSelector()
+
+		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
+		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		controllers = append(controllers, rc)
+	}
+	if len(controllers) == 0 {
+		err = fmt.Errorf("Could not find controllers for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
 // StoreToServiceLister makes a Store that has the List method of the client.ServiceInterface
 // The Store must contain (only) Services.
 type StoreToServiceLister struct {
@@ -106,7 +191,7 @@ func (s *StoreToServiceLister) List() (services api.ServiceList, err error) {
 
 // TODO: Move this back to scheduler as a helper function that takes a Store,
 // rather than a method of StoreToServiceLister.
-func (s *StoreToServiceLister) GetPodServices(pod api.Pod) (services []api.Service, err error) {
+func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Service, err error) {
 	var selector labels.Selector
 	var service api.Service
 
@@ -114,6 +199,10 @@ func (s *StoreToServiceLister) GetPodServices(pod api.Pod) (services []api.Servi
 		service = *m.(*api.Service)
 		// consider only services that are in the same namespace as the pod
 		if service.Namespace != pod.Namespace {
+			continue
+		}
+		if service.Spec.Selector == nil {
+			// services with nil selectors match nothing, not everything.
 			continue
 		}
 		selector = labels.Set(service.Spec.Selector).AsSelector()

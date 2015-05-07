@@ -22,14 +22,15 @@ import (
 	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/storage"
+	"github.com/google/cadvisor/utils"
 )
 
 // TODO(vmarmol): See about refactoring this class, we have an unecessary redirection of containerStorage and InMemoryStorage.
 // containerStorage is used to store per-container information
 type containerStorage struct {
 	ref         info.ContainerReference
-	recentStats *StatsBuffer
-	maxNumStats int
+	recentStats *utils.TimedStore
+	maxAge      time.Duration
 	lock        sync.RWMutex
 }
 
@@ -38,28 +39,33 @@ func (self *containerStorage) AddStats(stats *info.ContainerStats) error {
 	defer self.lock.Unlock()
 
 	// Add the stat to storage.
-	self.recentStats.Add(stats)
+	self.recentStats.Add(stats.Timestamp, stats)
 	return nil
 }
 
 func (self *containerStorage) RecentStats(start, end time.Time, maxStats int) ([]*info.ContainerStats, error) {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
-	return self.recentStats.InTimeRange(start, end, maxStats), nil
+	result := self.recentStats.InTimeRange(start, end, maxStats)
+	converted := make([]*info.ContainerStats, len(result))
+	for i, el := range result {
+		converted[i] = el.(*info.ContainerStats)
+	}
+	return converted, nil
 }
 
-func newContainerStore(ref info.ContainerReference, maxNumStats int) *containerStorage {
+func newContainerStore(ref info.ContainerReference, maxAge time.Duration) *containerStorage {
 	return &containerStorage{
 		ref:         ref,
-		recentStats: NewStatsBuffer(maxNumStats),
-		maxNumStats: maxNumStats,
+		recentStats: utils.NewTimedStore(maxAge),
+		maxAge:      maxAge,
 	}
 }
 
 type InMemoryStorage struct {
 	lock                sync.RWMutex
 	containerStorageMap map[string]*containerStorage
-	maxNumStats         int
+	maxAge              time.Duration
 	backend             storage.StorageDriver
 }
 
@@ -71,7 +77,7 @@ func (self *InMemoryStorage) AddStats(ref info.ContainerReference, stats *info.C
 		self.lock.Lock()
 		defer self.lock.Unlock()
 		if cstore, ok = self.containerStorageMap[ref.Name]; !ok {
-			cstore = newContainerStore(ref, self.maxNumStats)
+			cstore = newContainerStore(ref, self.maxAge)
 			self.containerStorageMap[ref.Name] = cstore
 		}
 	}()
@@ -113,12 +119,12 @@ func (self *InMemoryStorage) Close() error {
 }
 
 func New(
-	maxNumStats int,
+	maxAge time.Duration,
 	backend storage.StorageDriver,
 ) *InMemoryStorage {
 	ret := &InMemoryStorage{
 		containerStorageMap: make(map[string]*containerStorage, 32),
-		maxNumStats:         maxNumStats,
+		maxAge:              maxAge,
 		backend:             backend,
 	}
 	return ret

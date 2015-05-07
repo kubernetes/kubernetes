@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,8 +25,10 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -46,7 +48,7 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should provide DNS for the cluster", func() {
-		if testContext.Provider == "vagrant" {
+		if providerIs("vagrant") {
 			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 			return
 		}
@@ -65,7 +67,9 @@ var _ = Describe("Services", func() {
 
 		probeCmd := "for i in `seq 1 600`; do "
 		for _, name := range namesToResolve {
-			probeCmd += fmt.Sprintf("wget -O /dev/null %s && echo OK > /results/%s;", name, name)
+			// Resolve by TCP and UDP DNS.
+			probeCmd += fmt.Sprintf(`test -n "$(dig +notcp +noall +answer +search %s)" && echo OK > /results/udp@%s;`, name, name)
+			probeCmd += fmt.Sprintf(`test -n "$(dig +tcp +noall +answer +search %s)" && echo OK > /results/tcp@%s;`, name, name)
 		}
 		probeCmd += "sleep 1; done"
 
@@ -74,7 +78,7 @@ var _ = Describe("Services", func() {
 		pod := &api.Pod{
 			TypeMeta: api.TypeMeta{
 				Kind:       "Pod",
-				APIVersion: "v1beta1",
+				APIVersion: latest.Version,
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name: "dns-test-" + string(util.NewUUID()),
@@ -100,8 +104,8 @@ var _ = Describe("Services", func() {
 						},
 					},
 					{
-						Name:    "pinger",
-						Image:   "gcr.io/google_containers/busybox",
+						Name:    "querier",
+						Image:   "gcr.io/google_containers/dnsutils",
 						Command: []string{"sh", "-c", probeCmd},
 						VolumeMounts: []api.VolumeMount{
 							{
@@ -118,7 +122,7 @@ var _ = Describe("Services", func() {
 		defer func() {
 			By("deleting the pod")
 			defer GinkgoRecover()
-			podClient.Delete(pod.Name)
+			podClient.Delete(pod.Name, nil)
 		}()
 		if _, err := podClient.Create(pod); err != nil {
 			Failf("Failed to create %s pod: %v", pod.Name, err)
@@ -135,38 +139,41 @@ var _ = Describe("Services", func() {
 		// Try to find results for each expected name.
 		By("looking for the results for each expected name")
 		var failed []string
-		for try := 1; try < 100; try++ {
+
+		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			failed = []string{}
 			for _, name := range namesToResolve {
-				_, err := c.Get().
-					Prefix("proxy").
-					Resource("pods").
-					Namespace(api.NamespaceDefault).
-					Name(pod.Name).
-					Suffix("results", name).
-					Do().Raw()
-				if err != nil {
-					failed = append(failed, name)
-					fmt.Printf("Lookup using %s for %s failed: %v\n", pod.Name, name, err)
+				for _, proto := range []string{"udp", "tcp"} {
+					testCase := fmt.Sprintf("%s@%s", proto, name)
+					_, err := c.Get().
+						Prefix("proxy").
+						Resource("pods").
+						Namespace(api.NamespaceDefault).
+						Name(pod.Name).
+						Suffix("results", testCase).
+						Do().Raw()
+					if err != nil {
+						failed = append(failed, testCase)
+					}
 				}
 			}
 			if len(failed) == 0 {
-				break
+				return true, nil
 			}
-			fmt.Printf("lookups using %s failed for: %v\n", pod.Name, failed)
-			time.Sleep(10 * time.Second)
-		}
+			Logf("Lookups using %s failed for: %v\n", pod.Name, failed)
+			return false, nil
+		}))
 		Expect(len(failed)).To(Equal(0))
 
 		// TODO: probe from the host, too.
 
-		fmt.Printf("DNS probes using %s succeeded\n", pod.Name)
+		Logf("DNS probes using %s succeeded\n", pod.Name)
 	})
 
 	It("should provide RW and RO services", func() {
 		svc := api.ServiceList{}
 		err := c.Get().
-			AbsPath("/api/v1beta1/proxy/services/kubernetes-ro/api/v1beta1/services").
+			AbsPath("/api/v1beta3/proxy/namespaces/default/services/kubernetes-ro/api/v1beta3/services").
 			Do().
 			Into(&svc)
 		if err != nil {
@@ -219,7 +226,7 @@ var _ = Describe("Services", func() {
 		var names []string
 		defer func() {
 			for _, name := range names {
-				err := c.Pods(ns).Delete(name)
+				err := c.Pods(ns).Delete(name, nil)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}()
@@ -236,13 +243,13 @@ var _ = Describe("Services", func() {
 
 		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
 
-		err = c.Pods(ns).Delete(name1)
+		err = c.Pods(ns).Delete(name1, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names = []string{name2}
 
 		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
 
-		err = c.Pods(ns).Delete(name2)
+		err = c.Pods(ns).Delete(name2, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names = []string{}
 
@@ -255,8 +262,13 @@ var _ = Describe("Services", func() {
 	}, 240.0)
 
 	It("should be able to create a functioning external load balancer", func() {
+		if !providerIs("gce", "gke") {
+			By(fmt.Sprintf("Skipping service external load balancer test; uses createExternalLoadBalancer, a (gce|gke) feature"))
+			return
+		}
+
 		serviceName := "external-lb-test"
-		ns := api.NamespaceDefault
+		ns := namespace0
 		labels := map[string]string{
 			"key0": "value0",
 		}
@@ -273,9 +285,6 @@ var _ = Describe("Services", func() {
 				CreateExternalLoadBalancer: true,
 			},
 		}
-
-		By("cleaning up previous service " + serviceName + " from namespace " + ns)
-		c.Services(ns).Delete(serviceName)
 
 		By("creating service " + serviceName + " with external load balancer in namespace " + ns)
 		result, err := c.Services(ns).Create(service)
@@ -299,7 +308,7 @@ var _ = Describe("Services", func() {
 		pod := &api.Pod{
 			TypeMeta: api.TypeMeta{
 				Kind:       "Pod",
-				APIVersion: "v1beta1",
+				APIVersion: latest.Version,
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name:   "elb-test-" + string(util.NewUUID()),
@@ -316,20 +325,20 @@ var _ = Describe("Services", func() {
 		}
 
 		By("creating pod to be part of service " + serviceName)
-		podClient := c.Pods(api.NamespaceDefault)
+		podClient := c.Pods(ns)
 		defer func() {
 			By("deleting pod " + pod.Name)
 			defer GinkgoRecover()
-			podClient.Delete(pod.Name)
+			podClient.Delete(pod.Name, nil)
 		}()
 		if _, err := podClient.Create(pod); err != nil {
 			Failf("Failed to create pod %s: %v", pod.Name, err)
 		}
-		expectNoError(waitForPodRunning(c, pod.Name))
+		expectNoError(waitForPodRunningInNamespace(c, pod.Name, ns))
 
 		By("hitting the pod through the service's external load balancer")
 		var resp *http.Response
-		for t := time.Now(); time.Since(t) < time.Minute; time.Sleep(5 * time.Second) {
+		for t := time.Now(); time.Since(t) < podStartTimeout; time.Sleep(5 * time.Second) {
 			resp, err = http.Get(fmt.Sprintf("http://%s:%d", ip, port))
 			if err == nil {
 				break
@@ -349,6 +358,11 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
+		if !providerIs("gce", "gke") {
+			By(fmt.Sprintf("Skipping service namespace collision test; uses createExternalLoadBalancer, a (gce|gke) feature"))
+			return
+		}
+
 		serviceNames := []string{"s0"}                 // Could add more here, but then it takes longer.
 		namespaces := []string{namespace0, namespace1} // As above.
 		labels := map[string]string{
@@ -408,7 +422,7 @@ func waitForPublicIPs(c *client.Client, serviceName, namespace string) (*api.Ser
 		}
 		Logf("Waiting for service %s in namespace %s to have a public IP (%v)", serviceName, namespace, time.Since(start))
 	}
-	return service, fmt.Errorf("service %s in namespace %s to have a public IP after %.2f seconds", nil, serviceName, namespace, podStartTimeout.Seconds())
+	return service, fmt.Errorf("service %s in namespace %s doesn't have a public IP after %.2f seconds", serviceName, namespace, timeout.Seconds())
 }
 
 func validateUniqueOrFail(s []string) {
