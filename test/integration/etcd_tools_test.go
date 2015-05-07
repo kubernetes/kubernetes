@@ -145,3 +145,47 @@ func TestWatch(t *testing.T) {
 		}
 	})
 }
+
+func TestMigrateKeys(t *testing.T) {
+	withEtcdKey(func(oldPrefix string) {
+		client := newEtcdClient()
+		helper := tools.NewEtcdHelper(client, testapi.Codec(), oldPrefix)
+
+		key1 := oldPrefix + "/obj1"
+		key2 := oldPrefix + "/foo/obj2"
+		key3 := oldPrefix + "/foo/bar/obj3"
+
+		// Create a new entres - these are the 'existing' entries with old prefix
+		_, _ = helper.Client.Create(key1, "foo", 0)
+		_, _ = helper.Client.Create(key2, "foo", 0)
+		_, _ = helper.Client.Create(key3, "foo", 0)
+
+		// Change the helper to a new prefix
+		newPrefix := "/kubernetes.io"
+		helper = tools.NewEtcdHelper(client, testapi.Codec(), newPrefix)
+
+		// Migrate the keys
+		err := helper.MigrateKeys(oldPrefix)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		// Check the resources are at the correct new location
+		newNames := []string{
+			newPrefix + "/obj1",
+			newPrefix + "/foo/obj2",
+			newPrefix + "/foo/bar/obj3",
+		}
+		for _, name := range newNames {
+			_, err := helper.Client.Get(name, false, false)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+		}
+
+		// Check the old locations are removed
+		if _, err := helper.Client.Get(oldPrefix, false, false); err == nil {
+			t.Fatalf("Old directory still exists.")
+		}
+	})
+}

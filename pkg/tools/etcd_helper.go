@@ -545,6 +545,72 @@ func (h *EtcdHelper) PrefixEtcdKey(key string) string {
 	return path.Join("/", h.PathPrefix, key)
 }
 
+// Copies the key-value pairs from their old location to a new location based
+// on this helper's etcd prefix. All old keys without the prefix are then deleted.
+func (h *EtcdHelper) MigrateKeys(oldPathPrefix string) error {
+	// Check to see if a migration is necessary, i.e. is the oldPrefix different
+	// from the newPrefix?
+	if h.PathPrefix == oldPathPrefix {
+		return nil
+	}
+
+	// Get the root node
+	response, err := h.Client.Get(oldPathPrefix, false, true)
+	if err != nil {
+		glog.Infof("Couldn't get the existing etcd root node.")
+		return err
+	}
+
+	// Perform the migration
+	if err = h.migrateChildren(response.Node, oldPathPrefix); err != nil {
+		glog.Infof("Error performing the migration.")
+		return err
+	}
+
+	// Delete the old top-level entry recursively
+	// Quick sanity check: Did the process at least create a new top-level entry?
+	if _, err = h.Client.Get(h.PathPrefix, false, false); err != nil {
+		glog.Infof("Couldn't get the new etcd root node.")
+		return err
+	} else {
+		if _, err = h.Client.Delete(oldPathPrefix, true); err != nil {
+			glog.Infof("Couldn't delete the old etcd root node.")
+			return err
+		}
+	}
+	return nil
+}
+
+// This recurses through the etcd registry. Each key-value pair is copied with
+// to a new pair with a prefixed key.
+func (h *EtcdHelper) migrateChildren(parent *etcd.Node, oldPathPrefix string) error {
+	for _, child := range parent.Nodes {
+		if child.Dir && len(child.Nodes) > 0 {
+			// Descend into this directory
+			h.migrateChildren(child, oldPathPrefix)
+
+			// All children have been migrated, so this directory has
+			// already been automatically added.
+			continue
+		}
+
+		// Check if already prefixed (maybe we got interrupted in last attempt)
+		if strings.HasPrefix(child.Key, h.PathPrefix) {
+			// Skip this iteration
+			continue
+		}
+
+		// Create new entry
+		newKey := path.Join("/", h.PathPrefix, strings.TrimPrefix(child.Key, oldPathPrefix))
+		if _, err := h.Client.Create(newKey, child.Value, 0); err != nil {
+			// Assuming etcd is still available, this is due to the key
+			// already existing, in which case we can skip.
+			continue
+		}
+	}
+	return nil
+}
+
 // GetEtcdVersion performs a version check against the provided Etcd server,
 // returning the string response, and error (if any).
 func GetEtcdVersion(host string) (string, error) {
