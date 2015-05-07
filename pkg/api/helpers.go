@@ -17,12 +17,15 @@ limitations under the License.
 package api
 
 import (
+	"crypto/md5"
+	"fmt"
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/davecgh/go-spew/spew"
@@ -129,4 +132,12 @@ func AddToNodeAddresses(addresses *[]NodeAddress, addAddresses ...NodeAddress) {
 			*addresses = append(*addresses, add)
 		}
 	}
+}
+
+func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
+	data, err := codec.Encode(obj)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", md5.Sum(data)), nil
 }
