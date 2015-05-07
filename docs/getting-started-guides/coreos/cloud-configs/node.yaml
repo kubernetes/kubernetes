@@ -91,7 +91,7 @@ coreos:
         ExecStart=/opt/bin/kubelet \
         --address=0.0.0.0 \
         --port=10250 \
-        --hostname_override=$private_ipv4 \
+        --hostname_override=${DEFAULT_IPV4} \
         --api_servers=<master-private-ip>:8080 \
         --allow_privileged=true \
         --logtostderr=true \
