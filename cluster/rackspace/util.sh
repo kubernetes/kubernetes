@@ -21,6 +21,7 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source $(dirname ${BASH_SOURCE})/${KUBE_CONFIG_FILE-"config-default.sh"}
 source "${KUBE_ROOT}/cluster/common.sh"
+source "${KUBE_ROOT}/cluster/rackspace/authorization.sh"
 
 verify-prereqs() {
   # Make sure that prerequisites are installed.
@@ -129,8 +130,27 @@ copy_dev_tarballs() {
   echo "cluster/rackspace/util.sh: Uploading to Cloud Files"
   ${SWIFTLY_CMD} put -i ${RELEASE_DIR}/kubernetes-server-linux-amd64.tar.gz \
   ${CLOUDFILES_CONTAINER}/${CONTAINER_PREFIX}/kubernetes-server-linux-amd64.tar.gz > /dev/null 2>&1
-  
+
   echo "Release pushed."
+}
+
+prep_known_tokens() {
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    generate_kubelet_tokens ${MINION_NAMES[i]}
+    cat ${KUBE_TEMP}/${MINION_NAMES[i]}_token.csv >> ${KUBE_TEMP}/known_tokens.csv
+  done
+
+    # Generate tokens for other "service accounts".  Append to known_tokens.
+    #
+    # NB: If this list ever changes, this script actually has to
+    # change to detect the existence of this file, kill any deleted
+    # old tokens and add any new tokens (to handle the upgrade case).
+    local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
+    for account in "${service_accounts[@]}"; do
+      echo "$(create_token),${account},${account}" >> ${KUBE_TEMP}/known_tokens.csv
+    done
+
+  generate_admin_token
 }
 
 rax-boot-master() {
@@ -160,6 +180,7 @@ rax-boot-master() {
 --meta ${MASTER_TAG} \
 --meta ETCD=${DISCOVERY_ID} \
 --user-data ${KUBE_TEMP}/master-cloud-config.yaml \
+--file /var/lib/kubernetes/apiserver/known_tokens.csv=${KUBE_TEMP}/known_tokens.csv \
 --config-drive true \
 --nic net-id=${NETWORK_UUID} \
 ${MASTER_NAME}"
@@ -176,15 +197,19 @@ rax-boot-minions() {
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
 
+    get_tokens_from_csv ${MINION_NAMES[i]}
+
     sed -e "s|DISCOVERY_ID|${DISCOVERY_ID}|" \
-        -e "s|INDEX|$((i + 1))|g" \
         -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\\&}|" \
-        -e "s|ENABLE_NODE_MONITORING|${ENABLE_NODE_MONITORING:-false}|" \
-        -e "s|ENABLE_NODE_LOGGING|${ENABLE_NODE_LOGGING:-false}|" \
-        -e "s|LOGGING_DESTINATION|${LOGGING_DESTINATION:-}|" \
-        -e "s|ENABLE_CLUSTER_DNS|${ENABLE_CLUSTER_DNS:-false}|" \
         -e "s|DNS_SERVER_IP|${DNS_SERVER_IP:-}|" \
         -e "s|DNS_DOMAIN|${DNS_DOMAIN:-}|" \
+        -e "s|ENABLE_CLUSTER_DNS|${ENABLE_CLUSTER_DNS:-false}|" \
+        -e "s|ENABLE_NODE_MONITORING|${ENABLE_NODE_MONITORING:-false}|" \
+        -e "s|ENABLE_NODE_LOGGING|${ENABLE_NODE_LOGGING:-false}|" \
+        -e "s|INDEX|$((i + 1))|g" \
+        -e "s|KUBE_BEARER_TOKEN|${KUBE_BEARER_TOKEN}|" \
+        -e "s|KUBE_PROXY_TOKEN|${KUBE_PROXY_TOKEN}|" \
+        -e "s|LOGGING_DESTINATION|${LOGGING_DESTINATION:-}|" \
     $(dirname $0)/rackspace/cloud-config/minion-cloud-config.yaml > $KUBE_TEMP/minion-cloud-config-$(($i + 1)).yaml
 
 
@@ -287,6 +312,8 @@ kube-up() {
   rax-ssh-key
 
   echo "cluster/rackspace/util.sh: Starting Cloud Servers"
+  prep_known_tokens
+
   rax-boot-master
 
   rax-boot-minions
