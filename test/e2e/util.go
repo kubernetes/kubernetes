@@ -37,6 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	"golang.org/x/crypto/ssh"
@@ -776,14 +777,15 @@ func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {
 
 // Prints summary metrics for request types with latency above threshold
 // and returns number of such request types.
-func HighLatencyRequests(c *client.Client, threshold time.Duration) (int, error) {
+func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResources util.StringSet) (int, error) {
 	metrics, err := ReadLatencyMetrics(c)
 	if err != nil {
 		return 0, err
 	}
 	var badMetrics []LatencyMetric
 	for _, metric := range metrics {
-		if metric.verb != "WATCHLIST" &&
+		if !ignoredResources.Has(metric.resource) &&
+			metric.verb != "WATCHLIST" &&
 			// We are only interested in 99%tile, but for logging purposes
 			// it's useful to have all the offending percentiles.
 			metric.quantile <= 0.99 &&
