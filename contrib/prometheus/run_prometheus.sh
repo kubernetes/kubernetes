@@ -1,5 +1,6 @@
-#!/bin/sh
-# Copyright 2014 Google Inc. All rights reserved.
+#!/bin/bash
+
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,12 +27,15 @@ show_usage() {
   echo "where"
   echo " -t List of services to be monitored. Each service T should be described by"
   echo "    the T_SERVICE_HOST and T_SERVICE_PORT env variables."
-  echo " -d Location where the config file and metrics will be written."
+  echo "-d Prometheus' root directory (i.e. where config file/metrics data will be stored)."
 }
 
 build_config() {
   echo >$1 'global: { scrape_interval: "10s" evaluation_interval: "10s"}'
   local target
+
+  ### Allow prometheus to scrape multiple targets
+  ### i.e. -t KUBERNETES_RO,MY_METRICS_ABC
   for target in ${2//,/ }; do
     local host_variable=$target"_SERVICE_HOST"
     local port_variable=$target"_SERVICE_PORT"
@@ -73,6 +77,8 @@ if [ -z $targets ] || [ -z $location ]; then
   exit 2
 fi
 
+echo "------------------"
+echo "Using $location as the root for prometheus configs and data."
 mkdir -p $location
 config="$location/config.pb"
 storage="$location/storage"
