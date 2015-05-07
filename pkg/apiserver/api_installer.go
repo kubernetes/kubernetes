@@ -249,6 +249,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
 		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
+		actions = appendIf(actions, action{"HEAD", resourcePath, resourceParams, namer}, isGetter)
+		if getSubpath {
+			actions = appendIf(actions, action{"HEAD", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
+		}
 		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
 		if getSubpath {
 			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
@@ -288,6 +292,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			// DEPRECATED
 			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
+			actions = appendIf(actions, action{"HEAD", resourcePath, resourceParams, namer}, isGetter)
+			if getSubpath {
+				actions = appendIf(actions, action{"HEAD", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
+			}
 			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
 			if getSubpath {
 				actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
@@ -330,6 +338,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
 			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
+			actions = appendIf(actions, action{"HEAD", resourcePath, resourceParams, namer}, isGetter)
+			if getSubpath {
+				actions = appendIf(actions, action{"HEAD", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
+			}
 			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
 			if getSubpath {
 				actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
@@ -377,6 +389,27 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		reqScope.Namer = action.Namer
 		m := monitorFilter(action.Verb, resource)
 		switch action.Verb {
+		case "HEAD": // HEAD request for a resource.
+			var handler restful.RouteFunction
+			if isGetterWithOptions {
+				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsKind, getSubpath, getSubpathKey)
+			} else {
+				handler = GetResource(getter, reqScope)
+			}
+			route := ws.HEAD(action.Path).To(handler).
+				Filter(m).
+				Doc("metadata about the specified "+kind).
+				Operation("head"+kind).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Returns(http.StatusOK, "OK", versionedObject).
+				Writes(versionedObject)
+			if isGetterWithOptions {
+				if err := addObjectParams(ws, route, getOptions); err != nil {
+					return err
+				}
+			}
+			addParams(route, action.Params)
+			ws.Route(route)
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
