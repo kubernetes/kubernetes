@@ -170,8 +170,8 @@ func TestGetEventsForOneEvent(t *testing.T) {
 
 func TestGetEventsForTimePeriod(t *testing.T) {
 	myEventHolder, myRequest, fakeEvent, fakeEvent2 := initializeScenario(t)
-	myRequest.StartTime = createOldTime(t).Add(-1 * time.Second * 10)
-	myRequest.EndTime = createOldTime(t).Add(time.Second * 10)
+	myRequest.StartTime = time.Now().Add(-1 * time.Second * 10)
+	myRequest.EndTime = time.Now().Add(time.Second * 10)
 	myRequest.EventType[info.EventOom] = true
 
 	myEventHolder.AddEvent(fakeEvent)
@@ -181,7 +181,7 @@ func TestGetEventsForTimePeriod(t *testing.T) {
 	assert.Nil(t, err)
 
 	checkNumberOfEvents(t, 1, len(receivedEvents))
-	ensureProperEventReturned(t, fakeEvent, receivedEvents[0])
+	ensureProperEventReturned(t, fakeEvent2, receivedEvents[0])
 }
 
 func TestGetEventsForNoTypeRequested(t *testing.T) {
