@@ -24,7 +24,7 @@ Example:
     }
 
 */
-package inotify
+package inotify // import "golang.org/x/exp/inotify"
 
 import (
 	"errors"
@@ -221,7 +221,7 @@ func (e *Event) String() string {
 
 	m := e.Mask
 	for _, b := range eventBits {
-		if m&b.Value != 0 {
+		if m&b.Value == b.Value {
 			m &^= b.Value
 			events += "|" + b.Name
 		}

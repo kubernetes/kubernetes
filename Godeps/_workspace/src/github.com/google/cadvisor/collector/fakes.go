@@ -1,4 +1,4 @@
-// Copyright 2014 Google Inc. All Rights Reserved.
+// Copyright 2015 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package version
+package collector
 
-// Version of cAdvisor.
-const VERSION = "0.13.0"
+import (
+	"time"
+)
+
+type FakeCollectorManager struct {
+}
+
+func (fkm *FakeCollectorManager) RegisterCollector(collector Collector) error {
+	return nil
+}
+
+func (fkm *FakeCollectorManager) Collect() (time.Time, error) {
+	var zero time.Time
+	return zero, nil
+}

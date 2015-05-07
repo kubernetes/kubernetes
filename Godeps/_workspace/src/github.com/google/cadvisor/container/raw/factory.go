@@ -15,6 +15,7 @@
 package raw
 
 import (
+	"flag"
 	"fmt"
 
 	"github.com/golang/glog"
@@ -23,6 +24,8 @@ import (
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 )
+
+var dockerOnly = flag.Bool("docker_only", false, "Only report docker containers in addition to root stats")
 
 type rawFactory struct {
 	// Factory for machine information.
@@ -43,9 +46,10 @@ func (self *rawFactory) NewContainerHandler(name string) (container.ContainerHan
 	return newRawContainerHandler(name, self.cgroupSubsystems, self.machineInfoFactory, self.fsInfo)
 }
 
-// The raw factory can handle any container.
-func (self *rawFactory) CanHandle(name string) (bool, error) {
-	return true, nil
+// The raw factory can handle any container. If --docker_only is set to false, non-docker containers are ignored.
+func (self *rawFactory) CanHandleAndAccept(name string) (bool, bool, error) {
+	accept := name == "/" || !*dockerOnly
+	return true, accept, nil
 }
 
 func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo) error {

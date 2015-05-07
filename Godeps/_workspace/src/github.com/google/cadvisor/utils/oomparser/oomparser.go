@@ -180,7 +180,7 @@ func trySystemd() (*OomParser, error) {
 	if err != nil {
 		return nil, err
 	}
-	glog.V(1).Infof("oomparser using systemd")
+	glog.Infof("oomparser using systemd")
 	return &OomParser{
 		ioreader: bufio.NewReader(readcloser),
 	}, nil

@@ -24,6 +24,7 @@ import (
 
 	"github.com/docker/docker/pkg/units"
 	"github.com/golang/glog"
+	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/info/v2"
@@ -63,6 +64,9 @@ type containerData struct {
 
 	// Tells the container to stop.
 	stop chan bool
+
+	// Runs custom metric collectors.
+	collectorManager collector.CollectorManager
 }
 
 func (c *containerData) Start() error {
@@ -109,7 +113,7 @@ func (c *containerData) DerivedStats() (v2.DerivedStats, error) {
 	return c.summaryReader.DerivedStats()
 }
 
-func newContainerData(containerName string, memoryStorage *memory.InMemoryStorage, handler container.ContainerHandler, loadReader cpuload.CpuLoadReader, logUsage bool) (*containerData, error) {
+func newContainerData(containerName string, memoryStorage *memory.InMemoryStorage, handler container.ContainerHandler, loadReader cpuload.CpuLoadReader, logUsage bool, collectorManager collector.CollectorManager) (*containerData, error) {
 	if memoryStorage == nil {
 		return nil, fmt.Errorf("nil memory storage")
 	}
@@ -129,6 +133,7 @@ func newContainerData(containerName string, memoryStorage *memory.InMemoryStorag
 		logUsage:             logUsage,
 		loadAvg:              -1.0, // negative value indicates uninitialized.
 		stop:                 make(chan bool, 1),
+		collectorManager:     collectorManager,
 	}
 	cont.info.ContainerReference = ref
 
@@ -172,6 +177,7 @@ func (self *containerData) nextHousekeeping(lastHousekeeping time.Time) time.Tim
 	return lastHousekeeping.Add(self.housekeepingInterval)
 }
 
+// TODO(vmarmol): Implement stats collecting as a custom collector.
 func (c *containerData) housekeeping() {
 	// Long housekeeping is either 100ms or half of the housekeeping interval.
 	longHousekeeping := 100 * time.Millisecond
@@ -226,12 +232,24 @@ func (c *containerData) housekeeping() {
 			}
 		}
 
-		// Schedule the next housekeeping. Sleep until that time.
-		nextHousekeeping := c.nextHousekeeping(lastHousekeeping)
-		if time.Now().Before(nextHousekeeping) {
-			time.Sleep(nextHousekeeping.Sub(time.Now()))
+		// Run custom collectors.
+		nextCollectionTime, err := c.collectorManager.Collect()
+		if err != nil && c.allowErrorLogging() {
+			glog.Warningf("[%s] Collection failed: %v", c.info.Name, err)
 		}
-		lastHousekeeping = nextHousekeeping
+
+		// Next housekeeping is the first of the stats or the custom collector's housekeeping.
+		nextHousekeeping := c.nextHousekeeping(lastHousekeeping)
+		next := nextHousekeeping
+		if !nextCollectionTime.IsZero() && nextCollectionTime.Before(nextHousekeeping) {
+			next = nextCollectionTime
+		}
+
+		// Schedule the next housekeeping. Sleep until that time.
+		if time.Now().Before(next) {
+			time.Sleep(next.Sub(time.Now()))
+		}
+		lastHousekeeping = next
 	}
 }
 
@@ -302,7 +320,7 @@ func (c *containerData) updateStats() error {
 		err := c.summaryReader.AddSample(*stats)
 		if err != nil {
 			// Ignore summary errors for now.
-			glog.V(2).Infof("failed to add summary stats for %q: %v", c.info.Name, err)
+			glog.V(2).Infof("Failed to add summary stats for %q: %v", c.info.Name, err)
 		}
 	}
 	ref, err := c.handler.ContainerReference()

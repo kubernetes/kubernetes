@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/docker"
 	info "github.com/google/cadvisor/info/v1"
@@ -52,7 +53,7 @@ func createManagerAndAddContainers(
 			spec,
 			nil,
 		).Once()
-		cont, err := newContainerData(name, memoryStorage, mockHandler, nil, false)
+		cont, err := newContainerData(name, memoryStorage, mockHandler, nil, false, &collector.FakeCollectorManager{})
 		if err != nil {
 			t.Fatal(err)
 		}

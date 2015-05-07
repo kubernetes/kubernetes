@@ -22,11 +22,11 @@ import (
 )
 
 type ContainerHandlerFactory interface {
-	// Create a new ContainerHandler using this factory. CanHandle() must have returned true.
-	NewContainerHandler(name string) (ContainerHandler, error)
+	// Create a new ContainerHandler using this factory. CanHandleAndAccept() must have returned true.
+	NewContainerHandler(name string) (c ContainerHandler, err error)
 
-	// Returns whether this factory can handle the specified container.
-	CanHandle(name string) (bool, error)
+	// Returns whether this factory can handle and accept the specified container.
+	CanHandleAndAccept(name string) (handle bool, accept bool, err error)
 
 	// Name of the factory.
 	String() string
@@ -57,25 +57,30 @@ func HasFactories() bool {
 }
 
 // Create a new ContainerHandler for the specified container.
-func NewContainerHandler(name string) (ContainerHandler, error) {
+func NewContainerHandler(name string) (ContainerHandler, bool, error) {
 	factoriesLock.RLock()
 	defer factoriesLock.RUnlock()
 
 	// Create the ContainerHandler with the first factory that supports it.
 	for _, factory := range factories {
-		canHandle, err := factory.CanHandle(name)
+		canHandle, canAccept, err := factory.CanHandleAndAccept(name)
 		if err != nil {
-			glog.V(4).Infof("Error trying to work out if we can hande %s: %v", name, err)
+			glog.V(4).Infof("Error trying to work out if we can handle %s: %v", name, err)
 		}
 		if canHandle {
+			if !canAccept {
+				glog.V(3).Infof("Factory %q can handle container %q, but ignoring.", factory, name)
+				return nil, false, nil
+			}
 			glog.V(3).Infof("Using factory %q for container %q", factory, name)
-			return factory.NewContainerHandler(name)
+			handle, err := factory.NewContainerHandler(name)
+			return handle, canAccept, err
 		} else {
 			glog.V(4).Infof("Factory %q was unable to handle container %q", factory, name)
 		}
 	}
 
-	return nil, fmt.Errorf("no known factory can handle creation of container")
+	return nil, false, fmt.Errorf("no known factory can handle creation of container")
 }
 
 // Clear the known factories.

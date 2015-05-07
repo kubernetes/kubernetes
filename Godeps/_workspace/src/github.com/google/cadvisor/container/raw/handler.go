@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/go.exp/inotify"
 	"github.com/docker/libcontainer/cgroups"
 	cgroup_fs "github.com/docker/libcontainer/cgroups/fs"
 	"github.com/docker/libcontainer/configs"
@@ -34,6 +33,7 @@ import (
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
+	"golang.org/x/exp/inotify"
 )
 
 type rawContainerHandler struct {

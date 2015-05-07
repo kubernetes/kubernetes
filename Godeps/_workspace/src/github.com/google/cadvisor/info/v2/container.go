@@ -64,6 +64,9 @@ type ContainerSpec struct {
 	// An example of a namespace is "docker" for Docker containers.
 	Namespace string `json:"namespace,omitempty"`
 
+	// Metadata labels associated with this container.
+	Labels map[string]string `json:"labels,omitempty"`
+
 	HasCpu bool    `json:"has_cpu"`
 	Cpu    CpuSpec `json:"cpu,omitempty"`
 
