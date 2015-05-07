@@ -1,11 +1,11 @@
 apiVersion: v1beta3
 kind: ReplicationController
 metadata:
+  name: kube-dns
+  namespace: default
   labels:
     k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
-  name: kube-dns
-  namespace: default
 spec:
   replicas: {{ pillar['dns_replicas'] }}
   selector:
@@ -15,7 +15,6 @@ spec:
       labels:
         k8s-app: kube-dns
         kubernetes.io/cluster-service: "true"
-        name: kube-dns
     spec:
       containers:
       - name: etcd
@@ -31,7 +30,7 @@ spec:
       - name: kube2sky
         image: gcr.io/google_containers/kube2sky:1.4
         args:
-        # entrypoint = "/kube2sky"
+        # command = "/kube2sky"
         - -domain={{ pillar['dns_domain'] }}
         - -kubecfg_file=/etc/dns_token/kubeconfig
         volumeMounts:
@@ -41,7 +40,7 @@ spec:
       - name: skydns
         image: gcr.io/google_containers/skydns:2015-03-11-001
         args:
-        # entrypoint = "/skydns"
+        # command = "/skydns"
         - -machines=http://localhost:4001
         - -addr=0.0.0.0:53
         - -domain={{ pillar['dns_domain'] }}.
@@ -49,6 +48,9 @@ spec:
         - containerPort: 53
           name: dns
           protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
         livenessProbe:
           exec:
             command:

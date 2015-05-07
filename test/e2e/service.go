@@ -67,7 +67,9 @@ var _ = Describe("Services", func() {
 
 		probeCmd := "for i in `seq 1 600`; do "
 		for _, name := range namesToResolve {
-			probeCmd += fmt.Sprintf("wget -O /dev/null %s && echo OK > /results/%s;", name, name)
+			// Resolve by TCP and UDP DNS.
+			probeCmd += fmt.Sprintf(`test -n "$(dig +notcp +noall +answer +search %s)" && echo OK > /results/udp@%s;`, name, name)
+			probeCmd += fmt.Sprintf(`test -n "$(dig +tcp +noall +answer +search %s)" && echo OK > /results/tcp@%s;`, name, name)
 		}
 		probeCmd += "sleep 1; done"
 
@@ -102,8 +104,8 @@ var _ = Describe("Services", func() {
 						},
 					},
 					{
-						Name:    "pinger",
-						Image:   "gcr.io/google_containers/busybox",
+						Name:    "querier",
+						Image:   "gcr.io/google_containers/dnsutils",
 						Command: []string{"sh", "-c", probeCmd},
 						VolumeMounts: []api.VolumeMount{
 							{
@@ -141,16 +143,18 @@ var _ = Describe("Services", func() {
 		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			failed = []string{}
 			for _, name := range namesToResolve {
-				_, err := c.Get().
-					Prefix("proxy").
-					Resource("pods").
-					Namespace(api.NamespaceDefault).
-					Name(pod.Name).
-					Suffix("results", name).
-					Do().Raw()
-				if err != nil {
-					failed = append(failed, name)
-					Logf("Lookup using %s for %s failed: %v\n", pod.Name, name, err)
+				for _, proto := range []string{"udp", "tcp"} {
+					testCase := fmt.Sprintf("%s@%s", proto, name)
+					_, err := c.Get().
+						Prefix("proxy").
+						Resource("pods").
+						Namespace(api.NamespaceDefault).
+						Name(pod.Name).
+						Suffix("results", testCase).
+						Do().Raw()
+					if err != nil {
+						failed = append(failed, testCase)
+					}
 				}
 			}
 			if len(failed) == 0 {
