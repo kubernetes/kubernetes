@@ -2614,7 +2614,7 @@ func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s c
 	if in.Containers != nil {
 		out.Containers = make([]newer.Container, len(in.Containers))
 		for i := range in.Containers {
-			if err := s.Convert(&in.Containers[i], &out.Containers[i], 0); err != nil {
+			if err := convert_v1beta3_Container_To_api_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
 				return err
 			}
 		}
@@ -2659,7 +2659,7 @@ func convert_api_PodSpec_To_v1beta3_PodSpec(in *newer.PodSpec, out *PodSpec, s c
 	if in.Containers != nil {
 		out.Containers = make([]Container, len(in.Containers))
 		for i := range in.Containers {
-			if err := s.Convert(&in.Containers[i], &out.Containers[i], 0); err != nil {
+			if err := convert_api_Container_To_v1beta3_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
 				return err
 			}
 		}
