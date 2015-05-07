@@ -52,13 +52,15 @@ Use the file `examples/kubernetes-namespaces/v1beta3/namespace-dev.json` which d
 
 ```js
 {
-  "kind": "Namespace",
   "apiVersion":"v1beta3",
-  "name": "development",
+  "kind": "Namespace",
+  "metadata": {
+    "name": "development"
+  },
   "spec": {},
   "labels": {
     "name": "development"
-  },
+  }
 }
 ```
 
@@ -95,8 +97,8 @@ To demonstrate this, let's spin up a simple replication controller and pod in th
 The first step is to define a context for the kubectl client to work in each namespace.
 
 ```shell
-$ cluster/kubectl.sh config set-context dev --namespace=development
-$ cluster/kubectl.sh config set-context prod --namespace=production
+$ cluster/kubectl.sh config set-context dev --namespace=development --cluster=${CLUSTER_NAME} --user=${USER_NAME}
+$ cluster/kubectl.sh config set-context prod --namespace=production --cluster=${CLUSTER_NAME} --user=${USER_NAME}
 ```
 
 The above commands provided two request contexts you can alternate against depending on what namespace you
@@ -115,13 +117,13 @@ $ cluster/kubectl.sh config view
 clusters: {}
 contexts:
   dev:
-    cluster: ""
+    cluster: ${CLUSTER_NAME}
     namespace: development
-    user: ""
+    user: ${USER_NAME}
   prod:
-    cluster: ""
+    cluster: ${CLUSTER_NAME}
     namespace: production
-    user: ""
+    user: ${USER_NAME}
 current-context: dev
 preferences: {}
 users: {}
