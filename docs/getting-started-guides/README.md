@@ -19,7 +19,6 @@ Bare-metal     | custom       | Fedora | _none_      | [docs](../../docs/getting
 Bare-metal     | custom       | Fedora | flannel   | [docs](../../docs/getting-started-guides/fedora/flannel_multi_node_cluster.md) | Community ([@aveshagarwal](https://github.com/aveshagarwal))| Tested with 0.15.0
 libvirt        | custom       | Fedora | flannel   | [docs](../../docs/getting-started-guides/fedora/flannel_multi_node_cluster.md) | Community ([@aveshagarwal](https://github.com/aveshagarwal))| Tested with 0.15.0
 KVM            | custom       | Fedora | flannel   | [docs](../../docs/getting-started-guides/fedora/flannel_multi_node_cluster.md) | Community ([@aveshagarwal](https://github.com/aveshagarwal))| Tested with 0.15.0
-Bare-metal     | custom       | Ubuntu Cluster | flannel | [docs](../../docs/getting-started-guides/ubuntu_multinodes_cluster.md) | Community (@resouer @WIZARD-CXY) | use k8s version 0.12.0
 Mesos/GCE      |              |        |             | [docs](../../docs/getting-started-guides/mesos.md)     | [Community](https://github.com/mesosphere/kubernetes-mesos) ([@jdef](https://github.com/jdef)) | Uses K8s v0.11.2
 AWS            | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/coreos.md)    | Community                    | Uses K8s version 0.16.1
 GCE            | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@kelseyhightower) | Uses K8s version 0.15.0
@@ -34,7 +33,9 @@ Joyent         | Juju         | Ubuntu | flannel     | [docs](../../docs/getting
 AWS            | Saltstack    | Ubuntu | OVS         | [docs](../../docs/getting-started-guides/aws.md)       | Community (@justinsb)        | Uses K8s version 0.5.0
 Vmware         | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@kelseyhightower) | Uses K8s version 0.15.0
 Azure          | Saltstack    | Ubuntu | OpenVPN     | [docs](../../docs/getting-started-guides/azure.md)     | Community                    |
-Bare-metal     | custom       | Ubuntu | _none_      | [docs](../../docs/getting-started-guides/ubuntu_single_node.md) | Community (@jainvipin)       |
+Bare-metal     | custom       | Ubuntu | flannel     | [docs](../../docs/getting-started-guides/ubuntu.md)    | Community (@resouer @WIZARD-CXY)       | use k8s version 0.15.0
+Docker Single Node        | custom       | N/A    | local       | [docs](docker.md) | Project (@brendandburns) | Tested @ 0.14.1 |
+Docker Multi Node        | Flannel| N/A    | local       | [docs](docker-multinode.md) | Project (@brendandburns) | Tested @ 0.14.1 |
 Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Community (@preillyme)                     |
 libvirt/KVM    | CoreOS       | CoreOS | libvirt/KVM | [docs](../../docs/getting-started-guides/libvirt-coreos.md) | Community (@lhuard1A)   |
 oVirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Community (@simon3z)         |

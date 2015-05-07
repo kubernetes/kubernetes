@@ -9,7 +9,7 @@ set -e
 # Should-Stop:        
 # Default-Start:      
 # Default-Stop:       
-# Short-Description:  Start kube-proxy service
+# Short-Description:  Start kube-scheduler service
 # Description:
 #  http://www.github.com/GoogleCloudPlatform/Kubernetes
 ### END INIT INFO
