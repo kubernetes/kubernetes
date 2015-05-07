@@ -91,7 +91,7 @@ func TestPluralAggregate(t *testing.T) {
 		t.Errorf("expected '[abc, 123]', got %q", s)
 	}
 	if s := agg.Errors(); len(s) != 2 {
-		t.Errorf("expected one-element slice, got %#v", s)
+		t.Errorf("expected two-elements slice, got %#v", s)
 	}
 	if s := agg.Errors()[0].Error(); s != "abc" {
 		t.Errorf("expected '[abc, 123]', got %q", s)
