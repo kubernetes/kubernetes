@@ -27,6 +27,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -219,6 +220,9 @@ func NewMainKubelet(
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
 		nodeLister:                     nodeLister,
+		runtimeMutex:                   sync.Mutex{},
+		runtimeUpThreshold:             maxWaitForContainerRuntime,
+		lastTimestampRuntimeUp:         time.Time{},
 		masterServiceNamespace:         masterServiceNamespace,
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
@@ -269,6 +273,7 @@ func NewMainKubelet(
 	if err := waitUntilRuntimeIsUp(klet.containerRuntime, maxWaitForContainerRuntime); err != nil {
 		return nil, fmt.Errorf("timed out waiting for %q to come up: %v", containerRuntime, err)
 	}
+	klet.lastTimestampRuntimeUp = time.Now()
 
 	klet.runner = klet.containerRuntime
 	klet.podManager = newBasicPodManager(klet.kubeClient)
@@ -344,6 +349,12 @@ type Kubelet struct {
 	masterServiceNamespace string
 	serviceLister          serviceLister
 	nodeLister             nodeLister
+
+	// Last timestamp when runtime responsed on ping.
+	// Mutex is used to protect this value.
+	runtimeMutex           sync.Mutex
+	runtimeUpThreshold     time.Duration
+	lastTimestampRuntimeUp time.Time
 
 	// Volume plugins.
 	volumePluginMgr volume.VolumePluginMgr
@@ -606,6 +617,7 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 		glog.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
 	}
 
+	go util.Until(kl.updateRuntimeUp, 5*time.Second, util.NeverStop)
 	go kl.syncNodeStatus()
 	// Run the system oom watcher forever.
 	go util.Until(kl.runOOMWatcher, time.Second, util.NeverStop)
@@ -1444,6 +1456,15 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
 	return kl.podManager.GetPodByName(namespace, name)
 }
 
+func (kl *Kubelet) updateRuntimeUp() {
+	err := waitUntilRuntimeIsUp(kl.containerRuntime, 100*time.Millisecond)
+	kl.runtimeMutex.Lock()
+	defer kl.runtimeMutex.Unlock()
+	if err == nil {
+		kl.lastTimestampRuntimeUp = time.Now()
+	}
+}
+
 // updateNodeStatus updates node status to master with retries.
 func (kl *Kubelet) updateNodeStatus() error {
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
@@ -1520,13 +1541,31 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
 	}
 
+	// Check whether container runtime can be reported as up.
+	containerRuntimeUp := func() bool {
+		kl.runtimeMutex.Lock()
+		defer kl.runtimeMutex.Unlock()
+		return kl.lastTimestampRuntimeUp.Add(kl.runtimeUpThreshold).After(time.Now())
+	}()
+
 	currentTime := util.Now()
-	newCondition := api.NodeCondition{
-		Type:              api.NodeReady,
-		Status:            api.ConditionTrue,
-		Reason:            fmt.Sprintf("kubelet is posting ready status"),
-		LastHeartbeatTime: currentTime,
+	var newCondition api.NodeCondition
+	if containerRuntimeUp {
+		newCondition = api.NodeCondition{
+			Type:              api.NodeReady,
+			Status:            api.ConditionTrue,
+			Reason:            fmt.Sprintf("kubelet is posting ready status"),
+			LastHeartbeatTime: currentTime,
+		}
+	} else {
+		newCondition = api.NodeCondition{
+			Type:              api.NodeReady,
+			Status:            api.ConditionFalse,
+			Reason:            fmt.Sprintf("container runtime is down"),
+			LastHeartbeatTime: currentTime,
+		}
 	}
+
 	updated := false
 	for i := range node.Status.Conditions {
 		if node.Status.Conditions[i].Type == api.NodeReady {
