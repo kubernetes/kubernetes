@@ -132,6 +132,11 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	for i := 0; i < workers; i++ {
 		go util.Until(e.worker, time.Second, stopCh)
 	}
+	go func() {
+		defer util.HandleCrash()
+		time.Sleep(5 * time.Minute) // give time for our cache to fill
+		e.checkLeftoverEndpoints()
+	}()
 	<-stopCh
 	e.queue.ShutDown()
 }
@@ -367,6 +372,29 @@ func (e *EndpointController) syncService(key string) {
 	if err != nil {
 		glog.Errorf("Error updating endpoints: %v", err)
 		e.queue.Add(key) // Retry
+	}
+}
+
+// checkLeftoverEndpoints lists all currently existing endpoints and adds their
+// service to the queue. This will detect endpoints that exist with no
+// corresponding service; these endpoints need to be deleted. We only need to
+// do this once on startup, because in steady-state these are detected (but
+// some stragglers could have been left behind if the endpoint controller
+// reboots).
+func (e *EndpointController) checkLeftoverEndpoints() {
+	list, err := e.client.Endpoints(api.NamespaceAll).List(labels.Everything())
+	if err != nil {
+		glog.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err)
+		return
+	}
+	for i := range list.Items {
+		ep := &list.Items[i]
+		key, err := keyFunc(ep)
+		if err != nil {
+			glog.Errorf("Unable to get key for endpoint %#v", ep)
+			continue
+		}
+		e.queue.Add(key)
 	}
 }
 
