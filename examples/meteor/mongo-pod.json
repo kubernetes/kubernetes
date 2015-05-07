@@ -21,7 +21,7 @@
     "containers": [
       {
         "name": "mongo",
-        "image": "mongo",
+        "image": "mongo:latest",
         "ports": [
           {
             "name": "mongo",
@@ -29,11 +29,7 @@
             "protocol": "TCP"
           }
         ],
-        "resources": {
-          "limits": {
-            "cpu": "1"
-          }
-        },
+        "resources": {},
         "volumeMounts": [
           {
             "name": "mongo-disk",
