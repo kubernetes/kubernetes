@@ -25,7 +25,7 @@ calico-network-plugin:
 
 calico-node:
   cmd.run:
-    - name: /home/vagrant/calicoctl node --ip={{ grains.node_ip }}
+    - name: /home/vagrant/calicoctl node --ip={{ grains.node_ip }} --node-image=calico/node:v0.3.2
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
     - require:
