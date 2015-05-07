@@ -21,7 +21,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -37,13 +36,8 @@ import (
 )
 
 // Generate a pod name that is unique among nodes by appending the hostname.
-func generatePodName(name, hostname string) (string, error) {
-	// Hostname can be a fully-qualified domain name. To increase readability,
-	// only append the first chunk. Note that this assumes that no two nodes in
-	// the cluster should have the same host-specific label; this is true if
-	// all nodes have the same domain name.
-	chunks := strings.Split(hostname, ".")
-	return fmt.Sprintf("%s-%s", name, chunks[0]), nil
+func generatePodName(name, hostname string) string {
+	return fmt.Sprintf("%s-%s", name, hostname)
 }
 
 func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) error {
@@ -62,13 +56,10 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) er
 
 	// This is required for backward compatibility, and should be removed once we
 	// completely deprecate ContainerManifest.
-	var err error
 	if len(pod.Name) == 0 {
 		pod.Name = string(pod.UID)
 	}
-	if pod.Name, err = generatePodName(pod.Name, hostname); err != nil {
-		return err
-	}
+	pod.Name = generatePodName(pod.Name, hostname)
 	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
 
 	if pod.Namespace == "" {
