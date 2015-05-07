@@ -165,7 +165,7 @@ class NetworkPlugin():
         auth_data = json.loads(json_string)
         return auth_data['BearerToken']
 
-    def _generate_rules(self, profile_name, ports):
+    def _generate_rules(self):
         """
         Generate the Profile rules that have been specified on the Pod's ports.
 
@@ -179,53 +179,9 @@ class NetworkPlugin():
         :type ports: list
         :return list() rules: the rules to be added to the Profile.
         """
-        inbound_rules = []
-
-        for port in ports:
-            try:
-                # Default to allowing traffic on the port.
-                # Default to TCP, since Felix requires us to specify a proto.
-                # (We'll override it later if the allowFrom specifies a proto).
-                rule = {
-                    'action': 'allow',
-                    'dst_ports': [port['containerPort']],
-                }
-
-                if 'allowFrom' in port:
-                    # Restrict access to specified sources.
-                    for k, v in port['allowFrom'].iteritems():
-                        src_tag = '%s_%s' % (k, v)
-                        src_tag = src_tag.replace('-', '_')
-                        rule['src_tag'] = src_tag
-                        try:
-                            # Felix expects lower-case protocol strings.
-                            rule['protocol'] = port['protocol'].lower()
-                        except KeyError:
-                            # There was no protocol. OK, it's optional.
-                            pass
-                    inbound_rules.append(rule)
-                else:
-                    # Create a TCP and UDP copy of the rule.
-                    tcp_rule = rule.copy()
-                    tcp_rule['protocol'] = 'tcp'
-                    inbound_rules.append(tcp_rule)
-                    udp_rule = rule.copy()
-                    udp_rule['protocol'] = 'udp'
-                    inbound_rules.append(udp_rule)
-            except KeyError:
-                # Skip this rule if it's missing a mandatory field.
-                # Per the Kube data model, containerPort is mandatory,
-                # protocol is not.
-                pass
-
-        # Now add global rules
-        inbound_rules += [
+        inbound_rules = [
             {
                 'action': 'allow',
-                'src_tag': profile_name
-            },
-            {
-                'action': 'deny',
             },
         ]
 
@@ -272,8 +228,7 @@ class NetworkPlugin():
         :type pod: dict
         :return:
         """
-        ports = self._get_pod_ports(pod)
-        rules = self._generate_rules(profile_name, ports)
+        rules = self._generate_rules()
         profile_json = self._generate_profile_json(profile_name, rules)
 
         # Pipe the Profile JSON into the calicoctl command to update the rule.
