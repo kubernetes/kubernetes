@@ -1802,6 +1802,7 @@ func init() {
 			}
 			out.Container = in.Container
 			out.Follow = in.Follow
+			out.Previous = in.Previous
 			return nil
 		},
 		func(in *newer.PodLogOptions, out *PodLogOptions, s conversion.Scope) error {
@@ -1810,6 +1811,7 @@ func init() {
 			}
 			out.Container = in.Container
 			out.Follow = in.Follow
+			out.Previous = in.Previous
 			return nil
 		},
 		func(in *PodProxyOptions, out *newer.PodProxyOptions, s conversion.Scope) error {
