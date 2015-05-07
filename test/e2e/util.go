@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -444,11 +445,14 @@ func DeleteRC(c *client.Client, ns, name string) error {
 	return nil
 }
 
-// Launch a Replication Controller and wait for all pods it spawns
-// to become running. The controller will need to be cleaned up external
-// to this method
+// RunRC Launches (and verifies correctness) of a Replication Controller
+// It will waits for all pods it spawns to become "Running".
+// It's the caller's responsibility to clean up externally (i.e. use the
+// namespace lifecycle for handling cleanup).
 func RunRC(c *client.Client, name string, ns, image string, replicas int) error {
 	var last int
+
+	maxContainerFailures := int(math.Max(1.0, float64(replicas)*.01))
 	current := 0
 	same := 0
 
@@ -517,7 +521,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	}
 	Logf("Controller %s: Found %d pods out of %d", name, current, replicas)
 
-	By("Waiting for each pod to be running")
+	By(fmt.Sprintf("Waiting for all %d replicas to be running with a max container failures of %d", replicas, maxContainerFailures))
 	same = 0
 	last = 0
 	failCount = 10
@@ -539,7 +543,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 		for _, p := range currentPods.Items {
 			if p.Status.Phase == api.PodRunning {
 				current++
-				if err := VerifyContainersAreNotFailed(p); err != nil {
+				if err := VerifyContainersAreNotFailed(p, maxContainerFailures); err != nil {
 					return err
 				}
 			} else if p.Status.Phase == api.PodPending {
@@ -584,7 +588,9 @@ func listPods(c *client.Client, namespace string, label labels.Selector, field f
 	return pods, err
 }
 
-func VerifyContainersAreNotFailed(pod api.Pod) error {
+//VerifyContainersAreNotFailed confirms that containers didn't enter an invalid state.
+//For example, too many restarts, or non nill Termination, and so on.
+func VerifyContainersAreNotFailed(pod api.Pod, restartMax int) error {
 	var errStrings []string
 
 	statuses := pod.Status.ContainerStatuses
@@ -592,8 +598,17 @@ func VerifyContainersAreNotFailed(pod api.Pod) error {
 		return nil
 	} else {
 		for _, status := range statuses {
-			if status.State.Termination != nil || status.LastTerminationState.Termination != nil || status.RestartCount != 0 {
-				errStrings = append(errStrings, fmt.Sprintf("Error: Pod %s (host: %s) : Container %s was found to have terminated %d times", pod.Name, pod.Spec.Host, status.Name, status.RestartCount))
+			var errormsg string = ""
+			if status.State.Termination != nil {
+				errormsg = "status.State.Termination was nil"
+			} else if status.LastTerminationState.Termination != nil {
+				errormsg = "status.LastTerminationState.Termination was nil"
+			} else if status.RestartCount > restartMax {
+				errormsg = fmt.Sprintf("restarted %d times", restartMax)
+			}
+
+			if len(errormsg) != 0 {
+				errStrings = append(errStrings, fmt.Sprintf("Error: Pod %s (host: %s) : Container w/ name %s status was bad (%v).", pod.Name, pod.Spec.Host, status.Name, errormsg))
 			}
 		}
 	}
