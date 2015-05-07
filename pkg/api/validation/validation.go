@@ -465,6 +465,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 		numVolumes++
 		allErrs = append(allErrs, validateGlusterfs(pv.Spec.Glusterfs).Prefix("glusterfs")...)
 	}
+	if pv.Spec.NFS != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateNFS(pv.Spec.NFS).Prefix("nfs")...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.PersistentVolumeSource, "exactly 1 volume type is required"))
 	}

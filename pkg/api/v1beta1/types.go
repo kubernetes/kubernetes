@@ -145,6 +145,8 @@ type PersistentVolumeSource struct {
 	HostPath *HostPathVolumeSource `json:"hostPath" description:"a HostPath provisioned by a developer or tester; for develment use only"`
 	// Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs" description:"Glusterfs volume resource provisioned by an admin"`
+	// NFS represents an NFS mount on the host
+	NFS *NFSVolumeSource `json:"nfs" description:"NFS volume resource provisioned by an admin"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
