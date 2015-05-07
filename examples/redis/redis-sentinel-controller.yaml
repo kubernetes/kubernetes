@@ -1,25 +1,23 @@
-id: redis-sentinel
+apiVersion: v1beta3
 kind: ReplicationController
-apiVersion: v1beta1
-desiredState:
+metadata:
+  name: redis-sentinel
+spec:
   replicas: 1
-  replicaSelector:
+  selector:
     redis-sentinel: "true"
-  podTemplate:
-    desiredState:
-      manifest:
-        version: v1beta1
-        id: redis-slave
-        containers:
-          - name: sentinel
-            image: kubernetes/redis:v1
-            ports:
-              - containerPort: 26379
-            env:
-              - key: SENTINEL
-                value: "true"
-    labels:
-      name: redis-sentinel
-      role: sentinel
-      redis-sentinel: "true"
-
+  template:
+    metadata:
+      labels:
+        name: redis-sentinel
+        redis-sentinel: "true"
+        role: sentinel
+    spec:
+      containers:
+      - name: sentinel
+        image: kubernetes/redis:v1
+        env:
+          - name: SENTINEL
+            value: "true"
+        ports:
+          - containerPort: 26379

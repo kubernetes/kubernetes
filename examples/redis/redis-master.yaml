@@ -1,36 +1,33 @@
-id: redis-master
+apiVersion: v1beta3
 kind: Pod
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    version: v1beta1
-    id: redis-master
-    containers:
-      - name: master
-        image: kubernetes/redis:v1
-        cpu: 1000
-        ports:
-          - containerPort: 6379
-        volumeMounts:
-          - name: data
-            mountPath: /redis-master-data
-        env:
-          - key: MASTER
-            value: "true"
-      - name: sentinel
-        image: kubernetes/redis:v1
-        ports:
-          - containerPort: 26379
-        env:
-          - key: SENTINEL
-            value: "true"
-    volumes:
-      - name: data
-        source:
-          emptyDir: {}
-labels:
-  name: redis
-  role: master
-  redis-sentinel: "true"
-
-    
+metadata:
+  labels:
+    name: redis
+    redis-sentinel: "true"
+    role: master
+  name: redis-master
+spec:
+  containers:
+    - name: master
+      image: kubernetes/redis:v1
+      env:
+        - name: MASTER
+          value: "true"
+      ports:
+        - containerPort: 6379
+      resources:
+        limits:
+          cpu: "1"
+      volumeMounts:
+        - mountPath: /redis-master-data
+          name: data
+    - name: sentinel
+      image: kubernetes/redis:v1
+      env:
+        - name: SENTINEL
+          value: "true"
+      ports:
+        - containerPort: 26379
+  volumes:
+    - name: data
+      emptyDir: {}
