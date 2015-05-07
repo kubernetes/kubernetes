@@ -1,1 +1,0 @@
-go test -test.run NONE -test.bench . -test.benchmem -timeout 1h | tee $1

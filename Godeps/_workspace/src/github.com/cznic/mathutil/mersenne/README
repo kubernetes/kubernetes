@@ -1,2 +1,0 @@
-Install: $ go get github.com/cznic/mathutil/mersenne
-Godocs:  http://gopkgdoc.appspot.com/pkg/github.com/cznic/mathutil/mersenne

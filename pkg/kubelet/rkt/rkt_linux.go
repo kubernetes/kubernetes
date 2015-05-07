@@ -47,9 +47,8 @@ import (
 	appctypes "github.com/appc/spec/schema/types"
 	"github.com/coreos/go-systemd/dbus"
 	"github.com/coreos/go-systemd/unit"
-	"github.com/coreos/rkt/store"
 	"github.com/docker/docker/pkg/parsers"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"github.com/kr/pty"
 )
@@ -356,41 +355,30 @@ func setApp(app *appctypes.App, c *api.Container) error {
 func (r *runtime) makePodManifest(pod *api.Pod, volumeMap map[string]volume.Volume) (*appcschema.PodManifest, error) {
 	manifest := appcschema.BlankPodManifest()
 
-	// Get the image manifests, assume they are already in the cas,
-	// and extract the app field from the image and to be the 'base app'.
-	//
-	// We do this is because we will fully replace the image manifest's app
-	// with the pod manifest's app in rkt runtime. See below:
-	//
-	// https://github.com/coreos/rkt/issues/723.
-	//
-	s, err := store.NewStore(rktDataDir)
-	if err != nil {
-		return nil, fmt.Errorf("cannot open store: %v", err)
-	}
 	for _, c := range pod.Spec.Containers {
-		// Assume we are running docker images for now, see #7203.
-		imageID, err := r.getImageID(c.Image)
+		img, err := r.getImageByName(c.Image)
 		if err != nil {
-			return nil, fmt.Errorf("cannot get image ID for %q: %v", c.Image, err)
+			return nil, err
 		}
-		hash, err := appctypes.NewHash(imageID)
+		hash, err := appctypes.NewHash(img.id)
 		if err != nil {
 			return nil, err
 		}
 
-		im, err := s.GetImageManifest(hash.String())
-		if err != nil {
-			return nil, fmt.Errorf("cannot get image manifest: %v", err)
-		}
-
-		// Override the image manifest's app and store it in the pod manifest.
-		app := im.App
+		// TODO(yifan): Override the image manifest's app and store it in the pod manifest.
+		// We need to get the image manifest. https://github.com/coreos/rkt/issues/850
+		app := &appctypes.App{}
 		if err := setApp(app, &c); err != nil {
 			return nil, err
 		}
+		imageName, err := appctypes.NewACName(img.name)
+		if err != nil {
+			return nil, err
+		}
 		manifest.Apps = append(manifest.Apps, appcschema.RuntimeApp{
-			Name:  im.Name,
+			// TODO(yifan): We should allow app name to be different with
+			// image name. See https://github.com/coreos/rkt/pull/640.
+			Name:  *imageName,
 			Image: appcschema.RuntimeImage{ID: *hash},
 			App:   app,
 		})
@@ -426,22 +414,6 @@ func (r *runtime) makePodManifest(pod *api.Pod, volumeMap map[string]volume.Volu
 	return manifest, nil
 }
 
-// TODO(yifan): Replace with 'rkt images'.
-func (r *runtime) getImageID(imageName string) (string, error) {
-	output, err := r.runCommand("fetch", dockerPrefix+imageName)
-	if err != nil {
-		return "", err
-	}
-	if len(output) == 0 {
-		return "", fmt.Errorf("no result from rkt fetch")
-	}
-	last := output[len(output)-1]
-	if !strings.HasPrefix(last, "sha512-") {
-		return "", fmt.Errorf("unexpected result: %q", last)
-	}
-	return last, nil
-}
-
 func newUnitOption(section, name, value string) *unit.UnitOption {
 	return &unit.UnitOption{Section: section, Name: name, Value: value}
 }
@@ -463,12 +435,12 @@ func (r *runtime) apiPodToruntimePod(uuid string, pod *api.Pod) *kubecontainer.P
 	}
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
-		imageID, err := r.getImageID(c.Image)
+		img, err := r.getImageByName(c.Image)
 		if err != nil {
-			glog.Warningf("rkt: Cannot get image id: %v", err)
+			glog.Warningf("rkt: Cannot get image for %q: %v", c.Image, err)
 		}
 		p.Containers = append(p.Containers, &kubecontainer.Container{
-			ID:      types.UID(buildContainerID(&containerID{uuid, c.Name, imageID})),
+			ID:      types.UID(buildContainerID(&containerID{uuid, c.Name, img.id})),
 			Name:    c.Name,
 			Image:   c.Image,
 			Hash:    hashContainer(c),
@@ -1112,4 +1084,43 @@ func (r *runtime) getPodInfos() (map[string]*podInfo, error) {
 		result[id] = info
 	}
 	return result, nil
+}
+
+// listImages lists all the available appc images on the machine by invoking 'rkt images'.
+func (r *runtime) listImages() ([]image, error) {
+	output, err := r.runCommand("images", "--no-legend=true", "--fields=key,appname")
+	if err != nil {
+		return nil, err
+	}
+	if len(output) == 0 {
+		return nil, nil
+	}
+
+	var images []image
+	for _, line := range output {
+		var img image
+		if err := img.parseString(line); err != nil {
+			glog.Warningf("rkt: Cannot parse image info from %q: %v", line, err)
+			continue
+		}
+		images = append(images, img)
+	}
+	return images, nil
+}
+
+// getImageByName tries to find the image info with the given image name.
+func (r *runtime) getImageByName(name string) (image, error) {
+	// TODO(yifan): Use rkt image cat-file when that is ready:
+	// https://github.com/coreos/rkt/pull/649
+	images, err := r.listImages()
+	if err != nil {
+		return image{}, err
+	}
+
+	for _, img := range images {
+		if img.name == name {
+			return img, nil
+		}
+	}
+	return image{}, fmt.Errorf("cannot find the image %q", name)
 }
