@@ -11,7 +11,7 @@
 {% if pillar['instance_prefix'] is defined -%}
   {% set cluster_name = "--cluster_name=" + pillar['instance_prefix'] -%}
 {% endif -%}
-{% if pillar['cluster_cidr'] is defined -%}
+{% if pillar['cluster_cidr'] is defined and pillar['cluster_cidr'] != "" -%}
   {% set cluster_cidr = "--cluster-cidr=" + pillar['cluster_cidr'] -%}
 {% endif -%}
 {% if pillar['allocate_node_cidrs'] is defined -%}
