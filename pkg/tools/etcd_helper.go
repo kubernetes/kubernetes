@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -55,12 +56,28 @@ var (
 				"because two concurrent threads can miss the cache and generate the same entry twice.",
 		},
 	)
+	etcdRequestLatenciesSummary = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Name: "etcd_request_latencies_summary",
+			Help: "Etcd request latency summary in microseconds for each operation and object type.",
+		},
+		[]string{"operation", "type"},
+	)
 )
+
+func getTypeName(obj interface{}) string {
+	return reflect.TypeOf(obj).String()
+}
+
+func recordEtcdRequestLatency(verb, resource string, startTime time.Time) {
+	etcdRequestLatenciesSummary.WithLabelValues(verb, resource).Observe(float64(time.Since(startTime) / time.Microsecond))
+}
 
 func init() {
 	prometheus.MustRegister(cacheHitCounter)
 	prometheus.MustRegister(cacheMissCounter)
 	prometheus.MustRegister(cacheEntryCounter)
+	prometheus.MustRegister(etcdRequestLatenciesSummary)
 }
 
 // EtcdHelper offers common object marshalling/unmarshalling operations on an etcd client.
@@ -243,7 +260,9 @@ func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
 		return err
 	}
 	key = h.PrefixEtcdKey(key)
+	startTime := time.Now()
 	nodes, index, err := h.listEtcdNode(key)
+	recordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
 	if err != nil {
 		return err
 	}
@@ -266,7 +285,9 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 		return err
 	}
 	key = h.PrefixEtcdKey(key)
+	startTime := time.Now()
 	response, err := h.Client.Get(key, false, false)
+	recordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
 	if err != nil {
 		if IsEtcdNotFound(err) {
 			return nil
@@ -298,7 +319,9 @@ func (h *EtcdHelper) ExtractObj(key string, objPtr runtime.Object, ignoreNotFoun
 }
 
 func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) (body string, modifiedIndex uint64, err error) {
+	startTime := time.Now()
 	response, err := h.Client.Get(key, false, false)
+	recordEtcdRequestLatency("get", getTypeName(objPtr), startTime)
 
 	if err != nil && !IsEtcdNotFound(err) {
 		return "", 0, err
@@ -352,7 +375,9 @@ func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) 
 		}
 	}
 
+	startTime := time.Now()
 	response, err := h.Client.Create(key, string(data), ttl)
+	recordEtcdRequestLatency("create", getTypeName(obj), startTime)
 	if err != nil {
 		return err
 	}
@@ -368,7 +393,9 @@ func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) 
 // Delete removes the specified key.
 func (h *EtcdHelper) Delete(key string, recursive bool) error {
 	key = h.PrefixEtcdKey(key)
+	startTime := time.Now()
 	_, err := h.Client.Delete(key, recursive)
+	recordEtcdRequestLatency("delete", "UNKNOWN", startTime)
 	return err
 }
 
@@ -379,7 +406,9 @@ func (h *EtcdHelper) DeleteObj(key string, out runtime.Object) error {
 		panic("unable to convert output object to pointer")
 	}
 
+	startTime := time.Now()
 	response, err := h.Client.Delete(key, false)
+	recordEtcdRequestLatency("delete", getTypeName(out), startTime)
 	if !IsEtcdNotFound(err) {
 		// if the object that existed prior to the delete is returned by etcd, update out.
 		if err != nil || response.PrevNode != nil {
@@ -404,7 +433,9 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 	if h.Versioner != nil {
 		if version, err := h.Versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 			create = false
+			startTime := time.Now()
 			response, err = h.Client.CompareAndSwap(key, string(data), ttl, "", version)
+			recordEtcdRequestLatency("compareAndSwap", getTypeName(obj), startTime)
 			if err != nil {
 				return err
 			}
@@ -412,7 +443,9 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 	}
 	if create {
 		// Create will fail if a key already exists.
+		startTime := time.Now()
 		response, err = h.Client.Create(key, string(data), ttl)
+		recordEtcdRequestLatency("create", getTypeName(obj), startTime)
 	}
 
 	if err != nil {
@@ -480,7 +513,9 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 
 		// First time this key has been used, try creating new value.
 		if index == 0 {
+			startTime := time.Now()
 			response, err := h.Client.Create(key, string(data), ttl)
+			recordEtcdRequestLatency("create", getTypeName(ptrToType), startTime)
 			if IsEtcdNodeExist(err) {
 				continue
 			}
@@ -492,7 +527,9 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 			return nil
 		}
 
+		startTime := time.Now()
 		response, err := h.Client.CompareAndSwap(key, string(data), ttl, origBody, index)
+		recordEtcdRequestLatency("compareAndSwap", getTypeName(ptrToType), startTime)
 		if IsEtcdTestFailed(err) {
 			continue
 		}
