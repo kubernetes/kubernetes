@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
@@ -96,8 +97,8 @@ func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, podRef *api.Ob
 	return builder, nil
 }
 
-func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (volumeMap, error) {
-	podVolumes := make(volumeMap)
+func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, error) {
+	podVolumes := make(kubecontainer.VolumeMap)
 	for i := range pod.Spec.Volumes {
 		volSpec := &pod.Spec.Volumes[i]
 

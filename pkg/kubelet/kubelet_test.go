@@ -1309,7 +1309,7 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 		},
 	}
 
-	podVolumes := volumeMap{
+	podVolumes := kubecontainer.VolumeMap{
 		"disk":  &stubVolume{"/mnt/disk"},
 		"disk4": &stubVolume{"/mnt/host"},
 		"disk5": &stubVolume{"/var/lib/kubelet/podID/volumes/empty/disk5"},
@@ -4078,7 +4078,7 @@ func TestGetPodCreationFailureReason(t *testing.T) {
 	}
 	pods := []*api.Pod{pod}
 	kubelet.podManager.SetPods(pods)
-	kubelet.volumeManager.SetVolumes(pod.UID, volumeMap{})
+	kubelet.volumeManager.SetVolumes(pod.UID, kubecontainer.VolumeMap{})
 	// TODO: Move this test to dockertools so that we don't have to do the hacky
 	// type assertion here.
 	dm := kubelet.containerRuntime.(*dockertools.DockerManager)

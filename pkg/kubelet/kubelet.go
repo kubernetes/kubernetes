@@ -94,8 +94,6 @@ type SyncHandler interface {
 
 type SourcesReadyFn func() bool
 
-type volumeMap map[string]volume.Volume
-
 // Wait for the container runtime to be up with a timeout.
 func waitUntilRuntimeIsUp(cr kubecontainer.Runtime, timeout time.Duration) error {
 	var err error = nil
@@ -657,7 +655,7 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 }
 
-func makeBinds(container *api.Container, podVolumes volumeMap) (binds []string) {
+func makeBinds(container *api.Container, podVolumes kubecontainer.VolumeMap) (binds []string) {
 	for _, mount := range container.VolumeMounts {
 		vol, ok := podVolumes[mount.Name]
 		if !ok {
