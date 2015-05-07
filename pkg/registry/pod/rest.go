@@ -212,6 +212,9 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 	if opts.Follow {
 		params.Add("follow", "true")
 	}
+	if opts.Previous {
+		params.Add("previous", "true")
+	}
 	loc := &url.URL{
 		Scheme:   nodeScheme,
 		Host:     fmt.Sprintf("%s:%d", nodeHost, nodePort),
