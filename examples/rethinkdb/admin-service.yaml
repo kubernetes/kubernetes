@@ -1,11 +1,15 @@
-apiVersion: v1beta1
-namespace: rethinkdb
+apiVersion: v1beta3
 kind: Service
-id: rethinkdb-admin
-port: 8080
-containerPort: 8080
-labels:
-  db: influxdb
-selector:
-  db: rethinkdb
-  role: admin
+metadata:
+  labels:
+    db: influxdb
+  name: rethinkdb-admin
+  namespace: rethinkdb
+spec:
+  ports:
+   - port: 8080
+     targetPort: 8080
+  createExternalLoadBalancer: true
+  selector:
+    db: rethinkdb
+    role: admin
