@@ -43,12 +43,15 @@ port 9376 and carry a label "app=MyApp".
     "kind": "Service",
     "apiVersion": "v1beta3",
     "metadata": {
-        "name": "my-service"
-    },
-    "selector": {
-        "app": "MyApp"
+        "name": "my-service",
+        "labels": {
+            "environment": "testing"
+        }
     },
     "spec": {
+        "selector": {
+            "app": "MyApp"
+        },
         "ports": [
             {
                 "protocol": "TCP",
@@ -235,9 +238,9 @@ address.
 On cloud providers which support external load balancers, this should be as
 simple as setting the `createExternalLoadBalancer` flag of the `Service` spec
 to `true`.  This sets up a cloud-specific load balancer and populates the
-`publicIPs` field (see below).  Traffic from the external load balancer will be
-directed at the backend `Pods`, though exactly how that works depends on the
-cloud provider.
+`publicIPs` field of the spec (see below).  Traffic from the external load 
+balancer will be directed at the backend `Pods`, though exactly how that works 
+depends on the cloud provider.
 
 For cloud providers which do not support external load balancers, there is
 another approach that is a bit more "do-it-yourself" - the `publicIPs` field.
