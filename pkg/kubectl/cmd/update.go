@@ -93,6 +93,7 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).RequireNamespace().
 		FilenameParam(filenames...).
@@ -106,9 +107,6 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	return r.Visit(func(info *resource.Info) error {
 		data, err := info.Mapping.Codec.Encode(info.Object)
 		if err != nil {
-			return err
-		}
-		if err := schema.ValidateBytes(data); err != nil {
 			return err
 		}
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Update(info.Namespace, info.Name, true, data)
