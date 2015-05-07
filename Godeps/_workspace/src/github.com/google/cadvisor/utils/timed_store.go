@@ -19,10 +19,12 @@ import (
 	"time"
 )
 
-// A time-based buffer for ContainerStats. Holds information for a specific time period.
+// A time-based buffer for ContainerStats.
+// Holds information for a specific time period and/or a max number of items.
 type TimedStore struct {
-	buffer []timedStoreData
-	age    time.Duration
+	buffer   []timedStoreData
+	age      time.Duration
+	maxItems int
 }
 
 type timedStoreData struct {
@@ -31,10 +33,12 @@ type timedStoreData struct {
 }
 
 // Returns a new thread-compatible TimedStore.
-func NewTimedStore(age time.Duration) *TimedStore {
+// A maxItems value of -1 means no limit.
+func NewTimedStore(age time.Duration, maxItems int) *TimedStore {
 	return &TimedStore{
-		buffer: make([]timedStoreData, 0),
-		age:    age,
+		buffer:   make([]timedStoreData, 0),
+		age:      age,
+		maxItems: maxItems,
 	}
 }
 
@@ -47,6 +51,12 @@ func (self *TimedStore) Add(timestamp time.Time, item interface{}) {
 	})
 	if index < len(self.buffer) {
 		self.buffer = self.buffer[index:]
+	}
+
+	// Remove any elements if over our max size.
+	if self.maxItems >= 0 && (len(self.buffer)+1) > self.maxItems {
+		startIndex := len(self.buffer) + 1 - self.maxItems
+		self.buffer = self.buffer[startIndex:]
 	}
 
 	copied := item

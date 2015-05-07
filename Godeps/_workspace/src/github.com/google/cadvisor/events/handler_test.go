@@ -47,7 +47,7 @@ func initializeScenario(t *testing.T) (*events, *Request, *info.Event, *info.Eve
 	fakeEvent := makeEvent(createOldTime(t), "/")
 	fakeEvent2 := makeEvent(time.Now(), "/")
 
-	return NewEventManager(), NewRequest(), fakeEvent, fakeEvent2
+	return NewEventManager(DefaultStoragePolicy()), NewRequest(), fakeEvent, fakeEvent2
 }
 
 func checkNumberOfEvents(t *testing.T, numEventsExpected int, numEventsReceived int) {
@@ -150,8 +150,8 @@ func TestAddEventAddsEventsToEventManager(t *testing.T) {
 
 	myEventHolder.AddEvent(fakeEvent)
 
-	checkNumberOfEvents(t, 1, myEventHolder.eventList.Len())
-	ensureProperEventReturned(t, fakeEvent, myEventHolder.eventList[0])
+	checkNumberOfEvents(t, 1, len(myEventHolder.eventStore))
+	ensureProperEventReturned(t, fakeEvent, myEventHolder.eventStore[info.EventOom].Get(0).(*info.Event))
 }
 
 func TestGetEventsForOneEvent(t *testing.T) {
@@ -164,7 +164,7 @@ func TestGetEventsForOneEvent(t *testing.T) {
 
 	receivedEvents, err := myEventHolder.GetEvents(myRequest)
 	assert.Nil(t, err)
-	checkNumberOfEvents(t, 1, receivedEvents.Len())
+	checkNumberOfEvents(t, 1, len(receivedEvents))
 	ensureProperEventReturned(t, fakeEvent2, receivedEvents[0])
 }
 
@@ -180,7 +180,7 @@ func TestGetEventsForTimePeriod(t *testing.T) {
 	receivedEvents, err := myEventHolder.GetEvents(myRequest)
 	assert.Nil(t, err)
 
-	checkNumberOfEvents(t, 1, receivedEvents.Len())
+	checkNumberOfEvents(t, 1, len(receivedEvents))
 	ensureProperEventReturned(t, fakeEvent, receivedEvents[0])
 }
 
@@ -192,5 +192,5 @@ func TestGetEventsForNoTypeRequested(t *testing.T) {
 
 	receivedEvents, err := myEventHolder.GetEvents(myRequest)
 	assert.Nil(t, err)
-	checkNumberOfEvents(t, 0, receivedEvents.Len())
+	checkNumberOfEvents(t, 0, len(receivedEvents))
 }

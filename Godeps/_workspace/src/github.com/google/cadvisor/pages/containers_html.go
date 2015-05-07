@@ -19,23 +19,23 @@ const containersHtmlTemplate = `
   <head>
     <title>cAdvisor - {{.DisplayName}}</title>
     <!-- Latest compiled and minified CSS -->
-    <link rel="stylesheet" href="/static/bootstrap-3.1.1.min.css">
+    <link rel="stylesheet" href="{{.Root}}static/bootstrap-3.1.1.min.css">
 
     <!-- Optional theme -->
-    <link rel="stylesheet" href="/static/bootstrap-theme-3.1.1.min.css">
+    <link rel="stylesheet" href="{{.Root}}static/bootstrap-theme-3.1.1.min.css">
 
-    <link rel="stylesheet" href="/static/containers.css">
+    <link rel="stylesheet" href="{{.Root}}static/containers.css">
 
     <!-- Latest compiled and minified JavaScript -->
-    <script src="/static/jquery-1.10.2.min.js"></script>
-    <script src="/static/bootstrap-3.1.1.min.js"></script>
-    <script type="text/javascript" src="/static/google-jsapi.js"></script>
+    <script src="{{.Root}}static/jquery-1.10.2.min.js"></script>
+    <script src="{{.Root}}static/bootstrap-3.1.1.min.js"></script>
+    <script type="text/javascript" src="{{.Root}}static/google-jsapi.js"></script>
 
-    <script type="text/javascript" src="/static/containers.js"></script>
+    <script type="text/javascript" src="{{.Root}}static/containers.js"></script>
   </head>
   <body>
     <div class="container theme-showcase" >
-      <a href="/" class="col-sm-12" id="logo">
+      <a href="{{.Root}}" class="col-sm-12" id="logo">
       </a>
       <div class="col-sm-12">
 	<div class="page-header">
@@ -49,7 +49,7 @@ const containersHtmlTemplate = `
       </div>
       {{if .IsRoot}}
       <div class="col-sm-12">
-        <h4><a href="/docker">Docker Containers</a></h4>
+        <h4><a href="../docker">Docker Containers</a></h4>
       </div>
       {{end}}
       {{if .Subcontainers}}
@@ -179,7 +179,7 @@ const containersHtmlTemplate = `
       {{end}}
     </div>
     <script type="text/javascript">
-      startPage({{.ContainerName}}, {{.CpuAvailable}}, {{.MemoryAvailable}});
+      startPage({{.ContainerName}}, {{.CpuAvailable}}, {{.MemoryAvailable}}, {{.Root}});
     </script>
   </body>
 </html>

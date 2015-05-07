@@ -1518,21 +1518,21 @@ function drawGauges(elementId, gauges) {
 }
 
 // Get the machine info.
-function getMachineInfo(callback) {
-	$.getJSON("/api/v1.0/machine", function(data) {
+function getMachineInfo(rootDir, callback) {
+	$.getJSON(rootDir + "api/v1.0/machine", function(data) {
 		callback(data);
 	});
 }
 
 // Get the container stats for the specified container.
-function getStats(containerName, callback) {
+function getStats(rootDir, containerName, callback) {
 	// Request 60s of container history and no samples.
 	var request = JSON.stringify({
                 // Update main.statsRequestedByUI while updating "num_stats" here.
 		"num_stats": 60,
 		"num_samples": 0
 	});
-	$.post("/api/v1.0/containers" + containerName, request, function(data) {
+	$.post(rootDir + "api/v1.0/containers" + containerName, request, function(data) {
 		callback(data);
 	}, "json");
 }
@@ -1891,7 +1891,7 @@ function drawCharts(machineInfo, containerInfo) {
 }
 
 // Executed when the page finishes loading.
-function startPage(containerName, hasCpu, hasMemory) {
+function startPage(containerName, hasCpu, hasMemory, rootDir) {
 	// Don't fetch data if we don't have any resource.
 	if (!hasCpu && !hasMemory) {
 		return;
@@ -1902,9 +1902,9 @@ function startPage(containerName, hasCpu, hasMemory) {
 	window.cadvisor.firstRun = true;
 
 	// Get machine info, then get the stats every 1s.
-	getMachineInfo(function(machineInfo) {
+	getMachineInfo(rootDir, function(machineInfo) {
 		setInterval(function() {
-			getStats(containerName, function(containerInfo){
+			getStats(rootDir, containerName, function(containerInfo){
 				if (window.cadvisor.firstRun && containerInfo.spec.has_filesystem) {
 					window.cadvisor.firstRun = false;
 					startFileSystemUsage("filesystem-usage", machineInfo, containerInfo);

@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/golang/glog"
+	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/docker"
 	"github.com/google/cadvisor/container/raw"
@@ -42,6 +44,8 @@ import (
 var globalHousekeepingInterval = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
 var logCadvisorUsage = flag.Bool("log_cadvisor_usage", false, "Whether to log the usage of the cAdvisor container")
 var enableLoadReader = flag.Bool("enable_load_reader", false, "Whether to enable cpu load reader")
+var eventStorageAgeLimit = flag.String("event_storage_age_limit", "default=24h", "Max length of time for which to store events (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is a duration. Default is applied to all non-specified event types")
+var eventStorageEventLimit = flag.String("event_storage_event_limit", "default=100000", "Max number of events to store (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is an integer. Default is applied to all non-specified event types")
 
 // The Manager interface defines operations for starting a manager and getting
 // container and machine information.
@@ -72,6 +76,9 @@ type Manager interface {
 
 	// Get info for all requested containers based on the request options.
 	GetRequestedContainersInfo(containerName string, options v2.RequestOptions) (map[string]*info.ContainerInfo, error)
+
+	// Returns true if the named container exists.
+	Exists(containerName string) bool
 
 	// Get information about the machine.
 	GetMachineInfo() (*info.MachineInfo, error)
@@ -133,7 +140,7 @@ func New(memoryStorage *memory.InMemoryStorage, sysfs sysfs.SysFs) (Manager, err
 	newManager.versionInfo = *versionInfo
 	glog.Infof("Version: %+v", newManager.versionInfo)
 
-	newManager.eventHandler = events.NewEventManager()
+	newManager.eventHandler = events.NewEventManager(parseEventsStoragePolicy())
 
 	// Register Docker container factory.
 	err = docker.Register(newManager, fsInfo)
@@ -618,14 +625,39 @@ func (m *manager) GetVersionInfo() (*info.VersionInfo, error) {
 	return &m.versionInfo, nil
 }
 
+func (m *manager) Exists(containerName string) bool {
+	m.containersLock.Lock()
+	defer m.containersLock.Unlock()
+
+	namespacedName := namespacedContainerName{
+		Name: containerName,
+	}
+
+	_, ok := m.containers[namespacedName]
+	if ok {
+		return true
+	}
+	return false
+}
+
 // Create a container.
 func (m *manager) createContainer(containerName string) error {
-	handler, err := container.NewContainerHandler(containerName)
+	handler, accept, err := container.NewContainerHandler(containerName)
+	if err != nil {
+		return err
+	}
+	if !accept {
+		// ignoring this container.
+		glog.V(4).Infof("ignoring container %q", containerName)
+		return nil
+	}
+	// TODO(vmarmol): Register collectors.
+	collectorManager, err := collector.NewCollectorManager()
 	if err != nil {
 		return err
 	}
 	logUsage := *logCadvisorUsage && containerName == m.cadvisorContainer
-	cont, err := newContainerData(containerName, m.memoryStorage, handler, m.loadReader, logUsage)
+	cont, err := newContainerData(containerName, m.memoryStorage, handler, m.loadReader, logUsage, collectorManager)
 	if err != nil {
 		return err
 	}
@@ -659,33 +691,26 @@ func (m *manager) createContainer(containerName string) error {
 	if alreadyExists {
 		return nil
 	}
-	glog.V(2).Infof("Added container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
+	glog.V(3).Infof("Added container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
 
 	contSpec, err := cont.handler.GetSpec()
 	if err != nil {
 		return err
 	}
 
-	if contSpec.CreationTime.After(m.startupTime) {
-		contRef, err := cont.handler.ContainerReference()
-		if err != nil {
-			return err
-		}
+	contRef, err := cont.handler.ContainerReference()
+	if err != nil {
+		return err
+	}
 
-		newEvent := &info.Event{
-			ContainerName: contRef.Name,
-			Timestamp:     contSpec.CreationTime,
-			EventType:     info.EventContainerCreation,
-			EventData: info.EventData{
-				Created: &info.CreatedEventData{
-					Spec: contSpec,
-				},
-			},
-		}
-		err = m.eventHandler.AddEvent(newEvent)
-		if err != nil {
-			return err
-		}
+	newEvent := &info.Event{
+		ContainerName: contRef.Name,
+		Timestamp:     contSpec.CreationTime,
+		EventType:     info.EventContainerCreation,
+	}
+	err = m.eventHandler.AddEvent(newEvent)
+	if err != nil {
+		return err
 	}
 
 	// Start the container's housekeeping.
@@ -721,7 +746,7 @@ func (m *manager) destroyContainer(containerName string) error {
 			Name:      alias,
 		})
 	}
-	glog.V(2).Infof("Destroyed container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
+	glog.V(3).Infof("Destroyed container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
 
 	contRef, err := cont.handler.ContainerReference()
 	if err != nil {
@@ -924,4 +949,51 @@ func (self *manager) GetPastEvents(request *events.Request) ([]*info.Event, erro
 // called by the api when a client is no longer listening to the channel
 func (self *manager) CloseEventChannel(watch_id int) {
 	self.eventHandler.StopWatch(watch_id)
+}
+
+// Parses the events StoragePolicy from the flags.
+func parseEventsStoragePolicy() events.StoragePolicy {
+	policy := events.DefaultStoragePolicy()
+
+	// Parse max age.
+	parts := strings.Split(*eventStorageAgeLimit, ",")
+	for _, part := range parts {
+		items := strings.Split(part, "=")
+		if len(items) != 2 {
+			glog.Warningf("Unknown event storage policy %q when parsing max age", part)
+			continue
+		}
+		dur, err := time.ParseDuration(items[1])
+		if err != nil {
+			glog.Warningf("Unable to parse event max age duration %q: %v", items[1], err)
+			continue
+		}
+		if items[0] == "default" {
+			policy.DefaultMaxAge = dur
+			continue
+		}
+		policy.PerTypeMaxAge[info.EventType(items[0])] = dur
+	}
+
+	// Parse max number.
+	parts = strings.Split(*eventStorageEventLimit, ",")
+	for _, part := range parts {
+		items := strings.Split(part, "=")
+		if len(items) != 2 {
+			glog.Warningf("Unknown event storage policy %q when parsing max event limit", part)
+			continue
+		}
+		val, err := strconv.Atoi(items[1])
+		if err != nil {
+			glog.Warningf("Unable to parse integer from %q: %v", items[1], err)
+			continue
+		}
+		if items[0] == "default" {
+			policy.DefaultMaxNumEvents = val
+			continue
+		}
+		policy.PerTypeMaxNumEvents[info.EventType(items[0])] = val
+	}
+
+	return policy
 }

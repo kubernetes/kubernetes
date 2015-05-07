@@ -43,6 +43,9 @@ type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
 
+	// Metadata labels associated with this container.
+	Labels map[string]string `json:"labels,omitempty"`
+
 	HasCpu bool    `json:"has_cpu"`
 	Cpu    CpuSpec `json:"cpu,omitempty"`
 
@@ -505,17 +508,8 @@ const (
 
 // Extra information about an event. Only one type will be set.
 type EventData struct {
-	// Information about a container creation event.
-	Created *CreatedEventData `json:"created,omitempty"`
-
 	// Information about an OOM kill event.
 	OomKill *OomKillEventData `json:"oom,omitempty"`
-}
-
-// Information related to a container creation event.
-type CreatedEventData struct {
-	// Spec of the container at creation.
-	Spec ContainerSpec `json:"spec"`
 }
 
 // Information related to an OOM kill instance
