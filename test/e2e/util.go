@@ -957,7 +957,7 @@ type LatencyMetric struct {
 }
 
 func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {
-	body, err := c.Get().AbsPath("/metrics").DoRaw()
+	body, err := getMetrics(c)
 	if err != nil {
 		return nil, err
 	}
