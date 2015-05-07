@@ -1,3 +1,5 @@
+{% set num_cpus = salt['grains.get']('num_cpus', '') %}
+
 {
 "apiVersion": "v1beta3",
 "kind": "Pod",
@@ -29,6 +31,10 @@
       { "name": "varetcd",
         "mountPath": "/var/etcd",
         "readOnly": false}
+        ],
+    "env": [
+      { "name": "GOMAXPROCS",
+        "value": "{{num_cpus}}"}
         ]
        }
 ],
