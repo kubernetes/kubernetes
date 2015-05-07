@@ -2245,6 +2245,14 @@ func convert_v1beta3_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Pe
 	} else {
 		out.HostPath = nil
 	}
+	if in.ISCSI != nil {
+		out.ISCSI = new(newer.ISCSIVolumeSource)
+		if err := convert_v1beta3_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in.ISCSI, out.ISCSI, s); err != nil {
+			return err
+		}
+	} else {
+		out.ISCSI = nil
+	}
 	if in.Glusterfs != nil {
 		out.Glusterfs = new(newer.GlusterfsVolumeSource)
 		if err := convert_v1beta3_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource(in.Glusterfs, out.Glusterfs, s); err != nil {
@@ -2291,6 +2299,14 @@ func convert_api_PersistentVolumeSource_To_v1beta3_PersistentVolumeSource(in *ne
 		}
 	} else {
 		out.HostPath = nil
+	}
+	if in.ISCSI != nil {
+		out.ISCSI = new(ISCSIVolumeSource)
+		if err := convert_api_ISCSIVolumeSource_To_v1beta3_ISCSIVolumeSource(in.ISCSI, out.ISCSI, s); err != nil {
+			return err
+		}
+	} else {
+		out.ISCSI = nil
 	}
 	if in.Glusterfs != nil {
 		out.Glusterfs = new(GlusterfsVolumeSource)
