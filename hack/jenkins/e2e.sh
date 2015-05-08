@@ -130,6 +130,31 @@ else
     gsutil -m cp gs://kubernetes-release/${bucket}/${githash}/kubernetes.tar.gz gs://kubernetes-release/${bucket}/${githash}/kubernetes-test.tar.gz .
 fi
 
+if [[ ! "${CIRCLECI:-}" == "true" ]]; then
+  # Copy GCE keys so we don't keep cycling them.
+  # To set this up, you must know the <project>, <zone>, and <instance> that
+  # on which your jenkins jobs are running. Then do:
+  #
+  # # Get into the instance.
+  # $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
+  #
+  # # Generate a key by ssh'ing into itself, then exit.
+  # $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
+  # $ ^D
+  #
+  # # Copy the keys to the desired location, e.g. /var/lib/jenkins/gce_keys/
+  # $ sudo mkdir -p /var/lib/jenkins/gce_keys/
+  # $ sudo cp ~/.ssh/google_compute_engine /var/lib/jenkins/gce_keys/
+  # $ sudo cp ~/.ssh/google_compute_engine.pub /var/lib/jenkins/gce_keys/
+  #
+  # Move the permissions to jenkins.
+  # $ sudo chown -R jenkins /var/lib/jenkins/gce_keys/
+  # $ sudo chgrp -R jenkins /var/lib/jenkins/gce_keys/
+  mkdir -p ${WORKSPACE}/.ssh/
+  cp /var/lib/jenkins/gce_keys/google_compute_engine ${WORKSPACE}/.ssh/
+  cp /var/lib/jenkins/gce_keys/google_compute_engine.pub ${WORKSPACE}/.ssh/
+fi
+
 md5sum kubernetes*.tar.gz
 tar -xzf kubernetes.tar.gz
 tar -xzf kubernetes-test.tar.gz
