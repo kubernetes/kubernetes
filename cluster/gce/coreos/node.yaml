@@ -17,7 +17,7 @@ write_files:
       source /etc/kube-env
 
       /usr/bin/mkdir -p /var/lib/kubelet
-      /bin/echo  {\"BearerToken\": \"${KUBE_BEARER_TOKEN}\", \"Insecure\": true } > /var/lib/kubelet/kubernetes_auth
+      /bin/echo  {\"BearerToken\": \"${KUBELET_TOKEN}\", \"Insecure\": true } > /var/lib/kubelet/kubernetes_auth
   - path: /run/config-kube-proxy.sh
     permissions: "0755"
     content: |
