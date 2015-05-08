@@ -17,7 +17,6 @@ limitations under the License.
 package gce_cloud
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -42,10 +41,6 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/cloud/compute/metadata"
 )
-
-var ErrMetadataConflict = errors.New("Metadata already set at the same key")
-
-const podCIDRMetadataKey string = "node-ip-range"
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
@@ -562,44 +557,23 @@ func getMetadataValue(metadata *compute.Metadata, key string) (string, bool) {
 
 func (gce *GCECloud) Configure(name string, spec *api.NodeSpec) error {
 	instanceName := canonicalizeInstanceName(name)
-	instance, err := gce.service.Instances.Get(gce.projectID, gce.zone, instanceName).Do()
-	if err != nil {
-		return err
-	}
-	if currentValue, ok := getMetadataValue(instance.Metadata, podCIDRMetadataKey); ok {
-		if currentValue == spec.PodCIDR {
-			// IP range already set to proper value.
-			return nil
-		}
-		return ErrMetadataConflict
-	}
-	// We are setting the metadata, so they can be picked-up by the configure-vm.sh script to start docker with the given CIDR for Pods.
-	instance.Metadata.Items = append(instance.Metadata.Items,
-		&compute.MetadataItems{
-			Key:   podCIDRMetadataKey,
-			Value: spec.PodCIDR,
-		})
-	setMetadataCall := gce.service.Instances.SetMetadata(gce.projectID, gce.zone, instanceName, instance.Metadata)
-	setMetadataOp, err := setMetadataCall.Do()
-	if err != nil {
-		return err
-	}
-	err = gce.waitForZoneOp(setMetadataOp)
-	if err != nil {
-		return err
-	}
-	insertCall := gce.service.Routes.Insert(gce.projectID, &compute.Route{
+	insertOp, err := gce.service.Routes.Insert(gce.projectID, &compute.Route{
 		Name:            instanceName,
 		DestRange:       spec.PodCIDR,
 		NextHopInstance: fmt.Sprintf("zones/%s/instances/%s", gce.zone, instanceName),
 		Network:         fmt.Sprintf("global/networks/%s", gce.networkName),
 		Priority:        1000,
-	})
-	insertOp, err := insertCall.Do()
+	}).Do()
 	if err != nil {
 		return err
 	}
-	return gce.waitForGlobalOp(insertOp)
+	if err := gce.waitForGlobalOp(insertOp); err != nil {
+		if gapiErr, ok := err.(*googleapi.Error); ok && gapiErr.Code == http.StatusConflict {
+			// TODO (cjcullen): Make this actually check the route is correct.
+			return nil
+		}
+	}
+	return err
 }
 
 func (gce *GCECloud) Release(name string) error {

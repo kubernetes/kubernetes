@@ -1555,6 +1555,23 @@ func (kl *Kubelet) updateRuntimeUp() {
 	}
 }
 
+func (kl *Kubelet) reconcileCbr0(podCIDR string) error {
+	if podCIDR == "" {
+		glog.V(5).Info("PodCIDR not set. Will not configure cbr0.")
+		return nil
+	}
+	_, cidr, err := net.ParseCIDR(podCIDR)
+	if err != nil {
+		return err
+	}
+	// Set cbr0 interface address to first address in IPNet
+	cidr.IP.To4()[3] += 1
+	if err := ensureCbr0(cidr); err != nil {
+		return err
+	}
+	return nil
+}
+
 // updateNodeStatus updates node status to master with retries.
 func (kl *Kubelet) updateNodeStatus() error {
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
@@ -1597,6 +1614,10 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	}
 	if node == nil {
 		return fmt.Errorf("no node instance returned for %q", kl.hostname)
+	}
+
+	if err := kl.reconcileCbr0(node.Spec.PodCIDR); err != nil {
+		glog.Errorf("Error configuring cbr0: %v", err)
 	}
 
 	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
