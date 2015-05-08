@@ -29,6 +29,7 @@ class NetworkPlugin():
         # Calicoctl only
         self.pod_name = args[3].replace('-', '_')
         self.docker_id = args[4]
+
         print('Configuring docker container %s' % self.docker_id)
 
         try:
@@ -38,6 +39,13 @@ class NetworkPlugin():
             print('Error code %d creating pod networking: %s\n%s' % (
                 e.returncode, e.output, e))
             sys.exit(1)
+
+    def delete(self, args):
+        """Cleanup after a pod."""
+        self.docker_id = args[4]
+
+        # Remove the profile for the workload.
+        calicoctl('container', 'remove', self.docker_id)
 
     def _configure_interface(self):
         """Configure the Calico interface for a pod."""
@@ -268,10 +276,12 @@ if __name__ == '__main__':
     print('Args: %s' % sys.argv)
     mode = sys.argv[1]
 
+
     if mode == 'init':
         print('No initialization work to perform')
     elif mode == 'setup':
-        print('Executing Calico pod-creation plugin')
+        print('Executing Calico pod-creation hook')
         NetworkPlugin().create(sys.argv)
     elif mode == 'teardown':
-        print('No pod-deletion work to perform')
+        print('Executing Calico pod-deletion hook')
+        NetworkPlugin().delete(sys.argv)
