@@ -691,6 +691,9 @@ var _ ScopeNamer = legacyScopeNaming{}
 
 // Namespace returns the namespace from the query or the default.
 func (n legacyScopeNaming) Namespace(req *restful.Request) (namespace string, err error) {
+	if n.scope.Name() == meta.RESTScopeNameRoot {
+		return api.NamespaceNone, nil
+	}
 	values, ok := req.Request.URL.Query()[n.scope.ParamName()]
 	if !ok || len(values) == 0 {
 		// legacy behavior
