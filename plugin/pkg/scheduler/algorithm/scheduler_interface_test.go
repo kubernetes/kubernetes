@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package algorithm
 
 import (
 	"testing"
@@ -26,7 +26,7 @@ import (
 
 type schedulerTester struct {
 	t            *testing.T
-	scheduler    Scheduler
+	scheduler    ScheduleAlgorithm
 	minionLister MinionLister
 }
 
@@ -56,22 +56,5 @@ func (st *schedulerTester) expectFailure(pod *api.Pod) {
 	_, err := st.scheduler.Schedule(pod, st.minionLister)
 	if err == nil {
 		st.t.Error("Unexpected non-error")
-	}
-}
-
-func newPod(host string, hostPorts ...int) *api.Pod {
-	networkPorts := []api.ContainerPort{}
-	for _, port := range hostPorts {
-		networkPorts = append(networkPorts, api.ContainerPort{HostPort: port})
-	}
-	return &api.Pod{
-		Spec: api.PodSpec{
-			Host: host,
-			Containers: []api.Container{
-				{
-					Ports: networkPorts,
-				},
-			},
-		},
 	}
 }

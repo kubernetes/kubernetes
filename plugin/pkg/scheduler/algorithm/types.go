@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package algorithm
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -25,8 +25,8 @@ type FitPredicate func(pod *api.Pod, existingPods []*api.Pod, node string) (bool
 
 // HostPriority represents the priority of scheduling to a particular host, lower priority is better.
 type HostPriority struct {
-	host  string
-	score int
+	Host  string
+	Score int
 }
 
 type HostPriorityList []HostPriority
@@ -36,10 +36,10 @@ func (h HostPriorityList) Len() int {
 }
 
 func (h HostPriorityList) Less(i, j int) bool {
-	if h[i].score == h[j].score {
-		return h[i].host < h[j].host
+	if h[i].Score == h[j].Score {
+		return h[i].Host < h[j].Host
 	}
-	return h[i].score < h[j].score
+	return h[i].Score < h[j].Score
 }
 
 func (h HostPriorityList) Swap(i, j int) {

@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package priorities
 
 import (
 	"math"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"github.com/golang/glog"
 )
 
@@ -39,7 +41,7 @@ func calculateScore(requested, capacity int64, node string) int {
 
 // Calculate the occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
-func calculateOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) HostPriority {
+func calculateOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
 	for _, existingPod := range pods {
@@ -68,9 +70,9 @@ func calculateOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) HostPriori
 		cpuScore, memoryScore,
 	)
 
-	return HostPriority{
-		host:  node.Name,
-		score: int((cpuScore + memoryScore) / 2),
+	return algorithm.HostPriority{
+		Host:  node.Name,
+		Score: int((cpuScore + memoryScore) / 2),
 	}
 }
 
@@ -78,14 +80,14 @@ func calculateOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) HostPriori
 // It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 // based on the minimum of the average of the fraction of requested to capacity.
 // Details: (Sum(requested cpu) / Capacity + Sum(requested memory) / Capacity) * 50
-func LeastRequestedPriority(pod *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+func LeastRequestedPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	if err != nil {
-		return HostPriorityList{}, err
+		return algorithm.HostPriorityList{}, err
 	}
-	podsToMachines, err := MapPodsToMachines(podLister)
+	podsToMachines, err := predicates.MapPodsToMachines(podLister)
 
-	list := HostPriorityList{}
+	list := algorithm.HostPriorityList{}
 	for _, node := range nodes.Items {
 		list = append(list, calculateOccupancy(pod, node, podsToMachines[node.Name]))
 	}
@@ -97,7 +99,7 @@ type NodeLabelPrioritizer struct {
 	presence bool
 }
 
-func NewNodeLabelPriority(label string, presence bool) PriorityFunction {
+func NewNodeLabelPriority(label string, presence bool) algorithm.PriorityFunction {
 	labelPrioritizer := &NodeLabelPrioritizer{
 		label:    label,
 		presence: presence,
@@ -108,7 +110,7 @@ func NewNodeLabelPriority(label string, presence bool) PriorityFunction {
 // CalculateNodeLabelPriority checks whether a particular label exists on a minion or not, regardless of its value.
 // If presence is true, prioritizes minions that have the specified label, regardless of value.
 // If presence is false, prioritizes minions that do not have the specified label.
-func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
 	var score int
 	minions, err := minionLister.List()
 	if err != nil {
@@ -121,7 +123,7 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podListe
 		labeledMinions[minion.Name] = (exists && n.presence) || (!exists && !n.presence)
 	}
 
-	result := []HostPriority{}
+	result := []algorithm.HostPriority{}
 	//score int - scale of 0-10
 	// 0 being the lowest priority and 10 being the highest
 	for minionName, success := range labeledMinions {
@@ -130,7 +132,7 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podListe
 		} else {
 			score = 0
 		}
-		result = append(result, HostPriority{host: minionName, score: score})
+		result = append(result, algorithm.HostPriority{Host: minionName, Score: score})
 	}
 	return result, nil
 }
@@ -141,21 +143,21 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podListe
 // close the two metrics are to each other.
 // Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
 // "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-func BalancedResourceAllocation(pod *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+func BalancedResourceAllocation(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	if err != nil {
-		return HostPriorityList{}, err
+		return algorithm.HostPriorityList{}, err
 	}
-	podsToMachines, err := MapPodsToMachines(podLister)
+	podsToMachines, err := predicates.MapPodsToMachines(podLister)
 
-	list := HostPriorityList{}
+	list := algorithm.HostPriorityList{}
 	for _, node := range nodes.Items {
 		list = append(list, calculateBalancedResourceAllocation(pod, node, podsToMachines[node.Name]))
 	}
 	return list, nil
 }
 
-func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*api.Pod) HostPriority {
+func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
 	score := int(0)
@@ -196,9 +198,9 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 		score,
 	)
 
-	return HostPriority{
-		host:  node.Name,
-		score: score,
+	return algorithm.HostPriority{
+		Host:  node.Name,
+		Score: score,
 	}
 }
 

@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package scheduler contains a generic Scheduler interface and several
 // implementations.
-package scheduler
+package algorithm

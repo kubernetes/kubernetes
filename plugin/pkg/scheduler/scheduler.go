@@ -21,9 +21,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	// TODO: move everything from pkg/scheduler into this package. Remove references from registry.
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/metrics"
 
 	"github.com/golang/glog"
@@ -70,8 +69,8 @@ type Config struct {
 	// It is expected that changes made via modeler will be observed
 	// by MinionLister and Algorithm.
 	Modeler      SystemModeler
-	MinionLister scheduler.MinionLister
-	Algorithm    scheduler.Scheduler
+	MinionLister algorithm.MinionLister
+	Algorithm    algorithm.ScheduleAlgorithm
 	Binder       Binder
 
 	// NextPod should be a function that blocks until the next pod

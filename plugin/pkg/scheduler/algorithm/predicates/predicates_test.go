@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package predicates
 
 import (
 	"fmt"
@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 type FakeNodeInfo api.Node
@@ -176,6 +177,23 @@ func TestPodFitsHost(t *testing.T) {
 		if result != test.fits {
 			t.Errorf("unexpected difference for %s: got: %v expected %v", test.test, test.fits, result)
 		}
+	}
+}
+
+func newPod(host string, hostPorts ...int) *api.Pod {
+	networkPorts := []api.ContainerPort{}
+	for _, port := range hostPorts {
+		networkPorts = append(networkPorts, api.ContainerPort{HostPort: port})
+	}
+	return &api.Pod{
+		Spec: api.PodSpec{
+			Host: host,
+			Containers: []api.Container{
+				{
+					Ports: networkPorts,
+				},
+			},
+		},
 	}
 }
 
@@ -641,7 +659,7 @@ func TestServiceAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		nodes := []api.Node{node1, node2, node3, node4, node5}
-		serviceAffinity := ServiceAffinity{FakePodLister(test.pods), FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
+		serviceAffinity := ServiceAffinity{algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
 		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, []*api.Pod{}, test.node)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
