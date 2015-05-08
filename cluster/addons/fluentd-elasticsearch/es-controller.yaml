@@ -6,7 +6,7 @@ metadata:
     kubernetes.io/cluster-service: "true"
   name: elasticsearch-logging
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     name: elasticsearch-logging
   template:
@@ -16,7 +16,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/elasticsearch:1.0
+      - image: gcr.io/google_containers/elasticsearch:1.2
         name: elasticsearch-logging
         ports:
         - containerPort: 9200
@@ -26,8 +26,10 @@ spec:
           name: es-transport-port
           protocol: TCP
         volumeMounts:
-        - mountPath: /data
-          name: es-persistent-storage
+        - name: token-system-logging
+          mountPath: /etc/token-system-logging
+          readOnly: true
       volumes:
-      - name: es-persistent-storage
-        emptyDir: {}
+      - name: token-system-logging
+        secret:
+          secretName: token-system-logging
