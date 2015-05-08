@@ -178,7 +178,13 @@ func (v *OVirtCloud) ExternalID(name string) (string, error) {
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (v *OVirtCloud) InstanceID(name string) (string, error) {
-	return "", nil
+	instance, err := v.fetchInstance(name)
+	if err != nil {
+		return "", err
+	}
+	// TODO: define a way to identify the provider instance to complete
+	// the format <provider_instance_id>/<instance_id>.
+	return "/" + instance.UUID, err
 }
 
 func getInstancesFromXml(body io.Reader) (OVirtInstanceMap, error) {
