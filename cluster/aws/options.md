@@ -37,3 +37,15 @@ For production usage, we recommend bigger instances, for example:
 export MASTER_SIZE=c4.large
 export MINION_SIZE=r3.large
 ```
+
+**KUBE_ENABLE_MINION_PUBLIC_IP**
+
+Should a public IP automatically assigned to the minions? "true" or "false"  
+Defaults to: "true"
+
+Please note: Do not set this to "false" unless you...
+
+- ... already configured a NAT instance in the kubernetes VPC that will enable internet access for the new minions
+- ... already configured a route for "0.0.0.0/0" to this NAT instance
+- ... already configured a route for "YOUR_IP/32" to an AWS internet gateway (for the master instance to reach your
+  client directly during setup)
