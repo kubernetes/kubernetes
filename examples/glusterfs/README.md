@@ -1,5 +1,3 @@
-### Warning: Only use this plugin  in Read Only mode. There is currently [a critical bug](https://github.com/GoogleCloudPlatform/kubernetes/issues/7317) that deletes your data when used in Read/Write mode.
-
 ## Glusterfs
 
 [Glusterfs](http://www.gluster.org) is an open source scale-out filesystem. These examples provide information about how to allow containers use Glusterfs volumes.
