@@ -539,7 +539,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "CONNECT":
 			for _, method := range connecter.ConnectMethods() {
 				route := ws.Method(method).Path(action.Path).
-					To(ConnectResource(connecter, reqScope, connectOptionsKind, connectSubpath, connectSubpathKey)).
+					To(ConnectResource(connecter, reqScope, admit, connectOptionsKind, path, connectSubpath, connectSubpathKey)).
 					Filter(m).
 					Doc("connect " + method + " requests to " + kind).
 					Operation("connect" + method + kind).
