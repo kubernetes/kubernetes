@@ -28,7 +28,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
@@ -74,59 +73,6 @@ var testContext TestContextType
 type ContainerFailures struct {
 	status   *api.ContainerStateTerminated
 	restarts int
-}
-
-type QueueItem struct {
-	createTime string
-	value      interface{}
-}
-
-type QueueItems struct {
-	pos   int
-	mutex *sync.Mutex
-	list  []QueueItem
-}
-
-type FifoQueue QueueItems
-
-func (fq *FifoQueue) Push(elem interface{}) {
-	fq.mutex.Lock()
-	fq.list = append(fq.list, QueueItem{time.Now().String(), elem})
-	fq.mutex.Unlock()
-}
-
-func (fq *FifoQueue) Pop() QueueItem {
-	fq.mutex.Lock()
-	var val QueueItem
-	if len(fq.list)-1 >= fq.pos {
-		val = fq.list[fq.pos]
-		fq.pos++
-	}
-	fq.mutex.Unlock()
-	return val
-}
-
-func (fq FifoQueue) Len() int {
-	return len(fq.list[fq.pos:])
-}
-
-func (fq *FifoQueue) First() QueueItem {
-	return fq.list[fq.pos]
-}
-
-func (fq *FifoQueue) Last() QueueItem {
-	return fq.list[len(fq.list)-1]
-}
-
-func (fq *FifoQueue) Reset() {
-	fq.pos = 0
-}
-
-func newFifoQueue() *FifoQueue {
-	tmp := new(FifoQueue)
-	tmp.mutex = &sync.Mutex{}
-	tmp.pos = 0
-	return tmp
 }
 
 func Logf(format string, a ...interface{}) {
@@ -1041,7 +987,7 @@ func getDebugInfo(c *client.Client) (map[string]string, error) {
 func writePerfData(c *client.Client, dirName string, postfix string) error {
 	fname := fmt.Sprintf("%s/metrics_%s.txt", dirName, postfix)
 
-	hdnl, err := os.Create(fname)
+	handler, err := os.Create(fname)
 	if err != nil {
 		return fmt.Errorf("Error creating file '%s': %v", fname, err)
 	}
@@ -1051,12 +997,12 @@ func writePerfData(c *client.Client, dirName string, postfix string) error {
 		return fmt.Errorf("Error retrieving metrics: %v", err)
 	}
 
-	_, err = hdnl.WriteString(metrics)
+	_, err = handler.WriteString(metrics)
 	if err != nil {
 		return fmt.Errorf("Error writing metrics: %v", err)
 	}
 
-	err = hdnl.Close()
+	err = handler.Close()
 	if err != nil {
 		return fmt.Errorf("Error closing '%s': %v", fname, err)
 	}
@@ -1068,16 +1014,16 @@ func writePerfData(c *client.Client, dirName string, postfix string) error {
 
 	for key, value := range debug {
 		fname := fmt.Sprintf("%s/%s_%s.txt", dirName, key, postfix)
-		hdnl, err = os.Create(fname)
+		handler, err = os.Create(fname)
 		if err != nil {
 			return fmt.Errorf("Error creating file '%s': %v", fname, err)
 		}
-		_, err = hdnl.WriteString(value)
+		_, err = handler.WriteString(value)
 		if err != nil {
 			return fmt.Errorf("Error writing %s: %v", key, err)
 		}
 
-		err = hdnl.Close()
+		err = handler.Close()
 		if err != nil {
 			return fmt.Errorf("Error closing '%s': %v", fname, err)
 		}
