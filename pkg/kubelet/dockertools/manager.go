@@ -929,7 +929,7 @@ func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin
 	args = append(args, cmd...)
 	command := exec.Command(nsenter, args...)
 	if tty {
-		p, err := StartPty(command)
+		p, err := kubecontainer.StartPty(command)
 		if err != nil {
 			return err
 		}
