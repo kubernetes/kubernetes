@@ -76,10 +76,15 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 
 	keyring.Add(provider.Provide())
 
-	val, ok := keyring.Lookup(registryUrl)
+	creds, ok := keyring.Lookup(registryUrl)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", registryUrl)
+		return
 	}
+	if len(creds) > 1 {
+		t.Errorf("Got more hits than expected: %s", creds)
+	}
+	val := creds[0]
 
 	if username != val.Username {
 		t.Errorf("Unexpected username value, want: %s, got: %s", username, val.Username)
@@ -143,10 +148,15 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 
 	keyring.Add(provider.Provide())
 
-	val, ok := keyring.Lookup(registryUrl)
+	creds, ok := keyring.Lookup(registryUrl)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", registryUrl)
+		return
 	}
+	if len(creds) > 1 {
+		t.Errorf("Got more hits than expected: %s", creds)
+	}
+	val := creds[0]
 
 	if username != val.Username {
 		t.Errorf("Unexpected username value, want: %s, got: %s", username, val.Username)
@@ -211,10 +221,15 @@ func TestContainerRegistryBasics(t *testing.T) {
 
 	keyring.Add(provider.Provide())
 
-	val, ok := keyring.Lookup(registryUrl)
+	creds, ok := keyring.Lookup(registryUrl)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", registryUrl)
+		return
 	}
+	if len(creds) > 1 {
+		t.Errorf("Got more hits than expected: %s", creds)
+	}
+	val := creds[0]
 
 	if "_token" != val.Username {
 		t.Errorf("Unexpected username value, want: %s, got: %s", "_token", val.Username)

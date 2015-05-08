@@ -17,14 +17,16 @@ limitations under the License.
 package dockertools
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
 	"sort"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
@@ -264,7 +266,8 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 		if len(registry) != 0 {
 			registry = registry + "/"
 		}
-		f.pulled = append(f.pulled, fmt.Sprintf("%s%s:%s", registry, opts.Repository, opts.Tag))
+		authJson, _ := json.Marshal(auth)
+		f.pulled = append(f.pulled, fmt.Sprintf("%s%s:%s using %s", registry, opts.Repository, opts.Tag, string(authJson)))
 	}
 	return err
 }
