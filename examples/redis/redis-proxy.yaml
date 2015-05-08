@@ -1,19 +1,14 @@
-id: redis-proxy
+apiVersion: v1beta3
 kind: Pod
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    version: v1beta1
-    id: redis-proxy
-    containers:
-      - name: proxy
-        image: kubernetes/redis-proxy:v1
-        ports:
-          - name: api
-            containerPort: 6379
-labels:
+metadata:
+  labels:
+    name: redis-proxy
+    role: proxy
   name: redis-proxy
-  role: proxy
-
-
-
+spec:
+  containers:
+  - name: proxy
+    image: kubernetes/redis-proxy:v1
+    ports:
+    - containerPort: 6379
+      name: api
