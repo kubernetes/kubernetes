@@ -25,18 +25,20 @@ import sys
 def PrintError(*err):
   print(*err, file=sys.stderr)
 
-def file_passes(filename, extention, ref, regex):
+def file_passes(filename, extention, ref, regexs):
     try:
         f = open(filename, 'r')
     except:
         return False
 
-    data = f.readlines()
+    data = f.read()
 
     # remove build tags from the top of Go file
     if extention == "go":
-        while data[0] != "/*\n":
-            data = data[1:]
+        p = regexs["go_build_constraints"]
+        (data, found) = p.subn("", data, 1)
+
+    data = data.splitlines()
 
     # if our test file is smaller than the reference it surely fails!
     if len(ref) > len(data):
@@ -46,8 +48,10 @@ def file_passes(filename, extention, ref, regex):
     data = data[:len(ref)]
 
     # Replace all occurances of the regex "2015" with "2014"
+    p = regexs["date"]
     for i, d in enumerate(data):
-        (data[i], found) = regex.subn( '2014', d)
+
+        (data[i], found) = p.subn( '2014', d)
         if found != 0:
             break
 
@@ -74,13 +78,16 @@ def main():
     except:
         # No boilerplate template is success
         return True
-    ref = ref_file.readlines()
+    ref = ref_file.read().splitlines()
 
+    regexs = {}
     # dates can be 2014 or 2015, company holder names can be anything
-    p = re.compile( '(2014|2015)' )
+    regexs["date"] = re.compile( '(2014|2015)' )
+    # strip // +build \n\n build constraints
+    regexs["go_build_constraints"] = re.compile(r"^(// \+build.*\n)+\n", re.MULTILINE)
 
     for filename in filenames:
-        if not file_passes(filename, extention, ref, p):
+        if not file_passes(filename, extention, ref, regexs):
             print(filename, file=sys.stdout)
 
 if __name__ == "__main__":
