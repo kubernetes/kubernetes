@@ -50,6 +50,9 @@ const (
 	// Initial pod start can be delayed O(minutes) by slow docker pulls
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	podStartTimeout = 5 * time.Minute
+
+	// String used to mark pod deletion
+	nonExist = "NonExist"
 )
 
 type TestContextType struct {
@@ -409,6 +412,71 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 	}
 }
 
+// podInfo contains pod information useful for debugging e2e tests.
+type podInfo struct {
+	oldHostname string
+	oldPhase    string
+	hostname    string
+	phase       string
+}
+
+// PodDiff is a map of pod name to podInfos
+type PodDiff map[string]*podInfo
+
+// Print formats and prints the give PodDiff.
+func (p PodDiff) Print(ignorePhases util.StringSet) {
+	for name, info := range p {
+		if ignorePhases.Has(info.phase) {
+			continue
+		}
+		if info.phase == nonExist {
+			Logf("Pod %v was deleted, had phase %v and host %v", name, info.phase, info.hostname)
+			continue
+		}
+		phaseChange, hostChange := false, false
+		msg := fmt.Sprintf("Pod %v ", name)
+		if info.oldPhase != info.phase {
+			phaseChange = true
+			if info.oldPhase == nonExist {
+				msg += fmt.Sprintf("in phase %v ", info.phase)
+			} else {
+				msg += fmt.Sprintf("went from phase: %v -> %v ", info.oldPhase, info.phase)
+			}
+		}
+		if info.oldHostname != info.hostname {
+			hostChange = true
+			if info.oldHostname == nonExist || info.oldHostname == "" {
+				msg += fmt.Sprintf("assigned host %v ", info.hostname)
+			} else {
+				msg += fmt.Sprintf("went from host: %v -> %v ", info.oldHostname, info.hostname)
+			}
+		}
+		if phaseChange || hostChange {
+			Logf(msg)
+		}
+	}
+}
+
+// Diff computes a PodDiff given 2 lists of pods.
+func Diff(oldPods *api.PodList, curPods *api.PodList) PodDiff {
+	podInfoMap := PodDiff{}
+
+	// New pods will show up in the curPods list but not in oldPods. They have oldhostname/phase == nonexist.
+	for _, pod := range curPods.Items {
+		podInfoMap[pod.Name] = &podInfo{hostname: pod.Spec.Host, phase: string(pod.Status.Phase), oldHostname: nonExist, oldPhase: nonExist}
+	}
+
+	// Deleted pods will show up in the oldPods list but not in curPods. They have a hostname/phase == nonexist.
+	for _, pod := range oldPods.Items {
+		if info, ok := podInfoMap[pod.Name]; ok {
+			info.oldHostname, info.oldPhase = pod.Spec.Host, string(pod.Status.Phase)
+		} else {
+			podInfoMap[pod.Name] = &podInfo{hostname: nonExist, phase: nonExist, oldHostname: pod.Spec.Host, oldPhase: string(pod.Status.Phase)}
+		}
+	}
+	return podInfoMap
+}
+
 // RunRC Launches (and verifies correctness) of a Replication Controller
 // It will waits for all pods it spawns to become "Running".
 // It's the caller's responsibility to clean up externally (i.e. use the
@@ -420,8 +488,8 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	current := 0
 	same := 0
 
-	By(fmt.Sprintf("Creating replication controller %s in namespace %s", name, ns))
-	_, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
+	By(fmt.Sprintf("Creating replication controller %s", name))
+	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
@@ -445,10 +513,12 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 				},
 			},
 		},
-	})
+	}
+	_, err := c.ReplicationControllers(ns).Create(rc)
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
 	}
+	Logf("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, ns, rc.Spec.Replicas)
 
 	By(fmt.Sprintf("Making sure all %d replicas of rc %s in namespace %s exist", replicas, name, ns))
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
@@ -483,26 +553,27 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	if current != replicas {
 		return fmt.Errorf("Controller %s: Only found %d replicas out of %d", name, current, replicas)
 	}
-	Logf("Controller %s: Found %d pods out of %d", name, current, replicas)
+	Logf("Controller %s in ns %s: Found %d pods out of %d", name, ns, current, replicas)
 
 	By(fmt.Sprintf("Waiting for all %d replicas to be running with a max container failures of %d", replicas, maxContainerFailures))
 	same = 0
 	last = 0
 	failCount = 10
 	current = 0
+	oldPods := &api.PodList{}
 	for same < failCount && current < replicas {
 		current = 0
 		waiting := 0
 		pending := 0
 		unknown := 0
+		inactive := 0
 		time.Sleep(10 * time.Second)
 
+		// TODO: Use a reflector both to put less strain on the cluster and
+		// for more clarity.
 		currentPods, err := listPods(c, ns, label, fields.Everything())
 		if err != nil {
 			return fmt.Errorf("Error listing pods: %v", err)
-		}
-		if len(currentPods.Items) != len(pods.Items) {
-			return fmt.Errorf("Number of reported pods changed: %d vs %d", len(currentPods.Items), len(pods.Items))
 		}
 		for _, p := range currentPods.Items {
 			if p.Status.Phase == api.PodRunning {
@@ -516,22 +587,49 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 				} else {
 					pending++
 				}
+			} else if p.Status.Phase == api.PodSucceeded || p.Status.Phase == api.PodFailed {
+				inactive++
 			} else if p.Status.Phase == api.PodUnknown {
 				unknown++
 			}
 		}
-		Logf("Pod States: %d running, %d pending, %d waiting, %d unknown ", current, pending, waiting, unknown)
+		Logf("Pod States: %d running, %d pending, %d waiting, %d inactive, %d unknown ", current, pending, waiting, inactive, unknown)
+
+		if len(currentPods.Items) != len(pods.Items) {
+
+			// This failure mode includes:
+			// kubelet is dead, so node controller deleted pods and rc creates more
+			//	- diagnose by noting the pod diff below.
+			// pod is unhealthy, so replication controller creates another to take its place
+			//	- diagnose by comparing the previous "2 Pod states" lines for inactive pods
+			errorStr := fmt.Sprintf("Number of reported pods changed: %d vs %d", len(currentPods.Items), len(pods.Items))
+			Logf("%v, pods that changed since the last iteration:", errorStr)
+			Diff(oldPods, currentPods).Print(util.NewStringSet())
+			return fmt.Errorf(errorStr)
+		}
 		if last < current {
 			same = 0
 		} else if last == current {
 			same++
 		} else if current < last {
-			return fmt.Errorf("Number of running pods dropped from %d to %d", last, current)
+
+			// The pod failed or succeeded, or was somehow pushed out of running by the kubelet.
+			errorStr := fmt.Sprintf("Number of running pods dropped from %d to %d", last, current)
+			Logf("%v, pods that changed since the last iteration:", errorStr)
+			Diff(oldPods, currentPods).Print(util.NewStringSet())
+			return fmt.Errorf(errorStr)
 		}
 		if same >= failCount {
-			return fmt.Errorf("No pods started for the last %d checks", failCount)
+
+			// Most times this happens because a few nodes have kubelet problems, and their pods are
+			// stuck in pending.
+			errorStr := fmt.Sprintf("No pods started for the last %d checks", failCount)
+			Logf("%v, pods currently in pending:", errorStr)
+			Diff(currentPods, &api.PodList{}).Print(util.NewStringSet(string(api.PodRunning)))
+			return fmt.Errorf(errorStr)
 		}
 		last = current
+		oldPods = currentPods
 	}
 	if current != replicas {
 		return fmt.Errorf("Only %d pods started out of %d", current, replicas)
