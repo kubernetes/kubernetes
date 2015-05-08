@@ -260,7 +260,7 @@ EOF
 # on upgrade, this file exists on the master-pd and should never
 # be touched again (except perhaps an additional service account,
 # see NB below.)
-function create-salt-auth() {
+function create-salt-master-auth() {
   if [ ! -e "${BASIC_AUTH_FILE}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
     (umask 077;
@@ -273,13 +273,31 @@ function create-salt-auth() {
       echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}";
       echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${KNOWN_TOKENS_FILE}")
 
+    # Generate tokens for other "service accounts".  Append to known_tokens.
+    #
+    # NB: If this list ever changes, this script actually has to
+    # change to detect the existence of this file, kill any deleted
+    # old tokens and add any new tokens (to handle the upgrade case).
+    local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
+    for account in "${service_accounts[@]}"; do
+      token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+      echo "${token},${account},${account}" >> "${KNOWN_TOKENS_FILE}"
+    done
+  fi
+}
+
+function create-salt-node-auth() {
+  kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
+  if [ ! -e "${kubelet_auth_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kubelet
-    kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
     (umask 077;
       echo "{\"BearerToken\": \"${KUBELET_TOKEN}\", \"Insecure\": true }" > "${kubelet_auth_file}")
+  fi
 
+  kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
+  if [ ! -e "${kube_proxy_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-proxy
-    kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
+
     # Make a kubeconfig file with the token.
     # TODO(etune): put apiserver certs into secret too, and reference from authfile,
     # so that "Insecure" is not needed.
@@ -303,17 +321,6 @@ contexts:
 current-context: service-account-context
 EOF
 )
-
-    # Generate tokens for other "service accounts".  Append to known_tokens.
-    #
-    # NB: If this list ever changes, this script actually has to
-    # change to detect the existence of this file, kill any deleted
-    # old tokens and add any new tokens (to handle the upgrade case).
-    local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
-    for account in "${service_accounts[@]}"; do
-      token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-      echo "${token},${account},${account}" >> "${KNOWN_TOKENS_FILE}"
-    done
   fi
 }
 
@@ -453,7 +460,11 @@ if [[ -z "${is_push}" ]]; then
   set-kube-env
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
   create-salt-pillar
-  create-salt-auth
+  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
+    create-salt-master-auth
+  else
+    create-salt-node-auth
+  fi
   download-release
   configure-salt
   remove-docker-artifacts
