@@ -30,10 +30,7 @@ func GetHostname(hostnameOverride string) string {
 		if err != nil {
 			glog.Fatalf("Couldn't determine hostname: %v", err)
 		}
-		chunks := strings.Split(string(nodename), ".")
-		// nodename could be a fully-qualified domain name or not. Take the first
-		// word of nodename as the hostname for consistency.
-		hostname = chunks[0]
+		hostname = string(nodename)
 	}
 	return strings.ToLower(strings.TrimSpace(hostname))
 }
