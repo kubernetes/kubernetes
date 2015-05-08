@@ -759,12 +759,10 @@ func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, destPort int,
 	// If the proxy is bound to localhost only, all of this is broken.  Not
 	// allowed.
 	if proxyIP.Equal(zeroIPv4) || proxyIP.Equal(zeroIPv6) {
-		// TODO: Can we REDIRECT with IPv6?
-		args = append(args, "-j", "REDIRECT", "--to-ports", fmt.Sprintf("%d", proxyPort))
-	} else {
-		// TODO: Can we DNAT with IPv6?
-		args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
+		proxyIP = proxier.hostIP
 	}
+	// TODO: Can we DNAT with IPv6?
+	args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
 	return args
 }
 

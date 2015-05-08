@@ -72,6 +72,7 @@ grains:
   roles:
     - kubernetes-pool
   cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
+  container_subnet: '$(echo "$MINION_CONTAINER_SUBNET" | sed -e "s/'/''/g")'
   hostname_override: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
 EOF
 
