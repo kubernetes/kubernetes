@@ -34,6 +34,29 @@ if [[ "${CIRCLECI:-}" == "true" ]]; then
     WORKSPACE=`pwd`
 else
     # Jenkins?
+    # Copy GCE keys so we don't keep cycling them.
+    # To set this up, you must know the <project>, <zone>, and <instance> that
+    # on which your jenkins jobs are running. Then do:
+    #
+    # # Get into the instance.
+    # $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
+    #
+    # # Generate a key by ssh'ing into itself, then exit.
+    # $ gcloud compute ssh --project="<prj>" ssh --zone="<zone>" <instance>
+    # $ ^D
+    #
+    # # Copy the keys to the desired location, e.g. /var/lib/jenkins/gce_keys/
+    # $ sudo mkdir -p /var/lib/jenkins/gce_keys/
+    # $ sudo cp ~/.ssh/google_compute_engine /var/lib/jenkins/gce_keys/
+    # $ sudo cp ~/.ssh/google_compute_engine.pub /var/lib/jenkins/gce_keys/
+    #
+    # Move the permissions to jenkins.
+    # $ sudo chown -R jenkins /var/lib/jenkins/gce_keys/
+    # $ sudo chgrp -R jenkins /var/lib/jenkins/gce_keys/
+    mkdir -p ${WORKSPACE}/.ssh/
+    cp /var/lib/jenkins/gce_keys/google_compute_engine ${WORKSPACE}/.ssh/
+    cp /var/lib/jenkins/gce_keys/google_compute_engine.pub ${WORKSPACE}/.ssh/
+
     export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 fi
 
@@ -73,7 +96,6 @@ echo "E2E_ZONE: ${E2E_ZONE}"                       # Name of the GCE zone (e.g. 
 echo "E2E_OPT: ${E2E_OPT}"                         # hack/e2e.go options
 echo "E2E_SET_CLUSTER_API_VERSION: ${E2E_SET_CLUSTER_API_VERSION:-<not set>}" # optional, for GKE, set CLUSTER_API_VERSION to git hash
 echo "--------------------------------------------------------------------------------"
-
 
 # AWS variables
 export KUBE_AWS_INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
