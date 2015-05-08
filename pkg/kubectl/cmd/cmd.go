@@ -45,9 +45,6 @@ __kubectl_get_resource()
         return 1
     fi
     __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
-    if [[ $? -eq 0 ]]; then
-        return 0
-    fi
 }
 
 # $1 is the name of the pod we want to get the list of containers inside
