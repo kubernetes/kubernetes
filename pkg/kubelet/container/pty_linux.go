@@ -1,4 +1,4 @@
-// +build !linux
+// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors All rights reserved.
@@ -16,13 +16,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockertools
+package container
 
 import (
 	"os"
 	"os/exec"
+
+	"github.com/kr/pty"
 )
 
-func StartPty(c *exec.Cmd) (pty *os.File, err error) {
-	return nil, nil
+func StartPty(c *exec.Cmd) (*os.File, error) {
+	return pty.Start(c)
 }

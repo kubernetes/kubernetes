@@ -47,7 +47,6 @@ import (
 	"github.com/docker/docker/pkg/parsers"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
-	"github.com/kr/pty"
 )
 
 const (
@@ -928,8 +927,7 @@ func (r *runtime) ExecInContainer(containerID string, cmd []string, stdin io.Rea
 	command := r.buildCommand(args...)
 
 	if tty {
-		// TODO(yifan): Merge with dockertools.StartPty().
-		p, err := pty.Start(command)
+		p, err := kubecontainer.StartPty(command)
 		if err != nil {
 			return err
 		}
