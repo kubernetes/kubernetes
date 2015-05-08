@@ -990,3 +990,38 @@ func TestRCSyncExpectations(t *testing.T) {
 	manager.syncReplicationController(getKey(controllerSpec, t))
 	validateSyncReplication(t, &fakePodControl, 0, 0)
 }
+
+func TestDeleteControllerAndExpectations(t *testing.T) {
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	manager := NewReplicationManager(client, 10)
+
+	rc := newReplicationController(1)
+	manager.controllerStore.Store.Add(rc)
+
+	fakePodControl := FakePodControl{}
+	manager.podControl = &fakePodControl
+
+	// This should set expectations for the rc
+	manager.syncReplicationController(getKey(rc, t))
+	validateSyncReplication(t, &fakePodControl, 1, 0)
+	fakePodControl.clear()
+
+	// This is to simulate a concurrent addPod, that has a handle on the expectations
+	// as the controller deletes it.
+	podExp, exists, err := manager.expectations.GetExpectations(rc)
+	if !exists || err != nil {
+		t.Errorf("No expectations found for rc")
+	}
+	manager.controllerStore.Delete(rc)
+	manager.syncReplicationController(getKey(rc, t))
+
+	if _, exists, err = manager.expectations.GetExpectations(rc); exists {
+		t.Errorf("Found expectaions, expected none since the rc has been deleted.")
+	}
+
+	// This should have no effect, since we've deleted the rc.
+	podExp.Seen(1, 0)
+	manager.podStore.Store.Replace(make([]interface{}, 0))
+	manager.syncReplicationController(getKey(rc, t))
+	validateSyncReplication(t, &fakePodControl, 0, 0)
+}
