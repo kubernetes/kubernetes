@@ -488,13 +488,18 @@ func (gce *GCECloud) NodeAddresses(_ string) ([]api.NodeAddress, error) {
 	}, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (gce *GCECloud) ExternalID(instance string) (string, error) {
 	inst, err := gce.getInstanceByName(instance)
 	if err != nil {
 		return "", err
 	}
 	return strconv.FormatUint(inst.Id, 10), nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (gce *GCECloud) InstanceID(instance string) (string, error) {
+	return "", nil
 }
 
 // List is an implementation of Instances.List.

@@ -357,13 +357,18 @@ func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	return addrs, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (i *Instances) ExternalID(name string) (string, error) {
 	srv, err := getServerByName(i.compute, name)
 	if err != nil {
 		return "", err
 	}
 	return srv.ID, nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (i *Instances) InstanceID(name string) (string, error) {
+	return "", nil
 }
 
 func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {

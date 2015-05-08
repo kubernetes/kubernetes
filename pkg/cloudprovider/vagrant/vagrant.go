@@ -142,7 +142,7 @@ func (v *VagrantCloud) NodeAddresses(instance string) ([]api.NodeAddress, error)
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (v *VagrantCloud) ExternalID(instance string) (string, error) {
 	// Due to vagrant not running with a dedicated DNS setup, we return the IP address of a minion as its hostname at this time
 	minion, err := v.getInstanceByAddress(instance)
@@ -150,6 +150,11 @@ func (v *VagrantCloud) ExternalID(instance string) (string, error) {
 		return "", err
 	}
 	return minion.IP, nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (v *VagrantCloud) InstanceID(instance string) (string, error) {
+	return "", nil
 }
 
 // saltMinionsByRole filters a list of minions that have a matching role.

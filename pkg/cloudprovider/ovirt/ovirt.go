@@ -167,13 +167,18 @@ func (v *OVirtCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: address.String()}}, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (v *OVirtCloud) ExternalID(name string) (string, error) {
 	instance, err := v.fetchInstance(name)
 	if err != nil {
 		return "", err
 	}
 	return instance.UUID, nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (v *OVirtCloud) InstanceID(name string) (string, error) {
+	return "", nil
 }
 
 func getInstancesFromXml(body io.Reader) (OVirtInstanceMap, error) {

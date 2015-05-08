@@ -87,8 +87,10 @@ type Instances interface {
 	// returns the address of the calling instance. We should do a rename to
 	// make this clearer.
 	NodeAddresses(name string) ([]api.NodeAddress, error)
-	// ExternalID returns the cloud provider ID of the specified instance.
+	// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 	ExternalID(name string) (string, error)
+	// InstanceID returns the cloud provider ID of the specified instance.
+	InstanceID(name string) (string, error)
 	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
 	List(filter string) ([]string, error)
 	// GetNodeResources gets the resources for a particular node

@@ -366,9 +366,14 @@ func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: net.ParseIP(ip).String()}}, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (i *Instances) ExternalID(name string) (string, error) {
 	return "", fmt.Errorf("unimplemented")
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (i *Instances) InstanceID(name string) (string, error) {
+	return "", nil
 }
 
 func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {

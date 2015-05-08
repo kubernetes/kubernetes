@@ -166,13 +166,18 @@ func ipAddress(name string) (net.IP, error) {
 	return ipaddr, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (c *MesosCloud) ExternalID(instance string) (string, error) {
 	ip, err := ipAddress(instance)
 	if err != nil {
 		return "", err
 	}
 	return ip.String(), nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (c *MesosCloud) InstanceID(name string) (string, error) {
+	return "", nil
 }
 
 // List lists instances that match 'filter' which is a regular expression

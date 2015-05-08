@@ -159,6 +159,12 @@ func (f *FakeCloud) ExternalID(instance string) (string, error) {
 	return f.ExtID[instance], f.Err
 }
 
+// InstanceID returns the cloud provider ID of the specified instance.
+func (f *FakeCloud) InstanceID(instance string) (string, error) {
+	f.addCall("instance-id")
+	return f.ExtID[instance], nil
+}
+
 // List is a test-spy implementation of Instances.List.
 // It adds an entry "list" into the internal method call record.
 func (f *FakeCloud) List(filter string) ([]string, error) {
