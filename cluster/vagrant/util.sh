@@ -295,7 +295,7 @@ function test-setup {
 
 # Execute after running tests to perform any required clean-up
 function test-teardown {
-  echo "Vagrant ignores tear-down" 1>&2
+  kube-down
 }
 
 # Set the {user} and {password} environment values required to interact with provider
