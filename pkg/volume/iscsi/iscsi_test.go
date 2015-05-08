@@ -39,28 +39,6 @@ func TestCanSupport(t *testing.T) {
 	}
 }
 
-func TestGetAccessModes(t *testing.T) {
-	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
-
-	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/iscsi")
-	if err != nil {
-		t.Errorf("Can't find the plugin by name")
-	}
-	if !contains(plug.GetAccessModes(), api.ReadWriteOnce) || !contains(plug.GetAccessModes(), api.ReadOnlyMany) {
-		t.Errorf("Expected two AccessModeTypes:  %s and %s", api.ReadWriteOnce, api.ReadOnlyMany)
-	}
-}
-
-func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
-}
-
 type fakeDiskManager struct {
 	attachCalled bool
 	detachCalled bool
