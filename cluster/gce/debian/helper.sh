@@ -107,8 +107,15 @@ function create-master-instance {
     --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no
 }
 
+# TODO(mbforbes): Make $1 required.
+# TODO(mbforbes): Document required vars (for this and call chain).
+# $1 version
 function create-node-instance-template {
-  create-node-template "${NODE_INSTANCE_PREFIX}-template" "${scope_flags[*]}" \
+  local suffix=""
+  if [[ -n ${1:-} ]]; then
+    suffix="-${1}"
+  fi
+  create-node-template "${NODE_INSTANCE_PREFIX}-template${suffix}" "${scope_flags[*]}" \
     "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml"
 }
