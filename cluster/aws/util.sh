@@ -354,7 +354,7 @@ function ensure-iam-profiles {
 function wait-for-instance-running {
   instance_id=$1
   while true; do
-    instance_state=$($AWS_CMD describe-instances --instance-ids $instance_id | expect_instance_states running)
+    instance_state=$($AWS_CMD describe-instances --instance-ids ${instance_id} | expect_instance_states running)
     if [[ "$instance_state" == "" ]]; then
       break
     else
@@ -365,6 +365,8 @@ function wait-for-instance-running {
   done
 }
 
+# Allocates new Elastic IP from Amazon
+# Output: allocated IP address
 function allocate-elastic-ip {
   $AWS_CMD allocate-address --domain vpc --output text | cut -f3
 }
@@ -372,23 +374,29 @@ function allocate-elastic-ip {
 function assign-ip-to-instance {
   local ip_address=$1
   local instance_id=$2
-  local elastic_ip_allocation_id=$($AWS_CMD describe-addresses --public-ips $ip_address --output text | cut -f2)
-  $AWS_CMD associate-address --instance-id $master_instance_id --allocation-id $elastic_ip_allocation_id > /dev/null
-  local association_result=$?
+  local fallback_ip=$3
 
-  if [[ $association_result -eq 0 ]]; then
-    echo $ip_address
+  local elastic_ip_allocation_id=$($AWS_CMD describe-addresses --public-ips $ip_address --output text | cut -f2)
+  local association_result=$($AWS_CMD associate-address --instance-id ${master_instance_id} --allocation-id ${elastic_ip_allocation_id} > /dev/null && echo "success" || echo "failure")
+
+  if [[ $association_result = "success" ]]; then
+    echo "${ip_address}"
+  else
+    echo "${fallback_ip}"
   fi
 }
 
+# Assigns elastic ip to a Amazon EC2 instance. If assigned public IP is empty,
+# then will request new one.
+# Output: assigned IP address
 function assign-elastic-ip {
   local assigned_public_ip=$1
   local master_instance_id=$2
 
-  if [[ -n $MASTER_RESERVED_IP ]]; then
-    assign-ip-to-instance $MASTER_RESERVED_IP $master_instance_id
+  if [[ -n "${MASTER_RESERVED_IP}" ]]; then
+    assign-ip-to-instance "${MASTER_RESERVED_IP}" "${master_instance_id}" "${assigned_public_ip}"
   else
-    assign-ip-to-instance $(allocate-elastic-ip) $master_instance_id
+    assign-ip-to-instance $(allocate-elastic-ip) "${master_instance_id}" "${assigned_public_ip}"
   fi
 }
 
