@@ -16,14 +16,12 @@ spec:
         name: kibana-logging
     spec:
       containers:
-      - env:
-        - name: ES_SCHEME
-          value: https
-        - name: ES_HOST
-          value: '"+window.location.hostname+"/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging'
-        image: gcr.io/google_containers/kibana:1.2
-        name: kibana-logging
+      - name: kibana-logging
+        image: gcr.io/google_containers/kibana:1.3
+        env:
+          - name: "ELASTICSEARCH_URL"
+            value: "http://elasticsearch-logging:9200"
         ports:
-        - containerPort: 80
+        - containerPort: 5601
           name: kibana-port
           protocol: TCP
