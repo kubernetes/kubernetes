@@ -135,12 +135,20 @@ func RecommendedContextOverrideFlags(prefix string) ContextOverrideFlags {
 
 // BindAuthInfoFlags is a convenience method to bind the specified flags to their associated variables
 func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, flagNames AuthOverrideFlags) {
-	bindStringFlag(flags, &authInfo.AuthPath, flagNames.AuthPath)
+	deadString := ""
+	bindStringFlag(flags, &deadString, flagNames.AuthPath)
 	bindStringFlag(flags, &authInfo.ClientCertificate, flagNames.ClientCertificate)
 	bindStringFlag(flags, &authInfo.ClientKey, flagNames.ClientKey)
 	bindStringFlag(flags, &authInfo.Token, flagNames.Token)
 	bindStringFlag(flags, &authInfo.Username, flagNames.Username)
 	bindStringFlag(flags, &authInfo.Password, flagNames.Password)
+
+	if len(flagNames.AuthPath.LongName) > 0 {
+		flags.MarkDeprecated(flagNames.AuthPath.LongName, flagNames.AuthPath.LongName+" has been removed and is no longer respected")
+	}
+	if len(flagNames.AuthPath.ShortName) > 0 {
+		flags.MarkDeprecated(flagNames.AuthPath.ShortName, flagNames.AuthPath.ShortName+" has been removed and is no longer respected")
+	}
 }
 
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables

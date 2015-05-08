@@ -97,10 +97,10 @@ func TestSetIntoExistingStruct(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	a := expectedConfig.AuthInfos["red-user"]
 	authInfo := &a
-	authInfo.AuthPath = "new-path-value"
+	authInfo.Password = "new-path-value"
 	expectedConfig.AuthInfos["red-user"] = *authInfo
 	test := configCommandTest{
-		args:           []string{"set", "users.red-user.auth-path", "new-path-value"},
+		args:           []string{"set", "users.red-user.password", "new-path-value"},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
 	}
@@ -189,11 +189,10 @@ func TestNewEmptyAuth(t *testing.T) {
 func TestAdditionalAuth(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
-	authInfo.AuthPath = "auth-path"
 	authInfo.Token = "token"
 	expectedConfig.AuthInfos["another-user"] = *authInfo
 	test := configCommandTest{
-		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagAuthPath + "=auth-path", "--" + clientcmd.FlagBearerToken + "=token"},
+		args:           []string{"set-credentials", "another-user", "--" + clientcmd.FlagBearerToken + "=token"},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
 	}
@@ -512,10 +511,10 @@ func TestCAAndInsecureDisallowed(t *testing.T) {
 func TestMergeExistingAuth(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := expectedConfig.AuthInfos["red-user"]
-	authInfo.AuthPath = "auth-path"
+	authInfo.ClientKey = "key"
 	expectedConfig.AuthInfos["red-user"] = authInfo
 	test := configCommandTest{
-		args:           []string{"set-credentials", "red-user", "--" + clientcmd.FlagAuthPath + "=auth-path"},
+		args:           []string{"set-credentials", "red-user", "--" + clientcmd.FlagKeyFile + "=key"},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
 	}
