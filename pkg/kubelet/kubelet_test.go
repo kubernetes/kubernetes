@@ -4054,38 +4054,125 @@ func TestGetPodStatusWithLastTermination(t *testing.T) {
 	}
 }
 
-// TODO(vmarmol): Move this test away from using RunContainer().
 func TestGetPodCreationFailureReason(t *testing.T) {
 	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
+	waitGroup := testKubelet.waitGroup
+
+	// Inject the creation failure error to docker.
 	failureReason := "creation failure"
 	fakeDocker.Errors = map[string]error{
 		"create": fmt.Errorf("%s", failureReason),
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{}
+
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
-			Name:      "bar",
+			Name:      "foo",
 			Namespace: "new",
 		},
 		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{Name: "foo"},
-			},
+			Containers: []api.Container{{Name: "bar"}},
 		},
 	}
+
+	// Pretend that the pod infra container has already been created, so that
+	// we can run the user containers.
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_0"},
+			ID:    "9876",
+		},
+	}
+	fakeDocker.ContainerMap = map[string]*docker.Container{
+		"9876": {
+			ID:         "9876",
+			HostConfig: &docker.HostConfig{},
+			Config:     &docker.Config{},
+		},
+	}
+
 	pods := []*api.Pod{pod}
 	kubelet.podManager.SetPods(pods)
 	kubelet.volumeManager.SetVolumes(pod.UID, kubecontainer.VolumeMap{})
-	// TODO: Move this test to dockertools so that we don't have to do the hacky
-	// type assertion here.
-	dm := kubelet.containerRuntime.(*dockertools.DockerManager)
-	_, err := dm.RunContainer(pod, &pod.Spec.Containers[0], "", "")
-	if err == nil {
-		t.Errorf("expected error, found nil")
+	waitGroup.Add(1)
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
+	waitGroup.Wait()
+
+	status, err := kubelet.GetPodStatus(kubecontainer.GetPodFullName(pod))
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if len(status.ContainerStatuses) < 1 {
+		t.Errorf("expected 1 container status, got %d", len(status.ContainerStatuses))
+	} else {
+		state := status.ContainerStatuses[0].State
+		if state.Waiting == nil {
+			t.Errorf("expected waiting state, got %#v", state)
+		} else if state.Waiting.Reason != failureReason {
+			t.Errorf("expected reason %q, got %q", failureReason, state.Waiting.Reason)
+		}
+	}
+}
+
+func TestGetPodPullImageFailureReason(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kubelet := testKubelet.kubelet
+	fakeDocker := testKubelet.fakeDocker
+	waitGroup := testKubelet.waitGroup
+
+	// Initialize the FakeDockerPuller so that it'd try to pull non-existent
+	// images.
+	dm := kubelet.containerRuntime.(*dockertools.DockerManager)
+	puller := dm.Puller.(*dockertools.FakeDockerPuller)
+	puller.HasImages = []string{}
+	// Inject the pull image failure error.
+	failureReason := "pull image faiulre"
+	puller.ErrorsToInject = []error{fmt.Errorf("%s", failureReason)}
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{{Name: "bar", Image: "realImage", ImagePullPolicy: api.PullAlways}},
+		},
+	}
+
+	// Pretend that the pod infra container has already been created, so that
+	// we can run the user containers.
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_0"},
+			ID:    "9876",
+		},
+	}
+	fakeDocker.ContainerMap = map[string]*docker.Container{
+		"9876": {
+			ID:         "9876",
+			HostConfig: &docker.HostConfig{},
+			Config:     &docker.Config{},
+		},
+	}
+
+	pods := []*api.Pod{pod}
+	kubelet.podManager.SetPods(pods)
+	kubelet.volumeManager.SetVolumes(pod.UID, kubecontainer.VolumeMap{})
+	waitGroup.Add(1)
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	waitGroup.Wait()
+
 	status, err := kubelet.GetPodStatus(kubecontainer.GetPodFullName(pod))
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
