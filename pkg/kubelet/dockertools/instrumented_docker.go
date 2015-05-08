@@ -153,3 +153,11 @@ func (in instrumentedDockerInterface) StartExec(startExec string, opts docker.St
 	}()
 	return in.client.StartExec(startExec, opts)
 }
+
+func (in instrumentedDockerInterface) InspectExec(id string) (*docker.ExecInspect, error) {
+	start := time.Now()
+	defer func() {
+		metrics.DockerOperationsLatency.WithLabelValues("inspect_exec").Observe(metrics.SinceInMicroseconds(start))
+	}()
+	return in.client.InspectExec(id)
+}
