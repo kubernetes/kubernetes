@@ -22,5 +22,5 @@ KUBE_ETCD_SERVERS="--etcd_servers=http://{{ groups['etcd'][0] }}:2379"
 # default admission control policies
 KUBE_ADMISSION_CONTROL="--admission_control=NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ResourceQuota"
 
-# Add you own!
+# Add your own!
 KUBE_API_ARGS=""

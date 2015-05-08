@@ -22,5 +22,5 @@ KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
 # default admission control policies
 KUBE_ADMISSION_CONTROL="--admission_control=NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ResourceQuota"
 
-# Add you own!
+# Add your own!
 KUBE_API_ARGS=""
