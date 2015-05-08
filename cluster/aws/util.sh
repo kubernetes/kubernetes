@@ -82,6 +82,14 @@ function get_instance_public_ip {
     --query Reservations[].Instances[].NetworkInterfaces[0].Association.PublicIp
 }
 
+function get_instance_private_ip {
+  local tagName=$1
+  $AWS_CMD --output text describe-instances \
+    --filters Name=tag:Name,Values=${tagName} \
+              Name=instance-state-name,Values=running \
+              Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+    --query Reservations[].Instances[].NetworkInterfaces[0].PrivateIpAddress
+}
 
 function detect-master () {
   KUBE_MASTER=${MASTER_NAME}
@@ -98,7 +106,12 @@ function detect-master () {
 function detect-minions () {
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    local minion_ip=$(get_instance_public_ip ${MINION_NAMES[$i]})
+    local minion_ip
+    if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
+      minion_ip=$(get_instance_public_ip ${MINION_NAMES[$i]})
+    else
+      minion_ip=$(get_instance_private_ip ${MINION_NAMES[$i]})
+    fi
     echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
     KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
   done
@@ -542,6 +555,14 @@ function kube-up {
       grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
       grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
+
+    local public_ip_option
+    if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
+      public_ip_option="--associate-public-ip-address"
+    else
+      public_ip_option="--no-associate-public-ip-address"
+    fi
+
     minion_id=$($AWS_CMD run-instances \
       --image-id $AWS_IMAGE \
       --iam-instance-profile Name=$IAM_PROFILE_MINION \
@@ -550,7 +571,7 @@ function kube-up {
       --private-ip-address $INTERNAL_IP_BASE.1${i} \
       --key-name kubernetes \
       --security-group-ids $SEC_GROUP_ID \
-      --associate-public-ip-address \
+      ${public_ip_option} \
       --user-data file://${KUBE_TEMP}/minion-start-${i}.sh | json_val '["Instances"][0]["InstanceId"]')
 
     add-tag $minion_id Name ${MINION_NAMES[$i]}
