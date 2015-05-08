@@ -28,6 +28,12 @@ import (
 	"github.com/golang/glog"
 )
 
+// PodWorkers is an abstract interface for testability.
+type PodWorkers interface {
+	UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete func())
+	ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty)
+}
+
 type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod) error
 
 type podWorkers struct {
