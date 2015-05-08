@@ -1,20 +1,36 @@
 # Accessing the Cluster
 
 ## Using the Kubernetes proxy to access the cluster
-Information about the cluster can be accessed by using a proxy URL and by providing the keys to the cluster.
-For example, for a cluster that has cluster-level logging enabled using Elasticsearch you can fetch information about
-the Elasticsearch logging cluster.
+Information about the cluster can be accessed by using a proxy URL and the cluster authentication keys.
+For example, for a cluster that has cluster-level logging enabled (using Elasticsearch), you can retrieve information about the Elasticsearch logging on that cluster.
 
-First, you will need to obtain the keys (username and password) for your cluster:
-
+To retrieve the configuration details about your cluster, including the address of the Kubernetes master cluster and the cluster's authentication keys (username, password, and access token), run the following command:
 ```
-$ cat ~/.kube/kubernetes-satnam2_kubernetes/kubernetes_auth
+$ kubectl config view
 {
-  "User": "admin",
-  "Password": "4mty0Vl9nNFfwLJz",
-  "CAFile": "/Users/satnam/.kube/kubernetes-satnam2_kubernetes/kubernetes.ca.crt",
-  "CertFile": "/Users/satnam/.kube/kubernetes-satnam2_kubernetes/kubecfg.crt",
-  "KeyFile": "/Users/satnam/.kube/kubernetes-satnam2_kubernetes/kubecfg.key"
+  clusters:
+  - cluster:
+      certificate-authority-data: REDACTED
+      server: https://104.197.5.247
+    name: kubernetes_logging
+  contexts:
+  - context:
+      cluster: kubernetes_logging
+      user: kubernetes_logging
+    name: kubernetes_logging
+  current-context: kubernetes_logging
+  kind: Config
+  preferences: {}
+  users:
+  - name: kubernetes_logging
+    user:
+      client-certificate-data: REDACTED
+      client-key-data: REDACTED
+      token: cvIH2BYtNS85QG0KSLHgl5Oba4YNQOrx
+  - name: kubernetes_logging-basic-auth
+    user:
+      password: MqkkhyhEbfkiYOwF
+      username: admin
 }
 ```
 
