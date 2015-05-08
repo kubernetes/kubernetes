@@ -1,66 +1,45 @@
 package main
 
 import (
-	"log"
 	"os"
-	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 )
 
-var (
-	logPath = os.Getenv("log")
-	argvs   = make(map[string]*rFunc)
-)
-
-func init() {
-	argvs["exec"] = &rFunc{
-		Usage:  "execute a process inside an existing container",
-		Action: nsenterExec,
-	}
-
-	argvs["mknod"] = &rFunc{
-		Usage:  "mknod a device inside an existing container",
-		Action: nsenterMknod,
-	}
-
-	argvs["ip"] = &rFunc{
-		Usage:  "display the container's network interfaces",
-		Action: nsenterIp,
-	}
-}
-
 func main() {
-	// we need to check our argv 0 for any registred functions to run instead of the
-	// normal cli code path
-	f, exists := argvs[strings.TrimPrefix(os.Args[0], "nsenter-")]
-	if exists {
-		runFunc(f)
-
-		return
-	}
-
 	app := cli.NewApp()
-
 	app.Name = "nsinit"
-	app.Version = "0.1"
+	app.Version = "2"
 	app.Author = "libcontainer maintainers"
 	app.Flags = []cli.Flag{
-		cli.StringFlag{Name: "nspid"},
-		cli.StringFlag{Name: "console"},
+		cli.StringFlag{Name: "root", Value: "/var/run/nsinit", Usage: "root directory for containers"},
+		cli.StringFlag{Name: "log-file", Value: "", Usage: "set the log file to output logs to"},
+		cli.BoolFlag{Name: "debug", Usage: "enable debug output in the logs"},
 	}
-
-	app.Before = preload
-
 	app.Commands = []cli.Command{
+		configCommand,
 		execCommand,
 		initCommand,
-		statsCommand,
-		configCommand,
+		oomCommand,
 		pauseCommand,
+		statsCommand,
 		unpauseCommand,
+		stateCommand,
 	}
-
+	app.Before = func(context *cli.Context) error {
+		if context.GlobalBool("debug") {
+			log.SetLevel(log.DebugLevel)
+		}
+		if path := context.GlobalString("log-file"); path != "" {
+			f, err := os.Create(path)
+			if err != nil {
+				return err
+			}
+			log.SetOutput(f)
+		}
+		return nil
+	}
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}

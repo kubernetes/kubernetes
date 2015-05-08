@@ -1,7 +1,7 @@
 // +build integration,!no-etcd
 
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -93,16 +93,21 @@ func TestExtractObj(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	client := newEtcdClient()
-	helper := tools.NewEtcdHelper(client, latest.Codec)
+	helper := tools.NewEtcdHelper(client, testapi.Codec(), etcdtest.PathPrefix())
 	withEtcdKey(func(key string) {
-		resp, err := client.Set(key, runtime.EncodeOrDie(v1beta1.Codec, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
+		key = etcdtest.AddPrefix(key)
+		resp, err := client.Set(key, runtime.EncodeOrDie(testapi.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		expectedVersion := resp.Node.ModifiedIndex
 
 		// watch should load the object at the current index
-		w := helper.Watch(key, 0)
+		w, err := helper.Watch(key, 0, tools.Everything)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
 		event := <-w.ResultChan()
 		if event.Type != watch.Added || event.Object == nil {
 			t.Fatalf("expected first value to be set to ADDED, got %#v", event)
@@ -137,6 +142,50 @@ func TestWatch(t *testing.T) {
 		pod = event.Object.(*api.Pod)
 		if pod.ResourceVersion != strconv.FormatUint(expectedVersion, 10) {
 			t.Errorf("expected version %d, got %#v", expectedVersion, pod)
+		}
+	})
+}
+
+func TestMigrateKeys(t *testing.T) {
+	withEtcdKey(func(oldPrefix string) {
+		client := newEtcdClient()
+		helper := tools.NewEtcdHelper(client, testapi.Codec(), oldPrefix)
+
+		key1 := oldPrefix + "/obj1"
+		key2 := oldPrefix + "/foo/obj2"
+		key3 := oldPrefix + "/foo/bar/obj3"
+
+		// Create a new entres - these are the 'existing' entries with old prefix
+		_, _ = helper.Client.Create(key1, "foo", 0)
+		_, _ = helper.Client.Create(key2, "foo", 0)
+		_, _ = helper.Client.Create(key3, "foo", 0)
+
+		// Change the helper to a new prefix
+		newPrefix := "/kubernetes.io"
+		helper = tools.NewEtcdHelper(client, testapi.Codec(), newPrefix)
+
+		// Migrate the keys
+		err := helper.MigrateKeys(oldPrefix)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		// Check the resources are at the correct new location
+		newNames := []string{
+			newPrefix + "/obj1",
+			newPrefix + "/foo/obj2",
+			newPrefix + "/foo/bar/obj3",
+		}
+		for _, name := range newNames {
+			_, err := helper.Client.Get(name, false, false)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+		}
+
+		// Check the old locations are removed
+		if _, err := helper.Client.Get(oldPrefix, false, false); err == nil {
+			t.Fatalf("Old directory still exists.")
 		}
 	})
 }

@@ -62,9 +62,7 @@ func ListDetail(client *gophercloud.ServiceClient, opts ListOptsBuilder) paginat
 // Get instructs OpenStack to provide details on a single flavor, identified by its ID.
 // Use ExtractFlavor to convert its result into a Flavor.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
-	var gr GetResult
-	_, gr.Err = client.Request("GET", getURL(client, id), gophercloud.RequestOpts{
-		JSONResponse: &gr.Body,
-	})
-	return gr
+	var res GetResult
+	_, res.Err = client.Get(getURL(client, id), &res.Body, nil)
+	return res
 }

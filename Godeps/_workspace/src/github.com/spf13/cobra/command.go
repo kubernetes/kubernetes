@@ -18,11 +18,13 @@ package cobra
 import (
 	"bytes"
 	"fmt"
+	"github.com/inconshreveable/mousetrap"
+	flag "github.com/spf13/pflag"
 	"io"
 	"os"
+	"runtime"
 	"strings"
-
-	flag "github.com/spf13/pflag"
+	"time"
 )
 
 // Command is just that, a command for your application.
@@ -42,15 +44,35 @@ type Command struct {
 	Long string
 	// Examples of how to use the command
 	Example string
+	// List of all valid non-flag arguments, used for bash completions *TODO* actually validate these
+	ValidArgs []string
+	// Custom functions used by the bash autocompletion generator
+	BashCompletionFunction string
+	// Is this command deprecated and should print this string when used?
+	Deprecated string
 	// Full set of flags
 	flags *flag.FlagSet
 	// Set of flags childrens of this command will inherit
 	pflags *flag.FlagSet
 	// Flags that are declared specifically by this command (not inherited).
 	lflags *flag.FlagSet
-	// Run runs the command.
-	// The args are the arguments after the command name.
+	// The *Run functions are executed in the following order:
+	//   * PersistentPreRun()
+	//   * PreRun()
+	//   * Run()
+	//   * PostRun()
+	//   * PersistentPostRun()
+	// All functions get the same args, the arguments after the command name
+	// PersistentPreRun: children of this command will inherit and execute
+	PersistentPreRun func(cmd *Command, args []string)
+	// PreRun: children of this command will not inherit.
+	PreRun func(cmd *Command, args []string)
+	// Run: Typically the actual work function. Most commands will only implement this
 	Run func(cmd *Command, args []string)
+	// PostRun: run after the Run command.
+	PostRun func(cmd *Command, args []string)
+	// PersistentPostRun: children of this command will inherit and execute after PostRun
+	PersistentPostRun func(cmd *Command, args []string)
 	// Commands is the list of commands supported by this program.
 	commands []*Command
 	// Parent Command for this command
@@ -223,16 +245,17 @@ Aliases:
 
 Examples:
 {{ .Example }}
-{{end}}{{ if .HasSubCommands}}
+{{end}}{{ if .HasRunnableSubCommands}}
 
-Available Commands: {{range .Commands}}{{if .Runnable}}
+Available Commands: {{range .Commands}}{{if and (.Runnable) (not .Deprecated)}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
 {{end}}
 {{ if .HasLocalFlags}}Flags:
 {{.LocalFlags.FlagUsages}}{{end}}
 {{ if .HasInheritedFlags}}Global Flags:
-{{.InheritedFlags.FlagUsages}}{{end}}{{if .HasParent}}{{if and (gt .Commands 0) (gt .Parent.Commands 1) }}
-Additional help topics: {{if gt .Commands 0 }}{{range .Commands}}{{if not .Runnable}} {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if gt .Parent.Commands 1 }}{{range .Parent.Commands}}{{if .Runnable}}{{if not (eq .Name $cmd.Name) }}{{end}}
+{{.InheritedFlags.FlagUsages}}{{end}}{{if or (.HasHelpSubCommands) (.HasRunnableSiblings)}}
+Additional help topics:
+{{if .HasHelpSubCommands}}{{range .Commands}}{{if and (not .Runnable) (not .Deprecated)}} {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasRunnableSiblings }}{{range .Parent.Commands}}{{if and (not .Runnable) (not .Deprecated)}}{{if not (eq .Name $cmd.Name) }}
   {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{end}}
 {{end}}{{ if .HasSubCommands }}
 Use "{{.Root.Name}} help [command]" for more information about a command.
@@ -305,6 +328,8 @@ func stripFlags(args []string, c *Command) []string {
 				inFlag = true
 			case inFlag:
 				inFlag = false
+			case y == "":
+				// strip empty commands, as the go tests expect this to be ok....
 			case !strings.HasPrefix(y, "-"):
 				commands = append(commands, y)
 				inFlag = false
@@ -319,15 +344,18 @@ func stripFlags(args []string, c *Command) []string {
 	return commands
 }
 
-func argsMinusX(args []string, x string) []string {
-	newargs := []string{}
-
-	for _, y := range args {
-		if x != y {
-			newargs = append(newargs, y)
+// argsMinusFirstX removes only the first x from args.  Otherwise, commands that look like
+// openshift admin policy add-role-to-user admin my-user, lose the admin argument (arg[4]).
+func argsMinusFirstX(args []string, x string) []string {
+	for i, y := range args {
+		if x == y {
+			ret := []string{}
+			ret = append(ret, args[:i]...)
+			ret = append(ret, args[i+1:]...)
+			return ret
 		}
 	}
-	return newargs
+	return args
 }
 
 // find the target command given the args and command tree
@@ -350,7 +378,7 @@ func (c *Command) Find(arrs []string) (*Command, []string, error) {
 				matches := make([]*Command, 0)
 				for _, cmd := range c.commands {
 					if cmd.Name() == argsWOflags[0] || cmd.HasAlias(argsWOflags[0]) { // exact name or alias match
-						return innerfind(cmd, argsMinusX(args, argsWOflags[0]))
+						return innerfind(cmd, argsMinusFirstX(args, argsWOflags[0]))
 					} else if EnablePrefixMatching {
 						if strings.HasPrefix(cmd.Name(), argsWOflags[0]) { // prefix match
 							matches = append(matches, cmd)
@@ -365,7 +393,7 @@ func (c *Command) Find(arrs []string) (*Command, []string, error) {
 
 				// only accept a single prefix match - multiple matches would be ambiguous
 				if len(matches) == 1 {
-					return innerfind(matches[0], argsMinusX(args, argsWOflags[0]))
+					return innerfind(matches[0], argsMinusFirstX(args, argsWOflags[0]))
 				}
 			}
 		}
@@ -375,10 +403,9 @@ func (c *Command) Find(arrs []string) (*Command, []string, error) {
 
 	commandFound, a := innerfind(c, arrs)
 
-	// if commander returned and the first argument (if it exists) doesn't
-	// match the command name, return nil & error
-	if commandFound.Name() == c.Name() && len(arrs[0]) > 0 && commandFound.Name() != arrs[0] {
-		return nil, a, fmt.Errorf("unknown command %q\nRun 'help' for usage.\n", a[0])
+	// If we matched on the root, but we asked for a subcommand, return an error
+	if commandFound.Name() == c.Name() && len(stripFlags(arrs, c)) > 0 && commandFound.Name() != arrs[0] {
+		return nil, a, fmt.Errorf("unknown command %q", a[0])
 	}
 
 	return commandFound, a, nil
@@ -398,19 +425,13 @@ func (c *Command) Root() *Command {
 	return findRoot(c)
 }
 
-// execute the command determined by args and the command tree
-func (c *Command) findAndExecute(args []string) (err error) {
-
-	cmd, a, e := c.Find(args)
-	if e != nil {
-		return e
-	}
-	return cmd.execute(a)
-}
-
 func (c *Command) execute(a []string) (err error) {
 	if c == nil {
 		return fmt.Errorf("Called Execute() on a nil Command")
+	}
+
+	if len(c.Deprecated) > 0 {
+		c.Printf("Command %q is deprecated, %s\n", c.Name(), c.Deprecated)
 	}
 
 	err = c.ParseFlags(a)
@@ -431,19 +452,40 @@ func (c *Command) execute(a []string) (err error) {
 		c.Usage()
 		r.SetOutput(out)
 		return err
-	} else {
-		// If help is called, regardless of other flags, we print that.
-		// Print help also if c.Run is nil.
-		if c.helpFlagVal || !c.Runnable() {
-			c.Help()
-			return nil
-		}
-
-		c.preRun()
-		argWoFlags := c.Flags().Args()
-		c.Run(c, argWoFlags)
+	}
+	// If help is called, regardless of other flags, we print that.
+	// Print help also if c.Run is nil.
+	if c.helpFlagVal || !c.Runnable() {
+		c.Help()
 		return nil
 	}
+
+	c.preRun()
+	argWoFlags := c.Flags().Args()
+
+	for p := c; p != nil; p = p.Parent() {
+		if p.PersistentPreRun != nil {
+			p.PersistentPreRun(c, argWoFlags)
+			break
+		}
+	}
+	if c.PreRun != nil {
+		c.PreRun(c, argWoFlags)
+	}
+
+	c.Run(c, argWoFlags)
+
+	if c.PostRun != nil {
+		c.PostRun(c, argWoFlags)
+	}
+	for p := c; p != nil; p = p.Parent() {
+		if p.PersistentPostRun != nil {
+			p.PersistentPostRun(c, argWoFlags)
+			break
+		}
+	}
+
+	return nil
 }
 
 func (c *Command) preRun() {
@@ -474,6 +516,14 @@ func (c *Command) Execute() (err error) {
 		return c.Root().Execute()
 	}
 
+	if EnableWindowsMouseTrap && runtime.GOOS == "windows" {
+		if mousetrap.StartedByExplorer() {
+			c.Print(MousetrapHelpText)
+			time.Sleep(5 * time.Second)
+			os.Exit(1)
+		}
+	}
+
 	// initialize help as the last point possible to allow for user
 	// overriding
 	c.initHelp()
@@ -486,63 +536,18 @@ func (c *Command) Execute() (err error) {
 		args = c.args
 	}
 
-	if len(args) == 0 {
-		// Only the executable is called and the root is runnable, run it
-		if c.Runnable() {
-			err = c.execute([]string(nil))
-		} else {
-			c.Help()
-		}
-	} else {
-		err = c.findAndExecute(args)
-	}
-
-	// Now handle the case where the root is runnable and only flags are provided
-	if err != nil && c.Runnable() {
-		// This is pretty much a custom version of the *Command.execute method
-		// with a few differences because it's the final command (no fall back)
-		e := c.ParseFlags(args)
-		if e != nil {
-			// Flags parsing had an error.
-			// If an error happens here, we have to report it to the user
-			c.Println(e.Error())
-			// If an error happens search also for subcommand info about that
-			if c.cmdErrorBuf != nil && c.cmdErrorBuf.Len() > 0 {
-				c.Println(c.cmdErrorBuf.String())
-			} else {
-				c.Usage()
-			}
-			err = e
-			return
-		} else {
-			// If help is called, regardless of other flags, we print that
-			if c.helpFlagVal {
-				c.Help()
-				return nil
-			}
-
-			argWoFlags := c.Flags().Args()
-			if len(argWoFlags) > 0 {
-				// If there are arguments (not flags) one of the earlier
-				// cases should have caught it.. It means invalid usage
-				// print the usage
-				c.Usage()
-			} else {
-				// Only flags left... Call root.Run
-				c.preRun()
-				c.Run(c, argWoFlags)
-				err = nil
-			}
-		}
+	cmd, flags, err := c.Find(args)
+	if err == nil {
+		err = cmd.execute(flags)
 	}
 
 	if err != nil {
 		if err == flag.ErrHelp {
 			c.Help()
+
 		} else {
 			c.Println("Error:", err.Error())
-			c.Printf("%v: invalid command %#q\n", c.Root().Name(), os.Args[1:])
-			c.Printf("Run '%v help' for usage\n", c.Root().Name())
+			c.Printf("Run '%v help' for usage.\n", c.Root().Name())
 		}
 	}
 
@@ -560,7 +565,9 @@ func (c *Command) initHelp() {
 			Short: "Help about any command",
 			Long: `Help provides help for any command in the application.
     Simply type ` + c.Name() + ` help [path to command] for full details.`,
-			Run: c.HelpFunc(),
+			Run:               c.HelpFunc(),
+			PersistentPreRun:  func(cmd *Command, args []string) {},
+			PersistentPostRun: func(cmd *Command, args []string) {},
 		}
 	}
 	c.AddCommand(c.helpCommand)
@@ -787,6 +794,37 @@ func (c *Command) HasSubCommands() bool {
 	return len(c.commands) > 0
 }
 
+func (c *Command) HasRunnableSiblings() bool {
+	if !c.HasParent() {
+		return false
+	}
+	for _, sub := range c.parent.commands {
+		if sub.Runnable() {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Command) HasHelpSubCommands() bool {
+	for _, sub := range c.commands {
+		if !sub.Runnable() {
+			return true
+		}
+	}
+	return false
+}
+
+// Determine if the command has runnable children commands
+func (c *Command) HasRunnableSubCommands() bool {
+	for _, sub := range c.commands {
+		if sub.Runnable() {
+			return true
+		}
+	}
+	return false
+}
+
 // Determine if the command is a child command
 func (c *Command) HasParent() bool {
 	return c.parent != nil
@@ -942,6 +980,13 @@ func (c *Command) mergePersistentFlags() {
 		c.PersistentFlags().VisitAll(addtolocal)
 	}
 	rmerge = func(x *Command) {
+		if !x.HasParent() {
+			flag.CommandLine.VisitAll(func(f *flag.Flag) {
+				if x.PersistentFlags().Lookup(f.Name) == nil {
+					x.PersistentFlags().AddFlag(f)
+				}
+			})
+		}
 		if x.HasPersistentFlags() {
 			x.PersistentFlags().VisitAll(func(f *flag.Flag) {
 				if c.Flags().Lookup(f.Name) == nil {

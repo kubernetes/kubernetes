@@ -56,11 +56,7 @@ func Create(client *gophercloud.ServiceClient, opts EndpointOpts) CreateResult {
 	reqBody.Endpoint.Region = gophercloud.MaybeString(opts.Region)
 
 	var result CreateResult
-	_, result.Err = client.Request("POST", listURL(client), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &result.Body,
-		OkCodes:      []int{201},
-	})
+	_, result.Err = client.Post(listURL(client), reqBody, &result.Body, nil)
 	return result
 }
 
@@ -122,8 +118,6 @@ func Update(client *gophercloud.ServiceClient, endpointID string, opts EndpointO
 // Delete removes an endpoint from the service catalog.
 func Delete(client *gophercloud.ServiceClient, endpointID string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = client.Request("DELETE", endpointURL(client, endpointID), gophercloud.RequestOpts{
-		OkCodes: []int{204},
-	})
+	_, res.Err = client.Delete(endpointURL(client, endpointID), nil)
 	return res
 }

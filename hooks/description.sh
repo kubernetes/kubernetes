@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 # Print 1 if the file in $1 is not in need of additional field descriptions, 0 otherwise.
 FILE="$1"
 
-if grep json: "${FILE}" | grep -v ,inline | grep -v -q description: | grep -v // ; then
+if grep json: "${FILE}" | grep -v // | grep -v ,inline | grep -v -q description: ; then
   echo "0"
 else
   echo "1"

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,31 +44,6 @@ func (c C) String() string {
 }
 
 func TestDeepHashObject(t *testing.T) {
-	// These types are known to fail object hashing because of how spew implements map keys.
-	// http://github.com/davecgh/go-spew/issues/30
-	failureCases := []func() interface{}{
-		func() interface{} { return map[A]bool{A{8675309, "Jenny"}: true, A{9765683, "!Jenny"}: false} },
-		func() interface{} { return map[C]bool{C{8675309, "Jenny"}: true, C{9765683, "!Jenny"}: false} },
-		func() interface{} { return map[*A]bool{&A{8675309, "Jenny"}: true, &A{9765683, "!Jenny"}: false} },
-		func() interface{} { return map[*C]bool{&C{8675309, "Jenny"}: true, &C{9765683, "!Jenny"}: false} },
-	}
-	for _, tc := range failureCases {
-		hasher := adler32.New()
-		DeepHashObject(hasher, tc())
-		first := hasher.Sum32()
-		alwaysSame := false
-		for i := 0; i < 100; i++ {
-			DeepHashObject(hasher, tc())
-			if hasher.Sum32() != first {
-				alwaysSame = false
-				break
-			}
-		}
-		if alwaysSame {
-			t.Errorf("expected failure for %q", toString(tc()))
-		}
-	}
-
 	successCases := []func() interface{}{
 		func() interface{} { return 8675309 },
 		func() interface{} { return "Jenny, I got your number" },
@@ -81,6 +56,10 @@ func TestDeepHashObject(t *testing.T) {
 		func() interface{} {
 			return B{[]int{8, 6, 7}, map[string]bool{"5": true, "3": true, "0": true, "9": true}}
 		},
+		func() interface{} { return map[A]bool{A{8675309, "Jenny"}: true, A{9765683, "!Jenny"}: false} },
+		func() interface{} { return map[C]bool{C{8675309, "Jenny"}: true, C{9765683, "!Jenny"}: false} },
+		func() interface{} { return map[*A]bool{&A{8675309, "Jenny"}: true, &A{9765683, "!Jenny"}: false} },
+		func() interface{} { return map[*C]bool{&C{8675309, "Jenny"}: true, &C{9765683, "!Jenny"}: false} },
 	}
 
 	for _, tc := range successCases {

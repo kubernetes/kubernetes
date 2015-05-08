@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,15 +42,15 @@ type FakeRuntime struct {
 }
 
 type FakeRuntimeCache struct {
-	runtime Runtime
+	getter podsGetter
 }
 
-func NewFakeRuntimeCache(runtime Runtime) RuntimeCache {
-	return &FakeRuntimeCache{runtime}
+func NewFakeRuntimeCache(getter podsGetter) RuntimeCache {
+	return &FakeRuntimeCache{getter}
 }
 
 func (f *FakeRuntimeCache) GetPods() ([]*Pod, error) {
-	return f.runtime.GetPods(false)
+	return f.getter.GetPods(false)
 }
 
 func (f *FakeRuntimeCache) ForceUpdateIfOlder(time.Time) error {
@@ -128,11 +128,11 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return f.Podlist, f.Err
 }
 
-func (f *FakeRuntime) RunPod(pod *api.Pod, volumeMap map[string]volume.VolumePlugin) error {
+func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus) error {
 	f.Lock()
 	defer f.Unlock()
 
-	f.CalledFunctions = append(f.CalledFunctions, "RunPod")
+	f.CalledFunctions = append(f.CalledFunctions, "SyncPod")
 	f.StartedPods = append(f.StartedPods, string(pod.UID))
 	for _, c := range pod.Spec.Containers {
 		f.StartedContainers = append(f.StartedContainers, c.Name)

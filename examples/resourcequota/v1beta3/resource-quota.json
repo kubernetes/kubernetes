@@ -2,7 +2,7 @@
   "apiVersion": "v1beta3",
   "kind": "ResourceQuota",
   "metadata": {
-    "name": "quota",
+    "name": "quota"
   },
   "spec": {
     "hard": {
@@ -12,6 +12,8 @@
       "services": "5",
       "replicationcontrollers":"20",
       "resourcequotas":"1",
-    },
+      "secrets":"10",
+      "persistentvolumeclaims":"10"
+    }
   }
 }

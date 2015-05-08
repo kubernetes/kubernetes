@@ -112,32 +112,33 @@ func (c Cap) String() string {
 		return "wake_alarm"
 	case CAP_BLOCK_SUSPEND:
 		return "block_suspend"
+	case CAP_AUDIT_READ:
+		return "audit_read"
 	}
 	return "unknown"
 }
 
+// POSIX-draft defined capabilities.
 const (
-	// POSIX-draft defined capabilities.
-
 	// In a system with the [_POSIX_CHOWN_RESTRICTED] option defined, this
 	// overrides the restriction of changing file ownership and group
 	// ownership.
-	CAP_CHOWN Cap = 0
+	CAP_CHOWN = Cap(0)
 
 	// Override all DAC access, including ACL execute access if
 	// [_POSIX_ACL] is defined. Excluding DAC access covered by
 	// CAP_LINUX_IMMUTABLE.
-	CAP_DAC_OVERRIDE Cap = 1
+	CAP_DAC_OVERRIDE = Cap(1)
 
 	// Overrides all DAC restrictions regarding read and search on files
 	// and directories, including ACL restrictions if [_POSIX_ACL] is
 	// defined. Excluding DAC access covered by CAP_LINUX_IMMUTABLE.
-	CAP_DAC_READ_SEARCH Cap = 2
+	CAP_DAC_READ_SEARCH = Cap(2)
 
 	// Overrides all restrictions about allowed operations on files, where
 	// file owner ID must be equal to the user ID, except where CAP_FSETID
 	// is applicable. It doesn't override MAC and DAC restrictions.
-	CAP_FOWNER Cap = 3
+	CAP_FOWNER = Cap(3)
 
 	// Overrides the following restrictions that the effective user ID
 	// shall match the file owner ID when setting the S_ISUID and S_ISGID
@@ -145,21 +146,21 @@ const (
 	// supplementary group IDs) shall match the file owner ID when setting
 	// the S_ISGID bit on that file; that the S_ISUID and S_ISGID bits are
 	// cleared on successful return from chown(2) (not implemented).
-	CAP_FSETID Cap = 4
+	CAP_FSETID = Cap(4)
 
 	// Overrides the restriction that the real or effective user ID of a
 	// process sending a signal must match the real or effective user ID
 	// of the process receiving the signal.
-	CAP_KILL Cap = 5
+	CAP_KILL = Cap(5)
 
 	// Allows setgid(2) manipulation
 	// Allows setgroups(2)
 	// Allows forged gids on socket credentials passing.
-	CAP_SETGID Cap = 6
+	CAP_SETGID = Cap(6)
 
 	// Allows set*uid(2) manipulation (including fsuid).
 	// Allows forged pids on socket credentials passing.
-	CAP_SETUID Cap = 7
+	CAP_SETUID = Cap(7)
 
 	// Linux-specific capabilities
 
@@ -171,17 +172,17 @@ const (
 	//     to the current process' inheritable set
 	//   Allow taking bits out of capability bounding set
 	//   Allow modification of the securebits for a process
-	CAP_SETPCAP Cap = 8
+	CAP_SETPCAP = Cap(8)
 
 	// Allow modification of S_IMMUTABLE and S_APPEND file attributes
-	CAP_LINUX_IMMUTABLE Cap = 9
+	CAP_LINUX_IMMUTABLE = Cap(9)
 
 	// Allows binding to TCP/UDP sockets below 1024
 	// Allows binding to ATM VCIs below 32
-	CAP_NET_BIND_SERVICE Cap = 10
+	CAP_NET_BIND_SERVICE = Cap(10)
 
 	// Allow broadcasting, listen to multicast
-	CAP_NET_BROADCAST Cap = 11
+	CAP_NET_BROADCAST = Cap(11)
 
 	// Allow interface configuration
 	// Allow administration of IP firewall, masquerading and accounting
@@ -196,36 +197,36 @@ const (
 	// Allow multicasting
 	// Allow read/write of device-specific registers
 	// Allow activation of ATM control sockets
-	CAP_NET_ADMIN Cap = 12
+	CAP_NET_ADMIN = Cap(12)
 
 	// Allow use of RAW sockets
 	// Allow use of PACKET sockets
 	// Allow binding to any address for transparent proxying (also via NET_ADMIN)
-	CAP_NET_RAW Cap = 13
+	CAP_NET_RAW = Cap(13)
 
 	// Allow locking of shared memory segments
 	// Allow mlock and mlockall (which doesn't really have anything to do
 	// with IPC)
-	CAP_IPC_LOCK Cap = 14
+	CAP_IPC_LOCK = Cap(14)
 
 	// Override IPC ownership checks
-	CAP_IPC_OWNER Cap = 15
+	CAP_IPC_OWNER = Cap(15)
 
 	// Insert and remove kernel modules - modify kernel without limit
-	CAP_SYS_MODULE Cap = 16
+	CAP_SYS_MODULE = Cap(16)
 
 	// Allow ioperm/iopl access
 	// Allow sending USB messages to any device via /proc/bus/usb
-	CAP_SYS_RAWIO Cap = 17
+	CAP_SYS_RAWIO = Cap(17)
 
 	// Allow use of chroot()
-	CAP_SYS_CHROOT Cap = 18
+	CAP_SYS_CHROOT = Cap(18)
 
 	// Allow ptrace() of any process
-	CAP_SYS_PTRACE Cap = 19
+	CAP_SYS_PTRACE = Cap(19)
 
 	// Allow configuration of process accounting
-	CAP_SYS_PACCT Cap = 20
+	CAP_SYS_PACCT = Cap(20)
 
 	// Allow configuration of the secure attention key
 	// Allow administration of the random device
@@ -263,10 +264,10 @@ const (
 	// arbitrary SCSI commands
 	// Allow setting encryption key on loopback filesystem
 	// Allow setting zone reclaim policy
-	CAP_SYS_ADMIN Cap = 21
+	CAP_SYS_ADMIN = Cap(21)
 
 	// Allow use of reboot()
-	CAP_SYS_BOOT Cap = 22
+	CAP_SYS_BOOT = Cap(22)
 
 	// Allow raising priority and setting priority on other (different
 	// UID) processes
@@ -274,7 +275,7 @@ const (
 	// processes and setting the scheduling algorithm used by another
 	// process.
 	// Allow setting cpu affinity on other processes
-	CAP_SYS_NICE Cap = 23
+	CAP_SYS_NICE = Cap(23)
 
 	// Override resource limits. Set resource limits.
 	// Override quota limits.
@@ -287,33 +288,33 @@ const (
 	// Allow more than 64hz interrupts from the real-time clock
 	// Override max number of consoles on console allocation
 	// Override max number of keymaps
-	CAP_SYS_RESOURCE Cap = 24
+	CAP_SYS_RESOURCE = Cap(24)
 
 	// Allow manipulation of system clock
 	// Allow irix_stime on mips
 	// Allow setting the real-time clock
-	CAP_SYS_TIME Cap = 25
+	CAP_SYS_TIME = Cap(25)
 
 	// Allow configuration of tty devices
 	// Allow vhangup() of tty
-	CAP_SYS_TTY_CONFIG Cap = 26
+	CAP_SYS_TTY_CONFIG = Cap(26)
 
 	// Allow the privileged aspects of mknod()
-	CAP_MKNOD Cap = 27
+	CAP_MKNOD = Cap(27)
 
 	// Allow taking of leases on files
-	CAP_LEASE Cap = 28
+	CAP_LEASE = Cap(28)
 
-	CAP_AUDIT_WRITE   Cap = 29
-	CAP_AUDIT_CONTROL Cap = 30
-	CAP_SETFCAP       Cap = 31
+	CAP_AUDIT_WRITE   = Cap(29)
+	CAP_AUDIT_CONTROL = Cap(30)
+	CAP_SETFCAP       = Cap(31)
 
 	// Override MAC access.
 	// The base kernel enforces no MAC policy.
 	// An LSM may enforce a MAC policy, and if it does and it chooses
 	// to implement capability based overrides of that policy, this is
 	// the capability it should use to do so.
-	CAP_MAC_OVERRIDE Cap = 32
+	CAP_MAC_OVERRIDE = Cap(32)
 
 	// Allow MAC configuration or state changes.
 	// The base kernel requires no MAC configuration.
@@ -321,18 +322,24 @@ const (
 	// to implement capability based checks on modifications to that
 	// policy or the data required to maintain it, this is the
 	// capability it should use to do so.
-	CAP_MAC_ADMIN Cap = 33
+	CAP_MAC_ADMIN = Cap(33)
 
 	// Allow configuring the kernel's syslog (printk behaviour)
-	CAP_SYSLOG Cap = 34
+	CAP_SYSLOG = Cap(34)
 
 	// Allow triggering something that will wake the system
-	CAP_WAKE_ALARM Cap = 35
+	CAP_WAKE_ALARM = Cap(35)
 
 	// Allow preventing system suspends
-	CAP_BLOCK_SUSPEND Cap = 36
+	CAP_BLOCK_SUSPEND = Cap(36)
 
-	CAP_LAST_CAP = CAP_BLOCK_SUSPEND
+	// Allow reading audit messages from the kernel
+	CAP_AUDIT_READ = Cap(37)
 )
 
-const capUpperMask = (uint32(1) << (uint(CAP_LAST_CAP) - 31)) - 1
+var (
+	// Highest valid capability of the running kernel.
+	CAP_LAST_CAP = Cap(63)
+
+	capUpperMask = ^uint32(0)
+)

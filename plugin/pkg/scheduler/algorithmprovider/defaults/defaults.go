@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -60,6 +60,8 @@ func defaultPriorities() util.StringSet {
 	return util.NewStringSet(
 		// Prioritize nodes by least requested utilization.
 		factory.RegisterPriorityFunction("LeastRequestedPriority", algorithm.LeastRequestedPriority, 1),
+		// Prioritizes nodes to help achieve balanced resource usage
+		factory.RegisterPriorityFunction("BalancedResourceAllocation", algorithm.BalancedResourceAllocation, 1),
 		// spreads pods by minimizing the number of pods (belonging to the same service) on the same minion.
 		factory.RegisterPriorityConfigFactory(
 			"ServiceSpreadingPriority",

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,8 +23,9 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
@@ -39,15 +40,17 @@ func newPod(uid, name string) *api.Pod {
 
 func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 	fakeDocker := &dockertools.FakeDockerClient{}
-	fakeDockerCache := dockertools.NewFakeDockerCache(fakeDocker)
-	recorder := &record.FakeRecorder{}
+	fakeRecorder := &record.FakeRecorder{}
+	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, newKubeletRuntimeHooks(fakeRecorder))
+	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(dockerManager)
 
 	lock := sync.Mutex{}
 	processed := make(map[types.UID][]string)
 
 	podWorkers := newPodWorkers(
-		fakeDockerCache,
-		func(pod *api.Pod, mirrorPod *api.Pod, runningPod container.Pod) error {
+		fakeRuntimeCache,
+		func(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
@@ -55,7 +58,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 			}()
 			return nil
 		},
-		recorder,
+		fakeRecorder,
 	)
 	return podWorkers, processed
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ type RESTClient struct {
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server. If this client should use the older, legacy
 // API conventions from Kubernetes API v1beta1 and v1beta2, set legacyBehavior true.
-func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyBehavior bool, maxQPS float32) *RESTClient {
+func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyBehavior bool, maxQPS float32, maxBurst int) *RESTClient {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -71,7 +71,7 @@ func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyB
 
 	var throttle util.RateLimiter
 	if maxQPS > 0 {
-		throttle = util.NewTokenBucketRateLimiter(maxQPS, 10)
+		throttle = util.NewTokenBucketRateLimiter(maxQPS, maxBurst)
 	}
 	return &RESTClient{
 		baseURL:    &base,

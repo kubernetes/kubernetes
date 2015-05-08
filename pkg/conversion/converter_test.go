@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,19 @@ import (
 
 	"github.com/google/gofuzz"
 )
+
+func TestConverter_byteSlice(t *testing.T) {
+	c := NewConverter()
+	src := []byte{1, 2, 3}
+	dest := []byte{}
+	err := c.Convert(&src, &dest, 0, nil)
+	if err != nil {
+		t.Fatalf("expected no error")
+	}
+	if e, a := src, dest; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %#v, got %#v", e, a)
+	}
+}
 
 func TestConverter_DefaultConvert(t *testing.T) {
 	type A struct {
@@ -171,6 +184,28 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	err = c.Convert(&A{}, &C{}, 0, nil)
 	if err == nil {
 		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestConverter_GeneratedConversionOverriden(t *testing.T) {
+	type A struct{}
+	type B struct{}
+	c := NewConverter()
+	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if err := c.RegisterGeneratedConversionFunc(func(in *A, out *B, s Scope) error {
+		return fmt.Errorf("generated function should be overriden")
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	a := A{}
+	b := B{}
+	if err := c.Convert(&a, &b, 0, nil); err != nil {
+		t.Errorf("%v", err)
 	}
 }
 

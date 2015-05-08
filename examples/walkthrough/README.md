@@ -19,7 +19,7 @@ desiredState:
     id: www
     containers:
       - name: nginx
-        image: dockerfile/nginx
+        image: nginx
 ```
 
 A pod definition is a declaration of a _desired state_.  Desired state is a very important concept in the Kubernetes model.  Many things present a desired state to the system, and it is Kubernetes' responsibility to make sure that the current state matches the desired state.  For example, when you create a Pod, you declare that you want the containers in it to be running.  If the containers happen to not be running (e.g. program failure, ...), Kubernetes will continue to (re-)create them for you in order to drive them to the desired state. This process continues until you delete the Pod.
@@ -40,7 +40,7 @@ desiredState:
     id: storage
     containers:
       - name: redis
-        image: dockerfile/redis
+        image: redis
         volumeMounts:
             # name must match the volume name below
           - name: redis-persistent-storage
@@ -55,23 +55,23 @@ desiredState:
 Ok, so what did we do?  We added a volume to our pod:
 
 ```yaml
-...
+    # ...
     volumes:
       - name: redis-persistent-storage
         source:
           emptyDir: {}
-...
+    # ...
 ```
 
 And we added a reference to that volume to our container:
 ```yaml
-...
+    # ...
         volumeMounts:
             # name must match the volume name below
           - name: redis-persistent-storage
             # mount path within the container
             mountPath: /data/redis
-...
+    # ...
 ```
 
 In Kubernetes, ```emptyDir``` Volumes live for the lifespan of the Pod, which is longer than the lifespan of any one container, so if the container fails and is restarted, our persistent storage will live on.
@@ -98,7 +98,7 @@ desiredState:
     id: www
     containers:
       - name: nginx
-        image: dockerfile/nginx
+        image: nginx
         volumeMounts:
           - name: www-data
             mountPath: /srv/www
@@ -114,7 +114,7 @@ desiredState:
     volumes:
       - name: www-data
         source:
-          emptyDir
+          emptyDir: {}
 ```
 
 Note that we have also added a volume here.  In this case, the volume is mounted into both containers.  It is marked ```readOnly``` in the web server's case, since it doesn't need to write to the directory.

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
@@ -49,23 +50,33 @@ type externalType struct {
 	Name string `json:"name"`
 }
 
-func (*internalType) IsAnAPIObject() {}
-func (*externalType) IsAnAPIObject() {}
+type ExternalType2 struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+
+	Name string `json:"name"`
+}
+
+func (*internalType) IsAnAPIObject()  {}
+func (*externalType) IsAnAPIObject()  {}
+func (*ExternalType2) IsAnAPIObject() {}
 
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName("", "Type", &internalType{})
 	scheme.AddKnownTypeWithName("unlikelyversion", "Type", &externalType{})
+	scheme.AddKnownTypeWithName("v1beta1", "Type", &ExternalType2{})
 
 	codec := runtime.CodecFor(scheme, "unlikelyversion")
-	mapper := meta.NewDefaultRESTMapper([]string{"unlikelyversion"}, func(version string) (*meta.VersionInterfaces, bool) {
+	validVersion := testapi.Version()
+	mapper := meta.NewDefaultRESTMapper([]string{"unlikelyversion", validVersion}, func(version string) (*meta.VersionInterfaces, bool) {
 		return &meta.VersionInterfaces{
-			Codec:            codec,
+			Codec:            runtime.CodecFor(scheme, version),
 			ObjectConvertor:  scheme,
 			MetadataAccessor: meta.NewAccessor(),
-		}, (version == "unlikelyversion")
+		}, (version == validVersion || version == "unlikelyversion")
 	})
-	for _, version := range []string{"unlikelyversion"} {
+	for _, version := range []string{"unlikelyversion", validVersion} {
 		for kind := range scheme.KnownTypes(version) {
 			mixedCase := false
 			scope := meta.RESTScopeNamespace
@@ -142,6 +153,20 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	}, t, codec
 }
 
+func NewMixedFactory(apiClient resource.RESTClient) (*cmdutil.Factory, *testFactory, runtime.Codec) {
+	f, t, c := NewTestFactory()
+	f.Object = func() (meta.RESTMapper, runtime.ObjectTyper) {
+		return meta.MultiRESTMapper{t.Mapper, latest.RESTMapper}, runtime.MultiObjectTyper{t.Typer, api.Scheme}
+	}
+	f.RESTClient = func(m *meta.RESTMapping) (resource.RESTClient, error) {
+		if m.ObjectConvertor == api.Scheme {
+			return apiClient, t.Err
+		}
+		return t.Client, t.Err
+	}
+	return f, t, c
+}
+
 func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	t := &testFactory{
 		Validator: validation.NullSchema{},
@@ -149,6 +174,13 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return latest.RESTMapper, api.Scheme
+		},
+		Client: func() (*client.Client, error) {
+			// Swap out the HTTP client out of the client with the fake's version.
+			fakeClient := t.Client.(*client.FakeRESTClient)
+			c := client.NewOrDie(t.ClientConfig)
+			c.Client = fakeClient.Client
+			return c, t.Err
 		},
 		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
@@ -168,7 +200,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		ClientConfig: func() (*client.Config, error) {
 			return t.ClientConfig, t.Err
 		},
-	}, t, latest.Codec
+	}, t, testapi.Codec()
 }
 
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
@@ -183,23 +215,17 @@ func stringBody(body string) io.ReadCloser {
 func TestClientVersions(t *testing.T) {
 	f := cmdutil.NewFactory(nil)
 
-	versions := []string{
-		"v1beta1",
-		"v1beta2",
-		"v1beta3",
+	version := testapi.Version()
+	mapping := &meta.RESTMapping{
+		APIVersion: version,
 	}
-	for _, version := range versions {
-		mapping := &meta.RESTMapping{
-			APIVersion: version,
-		}
-		c, err := f.RESTClient(mapping)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		client := c.(*client.RESTClient)
-		if client.APIVersion() != version {
-			t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
-		}
+	c, err := f.RESTClient(mapping)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	client := c.(*client.RESTClient)
+	if client.APIVersion() != version {
+		t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
 	}
 }
 

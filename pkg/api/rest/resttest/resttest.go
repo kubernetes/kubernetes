@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -179,7 +179,7 @@ func (t *Tester) TestCreateRejectsMismatchedNamespace(valid runtime.Object) {
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if strings.Contains(err.Error(), "Controller.Namespace does not match the provided context") {
-		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
+		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err)
 	}
 }
 
@@ -195,7 +195,30 @@ func (t *Tester) TestCreateRejectsNamespace(valid runtime.Object) {
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if strings.Contains(err.Error(), "Controller.Namespace does not match the provided context") {
-		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
+		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err)
+	}
+}
+
+func (t *Tester) TestUpdate(valid runtime.Object, existing, older runtime.Object) {
+	t.TestUpdateFailsOnNotFound(copyOrDie(valid))
+	t.TestUpdateFailsOnVersion(copyOrDie(older))
+}
+
+func (t *Tester) TestUpdateFailsOnNotFound(valid runtime.Object) {
+	_, _, err := t.storage.(rest.Updater).Update(api.NewDefaultContext(), valid)
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if !errors.IsNotFound(err) {
+		t.Errorf("Expected NotFound error, got '%v'", err)
+	}
+}
+
+func (t *Tester) TestUpdateFailsOnVersion(older runtime.Object) {
+	_, _, err := t.storage.(rest.Updater).Update(api.NewDefaultContext(), older)
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if !errors.IsConflict(err) {
+		t.Errorf("Expected Conflict error, got '%v'", err)
 	}
 }
 
@@ -248,7 +271,6 @@ func (t *Tester) TestDeleteNoGraceful(createFn func() runtime.Object, wasGracefu
 	if err != nil {
 		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, existing)
 	}
-
 	ctx := api.WithNamespace(api.NewContext(), objectMeta.Namespace)
 	_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, api.NewDeleteOptions(10))
 	if err != nil {

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,6 +33,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
@@ -42,12 +45,12 @@ type fakeKubelet struct {
 	podByNameFunc                      func(namespace, name string) (*api.Pod, bool)
 	statusFunc                         func(name string) (api.PodStatus, error)
 	containerInfoFunc                  func(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
-	rootInfoFunc                       func(query *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
+	rawInfoFunc                        func(query *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error)
 	machineInfoFunc                    func() (*cadvisorApi.MachineInfo, error)
-	podsFunc                           func() []api.Pod
+	podsFunc                           func() []*api.Pod
 	logFunc                            func(w http.ResponseWriter, req *http.Request)
 	runFunc                            func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
-	dockerVersionFunc                  func() ([]uint, error)
+	containerVersionFunc               func() (kubecontainer.Version, error)
 	execFunc                           func(pod string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	portForwardFunc                    func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
 	containerLogsFunc                  func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
@@ -67,19 +70,19 @@ func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, conta
 	return fk.containerInfoFunc(podFullName, uid, containerName, req)
 }
 
-func (fk *fakeKubelet) GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
-	return fk.rootInfoFunc(req)
+func (fk *fakeKubelet) GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error) {
+	return fk.rawInfoFunc(req)
 }
 
-func (fk *fakeKubelet) GetDockerVersion() ([]uint, error) {
-	return fk.dockerVersionFunc()
+func (fk *fakeKubelet) GetContainerRuntimeVersion() (kubecontainer.Version, error) {
+	return fk.containerVersionFunc()
 }
 
 func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return fk.machineInfoFunc()
 }
 
-func (fk *fakeKubelet) GetPods() []api.Pod {
+func (fk *fakeKubelet) GetPods() []*api.Pod {
 	return fk.podsFunc()
 }
 
@@ -267,9 +270,15 @@ func TestContainerNotFound(t *testing.T) {
 
 func TestRootInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &cadvisorApi.ContainerInfo{}
-	fw.fakeKubelet.rootInfoFunc = func(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
-		return expectedInfo, nil
+	expectedInfo := &cadvisorApi.ContainerInfo{
+		ContainerReference: cadvisorApi.ContainerReference{
+			Name: "/",
+		},
+	}
+	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+		return map[string]*cadvisorApi.ContainerInfo{
+			expectedInfo.Name: expectedInfo,
+		}, nil
 	}
 
 	resp, err := http.Get(fw.testHTTPServer.URL + "/stats")
@@ -283,7 +292,52 @@ func TestRootInfo(t *testing.T) {
 		t.Fatalf("received invalid json data: %v", err)
 	}
 	if !receivedInfo.Eq(expectedInfo) {
-		t.Errorf("received wrong data: %#v", receivedInfo)
+		t.Errorf("received wrong data: %#v, expected %#v", receivedInfo, expectedInfo)
+	}
+}
+
+func TestSubcontainerContainerInfo(t *testing.T) {
+	fw := newServerTest()
+	const kubeletContainer = "/kubelet"
+	const kubeletSubContainer = "/kubelet/sub"
+	expectedInfo := map[string]*cadvisorApi.ContainerInfo{
+		kubeletContainer: {
+			ContainerReference: cadvisorApi.ContainerReference{
+				Name: kubeletContainer,
+			},
+		},
+		kubeletSubContainer: {
+			ContainerReference: cadvisorApi.ContainerReference{
+				Name: kubeletSubContainer,
+			},
+		},
+	}
+	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+		return expectedInfo, nil
+	}
+
+	request := fmt.Sprintf("{\"containerName\":%q, \"subcontainers\": true}", kubeletContainer)
+	resp, err := http.Post(fw.testHTTPServer.URL+"/stats/container", "application/json", bytes.NewBuffer([]byte(request)))
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+	var receivedInfo map[string]*cadvisorApi.ContainerInfo
+	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
+	if err != nil {
+		t.Fatalf("Received invalid json data: %v", err)
+	}
+	if len(receivedInfo) != len(expectedInfo) {
+		t.Errorf("Received wrong data: %#v, expected %#v", receivedInfo, expectedInfo)
+	}
+
+	for _, containerName := range []string{kubeletContainer, kubeletSubContainer} {
+		if _, ok := receivedInfo[containerName]; !ok {
+			t.Errorf("Expected container %q to be present in result: %#v", containerName, receivedInfo)
+		}
+		if !receivedInfo[containerName].Eq(expectedInfo[containerName]) {
+			t.Errorf("Invalid result for %q: Expected %#v, received %#v", containerName, expectedInfo[containerName], receivedInfo[containerName])
+		}
 	}
 }
 
@@ -424,33 +478,10 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	}
 }
 
-// TODO: fix me when pod level stats get implemented
-func TestPodsInfo(t *testing.T) {
-	fw := newServerTest()
-
-	resp, err := http.Get(fw.testHTTPServer.URL + "/stats/goodpod")
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("expected status code %d, got %d", http.StatusInternalServerError, resp.StatusCode)
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		// copying the response body did not work
-		t.Fatalf("Cannot copy resp: %#v", err)
-	}
-	result := string(body)
-	if !strings.Contains(result, "pod level status currently unimplemented") {
-		t.Errorf("expected body contains pod level status currently unimplemented, got %s", result)
-	}
-}
-
 func TestHealthCheck(t *testing.T) {
 	fw := newServerTest()
-	fw.fakeKubelet.dockerVersionFunc = func() ([]uint, error) {
-		return []uint{1, 15}, nil
+	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
+		return dockertools.NewVersion("1.15")
 	}
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"
@@ -488,9 +519,9 @@ func TestHealthCheck(t *testing.T) {
 		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
 	}
 
-	//Test with old docker version
-	fw.fakeKubelet.dockerVersionFunc = func() ([]uint, error) {
-		return []uint{1, 1}, nil
+	//Test with old container runtime version
+	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
+		return dockertools.NewVersion("1.1")
 	}
 
 	resp, err = http.Get(fw.testHTTPServer.URL + "/healthz")
@@ -655,15 +686,6 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	if conn == nil {
 		t.Fatal("Unexpected nil connection")
 	}
-	defer conn.Close()
-
-	h := http.Header{}
-	h.Set(api.StreamType, api.StreamTypeError)
-	stream, err := conn.CreateStream(h)
-	if err != nil {
-		t.Fatalf("error creating input stream: %v", err)
-	}
-	defer stream.Reset()
 
 	<-conn.CloseChan()
 }

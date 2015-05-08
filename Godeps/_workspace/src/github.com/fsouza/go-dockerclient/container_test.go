@@ -1,4 +1,4 @@
-// Copyright 2014 go-dockerclient authors. All rights reserved.
+// Copyright 2015 go-dockerclient authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -7,6 +7,7 @@ package docker
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -154,6 +155,7 @@ func TestListContainersFailure(t *testing.T) {
 func TestInspectContainer(t *testing.T) {
 	jsonContainer := `{
              "Id": "4fa6e0f0c6786287e131c3852c58a2e01cc697a68231826813597e4994f1d6e2",
+             "AppArmorProfile": "Profile",
              "Created": "2013-05-07T14:51:42.087658+02:00",
              "Path": "date",
              "Args": [],
@@ -175,7 +177,10 @@ func TestInspectContainer(t *testing.T) {
                      ],
                      "Image": "base",
                      "Volumes": {},
-                     "VolumesFrom": ""
+                     "VolumesFrom": "",
+                     "SecurityOpt": [
+                         "label:user:USER"
+                      ]
              },
              "State": {
                      "Running": false,
@@ -184,6 +189,21 @@ func TestInspectContainer(t *testing.T) {
                      "StartedAt": "2013-05-07T14:51:42.087658+02:00",
                      "Ghost": false
              },
+             "Node": {
+                  "ID": "4I4E:QR4I:Z733:QEZK:5X44:Q4T7:W2DD:JRDY:KB2O:PODO:Z5SR:XRB6",
+                  "IP": "192.168.99.105",
+                  "Addra": "192.168.99.105:2376",
+                  "Name": "node-01",
+                  "Cpus": 4,
+                  "Memory": 1048436736,
+                  "Labels": {
+                      "executiondriver": "native-0.2",
+                      "kernelversion": "3.18.5-tinycore64",
+                      "operatingsystem": "Boot2Docker 1.5.0 (TCL 5.4); master : a66bce5 - Tue Feb 10 23:31:27 UTC 2015",
+                      "provider": "virtualbox",
+                      "storagedriver": "aufs"
+                  }
+              },
              "Image": "b750fe79269d2ec9a3c593ef05b4332b1d1a02a62b4accb2c21d589ff2f5f2dc",
              "NetworkSettings": {
                      "IpAddress": "",
@@ -209,7 +229,8 @@ func TestInspectContainer(t *testing.T) {
                  ]
                },
                "Links": null,
-               "PublishAllPorts": false
+               "PublishAllPorts": false,
+               "CgroupParent": "/mesos"
              }
 }`
 	var expected Container
@@ -511,12 +532,17 @@ func TestStartContainerNilHostConfig(t *testing.T) {
 	if contentType := req.Header.Get("Content-Type"); contentType != expectedContentType {
 		t.Errorf("StartContainer(%q): Wrong content-type in request. Want %q. Got %q.", id, expectedContentType, contentType)
 	}
+	var buf [4]byte
+	req.Body.Read(buf[:])
+	if string(buf[:]) != "null" {
+		t.Errorf("Startcontainer(%q): Wrong body. Want null. Got %s", buf[:])
+	}
 }
 
 func TestStartContainerNotFound(t *testing.T) {
 	client := newTestClient(&FakeRoundTripper{message: "no such container", status: http.StatusNotFound})
 	err := client.StartContainer("a2344", &HostConfig{})
-	expected := &NoSuchContainer{ID: "a2344"}
+	expected := &NoSuchContainer{ID: "a2344", Err: err.(*NoSuchContainer).Err}
 	if !reflect.DeepEqual(err, expected) {
 		t.Errorf("StartContainer: Wrong error returned. Want %#v. Got %#v.", expected, err)
 	}
@@ -1287,6 +1313,14 @@ func TestNoSuchContainerError(t *testing.T) {
 	}
 }
 
+func TestNoSuchContainerErrorMessage(t *testing.T) {
+	var err = &NoSuchContainer{ID: "i345", Err: errors.New("some advanced error info")}
+	expected := "some advanced error info"
+	if got := err.Error(); got != expected {
+		t.Errorf("NoSuchContainer: wrong message. Want %q. Got %q.", expected, got)
+	}
+}
+
 func TestExportContainer(t *testing.T) {
 	content := "exported container tar content"
 	out := stdoutMock{bytes.NewBufferString(content)}
@@ -1311,7 +1345,7 @@ func TestExportContainerViaUnixSocket(t *testing.T) {
 	tempSocket := tempfile("export_socket")
 	defer os.Remove(tempSocket)
 	endpoint := "unix://" + tempSocket
-	u, _ := parseEndpoint(endpoint)
+	u, _ := parseEndpoint(endpoint, false)
 	client := Client{
 		HTTPClient:             http.DefaultClient,
 		endpoint:               endpoint,
@@ -1520,5 +1554,28 @@ func TestTopContainerWithPsArgs(t *testing.T) {
 	expectedURI := "/containers/abef348/top?ps_args=aux"
 	if !strings.HasSuffix(fakeRT.requests[0].URL.String(), expectedURI) {
 		t.Errorf("TopContainer: Expected URI to have %q. Got %q.", expectedURI, fakeRT.requests[0].URL.String())
+	}
+}
+
+func TestRenameContainer(t *testing.T) {
+	fakeRT := &FakeRoundTripper{message: "", status: http.StatusOK}
+	client := newTestClient(fakeRT)
+	opts := RenameContainerOptions{ID: "something_old", Name: "something_new"}
+	err := client.RenameContainer(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := fakeRT.requests[0]
+	if req.Method != "POST" {
+		t.Errorf("RenameContainer: wrong HTTP method. Want %q. Got %q.", "POST", req.Method)
+	}
+	expectedURL, _ := url.Parse(client.getURL("/containers/something_old/rename?name=something_new"))
+	if gotPath := req.URL.Path; gotPath != expectedURL.Path {
+		t.Errorf("RenameContainer: Wrong path in request. Want %q. Got %q.", expectedURL.Path, gotPath)
+	}
+	expectedValues := expectedURL.Query()["name"]
+	actualValues := req.URL.Query()["name"]
+	if len(actualValues) != 1 || expectedValues[0] != actualValues[0] {
+		t.Errorf("RenameContainer: Wrong params in request. Want %q. Got %q.", expectedValues, actualValues)
 	}
 }

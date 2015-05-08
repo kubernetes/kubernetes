@@ -1,0 +1,6 @@
+server {
+    listen %(api_bind_address)s:80;
+    location %(web_uri)s {
+        alias /opt/kubernetes/_output/local/bin/linux/amd64/;
+    }
+}

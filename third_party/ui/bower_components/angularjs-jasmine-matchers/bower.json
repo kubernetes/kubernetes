@@ -1,0 +1,24 @@
+{
+    "name": "angular-jasmine-matchers",
+    "version": "0.0.7",
+    "main": "./dist/matchers.js",
+    "dependencies": {
+        "angular": ">= 1.1.2"
+    },
+    "ignore": [
+        "**/.*",
+        "_*",
+        "node_modules",
+        "config",
+        "lib",
+        "test",
+        "DEVELOP.md",
+        "CHANGELOG.md",
+        "LICENSE",
+        "Gruntfile.js",
+        "browserstack.json",
+        "composer.json",
+        "package.json",
+        ".*"
+    ]
+}

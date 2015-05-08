@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -248,36 +248,102 @@ func (r *Request) RequestURI(uri string) *Request {
 	return r
 }
 
-/*
-// ParseSelectorParam parses the given string as a resource selector.
-// This is a convenience function so you don't have to first check that it's a
-// validly formatted selector.
-func (r *Request) ParseSelectorParam(paramName, item string) *Request {
-	if r.err != nil {
-		return r
+const (
+	// A constant that clients can use to refer in a field selector to the object name field.
+	// Will be automatically emitted as the correct name for the API version.
+	NodeUnschedulable = "spec.unschedulable"
+	ObjectNameField   = "metadata.name"
+	PodHost           = "spec.host"
+	SecretType        = "type"
+)
+
+type clientFieldNameToAPIVersionFieldName map[string]string
+
+func (c clientFieldNameToAPIVersionFieldName) filterField(field, value string) (newField, newValue string, err error) {
+	newFieldName, ok := c[field]
+	if !ok {
+		return "", "", fmt.Errorf("%v - %v - no field mapping defined", field, value)
 	}
-	var selector string
-	var err error
-	switch paramName {
-	case "labels":
-		var lsel labels.Selector
-		if lsel, err = labels.Parse(item); err == nil {
-			selector = lsel.String()
-		}
-	case "fields":
-		var fsel fields.Selector
-		if fsel, err = fields.ParseSelector(item); err == nil {
-			selector = fsel.String()
-		}
-	default:
-		err = fmt.Errorf("unknown parameter name '%s'", paramName)
+	return newFieldName, value, nil
+}
+
+type resourceTypeToFieldMapping map[string]clientFieldNameToAPIVersionFieldName
+
+func (r resourceTypeToFieldMapping) filterField(resourceType, field, value string) (newField, newValue string, err error) {
+	fMapping, ok := r[resourceType]
+	if !ok {
+		return "", "", fmt.Errorf("%v - %v - %v - no field mapping defined", resourceType, field, value)
 	}
+	return fMapping.filterField(field, value)
+}
+
+type versionToResourceToFieldMapping map[string]resourceTypeToFieldMapping
+
+func (v versionToResourceToFieldMapping) filterField(apiVersion, resourceType, field, value string) (newField, newValue string, err error) {
+	rMapping, ok := v[apiVersion]
+	if !ok {
+		glog.Warningf("field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", apiVersion, resourceType, field, value)
+		return field, value, nil
+	}
+	newField, newValue, err = rMapping.filterField(resourceType, field, value)
 	if err != nil {
-		r.err = err
-		return r
+		// This is only a warning until we find and fix all of the client's usages.
+		glog.Warningf("field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", apiVersion, resourceType, field, value)
+		return field, value, nil
 	}
-	return r.setParam(paramName, selector)
-}*/
+	return newField, newValue, nil
+}
+
+var fieldMappings = versionToResourceToFieldMapping{
+	"v1beta1": resourceTypeToFieldMapping{
+		"nodes": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:   "name",
+			NodeUnschedulable: "unschedulable",
+		},
+		"minions": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:   "name",
+			NodeUnschedulable: "unschedulable",
+		},
+		"pods": clientFieldNameToAPIVersionFieldName{
+			PodHost: "DesiredState.Host",
+		},
+		"secrets": clientFieldNameToAPIVersionFieldName{
+			SecretType: "type",
+		},
+	},
+	"v1beta2": resourceTypeToFieldMapping{
+		"nodes": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:   "name",
+			NodeUnschedulable: "unschedulable",
+		},
+		"minions": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:   "name",
+			NodeUnschedulable: "unschedulable",
+		},
+		"pods": clientFieldNameToAPIVersionFieldName{
+			PodHost: "DesiredState.Host",
+		},
+		"secrets": clientFieldNameToAPIVersionFieldName{
+			SecretType: "type",
+		},
+	},
+	"v1beta3": resourceTypeToFieldMapping{
+		"nodes": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:   "metadata.name",
+			NodeUnschedulable: "spec.unschedulable",
+		},
+		"minions": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:   "metadata.name",
+			NodeUnschedulable: "spec.unschedulable",
+		},
+		"pods": clientFieldNameToAPIVersionFieldName{
+			PodHost: "spec.host",
+		},
+		"secrets": clientFieldNameToAPIVersionFieldName{
+			SecretType: "type",
+		},
+	},
+}
 
 // FieldsSelectorParam adds the given selector as a query parameter with the name paramName.
 func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
@@ -287,7 +353,14 @@ func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 	if s.Empty() {
 		return r
 	}
-	return r.setParam(api.FieldSelectorQueryParam(r.apiVersion), s.String())
+	s2, err := s.Transform(func(field, value string) (newField, newValue string, err error) {
+		return fieldMappings.filterField(r.apiVersion, r.resource, field, value)
+	})
+	if err != nil {
+		r.err = err
+		return r
+	}
+	return r.setParam(api.FieldSelectorQueryParam(r.apiVersion), s2.String())
 }
 
 // LabelsSelectorParam adds the given selector as a query parameter
@@ -382,7 +455,8 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
-func (r *Request) finalURL() string {
+// URL returns the current working URL.
+func (r *Request) URL() *url.URL {
 	p := r.path
 	if r.namespaceSet && !r.namespaceInQuery && len(r.namespace) > 0 {
 		p = path.Join(p, "namespaces", r.namespace)
@@ -399,9 +473,9 @@ func (r *Request) finalURL() string {
 		p = path.Join(p, r.resourceName, r.subresource, r.subpath)
 	}
 
-	finalURL := url.URL{}
+	finalURL := &url.URL{}
 	if r.baseURL != nil {
-		finalURL = *r.baseURL
+		*finalURL = *r.baseURL
 	}
 	finalURL.Path = p
 
@@ -421,16 +495,16 @@ func (r *Request) finalURL() string {
 		query.Set("timeout", r.timeout.String())
 	}
 	finalURL.RawQuery = query.Encode()
-	return finalURL.String()
+	return finalURL
 }
 
-// Similar to finalURL(), but if the request contains name of an object
+// finalURLTemplate is similar to URL(), but if the request contains name of an object
 // (e.g. GET for a specific Pod) it will be substited with "<name>".
-func (r Request) finalURLTemplate() string {
+func (r *Request) finalURLTemplate() string {
 	if len(r.resourceName) != 0 {
 		r.resourceName = "<name>"
 	}
-	return r.finalURL()
+	return r.URL().String()
 }
 
 // Watch attempts to begin watching the requested location.
@@ -439,7 +513,8 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	req, err := http.NewRequest(r.verb, r.finalURL(), r.body)
+	url := r.URL().String()
+	req, err := http.NewRequest(r.verb, url, r.body)
 	if err != nil {
 		return nil, err
 	}
@@ -449,46 +524,32 @@ func (r *Request) Watch() (watch.Interface, error) {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		if isProbableEOF(err) {
+		// The watch stream mechanism handles many common partial data errors, so closed
+		// connections can be retried in many cases.
+		if util.IsProbableEOF(err) {
 			return watch.NewEmptyWatch(), nil
 		}
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		if _, _, err := r.transformResponse(resp, req, nil); err != nil {
-			return nil, err
+		if result := r.transformResponse(resp, req); result.err != nil {
+			return nil, result.err
 		}
-		return nil, fmt.Errorf("for request '%+v', got status: %v", req.URL, resp.StatusCode)
+		return nil, fmt.Errorf("for request '%+v', got status: %v", url, resp.StatusCode)
 	}
 	return watch.NewStreamWatcher(watchjson.NewDecoder(resp.Body, r.codec)), nil
 }
 
-// isProbableEOF returns true if the given error resembles a connection termination
-// scenario that would justify assuming that the watch is empty. The watch stream
-// mechanism handles many common partial data errors, so closed connections can be
-// retried in many cases.
-func isProbableEOF(err error) bool {
-	if uerr, ok := err.(*url.Error); ok {
-		err = uerr.Err
-	}
-	switch {
-	case err == io.EOF:
-		return true
-	case err.Error() == "http: can't write HTTP request on broken connection":
-		return true
-	case strings.Contains(err.Error(), "connection reset by peer"):
-		return true
-	}
-	return false
-}
-
 // Stream formats and executes the request, and offers streaming of the response.
 // Returns io.ReadCloser which could be used for streaming of the response, or an error
+// Any non-2xx http status code causes an error.  If we get a non-2xx code, we try to convert the body into an APIStatus object.
+// If we can, we return that as an error.  Otherwise, we create an error that lists the http status and the content of the response.
 func (r *Request) Stream() (io.ReadCloser, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	req, err := http.NewRequest(r.verb, r.finalURL(), nil)
+	url := r.URL().String()
+	req, err := http.NewRequest(r.verb, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -500,6 +561,30 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	switch {
+	case (resp.StatusCode >= 200) && (resp.StatusCode < 300):
+		return resp.Body, nil
+
+	default:
+		// we have a decent shot at taking the object returned, parsing it as a status object and returning a more normal error
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("%v while accessing %v", resp.Status, url)
+		}
+
+		if runtimeObject, err := r.codec.Decode(bodyBytes); err == nil {
+			statusError := errors.FromObject(runtimeObject)
+
+			if _, ok := statusError.(APIStatus); ok {
+				return nil, statusError
+			}
+		}
+
+		bodyText := string(bodyBytes)
+		return nil, fmt.Errorf("%s while accessing %v: %s", resp.Status, url, bodyText)
+	}
+
 	return resp.Body, nil
 }
 
@@ -524,7 +609,7 @@ func (r *Request) Upgrade(config *Config, newRoundTripperFunc func(*tls.Config) 
 
 	r.client = &http.Client{Transport: wrapper}
 
-	req, err := http.NewRequest(r.verb, r.finalURL(), nil)
+	req, err := http.NewRequest(r.verb, r.URL().String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating request: %s", err)
 	}
@@ -538,8 +623,23 @@ func (r *Request) Upgrade(config *Config, newRoundTripperFunc func(*tls.Config) 
 	return upgradeRoundTripper.NewConnection(resp)
 }
 
-// DoRaw executes a raw request which is not subject to interpretation as an API response.
-func (r *Request) DoRaw() ([]byte, error) {
+// request connects to the server and invokes the provided function when a server response is
+// received. It handles retry behavior and up front validation of requests. It wil invoke
+// fn at most once. It will return an error if a problem occured prior to connecting to the
+// server - the provided function is responsible for handling server errors.
+func (r *Request) request(fn func(*http.Request, *http.Response)) error {
+	if r.err != nil {
+		return r.err
+	}
+
+	// TODO: added to catch programmer errors (invoking operations with an object with an empty namespace)
+	if (r.verb == "GET" || r.verb == "PUT" || r.verb == "DELETE") && r.namespaceSet && len(r.resourceName) > 0 && len(r.namespace) == 0 {
+		return fmt.Errorf("an empty namespace may not be set when a resource name is provided")
+	}
+	if (r.verb == "POST") && r.namespaceSet && len(r.namespace) == 0 {
+		return fmt.Errorf("an empty namespace may not be set during creation")
+	}
+
 	client := r.client
 	if client == nil {
 		client = http.DefaultClient
@@ -547,52 +647,38 @@ func (r *Request) DoRaw() ([]byte, error) {
 
 	// Right now we make about ten retry attempts if we get a Retry-After response.
 	// TODO: Change to a timeout based approach.
+	maxRetries := 10
 	retries := 0
-
 	for {
-		if r.err != nil {
-			return nil, r.err
-		}
-
-		// TODO: added to catch programmer errors (invoking operations with an object with an empty namespace)
-		if (r.verb == "GET" || r.verb == "PUT" || r.verb == "DELETE") && r.namespaceSet && len(r.resourceName) > 0 && len(r.namespace) == 0 {
-			return nil, fmt.Errorf("an empty namespace may not be set when a resource name is provided")
-		}
-		if (r.verb == "POST") && r.namespaceSet && len(r.namespace) == 0 {
-			return nil, fmt.Errorf("an empty namespace may not be set during creation")
-		}
-
-		var err error
-		r.req, err = http.NewRequest(r.verb, r.finalURL(), r.body)
+		url := r.URL().String()
+		req, err := http.NewRequest(r.verb, url, r.body)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		r.req.Header = r.headers
-		r.resp, err = client.Do(r.req)
-		if err != nil {
-			return nil, err
-		}
-		defer r.resp.Body.Close()
+		req.Header = r.headers
 
-		// Check to see if we got a 429 Too Many Requests response code.
-		if r.resp.StatusCode == errors.StatusTooManyRequests {
-			if retries < 10 {
-				retries++
-				if waitFor := r.resp.Header.Get("Retry-After"); waitFor != "" {
-					delay, err := strconv.Atoi(waitFor)
-					if err == nil {
-						glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", waitFor, retries, r.finalURL())
-						time.Sleep(time.Duration(delay) * time.Second)
-						continue
-					}
-				}
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+
+		done := func() bool {
+			// ensure the response body is closed before we reconnect, so that we reuse the same
+			// TCP connection
+			defer resp.Body.Close()
+
+			retries++
+			if seconds, wait := checkWait(resp); wait && retries < maxRetries {
+				glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", seconds, retries, url)
+				time.Sleep(time.Duration(seconds) * time.Second)
+				return false
 			}
+			fn(req, resp)
+			return true
+		}()
+		if done {
+			return nil
 		}
-		body, err := ioutil.ReadAll(r.resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		return body, err
 	}
 }
 
@@ -603,25 +689,42 @@ func (r *Request) DoRaw() ([]byte, error) {
 //  * If the request can't be constructed, or an error happened earlier while building its
 //    arguments: *RequestConstructionError
 //  * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
-//  * If the status code and body don't make sense together: *UnexpectedStatusError
 //  * http.Client.Do errors are returned directly.
 func (r *Request) Do() Result {
 	start := time.Now()
 	defer func() {
 		metrics.RequestLatency.WithLabelValues(r.verb, r.finalURLTemplate()).Observe(metrics.SinceInMicroseconds(start))
 	}()
-	body, err := r.DoRaw()
+	var result Result
+	err := r.request(func(req *http.Request, resp *http.Response) {
+		result = r.transformResponse(resp, req)
+	})
 	if err != nil {
 		return Result{err: err}
 	}
-	respBody, created, err := r.transformResponse(r.resp, r.req, body)
-	return Result{respBody, created, err, r.codec}
+	return result
 }
 
-// transformResponse converts an API response into a structured API object. If body is nil, the response
-// body will be read to try and gather more response data.
-func (r *Request) transformResponse(resp *http.Response, req *http.Request, body []byte) ([]byte, bool, error) {
-	if body == nil && resp.Body != nil {
+// DoRaw executes the request but does not process the response body.
+func (r *Request) DoRaw() ([]byte, error) {
+	start := time.Now()
+	defer func() {
+		metrics.RequestLatency.WithLabelValues(r.verb, r.finalURLTemplate()).Observe(metrics.SinceInMicroseconds(start))
+	}()
+	var result Result
+	err := r.request(func(req *http.Request, resp *http.Response) {
+		result.body, result.err = ioutil.ReadAll(resp.Body)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.body, result.err
+}
+
+// transformResponse converts an API response into a structured API object
+func (r *Request) transformResponse(resp *http.Response, req *http.Request) Result {
+	var body []byte
+	if resp.Body != nil {
 		if data, err := ioutil.ReadAll(resp.Body); err == nil {
 			body = data
 		}
@@ -638,21 +741,23 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request, body
 		// no-op, we've been upgraded
 	case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
 		if !isStatusResponse {
-			return nil, false, r.transformUnstructuredResponseError(resp, req, body)
+			return Result{err: r.transformUnstructuredResponseError(resp, req, body)}
 		}
-		return nil, false, errors.FromObject(&status)
+		return Result{err: errors.FromObject(&status)}
 	}
 
 	// If the server gave us a status back, look at what it was.
 	success := resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent
 	if isStatusResponse && (status.Status != api.StatusSuccess && !success) {
-		// "Working" requests need to be handled specially.
 		// "Failed" requests are clearly just an error and it makes sense to return them as such.
-		return nil, false, errors.FromObject(&status)
+		return Result{err: errors.FromObject(&status)}
 	}
 
-	created := resp.StatusCode == http.StatusCreated
-	return body, created, nil
+	return Result{
+		body:    body,
+		created: resp.StatusCode == http.StatusCreated,
+		codec:   r.codec,
+	}
 }
 
 // transformUnstructuredResponseError handles an error from the server that is not in a structured form.
@@ -684,7 +789,7 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 		message = strings.TrimSpace(string(body))
 	}
 	retryAfter, _ := retryAfterSeconds(resp)
-	return errors.NewGenericServerResponse(resp.StatusCode, req.Method, r.resource, r.resourceName, message, retryAfter)
+	return errors.NewGenericServerResponse(resp.StatusCode, req.Method, r.resource, r.resourceName, message, retryAfter, true)
 }
 
 // isTextResponse returns true if the response appears to be a textual media type.
@@ -698,6 +803,16 @@ func isTextResponse(resp *http.Response) bool {
 		return false
 	}
 	return strings.HasPrefix(media, "text/")
+}
+
+// checkWait returns true along with a number of seconds if the server instructed us to wait
+// before retrying.
+func checkWait(resp *http.Response) (int, bool) {
+	if resp.StatusCode != errors.StatusTooManyRequests {
+		return 0, false
+	}
+	i, ok := retryAfterSeconds(resp)
+	return i, ok
 }
 
 // retryAfterSeconds returns the value of the Retry-After header and true, or 0 and false if

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -87,6 +87,7 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 	ws.Consumes("*/*")
 	ws.Produces(restful.MIME_JSON)
 	ws.ApiVersion(a.group.Version)
+
 	return ws
 }
 
@@ -109,6 +110,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// TODO: support deeper paths
 		return fmt.Errorf("api_installer allows only one or two segment paths (resource or resource/subresource)")
 	}
+	hasSubresource := len(subresource) > 0
 
 	object := storage.New()
 	_, kind, err := a.group.Typer.ObjectVersionAndKind(object)
@@ -128,6 +130,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	// what verbs are supported by the storage, used to know what verbs we support per path
 	creater, isCreater := storage.(rest.Creater)
+	namedCreater, isNamedCreater := storage.(rest.NamedCreater)
 	lister, isLister := storage.(rest.Lister)
 	getter, isGetter := storage.(rest.Getter)
 	getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)
@@ -137,9 +140,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	patcher, isPatcher := storage.(rest.Patcher)
 	watcher, isWatcher := storage.(rest.Watcher)
 	_, isRedirector := storage.(rest.Redirector)
+	connecter, isConnecter := storage.(rest.Connecter)
 	storageMeta, isMetadata := storage.(rest.StorageMetadata)
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
+	}
+
+	if isNamedCreater {
+		isCreater = true
 	}
 
 	var versionedList interface{}
@@ -158,28 +166,53 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return err
 	}
 
-	var versionedDeleterObject runtime.Object
+	var versionedDeleterObject interface{}
 	switch {
 	case isGracefulDeleter:
-		object, err := a.group.Creater.New(serverVersion, "DeleteOptions")
+		objectPtr, err := a.group.Creater.New(serverVersion, "DeleteOptions")
 		if err != nil {
 			return err
 		}
-		versionedDeleterObject = object
+		versionedDeleterObject = indirectArbitraryPointer(objectPtr)
 		isDeleter = true
 	case isDeleter:
 		gracefulDeleter = rest.GracefulDeleteAdapter{deleter}
 	}
 
-	var getOptions runtime.Object
-	var getOptionsKind string
+	versionedStatusPtr, err := a.group.Creater.New(serverVersion, "Status")
+	if err != nil {
+		return err
+	}
+	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
+	var (
+		getOptions     runtime.Object
+		getOptionsKind string
+		getSubpath     bool
+		getSubpathKey  string
+	)
 	if isGetterWithOptions {
-		getOptions = getterWithOptions.NewGetOptions()
+		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
 		_, getOptionsKind, err = a.group.Typer.ObjectVersionAndKind(getOptions)
 		if err != nil {
 			return err
 		}
 		isGetter = true
+	}
+
+	var (
+		connectOptions     runtime.Object
+		connectOptionsKind string
+		connectSubpath     bool
+		connectSubpathKey  string
+	)
+	if isConnecter {
+		connectOptions, connectSubpath, connectSubpathKey = connecter.NewConnectOptions()
+		if connectOptions != nil {
+			_, connectOptionsKind, err = a.group.Typer.ObjectVersionAndKind(connectOptions)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	var ctxFn ContextFunc
@@ -200,21 +233,26 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// Get the list of actions for the given scope.
 	if scope.Name() != meta.RESTScopeNameNamespace {
 		resourcePath := resource
+		resourceParams := params
 		itemPath := resourcePath + "/{name}"
-		if len(subresource) > 0 {
-			itemPath = itemPath + "/" + subresource
-			resourcePath = itemPath
-		}
 		nameParams := append(params, nameParam)
 		proxyParams := append(nameParams, pathParam)
+		if hasSubresource {
+			itemPath = itemPath + "/" + subresource
+			resourcePath = itemPath
+			resourceParams = nameParams
+		}
 		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
-		actions = appendIf(actions, action{"LIST", resourcePath, params, namer}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, params, namer}, isCreater)
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, params, namer}, allowWatchList)
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
 		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
+		if getSubpath {
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
+		}
 		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
 		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
@@ -222,6 +260,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
 
 	} else {
 		// v1beta3 format with namespace in path
@@ -232,25 +272,26 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			namespaceParams := []*restful.Parameter{namespaceParam}
 
 			resourcePath := namespacedPath
+			resourceParams := namespaceParams
 			itemPath := namespacedPath + "/{name}"
-			if len(subresource) > 0 {
-				itemPath = itemPath + "/" + subresource
-				resourcePath = itemPath
-			}
 			nameParams := append(namespaceParams, nameParam)
 			proxyParams := append(nameParams, pathParam)
+			if hasSubresource {
+				itemPath = itemPath + "/" + subresource
+				resourcePath = itemPath
+				resourceParams = nameParams
+			}
 			namer := scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), false}
 
-			actions = appendIf(actions, action{"LIST", resourcePath, namespaceParams, namer}, isLister)
-			// Some paths ("/pods/{name}/binding", I'm looking at you) contain an embedded '{name}')
-			if strings.Contains(resourcePath, "{name}") {
-				actions = appendIf(actions, action{"POST", resourcePath, nameParams, namer}, isCreater)
-			} else {
-				actions = appendIf(actions, action{"POST", resourcePath, namespaceParams, namer}, isCreater)
-			}
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, namespaceParams, namer}, allowWatchList)
+			actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
+			actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
+			// DEPRECATED
+			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
 			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
+			if getSubpath {
+				actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
+			}
 			actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
 			actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
@@ -258,6 +299,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
+			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
+			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
 
 			// list across namespace.
 			namer = scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), true}
@@ -272,20 +315,25 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 			basePath := resource
 			resourcePath := basePath
+			resourceParams := namespaceParams
 			itemPath := resourcePath + "/{name}"
-			if len(subresource) > 0 {
-				itemPath = itemPath + "/" + subresource
-				resourcePath = itemPath
-			}
 			nameParams := append(namespaceParams, nameParam)
 			proxyParams := append(nameParams, pathParam)
+			if hasSubresource {
+				itemPath = itemPath + "/" + subresource
+				resourcePath = itemPath
+				resourceParams = nameParams
+			}
 			namer := legacyScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
 
-			actions = appendIf(actions, action{"LIST", resourcePath, namespaceParams, namer}, isLister)
-			actions = appendIf(actions, action{"POST", resourcePath, namespaceParams, namer}, isCreater)
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, namespaceParams, namer}, allowWatchList)
+			actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
+			actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
+			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
 			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
+			if getSubpath {
+				actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
+			}
 			actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
 			actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
@@ -293,6 +341,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
+			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
+			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
 		}
 	}
 
@@ -330,15 +380,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsKind)
+				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsKind, getSubpath, getSubpathKey)
 			} else {
 				handler = GetResource(getter, reqScope)
 			}
 			route := ws.GET(action.Path).To(handler).
 				Filter(m).
-				Doc("read the specified " + kind).
-				Operation("read" + kind).
+				Doc("read the specified "+kind).
+				Operation("read"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Returns(http.StatusOK, "OK", versionedObject).
 				Writes(versionedObject)
 			if isGetterWithOptions {
 				if err := addObjectParams(ws, route, getOptions); err != nil {
@@ -350,9 +401,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "LIST": // List all resources of a kind.
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, false)).
 				Filter(m).
-				Doc("list objects of kind " + kind).
-				Operation("list" + kind).
+				Doc("list objects of kind "+kind).
+				Operation("list"+kind).
 				Produces("application/json").
+				Returns(http.StatusOK, "OK", versionedList).
 				Writes(versionedList)
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
 				return err
@@ -368,10 +420,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "PUT": // Update a resource.
 			route := ws.PUT(action.Path).To(UpdateResource(updater, reqScope, a.group.Typer, admit)).
 				Filter(m).
-				Doc("replace the specified " + kind).
-				Operation("replace" + kind).
+				Doc("replace the specified "+kind).
+				Operation("replace"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
-				Reads(versionedObject)
+				Returns(http.StatusOK, "OK", versionedObject).
+				Reads(versionedObject).
+				Writes(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PATCH": // Partially update a resource
@@ -379,26 +433,38 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Filter(m).
 				Doc("partially update the specified "+kind).
 				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType)).
-				Operation("patch" + kind).
+				Operation("patch"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
-				Reads(versionedObject)
+				Returns(http.StatusOK, "OK", "string").
+				Reads("string").
+				Writes(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "POST": // Create a resource.
-			route := ws.POST(action.Path).To(CreateResource(creater, reqScope, a.group.Typer, admit)).
+			var handler restful.RouteFunction
+			if isNamedCreater {
+				handler = CreateNamedResource(namedCreater, reqScope, a.group.Typer, admit)
+			} else {
+				handler = CreateResource(creater, reqScope, a.group.Typer, admit)
+			}
+			route := ws.POST(action.Path).To(handler).
 				Filter(m).
-				Doc("create a " + kind).
-				Operation("create" + kind).
+				Doc("create a "+kind).
+				Operation("create"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
-				Reads(versionedObject)
+				Returns(http.StatusOK, "OK", versionedObject).
+				Reads(versionedObject).
+				Writes(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "DELETE": // Delete a resource.
 			route := ws.DELETE(action.Path).To(DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit)).
 				Filter(m).
-				Doc("delete a " + kind).
-				Operation("delete" + kind).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...)
+				Doc("delete a "+kind).
+				Operation("delete"+kind).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Writes(versionedStatus).
+				Returns(http.StatusOK, "OK", versionedStatus)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
 			}
@@ -408,9 +474,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "WATCH": // Watch a resource.
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
 				Filter(m).
-				Doc("watch changes to an object of kind " + kind).
-				Operation("watch" + kind).
+				Doc("watch changes to an object of kind "+kind).
+				Operation("watch"+kind).
 				Produces("application/json").
+				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
 				return err
@@ -421,9 +488,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "WATCHLIST": // Watch all resources of a kind.
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
 				Filter(m).
-				Doc("watch individual changes to a list of " + kind).
-				Operation("watch" + kind + "list").
+				Doc("watch individual changes to a list of "+kind).
+				Operation("watch"+kind+"list").
 				Produces("application/json").
+				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
 				return err
@@ -436,7 +504,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc("redirect GET request to " + kind).
 				Operation("redirect" + kind).
 				Produces("*/*").
-				Consumes("*/*")
+				Consumes("*/*").
+				Writes("string")
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PROXY": // Proxy requests to a resource.
@@ -445,6 +514,23 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
 			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
 			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
+		case "CONNECT":
+			for _, method := range connecter.ConnectMethods() {
+				route := ws.Method(method).Path(action.Path).
+					To(ConnectResource(connecter, reqScope, connectOptionsKind, connectSubpath, connectSubpathKey)).
+					Filter(m).
+					Doc("connect " + method + " requests to " + kind).
+					Operation("connect" + method + kind).
+					Produces("*/*").
+					Consumes("*/*").
+					Writes("string")
+				if connectOptions != nil {
+					if err := addObjectParams(ws, route, connectOptions); err != nil {
+						return err
+					}
+				}
+				ws.Route(route)
+			}
 		default:
 			return fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
@@ -694,7 +780,8 @@ func addProxyRoute(ws *restful.WebService, method string, prefix string, path st
 		Doc("proxy " + method + " requests to " + kind).
 		Operation("proxy" + method + kind).
 		Produces("*/*").
-		Consumes("*/*")
+		Consumes("*/*").
+		Writes("string")
 	addParams(proxyRoute, params)
 	ws.Route(proxyRoute)
 }
@@ -711,7 +798,7 @@ func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
 // Go JSON behavior for omitting a field) become query parameters. The name of the query parameter is
 // the JSON field name. If a description struct tag is set on the field, that description is used on the
 // query parameter. In essence, it converts a standard JSON top level object into a query param schema.
-func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj runtime.Object) error {
+func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj interface{}) error {
 	sv, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return err

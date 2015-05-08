@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,25 +25,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/golang/glog"
 )
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return ProbeVolumePluginsWithMounter(mount.New())
-}
-
-// ProbePluginsWithMounter is a convenience for testing other plugins which wrap this one.
-//FIXME: alternative: pass mount.Interface to all ProbeVolumePlugins() functions?  Opinions?
-func ProbeVolumePluginsWithMounter(mounter mount.Interface) []volume.VolumePlugin {
 	return []volume.VolumePlugin{
-		&emptyDirPlugin{nil, mounter, false},
-		&emptyDirPlugin{nil, mounter, true},
+		&emptyDirPlugin{nil, false},
+		&emptyDirPlugin{nil, true},
 	}
 }
 
 type emptyDirPlugin struct {
 	host       volume.VolumeHost
-	mounter    mount.Interface
 	legacyMode bool // if set, plugin answers to the legacy name
 }
 
@@ -65,34 +59,30 @@ func (plugin *emptyDirPlugin) Name() string {
 	return emptyDirPluginName
 }
 
-func (plugin *emptyDirPlugin) CanSupport(spec *api.Volume) bool {
+func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return false
 	}
 
-	if util.AllPtrFieldsNil(&spec.VolumeSource) {
-		return true
-	}
-	if spec.EmptyDir != nil {
+	if spec.VolumeSource.EmptyDir != nil {
 		return true
 	}
 	return false
 }
 
-func (plugin *emptyDirPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
-	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, podRef, plugin.mounter, &realMountDetector{plugin.mounter})
+func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+	return plugin.newBuilderInternal(spec, podRef, mounter, &realMountDetector{mounter}, opts)
 }
 
-func (plugin *emptyDirPlugin) newBuilderInternal(spec *api.Volume, podRef *api.ObjectReference, mounter mount.Interface, mountDetector mountDetector) (volume.Builder, error) {
+func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
 	medium := api.StorageTypeDefault
-	if spec.EmptyDir != nil { // Support a non-specified source as EmptyDir.
-		medium = spec.EmptyDir.Medium
+	if spec.VolumeSource.EmptyDir != nil { // Support a non-specified source as EmptyDir.
+		medium = spec.VolumeSource.EmptyDir.Medium
 	}
 	return &emptyDir{
 		podUID:        podRef.UID,
@@ -102,12 +92,13 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *api.Volume, podRef *api.O
 		mountDetector: mountDetector,
 		plugin:        plugin,
 		legacyMode:    false,
+		rootContext:   opts.RootContext,
 	}, nil
 }
 
-func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, plugin.mounter, &realMountDetector{plugin.mounter})
+	return plugin.newCleanerInternal(volName, podUID, mounter, &realMountDetector{mounter})
 }
 
 func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Cleaner, error) {
@@ -154,6 +145,7 @@ type emptyDir struct {
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
 	legacyMode    bool
+	rootContext   string
 }
 
 // SetUp creates new directory.
@@ -192,10 +184,30 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 	if err != nil {
 		return err
 	}
+	// If the directory is a mountpoint with medium memory, there is no
+	// work to do since we are already in the desired state.
 	if isMnt && medium == mediumMemory {
-		return nil // current state is what we expect
+		return nil
 	}
-	return ed.mounter.Mount("tmpfs", dir, "tmpfs", 0, "")
+
+	// By default a tmpfs mount will receive a different SELinux context
+	// from that of the Kubelet root directory which is not readable from
+	// the SELinux context of a docker container.
+	//
+	// getTmpfsMountOptions gets the mount option to set the context of
+	// the tmpfs mount so that it can be read from the SELinux context of
+	// the container.
+	opts := ed.getTmpfsMountOptions()
+	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v with opts %v", ed.podUID, ed.volName, opts)
+	return ed.mounter.Mount("tmpfs", dir, "tmpfs", opts)
+}
+
+func (ed *emptyDir) getTmpfsMountOptions() []string {
+	if ed.rootContext == "" {
+		return []string{""}
+	}
+
+	return []string{fmt.Sprintf("rootcontext=\"%v\"", ed.rootContext)}
 }
 
 func (ed *emptyDir) GetPath() string {
@@ -242,7 +254,7 @@ func (ed *emptyDir) teardownTmpfs(dir string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
-	if err := ed.mounter.Unmount(dir, 0); err != nil {
+	if err := ed.mounter.Unmount(dir); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(dir); err != nil {

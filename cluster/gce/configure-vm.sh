@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ set -o pipefail
 is_push=$@
 
 readonly KNOWN_TOKENS_FILE="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
+readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 
 function ensure-install-dir() {
   INSTALL_DIR="/var/cache/kubernetes-install"
@@ -73,19 +74,6 @@ for k,v in yaml.load(sys.stdin).iteritems():
   fi
 }
 
-function ensure-kube-token() {
-  # We bake the KUBELET_TOKEN in separately to avoid auth information
-  # having to be re-communicated on kube-push. (Otherwise the client
-  # has to keep the bearer token around to handle generating a valid
-  # kube-env.)
-  if [[ -z "${KUBELET_TOKEN:-}" ]] && [[ ! -e "${KNOWN_TOKENS_FILE}" ]]; then
-    until KUBELET_TOKEN=$(curl-metadata kube-token); do
-      echo 'Waiting for metadata KUBELET_TOKEN...'
-      sleep 3
-    done
-  fi
-}
-
 function remove-docker-artifacts() {
   echo "== Deleting docker0 =="
   # Forcibly install bridge-utils (options borrowed from Salt logs).
@@ -116,6 +104,11 @@ download-or-bust() {
 # Install salt from GCS.  See README.md for instructions on how to update these
 # debs.
 install-salt() {
+  if dpkg -s salt-minion &>/dev/null; then
+    echo "== SaltStack already installed, skipping install step =="
+    return
+  fi
+
   echo "== Refreshing package database =="
   until apt-get update; do
     echo "== apt-get update failed, retrying =="
@@ -134,7 +127,9 @@ install-salt() {
   URL_BASE="https://storage.googleapis.com/kubernetes-release/salt"
 
   for deb in "${DEBS[@]}"; do
-    download-or-bust "${URL_BASE}/${deb}"
+    if [ ! -e "${deb}" ]; then
+      download-or-bust "${URL_BASE}/${deb}"
+    fi
   done
 
   # Based on
@@ -152,7 +147,7 @@ EOF
 
   for deb in "${DEBS[@]}"; do
     echo "== Installing ${deb}, ignore dependency complaints (will fix later) =="
-    dpkg --force-depends -i "${deb}"
+    dpkg --skip-same-version --force-depends -i "${deb}"
   done
 
   # This will install any of the unmet dependencies from above.
@@ -168,15 +163,22 @@ EOF
   echo "== Finished installing Salt =="
 }
 
-# Ensure salt-minion never runs
+# Ensure salt-minion isn't running and never runs
 stop-salt-minion() {
+  if [[ -e /etc/init/salt-minion.override ]]; then
+    # Assume this has already run (upgrade, or baked into containervm)
+    return
+  fi
+
   # This ensures it on next reboot
   echo manual > /etc/init/salt-minion.override
+  update-rc.d salt-minion disable
 
-  if service salt-minion status >/dev/null; then
-    echo "salt-minion started in defiance of runlevel policy, aborting startup." >&2
-    return 1
-  fi
+  while service salt-minion status >/dev/null; do
+    echo "salt-minion found running, stopping"
+    service salt-minion stop
+    sleep 1
+  done
 }
 
 # Mounts a persistent disk (formatting if needed) to store the persistent data
@@ -197,26 +199,31 @@ mount-master-pd() {
 
   # Format and mount the disk, create directories on it for all of the master's
   # persistent data, and link them to where they're used.
+  echo "Mounting master-pd"
   mkdir -p /mnt/master-pd
-  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${device_path}" /mnt/master-pd
+  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${device_path}" /mnt/master-pd &>/var/log/master-pd-mount.log || \
+    { echo "!!! master-pd mount failed, review /var/log/master-pd-mount.log !!!"; return 1; }
   # Contains all the data stored in etcd
   mkdir -m 700 -p /mnt/master-pd/var/etcd
   # Contains the dynamically generated apiserver auth certs and keys
   mkdir -p /mnt/master-pd/srv/kubernetes
   # Contains the cluster's initial config parameters and auth tokens
   mkdir -p /mnt/master-pd/srv/salt-overlay
-  ln -s /mnt/master-pd/var/etcd /var/etcd
-  ln -s /mnt/master-pd/srv/kubernetes /srv/kubernetes
-  ln -s /mnt/master-pd/srv/salt-overlay /srv/salt-overlay
+
+  ln -s -f /mnt/master-pd/var/etcd /var/etcd
+  ln -s -f /mnt/master-pd/srv/kubernetes /srv/kubernetes
+  ln -s -f /mnt/master-pd/srv/salt-overlay /srv/salt-overlay
 
   # This is a bit of a hack to get around the fact that salt has to run after the
   # PD and mounted directory are already set up. We can't give ownership of the
   # directory to etcd until the etcd user and group exist, but they don't exist
   # until salt runs if we don't create them here. We could alternatively make the
   # permissions on the directory more permissive, but this seems less bad.
-  useradd -s /sbin/nologin -d /var/etcd etcd
-  chown etcd /mnt/master-pd/var/etcd
-  chgrp etcd /mnt/master-pd/var/etcd
+  if ! id etcd &>/dev/null; then
+    useradd -s /sbin/nologin -d /var/etcd etcd
+  fi
+  chown -R etcd /mnt/master-pd/var/etcd
+  chgrp -R etcd /mnt/master-pd/var/etcd
 }
 
 # Create the overlay files for the salt tree.  We create these in a separate
@@ -229,6 +236,8 @@ function create-salt-pillar() {
   cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
 instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 node_instance_prefix: '$(echo "$NODE_INSTANCE_PREFIX" | sed -e "s/'/''/g")'
+cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
+allocate_node_cidrs: '$(echo "$ALLOCATE_NODE_CIDRS" | sed -e "s/'/''/g")'
 portal_net: '$(echo "$PORTAL_NET" | sed -e "s/'/''/g")'
 enable_cluster_monitoring: '$(echo "$ENABLE_CLUSTER_MONITORING" | sed -e "s/'/''/g")'
 enable_node_monitoring: '$(echo "$ENABLE_NODE_MONITORING" | sed -e "s/'/''/g")'
@@ -245,28 +254,55 @@ EOF
 }
 
 # This should only happen on cluster initialization. Uses
-# MASTER_HTPASSWORD to generate the nginx/htpasswd file, and the
-# KUBELET_TOKEN, plus /dev/urandom, to generate known_tokens.csv
-# (KNOWN_TOKENS_FILE). After the first boot and on upgrade, these
-# files exist on the master-pd and should never be touched again
-# (except perhaps an additional service account, see NB below.)
+# KUBE_PASSWORD and KUBE_USER to generate basic_auth.csv. Uses
+# KUBE_BEARER_TOKEN, KUBELET_TOKEN, and KUBE_PROXY_TOKEN to generate
+# known_tokens.csv (KNOWN_TOKENS_FILE). After the first boot and
+# on upgrade, this file exists on the master-pd and should never
+# be touched again (except perhaps an additional service account,
+# see NB below.)
 function create-salt-auth() {
-  local -r htpasswd_file="/srv/salt-overlay/salt/nginx/htpasswd"
-
-  if [ ! -e "${htpasswd_file}" ]; then
-    mkdir -p /srv/salt-overlay/salt/nginx
-    echo "${MASTER_HTPASSWD}" > "${htpasswd_file}"
+  if [ ! -e "${BASIC_AUTH_FILE}" ]; then
+    mkdir -p /srv/salt-overlay/salt/kube-apiserver
+    (umask 077;
+      echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${BASIC_AUTH_FILE}")
   fi
-
   if [ ! -e "${KNOWN_TOKENS_FILE}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
     (umask 077;
-      echo "${KUBELET_TOKEN},kubelet,kubelet" > "${KNOWN_TOKENS_FILE}")
+      echo "${KUBE_BEARER_TOKEN},admin,admin" > "${KNOWN_TOKENS_FILE}";
+      echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}";
+      echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${KNOWN_TOKENS_FILE}")
 
     mkdir -p /srv/salt-overlay/salt/kubelet
     kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
     (umask 077;
       echo "{\"BearerToken\": \"${KUBELET_TOKEN}\", \"Insecure\": true }" > "${kubelet_auth_file}")
+
+    mkdir -p /srv/salt-overlay/salt/kube-proxy
+    kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
+    # Make a kubeconfig file with the token.
+    # TODO(etune): put apiserver certs into secret too, and reference from authfile,
+    # so that "Insecure" is not needed.
+    (umask 077;
+    cat > "${kube_proxy_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kube-proxy
+  user:
+    token: ${KUBE_PROXY_TOKEN}
+clusters:
+- name: local
+  cluster:
+     insecure-skip-tls-verify: true
+contexts:
+- context:
+    cluster: local
+    user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+)
 
     # Generate tokens for other "service accounts".  Append to known_tokens.
     #
@@ -282,6 +318,14 @@ function create-salt-auth() {
 }
 
 function download-release() {
+  # TODO(zmerlynn): We should optimize for the reboot case here, but
+  # unlike the .debs, we don't have version information in the
+  # filenames here, nor do the URLs even provide useful information in
+  # the dev environment case (because they're just a project
+  # bucket). We should probably push a hash into the kube-env, and
+  # store it when we download, and then when it's different infer that
+  # a push occurred (otherwise it's a simple reboot).
+
   echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
   download-or-bust "$SERVER_BINARY_TAR_URL"
 
@@ -408,7 +452,6 @@ if [[ -z "${is_push}" ]]; then
   ensure-install-dir
   set-kube-env
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
-  ensure-kube-token
   create-salt-pillar
   create-salt-auth
   download-release

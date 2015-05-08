@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import (
 )
 
 type createAuthInfoOptions struct {
-	pathOptions       *pathOptions
+	configAccess      ConfigAccess
 	name              string
 	authPath          util.StringFlag
 	clientCertificate util.StringFlag
@@ -42,7 +42,7 @@ type createAuthInfoOptions struct {
 	embedCertData     util.BoolFlag
 }
 
-var create_authinfo_long = fmt.Sprintf(`Sets a user entry in .kubeconfig
+var create_authinfo_long = fmt.Sprintf(`Sets a user entry in kubeconfig
 Specifying a name that already exists will merge new fields on top of existing values.
 
   Client-certificate flags:
@@ -67,12 +67,12 @@ $ kubectl set-credentials cluster-admin --username=admin --password=uXFGweU9l35q
 // Embed client certificate data in the "cluster-admin" entry
 $ kubectl set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true`
 
-func NewCmdConfigSetAuthInfo(out io.Writer, pathOptions *pathOptions) *cobra.Command {
-	options := &createAuthInfoOptions{pathOptions: pathOptions}
+func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+	options := &createAuthInfoOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:     fmt.Sprintf("set-credentials NAME [--%v=/path/to/authfile] [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password]", clientcmd.FlagAuthPath, clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword),
-		Short:   "Sets a user entry in .kubeconfig",
+		Short:   "Sets a user entry in kubeconfig",
 		Long:    create_authinfo_long,
 		Example: create_authinfo_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -87,13 +87,13 @@ func NewCmdConfigSetAuthInfo(out io.Writer, pathOptions *pathOptions) *cobra.Com
 		},
 	}
 
-	cmd.Flags().Var(&options.authPath, clientcmd.FlagAuthPath, clientcmd.FlagAuthPath+" for the user entry in .kubeconfig")
-	cmd.Flags().Var(&options.clientCertificate, clientcmd.FlagCertFile, "path to "+clientcmd.FlagCertFile+" for the user entry in .kubeconfig")
-	cmd.Flags().Var(&options.clientKey, clientcmd.FlagKeyFile, "path to "+clientcmd.FlagKeyFile+" for the user entry in .kubeconfig")
-	cmd.Flags().Var(&options.token, clientcmd.FlagBearerToken, clientcmd.FlagBearerToken+" for the user entry in .kubeconfig")
-	cmd.Flags().Var(&options.username, clientcmd.FlagUsername, clientcmd.FlagUsername+" for the user entry in .kubeconfig")
-	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in .kubeconfig")
-	cmd.Flags().Var(&options.embedCertData, clientcmd.FlagEmbedCerts, "embed client cert/key for the user entry in .kubeconfig")
+	cmd.Flags().Var(&options.authPath, clientcmd.FlagAuthPath, clientcmd.FlagAuthPath+" for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.clientCertificate, clientcmd.FlagCertFile, "path to "+clientcmd.FlagCertFile+" for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.clientKey, clientcmd.FlagKeyFile, "path to "+clientcmd.FlagKeyFile+" for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.token, clientcmd.FlagBearerToken, clientcmd.FlagBearerToken+" for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.username, clientcmd.FlagUsername, clientcmd.FlagUsername+" for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.embedCertData, clientcmd.FlagEmbedCerts, "embed client cert/key for the user entry in kubeconfig")
 
 	return cmd
 }
@@ -104,7 +104,7 @@ func (o createAuthInfoOptions) run() error {
 		return err
 	}
 
-	config, filename, err := o.pathOptions.getStartingConfig()
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
@@ -112,8 +112,7 @@ func (o createAuthInfoOptions) run() error {
 	authInfo := o.modifyAuthInfo(config.AuthInfos[o.name])
 	config.AuthInfos[o.name] = authInfo
 
-	err = clientcmd.WriteToFile(*config, filename)
-	if err != nil {
+	if err := ModifyConfig(o.configAccess, *config); err != nil {
 		return err
 	}
 

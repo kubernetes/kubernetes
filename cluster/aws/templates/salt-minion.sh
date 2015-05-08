@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +30,18 @@ grains:
   cloud: aws
 EOF
 
+# We set the hostname_override to the full EC2 private dns name
+# we'd like to use EC2 instance-id, but currently the kubelet health-check assumes the name
+# is resolvable, although that check should be going away entirely (#7092)
+if [[ -z "${HOSTNAME_OVERRIDE}" ]]; then
+  HOSTNAME_OVERRIDE=`curl --silent curl http://169.254.169.254/2007-01-19/meta-data/local-hostname`
+fi
+
+if [[ -n "${HOSTNAME_OVERRIDE}" ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  hostname_override: "${HOSTNAME_OVERRIDE}"
+EOF
+fi
 
 if [[ -n "${DOCKER_OPTS}" ]]; then
   cat <<EOF >>/etc/salt/minion.d/grains.conf

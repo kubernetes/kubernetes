@@ -277,3 +277,60 @@ func TestUpdateMetadata(t *testing.T) {
 	th.AssertNoErr(t, err)
 	th.AssertDeepEquals(t, expected, actual)
 }
+
+func TestListAddresses(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleAddressListSuccessfully(t)
+
+	expected := ListAddressesExpected
+	pages := 0
+	err := ListAddresses(client.ServiceClient(), "asdfasdfasdf").EachPage(func(page pagination.Page) (bool, error) {
+		pages++
+
+		actual, err := ExtractAddresses(page)
+		th.AssertNoErr(t, err)
+
+		if len(actual) != 2 {
+			t.Fatalf("Expected 2 networks, got %d", len(actual))
+		}
+		th.CheckDeepEquals(t, expected, actual)
+
+		return true, nil
+	})
+	th.AssertNoErr(t, err)
+	th.CheckEquals(t, 1, pages)
+}
+
+func TestListAddressesByNetwork(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleNetworkAddressListSuccessfully(t)
+
+	expected := ListNetworkAddressesExpected
+	pages := 0
+	err := ListAddressesByNetwork(client.ServiceClient(), "asdfasdfasdf", "public").EachPage(func(page pagination.Page) (bool, error) {
+		pages++
+
+		actual, err := ExtractNetworkAddresses(page)
+		th.AssertNoErr(t, err)
+
+		if len(actual) != 2 {
+			t.Fatalf("Expected 2 addresses, got %d", len(actual))
+		}
+		th.CheckDeepEquals(t, expected, actual)
+
+		return true, nil
+	})
+	th.AssertNoErr(t, err)
+	th.CheckEquals(t, 1, pages)
+}
+
+func TestCreateServerImage(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleCreateServerImageSuccessfully(t)
+
+	_, err := CreateImage(client.ServiceClient(), "serverimage", CreateImageOpts{Name: "test"}).ExtractImageID()
+	th.AssertNoErr(t, err)
+}

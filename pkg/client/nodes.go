@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,9 +32,10 @@ type NodesInterface interface {
 type NodeInterface interface {
 	Get(name string) (result *api.Node, err error)
 	Create(node *api.Node) (*api.Node, error)
-	List() (*api.NodeList, error)
+	List(label labels.Selector, field fields.Selector) (*api.NodeList, error)
 	Delete(name string) error
 	Update(*api.Node) (*api.Node, error)
+	UpdateStatus(*api.Node) (*api.Node, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -64,10 +65,10 @@ func (c *nodes) Create(node *api.Node) (*api.Node, error) {
 	return result, err
 }
 
-// List lists all the nodes in the cluster.
-func (c *nodes) List() (*api.NodeList, error) {
+// List takes a selector, and returns the list of nodes that match that selector in the cluster.
+func (c *nodes) List(label labels.Selector, field fields.Selector) (*api.NodeList, error) {
 	result := &api.NodeList{}
-	err := c.r.Get().Resource(c.resourceName()).Do().Into(result)
+	err := c.r.Get().Resource(c.resourceName()).LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return result, err
 }
 
@@ -91,6 +92,16 @@ func (c *nodes) Update(node *api.Node) (*api.Node, error) {
 		return nil, err
 	}
 	err := c.r.Put().Resource(c.resourceName()).Name(node.Name).Body(node).Do().Into(result)
+	return result, err
+}
+
+func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
+	result := &api.Node{}
+	if len(node.ResourceVersion) == 0 {
+		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
+		return nil, err
+	}
+	err := c.r.Put().Resource(c.resourceName()).Name(node.Name).SubResource("status").Body(node).Do().Into(result)
 	return result, err
 }
 

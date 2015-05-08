@@ -72,7 +72,7 @@ func RegisterHandlers(mux httpMux.Mux, containerManager manager.Manager, httpAut
 		authenticator := auth.NewDigestAuthenticator(httpDigestRealm, secrets)
 		mux.HandleFunc(static.StaticResource, authenticator.Wrap(staticHandler))
 		if err := pages.RegisterHandlersDigest(mux, containerManager, authenticator); err != nil {
-			fmt.Errorf("failed to register pages digest handlers: %s", err)
+			return fmt.Errorf("failed to register pages digest handlers: %s", err)
 		}
 		authenticated = true
 	}

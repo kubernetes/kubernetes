@@ -34,6 +34,7 @@ func serveDockerPage(m manager.Manager, w http.ResponseWriter, u *url.URL) error
 
 	// The container name is the path after the handler
 	containerName := u.Path[len(DockerPage):]
+	rootDir := getRootDir(u.Path)
 
 	var data *pageData
 	if containerName == "" {
@@ -62,6 +63,7 @@ func serveDockerPage(m manager.Manager, w http.ResponseWriter, u *url.URL) error
 					Link: DockerPage,
 				}},
 			Subcontainers: subcontainers,
+			Root:          rootDir,
 		}
 	} else {
 		// Get the container.
@@ -103,6 +105,7 @@ func serveDockerPage(m manager.Manager, w http.ResponseWriter, u *url.URL) error
 			MemoryAvailable:    cont.Spec.HasMemory,
 			NetworkAvailable:   cont.Spec.HasNetwork,
 			FsAvailable:        cont.Spec.HasFilesystem,
+			Root:               rootDir,
 		}
 	}
 
@@ -111,6 +114,6 @@ func serveDockerPage(m manager.Manager, w http.ResponseWriter, u *url.URL) error
 		glog.Errorf("Failed to apply template: %s", err)
 	}
 
-	glog.V(1).Infof("Request took %s", time.Since(start))
+	glog.V(5).Infof("Request took %s", time.Since(start))
 	return nil
 }

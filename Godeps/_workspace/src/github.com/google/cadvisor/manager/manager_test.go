@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/docker"
 	info "github.com/google/cadvisor/info/v1"
@@ -52,7 +53,7 @@ func createManagerAndAddContainers(
 			spec,
 			nil,
 		).Once()
-		cont, err := newContainerData(name, memoryStorage, mockHandler, nil, false)
+		cont, err := newContainerData(name, memoryStorage, mockHandler, nil, false, &collector.FakeCollectorManager{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,7 +82,7 @@ func expectManagerWithContainers(containers []string, query *info.ContainerInfoR
 		infosMap[container] = itest.GenerateRandomContainerInfo(container, 4, query, 1*time.Second)
 	}
 
-	memoryStorage := memory.New(query.NumStats, nil)
+	memoryStorage := memory.New(time.Duration(query.NumStats)*time.Second, nil)
 	sysfs := &fakesysfs.FakeSysFs{}
 	m := createManagerAndAddContainers(
 		memoryStorage,

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,9 +34,9 @@ func TestUpdateObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "GET":
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "PUT":
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "PUT":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -52,7 +52,7 @@ func TestUpdateObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "replicationControllers/rc1\n" {
+	if buf.String() != "replicationcontrollers/rc1\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -66,9 +66,9 @@ func TestUpdateMultipleObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "GET":
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "PUT":
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "PUT":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/services/frontend" && m == "GET":
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
@@ -88,7 +88,7 @@ func TestUpdateMultipleObject(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationControllers/rc1\nservices/baz\n" {
+	if buf.String() != "replicationcontrollers/rc1\nservices/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -120,7 +120,7 @@ func TestUpdateDirectory(t *testing.T) {
 	cmd.Flags().Set("namespace", "test")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationControllers/rc1\nservices/baz\nreplicationControllers/rc1\nservices/baz\nreplicationControllers/rc1\nservices/baz\n" {
+	if buf.String() != "replicationcontrollers/rc1\nservices/baz\nreplicationcontrollers/rc1\nservices/baz\nreplicationcontrollers/rc1\nservices/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

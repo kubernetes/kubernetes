@@ -1,0 +1,122 @@
+
+@color-codes:
+  #2962FF, //blue-deep
+  #AA00FF, //purple-deep
+  #00C853, //green-deep
+  #304FFE, //indigo-deep
+  #0091EA, //light-blue-deep
+  #FF6D00, //orange-deep
+  #00BFA5, //teal-deep
+  #C51162, //pink-deep
+  #64DD17, //light-green-deep
+  #6200EA, //deep-purple-deep
+  #FFD600, //yellow-deep
+  #00B8D4, //cyan-deep
+  #FFAB00, //amber-deep
+  #DD2C00, //deep-orange-deep
+  #2979FF, //blue-med
+  #D500F9, //purple-med
+  #00E676, //green-med
+  #3D5AFE, //indigo-med
+  #00B0FF, //light-blue-med
+  #FF9100, //orange-med
+  #1DE9B6, //teal-med
+  #F50057, //pink-med
+  #76FF03, //light-green-med
+  #651FFF, //deep-purple-med
+  #FFEA00, //yellow-med
+  #00E5FF, //cyan-med
+  #FFC400, //amber-med
+  #FF3D00, //deep-orange-med
+  #448AFF, //blue-light
+  #E040FB, //purple-light
+  #69F0AE, //green-light
+  #536DFE, //indigo-light
+  #40C4FF, //light-blue-light
+  #FFAB40, //orange-light
+  #64FFDA, //teal-light
+  #FF4081, //pink-light
+  #B2FF59, //light-green-light
+  #7C4DFF, //deep-purple-light
+  #FFFF00, //yellow-light
+  #18FFFF, //cyan-light
+  #FFD740, //amber-light
+  #FF6E40; //deep-orange-light
+
+
+.dark-overlay {
+  background-color: #292935;
+  opacity: 0.5;
+}
+
+.light-overlay {
+  background-color: #FFFFFF;
+  opacity: 0.2;
+}
+
+
+// #D50000, //red-deep
+// #FF1744, //red-med
+// #FF5252, //red-light
+
+@warningColor: #FF9800;
+@criticalColor: #F44336;
+
+@freeColor: #2E2E3B;
+@errorColor: #FF1744;
+@waitingColor: #DAD462;
+
+.getColorIndex(@i){
+  @index: @i; //mod(@i - 1, 3) * 7 + round((@i - 1) / 3 - .3);
+}
+.creatcolorclasses(@i:1) when(@i <= length(@color-codes)) {
+
+  .getColorIndex(@i);
+  .color-@{index} {
+    background-color: extract(@color-codes, @i);
+    // border-color: lighten(extract(@color-codes, @i), 20%);
+    // border-width: 2px;
+    // border-style: solid;
+    fill: extract(@color-codes, @i);
+    stroke: extract(@color-codes, @i);
+  }
+
+  md-grid-list.list-color-@{i} md-grid-tile.colored {
+    background-color: extract(@color-codes, @i);
+    // border-color: darken(extract(@color-codes, @i), 10%);
+    // border-width: 1px;
+    // border-style: solid;
+  }
+  .creatcolorclasses((@i + 1));
+}
+.creatcolorclasses();
+
+.color-warning {
+  background-color: @warningColor !important;
+  border-color: @warningColor !important;
+  fill: @warningColor !important;
+  stroke: @warningColor !important;
+}
+
+.color-critical {
+  background-color: @criticalColor !important;
+  border-color: @criticalColor !important;
+  fill: @criticalColor !important;
+  stroke: @criticalColor !important;
+}
+
+.status-waiting {
+  background-color: @freeColor !important;
+  border-color: @waitingColor !important;
+  border-width: 2px !important;
+  border-style: solid !important;
+}
+
+.status-succeeded {}
+
+.status-terminated, .status-unknown {
+  background-color: @errorColor !important;
+  border-color: darken(@errorColor, 10%) !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+}

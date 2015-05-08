@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 
 // Registry is an interface for things that know how to store node.
 type Registry interface {
-	ListMinions(ctx api.Context) (*api.NodeList, error)
+	ListMinions(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error)
 	CreateMinion(ctx api.Context, minion *api.Node) error
 	UpdateMinion(ctx api.Context, minion *api.Node) error
 	GetMinion(ctx api.Context, minionID string) (*api.Node, error)
@@ -45,8 +45,8 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListMinions(ctx api.Context) (*api.NodeList, error) {
-	obj, err := s.List(ctx, labels.Everything(), fields.Everything())
+func (s *storage) ListMinions(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
+	obj, err := s.List(ctx, label, field)
 	if err != nil {
 		return nil, err
 	}

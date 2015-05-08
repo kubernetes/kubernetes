@@ -1,0 +1,79 @@
+.clear-bg {
+  background-color: transparent;
+}
+.list-pods {
+  .pod-group {
+    margin: 25px;
+
+    md-grid-list {
+      margin-top: 50px;
+      color: white;
+
+      // Header and footer
+      figcaption {
+        width:100%;
+      }
+
+      md-grid-tile-header {
+        padding-left: 10px;
+        .labels {
+          width: 100%;
+        }
+      }
+
+      md-grid-tile {
+        transition: all 700ms ease-in 50ms;
+      }
+
+
+      // inner body
+      .inner-box {
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+
+      // Footer
+      md-grid-tile-footer {
+
+        background: rgba(0, 0, 0, 0.50);
+        // height: 36px;
+
+        .pod-title
+        {
+          margin-left: 10px;
+        }
+
+        .pod-host {
+          text-align: right;
+          padding-right: 15px;
+        }
+
+        a {
+          color: white;
+        }
+      }
+
+      // Restart button
+      .restarts {
+        width: 100%;
+        text-align: right;
+        padding-right: 10px;
+
+        .restart-button {
+          &, &:not([disabled]):hover, &:not([disabled]):focus, &:hover, &:focus {
+            background-color: @errorColor;
+            width:30px;
+            height:30px;
+          }
+        }
+
+      }
+    }
+  }
+
+  .gray {
+    background: #f5f5f5;
+  }
+
+  @import (multiple) "colors";
+}

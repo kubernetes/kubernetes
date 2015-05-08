@@ -156,7 +156,7 @@ people have reported success with Flannel and Kubernetes.
 
 ### OpenVSwitch
 
-[OpenVSwitch](../ovs-networking.md) is a somewhat more mature but also
+[OpenVSwitch](./ovs-networking.md) is a somewhat more mature but also
 complicated way to build an overlay network.  This is endorsed by several of the
 "Big Shops" for networking.
 

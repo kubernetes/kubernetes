@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,10 @@ package etcd
 
 import (
 	"fmt"
+	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
@@ -48,14 +50,15 @@ type FinalizeREST struct {
 
 // NewStorage returns a RESTStorage object that will work against namespaces
 func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST, *FinalizeREST) {
+	prefix := "/namespaces"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },
 		NewListFunc: func() runtime.Object { return &api.NamespaceList{} },
 		KeyRootFunc: func(ctx api.Context) string {
-			return "/registry/namespaces"
+			return prefix
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return "/registry/namespaces/" + name, nil
+			return path.Join(prefix, name), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Namespace).Name, nil
@@ -89,7 +92,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	namespace := nsObj.(*api.Namespace)
 
 	// upon first request to delete, we switch the phase to start namespace termination
-	if namespace.DeletionTimestamp == nil {
+	if namespace.DeletionTimestamp.IsZero() {
 		now := util.Now()
 		namespace.DeletionTimestamp = &now
 		namespace.Status.Phase = api.NamespaceTerminating
@@ -99,7 +102,8 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	// prior to final deletion, we must ensure that finalizers is empty
 	if len(namespace.Spec.Finalizers) != 0 {
-		err = fmt.Errorf("Unable to delete namespace %v because finalizers is not empty %v", namespace.Name, namespace.Spec.Finalizers)
+		err = apierrors.NewConflict("Namespace", namespace.Name, fmt.Errorf("Termination is in progress, waiting for %v", namespace.Spec.Finalizers))
+		return nil, err
 	}
 	return r.Etcd.Delete(ctx, name, nil)
 }

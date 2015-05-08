@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -145,9 +145,20 @@ func (e *Etcd) List(ctx api.Context, label labels.Selector, field fields.Selecto
 // ListPredicate returns a list of all the items matching m.
 func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
 	list := e.NewListFunc()
-	err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
-	if err != nil {
-		return nil, err
+	if name, ok := m.MatchesSingle(); ok {
+		key, err := e.KeyFunc(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		err = e.Helper.ExtractObjToList(key, list)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return generic.FilterList(list, m, generic.DecoratorFunc(e.Decorator))
 }
@@ -255,7 +266,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	// TODO: expose TTL
 	creating := false
 	out := e.NewFunc()
-	err = e.Helper.AtomicUpdate(key, out, true, func(existing runtime.Object) (runtime.Object, uint64, error) {
+	err = e.Helper.GuaranteedUpdate(key, out, true, func(existing runtime.Object) (runtime.Object, uint64, error) {
 		version, err := e.Helper.Versioner.ObjectResourceVersion(existing)
 		if err != nil {
 			return nil, 0, err
@@ -406,7 +417,8 @@ func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object
 
 // Watch makes a matcher for the given label and field, and calls
 // WatchPredicate. If possible, you should customize PredicateFunc to produre a
-// matcher that matches by key.
+// matcher that matches by key. generic.SelectionPredicate does this for you
+// automatically.
 func (e *Etcd) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
 }
@@ -418,18 +430,7 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 		return nil, err
 	}
 
-	var watchKey string
-	if name, ok := m.MatchesSingle(); ok {
-		key, err := e.KeyFunc(ctx, name)
-		if err != nil {
-			return nil, err
-		}
-		watchKey = key
-	} else {
-		watchKey = e.KeyRootFunc(ctx)
-	}
-
-	return e.Helper.WatchList(watchKey, version, func(obj runtime.Object) bool {
+	filterFunc := func(obj runtime.Object) bool {
 		matches, err := m.Matches(obj)
 		if err != nil {
 			glog.Errorf("unable to match watch: %v", err)
@@ -442,5 +443,15 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 			}
 		}
 		return matches
-	})
+	}
+
+	if name, ok := m.MatchesSingle(); ok {
+		key, err := e.KeyFunc(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		return e.Helper.Watch(key, version, filterFunc)
+	}
+
+	return e.Helper.WatchList(e.KeyRootFunc(ctx), version, filterFunc)
 }

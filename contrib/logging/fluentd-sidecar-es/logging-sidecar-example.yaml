@@ -1,0 +1,26 @@
+apiVersion: v1beta3
+kind: Pod
+metadata:
+  labels:
+    example: logging-sidecar
+  name: logging-sidecar-example
+spec:
+  containers:
+  - name: synthetic-logger
+    image: ubuntu:14.04
+    command: ["bash", "-c", "i=\"0\"; while true; do echo \"`hostname`: $i \" >> /var/log/synthetic-count.log; date --rfc-3339 ns >> /var/log/synthetic-dates.log; sleep 4; i=$[$i+1]; done"]
+    volumeMounts:
+    - name: log-storage
+      mountPath: /var/log
+  - name: sidecar-log-collector
+    image: gcr.io/google_containers/fluentd-sidecar-es:1.0
+    env:
+    - name: FILES_TO_COLLECT
+      value: "/mnt/log/synthetic-count.log /mnt/log/synthetic-dates.log"
+    volumeMounts:
+    - name: log-storage
+      readOnly: true
+      mountPath: /mnt/log
+  volumes:
+  - name: log-storage
+    emptyDir: {}

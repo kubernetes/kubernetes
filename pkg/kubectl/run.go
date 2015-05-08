@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -32,6 +33,7 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"replicas", true},
 		{"image", true},
 		{"port", false},
+		{"hostport", false},
 	}
 }
 
@@ -39,8 +41,12 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 	// TODO: extract this flag to a central location.
 	labelString, found := params["labels"]
 	var labels map[string]string
+	var err error
 	if found && len(labelString) > 0 {
-		labels = ParseLabels(labelString)
+		labels, err = ParseLabels(labelString)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		labels = map[string]string{
 			"run-container": params["name"],
@@ -74,19 +80,34 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 		},
 	}
 
+	port := -1
+	hostPort := -1
 	if len(params["port"]) > 0 {
-		port, err := strconv.Atoi(params["port"])
+		port, err = strconv.Atoi(params["port"])
 		if err != nil {
 			return nil, err
 		}
+	}
 
-		// Don't include the port if it was not specified.
-		if port > 0 {
-			controller.Spec.Template.Spec.Containers[0].Ports = []api.ContainerPort{
-				{
-					ContainerPort: port,
-				},
-			}
+	if len(params["hostport"]) > 0 {
+		hostPort, err = strconv.Atoi(params["hostport"])
+		if err != nil {
+			return nil, err
+		}
+		if hostPort > 0 && port < 0 {
+			return nil, fmt.Errorf("--hostport requires --port to be specified")
+		}
+	}
+
+	// Don't include the port if it was not specified.
+	if port > 0 {
+		controller.Spec.Template.Spec.Containers[0].Ports = []api.ContainerPort{
+			{
+				ContainerPort: port,
+			},
+		}
+		if hostPort > 0 {
+			controller.Spec.Template.Spec.Containers[0].Ports[0].HostPort = hostPort
 		}
 	}
 	return &controller, nil

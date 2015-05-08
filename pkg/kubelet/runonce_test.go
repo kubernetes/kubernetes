@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -74,6 +74,9 @@ func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
 func TestRunOnce(t *testing.T) {
 	cadvisor := &cadvisor.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+
+	podManager, _ := newFakePodManager()
+
 	kb := &Kubelet{
 		rootDirectory:       "/tmp/kubelet",
 		recorder:            &record.FakeRecorder{},
@@ -81,6 +84,10 @@ func TestRunOnce(t *testing.T) {
 		nodeLister:          testNodeLister{},
 		statusManager:       newStatusManager(nil),
 		containerRefManager: kubecontainer.NewRefManager(),
+		readinessManager:    kubecontainer.NewReadinessManager(),
+		podManager:          podManager,
+		os:                  kubecontainer.FakeOS{},
+		volumeManager:       newVolumeManager(),
 	}
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
@@ -105,6 +112,7 @@ func TestRunOnce(t *testing.T) {
 			{label: "syncPod", containers: []docker.APIContainers{}},
 			{label: "list pod container", containers: []docker.APIContainers{}},
 			{label: "syncPod", containers: podContainers},
+			{label: "list pod container", containers: podContainers},
 			{label: "list pod container", containers: podContainers},
 		},
 		inspectContainersResults: []inspectContainersResult{
@@ -139,9 +147,23 @@ func TestRunOnce(t *testing.T) {
 		},
 		t: t,
 	}
-	kb.dockerPuller = &dockertools.FakeDockerPuller{}
-	kb.containerManager = dockertools.NewDockerManager(kb.dockerClient, kb.recorder)
-	results, err := kb.runOnce([]api.Pod{
+
+	kb.containerRuntime = dockertools.NewFakeDockerManager(
+		kb.dockerClient,
+		kb.recorder,
+		kb.readinessManager,
+		kb.containerRefManager,
+		dockertools.PodInfraContainerImage,
+		0,
+		0,
+		"",
+		kubecontainer.FakeOS{},
+		kb.networkPlugin,
+		kb,
+		nil,
+		newKubeletRuntimeHooks(kb.recorder))
+
+	pods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -154,7 +176,9 @@ func TestRunOnce(t *testing.T) {
 				},
 			},
 		},
-	}, time.Millisecond)
+	}
+	podManager.SetPods(pods)
+	results, err := kb.runOnce(pods, time.Millisecond)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

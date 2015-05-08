@@ -109,6 +109,7 @@ func v2auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 
 	if options.AllowReauth {
 		client.ReauthFunc = func() error {
+			client.TokenID = ""
 			return AuthenticateV2(client, options)
 		}
 	}
@@ -132,10 +133,36 @@ func v3auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 		v3Client.Endpoint = endpoint
 	}
 
-	token, err := tokens3.Create(v3Client, options, nil).Extract()
+	var scope *tokens3.Scope
+	if options.TenantID != "" {
+		scope = &tokens3.Scope{
+			ProjectID: options.TenantID,
+		}
+		options.TenantID = ""
+		options.TenantName = ""
+	} else {
+		if options.TenantName != "" {
+			scope = &tokens3.Scope{
+				ProjectName: options.TenantName,
+				DomainID:    options.DomainID,
+				DomainName:  options.DomainName,
+			}
+			options.TenantName = ""
+		}
+	}
+
+	result := tokens3.Create(v3Client, options, scope)
+
+	token, err := result.ExtractToken()
 	if err != nil {
 		return err
 	}
+
+	catalog, err := result.ExtractServiceCatalog()
+	if err != nil {
+		return err
+	}
+
 	client.TokenID = token.ID
 
 	if options.AllowReauth {
@@ -144,7 +171,7 @@ func v3auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 		}
 	}
 	client.EndpointLocator = func(opts gophercloud.EndpointOpts) (string, error) {
-		return V3EndpointURL(v3Client, opts)
+		return V3EndpointURL(catalog, opts)
 	}
 
 	return nil

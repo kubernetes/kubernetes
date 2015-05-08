@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,20 +24,31 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Secrets", func() {
 	var c *client.Client
+	var ns string
 
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
+		expectNoError(err)
+		ns_, err := createTestingNS("secrets", c)
+		ns = ns_.Name
+		expectNoError(err)
+	})
+
+	AfterEach(func() {
+		// Clean up the namespace if a non-default one was used
+		if ns != api.NamespaceDefault {
+			By("Cleaning up the namespace")
+			err := c.Namespaces().Delete(ns)
+			expectNoError(err)
+		}
 	})
 
 	It("should be consumable from pods", func() {
-		ns := api.NamespaceDefault
 		name := "secret-test-" + string(util.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
@@ -83,9 +94,11 @@ var _ = Describe("Secrets", func() {
 				},
 				Containers: []api.Container{
 					{
-						Name:    "catcont",
-						Image:   "gcr.io/google_containers/busybox",
-						Command: []string{"sh", "-c", "cat /etc/secret-volume/data-1"},
+						Name:  "secret-test",
+						Image: "kubernetes/mounttest:0.1",
+						Args: []string{
+							"--file_content=/etc/secret-volume/data-1",
+							"--file_mode=/etc/secret-volume/data-1"},
 						VolumeMounts: []api.VolumeMount{
 							{
 								Name:      volumeName,
@@ -99,8 +112,9 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 
-		testContainerOutput("consume secrets", c, pod, []string{
-			"value-1",
-		})
+		testContainerOutputInNamespace("consume secrets", c, pod, []string{
+			"content of file \"/etc/secret-volume/data-1\": value-1",
+			"mode of file \"/etc/secret-volume/data-1\": -r--r--r--",
+		}, ns)
 	})
 })

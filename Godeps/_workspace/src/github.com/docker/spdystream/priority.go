@@ -1,9 +1,10 @@
 package spdystream
 
 import (
-	"code.google.com/p/go.net/spdy"
 	"container/heap"
 	"sync"
+
+	"golang.org/x/net/spdy"
 )
 
 type prioritizedFrame struct {

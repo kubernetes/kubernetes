@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,12 +18,14 @@ package cache
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -37,15 +39,82 @@ func (t *testLW) Watch(resourceVersion string) (watch.Interface, error) {
 	return t.WatchFunc(resourceVersion)
 }
 
+func TestCloseWatchChannelOnError(t *testing.T) {
+	r := NewReflector(&testLW{}, &api.Pod{}, NewStore(MetaNamespaceKeyFunc), 0)
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	fw := watch.NewFake()
+	r.listerWatcher = &testLW{
+		WatchFunc: func(rv string) (watch.Interface, error) {
+			return fw, nil
+		},
+		ListFunc: func() (runtime.Object, error) {
+			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
+		},
+	}
+	go r.listAndWatch(util.NeverStop)
+	fw.Error(pod)
+	select {
+	case _, ok := <-fw.ResultChan():
+		if ok {
+			t.Errorf("Watch channel left open after cancellation")
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Errorf("the cancellation is at least 99 milliseconds late")
+		break
+	}
+}
+
+func TestRunUntil(t *testing.T) {
+	stopCh := make(chan struct{})
+	store := NewStore(MetaNamespaceKeyFunc)
+	r := NewReflector(&testLW{}, &api.Pod{}, store, 0)
+	fw := watch.NewFake()
+	r.listerWatcher = &testLW{
+		WatchFunc: func(rv string) (watch.Interface, error) {
+			return fw, nil
+		},
+		ListFunc: func() (runtime.Object, error) {
+			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
+		},
+	}
+	r.RunUntil(stopCh)
+	// Synchronously add a dummy pod into the watch channel so we
+	// know the RunUntil go routine is in the watch handler.
+	fw.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}})
+	stopCh <- struct{}{}
+	select {
+	case _, ok := <-fw.ResultChan():
+		if ok {
+			t.Errorf("Watch channel left open after stopping the watch")
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Errorf("the cancellation is at least 99 milliseconds late")
+		break
+	}
+}
+
 func TestReflector_resyncChan(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 	g := NewReflector(&testLW{}, &api.Pod{}, s, time.Millisecond)
-	a, b := g.resyncChan(), time.After(100*time.Millisecond)
+	a, _ := g.resyncChan()
+	b := time.After(100 * time.Millisecond)
 	select {
 	case <-a:
 		t.Logf("got timeout as expected")
 	case <-b:
 		t.Errorf("resyncChan() is at least 99 milliseconds late??")
+	}
+}
+
+func BenchmarkReflector_resyncChanMany(b *testing.B) {
+	s := NewStore(MetaNamespaceKeyFunc)
+	g := NewReflector(&testLW{}, &api.Pod{}, s, 25*time.Millisecond)
+	// The improvement to this (calling the timer's Stop() method) makes
+	// this benchmark about 40% faster.
+	for i := 0; i < b.N; i++ {
+		g.resyncPeriod = time.Duration(rand.Float64() * float64(time.Millisecond) * 25)
+		_, stop := g.resyncChan()
+		stop()
 	}
 }
 
@@ -57,7 +126,7 @@ func TestReflector_watchHandlerError(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(fw, &resumeRV, neverExitWatch)
+	err := g.watchHandler(fw, &resumeRV, neverExitWatch, util.NeverStop)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -77,7 +146,7 @@ func TestReflector_watchHandler(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(fw, &resumeRV, neverExitWatch)
+	err := g.watchHandler(fw, &resumeRV, neverExitWatch, util.NeverStop)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -112,6 +181,11 @@ func TestReflector_watchHandler(t *testing.T) {
 	if e, a := "32", resumeRV; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+
+	// last sync resource version should be the last version synced with store
+	if e, a := "32", g.LastSyncResourceVersion(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 }
 
 func TestReflector_watchHandlerTimeout(t *testing.T) {
@@ -121,9 +195,22 @@ func TestReflector_watchHandlerTimeout(t *testing.T) {
 	var resumeRV string
 	exit := make(chan time.Time, 1)
 	exit <- time.Now()
-	err := g.watchHandler(fw, &resumeRV, exit)
+	err := g.watchHandler(fw, &resumeRV, exit, util.NeverStop)
 	if err != errorResyncRequested {
 		t.Errorf("expected timeout error, but got %q", err)
+	}
+}
+
+func TestReflectorStopWatch(t *testing.T) {
+	s := NewStore(MetaNamespaceKeyFunc)
+	g := NewReflector(&testLW{}, &api.Pod{}, s, 0)
+	fw := watch.NewFake()
+	var resumeRV string
+	stopWatch := make(chan struct{}, 1)
+	stopWatch <- struct{}{}
+	err := g.watchHandler(fw, &resumeRV, neverExitWatch, stopWatch)
+	if err != errorStopRequested {
+		t.Errorf("expected stop error, got %q", err)
 	}
 }
 
@@ -152,7 +239,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 	}
 	s := NewFIFO(MetaNamespaceKeyFunc)
 	r := NewReflector(lw, &api.Pod{}, s, 0)
-	go r.listAndWatch()
+	go r.listAndWatch(util.NeverStop)
 
 	ids := []string{"foo", "bar", "baz", "qux", "zoo"}
 	var fw *watch.FakeWatcher
@@ -269,6 +356,6 @@ func TestReflector_listAndWatchWithErrors(t *testing.T) {
 			},
 		}
 		r := NewReflector(lw, &api.Pod{}, s, 0)
-		r.listAndWatch()
+		r.listAndWatch(util.NeverStop)
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -78,10 +78,7 @@ func testWriteAuthInfoFile(auth clientauth.Info, filename string) error {
 }
 
 func testBindClientConfig(cmd *cobra.Command) ClientConfig {
-	loadingRules := NewDefaultClientConfigLoadingRules()
-	loadingRules.Precedence[DefaultEnvVarIndex] = ""
-	loadingRules.Precedence[DefaultCurrentDirIndex] = ""
-	loadingRules.Precedence[DefaultHomeDirIndex] = ""
+	loadingRules := &ClientConfigLoadingRules{}
 	cmd.PersistentFlags().StringVar(&loadingRules.ExplicitPath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
 	overrides := &ConfigOverrides{}

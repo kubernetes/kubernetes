@@ -47,7 +47,7 @@ $ export KUBERNETES_MASTER=http://${servicehost}:8888
 Start etcd and verify that it is running:
 
 ```bash
-$ sudo docker run -d --hostname $(hostname -f) --name etcd -p 4001:4001 -p 7001:7001 coreos/etcd
+$ sudo docker run -d --hostname $(uname -n) --name etcd -p 4001:4001 -p 7001:7001 coreos/etcd
 ```
 
 ```bash
@@ -88,8 +88,9 @@ $ ./bin/km scheduler \
   --v=2 >scheduler.log 2>&1 &
 ```
 
-Kubernetes-mesos will start up kubelets automatically, but currently the service
-proxy needs to be started manually. Start the service proxy on each Mesos slave:
+Also on the master node, we'll start up a proxy instance to act as a
+public-facing service router, for testing the web interface a little
+later on.
 
 ```bash
 $ sudo ./bin/km proxy \
@@ -141,7 +142,7 @@ $ cat <<EOPOD >nginx.json
     "version": "v1beta1",
     "containers": [{
       "name": "nginx-01",
-      "image": "dockerfile/nginx",
+      "image": "nginx",
       "ports": [{
         "containerPort": 80,
         "hostPort": 31000
@@ -177,7 +178,7 @@ We can use the `kubectl` interface to monitor the status of our pod:
 ```bash
 $ bin/kubectl get pods
 POD          IP           CONTAINER(S)  IMAGE(S)          HOST                       LABELS                STATUS
-nginx-id-01  172.17.5.27  nginx-01      dockerfile/nginx  10.72.72.178/10.72.72.178  cluster=gce,name=foo  Running
+nginx-id-01  172.17.5.27  nginx-01      nginx             10.72.72.178/10.72.72.178  cluster=gce,name=foo  Running
 ```
 
 Verify that the pod task is running in the Mesos web GUI. Click on the

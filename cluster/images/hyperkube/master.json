@@ -1,7 +1,7 @@
 {
 "apiVersion": "v1beta3",
 "kind": "Pod",
-"metadata": {"name":"nginx"},
+"metadata": {"name":"k8s-master"},
 "spec":{
   "hostNetwork": true,
   "containers":[

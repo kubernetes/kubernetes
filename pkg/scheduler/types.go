@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 )
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.
-type FitPredicate func(pod api.Pod, existingPods []api.Pod, node string) (bool, error)
+type FitPredicate func(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error)
 
 // HostPriority represents the priority of scheduling to a particular host, lower priority is better.
 type HostPriority struct {
@@ -46,7 +46,7 @@ func (h HostPriorityList) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
 }
 
-type PriorityFunction func(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error)
+type PriorityFunction func(pod *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error)
 
 type PriorityConfig struct {
 	Function PriorityFunction

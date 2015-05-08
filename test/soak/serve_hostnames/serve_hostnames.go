@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ a serivce
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -35,6 +34,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -87,7 +88,7 @@ func main() {
 
 	var nodes *api.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = c.Nodes().List()
+		nodes, err = c.Nodes().List(labels.Everything(), fields.Everything())
 		if err == nil {
 			break
 		}
@@ -205,7 +206,7 @@ func main() {
 		// Make several attempts to delete the pods.
 		for _, podName := range podNames {
 			for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-				if err = c.Pods(ns).Delete(podName); err == nil {
+				if err = c.Pods(ns).Delete(podName, nil); err == nil {
 					break
 				}
 				glog.Warningf("After %v failed to delete pod %s/%s: %v", time.Since(start), ns, podName, err)
@@ -246,7 +247,7 @@ func main() {
 			continue
 		}
 		var r api.Status
-		if err := json.Unmarshal(hostname, &r); err != nil {
+		if err := api.Scheme.DecodeInto(hostname, &r); err != nil {
 			break
 		}
 		if r.Status == api.StatusFailure {

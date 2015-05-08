@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -50,7 +51,11 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(RunCreate(f, out, filenames))
 		},
 	}
-	cmd.Flags().VarP(&filenames, "filename", "f", "Filename, directory, or URL to file to use to create the resource")
+
+	usage := "Filename, directory, or URL to file to use to create the resource"
+	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
+	cmd.MarkFlagRequired("filename")
+
 	return cmd
 }
 

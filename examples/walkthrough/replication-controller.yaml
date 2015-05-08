@@ -16,7 +16,7 @@ desiredState:
         id: nginx
         containers:
           - name: nginx
-            image: dockerfile/nginx
+            image: nginx
             ports:
               - containerPort: 80
     # Important: these labels need to match the selector above

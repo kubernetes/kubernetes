@@ -1,4 +1,4 @@
-// Copyright 2014 go-dockerclient authors. All rights reserved.
+// Copyright 2015 go-dockerclient authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -19,7 +19,7 @@ import (
 
 func newTestClient(rt *FakeRoundTripper) Client {
 	endpoint := "http://localhost:4243"
-	u, _ := parseEndpoint("http://localhost:4243")
+	u, _ := parseEndpoint("http://localhost:4243", false)
 	client := Client{
 		HTTPClient:             &http.Client{Transport: rt},
 		endpoint:               endpoint,
@@ -205,6 +205,29 @@ func TestRemoveImageNotFound(t *testing.T) {
 	err := client.RemoveImage("test:")
 	if err != ErrNoSuchImage {
 		t.Errorf("RemoveImage: wrong error. Want %#v. Got %#v.", ErrNoSuchImage, err)
+	}
+}
+
+func TestRemoveImageExtended(t *testing.T) {
+	name := "test"
+	fakeRT := &FakeRoundTripper{message: "", status: http.StatusNoContent}
+	client := newTestClient(fakeRT)
+	err := client.RemoveImageExtended(name, RemoveImageOptions{Force: true, NoPrune: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := fakeRT.requests[0]
+	expectedMethod := "DELETE"
+	if req.Method != expectedMethod {
+		t.Errorf("RemoveImage(%q): Wrong HTTP method. Want %s. Got %s.", name, expectedMethod, req.Method)
+	}
+	u, _ := url.Parse(client.getURL("/images/" + name))
+	if req.URL.Path != u.Path {
+		t.Errorf("RemoveImage(%q): Wrong request path. Want %q. Got %q.", name, u.Path, req.URL.Path)
+	}
+	expectedQuery := "force=1&noprune=1"
+	if query := req.URL.Query().Encode(); query != expectedQuery {
+		t.Errorf("PushImage: Wrong query string. Want %q. Got %q.", expectedQuery, query)
 	}
 }
 
@@ -834,6 +857,40 @@ func TestExportImage(t *testing.T) {
 	expectedPath := "/images/testimage/get"
 	if req.URL.Path != expectedPath {
 		t.Errorf("ExportIMage: wrong path. Expected %q. Got %q.", expectedPath, req.URL.Path)
+	}
+}
+
+func TestExportImages(t *testing.T) {
+	var buf bytes.Buffer
+	fakeRT := &FakeRoundTripper{message: "", status: http.StatusOK}
+	client := newTestClient(fakeRT)
+	opts := ExportImagesOptions{Names: []string{"testimage1", "testimage2:latest"}, OutputStream: &buf}
+	err := client.ExportImages(opts)
+	if nil != err {
+		t.Error(err)
+	}
+	req := fakeRT.requests[0]
+	if req.Method != "GET" {
+		t.Errorf("ExportImage: wrong method. Expected %q. Got %q.", "GET", req.Method)
+	}
+	expected := "http://localhost:4243/images/get?names=testimage1&names=testimage2%3Alatest"
+	got := req.URL.String()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("ExportIMage: wrong path. Expected %q. Got %q.", expected, got)
+	}
+}
+
+func TestExportImagesNoNames(t *testing.T) {
+	var buf bytes.Buffer
+	fakeRT := &FakeRoundTripper{message: "", status: http.StatusOK}
+	client := newTestClient(fakeRT)
+	opts := ExportImagesOptions{Names: []string{}, OutputStream: &buf}
+	err := client.ExportImages(opts)
+	if err == nil {
+		t.Error("Expected an error")
+	}
+	if err != ErrMustSpecifyNames {
+		t.Error(err)
 	}
 }
 

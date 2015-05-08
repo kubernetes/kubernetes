@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
-// Accessor takes an arbitary object pointer and returns meta.Interface.
+// Accessor takes an arbitrary object pointer and returns meta.Interface.
 // obj must be a pointer to an API type. An error is returned if the minimum
 // required fields are missing. Fields that are not required return the default
 // value and are a no-op if set.
@@ -178,6 +178,23 @@ func (resourceAccessor) SetName(obj runtime.Object, name string) error {
 	return nil
 }
 
+func (resourceAccessor) GenerateName(obj runtime.Object) (string, error) {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return accessor.GenerateName(), nil
+}
+
+func (resourceAccessor) SetGenerateName(obj runtime.Object, name string) error {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetGenerateName(name)
+	return nil
+}
+
 func (resourceAccessor) UID(obj runtime.Object) (types.UID, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
@@ -268,6 +285,7 @@ func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) e
 type genericAccessor struct {
 	namespace       *string
 	name            *string
+	generateName    *string
 	uid             *types.UID
 	apiVersion      *string
 	kind            *string
@@ -303,6 +321,20 @@ func (a genericAccessor) SetName(name string) {
 		return
 	}
 	*a.name = name
+}
+
+func (a genericAccessor) GenerateName() string {
+	if a.generateName == nil {
+		return ""
+	}
+	return *a.generateName
+}
+
+func (a genericAccessor) SetGenerateName(generateName string) {
+	if a.generateName == nil {
+		return
+	}
+	*a.generateName = generateName
 }
 
 func (a genericAccessor) UID() types.UID {
@@ -390,6 +422,9 @@ func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
 		return err
 	}
 	if err := runtime.FieldPtr(v, "Name", &a.name); err != nil {
+		return err
+	}
+	if err := runtime.FieldPtr(v, "GenerateName", &a.generateName); err != nil {
 		return err
 	}
 	if err := runtime.FieldPtr(v, "UID", &a.uid); err != nil {

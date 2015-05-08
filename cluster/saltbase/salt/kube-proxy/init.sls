@@ -55,3 +55,12 @@ kube-proxy:
 {% if grains['os_family'] != 'RedHat' %}
       - file: /etc/init.d/kube-proxy
 {% endif %}
+      - file: /var/lib/kube-proxy/kubeconfig
+
+/var/lib/kube-proxy/kubeconfig:
+  file.managed:
+    - source: salt://kube-proxy/kubeconfig
+    - user: root
+    - group: root
+    - mode: 400
+    - makedirs: true

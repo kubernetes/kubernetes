@@ -1,31 +1,28 @@
-apiVersion: v1beta1
-id: wordpress
-desiredState:
-  manifest:
-    version: v1beta1
-    id: wordpress
-    containers:
-      - name: wordpress
-        image: wordpress
-        ports:
-          - containerPort: 80
-        volumeMounts:
-            # name must match the volume name below
-          - name: wordpress-persistent-storage
-            # mount path within the container
-            mountPath: /var/www/html
-        env:
-          - name: WORDPRESS_DB_PASSWORD
-            # change this - must match mysql.yaml password
-            value: yourpassword
-    volumes:
-      - name: wordpress-persistent-storage
-        source:
-          # emptyDir: {}
-          persistentDisk:
-            # This GCE PD must already exist.
-            pdName: wordpress-disk
-            fsType: ext4
-labels:
-  name: wpfrontend
+apiVersion: v1beta3
 kind: Pod
+metadata:
+  name: wordpress
+  labels: 
+    name: wordpress
+spec: 
+  containers: 
+    - image: wordpress
+      name: wordpress
+      env:
+        - name: WORDPRESS_DB_PASSWORD
+          # change this - must match mysql.yaml password
+          value: yourpassword
+      ports: 
+        - containerPort: 80
+          name: wordpress
+      volumeMounts:
+          # name must match the volume name below
+        - name: wordpress-persistent-storage
+          # mount path within the container
+          mountPath: /var/www/html
+  volumes:
+    - name: wordpress-persistent-storage
+      gcePersistentDisk:
+        # This GCE PD must already exist.
+        pdName: wordpress-disk
+        fsType: ext4

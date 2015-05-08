@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -73,40 +73,44 @@ function start_service() {
   echo "Starting service '$1' on port $2 with $3 replicas"
   svcs_to_clean+=("$1")
   ${KUBECTL} create -f - << __EOF__
-      {
-          "kind": "ReplicationController",
-          "apiVersion": "v1beta1",
-          "id": "$1",
-          "namespace": "default",
-          "desiredState": {
-              "replicas": $3,
-              "replicaSelector": {
-                  "name": "$1"
-              },
-              "podTemplate": {
-                  "desiredState": {
-                      "manifest": {
-                          "version": "v1beta2",
-                          "containers": [
-                              {
-                                  "name": "$1",
-                                  "image": "gcr.io/google_containers/serve_hostname:1.1",
-                                  "ports": [
-                                      {
-                                          "containerPort": 9376,
-                                          "protocol": "TCP"
-                                      }
-                                  ]
-                              }
-                          ]
-                      }
-                  },
-                  "labels": {
-                      "name": "$1"
-                  }
+{
+  "kind": "ReplicationController",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "$1",
+    "namespace": "default",
+    "labels": {
+      "name": "$1"
+    }
+  },
+  "spec": {
+    "replicas": $3,
+    "selector": {
+      "name": "$1"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "$1"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "$1",
+            "image": "gcr.io/google_containers/serve_hostname:1.1",
+            "ports": [
+              {
+                "containerPort": 9376,
+                "protocol": "TCP"
               }
+            ]
           }
+        ]
       }
+    }
+  }
+}
 __EOF__
   # Convert '1.2.3.4 5.6.7.8' => '"1.2.3.4", "5.6.7.8"'
   local ip ips_array=() public_ips
@@ -115,22 +119,30 @@ __EOF__
   done
   public_ips=$(join ", " "${ips_array[@]:+${ips_array[@]}}")
   ${KUBECTL} create -f - << __EOF__
+{
+  "kind": "Service",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "$1",
+    "namespace": "default",
+    "labels": {
+      "name": "$1"
+    }
+  },
+  "spec": {
+    "ports": [
       {
-          "kind": "Service",
-          "apiVersion": "v1beta1",
-          "id": "$1",
-          "namespace": "default",
-          "port": $2,
-          "protocol": "TCP",
-          "labels": {
-              "name": "$1"
-          },
-          "selector": {
-              "name": "$1"
-          },
-          "containerPort": 9376,
-          "publicIPs": [ ${public_ips} ]
+        "protocol": "TCP",
+        "port": $2,
+        "targetPort": 9376
       }
+    ],
+    "selector": {
+      "name": "$1"
+    },
+    "publicIPs": [ ${public_ips} ]
+  }
+}
 __EOF__
 }
 
@@ -151,8 +163,8 @@ function query_pods() {
   local i
   for i in $(seq 1 10); do
     pods_unsorted=($(${KUBECTL} get pods -o template \
-        '--template={{range.items}}{{.id}} {{end}}' \
-        '--api-version=v1beta1' \
+        '--template={{range.items}}{{.metadata.name}} {{end}}' \
+        '--api-version=v1beta3' \
         -l name="$1"))
     found="${#pods_unsorted[*]}"
     if [[ "${found}" == "$2" ]]; then
@@ -186,7 +198,7 @@ function wait_for_pods() {
     echo "Waiting for ${pods_needed} pods to become 'running'"
     pods_needed="$2"
     for id in ${pods_sorted}; do
-      status=$(${KUBECTL} get pods "${id}" -o template --template='{{.currentState.status}}' --api-version=v1beta1)
+      status=$(${KUBECTL} get pods "${id}" -o template --template='{{.status.phase}}' --api-version=v1beta3)
       if [[ "${status}" == "Running" ]]; then
         pods_needed=$((pods_needed-1))
       fi
@@ -312,9 +324,9 @@ svc1_pods=$(query_pods "${svc1_name}" "${svc1_count}")
 svc2_pods=$(query_pods "${svc2_name}" "${svc2_count}")
 
 # Get the portal IPs.
-svc1_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc1_name}" --api-version=v1beta1)
+svc1_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc1_name}" --api-version=v1beta3)
 test -n "${svc1_ip}" || error "Service1 IP is blank"
-svc2_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc2_name}" --api-version=v1beta1)
+svc2_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc2_name}" --api-version=v1beta3)
 test -n "${svc2_ip}" || error "Service2 IP is blank"
 if [[ "${svc1_ip}" == "${svc2_ip}" ]]; then
   error "Portal IPs conflict: ${svc1_ip}"
@@ -384,7 +396,7 @@ wait_for_pods "${svc3_name}" "${svc3_count}"
 svc3_pods=$(query_pods "${svc3_name}" "${svc3_count}")
 
 # Get the portal IP.
-svc3_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc3_name}" --api-version=v1beta1)
+svc3_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc3_name}" --api-version=v1beta3)
 test -n "${svc3_ip}" || error "Service3 IP is blank"
 
 echo "Verifying the portals from the host"
@@ -440,7 +452,7 @@ wait_for_pods "${svc4_name}" "${svc4_count}"
 svc4_pods=$(query_pods "${svc4_name}" "${svc4_count}")
 
 # Get the portal IP.
-svc4_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc4_name}" --api-version=v1beta1)
+svc4_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc4_name}" --api-version=v1beta3)
 test -n "${svc4_ip}" || error "Service4 IP is blank"
 if [[ "${svc4_ip}" == "${svc2_ip}" || "${svc4_ip}" == "${svc3_ip}" ]]; then
   error "Portal IPs conflict: ${svc4_ip}"

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -208,7 +208,7 @@ func contactOthers(state *State) {
 		Host:   os.Getenv("KUBERNETES_RO_SERVICE_HOST") + ":" + os.Getenv("KUBERNETES_RO_SERVICE_PORT"),
 		Path:   "/api/v1beta1",
 	}
-	client := &client.Client{client.NewRESTClient(&masterRO, "v1beta1", latest.Codec, true, 0)}
+	client := &client.Client{client.NewRESTClient(&masterRO, "v1beta1", latest.Codec, true, 5, 10)}
 
 	// Do this repeatedly, in case there's some propagation delay with getting
 	// newly started pods into the endpoints list.

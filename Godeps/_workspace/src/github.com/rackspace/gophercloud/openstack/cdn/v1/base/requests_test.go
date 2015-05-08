@@ -17,18 +17,18 @@ func TestGetHomeDocument(t *testing.T) {
 
 	expected := HomeDocument{
 		"rel/cdn": map[string]interface{}{
-        "href-template": "services{?marker,limit}",
-        "href-vars": map[string]interface{}{
-            "marker": "param/marker",
-            "limit": "param/limit",
-        },
-        "hints": map[string]interface{}{
-            "allow": []string{"GET"},
-            "formats": map[string]interface{}{
-                "application/json": map[string]interface{}{},
-            },
-        },
-    },
+			"href-template": "services{?marker,limit}",
+			"href-vars": map[string]interface{}{
+				"marker": "param/marker",
+				"limit":  "param/limit",
+			},
+			"hints": map[string]interface{}{
+				"allow": []string{"GET"},
+				"formats": map[string]interface{}{
+					"application/json": map[string]interface{}{},
+				},
+			},
+		},
 	}
 	th.CheckDeepEquals(t, expected, *actual)
 }

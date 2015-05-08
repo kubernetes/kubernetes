@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ type REST struct {
 
 // NewStorage returns a RESTStorage object that will work against ResourceQuota objects.
 func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
-	prefix := "/registry/resourcequotas"
+	prefix := "/resourcequotas"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.ResourceQuota{} },
 		NewListFunc: func() runtime.Object { return &api.ResourceQuotaList{} },

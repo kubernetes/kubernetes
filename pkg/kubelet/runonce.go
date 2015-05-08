@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/golang/glog"
 )
 
@@ -52,19 +52,15 @@ func (kl *Kubelet) RunOnce(updates <-chan PodUpdate) ([]RunPodResult, error) {
 }
 
 // runOnce runs a given set of pods and returns their status.
-func (kl *Kubelet) runOnce(pods []api.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
-	if kl.dockerPuller == nil {
-		kl.dockerPuller = dockertools.NewDockerPuller(kl.dockerClient, kl.pullQPS, kl.pullBurst)
-	}
+func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
 	kl.handleNotFittingPods(pods)
 
 	ch := make(chan RunPodResult)
-	for i := range pods {
-		pod := pods[i] // Make a copy
-		go func() {
+	for _, pod := range pods {
+		go func(pod *api.Pod) {
 			err := kl.runPod(pod, retryDelay)
-			ch <- RunPodResult{&pod, err}
-		}()
+			ch <- RunPodResult{pod, err}
+		}(pod)
 	}
 
 	glog.Infof("waiting for %d pods", len(pods))
@@ -88,11 +84,11 @@ func (kl *Kubelet) runOnce(pods []api.Pod, retryDelay time.Duration) (results []
 }
 
 // runPod runs a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
+func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
-		pods, err := dockertools.GetPods(kl.dockerClient, false)
+		pods, err := kl.containerRuntime.GetPods(false)
 		if err != nil {
 			return fmt.Errorf("failed to get kubelet pods: %v", err)
 		}
@@ -108,7 +104,7 @@ func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
 		glog.Infof("pod %q containers not running: syncing", pod.Name)
 		// We don't create mirror pods in this mode; pass a dummy boolean value
 		// to sycnPod.
-		if err = kl.syncPod(&pod, nil, p); err != nil {
+		if err = kl.syncPod(pod, nil, p); err != nil {
 			return fmt.Errorf("error syncing pod: %v", err)
 		}
 		if retry >= RunOnceMaxRetries {
@@ -123,20 +119,15 @@ func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
 }
 
 // isPodRunning returns true if all containers of a manifest are running.
-func (kl *Kubelet) isPodRunning(pod api.Pod, runningPod container.Pod) (bool, error) {
-	for _, container := range pod.Spec.Containers {
-		c := runningPod.FindContainerByName(container.Name)
-		if c == nil {
-			glog.Infof("container %q not found", container.Name)
-			return false, nil
-		}
-		inspectResult, err := kl.dockerClient.InspectContainer(string(c.ID))
-		if err != nil {
-			glog.Infof("failed to inspect container %q: %v", container.Name, err)
-			return false, err
-		}
-		if !inspectResult.State.Running {
-			glog.Infof("container %q not running: %#v", container.Name, inspectResult.State)
+func (kl *Kubelet) isPodRunning(pod *api.Pod, runningPod container.Pod) (bool, error) {
+	status, err := kl.containerRuntime.GetPodStatus(pod)
+	if err != nil {
+		glog.Infof("Failed to get the status of pod %q: %v", kubecontainer.GetPodFullName(pod), err)
+		return false, err
+	}
+	for _, st := range status.ContainerStatuses {
+		if st.State.Running == nil {
+			glog.Infof("Container %q not running: %#v", st.Name, st.State)
 			return false, nil
 		}
 	}

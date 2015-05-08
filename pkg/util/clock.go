@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 // needs to do arbitrary things based on time.
 type Clock interface {
 	Now() time.Time
+	Since(time.Time) time.Duration
 }
 
 // RealClock really calls time.Now()
@@ -34,7 +35,12 @@ func (r RealClock) Now() time.Time {
 	return time.Now()
 }
 
-// FakeClock implements Clock, but returns an arbitary time.
+// Since returns time since the specified timestamp.
+func (r RealClock) Since(ts time.Time) time.Duration {
+	return time.Since(ts)
+}
+
+// FakeClock implements Clock, but returns an arbitrary time.
 type FakeClock struct {
 	Time time.Time
 }
@@ -42,4 +48,9 @@ type FakeClock struct {
 // Now returns f's time.
 func (f *FakeClock) Now() time.Time {
 	return f.Time
+}
+
+// Since returns time since the time in f.
+func (f *FakeClock) Since(ts time.Time) time.Duration {
+	return f.Time.Sub(ts)
 }

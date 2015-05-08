@@ -1,27 +1,39 @@
 package fs
 
-import "github.com/docker/libcontainer/cgroups"
+import (
+	"github.com/docker/libcontainer/cgroups"
+	"github.com/docker/libcontainer/configs"
+)
 
 type DevicesGroup struct {
 }
 
-func (s *DevicesGroup) Set(d *data) error {
+func (s *DevicesGroup) Apply(d *data) error {
 	dir, err := d.join("devices")
 	if err != nil {
 		return err
 	}
 
-	if !d.c.AllowAllDevices {
-		if err := writeFile(dir, "devices.deny", "a"); err != nil {
+	if err := s.Set(dir, d.c); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *DevicesGroup) Set(path string, cgroup *configs.Cgroup) error {
+	if !cgroup.AllowAllDevices {
+		if err := writeFile(path, "devices.deny", "a"); err != nil {
 			return err
 		}
 
-		for _, dev := range d.c.AllowedDevices {
-			if err := writeFile(dir, "devices.allow", dev.GetCgroupAllowString()); err != nil {
+		for _, dev := range cgroup.AllowedDevices {
+			if err := writeFile(path, "devices.allow", dev.CgroupString()); err != nil {
 				return err
 			}
 		}
 	}
+
 	return nil
 }
 

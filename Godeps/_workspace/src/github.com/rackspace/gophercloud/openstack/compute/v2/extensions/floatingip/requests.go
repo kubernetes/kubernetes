@@ -45,10 +45,8 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		return res
 	}
 
-	_, res.Err = client.Request("POST", createURL(client), gophercloud.RequestOpts{
-		JSONBody:     reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
+	_, res.Err = client.Post(createURL(client), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 	return res
 }
@@ -56,19 +54,14 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 // Get returns data about a previously created FloatingIP.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = client.Request("GET", getURL(client, id), gophercloud.RequestOpts{
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
-	})
+	_, res.Err = client.Get(getURL(client, id), &res.Body, nil)
 	return res
 }
 
 // Delete requests the deletion of a previous allocated FloatingIP.
 func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = client.Request("DELETE", deleteURL(client, id), gophercloud.RequestOpts{
-		OkCodes: []int{202},
-	})
+	_, res.Err = client.Delete(deleteURL(client, id), nil)
 	return res
 }
 
@@ -82,10 +75,7 @@ func Associate(client *gophercloud.ServiceClient, serverId, fip string) Associat
 	addFloatingIp["address"] = fip
 	reqBody := map[string]interface{}{"addFloatingIp": addFloatingIp}
 
-	_, res.Err = client.Request("POST", associateURL(client, serverId), gophercloud.RequestOpts{
-		JSONBody: reqBody,
-		OkCodes:  []int{202},
-	})
+	_, res.Err = client.Post(associateURL(client, serverId), reqBody, nil, nil)
 	return res
 }
 
@@ -97,9 +87,6 @@ func Disassociate(client *gophercloud.ServiceClient, serverId, fip string) Disas
 	removeFloatingIp["address"] = fip
 	reqBody := map[string]interface{}{"removeFloatingIp": removeFloatingIp}
 
-	_, res.Err = client.Request("POST", disassociateURL(client, serverId), gophercloud.RequestOpts{
-		JSONBody: reqBody,
-		OkCodes:  []int{202},
-	})
+	_, res.Err = client.Post(disassociateURL(client, serverId), reqBody, nil, nil)
 	return res
 }

@@ -23,7 +23,7 @@ Kibana logging dashboard will be available at https://130.211.152.93/api/v1beta1
 Visiting the Kibana dashboard URL in a browser should give a display like this:
 ![Kibana](kibana.png)
 
-To learn how to query, fitler etc. using Kibana you might like to look at this [tutorial](http://www.elasticsearch.org/guide/en/kibana/current/working-with-queries-and-filters.html).
+To learn how to query, filter etc. using Kibana you might like to look at this [tutorial](http://www.elasticsearch.org/guide/en/kibana/current/working-with-queries-and-filters.html).
 
 You can check to see if any logs are being ingested into Elasticsearch by curling against its URL. You will need to provide the username and password that was generated when your cluster was created. This can be found in the `kubernetes_auth` file for your cluster.
 ```
@@ -38,7 +38,7 @@ Cluster logging can be turned on or off using the environment variable `ENABLE_N
 to `false` to disable cluster logging.
 
 The type of logging is used is specified by the environment variable `LOGGING_DESTINATION` which for the
-GCE provider has the default value `elasticsearch`. If this is set to `gcp` for the GCE provder then
+GCE provider has the default value `elasticsearch`. If this is set to `gcp` for the GCE provider then
 logs will be sent to the Google Cloud Logging system instead.
 
 When using Elasticsearch the number of Elasticsearch instances can be controlled by setting the

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,6 +79,9 @@ func tryConnect(service ServicePortName, srcAddr net.Addr, protocol string, prox
 		// and keep accepting inbound traffic.
 		outConn, err := net.DialTimeout(protocol, endpoint, retryTimeout*time.Second)
 		if err != nil {
+			if isTooManyFDsError(err) {
+				panic("Dial failed: " + err.Error())
+			}
 			glog.Errorf("Dial failed: %v", err)
 			continue
 		}
@@ -91,15 +94,21 @@ func (tcp *tcpProxySocket) ProxyLoop(service ServicePortName, myInfo *serviceInf
 	for {
 		if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
 			// The service port was closed or replaced.
-			break
+			return
 		}
-
 		// Block until a connection is made.
 		inConn, err := tcp.Accept()
 		if err != nil {
+			if isTooManyFDsError(err) {
+				panic("Accept failed: " + err.Error())
+			}
+
+			if isClosedError(err) {
+				return
+			}
 			if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
 				// Then the service port was just closed so the accept failure is to be expected.
-				break
+				return
 			}
 			glog.Errorf("Accept failed: %v", err)
 			continue
@@ -357,16 +366,16 @@ const syncInterval = 5 * time.Second
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
+	t := time.NewTicker(syncInterval)
+	defer t.Stop()
 	for {
-		select {
-		case <-time.After(syncInterval):
-			glog.V(3).Infof("Periodic sync")
-			if err := iptablesInit(proxier.iptables); err != nil {
-				glog.Errorf("Failed to ensure iptables: %v", err)
-			}
-			proxier.ensurePortals()
-			proxier.cleanupStaleStickySessions()
+		<-t.C
+		glog.V(3).Infof("Periodic sync")
+		if err := iptablesInit(proxier.iptables); err != nil {
+			glog.Errorf("Failed to ensure iptables: %v", err)
 		}
+		proxier.ensurePortals()
+		proxier.cleanupStaleStickySessions()
 	}
 }
 
@@ -456,7 +465,7 @@ func (proxier *Proxier) addServiceOnPort(service ServicePortName, protocol api.P
 }
 
 // How long we leave idle UDP connections open.
-const udpIdleTimeout = 1 * time.Minute
+const udpIdleTimeout = 10 * time.Second
 
 // OnUpdate manages the active set of service proxies.
 // Active service proxies are reinitialized if found in the update set or
@@ -790,4 +799,15 @@ func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, destPort int, prot
 	// TODO: Can we DNAT with IPv6?
 	args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
 	return args
+}
+
+func isTooManyFDsError(err error) bool {
+	return strings.Contains(err.Error(), "too many open files")
+}
+
+func isClosedError(err error) bool {
+	// A brief discussion about handling closed error here:
+	// https://code.google.com/p/go/issues/detail?id=4373#c14
+	// TODO: maybe create a stoppable TCP listener that returns a StoppedError
+	return strings.HasSuffix(err.Error(), "use of closed network connection")
 }

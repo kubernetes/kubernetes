@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,26 +23,17 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	//"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
+	//"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = BeforeSuite(func() {
-	//Assert basic external connectivity.
-	//Since this is not really a test of kubernetes in any way, we
-	//leave it as a pre-test assertion, rather than a Ginko test.
-
-	By("Executing a successfull http request from the external internet")
-	resp, err := http.Get("http://google.com")
-	if err != nil {
-		Failf("Unable to connect/talk to the internet: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		Failf("Unexpected error code, expected 200, got, %v (%v)", resp.StatusCode, resp)
-	}
-})
+var c *client.Client = nil
 
 func LaunchNetTestPodPerNode(nodes *api.NodeList, name string, c *client.Client, ns string) []string {
 	podNames := []string{}
@@ -86,12 +77,40 @@ func LaunchNetTestPodPerNode(nodes *api.NodeList, name string, c *client.Client,
 }
 
 var _ = Describe("Networking", func() {
-	var c *client.Client
+
+	//This namespace is modified throughout the course of the test.
+	var namespace *api.Namespace
+	var svcname = "nettest"
+	var c *client.Client = nil
 
 	BeforeEach(func() {
-		var err error
+		//Assert basic external connectivity.
+		//Since this is not really a test of kubernetes in any way, we
+		//leave it as a pre-test assertion, rather than a Ginko test.
+		By("Executing a successful http request from the external internet")
+		resp, err := http.Get("http://google.com")
+		if err != nil {
+			Failf("Unable to connect/talk to the internet: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			Failf("Unexpected error code, expected 200, got, %v (%v)", resp.StatusCode, resp)
+		}
+
+		By("Creating a kubernetes client")
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
+
+		By("Building a namespace api object")
+		namespace, err = createTestingNS("nettest", c)
+		Expect(err).NotTo(HaveOccurred())
+
+	})
+
+	AfterEach(func() {
+		By(fmt.Sprintf("Destroying namespace for this suite %v", namespace.Name))
+		if err := c.Namespaces().Delete(namespace.Name); err != nil {
+			Failf("Couldn't delete ns %s", err)
+		}
 	})
 
 	// First test because it has no dependencies on variables created later on.
@@ -106,7 +125,7 @@ var _ = Describe("Networking", func() {
 		for _, test := range tests {
 			By(fmt.Sprintf("testing: %s", test.path))
 			data, err := c.RESTClient.Get().
-				Namespace(api.NamespaceDefault).
+				Namespace(namespace.Name).
 				AbsPath(test.path).
 				DoRaw()
 			if err != nil {
@@ -115,22 +134,20 @@ var _ = Describe("Networking", func() {
 		}
 	})
 
-	// Create a unique namespace for this test.
-	ns := "nettest-" + randomSuffix()
-	name := "nettest"
-
+	//Now we can proceed with the test.
 	It("should function for intra-pod communication", func() {
+
 		if testContext.Provider == "vagrant" {
 			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 			return
 		}
 
-		By(fmt.Sprintf("Creating a service named [%s] in namespace %s", name, ns))
-		svc, err := c.Services(ns).Create(&api.Service{
+		By(fmt.Sprintf("Creating a service named [%s] in namespace %s", svcname, namespace.Name))
+		svc, err := c.Services(namespace.Name).Create(&api.Service{
 			ObjectMeta: api.ObjectMeta{
-				Name: name,
+				Name: svcname,
 				Labels: map[string]string{
-					"name": name,
+					"name": svcname,
 				},
 			},
 			Spec: api.ServiceSpec{
@@ -140,7 +157,7 @@ var _ = Describe("Networking", func() {
 					TargetPort: util.NewIntOrStringFromInt(8080),
 				}},
 				Selector: map[string]string{
-					"name": name,
+					"name": svcname,
 				},
 			},
 		})
@@ -152,26 +169,26 @@ var _ = Describe("Networking", func() {
 		defer func() {
 			defer GinkgoRecover()
 			By("Cleaning up the service")
-			if err = c.Services(ns).Delete(svc.Name); err != nil {
+			if err = c.Services(namespace.Name).Delete(svc.Name); err != nil {
 				Failf("unable to delete svc %v: %v", svc.Name, err)
 			}
 		}()
 
 		By("Creating a webserver (pending) pod on each node")
 
-		nodes, err := c.Nodes().List()
+		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		if err != nil {
 			Failf("Failed to list nodes: %v", err)
 		}
 
-		podNames := LaunchNetTestPodPerNode(nodes, name, c, ns)
+		podNames := LaunchNetTestPodPerNode(nodes, svcname, c, namespace.Name)
 
 		// Clean up the pods
 		defer func() {
 			defer GinkgoRecover()
 			By("Cleaning up the webserver pods")
 			for _, podName := range podNames {
-				if err = c.Pods(ns).Delete(podName); err != nil {
+				if err = c.Pods(namespace.Name).Delete(podName, nil); err != nil {
 					Logf("Failed to delete pod %s: %v", podName, err)
 				}
 			}
@@ -179,7 +196,7 @@ var _ = Describe("Networking", func() {
 
 		By("Waiting for the webserver pods to transition to Running state")
 		for _, podName := range podNames {
-			err = waitForPodRunningInNamespace(c, podName, ns)
+			err = waitForPodRunningInNamespace(c, podName, namespace.Name)
 			Expect(err).NotTo(HaveOccurred())
 		}
 
@@ -195,7 +212,7 @@ var _ = Describe("Networking", func() {
 			Logf("About to make a proxy status call")
 			start := time.Now()
 			body, err = c.Get().
-				Namespace(ns).
+				Namespace(namespace.Name).
 				Prefix("proxy").
 				Resource("services").
 				Name(svc.Name).
@@ -217,7 +234,7 @@ var _ = Describe("Networking", func() {
 				break
 			case "fail":
 				if body, err = c.Get().
-					Namespace(ns).Prefix("proxy").
+					Namespace(namespace.Name).Prefix("proxy").
 					Resource("services").
 					Name(svc.Name).Suffix("read").
 					DoRaw(); err != nil {
@@ -231,7 +248,7 @@ var _ = Describe("Networking", func() {
 
 		if !passed {
 			if body, err = c.Get().
-				Namespace(ns).
+				Namespace(namespace.Name).
 				Prefix("proxy").
 				Resource("services").
 				Name(svc.Name).

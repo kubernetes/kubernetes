@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,13 +43,18 @@ func (c *FakePersistentVolumes) Delete(name string) error {
 	return err
 }
 
-func (c *FakePersistentVolumes) Create(persistentVolumes *api.PersistentVolume) (*api.PersistentVolume, error) {
+func (c *FakePersistentVolumes) Create(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
 	obj, err := c.Fake.Invokes(FakeAction{Action: "create-persistentVolumes"}, &api.PersistentVolume{})
 	return obj.(*api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) Update(persistentVolumes *api.PersistentVolume) (*api.PersistentVolume, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-persistentVolumes", Value: persistentVolumes.Name}, &api.PersistentVolume{})
+func (c *FakePersistentVolumes) Update(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-persistentVolumes", Value: pv.Name}, &api.PersistentVolume{})
+	return obj.(*api.PersistentVolume), err
+}
+
+func (c *FakePersistentVolumes) UpdateStatus(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-persistentVolumes", Value: pv}, &api.PersistentVolume{})
 	return obj.(*api.PersistentVolume), err
 }
 

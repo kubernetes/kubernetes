@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>JSONPath Tests</title>
+        <link rel="stylesheet" href="../node_modules/nodeunit/dist/browser/nodeunit.css" type="text/css" />
+        <script src="../node_modules/nodeunit/dist/browser/nodeunit.js"></script>
+        <script src="../lib/jsonpath.js"></script>
+        <script>
+            /*jslint nomen: true, white: true, browser:true, plusplus: true, evil:true*/
+            /*global nodeunit, JSONPath, ActiveXObject*/
+            // helper to get all the test cases
+            'use strict';
+            var suites = [], _testCase = nodeunit.testCase;
+            nodeunit.testCase = function(tc) {
+                suites.push(tc);
+                return _testCase(tc);
+            };
+            // stubs to load nodejs tests
+            function require(path) {
+                if (path === 'nodeunit') {return nodeunit;}
+                if (path.match(/^\.\.\/?$/)) {return JSONPath;}
+            }
+            var module = {exports: {}};
+
+
+            // synchronous load function for JS code, uses XMLHttpRequest abstraction from
+            // http://www.quirksmode.org/js/xmlhttp.html
+            // Since the tests are written in node.js style we need to wrap their code into
+            // a function, otherwise they would pollute the global NS and interfere with each
+            // other
+            function get(url, callback) {
+                function createXMLHTTPObject() {
+                    var i, XMLHttpFactories = [
+                    	function () {return new XMLHttpRequest();},
+                    	function () {return new ActiveXObject('Msxml2.XMLHTTP');},
+                    	function () {return new ActiveXObject('Msxml3.XMLHTTP');},
+                    	function () {return new ActiveXObject('Microsoft.XMLHTTP');}];
+                	for (i = 0; i < XMLHttpFactories.length; i++) {
+                		try {return XMLHttpFactories[i]();}
+                        catch (ignore) {}
+                    }
+                	return false;
+                }
+                function sendRequest(url,callback) {
+                	var req = createXMLHTTPObject();
+                	req.open('GET', url, false /*sync*/);
+                	req.onreadystatechange = function () { if (req.readyState === 4) { callback(req); } };
+                	if (req.readyState !== 4) {req.send();}
+                }
+                sendRequest(url, callback);
+            }
+            function loadJS(url) { get(url, function(req) { new Function(req.responseText)(); });}
+        </script>
+    </head>
+    <body>
+        <h1 id="nodeunit-header">JSONPath Tests</h1>
+        <script>
+            loadJS('test.arr.js');
+            loadJS('test.at_and_dollar.js');
+            loadJS('test.eval.js');
+            loadJS('test.examples.js');
+            loadJS('test.intermixed.arr.js');
+            loadJS('test.parent-selector.js');
+            nodeunit.run(suites);
+        </script>
+    </body>
+</html>

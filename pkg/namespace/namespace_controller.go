@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,34 +17,28 @@ limitations under the License.
 package namespace
 
 import (
-	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/golang/glog"
 )
 
 // NamespaceManager is responsible for performing actions dependent upon a namespace phase
 type NamespaceManager struct {
-	kubeClient client.Interface
-	store      cache.Store
-	syncTime   <-chan time.Time
-
-	// To allow injection for testing.
-	syncHandler func(namespace api.Namespace) error
+	controller     *framework.Controller
+	StopEverything chan struct{}
 }
 
 // NewNamespaceManager creates a new NamespaceManager
-func NewNamespaceManager(kubeClient client.Interface) *NamespaceManager {
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	reflector := cache.NewReflector(
+func NewNamespaceManager(kubeClient client.Interface, resyncPeriod time.Duration) *NamespaceManager {
+	_, controller := framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
 				return kubeClient.Namespaces().List(labels.Everything(), fields.Everything())
@@ -54,42 +48,38 @@ func NewNamespaceManager(kubeClient client.Interface) *NamespaceManager {
 			},
 		},
 		&api.Namespace{},
-		store,
-		0,
+		resyncPeriod,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				namespace := obj.(*api.Namespace)
+				syncNamespace(kubeClient, *namespace)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				namespace := newObj.(*api.Namespace)
+				syncNamespace(kubeClient, *namespace)
+			},
+		},
 	)
-	reflector.Run()
-	nm := &NamespaceManager{
-		kubeClient: kubeClient,
-		store:      store,
+
+	return &NamespaceManager{
+		controller: controller,
 	}
-	// set the synchronization handler
-	nm.syncHandler = nm.syncNamespace
-	return nm
 }
 
-// Run begins syncing at the specified period interval
-func (nm *NamespaceManager) Run(period time.Duration) {
-	nm.syncTime = time.Tick(period)
-	go util.Forever(func() { nm.synchronize() }, period)
+// Run begins observing the system.  It starts a goroutine and returns immediately.
+func (nm *NamespaceManager) Run() {
+	if nm.StopEverything == nil {
+		nm.StopEverything = make(chan struct{})
+		go nm.controller.Run(nm.StopEverything)
+	}
 }
 
-// Iterate over the each namespace that is in terminating phase and perform necessary clean-up
-func (nm *NamespaceManager) synchronize() {
-	namespaceObjs := nm.store.List()
-	wg := sync.WaitGroup{}
-	wg.Add(len(namespaceObjs))
-	for ix := range namespaceObjs {
-		go func(ix int) {
-			defer wg.Done()
-			namespace := namespaceObjs[ix].(*api.Namespace)
-			glog.V(4).Infof("periodic sync of namespace: %v", namespace.Name)
-			err := nm.syncHandler(*namespace)
-			if err != nil {
-				glog.Errorf("Error synchronizing: %v", err)
-			}
-		}(ix)
+// Stop gracefully shutsdown this controller
+func (nm *NamespaceManager) Stop() {
+	if nm.StopEverything != nil {
+		close(nm.StopEverything)
+		nm.StopEverything = nil
 	}
-	wg.Wait()
 }
 
 // finalized returns true if the spec.finalizers is empty list
@@ -153,7 +143,7 @@ func deleteAllContent(kubeClient client.Interface, namespace string) (err error)
 }
 
 // syncNamespace makes namespace life-cycle decisions
-func (nm *NamespaceManager) syncNamespace(namespace api.Namespace) (err error) {
+func syncNamespace(kubeClient client.Interface, namespace api.Namespace) (err error) {
 	if namespace.DeletionTimestamp == nil {
 		return nil
 	}
@@ -164,7 +154,7 @@ func (nm *NamespaceManager) syncNamespace(namespace api.Namespace) (err error) {
 		newNamespace.ObjectMeta = namespace.ObjectMeta
 		newNamespace.Status = namespace.Status
 		newNamespace.Status.Phase = api.NamespaceTerminating
-		result, err := nm.kubeClient.Namespaces().Status(&newNamespace)
+		result, err := kubeClient.Namespaces().Status(&newNamespace)
 		if err != nil {
 			return err
 		}
@@ -174,25 +164,25 @@ func (nm *NamespaceManager) syncNamespace(namespace api.Namespace) (err error) {
 
 	// if the namespace is already finalized, delete it
 	if finalized(namespace) {
-		err = nm.kubeClient.Namespaces().Delete(namespace.Name)
+		err = kubeClient.Namespaces().Delete(namespace.Name)
 		return err
 	}
 
 	// there may still be content for us to remove
-	err = deleteAllContent(nm.kubeClient, namespace.Name)
+	err = deleteAllContent(kubeClient, namespace.Name)
 	if err != nil {
 		return err
 	}
 
 	// we have removed content, so mark it finalized by us
-	result, err := finalize(nm.kubeClient, namespace)
+	result, err := finalize(kubeClient, namespace)
 	if err != nil {
 		return err
 	}
 
 	// now check if all finalizers have reported that we delete now
 	if finalized(*result) {
-		err = nm.kubeClient.Namespaces().Delete(namespace.Name)
+		err = kubeClient.Namespaces().Delete(namespace.Name)
 		return err
 	}
 
@@ -256,12 +246,12 @@ func deleteReplicationControllers(kubeClient client.Interface, ns string) error 
 }
 
 func deletePods(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Pods(ns).List(labels.Everything())
+	items, err := kubeClient.Pods(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.Pods(ns).Delete(items.Items[i].Name)
+		err := kubeClient.Pods(ns).Delete(items.Items[i].Name, nil)
 		if err != nil {
 			return err
 		}

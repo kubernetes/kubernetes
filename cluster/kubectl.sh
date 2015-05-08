@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -100,27 +100,14 @@ elif [[ ! -x "${KUBECTL_PATH}" ]]; then
 fi
 kubectl="${KUBECTL_PATH:-${kubectl}}"
 
-# While GKE requires the kubectl binary, it's actually called through
-# gcloud. But we need to adjust the PATH so gcloud gets the right one.
+# GKE stores it's kubeconfig in a separate location.
 if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
-  export PATH=$(get_absolute_dirname $kubectl):$PATH
-  kubectl="${GCLOUD}"
-  # GKE runs kubectl through gcloud.
   config=(
-    "alpha"
-    "container"
-    "kubectl"
-    "--project=${PROJECT}"
-    "--zone=${ZONE}"
-    "--cluster=${CLUSTER_NAME}"
+    "--kubeconfig=${HOME}/.config/gcloud/kubernetes/kubeconfig"
+    "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
   )
-elif [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  # When we are using vagrant it has hard coded kubeconfig, and do not clobber public endpoints
-  config=(
-    "--kubeconfig=$HOME/.kubernetes_vagrant_kubeconfig"
-  )
-elif [[ "$KUBERNETES_PROVIDER" == "libvirt-coreos" ]]; then
+elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" ]]; then
   detect-master > /dev/null
   config=(
     "--server=http://${KUBE_MASTER_IP}:8080"

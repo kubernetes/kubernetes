@@ -2,7 +2,7 @@
 
 Use the [master.yaml](cloud-configs/master.yaml) and [node.yaml](cloud-configs/node.yaml) cloud-configs to provision a multi-node Kubernetes cluster.
 
-*Attention:* This requires at least CoreOS version 593.0.0/598.0.0.
+> **Attention**: This requires at least CoreOS version **653.0.0**.
 
 ## Overview
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -112,7 +112,7 @@ func (util *ISCSIUtil) AttachDisk(iscsi iscsiDisk) error {
 		return err
 	}
 
-	err = iscsi.mounter.Mount(devicePath, globalPDPath, iscsi.fsType, uintptr(0), "")
+	err = iscsi.mounter.Mount(devicePath, globalPDPath, iscsi.fsType, nil)
 	if err != nil {
 		glog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, iscsi.fsType, globalPDPath, err)
 	}
@@ -126,8 +126,8 @@ func (util *ISCSIUtil) DetachDisk(iscsi iscsiDisk, mntPath string) error {
 		glog.Errorf("iscsi detach disk: failed to get device from mnt: %s\nError: %v", mntPath, err)
 		return err
 	}
-	if err = iscsi.mounter.Unmount(mntPath, 0); err != nil {
-		glog.Errorf("iscsi detach disk: failed to umount: %s\nError: %v", mntPath, err)
+	if err = iscsi.mounter.Unmount(mntPath); err != nil {
+		glog.Errorf("iscsi detach disk: failed to unmount: %s\nError: %v", mntPath, err)
 		return err
 	}
 	cnt--

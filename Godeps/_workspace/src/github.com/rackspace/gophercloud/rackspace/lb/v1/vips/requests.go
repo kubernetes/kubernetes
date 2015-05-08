@@ -67,12 +67,7 @@ func Create(c *gophercloud.ServiceClient, lbID int, opts CreateOptsBuilder) Crea
 		return res
 	}
 
-	_, res.Err = c.Request("POST", rootURL(c, lbID), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{202},
-	})
-
+	_, res.Err = c.Post(rootURL(c, lbID), reqBody, &res.Body, nil)
 	return res
 }
 
@@ -90,18 +85,13 @@ func BulkDelete(c *gophercloud.ServiceClient, loadBalancerID int, vipIDs []int) 
 	url := rootURL(c, loadBalancerID)
 	url += gophercloud.IDSliceToQueryString("id", vipIDs)
 
-	_, res.Err = c.Request("DELETE", url, gophercloud.RequestOpts{
-		OkCodes: []int{202},
-	})
-
+	_, res.Err = c.Delete(url, nil)
 	return res
 }
 
 // Delete is the operation responsible for permanently deleting a VIP.
 func Delete(c *gophercloud.ServiceClient, lbID, vipID int) DeleteResult {
 	var res DeleteResult
-	_, res.Err = c.Request("DELETE", resourceURL(c, lbID, vipID), gophercloud.RequestOpts{
-		OkCodes: []int{202},
-	})
+	_, res.Err = c.Delete(resourceURL(c, lbID, vipID), nil)
 	return res
 }

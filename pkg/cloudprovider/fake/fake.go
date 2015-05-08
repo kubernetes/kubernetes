@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,6 +33,12 @@ type FakeBalancer struct {
 	Hosts      []string
 }
 
+type FakeUpdateBalancerCall struct {
+	Name   string
+	Region string
+	Hosts  []string
+}
+
 // FakeCloud is a test-double implementation of Interface, TCPLoadBalancer and Instances. It is useful for testing.
 type FakeCloud struct {
 	Exists        bool
@@ -46,7 +52,7 @@ type FakeCloud struct {
 	MasterName    string
 	ExternalIP    net.IP
 	Balancers     []FakeBalancer
-
+	UpdateCalls   []FakeUpdateBalancerCall
 	cloudprovider.Zone
 }
 
@@ -88,9 +94,9 @@ func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
 	return f, true
 }
 
-// TCPLoadBalancerExists is a stub implementation of TCPLoadBalancer.TCPLoadBalancerExists.
-func (f *FakeCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
-	return f.Exists, f.Err
+// GetTCPLoadBalancer is a stub implementation of TCPLoadBalancer.GetTCPLoadBalancer.
+func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error) {
+	return f.ExternalIP.String(), f.Exists, f.Err
 }
 
 // CreateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
@@ -105,6 +111,7 @@ func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP
 // It adds an entry "update" into the internal method call record.
 func (f *FakeCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
 	f.addCall("update")
+	f.UpdateCalls = append(f.UpdateCalls, FakeUpdateBalancerCall{name, region, hosts})
 	return f.Err
 }
 
@@ -151,4 +158,14 @@ func (f *FakeCloud) GetZone() (cloudprovider.Zone, error) {
 func (f *FakeCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	f.addCall("get-node-resources")
 	return f.NodeResources, f.Err
+}
+
+func (f *FakeCloud) Configure(name string, spec *api.NodeSpec) error {
+	f.addCall("configure")
+	return f.Err
+}
+
+func (f *FakeCloud) Release(name string) error {
+	f.addCall("release")
+	return f.Err
 }

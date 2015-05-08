@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,24 +23,22 @@ import (
 	"reflect"
 
 	"github.com/spf13/cobra"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 )
 
 type unsetOptions struct {
-	pathOptions  *pathOptions
+	configAccess ConfigAccess
 	propertyName string
 }
 
-const unset_long = `Unsets an individual value in a .kubeconfig file
+const unset_long = `Unsets an individual value in a kubeconfig file
 PROPERTY_NAME is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.`
 
-func NewCmdConfigUnset(out io.Writer, pathOptions *pathOptions) *cobra.Command {
-	options := &unsetOptions{pathOptions: pathOptions}
+func NewCmdConfigUnset(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+	options := &unsetOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:   "unset PROPERTY_NAME",
-		Short: "Unsets an individual value in a .kubeconfig file",
+		Short: "Unsets an individual value in a kubeconfig file",
 		Long:  unset_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
@@ -63,13 +61,9 @@ func (o unsetOptions) run() error {
 		return err
 	}
 
-	config, filename, err := o.pathOptions.getStartingConfig()
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
-	}
-
-	if len(filename) == 0 {
-		return errors.New("cannot set property without using a specific file")
 	}
 
 	steps, err := newNavigationSteps(o.propertyName)
@@ -81,8 +75,7 @@ func (o unsetOptions) run() error {
 		return err
 	}
 
-	err = clientcmd.WriteToFile(*config, filename)
-	if err != nil {
+	if err := ModifyConfig(o.configAccess, *config); err != nil {
 		return err
 	}
 

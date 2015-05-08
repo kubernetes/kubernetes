@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -274,6 +274,7 @@ func TestSetKubernetesDefaults(t *testing.T) {
 				Codec:          latest.Codec,
 				LegacyBehavior: (latest.Version == "v1beta1" || latest.Version == "v1beta2"),
 				QPS:            5,
+				Burst:          10,
 			},
 			false,
 		},

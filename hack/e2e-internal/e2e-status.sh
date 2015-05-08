@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ until [[ ${all_running} == 1 ]]; do
     echo "All pods never 'Running' in time." >&2
     exit 1
   fi
-  statuses=($(${KUBECTL} get pods --template='{{range.items}}{{.currentState.status}} {{end}}' --api-version=v1beta1))
+  statuses=($(${KUBECTL} get pods --template='{{range.items}}{{.status.phase}} {{end}}' --api-version=v1beta3))
 
   # Ensure that we have enough pods.
   echo "Found ${#statuses[@]} pods with statuses: ${statuses[@]}" >&2

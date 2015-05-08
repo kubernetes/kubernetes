@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -138,7 +138,10 @@ func (c *fakeUpgradeConnection) CreateStream(headers http.Header) (httpstream.St
 
 	stream := &fakeUpgradeStream{}
 	c.streams[headers.Get(api.PortHeader)] = stream
-	stream.data = c.portData[headers.Get(api.PortHeader)]
+	// only simulate data on the data stream for now, not the error stream
+	if headers.Get(api.StreamType) == api.StreamTypeData {
+		stream.data = c.portData[headers.Get(api.PortHeader)]
+	}
 
 	return stream, nil
 }
@@ -204,6 +207,92 @@ func (s *fakeUpgradeStream) Headers() http.Header {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	return http.Header{}
+}
+
+type TestCase struct {
+	Hostname                string
+	Protocol                string
+	ShouldRaiseError        bool
+	ExpectedListenerAddress string
+}
+
+func TestGetListener(t *testing.T) {
+	var pf PortForwarder
+	testCases := []TestCase{
+		{
+			Hostname:                "localhost",
+			Protocol:                "tcp4",
+			ShouldRaiseError:        false,
+			ExpectedListenerAddress: "127.0.0.1",
+		},
+		{
+			Hostname:                "127.0.0.1",
+			Protocol:                "tcp4",
+			ShouldRaiseError:        false,
+			ExpectedListenerAddress: "127.0.0.1",
+		},
+		{
+			Hostname:                "[::1]",
+			Protocol:                "tcp6",
+			ShouldRaiseError:        false,
+			ExpectedListenerAddress: "::1",
+		},
+		{
+			Hostname:         "[::1]",
+			Protocol:         "tcp4",
+			ShouldRaiseError: true,
+		},
+		{
+			Hostname:         "127.0.0.1",
+			Protocol:         "tcp6",
+			ShouldRaiseError: true,
+		},
+	}
+
+	// On some linux systems, ::1 does not resolve to localhost but to localhost6 or
+	// ip6-localhost. To make the test case portable, we need to do a reverse lookup on ::1 and
+	// trying to bind a port with the name.
+	names, err := net.LookupAddr("::1")
+	if err == nil && len(names) > 0 {
+		ipv6TestCase := TestCase{
+			Hostname:                names[0],
+			Protocol:                "tcp6",
+			ShouldRaiseError:        false,
+			ExpectedListenerAddress: "::1",
+		}
+		testCases = append(testCases, ipv6TestCase)
+	}
+
+	for i, testCase := range testCases {
+		expectedListenerPort := "12345"
+		listener, err := pf.getListener(testCase.Protocol, testCase.Hostname, &ForwardedPort{12345, 12345})
+		errorRaised := err != nil
+
+		if testCase.ShouldRaiseError != errorRaised {
+			t.Errorf("Test case #%d failed: Data %v an error has been raised(%t) where it should not (or reciprocally): %v", i, testCase, testCase.ShouldRaiseError, err)
+			continue
+		}
+		if errorRaised {
+			continue
+		}
+
+		if listener == nil {
+			t.Errorf("Test case #%d did not raised an error (%t) but failed in initializing listener", i, err)
+			continue
+		}
+
+		host, port, _ := net.SplitHostPort(listener.Addr().String())
+		t.Logf("Asked a %s forward for: %s:%v, got listener %s:%s, expected: %s", testCase.Protocol, testCase.Hostname, 12345, host, port, expectedListenerPort)
+		if host != testCase.ExpectedListenerAddress {
+			t.Errorf("Test case #%d failed: Listener does not listen on exepected address: asked %v got %v", i, testCase.ExpectedListenerAddress, host)
+		}
+		if port != expectedListenerPort {
+			t.Errorf("Test case #%d failed: Listener does not listen on exepected port: asked %v got %v", i, expectedListenerPort, port)
+
+		}
+		listener.Close()
+
+	}
 }
 
 func TestForwardPorts(t *testing.T) {
@@ -310,4 +399,5 @@ func TestForwardPorts(t *testing.T) {
 			t.Fatalf("%d: expected conn closure", i)
 		}
 	}
+
 }

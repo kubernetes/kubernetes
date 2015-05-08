@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,11 +25,24 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
 )
 
 var versioner = APIObjectVersioner{}
+
+// Implements etcdCache interface as empty methods (i.e. does not cache any objects)
+type fakeEtcdCache struct{}
+
+func (f *fakeEtcdCache) getFromCache(index uint64) (runtime.Object, bool) {
+	return nil, false
+}
+
+func (f *fakeEtcdCache) addToCache(index uint64, obj runtime.Object) {
+}
+
+var _ etcdCache = &fakeEtcdCache{}
 
 func TestWatchInterpretations(t *testing.T) {
 	codec := latest.Codec
@@ -114,7 +127,7 @@ func TestWatchInterpretations(t *testing.T) {
 
 	for name, item := range table {
 		for _, action := range item.actions {
-			w := newEtcdWatcher(true, nil, firstLetterIsB, codec, versioner, nil)
+			w := newEtcdWatcher(true, nil, firstLetterIsB, codec, versioner, nil, &fakeEtcdCache{})
 			emitCalled := false
 			w.emit = func(event watch.Event) {
 				emitCalled = true
@@ -152,7 +165,7 @@ func TestWatchInterpretations(t *testing.T) {
 }
 
 func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
-	w := newEtcdWatcher(false, nil, Everything, codec, versioner, nil)
+	w := newEtcdWatcher(false, nil, Everything, codec, versioner, nil, &fakeEtcdCache{})
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
 	}
@@ -166,7 +179,7 @@ func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
 func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, nil, Everything, codec, versioner, nil)
+		w := newEtcdWatcher(false, nil, Everything, codec, versioner, nil, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -180,7 +193,7 @@ func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
 func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, nil, Everything, codec, versioner, nil)
+		w := newEtcdWatcher(false, nil, Everything, codec, versioner, nil, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -205,9 +218,15 @@ func TestWatchEtcdError(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
 	fakeClient.WatchImmediateError = fmt.Errorf("immediate error")
-	h := EtcdHelper{fakeClient, codec, versioner}
+	h := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	got := <-h.Watch("/some/key", 4).ResultChan()
+	watching, err := h.Watch("/some/key", 4, Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer watching.Stop()
+
+	got := <-watching.ResultChan()
 	if got.Type != watch.Error {
 		t.Fatalf("Unexpected non-error")
 	}
@@ -226,10 +245,15 @@ func TestWatchEtcdError(t *testing.T) {
 func TestWatch(t *testing.T) {
 	codec := latest.Codec
 	fakeClient := NewFakeEtcdClient(t)
-	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
-	h := EtcdHelper{fakeClient, codec, versioner}
+	key := "/some/key"
+	prefixedKey := etcdtest.AddPrefix(key)
+	fakeClient.expectNotFoundGetSet[prefixedKey] = struct{}{}
+	h := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	watching := h.Watch("/some/key", 0)
+	watching, err := h.Watch(key, 0, Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	fakeClient.WaitForWatchCompletion()
 	// when server returns not found, the watch index starts at the next value (1)
@@ -291,6 +315,8 @@ func makeSubsets(ip string, port int) []api.EndpointSubset {
 
 func TestWatchEtcdState(t *testing.T) {
 	codec := latest.Codec
+	baseKey := "/somekey/foo"
+	prefixedKey := etcdtest.AddPrefix(baseKey)
 	type T struct {
 		Type      watch.EventType
 		Endpoints []api.EndpointSubset
@@ -348,7 +374,7 @@ func TestWatchEtcdState(t *testing.T) {
 		},
 		"from initial state": {
 			Initial: map[string]EtcdResponseWithError{
-				"/somekey/foo": {
+				prefixedKey: {
 					R: &etcd.Response{
 						Action: "get",
 						Node: &etcd.Node{
@@ -397,8 +423,13 @@ func TestWatchEtcdState(t *testing.T) {
 		for key, value := range testCase.Initial {
 			fakeClient.Data[key] = value
 		}
-		h := EtcdHelper{fakeClient, codec, versioner}
-		watching := h.Watch("/somekey/foo", testCase.From)
+
+		h := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+		watching, err := h.Watch(baseKey, testCase.From, Everything)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
 		fakeClient.WaitForWatchCompletion()
 
 		t.Logf("Testing %v", k)
@@ -463,10 +494,15 @@ func TestWatchFromZeroIndex(t *testing.T) {
 
 	for k, testCase := range testCases {
 		fakeClient := NewFakeEtcdClient(t)
-		fakeClient.Data["/some/key"] = testCase.Response
-		h := EtcdHelper{fakeClient, codec, versioner}
+		key := "/some/key"
+		prefixedKey := etcdtest.AddPrefix(key)
+		fakeClient.Data[prefixedKey] = testCase.Response
+		h := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-		watching := h.Watch("/some/key", 0)
+		watching, err := h.Watch(key, 0, Everything)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
 
 		fakeClient.WaitForWatchCompletion()
 		if e, a := testCase.Response.R.EtcdIndex+1, fakeClient.WatchIndex; e != a {
@@ -496,9 +532,10 @@ func TestWatchFromZeroIndex(t *testing.T) {
 func TestWatchListFromZeroIndex(t *testing.T) {
 	codec := latest.Codec
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-
+	key := "/some/key"
+	prefixedKey := etcdtest.AddPrefix(key)
 	fakeClient := NewFakeEtcdClient(t)
-	fakeClient.Data["/some/key"] = EtcdResponseWithError{
+	fakeClient.Data[prefixedKey] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Dir: true,
@@ -521,9 +558,9 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 			EtcdIndex: 3,
 		},
 	}
-	h := EtcdHelper{fakeClient, codec, versioner}
+	h := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	watching, err := h.WatchList("/some/key", 0, Everything)
+	watching, err := h.WatchList(key, 0, Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -557,11 +594,13 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 func TestWatchListIgnoresRootKey(t *testing.T) {
 	codec := latest.Codec
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	key := "/some/key"
+	prefixedKey := etcdtest.AddPrefix(key)
 
 	fakeClient := NewFakeEtcdClient(t)
-	h := EtcdHelper{fakeClient, codec, versioner}
+	h := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	watching, err := h.WatchList("/some/key", 1, Everything)
+	watching, err := h.WatchList(key, 1, Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -571,7 +610,7 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	fakeClient.WatchResponse <- &etcd.Response{
 		Action: "delete",
 		PrevNode: &etcd.Node{
-			Key:           "/some/key",
+			Key:           prefixedKey,
 			Value:         runtime.EncodeOrDie(codec, pod),
 			CreatedIndex:  1,
 			ModifiedIndex: 1,
@@ -582,7 +621,7 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	fakeClient.WatchResponse <- &etcd.Response{
 		Action: "delete",
 		PrevNode: &etcd.Node{
-			Key:           "/some/key",
+			Key:           prefixedKey,
 			Value:         "",
 			CreatedIndex:  1,
 			ModifiedIndex: 1,
@@ -601,7 +640,9 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 
 func TestWatchFromNotFound(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
-	fakeClient.Data["/some/key"] = EtcdResponseWithError{
+	key := "/some/key"
+	prefixedKey := etcdtest.AddPrefix(key)
+	fakeClient.Data[prefixedKey] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -610,10 +651,12 @@ func TestWatchFromNotFound(t *testing.T) {
 			ErrorCode: 100,
 		},
 	}
-	h := EtcdHelper{fakeClient, codec, versioner}
+	h := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	watching := h.Watch("/some/key", 0)
-
+	watching, err := h.Watch(key, 0, Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	fakeClient.WaitForWatchCompletion()
 	if fakeClient.WatchIndex != 3 {
 		t.Errorf("Expected client to wait for %d, got %#v", 3, fakeClient)
@@ -624,7 +667,9 @@ func TestWatchFromNotFound(t *testing.T) {
 
 func TestWatchFromOtherError(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
-	fakeClient.Data["/some/key"] = EtcdResponseWithError{
+	key := "/some/key"
+	prefixedKey := etcdtest.AddPrefix(key)
+	fakeClient.Data[prefixedKey] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -633,9 +678,12 @@ func TestWatchFromOtherError(t *testing.T) {
 			ErrorCode: 101,
 		},
 	}
-	h := EtcdHelper{fakeClient, codec, versioner}
+	h := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
 
-	watching := h.Watch("/some/key", 0)
+	watching, err := h.Watch(key, 0, Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	errEvent := <-watching.ResultChan()
 	if e, a := watch.Error, errEvent.Type; e != a {
@@ -661,11 +709,18 @@ func TestWatchFromOtherError(t *testing.T) {
 
 func TestWatchPurposefulShutdown(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
-	h := EtcdHelper{fakeClient, codec, versioner}
-	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
+
+	h := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+	key := "/some/key"
+	prefixedKey := etcdtest.AddPrefix(key)
+	fakeClient.expectNotFoundGetSet[prefixedKey] = struct{}{}
 
 	// Test purposeful shutdown
-	watching := h.Watch("/some/key", 0)
+	watching, err := h.Watch(key, 0, Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
 	fakeClient.WaitForWatchCompletion()
 	watching.Stop()
 

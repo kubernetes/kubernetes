@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,11 +48,11 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/empty-dir" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
-	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{}}) {
-		t.Errorf("Expected true")
+	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{}}) {
+		t.Errorf("Expected false")
 	}
 }
 
@@ -74,7 +74,7 @@ func TestPlugin(t *testing.T) {
 	}
 	mounter := mount.FakeMounter{}
 	mountDetector := fakeMountDetector{}
-	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mountDetector)
+	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mountDetector, volume.VolumeOptions{""})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestPluginTmpfs(t *testing.T) {
 	}
 	mounter := mount.FakeMounter{}
 	mountDetector := fakeMountDetector{}
-	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mountDetector)
+	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mountDetector, volume.VolumeOptions{""})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestPluginBackCompat(t *testing.T) {
 	spec := &api.Volume{
 		Name: "vol1",
 	}
-	builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")})
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""}, nil)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -217,12 +217,12 @@ func TestPluginLegacy(t *testing.T) {
 	if plug.Name() != "empty" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}) {
+	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
 
 	spec := api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}
-	if _, err := plug.(*emptyDirPlugin).newBuilderInternal(&spec, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, &fakeMountDetector{}); err == nil {
+	if _, err := plug.(*emptyDirPlugin).newBuilderInternal(volume.NewSpecFromVolume(&spec), &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, &fakeMountDetector{}, volume.VolumeOptions{""}); err == nil {
 		t.Errorf("Expected failiure")
 	}
 

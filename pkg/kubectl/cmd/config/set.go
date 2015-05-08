@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,8 +24,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 )
 
 const (
@@ -34,21 +32,21 @@ const (
 )
 
 type setOptions struct {
-	pathOptions   *pathOptions
+	configAccess  ConfigAccess
 	propertyName  string
 	propertyValue string
 }
 
-const set_long = `Sets an individual value in a .kubeconfig file
+const set_long = `Sets an individual value in a kubeconfig file
 PROPERTY_NAME is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
 PROPERTY_VALUE is the new value you wish to set.`
 
-func NewCmdConfigSet(out io.Writer, pathOptions *pathOptions) *cobra.Command {
-	options := &setOptions{pathOptions: pathOptions}
+func NewCmdConfigSet(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+	options := &setOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:   "set PROPERTY_NAME PROPERTY_VALUE",
-		Short: "Sets an individual value in a .kubeconfig file",
+		Short: "Sets an individual value in a kubeconfig file",
 		Long:  set_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
@@ -71,15 +69,10 @@ func (o setOptions) run() error {
 		return err
 	}
 
-	config, filename, err := o.pathOptions.getStartingConfig()
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
-
-	if len(filename) == 0 {
-		return errors.New("cannot set property without using a specific file")
-	}
-
 	steps, err := newNavigationSteps(o.propertyName)
 	if err != nil {
 		return err
@@ -89,8 +82,7 @@ func (o setOptions) run() error {
 		return err
 	}
 
-	err = clientcmd.WriteToFile(*config, filename)
-	if err != nil {
+	if err := ModifyConfig(o.configAccess, *config); err != nil {
 		return err
 	}
 

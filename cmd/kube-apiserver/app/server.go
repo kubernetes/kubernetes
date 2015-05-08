@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -38,6 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	forked "github.com/GoogleCloudPlatform/kubernetes/third_party/forked/coreos/go-etcd/etcd"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -46,21 +48,23 @@ import (
 
 // APIServer runs a kubernetes api server.
 type APIServer struct {
-	WideOpenPort               int
-	ExternalHost               string
-	Address                    util.IP
-	PublicAddressOverride      util.IP
+	InsecureBindAddress        util.IP
+	InsecurePort               int
+	BindAddress                util.IP
 	ReadOnlyPort               int
+	SecurePort                 int
+	ExternalHost               string
 	APIRate                    float32
 	APIBurst                   int
-	SecurePort                 int
 	TLSCertFile                string
 	TLSPrivateKeyFile          string
+	CertDirectory              string
 	APIPrefix                  string
 	StorageVersion             string
 	CloudProvider              string
 	CloudConfigFile            string
 	EventTTL                   time.Duration
+	BasicAuthFile              string
 	ClientCAFile               string
 	TokenAuthFile              string
 	AuthorizationMode          string
@@ -69,6 +73,8 @@ type APIServer struct {
 	AdmissionControlConfigFile string
 	EtcdServerList             util.StringList
 	EtcdConfigFile             string
+	EtcdPathPrefix             string
+	OldEtcdPathPrefix          string
 	CorsAllowedOriginList      util.StringList
 	AllowPrivileged            bool
 	PortalNet                  util.IPNet // TODO: make this a list
@@ -85,20 +91,23 @@ type APIServer struct {
 // NewAPIServer creates a new APIServer object with default parameters
 func NewAPIServer() *APIServer {
 	s := APIServer{
-		WideOpenPort:           8080,
-		Address:                util.IP(net.ParseIP("127.0.0.1")),
-		PublicAddressOverride:  util.IP(net.ParseIP("")),
+		InsecurePort:           8080,
+		InsecureBindAddress:    util.IP(net.ParseIP("127.0.0.1")),
+		BindAddress:            util.IP(net.ParseIP("0.0.0.0")),
 		ReadOnlyPort:           7080,
+		SecurePort:             6443,
 		APIRate:                10.0,
 		APIBurst:               200,
-		SecurePort:             6443,
 		APIPrefix:              "/api",
 		EventTTL:               1 * time.Hour,
 		AuthorizationMode:      "AlwaysAllow",
 		AdmissionControl:       "AlwaysAdmit",
+		EtcdPathPrefix:         master.DefaultEtcdPathPrefix,
+		OldEtcdPathPrefix:      master.DefaultEtcdPathPrefix,
 		EnableLogsSupport:      true,
 		MasterServiceNamespace: api.NamespaceDefault,
 		ClusterName:            "kubernetes",
+		CertDirectory:          "/var/run/kubernetes",
 
 		RuntimeConfig: make(util.ConfigurationMap),
 		KubeletConfig: client.KubeletConfig{
@@ -115,63 +124,73 @@ func NewAPIServer() *APIServer {
 func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-	fs.IntVar(&s.WideOpenPort, "port", s.WideOpenPort, ""+
-		"The port to listen on. Default 8080. It is assumed that firewall rules are "+
-		"set up such that this port is not reachable from outside of the cluster. It is "+
-		"further assumed that port 443 on the cluster's public address is proxied to this "+
+	fs.IntVar(&s.InsecurePort, "insecure-port", s.InsecurePort, ""+
+		"The port on which to serve unsecured, unauthenticated access. Default 8080. It is assumed "+
+		"that firewall rules are set up such that this port is not reachable from outside of "+
+		"the cluster and that port 443 on the cluster's public address is proxied to this "+
 		"port. This is performed by nginx in the default setup.")
-	fs.Var(&s.Address, "address", "The IP address on to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.Var(&s.PublicAddressOverride, "public_address_override", "Public serving address."+
-		"Read only port will be opened on this address, and it is assumed that port "+
-		"443 at this address will be proxied/redirected to '-address':'-port'. If "+
-		"blank, the address in the first listed interface will be used.")
-	fs.IntVar(&s.ReadOnlyPort, "read_only_port", s.ReadOnlyPort, ""+
-		"The port from which to serve read-only resources. If 0, don't serve on a "+
-		"read-only address. It is assumed that firewall rules are set up such that "+
-		"this port is not reachable from outside of the cluster.")
-	fs.Float32Var(&s.APIRate, "api_rate", s.APIRate, "API rate limit as QPS for the read only port")
-	fs.IntVar(&s.APIBurst, "api_burst", s.APIBurst, "API burst amount for the read only port")
-	fs.IntVar(&s.SecurePort, "secure_port", s.SecurePort,
-		"The port from which to serve HTTPS with authentication and authorization. If 0, don't serve HTTPS ")
-	fs.StringVar(&s.TLSCertFile, "tls_cert_file", s.TLSCertFile, ""+
+	fs.IntVar(&s.InsecurePort, "port", s.InsecurePort, "DEPRECATED: see --insecure-port instead")
+	fs.Var(&s.InsecureBindAddress, "insecure-bind-address", ""+
+		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). "+
+		"Defaults to localhost.")
+	fs.Var(&s.InsecureBindAddress, "address", "DEPRECATED: see --insecure-bind-address instead")
+	fs.Var(&s.BindAddress, "bind-address", ""+
+		"The IP address on which to serve the --read-only-port and --secure-port ports. This "+
+		"address must be reachable by the rest of the cluster. If blank, all interfaces will be used.")
+	fs.Var(&s.BindAddress, "public-address-override", "DEPRECATED: see --bind-address instead")
+	fs.IntVar(&s.ReadOnlyPort, "read-only-port", s.ReadOnlyPort, ""+
+		"The port on which to serve read-only resources. If 0, don't serve read-only "+
+		"at all. It is assumed that firewall rules are set up such that this port is "+
+		"not reachable from outside of the cluster.")
+	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, ""+
+		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
+		"don't serve HTTPS at all.")
+	fs.Float32Var(&s.APIRate, "api-rate", s.APIRate, "API rate limit as QPS for the read only port")
+	fs.IntVar(&s.APIBurst, "api-burst", s.APIBurst, "API burst amount for the read only port")
+	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
-		"If HTTPS serving is enabled, and --tls_cert_file and --tls_private_key_file are not provided, "+
+		"If HTTPS serving is enabled, and --tls-cert-file and --tls-private-key-file are not provided, "+
 		"a self-signed certificate and key are generated for the public address and saved to /var/run/kubernetes.")
-	fs.StringVar(&s.TLSPrivateKeyFile, "tls_private_key_file", s.TLSPrivateKeyFile, "File containing x509 private key matching --tls_cert_file.")
-	fs.StringVar(&s.APIPrefix, "api_prefix", s.APIPrefix, "The prefix for API requests on the server. Default '/api'.")
-	fs.StringVar(&s.StorageVersion, "storage_version", s.StorageVersion, "The version to store resources with. Defaults to server preferred")
-	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
-	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	fs.DurationVar(&s.EventTTL, "event_ttl", s.EventTTL, "Amount of time to retain events. Default 1 hour.")
-	fs.StringVar(&s.ClientCAFile, "client_ca_file", s.ClientCAFile, "If set, any request presenting a client certificate signed by one of the authorities in the client_ca_file is authenticated with an identity corresponding to the CommonName of the client certificate.")
-	fs.StringVar(&s.TokenAuthFile, "token_auth_file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")
-	fs.StringVar(&s.AuthorizationMode, "authorization_mode", s.AuthorizationMode, "Selects how to do authorization on the secure port.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
-	fs.StringVar(&s.AuthorizationPolicyFile, "authorization_policy_file", s.AuthorizationPolicyFile, "File with authorization policy in csv format, used with --authorization_mode=ABAC, on the secure port.")
-	fs.StringVar(&s.AdmissionControl, "admission_control", s.AdmissionControl, "Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: "+strings.Join(admission.GetPlugins(), ", "))
-	fs.StringVar(&s.AdmissionControlConfigFile, "admission_control_config_file", s.AdmissionControlConfigFile, "File with admission control configuration.")
-	fs.Var(&s.EtcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd_config")
-	fs.StringVar(&s.EtcdConfigFile, "etcd_config", s.EtcdConfigFile, "The config file for the etcd client. Mutually exclusive with -etcd_servers.")
-	fs.Var(&s.CorsAllowedOriginList, "cors_allowed_origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
-	fs.BoolVar(&s.AllowPrivileged, "allow_privileged", s.AllowPrivileged, "If true, allow privileged containers.")
-	fs.Var(&s.PortalNet, "portal_net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
-	fs.StringVar(&s.MasterServiceNamespace, "master_service_namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
-	fs.Var(&s.RuntimeConfig, "runtime_config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver.")
+	fs.StringVar(&s.TLSPrivateKeyFile, "tls-private-key-file", s.TLSPrivateKeyFile, "File containing x509 private key matching --tls-cert-file.")
+	fs.StringVar(&s.CertDirectory, "cert-dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes). "+
+		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
+	fs.StringVar(&s.APIPrefix, "api-prefix", s.APIPrefix, "The prefix for API requests on the server. Default '/api'.")
+	fs.StringVar(&s.StorageVersion, "storage-version", s.StorageVersion, "The version to store resources with. Defaults to server preferred")
+	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
+	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL, "Amount of time to retain events. Default 1 hour.")
+	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, "If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.")
+	fs.StringVar(&s.ClientCAFile, "client-ca-file", s.ClientCAFile, "If set, any request presenting a client certificate signed by one of the authorities in the client-ca-file is authenticated with an identity corresponding to the CommonName of the client certificate.")
+	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")
+	fs.StringVar(&s.AuthorizationMode, "authorization-mode", s.AuthorizationMode, "Selects how to do authorization on the secure port.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
+	fs.StringVar(&s.AuthorizationPolicyFile, "authorization-policy-file", s.AuthorizationPolicyFile, "File with authorization policy in csv format, used with --authorization-mode=ABAC, on the secure port.")
+	fs.StringVar(&s.AdmissionControl, "admission-control", s.AdmissionControl, "Ordered list of plug-ins to do admission control of resources into cluster. Comma-delimited list of: "+strings.Join(admission.GetPlugins(), ", "))
+	fs.StringVar(&s.AdmissionControlConfigFile, "admission-control-config-file", s.AdmissionControlConfigFile, "File with admission control configuration.")
+	fs.Var(&s.EtcdServerList, "etcd-servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd-config")
+	fs.StringVar(&s.EtcdConfigFile, "etcd-config", s.EtcdConfigFile, "The config file for the etcd client. Mutually exclusive with -etcd-servers.")
+	fs.StringVar(&s.EtcdPathPrefix, "etcd-prefix", s.EtcdPathPrefix, "The prefix for all resource paths in etcd.")
+	fs.StringVar(&s.OldEtcdPathPrefix, "old-etcd-prefix", s.OldEtcdPathPrefix, "The previous prefix for all resource paths in etcd, if any.")
+	fs.Var(&s.CorsAllowedOriginList, "cors-allowed-origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
+	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
+	fs.Var(&s.PortalNet, "portal-net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
+	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
+	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver.")
 	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
-	fs.StringVar(&s.ClusterName, "cluster_name", s.ClusterName, "The instance prefix for the cluster")
-	fs.BoolVar(&s.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
-	fs.StringVar(&s.ExternalHost, "external_hostname", "", "The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)")
-	fs.IntVar(&s.MaxRequestsInFlight, "max_requests_inflight", 20, "The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.")
-	fs.StringVar(&s.LongRunningRequestRE, "long_running_request_regexp", "[.*\\/watch$][^\\/proxy.*]", "A regular expression matching long running requests which should be excluded from maximum inflight request handling.")
+	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
+	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.StringVar(&s.ExternalHost, "external-hostname", "", "The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)")
+	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", 400, "The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.")
+	fs.StringVar(&s.LongRunningRequestRE, "long-running-request-regexp", "[.*\\/watch$][^\\/proxy.*]", "A regular expression matching long running requests which should be excluded from maximum inflight request handling.")
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
 func (s *APIServer) verifyPortalFlags() {
 	if s.PortalNet.IP == nil {
-		glog.Fatal("No --portal_net specified")
+		glog.Fatal("No --portal-net specified")
 	}
 }
 
-func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string) (helper tools.EtcdHelper, err error) {
+func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersion string, pathPrefix string) (helper tools.EtcdHelper, err error) {
 	var client tools.EtcdGetSet
 	if etcdConfigFile != "" {
 		client, err = etcd.NewClientFromFile(etcdConfigFile)
@@ -179,10 +198,19 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersi
 			return helper, err
 		}
 	} else {
-		client = etcd.NewClient(etcdServerList)
+		etcdClient := etcd.NewClient(etcdServerList)
+		transport := &http.Transport{
+			Dial: forked.Dial,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+			MaxIdleConnsPerHost: 500,
+		}
+		etcdClient.SetTransport(transport)
+		client = etcdClient
 	}
 
-	return master.NewEtcdHelper(client, storageVersion)
+	return master.NewEtcdHelper(client, storageVersion, pathPrefix)
 }
 
 // Run runs the specified APIServer.  This should never exit.
@@ -190,7 +218,7 @@ func (s *APIServer) Run(_ []string) error {
 	s.verifyPortalFlags()
 
 	if (s.EtcdConfigFile != "" && len(s.EtcdServerList) != 0) || (s.EtcdConfigFile == "" && len(s.EtcdServerList) == 0) {
-		glog.Fatalf("specify either --etcd_servers or --etcd_config")
+		glog.Fatalf("specify either --etcd-servers or --etcd-config")
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{
@@ -212,9 +240,11 @@ func (s *APIServer) Run(_ []string) error {
 		disableV1beta3 = true
 	}
 
+	_, enableV1 := s.RuntimeConfig["api/v1"]
+
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
-		Host:    net.JoinHostPort(s.Address.String(), strconv.Itoa(s.WideOpenPort)),
+		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
 		Version: s.StorageVersion,
 	}
 	client, err := client.New(clientConfig)
@@ -222,14 +252,22 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
 
-	helper, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, s.StorageVersion)
+	helper, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, s.StorageVersion, s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
 
+	// TODO Is this the right place for migration to happen? Must *both* old and
+	// new etcd prefix params be supplied for this to be valid?
+	if s.OldEtcdPathPrefix != "" {
+		if err = helper.MigrateKeys(s.OldEtcdPathPrefix); err != nil {
+			glog.Fatalf("Migration of old etcd keys failed: %v", err)
+		}
+	}
+
 	n := net.IPNet(s.PortalNet)
 
-	authenticator, err := apiserver.NewAuthenticator(s.ClientCAFile, s.TokenAuthFile)
+	authenticator, err := apiserver.NewAuthenticator(s.BasicAuthFile, s.ClientCAFile, s.TokenAuthFile)
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
@@ -267,7 +305,6 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	config := &master.Config{
-		Cloud:                  cloud,
 		EtcdHelper:             helper,
 		EventTTL:               s.EventTTL,
 		KubeletClient:          kubeletClient,
@@ -281,11 +318,13 @@ func (s *APIServer) Run(_ []string) error {
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,
 		ReadOnlyPort:           s.ReadOnlyPort,
 		ReadWritePort:          s.SecurePort,
-		PublicAddress:          net.IP(s.PublicAddressOverride),
+		PublicAddress:          net.IP(s.BindAddress),
 		Authenticator:          authenticator,
+		SupportsBasicAuth:      len(s.BasicAuthFile) > 0,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
 		DisableV1Beta3:         disableV1beta3,
+		EnableV1:               enableV1,
 		MasterServiceNamespace: s.MasterServiceNamespace,
 		ClusterName:            s.ClusterName,
 		ExternalHost:           s.ExternalHost,
@@ -295,13 +334,13 @@ func (s *APIServer) Run(_ []string) error {
 	// We serve on 3 ports.  See docs/accessing_the_api.md
 	roLocation := ""
 	if s.ReadOnlyPort != 0 {
-		roLocation = net.JoinHostPort(config.PublicAddress.String(), strconv.Itoa(s.ReadOnlyPort))
+		roLocation = net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.ReadOnlyPort))
 	}
 	secureLocation := ""
 	if s.SecurePort != 0 {
-		secureLocation = net.JoinHostPort(config.PublicAddress.String(), strconv.Itoa(s.SecurePort))
+		secureLocation = net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.SecurePort))
 	}
-	wideOpenLocation := net.JoinHostPort(s.Address.String(), strconv.Itoa(s.WideOpenPort))
+	insecureLocation := net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort))
 
 	// See the flag commentary to understand our assumptions when opening the read-only and read-write ports.
 
@@ -364,8 +403,8 @@ func (s *APIServer) Run(_ []string) error {
 			defer util.HandleCrash()
 			for {
 				if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
-					s.TLSCertFile = "/var/run/kubernetes/apiserver.crt"
-					s.TLSPrivateKeyFile = "/var/run/kubernetes/apiserver.key"
+					s.TLSCertFile = path.Join(s.CertDirectory, "apiserver.crt")
+					s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "apiserver.key")
 					if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
 						glog.Errorf("Unable to generate self signed cert: %v", err)
 					} else {
@@ -381,13 +420,13 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	http := &http.Server{
-		Addr:           wideOpenLocation,
+		Addr:           insecureLocation,
 		Handler:        apiserver.RecoverPanics(m.InsecureHandler),
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
-	glog.Infof("Serving insecurely on %s", wideOpenLocation)
+	glog.Infof("Serving insecurely on %s", insecureLocation)
 	glog.Fatal(http.ListenAndServe())
 	return nil
 }

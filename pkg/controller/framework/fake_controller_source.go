@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,10 +18,12 @@ package framework
 
 import (
 	"errors"
+	"math/rand"
 	"strconv"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -51,26 +53,49 @@ type nnu struct {
 // Add adds an object to the set and sends an add event to watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) Add(obj runtime.Object) {
-	f.change(watch.Event{watch.Added, obj})
+	f.Change(watch.Event{watch.Added, obj}, 1)
 }
 
 // Modify updates an object in the set and sends a modified event to watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) Modify(obj runtime.Object) {
-	f.change(watch.Event{watch.Modified, obj})
+	f.Change(watch.Event{watch.Modified, obj}, 1)
 }
 
 // Delete deletes an object from the set and sends a delete event to watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) Delete(lastValue runtime.Object) {
-	f.change(watch.Event{watch.Deleted, lastValue})
+	f.Change(watch.Event{watch.Deleted, lastValue}, 1)
+}
+
+// AddDropWatch adds an object to the set but forgets to send an add event to
+// watchers.
+// obj's ResourceVersion is set.
+func (f *FakeControllerSource) AddDropWatch(obj runtime.Object) {
+	f.Change(watch.Event{watch.Added, obj}, 0)
+}
+
+// ModifyDropWatch updates an object in the set but forgets to send a modify
+// event to watchers.
+// obj's ResourceVersion is set.
+func (f *FakeControllerSource) ModifyDropWatch(obj runtime.Object) {
+	f.Change(watch.Event{watch.Modified, obj}, 0)
+}
+
+// DeleteDropWatch deletes an object from the set but forgets to send a delete
+// event to watchers.
+// obj's ResourceVersion is set.
+func (f *FakeControllerSource) DeleteDropWatch(lastValue runtime.Object) {
+	f.Change(watch.Event{watch.Deleted, lastValue}, 0)
 }
 
 func (f *FakeControllerSource) key(meta *api.ObjectMeta) nnu {
 	return nnu{meta.Namespace, meta.Name, meta.UID}
 }
 
-func (f *FakeControllerSource) change(e watch.Event) {
+// Change records the given event (setting the object's resource version) and
+// sends a watch event with the specified probability.
+func (f *FakeControllerSource) Change(e watch.Event, watchProbability float64) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -89,7 +114,10 @@ func (f *FakeControllerSource) change(e watch.Event) {
 	case watch.Deleted:
 		delete(f.items, key)
 	}
-	f.broadcaster.Action(e.Type, e.Object)
+
+	if rand.Float64() < watchProbability {
+		f.broadcaster.Action(e.Type, e.Object)
+	}
 }
 
 // List returns a list object, with its resource version set.
@@ -98,8 +126,15 @@ func (f *FakeControllerSource) List() (runtime.Object, error) {
 	defer f.lock.RUnlock()
 	list := make([]runtime.Object, 0, len(f.items))
 	for _, obj := range f.items {
-		// TODO: should copy obj first
-		list = append(list, obj)
+		// Must make a copy to allow clients to modify the object.
+		// Otherwise, if they make a change and write it back, they
+		// will inadvertently change the our canonical copy (in
+		// addition to racing with other clients).
+		objCopy, err := conversion.DeepCopy(obj)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, objCopy.(runtime.Object))
 	}
 	listObj := &api.List{}
 	if err := runtime.SetList(listObj, list); err != nil {
@@ -123,8 +158,22 @@ func (f *FakeControllerSource) Watch(resourceVersion string) (watch.Interface, e
 	if err != nil {
 		return nil, err
 	}
+	rc++ // Don't re-send them a change they already have.
 	if rc < len(f.changes) {
-		return f.broadcaster.WatchWithPrefix(f.changes[rc:]), nil
+		changes := []watch.Event{}
+		for _, c := range f.changes[rc:] {
+			// Must make a copy to allow clients to modify the
+			// object.  Otherwise, if they make a change and write
+			// it back, they will inadvertently change the our
+			// canonical copy (in addition to racing with other
+			// clients).
+			objCopy, err := conversion.DeepCopy(c.Object)
+			if err != nil {
+				return nil, err
+			}
+			changes = append(changes, watch.Event{c.Type, objCopy.(runtime.Object)})
+		}
+		return f.broadcaster.WatchWithPrefix(changes), nil
 	} else if rc > len(f.changes) {
 		return nil, errors.New("resource version in the future not supported by this fake")
 	}

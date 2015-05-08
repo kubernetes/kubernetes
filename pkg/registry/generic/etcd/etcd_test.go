@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 
@@ -66,17 +67,20 @@ func hasCreated(t *testing.T, pod *api.Pod) func(runtime.Object) bool {
 func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	h := tools.NewEtcdHelper(f, testapi.Codec())
+	h := tools.NewEtcdHelper(f, testapi.Codec(), etcdtest.PathPrefix())
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false}
+	podPrefix := "/pods"
 	return f, &Etcd{
 		NewFunc:        func() runtime.Object { return &api.Pod{} },
 		NewListFunc:    func() runtime.Object { return &api.PodList{} },
 		EndpointName:   "pods",
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,
-		KeyRootFunc:    func(ctx api.Context) string { return "/registry/pods" },
+		KeyRootFunc: func(ctx api.Context) string {
+			return podPrefix
+		},
 		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			return path.Join("/registry/pods", id), nil
+			return path.Join(podPrefix, id), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*api.Pod).Name, nil },
 		Helper:         h,
@@ -126,6 +130,11 @@ func TestEtcdList(t *testing.T) {
 		Spec:       api.PodSpec{Host: "machine"},
 	}
 
+	singleElemListResp := &etcd.Response{
+		Node: &etcd.Node{
+			Value: runtime.EncodeOrDie(testapi.Codec(), podA),
+		},
+	}
 	normalListResp := &etcd.Response{
 		Node: &etcd.Node{
 			Nodes: []*etcd.Node{
@@ -174,7 +183,7 @@ func TestEtcdList(t *testing.T) {
 		},
 		"normalFiltered": {
 			in: tools.EtcdResponseWithError{
-				R: normalListResp,
+				R: singleElemListResp,
 				E: nil,
 			},
 			m:       setMatcher{util.NewStringSet("foo")},
@@ -194,13 +203,24 @@ func TestEtcdList(t *testing.T) {
 
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
-		fakeClient.Data[registry.KeyRootFunc(api.NewContext())] = item.in
+		if name, ok := item.m.MatchesSingle(); ok {
+			key, err := registry.KeyFunc(api.NewContext(), name)
+			if err != nil {
+				t.Errorf("Couldn't create key for %v", name)
+				continue
+			}
+			key = etcdtest.AddPrefix(key)
+			fakeClient.Data[key] = item.in
+		} else {
+			key, _ := registry.KeyFunc(api.NewContext(), name)
+			key = etcdtest.AddPrefix(key)
+			fakeClient.Data[key] = item.in
+		}
 		list, err := registry.ListPredicate(api.NewContext(), item.m)
 		if e, a := item.succeed, err == nil; e != a {
 			t.Errorf("%v: expected %v, got %v", name, e, a)
 			continue
 		}
-
 		if e, a := item.out, list; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%v: Expected %#v, got %#v", name, e, a)
 		}
@@ -233,8 +253,6 @@ func TestEtcdCreate(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 
-	path := "/registry/pods/foo"
-
 	table := map[string]struct {
 		existing tools.EtcdResponseWithError
 		expect   tools.EtcdResponseWithError
@@ -258,6 +276,7 @@ func TestEtcdCreate(t *testing.T) {
 
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
+		path := etcdtest.AddPrefix("pods/foo")
 		fakeClient.Data[path] = item.existing
 		obj, err := registry.Create(api.NewDefaultContext(), item.toCreate)
 		if !item.errOK(err) {
@@ -312,7 +331,6 @@ func TestEtcdCreateWithName(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 
-	path := "/registry/pods/foo"
 	key := "foo"
 
 	table := map[string]struct {
@@ -338,6 +356,7 @@ func TestEtcdCreateWithName(t *testing.T) {
 
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
+		path := etcdtest.AddPrefix("pods/foo")
 		fakeClient.Data[path] = item.existing
 		err := registry.CreateWithName(api.NewDefaultContext(), key, item.toCreate)
 		if !item.errOK(err) {
@@ -410,8 +429,6 @@ func TestEtcdUpdate(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 
-	path := "/registry/pods/foo"
-
 	table := map[string]struct {
 		existing    tools.EtcdResponseWithError
 		expect      tools.EtcdResponseWithError
@@ -450,6 +467,7 @@ func TestEtcdUpdate(t *testing.T) {
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
 		registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = item.allowCreate
+		path := etcdtest.AddPrefix("pods/foo")
 		fakeClient.Data[path] = item.existing
 		obj, _, err := registry.Update(api.NewDefaultContext(), item.toUpdate)
 		if !item.errOK(err) {
@@ -515,7 +533,6 @@ func TestEtcdUpdateWithName(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 
-	path := "/registry/pods/foo"
 	key := "foo"
 
 	table := map[string]struct {
@@ -541,6 +558,7 @@ func TestEtcdUpdateWithName(t *testing.T) {
 
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
+		path := etcdtest.AddPrefix("pods/foo")
 		fakeClient.Data[path] = item.existing
 		err := registry.UpdateWithName(api.NewContext(), key, item.toUpdate)
 		if !item.errOK(err) {
@@ -575,7 +593,6 @@ func TestEtcdGet(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 
-	path := "/registry/pods/foo"
 	key := "foo"
 
 	table := map[string]struct {
@@ -597,6 +614,7 @@ func TestEtcdGet(t *testing.T) {
 
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
+		path := etcdtest.AddPrefix("pods/foo")
 		fakeClient.Data[path] = item.existing
 		got, err := registry.Get(api.NewContext(), key)
 		if !item.errOK(err) {
@@ -631,7 +649,6 @@ func TestEtcdDelete(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 
-	path := "/registry/pods/foo"
 	key := "foo"
 
 	table := map[string]struct {
@@ -653,6 +670,7 @@ func TestEtcdDelete(t *testing.T) {
 
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
+		path := etcdtest.AddPrefix("pods/foo")
 		fakeClient.Data[path] = item.existing
 		obj, err := registry.Delete(api.NewContext(), key, nil)
 		if !item.errOK(err) {
@@ -676,11 +694,16 @@ func TestEtcdWatch(t *testing.T) {
 
 	for name, m := range table {
 		podA := &api.Pod{
-			ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-			Spec:       api.PodSpec{Host: "machine"},
+			ObjectMeta: api.ObjectMeta{
+				Name:            "foo",
+				Namespace:       api.NamespaceDefault,
+				ResourceVersion: "1",
+			},
+			Spec: api.PodSpec{Host: "machine"},
 		}
 		respWithPodA := &etcd.Response{
 			Node: &etcd.Node{
+				Key:           "/registry/pods/default/foo",
 				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,

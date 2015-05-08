@@ -41,6 +41,13 @@ var DockerNamespace = "docker"
 
 // Basepath to all container specific information that libcontainer stores.
 var dockerRootDir = flag.String("docker_root", "/var/lib/docker", "Absolute path to the Docker state root directory (default: /var/lib/docker)")
+var dockerRunDir = flag.String("docker_run", "/var/run/docker", "Absolute path to the Docker run directory (default: /var/run/docker)")
+
+// TODO(vmarmol): Export run dir too for newer Dockers.
+// Directory holding Docker container state information.
+func DockerStateDir() string {
+	return libcontainer.DockerStateDir(*dockerRootDir)
+}
 
 // Whether the system is using Systemd.
 var useSystemd bool
@@ -97,7 +104,6 @@ func (self *dockerFactory) NewContainerHandler(name string) (handler container.C
 		name,
 		self.machineInfoFactory,
 		self.fsInfo,
-		*dockerRootDir,
 		self.usesAufsDriver,
 		&self.cgroupSubsystems,
 	)
@@ -128,17 +134,19 @@ func FullContainerName(dockerId string) string {
 }
 
 // Docker handles all containers under /docker
-func (self *dockerFactory) CanHandle(name string) (bool, error) {
+func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
+	// docker factory accepts all containers it can handle.
+	canAccept := true
 	// Check if the container is known to docker and it is active.
 	id := ContainerNameToDockerId(name)
 
 	// We assume that if Inspect fails then the container is not known to docker.
 	ctnr, err := self.client.InspectContainer(id)
 	if err != nil || !ctnr.State.Running {
-		return false, fmt.Errorf("error inspecting container: %v", err)
+		return false, canAccept, fmt.Errorf("error inspecting container: %v", err)
 	}
 
-	return true, nil
+	return true, canAccept, nil
 }
 
 func parseDockerVersion(full_version_string string) ([]int, error) {

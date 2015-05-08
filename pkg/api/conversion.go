@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,6 +34,10 @@ func init() {
 		func(obj *ListOptions) {
 			obj.LabelSelector = labels.Everything()
 			obj.FieldSelector = fields.Everything()
+		},
+		func(obj *PodExecOptions) {
+			obj.Stderr = true
+			obj.Stdout = true
 		},
 	)
 	Scheme.AddConversionFuncs(
@@ -133,6 +137,10 @@ func init() {
 			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
 				return err
 			}
+			if in.TerminationGracePeriodSeconds != nil {
+				out.TerminationGracePeriodSeconds = new(int64)
+				*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
+			}
 			out.DNSPolicy = in.DNSPolicy
 			out.Version = "v1beta2"
 			return nil
@@ -146,6 +154,10 @@ func init() {
 			}
 			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
 				return err
+			}
+			if in.TerminationGracePeriodSeconds != nil {
+				out.TerminationGracePeriodSeconds = new(int64)
+				*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
 			}
 			out.DNSPolicy = in.DNSPolicy
 			return nil

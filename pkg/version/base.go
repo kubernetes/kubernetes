@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,8 +36,8 @@ package version
 var (
 	// TODO: Deprecate gitMajor and gitMinor, use only gitVersion instead.
 	gitMajor     string = "0"              // major version, always numeric
-	gitMinor     string = "14.1+"          // minor version, numeric possibly followed by "+"
-	gitVersion   string = "v0.14.1-dev"    // version from git, output of $(git describe)
+	gitMinor     string = "16.2+"          // minor version, numeric possibly followed by "+"
+	gitVersion   string = "v0.16.2-dev"    // version from git, output of $(git describe)
 	gitCommit    string = ""               // sha1 from git, output of $(git rev-parse HEAD)
 	gitTreeState string = "not a git tree" // state of git tree, either "clean" or "dirty"
 )

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -232,7 +232,7 @@ func TestIsValidIP(t *testing.T) {
 		"0.0.0.0",
 	}
 	for _, val := range goodValues {
-		if !IsValidIP(val) {
+		if !IsValidIPv4(val) {
 			t.Errorf("expected true for %q", val)
 		}
 	}
@@ -247,7 +247,7 @@ func TestIsValidIP(t *testing.T) {
 		"1.0.0.1.",
 	}
 	for _, val := range badValues {
-		if IsValidIP(val) {
+		if IsValidIPv4(val) {
 			t.Errorf("expected false for %q", val)
 		}
 	}

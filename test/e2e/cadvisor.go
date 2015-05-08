@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -47,7 +49,7 @@ var _ = Describe("Cadvisor", func() {
 
 func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
 	By("getting list of nodes")
-	nodeList, err := c.Nodes().List()
+	nodeList, err := c.Nodes().List(labels.Everything(), fields.Everything())
 	expectNoError(err)
 	var errors []error
 	retries := maxRetries
@@ -56,7 +58,7 @@ func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
 		for _, node := range nodeList.Items {
 			// cadvisor is not accessible directly unless its port (4194 by default) is exposed.
 			// Here, we access '/stats/' REST endpoint on the kubelet which polls cadvisor internally.
-			statsResource := fmt.Sprintf("api/v1beta1/proxy/minions/%s/stats/", node.Name)
+			statsResource := fmt.Sprintf("api/v1beta3/proxy/nodes/%s/stats/", node.Name)
 			By(fmt.Sprintf("Querying stats from node %s using url %s", node.Name, statsResource))
 			_, err = c.Get().AbsPath(statsResource).Timeout(timeout).Do().Raw()
 			if err != nil {

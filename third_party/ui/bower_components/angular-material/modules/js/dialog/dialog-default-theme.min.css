@@ -1,0 +1,6 @@
+/*!
+ * Angular Material Design
+ * https://github.com/angular/material
+ * @license MIT
+ * v0.7.0-rc3
+ */md-dialog.md-THEME_NAME-theme{border-radius:4px;background-color:'{{background-hue-3}}'}md-dialog.md-THEME_NAME-theme.md-content-overflow .md-actions{border-top-color:'{{foreground-4}}'}

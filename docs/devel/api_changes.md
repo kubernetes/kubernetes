@@ -222,9 +222,24 @@ types, structural change in particular - you must add some logic to convert
 versioned APIs to and from the internal representation.  If you see errors from
 the `serialization_test`, it may indicate the need for explicit conversions.
 
+Performance of conversions very heavily influence performance of apiserver.
+Thus, we are auto-generating conversion functions that are much more efficient
+than the generic ones (which are based on reflections and thus are highly
+inefficient).
+
 The conversion code resides with each versioned API -
-`pkg/api/<version>/conversion.go`.  Unsurprisingly, this also requires you to
-add tests to `pkg/api/<version>/conversion_test.go`.
+`pkg/api/<version>/conversion.go`.  To regenerate conversion functions:
+   - run
+```
+   $ go run cmd/kube-conversion/conversion.go -v <version> -f <file1.txt> -n <file2.txt>
+```
+   - replace all conversion functions (convert\* functions) in the above file
+     with the contents of \<file1.txt\>
+   - replace arguments of `newer.Scheme.AddGeneratedConversionFuncs`
+     with the contents of \<file2.txt\>
+
+Unsurprisingly, this also requires you to add tests to
+`pkg/api/<version>/conversion_test.go`.
 
 ## Update the fuzzer
 
@@ -236,14 +251,16 @@ assumptions.  If you have added any fields which need very careful formatting
 "this slice will always have at least 1 element", you may get an error or even
 a panic from the `serialization_test`.  If so, look at the diff it produces (or
 the backtrace in case of a panic) and figure out what you forgot.  Encode that
-into the fuzzer's custom fuzz functions.
+into the fuzzer's custom fuzz functions.  Hint: if you added defaults for a field,
+that field will need to have a custom fuzz function that ensures that the field is
+fuzzed to a non-empty value. 
 
 The fuzzer can be found in `pkg/api/testing/fuzzer.go`.
 
 ## Update the semantic comparisons
 
 VERY VERY rarely is this needed, but when it hits, it hurts.  In some rare
-cases we end up with objects (e.g. resource quantites) that have morally
+cases we end up with objects (e.g. resource quantities) that have morally
 equivalent values with different bitwise representations (e.g. value 10 with a
 base-2 formatter is the same as value 0 with a base-10 formatter).  The only way
 Go knows how to do deep-equality is through field-by-field bitwise comparisons.
@@ -278,11 +295,19 @@ At last, your change is done, all unit tests pass, e2e passes, you're done,
 right?  Actually, no.  You just changed the API.  If you are touching an
 existing facet of the API, you have to try *really* hard to make sure that
 *all* the examples and docs are updated.  There's no easy way to do this, due
-in part ot JSON and YAML silently dropping unknown fields.  You're clever -
+in part to JSON and YAML silently dropping unknown fields.  You're clever -
 you'll figure it out.  Put `grep` or `ack` to good use.
 
 If you added functionality, you should consider documenting it and/or writing
 an example to illustrate your change.
+
+Make sure you update the swagger API spec by running:
+
+```shell
+$ hack/update-swagger-spec.sh
+```
+
+The API spec changes should be in a commit separate from your other changes.
 
 ## Incompatible API changes
 If your change is going to be backward incompatible or might be a breaking change for API

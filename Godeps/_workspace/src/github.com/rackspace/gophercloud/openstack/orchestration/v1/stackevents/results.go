@@ -1,6 +1,8 @@
 package stackevents
 
 import (
+	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -106,7 +108,15 @@ func ExtractEvents(page pagination.Page) ([]Event, error) {
 		return nil, err
 	}
 
-	events := casted.(map[string]interface{})["events"].([]interface{})
+	var events []interface{}
+	switch casted.(type) {
+	case map[string]interface{}:
+		events = casted.(map[string]interface{})["events"].([]interface{})
+	case map[string][]interface{}:
+		events = casted.(map[string][]interface{})["events"]
+	default:
+		return res.Res, fmt.Errorf("Unknown type: %v", reflect.TypeOf(casted))
+	}
 
 	for i, eventRaw := range events {
 		event := eventRaw.(map[string]interface{})

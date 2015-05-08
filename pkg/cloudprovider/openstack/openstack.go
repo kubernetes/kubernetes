@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -67,6 +67,7 @@ func (d *MyDuration) UnmarshalText(text []byte) error {
 
 type LoadBalancerOpts struct {
 	SubnetId          string     `gcfg:"subnet-id"` // required
+	LBMethod          string     `gfcg:"lb-method"`
 	CreateMonitor     bool       `gcfg:"create-monitor"`
 	MonitorDelay      MyDuration `gcfg:"monitor-delay"`
 	MonitorTimeout    MyDuration `gcfg:"monitor-timeout"`
@@ -76,7 +77,6 @@ type LoadBalancerOpts struct {
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {
 	provider *gophercloud.ProviderClient
-	authOpts gophercloud.AuthOptions
 	region   string
 	lbOpts   LoadBalancerOpts
 }
@@ -117,11 +117,7 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 		TenantID:         cfg.Global.TenantId,
 		TenantName:       cfg.Global.TenantName,
 
-		// Persistent service, so we need to be able to renew
-		// tokens.
-		// (gophercloud doesn't appear to actually reauth yet,
-		// hence the explicit openstack.Authenticate() calls
-		// below)
+		// Persistent service, so we need to be able to renew tokens.
 		AllowReauth: true,
 	}
 }
@@ -138,15 +134,13 @@ func readConfig(config io.Reader) (Config, error) {
 }
 
 func newOpenStack(cfg Config) (*OpenStack, error) {
-	authOpts := cfg.toAuthOptions()
-	provider, err := openstack.AuthenticatedClient(authOpts)
+	provider, err := openstack.AuthenticatedClient(cfg.toAuthOptions())
 	if err != nil {
 		return nil, err
 	}
 
 	os := OpenStack{
 		provider: provider,
-		authOpts: authOpts,
 		region:   cfg.Global.Region,
 		lbOpts:   cfg.LoadBalancer,
 	}
@@ -161,11 +155,6 @@ type Instances struct {
 // Instances returns an implementation of Instances for OpenStack.
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	glog.V(4).Info("openstack.Instances() called")
-
-	if err := openstack.Authenticate(os.provider, os.authOpts); err != nil {
-		glog.Warningf("Failed to reauthenticate: %v", err)
-		return nil, false
-	}
 
 	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -400,6 +389,14 @@ func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
 	return rsrc, nil
 }
 
+func (i *Instances) Configure(name string, spec *api.NodeSpec) error {
+	return nil
+}
+
+func (i *Instances) Release(name string) error {
+	return nil
+}
+
 func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
@@ -412,11 +409,6 @@ type LoadBalancer struct {
 
 func (os *OpenStack) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	glog.V(4).Info("openstack.TCPLoadBalancer() called")
-
-	if err := openstack.Authenticate(os.provider, os.authOpts); err != nil {
-		glog.Warningf("Failed to reauthenticate: %v", err)
-		return nil, false
-	}
 
 	// TODO: Search for and support Rackspace loadbalancer API, and others.
 	network, err := openstack.NewNetworkV2(os.provider, gophercloud.EndpointOpts{
@@ -472,12 +464,15 @@ func getVipByName(client *gophercloud.ServiceClient, name string) (*vips.Virtual
 	return &vipList[0], nil
 }
 
-func (lb *LoadBalancer) TCPLoadBalancerExists(name, region string) (bool, error) {
+func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error) {
 	vip, err := getVipByName(lb.network, name)
 	if err == ErrNotFound {
-		return false, nil
+		return "", false, nil
 	}
-	return vip != nil, err
+	if vip == nil {
+		return "", false, err
+	}
+	return vip.Address, true, err
 }
 
 // TODO: This code currently ignores 'region' and always creates a
@@ -502,10 +497,15 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		return "", fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
 
+	lbmethod := lb.opts.LBMethod
+	if lbmethod == "" {
+		lbmethod = pools.LBMethodRoundRobin
+	}
 	pool, err := pools.Create(lb.network, pools.CreateOpts{
 		Name:     name,
 		Protocol: pools.ProtocolTCP,
 		SubnetID: lb.opts.SubnetId,
+		LBMethod: lbmethod,
 	}).Extract()
 	if err != nil {
 		return "", err

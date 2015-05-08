@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 	obj = maybeCopy(obj)
 	v, _ := EnforcePtr(obj) // maybeCopy guarantees a pointer
 	if _, registered := s.typeToVersion[v.Type()]; !registered {
-		return nil, fmt.Errorf("type %v is not registered and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type())
+		return nil, fmt.Errorf("type %v is not registered for %q and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type(), destVersion)
 	}
 
 	objVersion, objKind, err := s.ObjectVersionAndKind(obj)

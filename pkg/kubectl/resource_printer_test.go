@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
@@ -150,11 +149,13 @@ func TestPrintYAML(t *testing.T) {
 
 func TestPrintTemplate(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, found, err := GetPrinter("template", "{{.id}}")
+	printer, found, err := GetPrinter("template", "{{if .id}}{{.id}}{{end}}{{if .metadata.name}}{{.metadata.name}}{{end}}")
 	if err != nil || !found {
 		t.Fatalf("unexpected error: %#v", err)
 	}
-	err = printer.PrintObj(&v1beta1.Pod{TypeMeta: v1beta1.TypeMeta{ID: "foo"}}, buf)
+	unversionedPod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	obj, err := api.Scheme.ConvertToVersion(unversionedPod, testapi.Version())
+	err = printer.PrintObj(obj, buf)
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
@@ -289,7 +290,7 @@ func TestTemplateEmitsVersionedObjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
-	obj, err := api.Scheme.ConvertToVersion(&api.Pod{}, "v1beta1")
+	obj, err := api.Scheme.ConvertToVersion(&api.Pod{}, testapi.Version())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -367,7 +368,7 @@ func TestTemplateStrings(t *testing.T) {
 			},
 			"false",
 		},
-		"oneValid": {
+		"barValid": {
 			api.Pod{
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{
@@ -413,26 +414,28 @@ func TestTemplateStrings(t *testing.T) {
 			"true",
 		},
 	}
-
 	// The point of this test is to verify that the below template works. If you change this
 	// template, you need to update hack/e2e-suite/update.sh.
-	tmpl :=
-		`{{and (exists . "currentState" "info" "foo" "state" "running") (exists . "currentState" "info" "bar" "state" "running")}}`
-	useThisToDebug := `
+	tmpl := ``
+	if api.PreV1Beta3(testapi.Version()) {
+		tmpl = `{{exists . "currentState" "info" "foo" "state" "running"}}`
+		useThisToDebug := `
 a: {{exists . "currentState"}}
 b: {{exists . "currentState" "info"}}
 c: {{exists . "currentState" "info" "foo"}}
 d: {{exists . "currentState" "info" "foo" "state"}}
 e: {{exists . "currentState" "info" "foo" "state" "running"}}
 f: {{exists . "currentState" "info" "foo" "state" "running" "startedAt"}}`
-	_ = useThisToDebug // don't complain about unused var
-
+		_ = useThisToDebug // don't complain about unused var
+	} else {
+		tmpl = `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
+	}
 	p, err := NewTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 
-	printer := NewVersionedPrinter(p, api.Scheme, "v1beta1")
+	printer := NewVersionedPrinter(p, api.Scheme, testapi.Version())
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}
@@ -441,8 +444,12 @@ f: {{exists . "currentState" "info" "foo" "state" "running" "startedAt"}}`
 			t.Errorf("%v: unexpected err: %v", name, err)
 			continue
 		}
-		if e, a := item.expect, buffer.String(); e != a {
-			t.Errorf("%v: expected %v, got %v", name, e, a)
+		actual := buffer.String()
+		if len(actual) == 0 {
+			actual = "false"
+		}
+		if e := item.expect; e != actual {
+			t.Errorf("%v: expected %v, got %v", name, e, actual)
 		}
 	}
 }
@@ -551,6 +558,14 @@ func TestPrintMinionStatus(t *testing.T) {
 		},
 		{
 			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo2"},
+				Spec:       api.NodeSpec{Unschedulable: true},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+			},
+			status: "Ready,SchedulingDisabled",
+		},
+		{
+			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo3"},
 				Status: api.NodeStatus{Conditions: []api.NodeCondition{
 					{Type: api.NodeReady, Status: api.ConditionTrue},
@@ -568,16 +583,40 @@ func TestPrintMinionStatus(t *testing.T) {
 		{
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo5"},
+				Spec:       api.NodeSpec{Unschedulable: true},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}},
+			},
+			status: "NotReady,SchedulingDisabled",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo6"},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
 			},
 			status: "Unknown",
 		},
 		{
 			minion: api.Node{
-				ObjectMeta: api.ObjectMeta{Name: "foo6"},
+				ObjectMeta: api.ObjectMeta{Name: "foo7"},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
 			},
 			status: "Unknown",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo8"},
+				Spec:       api.NodeSpec{Unschedulable: true},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
+			},
+			status: "Unknown,SchedulingDisabled",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo9"},
+				Spec:       api.NodeSpec{Unschedulable: true},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
+			},
+			status: "Unknown,SchedulingDisabled",
 		},
 	}
 

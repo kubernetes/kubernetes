@@ -23,65 +23,30 @@ import (
 
 	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/utils"
 )
 
-// EventManager is implemented by Events. It provides two ways to monitor
-// events and one way to add events
-type EventManager interface {
-	// Watch checks if events fed to it by the caller of AddEvent satisfy the
-	// request and if so sends the event back to the caller on outChannel
-	WatchEvents(request *Request) (*EventChannel, error)
-	// GetEvents() returns a slice of all events detected that have passed
-	// the *Request object parameters to the caller
-	GetEvents(request *Request) (EventSlice, error)
-	// AddEvent allows the caller to add an event to an EventManager
-	// object
-	AddEvent(e *info.Event) error
-	// Removes a watch instance from the EventManager's watchers map
-	StopWatch(watch_id int)
+type byTimestamp []*info.Event
+
+// functions necessary to implement the sort interface on the Events struct
+func (e byTimestamp) Len() int {
+	return len(e)
 }
 
-// Events  holds a slice of *Event objects with a potential field
-// that caps the number of events held.  It is an implementation of the
-// EventManager interface
-type events struct {
-	// eventlist holds the complete set of events found over an
-	// EventManager events instantiation.
-	eventlist EventSlice
-	// the slice of watch pointers allows the EventManager access to channels
-	// linked to different calls of WatchEvents. When new events are found that
-	// satisfy the request of a given watch object in watchers, the event
-	// is sent over the channel to that caller of WatchEvents
-	watchers map[int]*watch
-	// lock that blocks eventlist from being accessed until a writer releases it
-	eventsLock sync.RWMutex
-	// lock that blocks watchers from being accessed until a writer releases it
-	watcherLock sync.RWMutex
-	// receives notices when a watch event ends and needs to be removed from
-	// the watchers list
-	lastId int
+func (e byTimestamp) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
 }
 
-// initialized by a call to WatchEvents(), a watch struct will then be added
-// to the events slice of *watch objects. When AddEvent() finds an event that
-// satisfies the request parameter of a watch object in events.watchers,
-// it will send that event out over the watch object's channel. The caller that
-// called WatchEvents will receive the event over the channel provided to
-// WatchEvents
-type watch struct {
-	// request specifies all the parameters that events sent through the
-	// channel must satisfy. Specified by the creator of the watch object
-	request *Request
-	// a channel created by the caller through which events satisfying the
-	// request are sent to the caller
-	eventChannel *EventChannel
-	// unique identifier of a watch that is used as a key in events' watchers
-	// map
-	id int
+func (e byTimestamp) Less(i, j int) bool {
+	return e[i].Timestamp.Before(e[j].Timestamp)
 }
 
-// typedef of a slice of Event pointers
-type EventSlice []*info.Event
+type EventChannel struct {
+	// Watch ID. Can be used by the caller to request cancellation of watch events.
+	watchId int
+	// Channel on which the caller can receive watch events.
+	channel chan *info.Event
+}
 
 // Request holds a set of parameters by which Event objects may be screened.
 // The caller may want events that occurred within a specific timeframe
@@ -97,7 +62,7 @@ type Request struct {
 	// EventType is a map that specifies the type(s) of events wanted
 	EventType map[info.EventType]bool
 	// allows the caller to put a limit on how many
-	// events they receive. If there are more events than MaxEventsReturned
+	// events to receive. If there are more events than MaxEventsReturned
 	// then the most chronologically recent events in the time period
 	// specified are returned. Must be >= 1
 	MaxEventsReturned int
@@ -108,9 +73,51 @@ type Request struct {
 	IncludeSubcontainers bool
 }
 
-type EventChannel struct {
-	watchId int
-	channel chan *info.Event
+// EventManager is implemented by Events. It provides two ways to monitor
+// events and one way to add events
+type EventManager interface {
+	// WatchEvents() allows a caller to register for receiving events based on the specified request.
+	// On successful registration, an EventChannel object is returned.
+	WatchEvents(request *Request) (*EventChannel, error)
+	// GetEvents() returns all detected events based on the filters specified in request.
+	GetEvents(request *Request) ([]*info.Event, error)
+	// AddEvent allows the caller to add an event to an EventManager
+	// object
+	AddEvent(e *info.Event) error
+	// Cancels a previously requested watch event.
+	StopWatch(watch_id int)
+}
+
+// events provides an implementation for the EventManager interface.
+type events struct {
+	// eventStore holds the events by event type.
+	eventStore map[info.EventType]*utils.TimedStore
+	// map of registered watchers keyed by watch id.
+	watchers map[int]*watch
+	// lock guarding the eventStore.
+	eventsLock sync.RWMutex
+	// lock guarding watchers.
+	watcherLock sync.RWMutex
+	// last allocated watch id.
+	lastId int
+	// Event storage policy.
+	storagePolicy StoragePolicy
+}
+
+// initialized by a call to WatchEvents(), a watch struct will then be added
+// to the events slice of *watch objects. When AddEvent() finds an event that
+// satisfies the request parameter of a watch object in events.watchers,
+// it will send that event out over the watch object's channel. The caller that
+// called WatchEvents will receive the event over the channel provided to
+// WatchEvents
+type watch struct {
+	// request parameters passed in by the caller of WatchEvents()
+	request *Request
+	// a channel used to send event back to the caller.
+	eventChannel *EventChannel
+	// unique identifier of a watch that is used as a key in events' watchers
+	// map
+	id int
 }
 
 func NewEventChannel(watchId int) *EventChannel {
@@ -120,11 +127,34 @@ func NewEventChannel(watchId int) *EventChannel {
 	}
 }
 
-// returns a pointer to an initialized Events object
-func NewEventManager() *events {
+// Policy specifying how many events to store.
+// MaxAge is the max duration for which to keep events.
+// MaxNumEvents is the max number of events to keep (-1 for no limit).
+type StoragePolicy struct {
+	// Defaults limites, used if a per-event limit is not set.
+	DefaultMaxAge       time.Duration
+	DefaultMaxNumEvents int
+
+	// Per-event type limits.
+	PerTypeMaxAge       map[info.EventType]time.Duration
+	PerTypeMaxNumEvents map[info.EventType]int
+}
+
+func DefaultStoragePolicy() StoragePolicy {
+	return StoragePolicy{
+		DefaultMaxAge:       24 * time.Hour,
+		DefaultMaxNumEvents: 100000,
+		PerTypeMaxAge:       make(map[info.EventType]time.Duration),
+		PerTypeMaxNumEvents: make(map[info.EventType]int),
+	}
+}
+
+// returns a pointer to an initialized Events object.
+func NewEventManager(storagePolicy StoragePolicy) *events {
 	return &events{
-		eventlist: make(EventSlice, 0),
-		watchers:  make(map[int]*watch),
+		eventStore:    make(map[info.EventType]*utils.TimedStore, 0),
+		watchers:      make(map[int]*watch),
+		storagePolicy: storagePolicy,
 	}
 }
 
@@ -153,29 +183,14 @@ func (self *EventChannel) GetWatchId() int {
 	return self.watchId
 }
 
-// function necessary to implement the sort interface on the Events struct
-func (e EventSlice) Len() int {
-	return len(e)
-}
-
-// function necessary to implement the sort interface on the Events struct
-func (e EventSlice) Swap(i, j int) {
-	e[i], e[j] = e[j], e[i]
-}
-
-// function necessary to implement the sort interface on the Events struct
-func (e EventSlice) Less(i, j int) bool {
-	return e[i].Timestamp.Before(e[j].Timestamp)
-}
-
 // sorts and returns up to the last MaxEventsReturned chronological elements
-func getMaxEventsReturned(request *Request, eSlice EventSlice) EventSlice {
-	sort.Sort(eSlice)
+func getMaxEventsReturned(request *Request, eSlice []*info.Event) []*info.Event {
+	sort.Sort(byTimestamp(eSlice))
 	n := request.MaxEventsReturned
-	if n >= eSlice.Len() || n <= 0 {
+	if n >= len(eSlice) || n <= 0 {
 		return eSlice
 	}
-	return eSlice[eSlice.Len()-n:]
+	return eSlice[len(eSlice)-n:]
 }
 
 // If the request wants all subcontainers, this returns if the request's
@@ -184,7 +199,7 @@ func getMaxEventsReturned(request *Request, eSlice EventSlice) EventSlice {
 // equivalent
 func checkIfIsSubcontainer(request *Request, event *info.Event) bool {
 	if request.IncludeSubcontainers == true {
-		return strings.HasPrefix(event.ContainerName+"/", request.ContainerName+"/")
+		return request.ContainerName == "/" || strings.HasPrefix(event.ContainerName+"/", request.ContainerName+"/")
 	}
 	return event.ContainerName == request.ContainerName
 }
@@ -204,7 +219,7 @@ func checkIfEventSatisfiesRequest(request *Request, event *info.Event) bool {
 			return false
 		}
 	}
-	if request.EventType[event.EventType] != true {
+	if !request.EventType[event.EventType] {
 		return false
 	}
 	if request.ContainerName != "" {
@@ -213,18 +228,30 @@ func checkIfEventSatisfiesRequest(request *Request, event *info.Event) bool {
 	return true
 }
 
-// method of Events object that screens Event objects found in the eventlist
+// method of Events object that screens Event objects found in the eventStore
 // attribute and if they fit the parameters passed by the Request object,
 // adds it to a slice of *Event objects that is returned. If both MaxEventsReturned
 // and StartTime/EndTime are specified in the request object, then only
 // up to the most recent MaxEventsReturned events in that time range are returned.
-func (self *events) GetEvents(request *Request) (EventSlice, error) {
-	returnEventList := EventSlice{}
+func (self *events) GetEvents(request *Request) ([]*info.Event, error) {
+	returnEventList := []*info.Event{}
 	self.eventsLock.RLock()
 	defer self.eventsLock.RUnlock()
-	for _, e := range self.eventlist {
-		if checkIfEventSatisfiesRequest(request, e) {
-			returnEventList = append(returnEventList, e)
+	for eventType, fetch := range request.EventType {
+		if !fetch {
+			continue
+		}
+		evs, ok := self.eventStore[eventType]
+		if !ok {
+			continue
+		}
+
+		res := evs.InTimeRange(request.StartTime, request.EndTime, request.MaxEventsReturned)
+		for _, in := range res {
+			e := in.(*info.Event)
+			if checkIfEventSatisfiesRequest(request, e) {
+				returnEventList = append(returnEventList, e)
+			}
 		}
 	}
 	returnEventList = getMaxEventsReturned(request, returnEventList)
@@ -251,11 +278,23 @@ func (self *events) WatchEvents(request *Request) (*EventChannel, error) {
 	return returnEventChannel, nil
 }
 
-// helper function to update the event manager's eventlist
-func (self *events) updateEventList(e *info.Event) {
+// helper function to update the event manager's eventStore
+func (self *events) updateEventStore(e *info.Event) {
 	self.eventsLock.Lock()
 	defer self.eventsLock.Unlock()
-	self.eventlist = append(self.eventlist, e)
+	if _, ok := self.eventStore[e.EventType]; !ok {
+		maxAge := self.storagePolicy.DefaultMaxAge
+		maxNumEvents := self.storagePolicy.DefaultMaxNumEvents
+		if age, ok := self.storagePolicy.PerTypeMaxAge[e.EventType]; ok {
+			maxAge = age
+		}
+		if numEvents, ok := self.storagePolicy.PerTypeMaxNumEvents[e.EventType]; ok {
+			maxNumEvents = numEvents
+		}
+
+		self.eventStore[e.EventType] = utils.NewTimedStore(maxAge, maxNumEvents)
+	}
+	self.eventStore[e.EventType].Add(e.Timestamp, e)
 }
 
 func (self *events) findValidWatchers(e *info.Event) []*watch {
@@ -270,16 +309,17 @@ func (self *events) findValidWatchers(e *info.Event) []*watch {
 }
 
 // method of Events object that adds the argument Event object to the
-// eventlist. It also feeds the event to a set of watch channels
+// eventStore. It also feeds the event to a set of watch channels
 // held by the manager if it satisfies the request keys of the channels
 func (self *events) AddEvent(e *info.Event) error {
-	self.updateEventList(e)
+	self.updateEventStore(e)
 	self.watcherLock.RLock()
 	defer self.watcherLock.RUnlock()
 	watchesToSend := self.findValidWatchers(e)
 	for _, watchObject := range watchesToSend {
 		watchObject.eventChannel.GetChannel() <- e
 	}
+	glog.V(4).Infof("Added event %v", e)
 	return nil
 }
 

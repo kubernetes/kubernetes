@@ -56,6 +56,9 @@ type ComputeChoices struct {
 	// FlavorIDResize contains the ID of a different flavor available on the same OpenStack installation, that is distinct
 	// from FlavorID.
 	FlavorIDResize string
+
+	// NetworkName is the name of a network to launch the instance on.
+	NetworkName string
 }
 
 // ComputeChoicesFromEnv populates a ComputeChoices struct from environment variables.
@@ -64,6 +67,7 @@ func ComputeChoicesFromEnv() (*ComputeChoices, error) {
 	imageID := os.Getenv("OS_IMAGE_ID")
 	flavorID := os.Getenv("OS_FLAVOR_ID")
 	flavorIDResize := os.Getenv("OS_FLAVOR_ID_RESIZE")
+	networkName := os.Getenv("OS_NETWORK_NAME")
 
 	missing := make([]string, 0, 3)
 	if imageID == "" {
@@ -74,6 +78,9 @@ func ComputeChoicesFromEnv() (*ComputeChoices, error) {
 	}
 	if flavorIDResize == "" {
 		missing = append(missing, "OS_FLAVOR_ID_RESIZE")
+	}
+	if networkName == "" {
+		networkName = "public"
 	}
 
 	notDistinct := ""
@@ -93,5 +100,5 @@ func ComputeChoicesFromEnv() (*ComputeChoices, error) {
 		return nil, fmt.Errorf(text)
 	}
 
-	return &ComputeChoices{ImageID: imageID, FlavorID: flavorID, FlavorIDResize: flavorIDResize}, nil
+	return &ComputeChoices{ImageID: imageID, FlavorID: flavorID, FlavorIDResize: flavorIDResize, NetworkName: networkName}, nil
 }

@@ -11,7 +11,7 @@ import (
 )
 
 // DefaultUserAgent is the default User-Agent string set in the request header.
-const DefaultUserAgent = "gophercloud/v1.0"
+const DefaultUserAgent = "gophercloud/1.0.0"
 
 // UserAgent represents a User-Agent header.
 type UserAgent struct {
@@ -196,25 +196,28 @@ func (client *ProviderClient) Request(method, url string, options RequestOpts) (
 		}
 	}
 
-	// Validate the response code, if requested to do so.
-	if options.OkCodes != nil {
-		var ok bool
-		for _, code := range options.OkCodes {
-			if resp.StatusCode == code {
-				ok = true
-				break
-			}
+	// Allow default OkCodes if none explicitly set
+	if options.OkCodes == nil {
+		options.OkCodes = defaultOkCodes(method)
+	}
+
+	// Validate the HTTP response status.
+	var ok bool
+	for _, code := range options.OkCodes {
+		if resp.StatusCode == code {
+			ok = true
+			break
 		}
-		if !ok {
-			body, _ := ioutil.ReadAll(resp.Body)
-			resp.Body.Close()
-			return resp, &UnexpectedResponseCodeError{
-				URL:      url,
-				Method:   method,
-				Expected: options.OkCodes,
-				Actual:   resp.StatusCode,
-				Body:     body,
-			}
+	}
+	if !ok {
+		body, _ := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		return resp, &UnexpectedResponseCodeError{
+			URL:      url,
+			Method:   method,
+			Expected: options.OkCodes,
+			Actual:   resp.StatusCode,
+			Body:     body,
 		}
 	}
 
@@ -225,4 +228,73 @@ func (client *ProviderClient) Request(method, url string, options RequestOpts) (
 	}
 
 	return resp, nil
+}
+
+func defaultOkCodes(method string) []int {
+	switch {
+	case method == "GET":
+		return []int{200}
+	case method == "POST":
+		return []int{201, 202}
+	case method == "PUT":
+		return []int{201, 202}
+	case method == "DELETE":
+		return []int{202, 204}
+	}
+
+	return []int{}
+}
+
+func (client *ProviderClient) Get(url string, JSONResponse *interface{}, opts *RequestOpts) (*http.Response, error) {
+	if opts == nil {
+		opts = &RequestOpts{}
+	}
+	if JSONResponse != nil {
+		opts.JSONResponse = JSONResponse
+	}
+	return client.Request("GET", url, *opts)
+}
+
+func (client *ProviderClient) Post(url string, JSONBody interface{}, JSONResponse *interface{}, opts *RequestOpts) (*http.Response, error) {
+	if opts == nil {
+		opts = &RequestOpts{}
+	}
+
+	if v, ok := (JSONBody).(io.Reader); ok {
+		opts.RawBody = v
+	} else if JSONBody != nil {
+		opts.JSONBody = JSONBody
+	}
+
+	if JSONResponse != nil {
+		opts.JSONResponse = JSONResponse
+	}
+
+	return client.Request("POST", url, *opts)
+}
+
+func (client *ProviderClient) Put(url string, JSONBody interface{}, JSONResponse *interface{}, opts *RequestOpts) (*http.Response, error) {
+	if opts == nil {
+		opts = &RequestOpts{}
+	}
+
+	if v, ok := (JSONBody).(io.Reader); ok {
+		opts.RawBody = v
+	} else if JSONBody != nil {
+		opts.JSONBody = JSONBody
+	}
+
+	if JSONResponse != nil {
+		opts.JSONResponse = JSONResponse
+	}
+
+	return client.Request("PUT", url, *opts)
+}
+
+func (client *ProviderClient) Delete(url string, opts *RequestOpts) (*http.Response, error) {
+	if opts == nil {
+		opts = &RequestOpts{}
+	}
+
+	return client.Request("DELETE", url, *opts)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,7 +49,18 @@ func NewRequestAuthenticator(mapper api.RequestContextMapper, auth authenticator
 	)
 }
 
-var Unauthorized http.HandlerFunc = unauthorized
+func Unauthorized(supportsBasicAuth bool) http.HandlerFunc {
+	if supportsBasicAuth {
+		return unauthorizedBasicAuth
+	}
+	return unauthorized
+}
+
+// unauthorizedBasicAuth serves an unauthorized message to clients.
+func unauthorizedBasicAuth(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("WWW-Authenticate", `Basic realm="kubernetes-master"`)
+	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+}
 
 // unauthorized serves an unauthorized message to clients.
 func unauthorized(w http.ResponseWriter, req *http.Request) {

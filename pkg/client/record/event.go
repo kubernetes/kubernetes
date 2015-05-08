@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -61,6 +61,9 @@ type EventRecorder interface {
 
 	// Eventf is just like Event, but with Sprintf for the message field.
 	Eventf(object runtime.Object, reason, messageFmt string, args ...interface{})
+
+	// PastEventf is just like Eventf, but with an option to specify the event's 'timestamp' field.
+	PastEventf(object runtime.Object, timestamp util.Time, reason, messageFmt string, args ...interface{})
 }
 
 // EventBroadcaster knows how to receive events and send them to any EventSink, watcher, or log.
@@ -234,7 +237,7 @@ type recorderImpl struct {
 	*watch.Broadcaster
 }
 
-func (recorder *recorderImpl) Event(object runtime.Object, reason, message string) {
+func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp util.Time, reason, message string) {
 	ref, err := api.GetReference(object)
 	if err != nil {
 		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v'", object, err, reason, message)
@@ -247,16 +250,28 @@ func (recorder *recorderImpl) Event(object runtime.Object, reason, message strin
 	recorder.Action(watch.Added, event)
 }
 
+func (recorder *recorderImpl) Event(object runtime.Object, reason, message string) {
+	recorder.generateEvent(object, util.Now(), reason, message)
+}
+
 func (recorder *recorderImpl) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
 	recorder.Event(object, reason, fmt.Sprintf(messageFmt, args...))
 }
 
+func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp util.Time, reason, messageFmt string, args ...interface{}) {
+	recorder.generateEvent(object, timestamp, reason, fmt.Sprintf(messageFmt, args...))
+}
+
 func makeEvent(ref *api.ObjectReference, reason, message string) *api.Event {
 	t := util.Now()
+	namespace := ref.Namespace
+	if namespace == "" {
+		namespace = api.NamespaceDefault
+	}
 	return &api.Event{
 		ObjectMeta: api.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
-			Namespace: ref.Namespace,
+			Namespace: namespace,
 		},
 		InvolvedObject: *ref,
 		Reason:         reason,

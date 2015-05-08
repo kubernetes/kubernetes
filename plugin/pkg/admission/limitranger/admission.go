@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -58,6 +57,9 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 	name := "Unknown"
 	if obj != nil {
 		name, _ = meta.NewAccessor().Name(obj)
+		if len(name) == 0 {
+			name, _ = meta.NewAccessor().GenerateName(obj)
+		}
 	}
 
 	key := &api.LimitRange{
@@ -68,7 +70,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 	}
 	items, err := l.indexer.Index("namespace", key)
 	if err != nil {
-		return apierrors.NewForbidden(a.GetResource(), name, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing limit ranges", a.GetOperation(), resource))
+		return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing limit ranges", a.GetOperation(), resource))
 	}
 	if len(items) == 0 {
 		return nil
@@ -79,7 +81,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 		limitRange := items[i].(*api.LimitRange)
 		err = l.limitFunc(limitRange, a.GetResource(), a.GetObject())
 		if err != nil {
-			return err
+			return admission.NewForbidden(a, err)
 		}
 	}
 	return nil
@@ -152,7 +154,13 @@ func defaultContainerResourceRequirements(limitRange *api.LimitRange) api.Resour
 // mergePodResourceRequirements merges enumerated requirements with default requirements
 func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.ResourceRequirements) {
 	for i := range pod.Spec.Containers {
-		container := pod.Spec.Containers[i]
+		container := &pod.Spec.Containers[i]
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = api.ResourceList{}
+		}
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = api.ResourceList{}
+		}
 		for k, v := range defaultRequirements.Limits {
 			_, found := container.Resources.Limits[k]
 			if !found {
@@ -185,7 +193,7 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 	maxContainerMem := int64(0)
 
 	for i := range pod.Spec.Containers {
-		container := pod.Spec.Containers[i]
+		container := &pod.Spec.Containers[i]
 		containerCPU := container.Resources.Limits.Cpu().MilliValue()
 		containerMem := container.Resources.Limits.Memory().Value()
 
@@ -244,11 +252,11 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 				switch minOrMax {
 				case "Min":
 					if observed < enforced {
-						return apierrors.NewForbidden("pods", pod.Name, err)
+						return err
 					}
 				case "Max":
 					if observed > enforced {
-						return apierrors.NewForbidden("pods", pod.Name, err)
+						return err
 					}
 				}
 			}

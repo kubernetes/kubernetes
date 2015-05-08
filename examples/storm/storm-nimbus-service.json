@@ -1,9 +1,21 @@
 {
-  "id": "nimbus",
   "kind": "Service",
-  "apiVersion": "v1beta1",
-  "port": 6627,
-  "containerPort": 6627,
-  "selector": { "name": "nimbus" },
-  "labels": { "name": "nimbus" }
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "nimbus",
+    "labels": {
+      "name": "nimbus"
+    }
+  },
+  "spec": {
+    "ports": [
+      {
+        "port": 6627,
+        "targetPort": 6627
+      }
+    ],
+    "selector": {
+      "name": "nimbus"
+    }
+  }
 }

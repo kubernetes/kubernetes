@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,6 +53,7 @@ func newStatusManager(kubeClient client.Interface) *statusManager {
 
 func (s *statusManager) Start() {
 	// syncBatch blocks when no updates are available, we can run it in a tight loop.
+	glog.Info("Starting to sync pod status with apiserver")
 	go util.Forever(func() {
 		err := s.syncBatch()
 		if err != nil {
@@ -111,21 +112,20 @@ func (s *statusManager) syncBatch() error {
 		ObjectMeta: pod.ObjectMeta,
 	}
 	// TODO: make me easier to express from client code
-	if statusPod, err = s.kubeClient.Pods(statusPod.Namespace).Get(statusPod.Name); err == nil {
-		statusPod.Status = status
-	}
+	statusPod, err = s.kubeClient.Pods(statusPod.Namespace).Get(statusPod.Name)
 	if err == nil {
-		statusPod, err = s.kubeClient.Pods(pod.Namespace).UpdateStatus(statusPod)
+		statusPod.Status = status
+		_, err = s.kubeClient.Pods(pod.Namespace).UpdateStatus(statusPod)
 		// TODO: handle conflict as a retry, make that easier too.
-	}
-	if err != nil {
-		// We failed to update status. In order to make sure we retry next time
-		// we delete cached value. This may result in an additional update, but
-		// this is ok.
-		s.DeletePodStatus(podFullName)
-		return fmt.Errorf("error updating status for pod %q: %v", pod.Name, err)
+		if err == nil {
+			glog.V(3).Infof("Status for pod %q updated successfully", pod.Name)
+			return nil
+		}
 	}
 
-	glog.V(3).Infof("Status for pod %q updated successfully", pod.Name)
-	return nil
+	// We failed to update status. In order to make sure we retry next time
+	// we delete cached value. This may result in an additional update, but
+	// this is ok.
+	s.DeletePodStatus(podFullName)
+	return fmt.Errorf("error updating status for pod %q: %v", pod.Name, err)
 }

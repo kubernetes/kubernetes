@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ func TestAddOrUpdateEventNoExisting(t *testing.T) {
 			Name:       "awesome.name",
 			Namespace:  "betterNamespace",
 			UID:        "C934D34AFB20242",
-			APIVersion: "v1beta1",
+			APIVersion: "version",
 		},
 		Source: api.EventSource{
 			Component: "kubelet",
@@ -148,7 +148,7 @@ func TestGetEventExisting(t *testing.T) {
 			Name:       "clever.name.here",
 			Namespace:  "spaceOfName",
 			UID:        "D933D32AFB2A238",
-			APIVersion: "v1beta1",
+			APIVersion: "version",
 		},
 		Source: api.EventSource{
 			Component: "kubelet",

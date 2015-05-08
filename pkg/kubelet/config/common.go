@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,27 +21,23 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	utilyaml "github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 )
 
 // Generate a pod name that is unique among nodes by appending the hostname.
-func generatePodName(name, hostname string) (string, error) {
-	// Hostname can be a fully-qualified domain name. To increase readability,
-	// only append the first chunk. Note that this assumes that no two nodes in
-	// the cluster should have the same host-specific label; this is true if
-	// all nodes have the same domain name.
-	chunks := strings.Split(hostname, ".")
-	return fmt.Sprintf("%s-%s", name, chunks[0]), nil
+func generatePodName(name, hostname string) string {
+	return fmt.Sprintf("%s-%s", name, hostname)
 }
 
 func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) error {
@@ -60,13 +56,10 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) er
 
 	// This is required for backward compatibility, and should be removed once we
 	// completely deprecate ContainerManifest.
-	var err error
 	if len(pod.Name) == 0 {
 		pod.Name = string(pod.UID)
 	}
-	if pod.Name, err = generatePodName(pod.Name, hostname); err != nil {
-		return err
-	}
+	pod.Name = generatePodName(pod.Name, hostname)
 	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
 
 	if pod.Namespace == "" {
@@ -74,16 +67,35 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) er
 	}
 	glog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
 
-	// Currently just simply follow the same format in resthandler.go
-	pod.ObjectMeta.SelfLink =
-		fmt.Sprintf("/api/v1beta2/pods/%s?namespace=%s", pod.Name, pod.Namespace)
+	// Set the Host field to indicate this pod is scheduled on the current node.
+	pod.Spec.Host = hostname
+
+	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
 	return nil
+}
+
+func getSelfLink(name, namespace string) string {
+	var selfLink string
+	if api.PreV1Beta3(latest.Version) {
+		selfLink = fmt.Sprintf("/api/"+latest.Version+"/pods/%s?namespace=%s", name, namespace)
+	} else {
+		if len(namespace) == 0 {
+			namespace = api.NamespaceDefault
+		}
+		selfLink = fmt.Sprintf("/api/"+latest.Version+"/pods/namespaces/%s/%s", name, namespace)
+	}
+	return selfLink
 }
 
 type defaultFunc func(pod *api.Pod) error
 
-func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod api.Pod, err error) {
-	obj, err := api.Scheme.Decode(data)
+func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *api.Pod, err error) {
+	// JSON is valid YAML, so this should work for everything.
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return false, nil, err
+	}
+	obj, err := api.Scheme.Decode(json)
 	if err != nil {
 		return false, pod, err
 	}
@@ -101,11 +113,15 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod ap
 		err = fmt.Errorf("invalid pod: %v", errs)
 		return true, pod, err
 	}
-	return true, *newPod, nil
+	return true, newPod, nil
 }
 
 func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api.PodList, err error) {
-	obj, err := api.Scheme.Decode(data)
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return false, api.PodList{}, err
+	}
+	obj, err := api.Scheme.Decode(json)
 	if err != nil {
 		return false, pods, err
 	}
@@ -129,7 +145,7 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api
 	return true, *newPods, err
 }
 
-func tryDecodeSingleManifest(data []byte, defaultFn defaultFunc) (parsed bool, manifest v1beta1.ContainerManifest, pod api.Pod, err error) {
+func tryDecodeSingleManifest(data []byte, defaultFn defaultFunc) (parsed bool, manifest v1beta1.ContainerManifest, pod *api.Pod, err error) {
 	// TODO: should be api.Scheme.Decode
 	// This is awful.  DecodeInto() expects to find an APIObject, which
 	// Manifest is not.  We keep reading manifest for now for compat, but
@@ -141,6 +157,7 @@ func tryDecodeSingleManifest(data []byte, defaultFn defaultFunc) (parsed bool, m
 	// avoids writing a v1beta1.ContainerManifest -> api.Pod
 	// conversion which would be identical to the api.ContainerManifest ->
 	// api.Pod conversion.
+	pod = new(api.Pod)
 	if err = yaml.Unmarshal(data, &manifest); err != nil {
 		return false, manifest, pod, err
 	}
@@ -152,10 +169,10 @@ func tryDecodeSingleManifest(data []byte, defaultFn defaultFunc) (parsed bool, m
 		err = fmt.Errorf("invalid manifest: %v", errs)
 		return false, manifest, pod, err
 	}
-	if err = api.Scheme.Convert(&newManifest, &pod); err != nil {
+	if err = api.Scheme.Convert(&newManifest, pod); err != nil {
 		return true, manifest, pod, err
 	}
-	if err := defaultFn(&pod); err != nil {
+	if err := defaultFn(pod); err != nil {
 		return true, manifest, pod, err
 	}
 	// Success.

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,8 +39,7 @@ var providers = make(map[string]Factory)
 func RegisterCloudProvider(name string, cloud Factory) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()
-	_, found := providers[name]
-	if found {
+	if _, found := providers[name]; found {
 		glog.Fatalf("Cloud provider %q was registered twice", name)
 	}
 	glog.V(1).Infof("Registered cloud provider %q", name)

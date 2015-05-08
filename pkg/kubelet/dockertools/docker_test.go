@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,11 +20,14 @@ import (
 	"fmt"
 	"hash/adler32"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
@@ -127,28 +130,22 @@ func TestContainerManifestNaming(t *testing.T) {
 	}
 }
 
-func TestGetDockerServerVersion(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.3", "Server API version=1.15"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
-	version, err := runner.GetDockerServerVersion()
+func TestVersion(t *testing.T) {
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.3", "ApiVersion=1.15"}}
+	manager := &DockerManager{client: fakeDocker}
+	version, err := manager.Version()
 	if err != nil {
 		t.Errorf("got error while getting docker server version - %s", err)
 	}
-	expectedVersion := []uint{1, 15}
-	if len(expectedVersion) != len(version) {
-		t.Errorf("invalid docker server version. expected: %v, got: %v", expectedVersion, version)
-	} else {
-		for idx, val := range expectedVersion {
-			if version[idx] != val {
-				t.Errorf("invalid docker server version. expected: %v, got: %v", expectedVersion, version)
-			}
-		}
+	expectedVersion, _ := docker.NewAPIVersion("1.15")
+	if e, a := expectedVersion.String(), version.String(); e != a {
+		t.Errorf("invalid docker server version. expected: %v, got: %v", e, a)
 	}
 }
 
 func TestExecSupportExists(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.3.0", "Server API version=1.15"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.3.0", "ApiVersion=1.15"}}
+	runner := &DockerManager{client: fakeDocker}
 	useNativeExec, err := runner.nativeExecSupportExists()
 	if err != nil {
 		t.Errorf("got error while checking for exec support - %s", err)
@@ -159,8 +156,8 @@ func TestExecSupportExists(t *testing.T) {
 }
 
 func TestExecSupportNotExists(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.2", "Server API version=1.14"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.2", "ApiVersion=1.14"}}
+	runner := &DockerManager{client: fakeDocker}
 	useNativeExec, _ := runner.nativeExecSupportExists()
 	if useNativeExec {
 		t.Errorf("invalid exec support check output.")
@@ -168,7 +165,7 @@ func TestExecSupportNotExists(t *testing.T) {
 }
 
 func TestDockerContainerCommand(t *testing.T) {
-	runner := dockerContainerCommandRunner{}
+	runner := &DockerManager{}
 	containerID := "1234"
 	command := []string{"ls"}
 	cmd, _ := runner.getRunInContainerCommand(containerID, command)
@@ -243,7 +240,7 @@ func TestPull(t *testing.T) {
 func TestDockerKeyringLookupFails(t *testing.T) {
 	fakeKeyring := &credentialprovider.FakeKeyring{}
 	fakeClient := &FakeDockerClient{
-		Err: fmt.Errorf("test error"),
+		Errors: map[string]error{"pull": fmt.Errorf("test error")},
 	}
 
 	dp := dockerPuller{
@@ -393,250 +390,184 @@ func TestIsImagePresent(t *testing.T) {
 	}
 }
 
-func TestGetRunningContainers(t *testing.T) {
-	fakeDocker := &FakeDockerClient{}
-	fakeRecorder := &record.FakeRecorder{}
-	containerManager := NewDockerManager(fakeDocker, fakeRecorder)
-	tests := []struct {
-		containers  map[string]*docker.Container
-		inputIDs    []string
-		expectedIDs []string
-		err         error
-	}{
-		{
-			containers: map[string]*docker.Container{
-				"foobar": {
-					ID: "foobar",
-					State: docker.State{
-						Running: false,
-					},
-				},
-				"baz": {
-					ID: "baz",
-					State: docker.State{
-						Running: true,
-					},
-				},
-			},
-			inputIDs:    []string{"foobar", "baz"},
-			expectedIDs: []string{"baz"},
-		},
-		{
-			containers: map[string]*docker.Container{
-				"foobar": {
-					ID: "foobar",
-					State: docker.State{
-						Running: true,
-					},
-				},
-				"baz": {
-					ID: "baz",
-					State: docker.State{
-						Running: true,
-					},
-				},
-			},
-			inputIDs:    []string{"foobar", "baz"},
-			expectedIDs: []string{"foobar", "baz"},
-		},
-		{
-			containers: map[string]*docker.Container{
-				"foobar": {
-					ID: "foobar",
-					State: docker.State{
-						Running: false,
-					},
-				},
-				"baz": {
-					ID: "baz",
-					State: docker.State{
-						Running: false,
-					},
-				},
-			},
-			inputIDs:    []string{"foobar", "baz"},
-			expectedIDs: []string{},
-		},
-		{
-			containers: map[string]*docker.Container{
-				"foobar": {
-					ID: "foobar",
-					State: docker.State{
-						Running: false,
-					},
-				},
-				"baz": {
-					ID: "baz",
-					State: docker.State{
-						Running: false,
-					},
-				},
-			},
-			inputIDs: []string{"foobar", "baz"},
-			err:      fmt.Errorf("test error"),
-		},
-	}
-	for _, test := range tests {
-		fakeDocker.ContainerMap = test.containers
-		fakeDocker.Err = test.err
-		if results, err := containerManager.GetRunningContainers(test.inputIDs); err == nil {
-			resultIDs := []string{}
-			for _, result := range results {
-				resultIDs = append(resultIDs, result.ID)
-			}
-			if !reflect.DeepEqual(resultIDs, test.expectedIDs) {
-				t.Errorf("expected: %v, saw: %v", test.expectedIDs, resultIDs)
-			}
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		} else {
-			if err != test.err {
-				t.Errorf("unexpected error: %v", err)
-			}
-		}
-	}
-}
+type podsByID []*kubecontainer.Pod
+
+func (b podsByID) Len() int           { return len(b) }
+func (b podsByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b podsByID) Less(i, j int) bool { return b[i].ID < b[j].ID }
+
+type containersByID []*kubecontainer.Container
+
+func (b containersByID) Len() int           { return len(b) }
+func (b containersByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b containersByID) Less(i, j int) bool { return b[i].ID < b[j].ID }
 
 func TestFindContainersByPod(t *testing.T) {
 	tests := []struct {
-		testContainers     DockerContainers
-		inputPodID         types.UID
-		inputPodFullName   string
-		expectedContainers DockerContainers
+		containerList       []docker.APIContainers
+		exitedContainerList []docker.APIContainers
+		all                 bool
+		expectedPods        []*kubecontainer.Pod
 	}{
+
 		{
-			DockerContainers{
-				"foobar": &docker.APIContainers{
+			[]docker.APIContainers{
+				{
 					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
+					Names: []string{"/k8s_foobar.1234_qux_ns_1234_42"},
 				},
-				"barbar": &docker.APIContainers{
+				{
 					ID:    "barbar",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
+					Names: []string{"/k8s_barbar.1234_qux_ns_2343_42"},
 				},
-				"baz": &docker.APIContainers{
+				{
 					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
+					Names: []string{"/k8s_baz.1234_qux_ns_1234_42"},
 				},
 			},
-			types.UID("1234"),
-			"",
-			DockerContainers{
-				"foobar": &docker.APIContainers{
-					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
+			[]docker.APIContainers{
+				{
+					ID:    "barfoo",
+					Names: []string{"/k8s_barfoo.1234_qux_ns_1234_42"},
 				},
-				"barbar": &docker.APIContainers{
-					ID:    "barbar",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
+				{
+					ID:    "bazbaz",
+					Names: []string{"/k8s_bazbaz.1234_qux_ns_5678_42"},
 				},
-				"baz": &docker.APIContainers{
-					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
+			},
+			false,
+			[]*kubecontainer.Pod{
+				{
+					ID:        "1234",
+					Name:      "qux",
+					Namespace: "ns",
+					Containers: []*kubecontainer.Container{
+						{
+							ID:   "foobar",
+							Name: "foobar",
+							Hash: 0x1234,
+						},
+						{
+							ID:   "baz",
+							Name: "baz",
+							Hash: 0x1234,
+						},
+					},
+				},
+				{
+					ID:        "2343",
+					Name:      "qux",
+					Namespace: "ns",
+					Containers: []*kubecontainer.Container{
+						{
+							ID:   "barbar",
+							Name: "barbar",
+							Hash: 0x1234,
+						},
+					},
 				},
 			},
 		},
 		{
-			DockerContainers{
-				"foobar": &docker.APIContainers{
+			[]docker.APIContainers{
+				{
 					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
+					Names: []string{"/k8s_foobar.1234_qux_ns_1234_42"},
 				},
-				"barbar": &docker.APIContainers{
+				{
 					ID:    "barbar",
-					Names: []string{"/k8s_foo_qux_ns_2343_42"},
+					Names: []string{"/k8s_barbar.1234_qux_ns_2343_42"},
 				},
-				"baz": &docker.APIContainers{
+				{
 					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
+					Names: []string{"/k8s_baz.1234_qux_ns_1234_42"},
 				},
 			},
-			types.UID("1234"),
-			"",
-			DockerContainers{
-				"foobar": &docker.APIContainers{
-					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
+			[]docker.APIContainers{
+				{
+					ID:    "barfoo",
+					Names: []string{"/k8s_barfoo.1234_qux_ns_1234_42"},
 				},
-				"baz": &docker.APIContainers{
-					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
+				{
+					ID:    "bazbaz",
+					Names: []string{"/k8s_bazbaz.1234_qux_ns_5678_42"},
+				},
+			},
+			true,
+			[]*kubecontainer.Pod{
+				{
+					ID:        "1234",
+					Name:      "qux",
+					Namespace: "ns",
+					Containers: []*kubecontainer.Container{
+						{
+							ID:   "foobar",
+							Name: "foobar",
+							Hash: 0x1234,
+						},
+						{
+							ID:   "barfoo",
+							Name: "barfoo",
+							Hash: 0x1234,
+						},
+						{
+							ID:   "baz",
+							Name: "baz",
+							Hash: 0x1234,
+						},
+					},
+				},
+				{
+					ID:        "2343",
+					Name:      "qux",
+					Namespace: "ns",
+					Containers: []*kubecontainer.Container{
+						{
+							ID:   "barbar",
+							Name: "barbar",
+							Hash: 0x1234,
+						},
+					},
+				},
+				{
+					ID:        "5678",
+					Name:      "qux",
+					Namespace: "ns",
+					Containers: []*kubecontainer.Container{
+						{
+							ID:   "bazbaz",
+							Name: "bazbaz",
+							Hash: 0x1234,
+						},
+					},
 				},
 			},
 		},
 		{
-			DockerContainers{
-				"foobar": &docker.APIContainers{
-					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
-				},
-				"barbar": &docker.APIContainers{
-					ID:    "barbar",
-					Names: []string{"/k8s_foo_qux_ns_2343_42"},
-				},
-				"baz": &docker.APIContainers{
-					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
-				},
-			},
-			types.UID("5678"),
-			"",
-			DockerContainers{},
-		},
-		{
-			DockerContainers{
-				"foobar": &docker.APIContainers{
-					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
-				},
-				"barbar": &docker.APIContainers{
-					ID:    "barbar",
-					Names: nil,
-				},
-				"baz": &docker.APIContainers{
-					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_ns_5678_42"},
-				},
-			},
-			types.UID("5678"),
-			"",
-			DockerContainers{
-				"baz": &docker.APIContainers{
-					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_ns_5678_42"},
-				},
-			},
-		},
-		{
-			DockerContainers{
-				"foobar": &docker.APIContainers{
-					ID:    "foobar",
-					Names: []string{"/k8s_foo_qux_ns_1234_42"},
-				},
-				"barbar": &docker.APIContainers{
-					ID:    "barbar",
-					Names: []string{"/k8s_foo_abc_ns_5678_42"},
-				},
-				"baz": &docker.APIContainers{
-					ID:    "baz",
-					Names: []string{"/k8s_foo_qux_ns_5678_42"},
-				},
-			},
-			"",
-			"abc_ns",
-			DockerContainers{
-				"barbar": &docker.APIContainers{
-					ID:    "barbar",
-					Names: []string{"/k8s_foo_abc_ns_5678_42"},
-				},
-			},
+			[]docker.APIContainers{},
+			[]docker.APIContainers{},
+			true,
+			nil,
 		},
 	}
-	for _, test := range tests {
-		result := test.testContainers.FindContainersByPod(test.inputPodID, test.inputPodFullName)
-		if !reflect.DeepEqual(result, test.expectedContainers) {
-			t.Errorf("expected: %v, saw: %v", test.expectedContainers, result)
+	fakeClient := &FakeDockerClient{}
+	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, nil)
+	for i, test := range tests {
+		fakeClient.ContainerList = test.containerList
+		fakeClient.ExitedContainerList = test.exitedContainerList
+
+		result, _ := containerManager.GetPods(test.all)
+		for i := range result {
+			sort.Sort(containersByID(result[i].Containers))
+		}
+		for i := range test.expectedPods {
+			sort.Sort(containersByID(test.expectedPods[i].Containers))
+		}
+		sort.Sort(podsByID(result))
+		sort.Sort(podsByID(test.expectedPods))
+		if !reflect.DeepEqual(test.expectedPods, result) {
+			t.Errorf("%d: expected: %#v, saw: %#v", i, test.expectedPods, result)
 		}
 	}
 }

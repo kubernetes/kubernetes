@@ -1,0 +1,17 @@
+<div dashboard-header></div>
+<div class="dashboard">
+  <div ng-controller="ListPodsCtrl" style="padding:25px;" class="list-pods">
+    <md-whiteframe layout-margin class="md-whiteframe-z2">
+    <md-content>
+<div>
+<md-button class="md-primary" ng-click="serverView = false">By Name</md-button> |
+<md-button class="md-primary" ng-click="serverView = true">By Server</md-button>
+  <div style="float:right;"><md-button class="md-primary" ng-href="/#/dashboard/pods">View Pod Listing</md-button></div>
+</div>
+    <div class="pod-group" ng-show="!serverView" ng-include="'components/dashboard/views/partials/podTilesByName.html'"></div>
+    <div class="pod-group" ng-show="serverView" ng-include="'components/dashboard/views/partials/podTilesByServer.html'"></div>
+    </md-content>
+    </md-whiteframe>
+  </div>
+</div>
+<div dashboard-footer></div>

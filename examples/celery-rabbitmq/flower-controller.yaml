@@ -1,0 +1,26 @@
+apiVersion: v1beta3
+kind: ReplicationController
+metadata:
+  labels:
+    name: flower
+  name: flower-controller
+spec:
+  replicas: 1
+  selector:
+    component: flower
+  template:
+    metadata:
+      labels:
+        app: taskQueue
+        component: flower
+    spec:
+      containers:
+      - image: endocode/flower
+        name: flower
+        ports:
+        - containerPort: 5555
+          hostPort: 5555
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 100m

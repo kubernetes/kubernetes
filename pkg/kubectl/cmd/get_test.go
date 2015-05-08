@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	encjson "encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -87,6 +88,33 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 	return pods, svc, rc
 }
 
+func testComponentStatusData() *api.ComponentStatusList {
+	good := &api.ComponentStatus{
+		Conditions: []api.ComponentCondition{
+			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: "nil"},
+		},
+	}
+	good.Name = "servergood"
+
+	bad := &api.ComponentStatus{
+		Conditions: []api.ComponentCondition{
+			{Type: api.ComponentHealthy, Status: api.ConditionFalse, Message: "", Error: "bad status: 500"},
+		},
+	}
+	bad.Name = "serverbad"
+
+	unknown := &api.ComponentStatus{
+		Conditions: []api.ComponentCondition{
+			{Type: api.ComponentHealthy, Status: api.ConditionUnknown, Message: "", Error: "fizzbuzz error"},
+		},
+	}
+	unknown.Name = "serverunknown"
+
+	return &api.ComponentStatusList{
+		Items: []api.ComponentStatus{*good, *bad, *unknown},
+	}
+}
+
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
 	f, tf, codec := NewTestFactory()
@@ -110,6 +138,84 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	}
 	if buf.String() != fmt.Sprintf("%#v", expected) {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+// Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
+// Because api.List is part of the Kube API, resource.Builder has to perform a conversion on
+// api.Scheme, which may not have access to all objects, and not all objects are at the same
+// internal versioning scheme. This test verifies that two isolated schemes (Test, and api.Scheme)
+// can be conjoined into a single output object.
+func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
+	testCases := map[string]struct {
+		output string
+		list   string
+		obj1   string
+		obj2   string
+	}{
+		"handles specific version": {
+			output: "v1beta3",
+			list:   "v1beta3",
+			obj1:   "unlikelyversion",
+			obj2:   "v1beta3",
+		},
+		"handles second specific version": {
+			output: "unlikelyversion",
+			list:   "v1beta3",
+			obj1:   "unlikelyversion", // doesn't have v1beta3
+			obj2:   "v1beta3",         // version of the API response
+		},
+		"handles common version": {
+			output: "v1beta1",
+			list:   "v1beta1",
+			obj1:   "unlikelyversion", // because test scheme defaults to unlikelyversion
+			obj2:   "v1beta1",
+		},
+	}
+	for k, test := range testCases {
+		apiCodec := runtime.CodecFor(api.Scheme, "v1beta1")
+		regularClient := &client.FakeRESTClient{
+			Codec: apiCodec,
+			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: 200, Body: objBody(apiCodec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}})}, nil
+			}),
+		}
+
+		f, tf, codec := NewMixedFactory(regularClient)
+		tf.Printer = &testPrinter{}
+		tf.Client = &client.FakeRESTClient{
+			Codec: codec,
+			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &internalType{Name: "foo"})}, nil
+			}),
+		}
+		tf.Namespace = "test"
+		tf.ClientConfig = &client.Config{Version: latest.Version}
+		buf := bytes.NewBuffer([]byte{})
+		cmd := NewCmdGet(f, buf)
+		cmd.SetOutput(buf)
+		cmd.Flags().Set("output", "json")
+		cmd.Flags().Set("output-version", test.output)
+		err := RunGet(f, buf, cmd, []string{"type/foo", "replicationcontrollers/foo"})
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", k, err)
+			continue
+		}
+		out := make(map[string]interface{})
+		if err := encjson.Unmarshal(buf.Bytes(), &out); err != nil {
+			t.Errorf("%s: unexpected error: %v\n%s", k, err, buf.String())
+			continue
+		}
+		if out["apiVersion"] != test.list {
+			t.Errorf("%s: unexpected list: %#v", k, out)
+		}
+		arr := out["items"].([]interface{})
+		if arr[0].(map[string]interface{})["apiVersion"] != test.obj1 {
+			t.Errorf("%s: unexpected list: %#v", k, out)
+		}
+		if arr[1].(map[string]interface{})["apiVersion"] != test.obj2 {
+			t.Errorf("%s: unexpected list: %#v", k, out)
+		}
 	}
 }
 
@@ -188,6 +294,32 @@ func TestGetListObjects(t *testing.T) {
 	}
 }
 
+func TestGetListComponentStatus(t *testing.T) {
+	statuses := testComponentStatusData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, statuses)},
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"componentstatuses"})
+
+	expected := []runtime.Object{statuses}
+	actual := tf.Printer.(*testPrinter).Objects
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("unexpected object: %#v %#v", expected, actual)
+	}
+	if len(buf.String()) == 0 {
+		t.Errorf("unexpected empty output")
+	}
+}
+
 func TestGetMultipleTypeObjects(t *testing.T) {
 	pods, svc, _ := testData()
 
@@ -244,7 +376,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &client.Config{Version: "v1beta1"}
+	tf.ClientConfig = &client.Config{Version: testapi.Version()}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdGet(f, buf)
@@ -261,6 +393,17 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	list, err := runtime.ExtractList(out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if errs := runtime.DecodeList(list, api.Scheme); len(errs) > 0 {
+		t.Fatalf("unexpected error: %v", errs)
+	}
+	if err := runtime.SetList(out, list); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	expected := &api.List{
 		Items: []runtime.Object{
 			&pods.Items[0],

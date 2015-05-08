@@ -24,14 +24,15 @@ type mockContainerHandlerFactory struct {
 	mock.Mock
 	Name           string
 	CanHandleValue bool
+	CanAcceptValue bool
 }
 
 func (self *mockContainerHandlerFactory) String() string {
 	return self.Name
 }
 
-func (self *mockContainerHandlerFactory) CanHandle(name string) (bool, error) {
-	return self.CanHandleValue, nil
+func (self *mockContainerHandlerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
+	return self.CanHandleValue, self.CanAcceptValue, nil
 }
 
 func (self *mockContainerHandlerFactory) NewContainerHandler(name string) (ContainerHandler, error) {
@@ -50,6 +51,7 @@ func TestNewContainerHandler_FirstMatches(t *testing.T) {
 	allwaysYes := &mockContainerHandlerFactory{
 		Name:           "yes",
 		CanHandleValue: true,
+		CanAcceptValue: true,
 	}
 	RegisterContainerHandlerFactory(allwaysYes)
 
@@ -60,7 +62,7 @@ func TestNewContainerHandler_FirstMatches(t *testing.T) {
 	}
 	allwaysYes.On("NewContainerHandler", testContainerName).Return(mockContainer, nil)
 
-	cont, err := NewContainerHandler(testContainerName)
+	cont, _, err := NewContainerHandler(testContainerName)
 	if err != nil {
 		t.Error(err)
 	}
@@ -76,11 +78,13 @@ func TestNewContainerHandler_SecondMatches(t *testing.T) {
 	allwaysNo := &mockContainerHandlerFactory{
 		Name:           "no",
 		CanHandleValue: false,
+		CanAcceptValue: true,
 	}
 	RegisterContainerHandlerFactory(allwaysNo)
 	allwaysYes := &mockContainerHandlerFactory{
 		Name:           "yes",
 		CanHandleValue: true,
+		CanAcceptValue: true,
 	}
 	RegisterContainerHandlerFactory(allwaysYes)
 
@@ -91,7 +95,7 @@ func TestNewContainerHandler_SecondMatches(t *testing.T) {
 	}
 	allwaysYes.On("NewContainerHandler", testContainerName).Return(mockContainer, nil)
 
-	cont, err := NewContainerHandler(testContainerName)
+	cont, _, err := NewContainerHandler(testContainerName)
 	if err != nil {
 		t.Error(err)
 	}
@@ -107,16 +111,44 @@ func TestNewContainerHandler_NoneMatch(t *testing.T) {
 	allwaysNo1 := &mockContainerHandlerFactory{
 		Name:           "no",
 		CanHandleValue: false,
+		CanAcceptValue: true,
 	}
 	RegisterContainerHandlerFactory(allwaysNo1)
 	allwaysNo2 := &mockContainerHandlerFactory{
 		Name:           "no",
 		CanHandleValue: false,
+		CanAcceptValue: true,
 	}
 	RegisterContainerHandlerFactory(allwaysNo2)
 
-	_, err := NewContainerHandler(testContainerName)
+	_, _, err := NewContainerHandler(testContainerName)
 	if err == nil {
 		t.Error("Expected NewContainerHandler to fail")
+	}
+}
+
+func TestNewContainerHandler_Accept(t *testing.T) {
+	ClearContainerHandlerFactories()
+
+	// Register handler that can handle the container, but can't accept it.
+	cannotHandle := &mockContainerHandlerFactory{
+		Name:           "no",
+		CanHandleValue: false,
+		CanAcceptValue: true,
+	}
+	RegisterContainerHandlerFactory(cannotHandle)
+	cannotAccept := &mockContainerHandlerFactory{
+		Name:           "no",
+		CanHandleValue: true,
+		CanAcceptValue: false,
+	}
+	RegisterContainerHandlerFactory(cannotAccept)
+
+	_, accept, err := NewContainerHandler(testContainerName)
+	if err != nil {
+		t.Error("Expected NewContainerHandler to succeed")
+	}
+	if accept == true {
+		t.Error("Expected NewContainerHandler to ignore the container.")
 	}
 }

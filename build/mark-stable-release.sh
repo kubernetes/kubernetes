@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,10 @@
 
 # Marks the current stable version
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 if [[ -z "$1" ]]; then
   echo "Usage: $0 <version>"
   exit 1
@@ -28,7 +32,7 @@ fi
 
 STABLE_FILE_LOCATION="kubernetes-release/release/stable.txt"
 
-version_file=$(mktemp -t stable)
+version_file=$(mktemp -t stable.XXXXXX)
 
 echo $1 >> ${version_file}
 echo "Uploading stable version $1 to google storage"

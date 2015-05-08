@@ -32,7 +32,8 @@ Bug Fixes:
 - If --skipPackages is used and all packages are skipped, Ginkgo should exit 0.
 - Fix tempfile leak when running in parallel
 - Fix incorrect failure message when a panic occurs during a parallel test run
-
+- Fixed an issue where a pending test within a focused context (or a focused test within a pending context) would skip all other tests.
+- Be more consistent about handling SIGTERM as well as SIGINT
 
 ## 1.1.0 (8/2/2014)
 

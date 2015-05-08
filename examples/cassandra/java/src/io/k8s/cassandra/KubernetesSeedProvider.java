@@ -64,7 +64,7 @@ public class KubernetesSeedProvider implements SeedProvider {
 
         String host = protocol + "://" + hostName + ":" + hostPort;
         String serviceName = getEnvOrDefault("CASSANDRA_SERVICE", "cassandra");
-        String path = "/api/v1beta1/endpoints/";
+        String path = "/api/v1beta3/endpoints/";
         try {
 	    URL url = new URL(host + path + serviceName);
 	    ObjectMapper mapper = new ObjectMapper();

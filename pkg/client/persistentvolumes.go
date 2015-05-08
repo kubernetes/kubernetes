@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ type PersistentVolumeInterface interface {
 	Get(name string) (*api.PersistentVolume, error)
 	Create(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 	Update(volume *api.PersistentVolume) (*api.PersistentVolume, error)
+	UpdateStatus(persistentVolume *api.PersistentVolume) (*api.PersistentVolume, error)
 	Delete(name string) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
@@ -79,6 +80,12 @@ func (c *persistentVolumes) Update(volume *api.PersistentVolume) (result *api.Pe
 		return
 	}
 	err = c.client.Put().Resource("persistentVolumes").Name(volume.Name).Body(volume).Do().Into(result)
+	return
+}
+
+func (c *persistentVolumes) UpdateStatus(volume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
+	result = &api.PersistentVolume{}
+	err = c.client.Put().Resource("persistentVolumes").Name(volume.Name).SubResource("status").Body(volume).Do().Into(result)
 	return
 }
 

@@ -87,3 +87,22 @@ func TestDuplicateLabel(t *testing.T) {
 		t.Errorf("DisableSecOpt Failed level incorrect")
 	}
 }
+func TestRelabel(t *testing.T) {
+	testdir := "/tmp/test"
+	label := "system_u:system_r:svirt_sandbox_file_t:s0:c1,c2"
+	if err := Relabel(testdir, "", "z"); err != nil {
+		t.Fatal("Relabel with no label failed: %v", err)
+	}
+	if err := Relabel(testdir, label, ""); err != nil {
+		t.Fatal("Relabel with no relabel field failed: %v", err)
+	}
+	if err := Relabel(testdir, label, "z"); err != nil {
+		t.Fatal("Relabel shared failed: %v", err)
+	}
+	if err := Relabel(testdir, label, "Z"); err != nil {
+		t.Fatal("Relabel unshared failed: %v", err)
+	}
+	if err := Relabel(testdir, label, "zZ"); err == nil {
+		t.Fatal("Relabel with shared and unshared succeeded: %v", err)
+	}
+}

@@ -12,11 +12,11 @@ import (
 
 const oomCgroupName = "memory"
 
-// NotifyOnOOM returns channel on which you can expect event about OOM,
+// notifyOnOOM returns channel on which you can expect event about OOM,
 // if process died without OOM this channel will be closed.
 // s is current *libcontainer.State for container.
-func NotifyOnOOM(s *State) (<-chan struct{}, error) {
-	dir := s.CgroupPaths[oomCgroupName]
+func notifyOnOOM(paths map[string]string) (<-chan struct{}, error) {
+	dir := paths[oomCgroupName]
 	if dir == "" {
 		return nil, fmt.Errorf("There is no path for %q in state", oomCgroupName)
 	}
@@ -26,6 +26,7 @@ func NotifyOnOOM(s *State) (<-chan struct{}, error) {
 	}
 	fd, _, syserr := syscall.RawSyscall(syscall.SYS_EVENTFD2, 0, syscall.FD_CLOEXEC, 0)
 	if syserr != 0 {
+		oomControl.Close()
 		return nil, syserr
 	}
 

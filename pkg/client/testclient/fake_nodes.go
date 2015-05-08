@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ func (c *FakeNodes) Get(name string) (*api.Node, error) {
 	return obj.(*api.Node), err
 }
 
-func (c *FakeNodes) List() (*api.NodeList, error) {
+func (c *FakeNodes) List(label labels.Selector, field fields.Selector) (*api.NodeList, error) {
 	obj, err := c.Fake.Invokes(FakeAction{Action: "list-nodes"}, &api.NodeList{})
 	return obj.(*api.NodeList), err
 }
@@ -51,6 +51,11 @@ func (c *FakeNodes) Delete(name string) error {
 
 func (c *FakeNodes) Update(minion *api.Node) (*api.Node, error) {
 	obj, err := c.Fake.Invokes(FakeAction{Action: "update-node", Value: minion}, &api.Node{})
+	return obj.(*api.Node), err
+}
+
+func (c *FakeNodes) UpdateStatus(minion *api.Node) (*api.Node, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-node", Value: minion}, &api.Node{})
 	return obj.(*api.Node), err
 }
 

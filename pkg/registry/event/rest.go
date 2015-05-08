@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -117,7 +117,12 @@ func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fi
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid object type")
 	}
-	return labels.Set{}, fields.Set{
+	l := event.Labels
+	if l == nil {
+		l = labels.Set{}
+	}
+	return l, fields.Set{
+		"metadata.name":                  event.Name,
 		"involvedObject.kind":            event.InvolvedObject.Kind,
 		"involvedObject.namespace":       event.InvolvedObject.Namespace,
 		"involvedObject.name":            event.InvolvedObject.Name,

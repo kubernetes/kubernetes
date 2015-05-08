@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,7 +71,8 @@ func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
 // watch.Interface. resourceVersion may be used to specify what version to begin
 // watching (e.g., for reconnecting without missing any updates).
 func (h *EtcdHelper) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
-	w := newEtcdWatcher(true, exceptKey(key), filter, h.Codec, h.Versioner, nil)
+	key = h.PrefixEtcdKey(key)
+	w := newEtcdWatcher(true, exceptKey(key), filter, h.Codec, h.Versioner, nil, h)
 	go w.etcdWatch(h.Client, key, resourceVersion)
 	return w, nil
 }
@@ -79,8 +80,11 @@ func (h *EtcdHelper) WatchList(key string, resourceVersion uint64, filter Filter
 // Watch begins watching the specified key. Events are decoded into
 // API objects and sent down the returned watch.Interface.
 // Errors will be sent down the channel.
-func (h *EtcdHelper) Watch(key string, resourceVersion uint64) watch.Interface {
-	return h.WatchAndTransform(key, resourceVersion, nil)
+func (h *EtcdHelper) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+	key = h.PrefixEtcdKey(key)
+	w := newEtcdWatcher(false, nil, filter, h.Codec, h.Versioner, nil, h)
+	go w.etcdWatch(h.Client, key, resourceVersion)
+	return w, nil
 }
 
 // WatchAndTransform begins watching the specified key. Events are decoded into
@@ -100,7 +104,8 @@ func (h *EtcdHelper) Watch(key string, resourceVersion uint64) watch.Interface {
 //
 // Errors will be sent down the channel.
 func (h *EtcdHelper) WatchAndTransform(key string, resourceVersion uint64, transform TransformFunc) watch.Interface {
-	w := newEtcdWatcher(false, nil, Everything, h.Codec, h.Versioner, transform)
+	key = h.PrefixEtcdKey(key)
+	w := newEtcdWatcher(false, nil, Everything, h.Codec, h.Versioner, transform, h)
 	go w.etcdWatch(h.Client, key, resourceVersion)
 	return w
 }
@@ -140,6 +145,8 @@ type etcdWatcher struct {
 
 	// Injectable for testing. Send the event down the outgoing channel.
 	emit func(watch.Event)
+
+	cache etcdCache
 }
 
 // watchWaitDuration is the amount of time to wait for an error from watch.
@@ -147,7 +154,7 @@ const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.  If you provide a transform
 // and a versioner, the versioner must be able to handle the objects that transform creates.
-func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding runtime.Codec, versioner EtcdVersioner, transform TransformFunc) *etcdWatcher {
+func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding runtime.Codec, versioner EtcdVersioner, transform TransformFunc, cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:     encoding,
 		versioner:    versioner,
@@ -160,6 +167,7 @@ func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding 
 		etcdStop:     make(chan bool),
 		outgoing:     make(chan watch.Event),
 		userStop:     make(chan struct{}),
+		cache:        cache,
 	}
 	w.emit = func(e watch.Event) { w.outgoing <- e }
 	go w.translate()
@@ -251,6 +259,10 @@ func (w *etcdWatcher) translate() {
 }
 
 func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
+	if obj, found := w.cache.getFromCache(node.ModifiedIndex); found {
+		return obj, nil
+	}
+
 	obj, err := w.encoding.Decode([]byte(node.Value))
 	if err != nil {
 		return nil, err
@@ -272,6 +284,9 @@ func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 		}
 	}
 
+	if node.ModifiedIndex != 0 {
+		w.cache.addToCache(node.ModifiedIndex, obj)
+	}
 	return obj, nil
 }
 

@@ -385,7 +385,7 @@ request_duration_microseconds_count 2693
 					},
 				},
 			},
-                },
+		},
 	}
 
 	for i, scenario := range scenarios {

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -91,7 +91,7 @@ func IsValidPortNum(port int) bool {
 	return 0 < port && port < 65536
 }
 
-// IsValidIP tests that the argument is a valid IPv4 address.
-func IsValidIP(value string) bool {
+// IsValidIPv4 tests that the argument is a valid IPv4 address.
+func IsValidIPv4(value string) bool {
 	return net.ParseIP(value) != nil && net.ParseIP(value).To4() != nil
 }

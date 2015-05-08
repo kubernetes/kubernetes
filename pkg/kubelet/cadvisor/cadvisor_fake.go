@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package cadvisor
 
 import (
+	"github.com/google/cadvisor/events"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
 )
@@ -29,6 +30,10 @@ var _ Interface = new(Fake)
 
 func (c *Fake) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	return new(cadvisorApi.ContainerInfo), nil
+}
+
+func (c *Fake) SubcontainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+	return map[string]*cadvisorApi.ContainerInfo{}, nil
 }
 
 func (c *Fake) DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error) {
@@ -45,4 +50,8 @@ func (c *Fake) VersionInfo() (*cadvisorApi.VersionInfo, error) {
 
 func (c *Fake) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	return cadvisorApiV2.FsInfo{}, nil
+}
+
+func (c *Fake) WatchEvents(request *events.Request) (*events.EventChannel, error) {
+	return new(events.EventChannel), nil
 }

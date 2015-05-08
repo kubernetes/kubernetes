@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
@@ -31,7 +32,7 @@ func TestListEmptyPods(t *testing.T) {
 		Request:  testRequest{Method: "GET", Path: testapi.ResourcePath("pods", ns, ""), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: &api.PodList{}},
 	}
-	podList, err := c.Setup().Pods(ns).List(labels.Everything())
+	podList, err := c.Setup().Pods(ns).List(labels.Everything(), fields.Everything())
 	c.Validate(t, podList, err)
 }
 
@@ -57,7 +58,7 @@ func TestListPods(t *testing.T) {
 			},
 		},
 	}
-	receivedPodList, err := c.Setup().Pods(ns).List(labels.Everything())
+	receivedPodList, err := c.Setup().Pods(ns).List(labels.Everything(), fields.Everything())
 	c.Validate(t, receivedPodList, err)
 }
 
@@ -91,7 +92,7 @@ func TestListPodsLabels(t *testing.T) {
 	c.Setup()
 	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedPodList, err := c.Pods(ns).List(selector)
+	receivedPodList, err := c.Pods(ns).List(selector, fields.Everything())
 	c.Validate(t, receivedPodList, err)
 }
 
@@ -135,7 +136,7 @@ func TestDeletePod(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().Pods(ns).Delete("foo")
+	err := c.Setup().Pods(ns).Delete("foo", nil)
 	c.Validate(t, nil, err)
 }
 

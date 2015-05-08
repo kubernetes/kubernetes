@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -96,6 +96,18 @@ kube::util::host_platform() {
   echo "${host_os}/${host_arch}"
 }
 
+kube::util::find-binary() {
+  local lookfor="${1}"
+  local host_platform="$(kube::util::host_platform)"
+  local locations=(
+    "${KUBE_ROOT}/_output/dockerized/bin/${host_platform}/${lookfor}"
+    "${KUBE_ROOT}/_output/local/bin/${host_platform}/${lookfor}"
+    "${KUBE_ROOT}/platforms/${host_platform}/${lookfor}"
+  )
+  local bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+  echo -n "${bin}"
+}
+
 # Wait for background jobs to finish. Return with
 # an error status if any of the jobs failed.
 kube::util::wait-for-jobs() {
@@ -106,3 +118,43 @@ kube::util::wait-for-jobs() {
   done
   return ${fail}
 }
+
+# Takes a binary to run $1 and then copies the results to $2.
+# If the generated and original files are the same after filtering lines
+# that match $3, copy is skipped.
+kube::util::gen-doc() {
+  local cmd="$1"
+  local dest="$2"
+  local skipprefix="${3:-}"
+
+  # We do this in a tmpdir in case the dest has other non-autogenned files
+  # We don't want to include them in the list of gen'd files
+  local tmpdir="${KUBE_ROOT}/doc_tmp"
+  mkdir "${tmpdir}"
+  # generate the new files
+  ${cmd} "${tmpdir}"
+  # create the list of generated files
+  ls "${tmpdir}" | LC_ALL=C sort > "${tmpdir}/.files_generated"
+
+  # remove all old generated file from the destination
+  while read file; do
+    if [[ -e "${tmpdir}/${file}" && -n "${skipprefix}" ]]; then
+      local original generated
+      original=$(grep -v "^${skipprefix}" "${dest}/${file}") || :
+      generated=$(grep -v "^${skipprefix}" "${tmpdir}/${file}") || :
+      if [[ "${original}" == "${generated}" ]]; then
+        # overwrite generated with original.
+        mv "${dest}/${file}" "${tmpdir}/${file}"
+      fi
+    else
+      rm "${dest}/${file}" || true
+    fi
+  done <"${dest}/.files_generated"
+
+  # put the new generated file into the destination
+  find "${tmpdir}" -exec rsync -pt {} "${dest}" \; >/dev/null
+  #cleanup
+  rm -rf "${tmpdir}"
+}
+
+# ex: ts=2 sw=2 et filetype=sh

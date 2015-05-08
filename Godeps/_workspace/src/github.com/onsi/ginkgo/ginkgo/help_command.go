@@ -23,7 +23,7 @@ func printHelp(args []string, additionalArgs []string) {
 	} else {
 		command, found := commandMatching(args[0])
 		if !found {
-			complainAndQuit(fmt.Sprintf("Unkown command: %s", args[0]))
+			complainAndQuit(fmt.Sprintf("Unknown command: %s", args[0]))
 		}
 
 		usageForCommand(command, true)

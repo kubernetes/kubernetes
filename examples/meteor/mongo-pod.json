@@ -1,0 +1,46 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "mongo",
+    "labels": {
+      "name": "mongo",
+      "role": "mongo"
+    }
+  },
+  "spec": {
+    "volumes": [
+      {
+        "name": "mongo-disk",
+        "gcePersistentDisk": {
+          "pdName": "mongo-disk",
+          "fsType": "ext4"
+        }
+      }
+    ],
+    "containers": [
+      {
+        "name": "mongo",
+        "image": "mongo",
+        "ports": [
+          {
+            "name": "mongo",
+            "containerPort": 27017,
+            "protocol": "TCP"
+          }
+        ],
+        "resources": {
+          "limits": {
+            "cpu": "1"
+          }
+        },
+        "volumeMounts": [
+          {
+            "name": "mongo-disk",
+            "mountPath": "/data/db"
+          }
+        ]
+      }
+    ]
+  }
+}

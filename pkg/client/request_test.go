@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,8 +36,6 @@ import (
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -73,26 +71,26 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 
 func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
 	r := &Request{baseURL: &url.URL{}, path: "/path/", namespaceInQuery: true}
-	if s := r.finalURL(); s != "/path/" {
+	if s := r.URL().String(); s != "/path/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
 	r := (&Request{baseURL: &url.URL{}, namespaceInQuery: true}).AbsPath("/foo/")
-	if s := r.finalURL(); s != "/foo/" {
+	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 
 	r = (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
-	if s := r.finalURL(); s != "/foo/" {
+	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathJoins(t *testing.T) {
 	r := (&Request{baseURL: &url.URL{}, namespaceInQuery: true}).AbsPath("foo/bar", "baz")
-	if s := r.finalURL(); s != "foo/bar/baz" {
+	if s := r.URL().String(); s != "foo/bar/baz" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
@@ -107,7 +105,7 @@ func TestRequestSetsNamespace(t *testing.T) {
 	if r.namespace == "" {
 		t.Errorf("namespace should be set: %#v", r)
 	}
-	if s := r.finalURL(); s != "?namespace=foo" {
+	if s := r.URL().String(); s != "?namespace=foo" {
 		t.Errorf("namespace should be in params: %s", s)
 	}
 
@@ -116,7 +114,7 @@ func TestRequestSetsNamespace(t *testing.T) {
 			Path: "/",
 		},
 	}).Namespace("foo")
-	if s := r.finalURL(); s != "namespaces/foo" {
+	if s := r.URL().String(); s != "namespaces/foo" {
 		t.Errorf("namespace should be in path: %s", s)
 	}
 }
@@ -126,7 +124,7 @@ func TestRequestOrdersNamespaceInPath(t *testing.T) {
 		baseURL: &url.URL{},
 		path:    "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo")
-	if s := r.finalURL(); s != "/test/namespaces/foo/baz/bar" {
+	if s := r.URL().String(); s != "/test/namespaces/foo/baz/bar" {
 		t.Errorf("namespace should be in order in path: %s", s)
 	}
 }
@@ -136,7 +134,7 @@ func TestRequestOrdersSubResource(t *testing.T) {
 		baseURL: &url.URL{},
 		path:    "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo").Suffix("test").SubResource("a", "b")
-	if s := r.finalURL(); s != "/test/namespaces/foo/baz/bar/a/b/test" {
+	if s := r.URL().String(); s != "/test/namespaces/foo/baz/bar/a/b/test" {
 		t.Errorf("namespace should be in order in path: %s", s)
 	}
 }
@@ -266,11 +264,8 @@ func TestTransformResponse(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
-		body, err := ioutil.ReadAll(test.Response.Body)
-		if err != nil {
-			t.Errorf("failed to read body of response: %v", err)
-		}
-		response, created, err := r.transformResponse(test.Response, &http.Request{}, body)
+		result := r.transformResponse(test.Response, &http.Request{})
+		response, created, err := result.body, result.created, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
@@ -356,11 +351,8 @@ func TestTransformUnstructuredError(t *testing.T) {
 			resourceName: testCase.Name,
 			resource:     testCase.Resource,
 		}
-		body, err := ioutil.ReadAll(testCase.Res.Body)
-		if err != nil {
-			t.Errorf("failed to read body: %v", err)
-		}
-		_, _, err = r.transformResponse(testCase.Res, testCase.Req, body)
+		result := r.transformResponse(testCase.Res, testCase.Req)
+		err := result.err
 		if !testCase.ErrFn(err) {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -527,6 +519,22 @@ func TestRequestStream(t *testing.T) {
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, errors.New("err")
 				}),
+				baseURL: &url.URL{},
+			},
+			Err: true,
+		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusUnauthorized,
+						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Codec(), &api.Status{
+							Status: api.StatusFailure,
+							Reason: api.StatusReasonUnauthorized,
+						})))),
+					}, nil
+				}),
+				codec:   latest.Codec,
 				baseURL: &url.URL{},
 			},
 			Err: true,
@@ -702,7 +710,7 @@ func TestDoRequestNewWay(t *testing.T) {
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
 	}}}}
-	expectedBody, _ := v1beta2.Codec.Encode(expectedObj)
+	expectedBody, _ := testapi.Codec().Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -710,7 +718,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta2", Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Version(), Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
 		Prefix("foo", "bar").
 		Suffix("baz").
@@ -726,28 +734,88 @@ func TestDoRequestNewWay(t *testing.T) {
 	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
-	fakeHandler.ValidateRequest(t, "/api/v1beta2/foo/bar/baz?timeout=1s", "POST", &reqBody)
+	requestURL := testapi.ResourcePathWithPrefix("foo/bar", "", "", "baz")
+	requestURL += "?timeout=1s"
+	fakeHandler.ValidateRequest(t, requestURL, "POST", &reqBody)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
 }
 
+func TestCheckRetryClosesBody(t *testing.T) {
+	count := 0
+	ch := make(chan struct{})
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		count++
+		t.Logf("attempt %d", count)
+		if count >= 5 {
+			w.WriteHeader(http.StatusOK)
+			close(ch)
+			return
+		}
+		w.Header().Set("Retry-After", "0")
+		w.WriteHeader(apierrors.StatusTooManyRequests)
+	}))
+	defer testServer.Close()
+
+	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Version(), Username: "user", Password: "pass"})
+	_, err := c.Verb("POST").
+		Prefix("foo", "bar").
+		Suffix("baz").
+		Timeout(time.Second).
+		Body([]byte(strings.Repeat("abcd", 1000))).
+		DoRaw()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v %#v", err, err)
+	}
+	<-ch
+	if count != 5 {
+		t.Errorf("unexpected retries: %d", count)
+	}
+}
+
+func BenchmarkCheckRetryClosesBody(t *testing.B) {
+	count := 0
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		count++
+		if count%3 == 0 {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header().Set("Retry-After", "0")
+		w.WriteHeader(apierrors.StatusTooManyRequests)
+	}))
+	defer testServer.Close()
+
+	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Version(), Username: "user", Password: "pass"})
+	r := c.Verb("POST").
+		Prefix("foo", "bar").
+		Suffix("baz").
+		Timeout(time.Second).
+		Body([]byte(strings.Repeat("abcd", 1000)))
+
+	for i := 0; i < t.N; i++ {
+		if _, err := r.DoRaw(); err != nil {
+			t.Fatalf("Unexpected error: %v %#v", err, err)
+		}
+	}
+}
 func TestDoRequestNewWayReader(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, _ := v1beta1.Codec.Encode(reqObj)
+	reqBodyExpected, _ := testapi.Codec().Encode(reqObj)
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
 	}}}}
-	expectedBody, _ := v1beta1.Codec.Encode(expectedObj)
+	expectedBody, _ := testapi.Codec().Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Version(), Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
 		Resource("bar").
 		Name("baz").
@@ -766,7 +834,9 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo&timeout=1s", "POST", &tmpStr)
+	requestURL := testapi.ResourcePathWithPrefix("foo", "bar", "", "baz")
+	requestURL += "?" + api.LabelSelectorQueryParam(testapi.Version()) + "=name%3Dfoo&timeout=1s"
+	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -774,20 +844,20 @@ func TestDoRequestNewWayReader(t *testing.T) {
 
 func TestDoRequestNewWayObj(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, _ := v1beta2.Codec.Encode(reqObj)
+	reqBodyExpected, _ := testapi.Codec().Encode(reqObj)
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
 	}}}}
-	expectedBody, _ := v1beta2.Codec.Encode(expectedObj)
+	expectedBody, _ := testapi.Codec().Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta2", Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Version(), Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
 		Suffix("baz").
 		Name("bar").
@@ -806,7 +876,9 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta2/foo/bar/baz?labels=name%3Dfoo&timeout=1s", "POST", &tmpStr)
+	requestURL := testapi.ResourcePath("foo", "", "bar/baz")
+	requestURL += "?" + api.LabelSelectorQueryParam(testapi.Version()) + "=name%3Dfoo&timeout=1s"
+	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -814,7 +886,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 
 func TestDoRequestNewWayFile(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, err := v1beta1.Codec.Encode(reqObj)
+	reqBodyExpected, err := testapi.Codec().Encode(reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -834,14 +906,14 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
 	}}}}
-	expectedBody, _ := v1beta1.Codec.Encode(expectedObj)
+	expectedBody, _ := testapi.Codec().Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Version(), Username: "user", Password: "pass"})
 	wasCreated := true
 	obj, err := c.Verb("POST").
 		Prefix("foo/bar", "baz").
@@ -861,7 +933,9 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("expected object was not created")
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?timeout=1s", "POST", &tmpStr)
+	requestURL := testapi.ResourcePathWithPrefix("foo/bar/baz", "", "", "")
+	requestURL += "?timeout=1s"
+	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -869,7 +943,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 
 func TestWasCreated(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, err := v1beta1.Codec.Encode(reqObj)
+	reqBodyExpected, err := testapi.Codec().Encode(reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -879,14 +953,14 @@ func TestWasCreated(t *testing.T) {
 		Port:       12345,
 		TargetPort: util.NewIntOrStringFromInt(12345),
 	}}}}
-	expectedBody, _ := v1beta1.Codec.Encode(expectedObj)
+	expectedBody, _ := testapi.Codec().Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   201,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
-	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
+	c := NewOrDie(&Config{Host: testServer.URL, Version: testapi.Version(), Username: "user", Password: "pass"})
 	wasCreated := false
 	obj, err := c.Verb("PUT").
 		Prefix("foo/bar", "baz").
@@ -907,7 +981,9 @@ func TestWasCreated(t *testing.T) {
 	}
 
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?timeout=1s", "PUT", &tmpStr)
+	requestURL := testapi.ResourcePathWithPrefix("foo/bar/baz", "", "", "")
+	requestURL += "?timeout=1s"
+	fakeHandler.ValidateRequest(t, requestURL, "PUT", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -952,7 +1028,7 @@ func TestUintParam(t *testing.T) {
 	for _, item := range table {
 		c := NewOrDie(&Config{})
 		r := c.Get().AbsPath("").UintParam(item.name, item.testVal)
-		if e, a := item.expectStr, r.finalURL(); e != a {
+		if e, a := item.expectStr, r.URL().String(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
 	}
@@ -1074,7 +1150,7 @@ func TestWatch(t *testing.T) {
 
 	s, err := New(&Config{
 		Host:     testServer.URL,
-		Version:  "v1beta1",
+		Version:  testapi.Version(),
 		Username: "user",
 		Password: "pass",
 	})
@@ -1124,7 +1200,7 @@ func TestStream(t *testing.T) {
 
 	s, err := New(&Config{
 		Host:     testServer.URL,
-		Version:  "v1beta1",
+		Version:  testapi.Version(),
 		Username: "user",
 		Password: "pass",
 	})

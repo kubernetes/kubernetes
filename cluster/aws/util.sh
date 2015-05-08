@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 # config-default.sh.
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
+source "${KUBE_ROOT}/cluster/common.sh"
 
 # This removes the final character in bash (somehow)
 AWS_REGION=${ZONE%?}
@@ -28,7 +29,9 @@ export AWS_DEFAULT_REGION=${AWS_REGION}
 AWS_CMD="aws --output json ec2"
 AWS_ELB_CMD="aws --output json elb"
 
-MASTER_INTERNAL_IP=172.20.0.9
+INTERNAL_IP_BASE=172.20.0
+MASTER_IP_SUFFIX=.9
+MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
 
 function json_val {
     python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
@@ -36,16 +39,20 @@ function json_val {
 
 # TODO (ayurchuk) Refactor the get_* functions to use filters
 # TODO (bburns) Parameterize this for multiple cluster per project
-function get_instance_ids {
-  python -c "import json,sys; lst = [str(instance['InstanceId']) for reservation in json.load(sys.stdin)['Reservations'] for instance in reservation['Instances'] for tag in instance.get('Tags', []) if tag['Value'].startswith('${MASTER_TAG}') or tag['Value'].startswith('${MINION_TAG}')]; print ' '.join(lst)"
-}
 
 function get_vpc_id {
-  python -c 'import json,sys; lst = [str(vpc["VpcId"]) for vpc in json.load(sys.stdin)["Vpcs"] for tag in vpc.get("Tags", []) if tag["Value"] == "kubernetes-vpc"]; print "".join(lst)'
+  $AWS_CMD --output text describe-vpcs \
+           --filters Name=tag:Name,Values=kubernetes-vpc \
+                     Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+           --query Vpcs[].VpcId
 }
 
 function get_subnet_id {
-  python -c "import json,sys; lst = [str(subnet['SubnetId']) for subnet in json.load(sys.stdin)['Subnets'] if subnet['VpcId'] == '$1']; print ''.join(lst)"
+  python -c "import json,sys; lst = [str(subnet['SubnetId']) for subnet in json.load(sys.stdin)['Subnets'] if subnet['VpcId'] == '$1' and subnet['AvailabilityZone'] == '$2']; print ''.join(lst)"
+}
+
+function get_cidr {
+  python -c "import json,sys; lst = [str(subnet['CidrBlock']) for subnet in json.load(sys.stdin)['Subnets'] if subnet['VpcId'] == '$1' and subnet['AvailabilityZone'] == '$2']; print ''.join(lst)"
 }
 
 function get_igw_id {
@@ -69,7 +76,9 @@ function expect_instance_states {
 function get_instance_public_ip {
   local tagName=$1
   $AWS_CMD --output text describe-instances \
-    --filters Name=tag:Name,Values=${tagName} Name=instance-state-name,Values=running \
+    --filters Name=tag:Name,Values=${tagName} \
+              Name=instance-state-name,Values=running \
+              Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
     --query Reservations[].Instances[].NetworkInterfaces[0].Association.PublicIp
 }
 
@@ -263,7 +272,7 @@ function upload-server-tars() {
 
 
 # Ensure that we have a password created for validating to the master.  Will
-# read from the kubernetes auth-file for the current context if available.
+# read from kubeconfig for the current context if available.
 #
 # Assumed vars
 #   KUBE_ROOT
@@ -272,17 +281,11 @@ function upload-server-tars() {
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-  # go template to extract the auth-path of the current-context user
-  # Note: we save dot ('.') to $dot because the 'with' action overrides dot
-  local template='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{$user := index $dot "contexts" $ctx "user"}}{{index $dot "users" $user "auth-path"}}{{end}}'
-  local file=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${template}")
-  if [[ ! -z "$file" && -r "$file" ]]; then
-    KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-    KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
-    return
+  get-kubeconfig-basicauth
+  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
+    KUBE_USER=admin
+    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
   fi
-  KUBE_USER=admin
-  KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
 }
 
 # Adds a tag to an AWS resource
@@ -358,10 +361,6 @@ function kube-up {
   ensure-iam-profiles
 
   get-password
-  python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
-    -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
-  local htpasswd
-  htpasswd=$(cat "${KUBE_TEMP}/htpasswd")
 
   if [[ ! -f "$AWS_SSH_KEY" ]]; then
     ssh-keygen -f "$AWS_SSH_KEY" -N ''
@@ -371,22 +370,28 @@ function kube-up {
 
   $AWS_CMD import-key-pair --key-name kubernetes --public-key-material "file://$AWS_SSH_KEY.pub" > $LOG 2>&1 || true
 
-  VPC_ID=$($AWS_CMD describe-vpcs | get_vpc_id)
+  VPC_ID=$(get_vpc_id)
 
   if [[ -z "$VPC_ID" ]]; then
 	  echo "Creating vpc."
-	  VPC_ID=$($AWS_CMD create-vpc --cidr-block 172.20.0.0/16 | json_val '["Vpc"]["VpcId"]')
+	  VPC_ID=$($AWS_CMD create-vpc --cidr-block $INTERNAL_IP_BASE.0/16 | json_val '["Vpc"]["VpcId"]')
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
 	  add-tag $VPC_ID Name kubernetes-vpc
+	  add-tag $VPC_ID KubernetesCluster ${CLUSTER_ID}
   fi
 
   echo "Using VPC $VPC_ID"
 
-  SUBNET_ID=$($AWS_CMD describe-subnets | get_subnet_id $VPC_ID)
+  SUBNET_ID=$($AWS_CMD describe-subnets | get_subnet_id $VPC_ID $ZONE)
   if [[ -z "$SUBNET_ID" ]]; then
-	  echo "Creating subnet."
-	  SUBNET_ID=$($AWS_CMD create-subnet --cidr-block 172.20.0.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
+    echo "Creating subnet."
+    SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $INTERNAL_IP_BASE.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
+  else
+    EXISTING_CIDR=$($AWS_CMD describe-subnets | get_cidr $VPC_ID $ZONE)
+    echo "Using existing CIDR $EXISTING_CIDR"
+    INTERNAL_IP_BASE=${EXISTING_CIDR%.*}
+    MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
   fi
 
   echo "Using subnet $SUBNET_ID"
@@ -433,7 +438,8 @@ function kube-up {
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     echo "readonly ZONE='${ZONE}'"
-    echo "readonly MASTER_HTPASSWD='${htpasswd}'"
+    echo "readonly KUBE_USER='${KUBE_USER}'"
+    echo "readonly KUBE_PASSWORD='${KUBE_PASSWORD}'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
     echo "readonly ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING:-false}'"
     echo "readonly ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
@@ -460,13 +466,14 @@ function kube-up {
     --iam-instance-profile Name=$IAM_PROFILE_MASTER \
     --instance-type $MASTER_SIZE \
     --subnet-id $SUBNET_ID \
-    --private-ip-address 172.20.0.9 \
+    --private-ip-address $MASTER_INTERNAL_IP \
     --key-name kubernetes \
     --security-group-ids $SEC_GROUP_ID \
     --associate-public-ip-address \
     --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
+  add-tag $master_id KubernetesCluster ${CLUSTER_ID}
 
   echo "Waiting for master to be ready"
 
@@ -540,7 +547,7 @@ function kube-up {
       --iam-instance-profile Name=$IAM_PROFILE_MINION \
       --instance-type $MINION_SIZE \
       --subnet-id $SUBNET_ID \
-      --private-ip-address 172.20.0.1${i} \
+      --private-ip-address $INTERNAL_IP_BASE.1${i} \
       --key-name kubernetes \
       --security-group-ids $SEC_GROUP_ID \
       --associate-public-ip-address \
@@ -548,6 +555,7 @@ function kube-up {
 
     add-tag $minion_id Name ${MINION_NAMES[$i]}
     add-tag $minion_id Role $MINION_TAG
+    add-tag $minion_id KubernetesCluster ${CLUSTER_ID}
 
     MINION_IDS[$i]=$minion_id
   done
@@ -604,44 +612,23 @@ function kube-up {
 
   echo "Kubernetes cluster created."
 
-  local kube_cert="kubecfg.crt"
-  local kube_key="kubecfg.key"
-  local ca_cert="kubernetes.ca.crt"
   # TODO use token instead of kube_auth
-  local kube_auth="kubernetes_auth"
+  export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
+  export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
+  export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
+  export CONTEXT="aws_${INSTANCE_PREFIX}"
 
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  local context="${INSTANCE_PREFIX}"
-  local user="${INSTANCE_PREFIX}-admin"
-  local config_dir="${HOME}/.kube/${context}"
 
   # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
   # config file.  Distribute the same way the htpasswd is done.
   (
-    mkdir -p "${config_dir}"
     umask 077
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.crt >"${config_dir}/${kube_cert}" 2>$LOG
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.key >"${config_dir}/${kube_key}" 2>$LOG
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/ca.crt >"${config_dir}/${ca_cert}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>"$LOG"
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>"$LOG"
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>"$LOG"
 
-    "${kubectl}" config set-cluster "${context}" --server="https://${KUBE_MASTER_IP}" --certificate-authority="${config_dir}/${ca_cert}" --global
-    "${kubectl}" config set-credentials "${user}" --auth-path="${config_dir}/${kube_auth}" --global
-    "${kubectl}" config set-context "${context}" --cluster="${context}" --user="${user}" --global
-    "${kubectl}" config use-context "${context}" --global
-
-    cat << EOF > "${config_dir}/${kube_auth}"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD",
-  "CAFile": "${config_dir}/${ca_cert}",
-  "CertFile": "${config_dir}/${kube_cert}",
-  "KeyFile": "${config_dir}/${kube_key}"
-}
-EOF
-
-    chmod 0600 "${config_dir}/${kube_auth}" "${config_dir}/$kube_cert" \
-      "${config_dir}/${kube_key}" "${config_dir}/${ca_cert}"
-    echo "Wrote ${config_dir}/${kube_auth}"
+    create-kubeconfig
   )
 
   echo "Sanity checking cluster..."
@@ -695,33 +682,15 @@ EOF
   echo
   echo -e "${color_yellow}  https://${KUBE_MASTER_IP}"
   echo
-  echo -e "${color_green}The user name and password to use is located in ${config_dir}/${kube_auth}${color_norm}"
+  echo -e "${color_green}The user name and password to use is located in ${KUBECONFIG}.${color_norm}"
   echo
 }
 
 function kube-down {
-  instance_ids=$($AWS_CMD describe-instances | get_instance_ids)
-  if [[ -n ${instance_ids} ]]; then
-    $AWS_CMD terminate-instances --instance-ids $instance_ids > $LOG
-    echo "Waiting for instances deleted"
-    while true; do
-      instance_states=$($AWS_CMD describe-instances --instance-ids $instance_ids | expect_instance_states terminated)
-      if [[ "$instance_states" == "" ]]; then
-        echo "All instances terminated"
-        break
-      else
-        echo "Instances not yet terminated: $instance_states"
-        echo "Sleeping for 3 seconds..."
-        sleep 3
-      fi
-    done
-  fi
-
-  echo "Deleting VPC"
-  vpc_id=$($AWS_CMD describe-vpcs | get_vpc_id)
+  local vpc_id=$(get_vpc_id)
   if [[ -n "${vpc_id}" ]]; then
     local elb_ids=$(get_elbs_in_vpc ${vpc_id})
-    if [[ -n ${elb_ids} ]]; then
+    if [[ -n "${elb_ids}" ]]; then
       echo "Deleting ELBs in: ${vpc_id}"
       for elb_id in ${elb_ids}; do
         $AWS_ELB_CMD delete-load-balancer --load-balancer-name=${elb_id}
@@ -741,13 +710,34 @@ function kube-down {
       done
     fi
 
+    echo "Deleting instances in VPC: ${vpc_id}"
+    instance_ids=$($AWS_CMD --output text describe-instances \
+                            --filters Name=vpc-id,Values=${vpc_id} \
+                                      Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                            --query Reservations[].Instances[].InstanceId)
+    if [[ -n "${instance_ids}" ]]; then
+      $AWS_CMD terminate-instances --instance-ids ${instance_ids} > $LOG
+      echo "Waiting for instances to be deleted"
+      while true; do
+        local instance_states=$($AWS_CMD describe-instances --instance-ids ${instance_ids} | expect_instance_states terminated)
+        if [[ -z "${instance_states}" ]]; then
+          echo "All instances deleted"
+          break
+        else
+          echo "Instances not yet deleted: ${instance_states}"
+          echo "Sleeping for 3 seconds..."
+          sleep 3
+        fi
+      done
+    fi
+
     echo "Deleting VPC: ${vpc_id}"
     default_sg_id=$($AWS_CMD --output text describe-security-groups \
-                             --filters Name=vpc-id,Values=$vpc_id Name=group-name,Values=default \
+                             --filters Name=vpc-id,Values=${vpc_id} Name=group-name,Values=default \
                              --query SecurityGroups[].GroupId \
                     | tr "\t" "\n")
     sg_ids=$($AWS_CMD --output text describe-security-groups \
-                      --filters Name=vpc-id,Values=$vpc_id \
+                      --filters Name=vpc-id,Values=${vpc_id} \
                       --query SecurityGroups[].GroupId \
              | tr "\t" "\n")
     for sg_id in ${sg_ids}; do
@@ -758,7 +748,7 @@ function kube-down {
     done
 
     subnet_ids=$($AWS_CMD --output text describe-subnets \
-                          --filters Name=vpc-id,Values=$vpc_id \
+                          --filters Name=vpc-id,Values=${vpc_id} \
                           --query Subnets[].SubnetId \
              | tr "\t" "\n")
     for subnet_id in ${subnet_ids}; do
@@ -766,7 +756,7 @@ function kube-down {
     done
 
     igw_ids=$($AWS_CMD --output text describe-internet-gateways \
-                       --filters Name=attachment.vpc-id,Values=$vpc_id \
+                       --filters Name=attachment.vpc-id,Values=${vpc_id} \
                        --query InternetGateways[].InternetGatewayId \
              | tr "\t" "\n")
     for igw_id in ${igw_ids}; do

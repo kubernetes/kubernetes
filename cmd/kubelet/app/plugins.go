@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network/exec"
 	// Volume plugins
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/aws_ebs"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/gce_pd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/git_repo"
@@ -32,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/iscsi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/nfs"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/persistent_claim"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/secret"
 	//Cloud providers
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
@@ -49,6 +51,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	// The list of plugins to probe is decided by the kubelet binary, not
 	// by dynamic linking or other "magic".  Plugins will be analyzed and
 	// initialized later.
+	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, empty_dir.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, git_repo.ProbeVolumePlugins()...)
@@ -57,6 +60,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, secret.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, persistent_claim.ProbeVolumePlugins()...)
 
 	return allPlugins
 }

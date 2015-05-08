@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -162,6 +162,7 @@ func TestRESTGet(t *testing.T) {
 func TestRESTgetAttrs(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := &api.Event{
+		ObjectMeta: api.ObjectMeta{Name: "f0118"},
 		InvolvedObject: api.ObjectReference{
 			Kind:            "Pod",
 			Name:            "foo",
@@ -182,6 +183,7 @@ func TestRESTgetAttrs(t *testing.T) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
 	expect := fields.Set{
+		"metadata.name":                  "f0118",
 		"involvedObject.kind":            "Pod",
 		"involvedObject.name":            "foo",
 		"involvedObject.namespace":       "baz",

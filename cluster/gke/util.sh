@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 # config-default.sh.
 
 KUBE_PROMPT_FOR_UPDATE=y
+KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gke/${KUBE_CONFIG_FILE:-config-default.sh}"
 
@@ -86,13 +87,20 @@ function verify-prereqs() {
       exit 1
     fi
   fi
+  if [[ "${KUBE_SKIP_UPDATE}" == "y" ]]; then
+    return
+  fi
   # update and install components as needed
   if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
     gcloud_prompt="-q"
   fi
-  gcloud ${gcloud_prompt:-} components update preview || true
-  gcloud ${gcloud_prompt:-} components update alpha || true
-  gcloud ${gcloud_prompt:-} components update || true
+  local sudo_prefix=""
+  if [ ! -w $(dirname `which gcloud`) ]; then
+    sudo_prefix="sudo"
+  fi
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update preview || true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update alpha|| true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update || true
 }
 
 # Instantiate a kubernetes cluster
@@ -238,8 +246,15 @@ function ssh-to-node() {
 
   local node="$1"
   local cmd="$2"
-  "${GCLOUD}" compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" \
-    --zone="${ZONE}" "${node}" --command "${cmd}"
+  # Loop until we can successfully ssh into the box
+  for try in $(seq 1 5); do
+    if gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "echo test > /dev/null"; then
+      break
+    fi
+    sleep 5
+  done
+  # Then actually try the command.
+  gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"
 }
 
 # Restart the kube-proxy on a node ($1)
@@ -251,7 +266,7 @@ function restart-kube-proxy() {
 # Restart the kube-proxy on master ($1)
 function restart-apiserver() {
   echo "... in restart-kube-apiserver()"  >&2
-  ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
+  ssh-to-node "$1" "sudo docker ps | grep /kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
 }
 
 # Execute after running tests to perform any required clean-up.  This is called
@@ -288,5 +303,5 @@ function kube-down() {
   echo "... in kube-down()" >&2
   detect-project >&2
   "${GCLOUD}" alpha container clusters delete --project="${PROJECT}" \
-    --zone="${ZONE}" "${CLUSTER_NAME}"
+    --zone="${ZONE}" "${CLUSTER_NAME}" --quiet
 }

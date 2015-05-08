@@ -1,7 +1,7 @@
 .PHONY:	clean build push
 
 IMAGE = etcd
-TAG = 2.0.8
+TAG = 2.0.9
 OUTPUT_DIR = $(IMAGE)-v$(TAG)-linux-amd64
 
 clean:

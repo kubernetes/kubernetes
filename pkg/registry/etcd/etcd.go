@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,9 +35,9 @@ import (
 
 const (
 	// ControllerPath is the path to controller resources in etcd
-	ControllerPath string = "/registry/controllers"
+	ControllerPath string = "/controllers"
 	// ServicePath is the path to service resources in etcd
-	ServicePath string = "/registry/services/specs"
+	ServicePath string = "/services/specs"
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
@@ -271,7 +271,8 @@ func (r *Registry) WatchServices(ctx api.Context, label labels.Selector, field f
 		if err != nil {
 			return nil, err
 		}
-		return r.Watch(key, version), nil
+		// TODO: use generic.SelectionPredicate
+		return r.Watch(key, version, tools.Everything)
 	}
 	if field.Empty() {
 		return r.WatchList(makeServiceListKey(ctx), version, tools.Everything)

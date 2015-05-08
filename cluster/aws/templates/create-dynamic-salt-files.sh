@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,19 +36,58 @@ dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 EOF
 
-mkdir -p /srv/salt-overlay/salt/nginx
-echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd
+readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
+if [ ! -e "${BASIC_AUTH_FILE}" ]; then
+  mkdir -p /srv/salt-overlay/salt/kube-apiserver
+  (umask 077;
+    echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${BASIC_AUTH_FILE}")
+fi
 
 # Generate and distribute a shared secret (bearer token) to
-# apiserver and kubelet so that kubelet can authenticate to
-# apiserver to send events.
+# apiserver and the nodes so that kubelet and kube-proxy can
+# authenticate to apiserver.
 # This works on CoreOS, so it should work on a lot of distros.
 kubelet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
+kube_proxy_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
 
+# Make a list of tokens and usernames to be pushed to the apiserver
 mkdir -p /srv/salt-overlay/salt/kube-apiserver
-known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
-(umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file)
+readonly KNOWN_TOKENS_FILE="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
+(umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $KNOWN_TOKENS_FILE ;
+echo "$kube_proxy_token,kube_proxy,kube_proxy" >> $KNOWN_TOKENS_FILE)
 
 mkdir -p /srv/salt-overlay/salt/kubelet
 kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
 (umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
+
+mkdir -p /srv/salt-overlay/salt/kube-proxy
+kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
+cat > "${kube_proxy_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kube-proxy
+  user:
+    token: ${kube_proxy_token}
+clusters:
+- name: local
+  cluster:
+     insecure-skip-tls-verify: true
+contexts:
+- context:
+    cluster: local
+    user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+
+# Generate tokens for other "service accounts".  Append to known_tokens.
+#
+# NB: If this list ever changes, this script actually has to
+# change to detect the existence of this file, kill any deleted
+# old tokens and add any new tokens (to handle the upgrade case).
+local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
+for account in "${service_accounts[@]}"; do
+  token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  echo "${token},${account},${account}" >> "${KNOWN_TOKENS_FILE}"
+done

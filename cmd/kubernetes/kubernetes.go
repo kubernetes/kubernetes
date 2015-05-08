@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,12 +34,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -54,15 +55,15 @@ import (
 var (
 	addr           = flag.String("addr", "127.0.0.1", "The address to use for the apiserver.")
 	port           = flag.Int("port", 8080, "The port for the apiserver to use.")
-	dockerEndpoint = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
-	etcdServer     = flag.String("etcd_server", "http://localhost:4001", "If non-empty, path to the set of etcd server to use")
+	dockerEndpoint = flag.String("docker-endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
+	etcdServer     = flag.String("etcd-server", "http://localhost:4001", "If non-empty, path to the set of etcd server to use")
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
-	nodeMilliCPU           = flag.Int64("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
-	nodeMemory             = flag.Int64("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
-	masterServiceNamespace = flag.String("master_service_namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
+	nodeMilliCPU           = flag.Int64("node-milli-cpu", 1000, "The amount of MilliCPU provisioned on each node")
+	nodeMemory             = flag.Int64("node-memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
+	masterServiceNamespace = flag.String("master-service-namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
 	enableProfiling        = flag.Bool("profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
-	deletingPodsQps        = flag.Float32("deleting_pods_qps", 0.1, "")
-	deletingPodsBurst      = flag.Int("deleting_pods_burst", 10, "")
+	deletingPodsQps        = flag.Float32("deleting-pods-qps", 0.1, "")
+	deletingPodsBurst      = flag.Int("deleting-pods-burst", 10, "")
 )
 
 type delegateHandler struct {
@@ -81,7 +82,7 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func runApiServer(etcdClient tools.EtcdClient, addr net.IP, port int, masterServiceNamespace string) {
 	handler := delegateHandler{}
 
-	helper, err := master.NewEtcdHelper(etcdClient, "")
+	helper, err := master.NewEtcdHelper(etcdClient, "", master.DefaultEtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Unable to get etcd helper: %v", err)
 	}
@@ -128,17 +129,22 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 			api.ResourceMemory: *resource.NewQuantity(nodeMemory, resource.BinarySI),
 		},
 	}
-	kubeClient := &client.HTTPKubeletClient{Client: http.DefaultClient, Port: ports.KubeletPort}
 
-	nodeController := nodeControllerPkg.NewNodeController(
-		nil, "", machineList, nodeResources, cl, kubeClient, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst), 40*time.Second, 60*time.Second, 5*time.Second)
-	nodeController.Run(10*time.Second, true, true)
+	const nodeSyncPeriod = 10 * time.Second
+	nodeController := nodecontroller.NewNodeController(
+		nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst), 40*time.Second, 60*time.Second, 5*time.Second, "", nil, false)
+	nodeController.Run(nodeSyncPeriod, true)
+
+	serviceController := servicecontroller.New(nil, cl, "kubernetes")
+	if err := serviceController.Run(nodeSyncPeriod); err != nil {
+		glog.Warningf("Running without a service controller: %v", err)
+	}
 
 	endpoints := service.NewEndpointController(cl)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
+	go endpoints.Run(5, util.NeverStop)
 
 	controllerManager := controller.NewReplicationManager(cl)
-	controllerManager.Run(controller.DefaultSyncPeriod)
+	go controllerManager.Run(5, util.NeverStop)
 }
 
 func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP, port int) {
@@ -153,7 +159,7 @@ func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP
 	if err != nil {
 		glog.Fatalf("Failed to create cAdvisor: %v", err)
 	}
-	kcfg := kubeletapp.SimpleKubelet(cl, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil)
+	kcfg := kubeletapp.SimpleKubelet(cl, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil, kubecontainer.RealOS{})
 	kubeletapp.RunKubelet(kcfg, nil)
 
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
@@ -40,7 +41,7 @@ const OldestVersion = "v1beta1"
 // may be assumed to be least feature rich to most feature rich, and clients may
 // choose to prefer the latter items in the list over the former items when presented
 // with a set of versions to choose.
-var Versions = []string{"v1beta1", "v1beta2", "v1beta3"}
+var Versions = []string{"v1beta1", "v1beta2", "v1beta3", "v1"}
 
 // Codec is the default codec for serializing output that should use
 // the latest supported version.  Use this Codec when writing to
@@ -60,6 +61,9 @@ var SelfLinker = runtime.SelfLinker(accessor)
 // RESTMapper provides the default mapping between REST paths and the objects declared in api.Scheme and all known
 // Kubernetes versions.
 var RESTMapper meta.RESTMapper
+
+// userResources is a group of resources mostly used by a kubectl user
+var userResources = []string{"rc", "svc", "pods", "pvc"}
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
 // string, or an error if the version is not known.
@@ -83,6 +87,12 @@ func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
+	case "v1":
+		return &meta.VersionInterfaces{
+			Codec:            v1.Codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
 	}
@@ -100,7 +110,8 @@ func init() {
 		},
 	)
 	// list of versions we support on the server
-	versions := []string{"v1beta1", "v1beta2", "v1beta3"}
+	// versions should be listed in the order of perferred versions first
+	versions := []string{"v1beta3", "v1beta2", "v1beta1", "v1"}
 
 	// versions that used mixed case URL formats
 	versionMixedCase := map[string]bool{
@@ -113,6 +124,7 @@ func init() {
 		"v1beta1": meta.RESTScopeNamespaceLegacy,
 		"v1beta2": meta.RESTScopeNamespaceLegacy,
 		"v1beta3": meta.RESTScopeNamespace,
+		"v1":      meta.RESTScopeNamespace,
 	}
 
 	// the list of kinds that are scoped at the root of the api hierarchy
@@ -124,8 +136,18 @@ func init() {
 		"PersistentVolume": true,
 	}
 
+	// setup aliases for groups of resources
+	mapper.AddResourceAlias("all", userResources...)
+
 	// these kinds should be excluded from the list of resources
-	ignoredKinds := util.NewStringSet("ListOptions", "DeleteOptions", "Status", "ContainerManifest")
+	ignoredKinds := util.NewStringSet(
+		"ListOptions",
+		"DeleteOptions",
+		"Status",
+		"ContainerManifest",
+		"PodLogOptions",
+		"PodExecOptions",
+		"PodProxyOptions")
 
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources
 	for _, version := range versions {

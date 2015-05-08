@@ -1,5 +1,7 @@
 package libcontainer
 
+import "io"
+
 // API error code type.
 type ErrorCode int
 
@@ -8,29 +10,52 @@ const (
 	// Factory errors
 	IdInUse ErrorCode = iota
 	InvalidIdFormat
-	// TODO: add Load errors
 
 	// Container errors
-	ContainerDestroyed
+	ContainerNotExists
 	ContainerPaused
+	ContainerNotStopped
+	ContainerNotRunning
+
+	// Process errors
+	ProcessNotExecuted
 
 	// Common errors
 	ConfigInvalid
 	SystemError
 )
 
+func (c ErrorCode) String() string {
+	switch c {
+	case IdInUse:
+		return "Id already in use"
+	case InvalidIdFormat:
+		return "Invalid format"
+	case ContainerPaused:
+		return "Container paused"
+	case ConfigInvalid:
+		return "Invalid configuration"
+	case SystemError:
+		return "System error"
+	case ContainerNotExists:
+		return "Container does not exist"
+	case ContainerNotStopped:
+		return "Container is not stopped"
+	case ContainerNotRunning:
+		return "Container is not running"
+	default:
+		return "Unknown error"
+	}
+}
+
 // API Error type.
 type Error interface {
 	error
 
-	// Returns the stack trace, if any, which identifies the
-	// point at which the error occurred.
-	Stack() []byte
-
 	// Returns a verbose string including the error message
 	// and a representation of the stack trace suitable for
 	// printing.
-	Detail() string
+	Detail(w io.Writer) error
 
 	// Returns the error code for this error.
 	Code() ErrorCode

@@ -1,0 +1,42 @@
+<div layout="row" ng-if="group.kind != 'grouping'">
+  <div>
+    <!-- Default box display -->
+      <div layout="row" class="group-item" ng-repeat="(groupType, data) in group | groupBy: 'labels.type'">
+        <!-- left image -->
+        <div class="icon-area">
+          <div class="group-icon" style="background-color: {{getGroupColor(groupType)}}"></div>
+        </div>
+        <!-- right area -->
+        <div class="group-main-area" layout="column">
+          <!-- type -->
+          <div class="subtype">
+            {{groupType | ucfirst}}s
+          </div>
+          <!-- links -->
+          <div layout="row" layout-wrap>
+            <div layout="row" ng-repeat="item in data">
+              <!-- title -->
+              <div ng-switch on='item.labels["type"]'>
+                <div class="group-name">
+                  <a ng-switch-when='pod' ng-href="/#/dashboard/pods/{{ item.id }}">{{ item.id }}</a>
+                  <a ng-switch-when='service' ng-href="/#/dashboard/services/{{ item.id }}">{{ item.id }}</a>
+                  <a ng-switch-when='replicationController' ng-href="/#/dashboard/replicationcontrollers/{{ item.id }}">{{ item.id }}</a>
+                  <div ng-switch-default>{{item.id}}</div>
+                </div>
+              </div>
+              <md-select ng-model="selectedFilter" ng-change="changeFilterBy(selectedFilter)" class="selectFilter">
+                <md-optgroup label="FILTER">
+                  <md-option ng-value="'{{key}}={{value}}'" ng-repeat="(key, value) in item.labels">{{key}}: {{value}}</md-option>
+                  </md-option-group>
+                </md-optgroup>
+              </md-select>
+              <!-- This is the official button design, but requires a custom dialog. Fix up after the demo. -->
+              <!-- <md-button ng-click="" class="filter-button" style="padding:0">
+                <md-icon md-svg-src="components/dashboard/img/icons/ic_arrow_drop_down_18px.svg" class="filter-icon" aria-label="" alt="Filter"></md-icon>
+              </md-button> -->
+            </div>
+          </div>
+        </div>
+      </div>
+  </div>
+</div>

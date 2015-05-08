@@ -92,7 +92,7 @@ get` while in fact they do not match `v0.5` (the one that was tagged) exactly.
 To handle that case, creating a new release should involve creating two adjacent
 commits where the first of them will set the version to `v0.5` and the second
 will set it to `v0.5-dev`. In that case, even in the presence of merges, there
-will be a single comit where the exact `v0.5` version will be used and all
+will be a single commit where the exact `v0.5` version will be used and all
 others around it will either have `v0.4-dev` or `v0.5-dev`.
 
 The diagram below illustrates it.

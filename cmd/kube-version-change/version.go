@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/ghodss/yaml"
 	flag "github.com/spf13/pflag"
@@ -55,6 +56,7 @@ func isYAML(data []byte) bool {
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	flag.CommandLine.SetNormalizeFunc(util.WordSepNormalizeFunc)
 	flag.Parse()
 
 	if *rewrite != "" {
@@ -78,7 +80,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Couldn't read from input: %q", err)
 	}
+	isYAML := isYAML(data)
 
+	if isYAML {
+		data, err = yaml.YAMLToJSON(data)
+		if err != nil {
+			log.Fatalf("Failed to convert YAML to JSON: %q", err)
+		}
+	}
 	obj, err := api.Scheme.Decode(data)
 	if err != nil {
 		log.Fatalf("Couldn't decode input: %q", err)
@@ -89,7 +98,7 @@ func main() {
 		log.Fatalf("Failed to encode to version %q: %q", *outputVersion, err)
 	}
 
-	if isYAML(data) {
+	if isYAML {
 		outData, err = yaml.JSONToYAML(outData)
 		if err != nil {
 			log.Fatalf("Failed to convert to YAML: %q", err)

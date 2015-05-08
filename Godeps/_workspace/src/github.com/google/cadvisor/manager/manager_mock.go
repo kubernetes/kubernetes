@@ -70,6 +70,11 @@ func (c *ManagerMock) GetRequestedContainersInfo(containerName string, options v
 	return args.Get(0).(map[string]*info.ContainerInfo), args.Error(1)
 }
 
+func (c *ManagerMock) Exists(name string) bool {
+	args := c.Called(name)
+	return args.Get(0).(bool)
+}
+
 func (c *ManagerMock) WatchForEvents(queryuest *events.Request, passedChannel chan *info.Event) error {
 	args := c.Called(queryuest, passedChannel)
 	return args.Error(0)

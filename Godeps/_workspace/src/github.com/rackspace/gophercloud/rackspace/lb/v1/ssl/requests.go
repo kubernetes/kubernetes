@@ -85,12 +85,9 @@ func Update(c *gophercloud.ServiceClient, lbID int, opts UpdateOptsBuilder) Upda
 		return res
 	}
 
-	_, res.Err = c.Request("PUT", rootURL(c, lbID), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
+	_, res.Err = c.Put(rootURL(c, lbID), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
-
 	return res
 }
 
@@ -98,12 +95,7 @@ func Update(c *gophercloud.ServiceClient, lbID int, opts UpdateOptsBuilder) Upda
 // Termination configuration for a load balancer.
 func Get(c *gophercloud.ServiceClient, lbID int) GetResult {
 	var res GetResult
-
-	_, res.Err = c.Request("GET", rootURL(c, lbID), gophercloud.RequestOpts{
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
-	})
-
+	_, res.Err = c.Get(rootURL(c, lbID), &res.Body, nil)
 	return res
 }
 
@@ -111,11 +103,9 @@ func Get(c *gophercloud.ServiceClient, lbID int) GetResult {
 // configuration for a load balancer.
 func Delete(c *gophercloud.ServiceClient, lbID int) DeleteResult {
 	var res DeleteResult
-
-	_, res.Err = c.Request("DELETE", rootURL(c, lbID), gophercloud.RequestOpts{
+	_, res.Err = c.Delete(rootURL(c, lbID), &gophercloud.RequestOpts{
 		OkCodes: []int{200},
 	})
-
 	return res
 }
 
@@ -180,10 +170,8 @@ func CreateCert(c *gophercloud.ServiceClient, lbID int, opts CreateCertOptsBuild
 		return res
 	}
 
-	_, res.Err = c.Request("POST", certURL(c, lbID), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
+	_, res.Err = c.Post(certURL(c, lbID), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 
 	return res
@@ -192,12 +180,7 @@ func CreateCert(c *gophercloud.ServiceClient, lbID int, opts CreateCertOptsBuild
 // GetCert will show the details of an existing SSL certificate.
 func GetCert(c *gophercloud.ServiceClient, lbID, certID int) GetCertResult {
 	var res GetCertResult
-
-	_, res.Err = c.Request("GET", certResourceURL(c, lbID, certID), gophercloud.RequestOpts{
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
-	})
-
+	_, res.Err = c.Get(certResourceURL(c, lbID, certID), &res.Body, nil)
 	return res
 }
 
@@ -247,12 +230,7 @@ func UpdateCert(c *gophercloud.ServiceClient, lbID, certID int, opts UpdateCertO
 		return res
 	}
 
-	_, res.Err = c.Request("PUT", certResourceURL(c, lbID, certID), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{202},
-	})
-
+	_, res.Err = c.Put(certResourceURL(c, lbID, certID), reqBody, &res.Body, nil)
 	return res
 }
 
@@ -261,7 +239,7 @@ func UpdateCert(c *gophercloud.ServiceClient, lbID, certID int, opts UpdateCertO
 func DeleteCert(c *gophercloud.ServiceClient, lbID, certID int) DeleteResult {
 	var res DeleteResult
 
-	_, res.Err = c.Request("DELETE", certResourceURL(c, lbID, certID), gophercloud.RequestOpts{
+	_, res.Err = c.Delete(certResourceURL(c, lbID, certID), &gophercloud.RequestOpts{
 		OkCodes: []int{200},
 	})
 

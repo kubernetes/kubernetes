@@ -20,18 +20,20 @@ HTTP on 3 ports:
     - only GET requests are allowed.
     - requests are rate limited
   3. Secure Port
-    - default is port 6443, change with `-secure_port`
+    - default is port 443, change with `-secure_port`
     - default IP is first non-localhost network interface, change with `-public_address_override`
     - serves HTTPS.  Set cert with `-tls_cert_file` and key with `-tls_private_key_file`.
-    - uses token-file based [authentication](./authentication.md).
+    - uses token-file or client-certificate based [authentication](./authentication.md).
     - uses policy-based [authorization](./authorization.md).
 
 ## Proxies and Firewall rules
 
-Additionally, in typical configurations (i.e. GCE), there is a proxy (nginx) running
+Additionally, in some configurations there is a proxy (nginx) running
 on the same machine as the apiserver process.  The proxy serves HTTPS protected
-by Basic Auth on port 443, and proxies to the apiserver on localhost:8080.
-Typically, firewall rules will allow HTTPS access to port 443.
+by Basic Auth on port 443, and proxies to the apiserver on localhost:8080. In
+these configurations the secure port is typically set to 6443.
+
+A firewall rule is typically configured to allow external HTTPS access to port 443.
 
 The above are defaults and reflect how Kubernetes is deployed to GCE using
 kube-up.sh.  Other cloud providers may vary.
@@ -42,15 +44,15 @@ There are three differently configured serving ports because there are a
 variety of uses cases:
    1. Clients outside of a Kubernetes cluster, such as human running `kubectl`
       on desktop machine.  Currently, accesses the Localhost Port via a proxy (nginx)
-      running on the `kubernetes-master` machine.  Proxy uses Basic Auth.
+      running on the `kubernetes-master` machine.  Proxy uses bearer token authentication.
    2. Processes running in Containers on Kubernetes that need to do read from
       the apiserver.  Currently, these can use Readonly Port.
    3. Scheduler and Controller-manager processes, which need to do read-write
-      API operations.  Currently, these have to run on the 
+      API operations.  Currently, these have to run on the
       operations on the apiserver.  Currently, these have to run on the same
       host as the apiserver and use the Localhost Port.
-   4. Kubelets, which need to do read-write API operations and are necessarily 
-      on different machines than the apiserver.  Kubelet uses the Secure Port 
+   4. Kubelets, which need to do read-write API operations and are necessarily
+      on different machines than the apiserver.  Kubelet uses the Secure Port
       to get their pods, to find the services that a pod can see, and to
       write events.  Credentials are distributed to kubelets at cluster
       setup time.
@@ -59,13 +61,14 @@ variety of uses cases:
    - Policy will limit the actions kubelets can do via the authed port.
    - Kube-proxy currently uses the readonly port to read services and endpoints,
      but will eventually use the auth port.
-   - Kubelets may change from token-based authentication to cert-based-auth.
+   - Kubelets will change from token-based authentication to cert-based-auth.
    - Scheduler and Controller-manager will use the Secure Port too.  They
      will then be able to run on different machines than the apiserver.
    - A general mechanism will be provided for [giving credentials to
      pods](
      https://github.com/GoogleCloudPlatform/kubernetes/issues/1907).
-   - The Readonly Port will no longer be needed and will be removed.
+   - The Readonly Port will no longer be needed and [will be removed](
+     https://github.com/GoogleCloudPlatform/kubernetes/issues/5921).
    - Clients, like kubectl, will all support token-based auth, and the
      Localhost will no longer be needed, and will not be the default.
      However, the localhost port may continue to be an option for

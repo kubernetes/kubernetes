@@ -14,7 +14,7 @@
         "resources": {
           "limits": {
             "cpu": "1",
-            "memory": "1Mi"
+            "memory": "5Mi"
          }
       }
     }]

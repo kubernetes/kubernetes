@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,31 @@ import (
 
 func init() {
 	err := newer.Scheme.AddConversionFuncs(
+		func(in *Cluster, out *newer.Cluster, s conversion.Scope) error {
+			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
+		},
+		func(in *newer.Cluster, out *Cluster, s conversion.Scope) error {
+			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
+		},
+		func(in *Preferences, out *newer.Preferences, s conversion.Scope) error {
+			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
+		},
+		func(in *newer.Preferences, out *Preferences, s conversion.Scope) error {
+			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
+		},
+		func(in *AuthInfo, out *newer.AuthInfo, s conversion.Scope) error {
+			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
+		},
+		func(in *newer.AuthInfo, out *AuthInfo, s conversion.Scope) error {
+			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
+		},
+		func(in *Context, out *newer.Context, s conversion.Scope) error {
+			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
+		},
+		func(in *newer.Context, out *Context, s conversion.Scope) error {
+			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
+		},
+
 		func(in *Config, out *newer.Config, s conversion.Scope) error {
 			out.CurrentContext = in.CurrentContext
 			if err := s.Convert(&in.Preferences, &out.Preferences, 0); err != nil {

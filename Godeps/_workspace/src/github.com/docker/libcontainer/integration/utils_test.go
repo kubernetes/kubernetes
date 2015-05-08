@@ -2,15 +2,18 @@ package integration
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
+	"syscall"
+	"testing"
 
 	"github.com/docker/libcontainer"
-	"github.com/docker/libcontainer/namespaces"
+	"github.com/docker/libcontainer/configs"
 )
 
 func newStdBuffers() *stdBuffers {
@@ -27,31 +30,27 @@ type stdBuffers struct {
 	Stderr *bytes.Buffer
 }
 
-func writeConfig(config *libcontainer.Config) error {
-	f, err := os.OpenFile(filepath.Join(config.RootFs, "container.json"), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0700)
-	if err != nil {
-		return err
+func (b *stdBuffers) String() string {
+	s := []string{}
+	if b.Stderr != nil {
+		s = append(s, b.Stderr.String())
 	}
-	defer f.Close()
-	return json.NewEncoder(f).Encode(config)
+	if b.Stdout != nil {
+		s = append(s, b.Stdout.String())
+	}
+	return strings.Join(s, "|")
 }
 
-func loadConfig() (*libcontainer.Config, error) {
-	f, err := os.Open(filepath.Join(os.Getenv("data_path"), "container.json"))
+// ok fails the test if an err is not nil.
+func ok(t testing.TB, err error) {
 	if err != nil {
-		return nil, err
+		_, file, line, _ := runtime.Caller(1)
+		t.Fatalf("%s:%d: unexpected error: %s\n\n", filepath.Base(file), line, err.Error())
 	}
-	defer f.Close()
-
-	var container *libcontainer.Config
-	if err := json.NewDecoder(f).Decode(&container); err != nil {
-		return nil, err
-	}
-	return container, nil
 }
 
-// newRootFs creates a new tmp directory and copies the busybox root filesystem
-func newRootFs() (string, error) {
+// newRootfs creates a new tmp directory and copies the busybox root filesystem
+func newRootfs() (string, error) {
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {
 		return "", err
@@ -79,17 +78,56 @@ func copyBusybox(dest string) error {
 	return nil
 }
 
+func newContainer(config *configs.Config) (libcontainer.Container, error) {
+	cgm := libcontainer.Cgroupfs
+	if config.Cgroups != nil && config.Cgroups.Slice == "system.slice" {
+		cgm = libcontainer.SystemdCgroups
+	}
+
+	factory, err := libcontainer.New(".",
+		libcontainer.InitArgs(os.Args[0], "init", "--"),
+		cgm,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return factory.Create("testCT", config)
+}
+
 // runContainer runs the container with the specific config and arguments
 //
 // buffers are returned containing the STDOUT and STDERR output for the run
 // along with the exit code and any go error
-func runContainer(config *libcontainer.Config, console string, args ...string) (buffers *stdBuffers, exitCode int, err error) {
-	if err := writeConfig(config); err != nil {
+func runContainer(config *configs.Config, console string, args ...string) (buffers *stdBuffers, exitCode int, err error) {
+	container, err := newContainer(config)
+	if err != nil {
 		return nil, -1, err
 	}
-
+	defer container.Destroy()
 	buffers = newStdBuffers()
-	exitCode, err = namespaces.Exec(config, buffers.Stdin, buffers.Stdout, buffers.Stderr,
-		console, config.RootFs, args, namespaces.DefaultCreateCommand, nil)
+	process := &libcontainer.Process{
+		Args:   args,
+		Env:    standardEnvironment,
+		Stdin:  buffers.Stdin,
+		Stdout: buffers.Stdout,
+		Stderr: buffers.Stderr,
+	}
+
+	err = container.Start(process)
+	if err != nil {
+		return nil, -1, err
+	}
+	ps, err := process.Wait()
+	if err != nil {
+		return nil, -1, err
+	}
+	status := ps.Sys().(syscall.WaitStatus)
+	if status.Exited() {
+		exitCode = status.ExitStatus()
+	} else if status.Signaled() {
+		exitCode = -int(status.Signal())
+	} else {
+		return nil, -1, err
+	}
 	return
 }

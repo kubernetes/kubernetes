@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,13 @@ type FakeAPIObject struct{}
 
 func (*FakeAPIObject) IsAnAPIObject() {}
 
+type ExtensionAPIObject struct {
+	TypeMeta
+	ObjectMeta
+}
+
+func (*ExtensionAPIObject) IsAnAPIObject() {}
+
 func TestGetReference(t *testing.T) {
 	table := map[string]struct {
 		obj       runtime.Object
@@ -40,13 +47,13 @@ func TestGetReference(t *testing.T) {
 					Name:            "foo",
 					UID:             "bar",
 					ResourceVersion: "42",
-					SelfLink:        "/api/v1beta1/pods/foo",
+					SelfLink:        "/api/version1/pods/foo",
 				},
 			},
 			fieldPath: ".desiredState.containers[0]",
 			ref: &ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      "v1beta1",
+				APIVersion:      "version1",
 				Name:            "foo",
 				UID:             "bar",
 				ResourceVersion: "42",
@@ -57,12 +64,32 @@ func TestGetReference(t *testing.T) {
 			obj: &ServiceList{
 				ListMeta: ListMeta{
 					ResourceVersion: "42",
-					SelfLink:        "/api/v1beta2/services",
+					SelfLink:        "/api/version2/services",
 				},
 			},
 			ref: &ObjectReference{
 				Kind:            "ServiceList",
-				APIVersion:      "v1beta2",
+				APIVersion:      "version2",
+				ResourceVersion: "42",
+			},
+		},
+		"extensionAPIObject": {
+			obj: &ExtensionAPIObject{
+				TypeMeta: TypeMeta{
+					Kind: "ExtensionAPIObject",
+				},
+				ObjectMeta: ObjectMeta{
+					Name:            "foo",
+					UID:             "bar",
+					ResourceVersion: "42",
+					SelfLink:        "/custom_prefix/version1/extensions/foo",
+				},
+			},
+			ref: &ObjectReference{
+				Kind:            "ExtensionAPIObject",
+				APIVersion:      "version1",
+				Name:            "foo",
+				UID:             "bar",
 				ResourceVersion: "42",
 			},
 		},
@@ -70,7 +97,7 @@ func TestGetReference(t *testing.T) {
 			obj: &ServiceList{
 				ListMeta: ListMeta{
 					ResourceVersion: "42",
-					SelfLink:        "v1beta2/services",
+					SelfLink:        "version2/services",
 				},
 			},
 			shouldErr: true,
@@ -90,7 +117,7 @@ func TestGetReference(t *testing.T) {
 	for name, item := range table {
 		ref, err := GetPartialReference(item.obj, item.fieldPath)
 		if e, a := item.shouldErr, (err != nil); e != a {
-			t.Errorf("%v: expected %v, got %v", name, e, a)
+			t.Errorf("%v: expected %v, got %v, err %v", name, e, a, err)
 			continue
 		}
 		if e, a := item.ref, ref; !reflect.DeepEqual(e, a) {

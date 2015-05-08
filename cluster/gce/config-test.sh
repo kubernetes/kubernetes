@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,22 +22,23 @@ MASTER_SIZE=${MASTER_SIZE:-g1-small}
 MINION_SIZE=${MINION_SIZE:-g1-small}
 NUM_MINIONS=${NUM_MINIONS:-2}
 MINION_DISK_TYPE=pd-standard
-MINION_DISK_SIZE=100GB
-# TODO(dchen1107): Filed an internal issue to create an alias
-# for containervm image, so that gcloud will expand this
-# to the latest supported image.
-IMAGE=container-vm-v20150317
-IMAGE_PROJECT=google-containers
+MINION_DISK_SIZE=${MINION_DISK_SIZE:-100GB}
+
+OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
+MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20150505}
+MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
+MINION_IMAGE=${KUBE_GCE_MINION_IMAGE:-container-vm-v20150505}
+MINION_IMAGE_PROJECT=${KUBE_GCE_MINION_PROJECT:-google-containers}
+CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
+
 NETWORK=${KUBE_GCE_NETWORK:-e2e}
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-e2e-test-${USER}}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
-CLUSTER_IP_RANGE="10.245.0.0/16"
-MINION_IP_RANGES=($(eval echo "10.245.{1..${NUM_MINIONS}}.0/24"))
+CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.245.0.0/16}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
-
-MINION_SCOPES=("storage-ro" "compute-rw")
+MINION_SCOPES=("storage-ro" "compute-rw" "https://www.googleapis.com/auth/logging.write" "https://www.googleapis.com/auth/monitoring")
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
@@ -48,8 +49,11 @@ ENABLE_DOCKER_REGISTRY_CACHE=true
 # Optional: Install node monitoring.
 ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
 
-# Optional: When set to true, heapster will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
+# Optional: Cluster monitoring to setup as part of the cluster bring up:
+#   none     - No cluster monitoring setup 
+#   influxdb - Heapster, InfluxDB, and Grafana 
+#   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging 
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
@@ -68,4 +72,4 @@ DNS_SERVER_IP="10.0.0.10"
 DNS_DOMAIN="kubernetes.local"
 DNS_REPLICAS=1
 
-ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,ResourceQuota
+ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ResourceQuota

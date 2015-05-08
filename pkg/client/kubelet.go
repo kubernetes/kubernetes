@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,7 +39,6 @@ var ErrPodInfoNotAvailable = errors.New("no pod info available")
 type KubeletClient interface {
 	KubeletHealthChecker
 	PodInfoGetter
-	NodeInfoGetter
 	ConnectionInfoGetter
 }
 
@@ -54,10 +53,6 @@ type PodInfoGetter interface {
 	// GetPodStatus returns information about all containers which are part
 	// Returns an api.PodStatus, or an error if one occurs.
 	GetPodStatus(host, podNamespace, podID string) (api.PodStatusResult, error)
-}
-
-type NodeInfoGetter interface {
-	GetNodeInfo(host string) (api.NodeInfo, error)
 }
 
 type ConnectionInfoGetter interface {
@@ -136,13 +131,6 @@ func (c *HTTPKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.
 	return status, err
 }
 
-// GetNodeInfo gets information about the specified node.
-func (c *HTTPKubeletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
-	info := api.NodeInfo{}
-	_, err := c.getEntity(host, "/api/v1beta1/nodeInfo", "", &info)
-	return info, err
-}
-
 // getEntity might return a nil response.
 func (c *HTTPKubeletClient) getEntity(host, path, query string, entity runtime.Object) (*http.Response, error) {
 	request, err := http.NewRequest("GET", c.url(host, path, query), nil)
@@ -177,11 +165,6 @@ type FakeKubeletClient struct{}
 // GetPodInfo is a fake implementation of PodInfoGetter.GetPodInfo.
 func (c FakeKubeletClient) GetPodStatus(host, podNamespace string, podID string) (api.PodStatusResult, error) {
 	return api.PodStatusResult{}, errors.New("Not Implemented")
-}
-
-// GetNodeInfo is a fake implementation of PodInfoGetter.GetNodeInfo
-func (c FakeKubeletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
-	return api.NodeInfo{}, errors.New("Not Implemented")
 }
 
 func (c FakeKubeletClient) HealthCheck(host string) (probe.Result, error) {

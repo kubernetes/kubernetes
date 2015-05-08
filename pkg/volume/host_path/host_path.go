@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
@@ -47,11 +48,8 @@ func (plugin *hostPathPlugin) Name() string {
 	return hostPathPluginName
 }
 
-func (plugin *hostPathPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.HostPath != nil {
-		return true
-	}
-	return false
+func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
+	return spec.VolumeSource.HostPath != nil || spec.PersistentVolumeSource.HostPath != nil
 }
 
 func (plugin *hostPathPlugin) GetAccessModes() []api.AccessModeType {
@@ -60,11 +58,15 @@ func (plugin *hostPathPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *hostPathPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
-	return &hostPath{spec.HostPath.Path}, nil
+func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
+	if spec.VolumeSource.HostPath != nil {
+		return &hostPath{spec.VolumeSource.HostPath.Path}, nil
+	} else {
+		return &hostPath{spec.PersistentVolumeSource.HostPath.Path}, nil
+	}
 }
 
-func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID, _ mount.Interface) (volume.Cleaner, error) {
 	return &hostPath{""}, nil
 }
 

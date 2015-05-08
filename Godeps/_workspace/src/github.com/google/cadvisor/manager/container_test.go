@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
 	itest "github.com/google/cadvisor/info/v1/test"
@@ -40,7 +41,7 @@ func setupContainerData(t *testing.T, spec info.ContainerSpec) (*containerData, 
 		nil,
 	)
 	memoryStorage := memory.New(60, nil)
-	ret, err := newContainerData(containerName, memoryStorage, mockHandler, nil, false)
+	ret, err := newContainerData(containerName, memoryStorage, mockHandler, nil, false, &collector.FakeCollectorManager{})
 	if err != nil {
 		t.Fatal(err)
 	}

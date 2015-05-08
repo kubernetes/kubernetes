@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,8 +52,8 @@ func (plugin *ISCSIPlugin) Name() string {
 	return ISCSIPluginName
 }
 
-func (plugin *ISCSIPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.ISCSI == nil {
+func (plugin *ISCSIPlugin) CanSupport(spec *volume.Spec) bool {
+	if spec.VolumeSource.ISCSI == nil {
 		return false
 	}
 	// see if iscsiadm is there
@@ -72,31 +72,32 @@ func (plugin *ISCSIPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *ISCSIPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *ISCSIPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, podRef.UID, &ISCSIUtil{}, mount.New())
+	return plugin.newBuilderInternal(spec, podRef.UID, &ISCSIUtil{}, mounter)
 }
 
-func (plugin *ISCSIPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
-	lun := strconv.Itoa(spec.ISCSI.Lun)
+func (plugin *ISCSIPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
+	iscsi := spec.VolumeSource.ISCSI
+	lun := strconv.Itoa(iscsi.Lun)
 
 	return &iscsiDisk{
 		podUID:   podUID,
 		volName:  spec.Name,
-		portal:   spec.ISCSI.TargetPortal,
-		iqn:      spec.ISCSI.IQN,
+		portal:   iscsi.TargetPortal,
+		iqn:      iscsi.IQN,
 		lun:      lun,
-		fsType:   spec.ISCSI.FSType,
-		readOnly: spec.ISCSI.ReadOnly,
+		fsType:   iscsi.FSType,
+		readOnly: iscsi.ReadOnly,
 		manager:  manager,
 		mounter:  mounter,
 		plugin:   plugin,
 	}, nil
 }
 
-func (plugin *ISCSIPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *ISCSIPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &ISCSIUtil{}, mount.New())
+	return plugin.newCleanerInternal(volName, podUID, &ISCSIUtil{}, mounter)
 }
 
 func (plugin *ISCSIPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
@@ -107,6 +108,11 @@ func (plugin *ISCSIPlugin) newCleanerInternal(volName string, podUID types.UID, 
 		mounter: mounter,
 		plugin:  plugin,
 	}, nil
+}
+
+func (plugin *ISCSIPlugin) execCommand(command string, args []string) ([]byte, error) {
+	cmd := plugin.exe.Command(command, args...)
+	return cmd.CombinedOutput()
 }
 
 type iscsiDisk struct {
@@ -141,15 +147,13 @@ func (iscsi *iscsiDisk) SetUpAt(dir string) error {
 		return err
 	}
 	globalPDPath := iscsi.manager.MakeGlobalPDName(*iscsi)
-	// make mountpoint rw/ro work as expected
-	//FIXME revisit pkg/util/mount and ensure rw/ro is implemented as expected
-	mode := "rw"
+	var options []string
 	if iscsi.readOnly {
-		mode = "ro"
+		options = []string{"remount", "ro"}
+	} else {
+		options = []string{"remount", "rw"}
 	}
-	iscsi.plugin.execCommand("mount", []string{"-o", "remount," + mode, globalPDPath, dir})
-
-	return nil
+	return iscsi.mounter.Mount(globalPDPath, dir, "", options)
 }
 
 // Unmounts the bind mount, and detaches the disk only if the disk
@@ -160,9 +164,4 @@ func (iscsi *iscsiDisk) TearDown() error {
 
 func (iscsi *iscsiDisk) TearDownAt(dir string) error {
 	return diskTearDown(iscsi.manager, *iscsi, dir, iscsi.mounter)
-}
-
-func (plugin *ISCSIPlugin) execCommand(command string, args []string) ([]byte, error) {
-	cmd := plugin.exe.Command(command, args...)
-	return cmd.CombinedOutput()
 }

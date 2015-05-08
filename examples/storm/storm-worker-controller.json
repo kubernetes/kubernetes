@@ -1,31 +1,55 @@
 {
-  "id": "storm-worker-controller",
   "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "replicas": 3,
-    "replicaSelector": {"name": "storm-worker"},
-    "podTemplate": {
-      "desiredState": {
-         "manifest": {
-           "version": "v1beta1",
-           "id": "storm-worker-controller",
-           "containers": [{
-             "name": "storm-worker",
-             "image": "mattf/storm-worker",
-             "cpu": 200,
-             "ports": [{"containerPort": 6700, "hostPort": 6700},
-                     {"containerPort": 6701, "hostPort": 6701},
-                     {"containerPort": 6702, "hostPort": 6702},
-                     {"containerPort": 6703, "hostPort": 6703}]
-           }]
-         }
-      },
-      "labels": {
-        "name": "storm-worker",
-        "uses": "nimbus"
-      }
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "storm-worker-controller",
+    "labels": {
+      "name": "storm-worker"
     }
   },
-  "labels": {"name": "storm-worker"}
+  "spec": {
+    "replicas": 3,
+    "selector": {
+      "name": "storm-worker"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "storm-worker",
+          "uses": "nimbus"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "storm-worker",
+            "image": "mattf/storm-worker",
+            "ports": [
+              {
+                "hostPort": 6700,
+                "containerPort": 6700
+              },
+              {
+                "hostPort": 6701,
+                "containerPort": 6701
+              },
+              {
+                "hostPort": 6702,
+                "containerPort": 6702
+              },
+              {
+                "hostPort": 6703,
+                "containerPort": 6703
+              }
+            ],
+            "resources": {
+              "limits": {
+                "cpu": "200m"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
 }

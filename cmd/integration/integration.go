@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,15 +41,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
@@ -57,6 +60,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
+	docker "github.com/fsouza/go-dockerclient"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -67,6 +71,8 @@ var (
 	fakeDocker1, fakeDocker2 dockertools.FakeDockerClient
 	// API version that should be used by the client to talk to the server.
 	apiVersion string
+	// Limit the number of concurrent tests.
+	maxConcurrency int
 )
 
 type fakeKubeletClient struct{}
@@ -99,10 +105,6 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podName string) (api.P
 		r.Status.ContainerStatuses[i].Ready = true
 	}
 	return r, nil
-}
-
-func (fakeKubeletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
-	return api.NodeInfo{}, nil
 }
 
 func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
@@ -161,7 +163,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 
 	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: apiVersion})
 
-	helper, err := master.NewEtcdHelper(etcdClient, "")
+	helper, err := master.NewEtcdHelper(etcdClient, "", etcdtest.PathPrefix())
 	if err != nil {
 		glog.Fatalf("Unable to get etcd helper: %v", err)
 	}
@@ -210,12 +212,12 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 
 	endpoints := service.NewEndpointController(cl)
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*4)
+	go endpoints.Run(3, util.NeverStop)
 
 	controllerManager := replicationControllerPkg.NewReplicationManager(cl)
 
 	// TODO: Write an integration test for the replication controllers watch.
-	controllerManager.Run(1 * time.Second)
+	go controllerManager.Run(3, util.NeverStop)
 
 	nodeResources := &api.NodeResources{
 		Capacity: api.ResourceList{
@@ -223,22 +225,24 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 			api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 		}}
 
-	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{}, 10, 5*time.Minute, util.NewFakeRateLimiter(), 40*time.Second, 60*time.Second, 5*time.Second)
-	nodeController.Run(5*time.Second, true, false)
+	nodeController := nodecontroller.NewNodeController(nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewFakeRateLimiter(), 40*time.Second, 60*time.Second, 5*time.Second, "", nil, false)
+	nodeController.Run(5*time.Second, true)
 	cadvisorInterface := new(cadvisor.Fake)
 
 	// Kubelet (localhost)
 	testRootDir := makeTempDirOrDie("kubelet_integ_1.", "")
 	configFilePath := makeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
-	kcfg := kubeletapp.SimpleKubelet(cl, &fakeDocker1, machineList[0], testRootDir, firstManifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, configFilePath, nil)
+	fakeDocker1.VersionInfo = docker.Env{"ApiVersion=1.15"}
+	kcfg := kubeletapp.SimpleKubelet(cl, &fakeDocker1, machineList[0], testRootDir, firstManifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, configFilePath, nil, kubecontainer.FakeOS{})
 	kubeletapp.RunKubelet(kcfg, nil)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
 	testRootDir = makeTempDirOrDie("kubelet_integ_2.", "")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
-	kcfg = kubeletapp.SimpleKubelet(cl, &fakeDocker2, machineList[1], testRootDir, secondManifestURL, "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil)
+	fakeDocker2.VersionInfo = docker.Env{"ApiVersion=1.15"}
+	kcfg = kubeletapp.SimpleKubelet(cl, &fakeDocker2, machineList[1], testRootDir, secondManifestURL, "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil, kubecontainer.FakeOS{})
 	kubeletapp.RunKubelet(kcfg, nil)
 	return apiServer.URL, configFilePath
 }
@@ -258,9 +262,15 @@ func makeTempDirOrDie(prefix string, baseDir string) string {
 }
 
 // podsOnMinions returns true when all of the selected pods exist on a minion.
-func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
+func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
 	podInfo := fakeKubeletClient{}
+	// wait for minions to indicate they have info about the desired pods
 	return func() (bool, error) {
+		pods, err := c.Pods(podNamespace).List(labelSelector, fields.Everything())
+		if err != nil {
+			glog.Infof("Unable to get pods to list: %v", err)
+			return false, nil
+		}
 		for i := range pods.Items {
 			host, id, namespace := pods.Items[i].Spec.Host, pods.Items[i].Name, pods.Items[i].Namespace
 			glog.Infof("Check whether pod %s.%s exists on node %q", id, namespace, host)
@@ -281,7 +291,7 @@ func endpointsSet(c *client.Client, serviceNamespace, serviceID string, endpoint
 	return func() (bool, error) {
 		endpoints, err := c.Endpoints(serviceNamespace).Get(serviceID)
 		if err != nil {
-			glog.Infof("Error on creating endpoints: %v", err)
+			glog.Infof("Error getting endpoints: %v", err)
 			return false, nil
 		}
 		count := 0
@@ -380,7 +390,7 @@ containers:
 			namespace := kubelet.NamespaceDefault
 			if err := wait.Poll(time.Second, time.Minute*2,
 				podRunning(c, namespace, podName)); err != nil {
-				if pods, err := c.Pods(namespace).List(labels.Everything()); err == nil {
+				if pods, err := c.Pods(namespace).List(labels.Everything(), fields.Everything()); err == nil {
 					for _, pod := range pods.Items {
 						glog.Infof("pod found: %s/%s", namespace, pod.Name)
 					}
@@ -388,7 +398,7 @@ containers:
 				glog.Fatalf("%s FAILED: mirror pod has not been created or is not running: %v", desc, err)
 			}
 			// Delete the mirror pod, and wait for it to be recreated.
-			c.Pods(namespace).Delete(podName)
+			c.Pods(namespace).Delete(podName, nil)
 			if err = wait.Poll(time.Second, time.Minute*1,
 				podRunning(c, namespace, podName)); err != nil {
 				glog.Fatalf("%s FAILED: mirror pod has not been re-created or is not running: %v", desc, err)
@@ -426,12 +436,13 @@ func runReplicationControllerTest(c *client.Client) {
 		glog.Fatalf("FAILED: pods never created %v", err)
 	}
 
-	// wait for minions to indicate they have info about the desired pods
-	pods, err := c.Pods("test").List(labels.Set(updated.Spec.Selector).AsSelector())
-	if err != nil {
-		glog.Fatalf("FAILED: unable to get pods to list: %v", err)
-	}
-	if err := wait.Poll(time.Second, time.Second*30, podsOnMinions(c, *pods)); err != nil {
+	// Poll till we can retrieve the status of all pods matching the given label selector from their minions.
+	// This involves 3 operations:
+	//	- The scheduler must assign all pods to a minion
+	//	- The assignment must reflect in a `List` operation against the apiserver, for labels matching the selector
+	//  - We need to be able to query the kubelet on that minion for information about the pod
+	if err := wait.Poll(
+		time.Second, time.Second*30, podsOnMinions(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
 	}
 
@@ -919,7 +930,8 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	}
 
 	// Delete a pod to free up room.
-	err = client.Pods(api.NamespaceDefault).Delete(bar.Name)
+	glog.Infof("Deleting pod %v", bar.Name)
+	err = client.Pods(api.NamespaceDefault).Delete(bar.Name, nil)
 	if err != nil {
 		glog.Fatalf("FAILED: couldn't delete pod %q: %v", bar.Name, err)
 	}
@@ -939,7 +951,9 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 type testFunc func(*client.Client)
 
 func addFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&apiVersion, "apiVersion", latest.Version, "API version that should be used by the client for communicating with the server")
+	fs.StringVar(&apiVersion, "api-version", latest.Version, "API version that should be used by the client for communicating with the server")
+	fs.IntVar(
+		&maxConcurrency, "max-concurrency", -1, "Maximum number of tests to be run simultaneously. Unlimited if set to negative.")
 }
 
 func main() {
@@ -987,16 +1001,26 @@ func main() {
 		},
 	}
 
+	// Only run at most maxConcurrency tests in parallel.
+	if maxConcurrency <= 0 {
+		maxConcurrency = len(testFuncs)
+	}
+	glog.Infof("Running %d tests in parallel.", maxConcurrency)
+	ch := make(chan struct{}, maxConcurrency)
+
 	var wg sync.WaitGroup
 	wg.Add(len(testFuncs))
 	for i := range testFuncs {
 		f := testFuncs[i]
 		go func() {
+			ch <- struct{}{}
 			f(kubeClient)
+			<-ch
 			wg.Done()
 		}()
 	}
 	wg.Wait()
+	close(ch)
 
 	// Check that kubelet tried to make the containers.
 	// Using a set to list unique creation attempts. Our fake is
@@ -1057,7 +1081,7 @@ const (
 			"containers": [
 				{
 					"name": "redis",
-					"image": "dockerfile/redis",
+					"image": "redis",
 					"volumeMounts": [{
 						"name": "redis-data",
 						"mountPath": "/data"
@@ -1085,7 +1109,7 @@ const (
 id: container-vm-guestbook-manifest
 containers:
   - name: redis
-    image: dockerfile/redis
+    image: redis
     volumeMounts:
       - name: redis-data
         mountPath: /data

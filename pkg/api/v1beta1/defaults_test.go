@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,6 +46,102 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	return obj3
 }
 
+func TestSetDefaultReplicationController(t *testing.T) {
+	tests := []struct {
+		rc             *current.ReplicationController
+		expectLabels   bool
+		expectSelector bool
+	}{
+		{
+			rc: &current.ReplicationController{
+				DesiredState: current.ReplicationControllerState{
+					PodTemplate: current.PodTemplate{
+						Labels: map[string]string{
+							"foo": "bar",
+						},
+					},
+				},
+			},
+			expectLabels:   true,
+			expectSelector: true,
+		},
+		{
+			rc: &current.ReplicationController{
+				Labels: map[string]string{
+					"bar": "foo",
+				},
+				DesiredState: current.ReplicationControllerState{
+					PodTemplate: current.PodTemplate{
+						Labels: map[string]string{
+							"foo": "bar",
+						},
+					},
+				},
+			},
+			expectLabels:   false,
+			expectSelector: true,
+		},
+		{
+			rc: &current.ReplicationController{
+				Labels: map[string]string{
+					"bar": "foo",
+				},
+				DesiredState: current.ReplicationControllerState{
+					ReplicaSelector: map[string]string{
+						"some": "other",
+					},
+					PodTemplate: current.PodTemplate{
+						Labels: map[string]string{
+							"foo": "bar",
+						},
+					},
+				},
+			},
+			expectLabels:   false,
+			expectSelector: false,
+		},
+		{
+			rc: &current.ReplicationController{
+				DesiredState: current.ReplicationControllerState{
+					ReplicaSelector: map[string]string{
+						"some": "other",
+					},
+					PodTemplate: current.PodTemplate{
+						Labels: map[string]string{
+							"foo": "bar",
+						},
+					},
+				},
+			},
+			expectLabels:   true,
+			expectSelector: false,
+		},
+	}
+	for _, test := range tests {
+		rc := test.rc
+		obj2 := roundTrip(t, runtime.Object(rc))
+		rc2, ok := obj2.(*current.ReplicationController)
+		if !ok {
+			t.Errorf("unexpected object: %v", rc2)
+			t.FailNow()
+		}
+		if test.expectSelector != reflect.DeepEqual(rc2.DesiredState.ReplicaSelector, rc2.DesiredState.PodTemplate.Labels) {
+			if test.expectSelector {
+				t.Errorf("expected: %v, got: %v", rc2.DesiredState.PodTemplate.Labels, rc2.DesiredState.ReplicaSelector)
+			} else {
+				t.Errorf("unexpected equality: %v", rc2.DesiredState.PodTemplate.Labels)
+			}
+		}
+		if test.expectLabels != reflect.DeepEqual(rc2.Labels, rc2.DesiredState.PodTemplate.Labels) {
+			if test.expectLabels {
+				t.Errorf("expected: %v, got: %v", rc2.DesiredState.PodTemplate.Labels, rc2.Labels)
+			} else {
+				t.Errorf("unexpected equality: %v", rc2.DesiredState.PodTemplate.Labels)
+			}
+		}
+	}
+}
+
 func TestSetDefaultService(t *testing.T) {
 	svc := &current.Service{}
 	obj2 := roundTrip(t, runtime.Object(svc))
@@ -65,6 +161,26 @@ func TestSetDefaultSecret(t *testing.T) {
 
 	if s2.Type != current.SecretTypeOpaque {
 		t.Errorf("Expected secret type %v, got %v", current.SecretTypeOpaque, s2.Type)
+	}
+}
+
+func TestSetDefaultPersistentVolume(t *testing.T) {
+	pv := &current.PersistentVolume{}
+	obj2 := roundTrip(t, runtime.Object(pv))
+	pv2 := obj2.(*current.PersistentVolume)
+
+	if pv2.Status.Phase != current.VolumePending {
+		t.Errorf("Expected volume phase %v, got %v", current.VolumePending, pv2.Status.Phase)
+	}
+}
+
+func TestSetDefaultPersistentVolumeClaim(t *testing.T) {
+	pvc := &current.PersistentVolumeClaim{}
+	obj2 := roundTrip(t, runtime.Object(pvc))
+	pvc2 := obj2.(*current.PersistentVolumeClaim)
+
+	if pvc2.Status.Phase != current.ClaimPending {
+		t.Errorf("Expected claim phase %v, got %v", current.ClaimPending, pvc2.Status.Phase)
 	}
 }
 
@@ -197,4 +313,133 @@ func TestSetDefaultMinionExternalID(t *testing.T) {
 	if m2.ExternalID != name {
 		t.Errorf("Expected default External ID: %s, got: %s", name, m2.ExternalID)
 	}
+}
+
+func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
+	s := current.ContainerManifest{
+		Containers: []current.Container{
+			{
+				Env: []current.EnvVar{
+					{
+						ValueFrom: &current.EnvVarSource{
+							FieldRef: &current.ObjectFieldSelector{},
+						},
+					},
+				},
+			},
+		},
+	}
+	obj2 := roundTrip(t, runtime.Object(&current.ContainerManifestList{
+		Items: []current.ContainerManifest{s},
+	}))
+	sList2 := obj2.(*current.ContainerManifestList)
+	s2 := sList2.Items[0]
+
+	apiVersion := s2.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion
+	if apiVersion != "v1beta1" {
+		t.Errorf("Expected default APIVersion v1beta1, got: %v", apiVersion)
+	}
+}
+
+func TestSetDefaultSecurityContext(t *testing.T) {
+	priv := false
+	privTrue := true
+	testCases := map[string]struct {
+		c current.Container
+	}{
+		"downward defaulting caps": {
+			c: current.Container{
+				Privileged: false,
+				Capabilities: current.Capabilities{
+					Add:  []current.CapabilityType{"foo"},
+					Drop: []current.CapabilityType{"bar"},
+				},
+				SecurityContext: &current.SecurityContext{
+					Privileged: &priv,
+				},
+			},
+		},
+		"downward defaulting priv": {
+			c: current.Container{
+				Privileged: false,
+				Capabilities: current.Capabilities{
+					Add:  []current.CapabilityType{"foo"},
+					Drop: []current.CapabilityType{"bar"},
+				},
+				SecurityContext: &current.SecurityContext{
+					Capabilities: &current.Capabilities{
+						Add:  []current.CapabilityType{"foo"},
+						Drop: []current.CapabilityType{"bar"},
+					},
+				},
+			},
+		},
+		"upward defaulting caps": {
+			c: current.Container{
+				Privileged: false,
+				SecurityContext: &current.SecurityContext{
+					Privileged: &priv,
+					Capabilities: &current.Capabilities{
+						Add:  []current.CapabilityType{"biz"},
+						Drop: []current.CapabilityType{"baz"},
+					},
+				},
+			},
+		},
+		"upward defaulting priv": {
+			c: current.Container{
+				Capabilities: current.Capabilities{
+					Add:  []current.CapabilityType{"foo"},
+					Drop: []current.CapabilityType{"bar"},
+				},
+				SecurityContext: &current.SecurityContext{
+					Privileged: &privTrue,
+					Capabilities: &current.Capabilities{
+						Add:  []current.CapabilityType{"foo"},
+						Drop: []current.CapabilityType{"bar"},
+					},
+				},
+			},
+		},
+	}
+
+	pod := &current.Pod{
+		DesiredState: current.PodState{
+			Manifest: current.ContainerManifest{},
+		},
+	}
+
+	for k, v := range testCases {
+		pod.DesiredState.Manifest.Containers = []current.Container{v.c}
+		obj := roundTrip(t, runtime.Object(pod))
+		defaultedPod := obj.(*current.Pod)
+		c := defaultedPod.DesiredState.Manifest.Containers[0]
+		if isEqual, issues := areSecurityContextAndContainerEqual(&c); !isEqual {
+			t.Errorf("test case %s expected the security context to have the same values as the container but found %#v", k, issues)
+		}
+	}
+}
+
+func areSecurityContextAndContainerEqual(c *current.Container) (bool, []string) {
+	issues := make([]string, 0)
+	equal := true
+
+	if c.SecurityContext == nil || c.SecurityContext.Privileged == nil || c.SecurityContext.Capabilities == nil {
+		equal = false
+		issues = append(issues, "Expected non nil settings for SecurityContext")
+		return equal, issues
+	}
+	if *c.SecurityContext.Privileged != c.Privileged {
+		equal = false
+		issues = append(issues, "The defaulted SecurityContext.Privileged value did not match the container value")
+	}
+	if !reflect.DeepEqual(c.Capabilities.Add, c.Capabilities.Add) {
+		equal = false
+		issues = append(issues, "The defaulted SecurityContext.Capabilities.Add did not match the container settings")
+	}
+	if !reflect.DeepEqual(c.Capabilities.Drop, c.Capabilities.Drop) {
+		equal = false
+		issues = append(issues, "The defaulted SecurityContext.Capabilities.Drop did not match the container settings")
+	}
+	return equal, issues
 }

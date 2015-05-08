@@ -1,36 +1,35 @@
-id: cassandra
+apiVersion: v1beta3
 kind: Pod
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    version: v1beta1
-    id: cassandra
-    containers:
-      - name: cassandra
-        image: kubernetes/cassandra:v2
-        command:
-          - /run.sh
-        cpu: 1000
-        ports:
-          - name: cql
-            containerPort: 9042
-          - name: thrift
-            containerPort: 9160
-        volumeMounts:
-          - name: data
-            mountPath: /cassandra_data
-        env:
-          - key: MAX_HEAP_SIZE
-            value: 512M
-          - key: HEAP_NEWSIZE
-            value: 100M
-          - key: KUBERNETES_API_PROTOCOL
-            value: http
-    volumes:
-      - name: data
-        source:
-          emptyDir: {}
-labels:
+metadata:
+  labels:
+    name: cassandra
   name: cassandra
+spec:
+  containers:
+  - args:
+    - /run.sh
+    resources:
+      limits:
+        cpu: "1"      
+    image: kubernetes/cassandra:v2
+    name: cassandra
+    ports:
+    - name: cql
+      containerPort: 9042
+    - name: thrift
+      containerPort: 9160
+    volumeMounts:
+    - name: data
+      mountPath: /cassandra_data
+    env:
+    - name: MAX_HEAP_SIZE
+      value: 512M
+    - name: HEAP_NEWSIZE
+      value: 100M
+    - name: KUBERNETES_API_PROTOCOL
+      value: http
+  volumes:
+    - name: data
+      emptyDir: {}
 
     

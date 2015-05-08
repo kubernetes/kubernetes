@@ -9,7 +9,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta1.Binding",
       "method": "POST",
       "summary": "create a Binding",
       "nickname": "createBinding",
@@ -29,6 +29,123 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Binding"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/componentStatuses",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.ComponentStatusList",
+      "method": "GET",
+      "summary": "list objects of kind ComponentStatus",
+      "nickname": "listComponentStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ComponentStatusList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/componentStatuses/{name}",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.ComponentStatus",
+      "method": "GET",
+      "summary": "read the specified ComponentStatus",
+      "nickname": "readComponentStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ComponentStatus",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ComponentStatus"
        }
       ],
       "produces": [
@@ -91,6 +208,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.EndpointsList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -99,7 +223,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Endpoints",
       "method": "POST",
       "summary": "create a Endpoints",
       "nickname": "createEndpoints",
@@ -119,6 +243,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Endpoints"
        }
       ],
       "produces": [
@@ -181,6 +312,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -217,6 +355,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Endpoints"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -225,7 +370,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Endpoints",
       "method": "PUT",
       "summary": "replace the specified Endpoints",
       "nickname": "replaceEndpoints",
@@ -255,6 +400,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Endpoints"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -263,7 +415,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Endpoints",
       "method": "PATCH",
       "summary": "partially update the specified Endpoints",
       "nickname": "patchEndpoints",
@@ -285,12 +437,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Endpoints",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -303,7 +462,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a Endpoints",
       "nickname": "deleteEndpoints",
@@ -325,12 +484,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta1.DeleteOptions",
+        "type": "v1beta1.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -401,6 +567,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -461,6 +634,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.EventList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -469,7 +649,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Event",
       "method": "POST",
       "summary": "create a Event",
       "nickname": "createEvent",
@@ -489,6 +669,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Event"
        }
       ],
       "produces": [
@@ -551,6 +738,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -587,6 +781,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Event"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -595,7 +796,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Event",
       "method": "PUT",
       "summary": "replace the specified Event",
       "nickname": "replaceEvent",
@@ -625,6 +826,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Event"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -633,7 +841,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Event",
       "method": "PATCH",
       "summary": "partially update the specified Event",
       "nickname": "patchEvent",
@@ -655,12 +863,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Event",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -673,7 +888,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a Event",
       "nickname": "deleteEvent",
@@ -693,6 +908,13 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": false,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -763,6 +985,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -823,6 +1052,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.LimitRangeList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -831,7 +1067,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.LimitRange",
       "method": "POST",
       "summary": "create a LimitRange",
       "nickname": "createLimitRange",
@@ -851,6 +1087,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.LimitRange"
        }
       ],
       "produces": [
@@ -913,6 +1156,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -949,6 +1199,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.LimitRange"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -957,7 +1214,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.LimitRange",
       "method": "PUT",
       "summary": "replace the specified LimitRange",
       "nickname": "replaceLimitRange",
@@ -987,6 +1244,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.LimitRange"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -995,7 +1259,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.LimitRange",
       "method": "PATCH",
       "summary": "partially update the specified LimitRange",
       "nickname": "patchLimitRange",
@@ -1017,12 +1281,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.LimitRange",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -1035,7 +1306,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a LimitRange",
       "nickname": "deleteLimitRange",
@@ -1055,6 +1326,13 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": false,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -1125,6 +1403,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1177,6 +1462,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.MinionList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1185,7 +1477,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Minion",
       "method": "POST",
       "summary": "create a Node",
       "nickname": "createNode",
@@ -1197,6 +1489,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Minion"
        }
       ],
       "produces": [
@@ -1251,6 +1550,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1279,6 +1585,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Minion"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1287,7 +1600,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Minion",
       "method": "PUT",
       "summary": "replace the specified Node",
       "nickname": "replaceNode",
@@ -1309,6 +1622,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Minion"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1317,7 +1637,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Minion",
       "method": "PATCH",
       "summary": "partially update the specified Node",
       "nickname": "patchNode",
@@ -1331,12 +1651,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Minion",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -1349,7 +1676,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a Node",
       "nickname": "deleteNode",
@@ -1363,12 +1690,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta1.DeleteOptions",
+        "type": "v1beta1.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -1431,6 +1765,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1445,7 +1786,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "redirect GET request to Node",
       "nickname": "redirectNode",
@@ -1473,7 +1814,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Node",
       "nickname": "proxyGETNode",
@@ -1503,7 +1844,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Node",
       "nickname": "proxyPUTNode",
@@ -1533,7 +1874,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNode",
@@ -1563,7 +1904,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENode",
@@ -1599,7 +1940,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Node",
       "nickname": "proxyGETNode",
@@ -1621,7 +1962,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Node",
       "nickname": "proxyPUTNode",
@@ -1643,7 +1984,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNode",
@@ -1665,7 +2006,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENode",
@@ -1681,6 +2022,49 @@
       ],
       "produces": [
        "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/minions/{name}/status",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.Minion",
+      "method": "PUT",
+      "summary": "replace the specified Node",
+      "nickname": "replaceNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.Minion",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Minion"
+       }
+      ],
+      "produces": [
+       "application/json"
       ],
       "consumes": [
        "*/*"
@@ -1731,6 +2115,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.NamespaceList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1739,7 +2130,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Namespace",
       "method": "POST",
       "summary": "create a Namespace",
       "nickname": "createNamespace",
@@ -1751,6 +2142,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Namespace"
        }
       ],
       "produces": [
@@ -1805,6 +2203,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1833,6 +2238,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Namespace"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1841,7 +2253,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Namespace",
       "method": "PUT",
       "summary": "replace the specified Namespace",
       "nickname": "replaceNamespace",
@@ -1863,6 +2275,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Namespace"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1871,7 +2290,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Namespace",
       "method": "PATCH",
       "summary": "partially update the specified Namespace",
       "nickname": "patchNamespace",
@@ -1885,12 +2304,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Namespace",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -1903,7 +2329,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a Namespace",
       "nickname": "deleteNamespace",
@@ -1917,12 +2343,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta1.DeleteOptions",
+        "type": "v1beta1.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -1985,6 +2418,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1999,7 +2439,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta1.Namespace",
       "method": "PUT",
       "summary": "replace the specified Namespace",
       "nickname": "replaceNamespace",
@@ -2021,6 +2461,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Namespace"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2035,7 +2482,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta1.Namespace",
       "method": "PUT",
       "summary": "replace the specified Namespace",
       "nickname": "replaceNamespace",
@@ -2055,6 +2502,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Namespace"
        }
       ],
       "produces": [
@@ -2109,6 +2563,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.MinionList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2117,7 +2578,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Minion",
       "method": "POST",
       "summary": "create a Node",
       "nickname": "createNode",
@@ -2129,6 +2590,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Minion"
        }
       ],
       "produces": [
@@ -2183,6 +2651,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2211,6 +2686,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Minion"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2219,7 +2701,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Minion",
       "method": "PUT",
       "summary": "replace the specified Node",
       "nickname": "replaceNode",
@@ -2241,6 +2723,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Minion"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2249,7 +2738,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Minion",
       "method": "PATCH",
       "summary": "partially update the specified Node",
       "nickname": "patchNode",
@@ -2263,12 +2752,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Minion",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -2281,7 +2777,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a Node",
       "nickname": "deleteNode",
@@ -2295,12 +2791,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta1.DeleteOptions",
+        "type": "v1beta1.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -2363,6 +2866,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2377,7 +2887,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "redirect GET request to Node",
       "nickname": "redirectNode",
@@ -2405,7 +2915,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Node",
       "nickname": "proxyGETNode",
@@ -2435,7 +2945,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Node",
       "nickname": "proxyPUTNode",
@@ -2465,7 +2975,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNode",
@@ -2495,7 +3005,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENode",
@@ -2531,7 +3041,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Node",
       "nickname": "proxyGETNode",
@@ -2553,7 +3063,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Node",
       "nickname": "proxyPUTNode",
@@ -2575,7 +3085,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNode",
@@ -2597,7 +3107,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENode",
@@ -2613,6 +3123,49 @@
       ],
       "produces": [
        "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/nodes/{name}/status",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.Minion",
+      "method": "PUT",
+      "summary": "replace the specified Node",
+      "nickname": "replaceNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.Minion",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Minion"
+       }
+      ],
+      "produces": [
+       "application/json"
       ],
       "consumes": [
        "*/*"
@@ -2671,6 +3224,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PersistentVolumeClaimList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2679,7 +3239,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.PersistentVolumeClaim",
       "method": "POST",
       "summary": "create a PersistentVolumeClaim",
       "nickname": "createPersistentVolumeClaim",
@@ -2699,6 +3259,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PersistentVolumeClaim"
        }
       ],
       "produces": [
@@ -2761,6 +3328,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2797,6 +3371,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PersistentVolumeClaim"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2805,7 +3386,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.PersistentVolumeClaim",
       "method": "PUT",
       "summary": "replace the specified PersistentVolumeClaim",
       "nickname": "replacePersistentVolumeClaim",
@@ -2835,6 +3416,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PersistentVolumeClaim"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2843,7 +3431,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.PersistentVolumeClaim",
       "method": "PATCH",
       "summary": "partially update the specified PersistentVolumeClaim",
       "nickname": "patchPersistentVolumeClaim",
@@ -2865,12 +3453,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.PersistentVolumeClaim",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -2883,7 +3478,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a PersistentVolumeClaim",
       "nickname": "deletePersistentVolumeClaim",
@@ -2905,12 +3500,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta1.DeleteOptions",
+        "type": "v1beta1.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -2981,6 +3583,64 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/persistentVolumeClaims/{name}/status",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.PersistentVolumeClaim",
+      "method": "PUT",
+      "summary": "replace the specified PersistentVolumeClaim",
+      "nickname": "replacePersistentVolumeClaim",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeClaim",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.PersistentVolumeClaim",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PersistentVolumeClaim"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3033,6 +3693,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PersistentVolumeList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3041,7 +3708,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.PersistentVolume",
       "method": "POST",
       "summary": "create a PersistentVolume",
       "nickname": "createPersistentVolume",
@@ -3053,6 +3720,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PersistentVolume"
        }
       ],
       "produces": [
@@ -3107,6 +3781,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3135,6 +3816,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PersistentVolume"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3143,7 +3831,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.PersistentVolume",
       "method": "PUT",
       "summary": "replace the specified PersistentVolume",
       "nickname": "replacePersistentVolume",
@@ -3165,6 +3853,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PersistentVolume"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3173,7 +3868,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.PersistentVolume",
       "method": "PATCH",
       "summary": "partially update the specified PersistentVolume",
       "nickname": "patchPersistentVolume",
@@ -3187,12 +3882,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.PersistentVolume",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -3205,7 +3907,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a PersistentVolume",
       "nickname": "deletePersistentVolume",
@@ -3219,12 +3921,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta1.DeleteOptions",
+        "type": "v1beta1.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -3287,6 +3996,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3301,7 +4017,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta1.PersistentVolume",
       "method": "PUT",
       "summary": "replace the specified PersistentVolume",
       "nickname": "replacePersistentVolume",
@@ -3321,6 +4037,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PersistentVolume"
        }
       ],
       "produces": [
@@ -3383,6 +4106,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PodList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3391,7 +4121,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Pod",
       "method": "POST",
       "summary": "create a Pod",
       "nickname": "createPod",
@@ -3411,6 +4141,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Pod"
        }
       ],
       "produces": [
@@ -3473,6 +4210,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3509,6 +4253,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Pod"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3517,7 +4268,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Pod",
       "method": "PUT",
       "summary": "replace the specified Pod",
       "nickname": "replacePod",
@@ -3547,6 +4298,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Pod"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3555,7 +4313,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Pod",
       "method": "PATCH",
       "summary": "partially update the specified Pod",
       "nickname": "patchPod",
@@ -3577,12 +4335,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Pod",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -3595,7 +4360,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a Pod",
       "nickname": "deletePod",
@@ -3617,12 +4382,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta1.DeleteOptions",
+        "type": "v1beta1.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -3693,6 +4465,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3707,7 +4486,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "redirect GET request to Pod",
       "nickname": "redirectPod",
@@ -3743,7 +4522,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Pod",
       "nickname": "proxyGETPod",
@@ -3781,7 +4560,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Pod",
       "nickname": "proxyPUTPod",
@@ -3819,7 +4598,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Pod",
       "nickname": "proxyPOSTPod",
@@ -3857,7 +4636,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Pod",
       "nickname": "proxyDELETEPod",
@@ -3901,7 +4680,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Pod",
       "nickname": "proxyGETPod",
@@ -3931,7 +4710,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Pod",
       "nickname": "proxyPUTPod",
@@ -3961,7 +4740,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Pod",
       "nickname": "proxyPOSTPod",
@@ -3991,7 +4770,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Pod",
       "nickname": "proxyDELETEPod",
@@ -4027,11 +4806,19 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta1.Binding",
       "method": "POST",
       "summary": "create a Binding",
       "nickname": "createBinding",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Binding",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -4049,40 +4836,11 @@
         "allowMultiple": false
        }
       ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta1/pods/{name}/log",
-    "description": "API at /api/v1beta1 version v1beta1",
-    "operations": [
-     {
-      "type": "v1beta1.PodLogOptions",
-      "method": "GET",
-      "summary": "read the specified PodLogOptions",
-      "nickname": "readPodLogOptions",
-      "parameters": [
+      "responseMessages": [
        {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the PodLogOptions",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": false,
-        "allowMultiple": false
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Binding"
        }
       ],
       "produces": [
@@ -4095,11 +4853,260 @@
     ]
    },
    {
+    "path": "/api/v1beta1/pods/{name}/exec",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to Pod",
+      "nickname": "connectGETPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/pods/{name}/log",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.Pod",
+      "method": "GET",
+      "summary": "read the specified Pod",
+      "nickname": "readPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Pod"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/pods/{name}/portforward",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to Pod",
+      "nickname": "connectGETPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/pods/{name}/proxy",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to Pod",
+      "nickname": "connectGETPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "POST",
+      "summary": "connect POST requests to Pod",
+      "nickname": "connectPOSTPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PUT",
+      "summary": "connect PUT requests to Pod",
+      "nickname": "connectPUTPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "DELETE",
+      "summary": "connect DELETE requests to Pod",
+      "nickname": "connectDELETEPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "connect HEAD requests to Pod",
+      "nickname": "connectHEADPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "connect OPTIONS requests to Pod",
+      "nickname": "connectOPTIONSPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/pods/{name}/proxy/{path:*}",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to Pod",
+      "nickname": "connectGETPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "POST",
+      "summary": "connect POST requests to Pod",
+      "nickname": "connectPOSTPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PUT",
+      "summary": "connect PUT requests to Pod",
+      "nickname": "connectPUTPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "DELETE",
+      "summary": "connect DELETE requests to Pod",
+      "nickname": "connectDELETEPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "connect HEAD requests to Pod",
+      "nickname": "connectHEADPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "connect OPTIONS requests to Pod",
+      "nickname": "connectOPTIONSPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1beta1/pods/{name}/status",
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta1.Pod",
       "method": "PUT",
       "summary": "replace the specified Pod",
       "nickname": "replacePod",
@@ -4127,6 +5134,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Pod"
        }
       ],
       "produces": [
@@ -4189,6 +5203,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ReplicationControllerList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4197,7 +5218,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.ReplicationController",
       "method": "POST",
       "summary": "create a ReplicationController",
       "nickname": "createReplicationController",
@@ -4217,6 +5238,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ReplicationController"
        }
       ],
       "produces": [
@@ -4279,6 +5307,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4315,6 +5350,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ReplicationController"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4323,7 +5365,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.ReplicationController",
       "method": "PUT",
       "summary": "replace the specified ReplicationController",
       "nickname": "replaceReplicationController",
@@ -4353,6 +5395,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ReplicationController"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4361,7 +5410,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.ReplicationController",
       "method": "PATCH",
       "summary": "partially update the specified ReplicationController",
       "nickname": "patchReplicationController",
@@ -4383,12 +5432,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.ReplicationController",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -4401,7 +5457,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a ReplicationController",
       "nickname": "deleteReplicationController",
@@ -4423,12 +5479,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta1.DeleteOptions",
+        "type": "v1beta1.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -4499,6 +5562,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4559,6 +5629,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ResourceQuotaList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4567,7 +5644,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.ResourceQuota",
       "method": "POST",
       "summary": "create a ResourceQuota",
       "nickname": "createResourceQuota",
@@ -4587,6 +5664,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ResourceQuota"
        }
       ],
       "produces": [
@@ -4649,6 +5733,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4685,6 +5776,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ResourceQuota"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4693,7 +5791,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.ResourceQuota",
       "method": "PUT",
       "summary": "replace the specified ResourceQuota",
       "nickname": "replaceResourceQuota",
@@ -4723,6 +5821,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ResourceQuota"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4731,7 +5836,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.ResourceQuota",
       "method": "PATCH",
       "summary": "partially update the specified ResourceQuota",
       "nickname": "patchResourceQuota",
@@ -4753,12 +5858,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.ResourceQuota",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -4771,7 +5883,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a ResourceQuota",
       "nickname": "deleteResourceQuota",
@@ -4793,12 +5905,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta1.DeleteOptions",
+        "type": "v1beta1.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -4869,6 +5988,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4883,7 +6009,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta1.ResourceQuota",
       "method": "PUT",
       "summary": "replace the specified ResourceQuota",
       "nickname": "replaceResourceQuota",
@@ -4911,6 +6037,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ResourceQuota"
        }
       ],
       "produces": [
@@ -4973,6 +6106,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.SecretList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4981,7 +6121,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Secret",
       "method": "POST",
       "summary": "create a Secret",
       "nickname": "createSecret",
@@ -5001,6 +6141,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Secret"
        }
       ],
       "produces": [
@@ -5063,6 +6210,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5099,6 +6253,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Secret"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5107,7 +6268,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Secret",
       "method": "PUT",
       "summary": "replace the specified Secret",
       "nickname": "replaceSecret",
@@ -5137,6 +6298,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Secret"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5145,7 +6313,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Secret",
       "method": "PATCH",
       "summary": "partially update the specified Secret",
       "nickname": "patchSecret",
@@ -5167,12 +6335,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Secret",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -5185,7 +6360,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a Secret",
       "nickname": "deleteSecret",
@@ -5205,6 +6380,21 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": false,
         "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -5275,6 +6465,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5335,6 +6532,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ServiceList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5343,7 +6547,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Service",
       "method": "POST",
       "summary": "create a Service",
       "nickname": "createService",
@@ -5363,6 +6567,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Service"
        }
       ],
       "produces": [
@@ -5425,6 +6636,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5461,6 +6679,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Service"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5469,7 +6694,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Service",
       "method": "PUT",
       "summary": "replace the specified Service",
       "nickname": "replaceService",
@@ -5499,6 +6724,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Service"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5507,7 +6739,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Service",
       "method": "PATCH",
       "summary": "partially update the specified Service",
       "nickname": "patchService",
@@ -5529,12 +6761,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Service",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -5547,7 +6786,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta1.Status",
       "method": "DELETE",
       "summary": "delete a Service",
       "nickname": "deleteService",
@@ -5567,6 +6806,13 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": false,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Status"
        }
       ],
       "produces": [
@@ -5637,6 +6883,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5651,7 +6904,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "redirect GET request to Service",
       "nickname": "redirectService",
@@ -5687,7 +6940,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Service",
       "nickname": "proxyGETService",
@@ -5725,7 +6978,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Service",
       "nickname": "proxyPUTService",
@@ -5763,7 +7016,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Service",
       "nickname": "proxyPOSTService",
@@ -5801,7 +7054,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Service",
       "nickname": "proxyDELETEService",
@@ -5845,7 +7098,7 @@
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Service",
       "nickname": "proxyGETService",
@@ -5875,7 +7128,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Service",
       "nickname": "proxyPUTService",
@@ -5905,7 +7158,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Service",
       "nickname": "proxyPOSTService",
@@ -5935,7 +7188,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Service",
       "nickname": "proxyDELETEService",
@@ -5968,10 +7221,6 @@
    }
   ],
   "models": {
-   "*v1beta1.DeleteOptions": {
-    "id": "*v1beta1.DeleteOptions",
-    "properties": {}
-   },
    "json.WatchEvent": {
     "id": "json.WatchEvent",
     "properties": {
@@ -5985,9 +7234,30 @@
      }
     }
    },
-   "uint64": {
-    "id": "",
-    "properties": null
+   "v1beta1.AWSElasticBlockStoreVolumeSource": {
+    "id": "v1beta1.AWSElasticBlockStoreVolumeSource",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "fsType": {
+      "type": "string",
+      "description": "file system type to mount, such as ext4, xfs, ntfs"
+     },
+     "partition": {
+      "type": "integer",
+      "format": "int32",
+      "description": "partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "read-only if true, read-write otherwise (false or unspecified)"
+     },
+     "volumeID": {
+      "type": "string",
+      "description": "unique id of the PD resource in AWS"
+     }
+    }
    },
    "v1beta1.AccessModeType": {
     "id": "v1beta1.AccessModeType",
@@ -6041,8 +7311,8 @@
       "description": "name of the pod to bind"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -6077,18 +7347,161 @@
     "id": "v1beta1.CapabilityType",
     "properties": {}
    },
+   "v1beta1.ComponentCondition": {
+    "id": "v1beta1.ComponentCondition",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "error": {
+      "type": "string",
+      "description": "error code from health check attempt (if any)"
+     },
+     "message": {
+      "type": "string",
+      "description": "health check message received from the component"
+     },
+     "status": {
+      "type": "string",
+      "description": "current status of this component condition, one of Full, None, Unknown"
+     },
+     "type": {
+      "type": "string",
+      "description": "type of component condition, currently only Healthy"
+     }
+    }
+   },
+   "v1beta1.ComponentStatus": {
+    "id": "v1beta1.ComponentStatus",
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.ComponentCondition"
+      },
+      "description": "list of component conditions observed"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "id": {
+      "type": "string",
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "name": {
+      "type": "string",
+      "description": "name of the component"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+     },
+     "resourceVersion": {
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
+     }
+    }
+   },
+   "v1beta1.ComponentStatusList": {
+    "id": "v1beta1.ComponentStatusList",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "id": {
+      "type": "string",
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.ComponentStatus"
+      },
+      "description": "list of component status objects"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+     },
+     "resourceVersion": {
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
+     }
+    }
+   },
    "v1beta1.Container": {
     "id": "v1beta1.Container",
     "required": [
      "name",
      "image",
-     "entrypoint:omitempty",
      "imagePullPolicy"
     ],
     "properties": {
      "capabilities": {
       "$ref": "v1beta1.Capabilities",
-      "description": "capabilities for container; cannot be updated"
+      "description": "capabilities for container; cannot be updated; deprecated; See SecurityContext"
      },
      "command": {
       "type": "array",
@@ -6102,7 +7515,7 @@
       "format": "int32",
       "description": "CPU share in thousandths of a core; cannot be updated"
      },
-     "entrypoint:omitempty": {
+     "entrypoint": {
       "type": "array",
       "items": {
        "type": "string"
@@ -6150,7 +7563,7 @@
      },
      "privileged": {
       "type": "boolean",
-      "description": "whether or not the container is granted privileged status; defaults to false; cannot be updated"
+      "description": "whether or not the container is granted privileged status; defaults to false; cannot be updated; deprecated; See SecurityContext"
      },
      "readinessProbe": {
       "$ref": "v1beta1.LivenessProbe",
@@ -6159,6 +7572,10 @@
      "resources": {
       "$ref": "v1beta1.ResourceRequirements",
       "description": "Compute Resources required by this container; cannot be updated"
+     },
+     "securityContext": {
+      "$ref": "v1beta1.SecurityContext",
+      "description": "security options the pod should run with"
      },
      "terminationMessagePath": {
       "type": "string",
@@ -6209,6 +7626,11 @@
       "$ref": "v1beta1.RestartPolicy",
       "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"
      },
+     "terminationGracePeriodSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "optional duration in seconds the pod needs to terminate gracefully; may be decreased in delete request; value must be non-negative integer; the value zero indicates delete immediately; if this value is not set, the default grace period will be used instead; the grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal; set this value longer than the expected cleanup time for your process"
+     },
      "uuid": {
       "type": "string",
       "description": "manifest UUID, populated by the system, read-only"
@@ -6256,6 +7678,63 @@
      }
     }
    },
+   "v1beta1.DeleteOptions": {
+    "id": "v1beta1.DeleteOptions",
+    "required": [
+     "gracePeriodSeconds"
+    ],
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "gracePeriodSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "the duration in seconds to wait before deleting this object; defaults to a per object value if not specified; zero means delete immediately"
+     },
+     "id": {
+      "type": "string",
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+     },
+     "resourceVersion": {
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
+     }
+    }
+   },
    "v1beta1.EmptyDirVolumeSource": {
     "id": "v1beta1.EmptyDirVolumeSource",
     "required": [
@@ -6287,40 +7766,17 @@
    "v1beta1.EndpointObjectReference": {
     "id": "v1beta1.EndpointObjectReference",
     "required": [
-     "endpoint"
+     "endpoint",
+     "targetRef"
     ],
     "properties": {
-     "apiVersion": {
-      "type": "string",
-      "description": "API version of the referent"
-     },
      "endpoint": {
       "type": "string",
       "description": "endpoint exposed by the referenced object"
      },
-     "fieldPath": {
-      "type": "string",
-      "description": "if referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]"
-     },
-     "kind": {
-      "type": "string",
-      "description": "kind of the referent"
-     },
-     "name": {
-      "type": "string",
-      "description": "id of the referent"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the referent"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "uid": {
-      "type": "string",
-      "description": "uid of the referent"
+     "targetRef": {
+      "$ref": "v1beta1.ObjectReference",
+      "description": "reference to the object providing the entry point"
      }
     }
    },
@@ -6415,8 +7871,8 @@
       "description": "IP protocol for the first set of endpoint ports; must be UDP or TCP; TCP if unspecified"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -6488,8 +7944,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -6518,6 +7974,22 @@
      "value": {
       "type": "string",
       "description": "value of the environment variable; defaults to empty string"
+     },
+     "valueFrom": {
+      "$ref": "v1beta1.EnvVarSource",
+      "description": "source for the environment variable's value; cannot be used if value is not empty"
+     }
+    }
+   },
+   "v1beta1.EnvVarSource": {
+    "id": "v1beta1.EnvVarSource",
+    "required": [
+     "fieldRef"
+    ],
+    "properties": {
+     "fieldRef": {
+      "$ref": "v1beta1.ObjectFieldSelector",
+      "description": "selects a field of the pod; only name and namespace are supported"
      }
     }
    },
@@ -6586,8 +8058,8 @@
       "description": "short, machine understandable string that gives the reason for the transition into the object's current status"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -6657,8 +8129,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -6725,6 +8197,27 @@
      "revision": {
       "type": "string",
       "description": "commit hash for the specified revision"
+     }
+    }
+   },
+   "v1beta1.GlusterfsVolumeSource": {
+    "id": "v1beta1.GlusterfsVolumeSource",
+    "required": [
+     "endpoints",
+     "path"
+    ],
+    "properties": {
+     "endpoints": {
+      "type": "string",
+      "description": "gluster hosts endpoints name"
+     },
+     "path": {
+      "type": "string",
+      "description": "path to gluster volume"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Glusterfs volume to be mounted with read-only permissions"
      }
     }
    },
@@ -6849,8 +8342,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -6933,8 +8426,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -7040,8 +8533,8 @@
       "description": "IP range assigned to the node"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "resources": {
       "$ref": "v1beta1.NodeResources",
@@ -7118,8 +8611,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -7192,8 +8685,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -7259,8 +8752,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -7319,7 +8812,7 @@
     "properties": {
      "kind": {
       "type": "string",
-      "description": "kind of the condition, one of Reachable, Ready, Schedulable"
+      "description": "kind of the condition, current kinds: Reachable, Ready, Schedulable"
      },
      "lastProbeTime": {
       "type": "string",
@@ -7389,13 +8882,9 @@
      "osImage",
      "containerRuntimeVersion",
      "kubeletVersion",
-     "KubeProxyVersion"
+     "kubeProxyVersion"
     ],
     "properties": {
-     "KubeProxyVersion": {
-      "type": "string",
-      "description": "Kube-proxy version reported by the node"
-     },
      "bootID": {
       "type": "string",
       "description": "boot id is the boot-id reported by the node"
@@ -7407,6 +8896,10 @@
      "kernelVersion": {
       "type": "string",
       "description": "Kernel version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64)"
+     },
+     "kubeProxyVersion": {
+      "type": "string",
+      "description": "Kube-proxy version reported by the node"
      },
      "kubeletVersion": {
       "type": "string",
@@ -7423,6 +8916,22 @@
      "systemUUID": {
       "type": "string",
       "description": "system uuid is the system-uuid reported by the node"
+     }
+    }
+   },
+   "v1beta1.ObjectFieldSelector": {
+    "id": "v1beta1.ObjectFieldSelector",
+    "required": [
+     "fieldPath"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema that fieldPath is written in terms of; defaults to v1beta1"
+     },
+     "fieldPath": {
+      "type": "string",
+      "description": "path of the field to select in the specified API version"
      }
     }
    },
@@ -7451,7 +8960,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "specific resourceVersion to which this reference is made, if any: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
       "type": "string",
@@ -7495,8 +9004,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -7552,8 +9061,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -7614,8 +9123,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -7667,6 +9176,19 @@
      }
     }
    },
+   "v1beta1.PersistentVolumeClaimVolumeSource": {
+    "id": "v1beta1.PersistentVolumeClaimVolumeSource",
+    "properties": {
+     "claimName": {
+      "type": "string",
+      "description": "the name of the claim in the same namespace to be mounted as a volume"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "mount volume as read-only when true; default false"
+     }
+    }
+   },
    "v1beta1.PersistentVolumeList": {
     "id": "v1beta1.PersistentVolumeList",
     "properties": {
@@ -7710,8 +9232,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -7727,7 +9249,9 @@
     "id": "v1beta1.PersistentVolumeSpec",
     "required": [
      "persistentDisk",
-     "hostPath"
+     "awsElasticBlockStore",
+     "hostPath",
+     "glusterfs"
     ],
     "properties": {
      "accessModes": {
@@ -7737,6 +9261,10 @@
       },
       "description": "all ways the volume can be mounted"
      },
+     "awsElasticBlockStore": {
+      "$ref": "v1beta1.AWSElasticBlockStoreVolumeSource",
+      "description": "AWS disk resource provisioned by an admin"
+     },
      "capacity": {
       "type": "any",
       "description": "a description of the persistent volume's resources and capacity"
@@ -7744,6 +9272,10 @@
      "claimRef": {
       "$ref": "v1beta1.ObjectReference",
       "description": "the binding reference to a persistent volume claim"
+     },
+     "glusterfs": {
+      "$ref": "v1beta1.GlusterfsVolumeSource",
+      "description": "Glusterfs volume resource provisioned by an admin"
      },
      "hostPath": {
       "$ref": "v1beta1.HostPathVolumeSource",
@@ -7816,8 +9348,8 @@
       "description": "selector which must match a node's labels for the pod to be scheduled on that node"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -7892,65 +9424,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
-     }
-    }
-   },
-   "v1beta1.PodLogOptions": {
-    "id": "v1beta1.PodLogOptions",
-    "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
-     },
-     "container": {
-      "type": "string",
-      "description": "the container for which to stream logs; defaults to only container if there is one container in the pod"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "follow": {
-      "type": "boolean",
-      "description": "follow the log stream of the pod; defaults to false"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
-     },
-     "id": {
-      "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
-     },
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
-     },
-     "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -8071,8 +9546,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -8130,8 +9605,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -8204,8 +9679,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -8271,8 +9746,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -8315,7 +9790,7 @@
      },
      "requests": {
       "type": "any",
-      "description": "Minimum amount of resources requested"
+      "description": "Minimum amount of resources requested; requests are honored only for persistent volumes as of now"
      }
     }
    },
@@ -8347,6 +9822,27 @@
    "v1beta1.RestartPolicyOnFailure": {
     "id": "v1beta1.RestartPolicyOnFailure",
     "properties": {}
+   },
+   "v1beta1.SELinuxOptions": {
+    "id": "v1beta1.SELinuxOptions",
+    "properties": {
+     "level": {
+      "type": "string",
+      "description": "the level label to apply to the container"
+     },
+     "role": {
+      "type": "string",
+      "description": "the role label to apply to the container"
+     },
+     "type": {
+      "type": "string",
+      "description": "the type label to apply to the container"
+     },
+     "user": {
+      "type": "string",
+      "description": "the user label to apply to the container"
+     }
+    }
    },
    "v1beta1.Secret": {
     "id": "v1beta1.Secret",
@@ -8388,8 +9884,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -8451,8 +9947,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -8473,6 +9969,28 @@
      "target": {
       "$ref": "v1beta1.ObjectReference",
       "description": "target is a reference to a secret"
+     }
+    }
+   },
+   "v1beta1.SecurityContext": {
+    "id": "v1beta1.SecurityContext",
+    "properties": {
+     "capabilities": {
+      "$ref": "v1beta1.Capabilities",
+      "description": "the linux capabilites that should be added or removed"
+     },
+     "privileged": {
+      "type": "boolean",
+      "description": "run the container in privileged mode"
+     },
+     "runAsUser": {
+      "type": "integer",
+      "format": "int64",
+      "description": "the user id that runs the first process in the container"
+     },
+     "seLinuxOptions": {
+      "$ref": "v1beta1.SELinuxOptions",
+      "description": "options that control the SELinux labels applied"
      }
     }
    },
@@ -8565,8 +10083,8 @@
       "description": "externally visible IPs (e.g. load balancers) that should be proxied to this service"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selector": {
       "type": "any",
@@ -8632,8 +10150,8 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -8673,6 +10191,118 @@
      }
     }
    },
+   "v1beta1.Status": {
+    "id": "v1beta1.Status",
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "code": {
+      "type": "integer",
+      "format": "int32",
+      "description": "suggested HTTP return code for this status; 0 if not set"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "details": {
+      "$ref": "v1beta1.StatusDetails",
+      "description": "extended data associated with the reason; each reason may define its own extended details; this field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "id": {
+      "type": "string",
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "message": {
+      "type": "string",
+      "description": "human-readable description of the status of this operation"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+     },
+     "reason": {
+      "type": "string",
+      "description": "machine-readable description of why this operation is in the 'Failure' status; if this value is empty there is no information available; a reason clarifies an HTTP status code but does not override it"
+     },
+     "resourceVersion": {
+      "type": "integer",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "status": {
+      "type": "string",
+      "description": "status of the operation; either Success, or Failure"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
+     }
+    }
+   },
+   "v1beta1.StatusCause": {
+    "id": "v1beta1.StatusCause",
+    "properties": {
+     "field": {
+      "type": "string",
+      "description": "field of the resource that has caused this error, as named by its JSON serialization; may include dot and postfix notation for nested attributes; arrays are zero-indexed; fields may appear more than once in an array of causes due to fields having multiple errors"
+     },
+     "message": {
+      "type": "string",
+      "description": "human-readable description of the cause of the error; this field may be presented as-is to a reader"
+     },
+     "reason": {
+      "type": "string",
+      "description": "machine-readable description of the cause of the error; if this value is empty there is no information available"
+     }
+    }
+   },
+   "v1beta1.StatusDetails": {
+    "id": "v1beta1.StatusDetails",
+    "properties": {
+     "causes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.StatusCause"
+      },
+      "description": "the Causes array includes more details associated with the StatusReason failure; not all StatusReasons may provide detailed causes"
+     },
+     "id": {
+      "type": "string",
+      "description": "the ID attribute of the resource associated with the status StatusReason (when there is a single ID which can be described)"
+     },
+     "kind": {
+      "type": "string",
+      "description": "the kind attribute of the resource associated with the status StatusReason; on some operations may differ from the requested resource Kind"
+     },
+     "retryAfterSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "the number of seconds before the client should attempt to retry this operation"
+     }
+    }
+   },
    "v1beta1.TCPSocketAction": {
     "id": "v1beta1.TCPSocketAction",
     "properties": {
@@ -8694,7 +10324,7 @@
      },
      "source": {
       "$ref": "v1beta1.VolumeSource",
-      "description": "location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, or GitRepo; default is EmptyDir"
+      "description": "location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, AWSElasticBlockStore, or GitRepo; default is EmptyDir"
      }
     }
    },
@@ -8733,12 +10363,18 @@
      "hostDir",
      "emptyDir",
      "persistentDisk",
+     "awsElasticBlockStore",
      "gitRepo",
      "secret",
      "nfs",
-     "iscsi"
+     "iscsi",
+     "glusterfs"
     ],
     "properties": {
+     "awsElasticBlockStore": {
+      "$ref": "v1beta1.AWSElasticBlockStoreVolumeSource",
+      "description": "AWS disk resource attached to the host machine on demand"
+     },
      "emptyDir": {
       "$ref": "v1beta1.EmptyDirVolumeSource",
       "description": "temporary directory that shares a pod's lifetime"
@@ -8746,6 +10382,10 @@
      "gitRepo": {
       "$ref": "v1beta1.GitRepoVolumeSource",
       "description": "git repository at a particular revision"
+     },
+     "glusterfs": {
+      "$ref": "v1beta1.GlusterfsVolumeSource",
+      "description": "Glusterfs volume that will be mounted on the host machine "
      },
      "hostDir": {
       "$ref": "v1beta1.HostPathVolumeSource",
@@ -8762,6 +10402,10 @@
      "persistentDisk": {
       "$ref": "v1beta1.GCEPersistentDiskVolumeSource",
       "description": "GCE disk resource attached to the host machine on demand"
+     },
+     "persistentVolumeClaim": {
+      "$ref": "v1beta1.PersistentVolumeClaimVolumeSource",
+      "description": "a reference to a PersistentVolumeClaim in the same namespace"
      },
      "secret": {
       "$ref": "v1beta1.SecretVolumeSource",

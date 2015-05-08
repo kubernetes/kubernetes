@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ func newConnection(conn *spdystream.Connection, newStreamHandler httpstream.NewS
 
 // createStreamResponseTimeout indicates how long to wait for the other side to
 // acknowledge the new stream before timing out.
-const createStreamResponseTimeout = 2 * time.Second
+const createStreamResponseTimeout = 30 * time.Second
 
 // Close first sends a reset for all of the connection's streams, and then
 // closes the underlying spdystream.Connection.

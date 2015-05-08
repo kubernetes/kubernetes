@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,19 +17,13 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
-
-// TODO: move this into pkg/capabilities
-func SetupCapabilities(allowPrivileged bool, hostNetworkSources []string) {
-	capabilities.Initialize(capabilities.Capabilities{
-		AllowPrivileged:    allowPrivileged,
-		HostNetworkSources: hostNetworkSources,
-	})
-}
 
 func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
 	c := api.ResourceList{
@@ -41,4 +35,33 @@ func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
 			resource.BinarySI),
 	}
 	return c
+}
+
+// Check whether we have the capabilities to run the specified pod.
+func canRunPod(pod *api.Pod) error {
+	if pod.Spec.HostNetwork {
+		allowed, err := allowHostNetwork(pod)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID)
+		}
+	}
+	// TODO(vmarmol): Check Privileged too.
+	return nil
+}
+
+// Determined whether the specified pod is allowed to use host networking
+func allowHostNetwork(pod *api.Pod) (bool, error) {
+	podSource, err := getPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().HostNetworkSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
 }

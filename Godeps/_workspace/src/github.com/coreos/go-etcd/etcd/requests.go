@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -189,13 +188,19 @@ func (c *Client) SendRequest(rr *RawRequest) (*RawResponse, error) {
 
 		logger.Debug("Connecting to etcd: attempt ", attempt+1, " for ", rr.RelativePath)
 
-		httpPath = c.getHttpPath(rr.RelativePath)
+		// get httpPath if not set
+		if httpPath == "" {
+			httpPath = c.getHttpPath(rr.RelativePath)
+		}
 
 		// Return a cURL command if curlChan is set
 		if c.cURLch != nil {
 			command := fmt.Sprintf("curl -X %s %s", rr.Method, httpPath)
 			for key, value := range rr.Values {
 				command += fmt.Sprintf(" -d %s=%s", key, value[0])
+			}
+			if c.credentials != nil {
+				command += fmt.Sprintf(" -u %s", c.credentials.username)
 			}
 			c.sendCURL(command)
 		}
@@ -226,7 +231,13 @@ func (c *Client) SendRequest(rr *RawRequest) (*RawResponse, error) {
 			return nil, err
 		}
 
+		if c.credentials != nil {
+			req.SetBasicAuth(c.credentials.username, c.credentials.password)
+		}
+
 		resp, err = c.httpClient.Do(req)
+		// clear previous httpPath
+		httpPath = ""
 		defer func() {
 			if resp != nil {
 				resp.Body.Close()
@@ -281,6 +292,19 @@ func (c *Client) SendRequest(rr *RawRequest) (*RawResponse, error) {
 			}
 		}
 
+		if resp.StatusCode == http.StatusTemporaryRedirect {
+			u, err := resp.Location()
+
+			if err != nil {
+				logger.Warning(err)
+			} else {
+				// set httpPath for following redirection
+				httpPath = u.String()
+			}
+			resp.Body.Close()
+			continue
+		}
+
 		if checkErr := checkRetry(c.cluster, numReqs, *resp,
 			errors.New("Unexpected HTTP status code")); checkErr != nil {
 			return nil, checkErr
@@ -304,9 +328,8 @@ func DefaultCheckRetry(cluster *Cluster, numReqs int, lastResp http.Response,
 	err error) error {
 
 	if isEmptyResponse(lastResp) {
-		if !isConnectionError(err) {
-			return err
-		}
+		// always retry if it failed to get response from one machine
+		return nil
 	} else if !shouldRetry(lastResp) {
 		body := []byte("nil")
 		if lastResp.Body != nil {
@@ -332,11 +355,6 @@ func DefaultCheckRetry(cluster *Cluster, numReqs int, lastResp http.Response,
 }
 
 func isEmptyResponse(r http.Response) bool { return r.StatusCode == 0 }
-
-func isConnectionError(err error) bool {
-	_, ok := err.(*net.OpError)
-	return ok
-}
 
 // shouldRetry returns whether the reponse deserves retry.
 func shouldRetry(r http.Response) bool {

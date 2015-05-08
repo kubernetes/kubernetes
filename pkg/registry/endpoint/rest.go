@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,25 +69,23 @@ func (endpointsStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (endpointsStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateEndpointsUpdate(old.(*api.Endpoints), obj.(*api.Endpoints))
+	errorList := validation.ValidateEndpoints(obj.(*api.Endpoints))
+	return append(errorList, validation.ValidateEndpointsUpdate(old.(*api.Endpoints), obj.(*api.Endpoints))...)
 }
 
 // MatchEndpoints returns a generic matcher for a given label and field selector.
 func MatchEndpoints(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		endpoints, ok := obj.(*api.Endpoints)
-		if !ok {
-			return false, fmt.Errorf("not a endpoints")
-		}
-		fields := EndpointsToSelectableFields(endpoints)
-		return label.Matches(labels.Set(endpoints.Labels)) && field.Matches(fields), nil
-	})
+	return &generic.SelectionPredicate{label, field, EndpointsAttributes}
 }
 
-// EndpointsToSelectableFields returns a label set that represents the object
-// TODO: fields are not labels, and the validation rules for them do not apply.
-func EndpointsToSelectableFields(endpoints *api.Endpoints) labels.Set {
-	return labels.Set{
-		"name": endpoints.Name,
+// EndpointsAttributes returns the attributes of an endpoint such that a
+// generic.SelectionPredicate can match appropriately.
+func EndpointsAttributes(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
+	endpoints, ok := obj.(*api.Endpoints)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid object type %#v", obj)
 	}
+	return endpoints.Labels, fields.Set{
+		"metadata.name": endpoints.Name,
+	}, nil
 }

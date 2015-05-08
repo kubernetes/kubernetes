@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,6 +42,116 @@ func TestStoreToMinionLister(t *testing.T) {
 	}
 	if !ids.HasAll(got...) || len(got) != len(ids) {
 		t.Errorf("Expected %v, got %v", ids, got)
+	}
+}
+
+func TestStoreToControllerLister(t *testing.T) {
+	store := NewStore(MetaNamespaceKeyFunc)
+	lister := StoreToControllerLister{store}
+	testCases := []struct {
+		inRCs      []*api.ReplicationController
+		list       func() ([]api.ReplicationController, error)
+		outRCNames util.StringSet
+		expectErr  bool
+	}{
+		// Basic listing with all labels and no selectors
+		{
+			inRCs: []*api.ReplicationController{
+				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+			},
+			list: func() ([]api.ReplicationController, error) {
+				return lister.List()
+			},
+			outRCNames: util.NewStringSet("basic"),
+		},
+		// No pod lables
+		{
+			inRCs: []*api.ReplicationController{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					Spec: api.ReplicationControllerSpec{
+						Selector: map[string]string{"foo": "baz"},
+					},
+				},
+			},
+			list: func() ([]api.ReplicationController, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
+				}
+				return lister.GetPodControllers(pod)
+			},
+			outRCNames: util.NewStringSet(),
+			expectErr:  true,
+		},
+		// No RC selectors
+		{
+			inRCs: []*api.ReplicationController{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+				},
+			},
+			list: func() ([]api.ReplicationController, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "ns",
+						Labels:    map[string]string{"foo": "bar"},
+					},
+				}
+				return lister.GetPodControllers(pod)
+			},
+			outRCNames: util.NewStringSet(),
+			expectErr:  true,
+		},
+		// Matching labels to selectors and namespace
+		{
+			inRCs: []*api.ReplicationController{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Spec: api.ReplicationControllerSpec{
+						Selector: map[string]string{"foo": "bar"},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
+					Spec: api.ReplicationControllerSpec{
+						Selector: map[string]string{"foo": "bar"},
+					},
+				},
+			},
+			list: func() ([]api.ReplicationController, error) {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name:      "pod1",
+						Labels:    map[string]string{"foo": "bar"},
+						Namespace: "ns",
+					},
+				}
+				return lister.GetPodControllers(pod)
+			},
+			outRCNames: util.NewStringSet("bar"),
+		},
+	}
+	for _, c := range testCases {
+		for _, r := range c.inRCs {
+			store.Add(r)
+		}
+
+		gotControllers, err := c.list()
+		if err != nil && c.expectErr {
+			continue
+		} else if c.expectErr {
+			t.Fatalf("Expected error, got none")
+		} else if err != nil {
+			t.Fatalf("Unexpected error %#v", err)
+		}
+		gotNames := make([]string, len(gotControllers))
+		for ix := range gotControllers {
+			gotNames[ix] = gotControllers[ix].Name
+		}
+		if !c.outRCNames.HasAll(gotNames...) || len(gotNames) != len(c.outRCNames) {
+			t.Errorf("Unexpected got controllers %+v expected %+v", gotNames, c.outRCNames)
+		}
 	}
 }
 
@@ -88,5 +198,36 @@ func TestStoreToPodLister(t *testing.T) {
 	}
 	if exists {
 		t.Errorf("Unexpected pod exists")
+	}
+}
+
+func TestStoreToServiceLister(t *testing.T) {
+	store := NewStore(MetaNamespaceKeyFunc)
+	store.Add(&api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{},
+		},
+	})
+	store.Add(&api.Service{ObjectMeta: api.ObjectMeta{Name: "bar"}})
+	ssl := StoreToServiceLister{store}
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:   "foopod",
+			Labels: map[string]string{"role": "foo"},
+		},
+	}
+
+	services, err := ssl.GetPodServices(pod)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if len(services) != 1 {
+		t.Fatalf("Expected 1 service, got %v", len(services))
+	}
+	if e, a := "foo", services[0].Name; e != a {
+		t.Errorf("Expected service %q, got %q", e, a)
 	}
 }

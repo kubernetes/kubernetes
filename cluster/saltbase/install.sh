@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # This script will set up the salt directory on the target server.  It takes one
-# argument that is a tarball with the pre-compiled kuberntes server binaries.
+# argument that is a tarball with the pre-compiled kubernetes server binaries.
 
 set -o errexit
 set -o nounset

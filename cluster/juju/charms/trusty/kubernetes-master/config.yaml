@@ -1,0 +1,9 @@
+options:
+  version:
+    type: string
+    default: "v0.15.0"
+    description: |
+        The kubernetes release to use in this charm. The binary files are
+        compiled from the source identified by this tag in github. Using the
+        value of "source" will use the master kubernetes branch when compiling
+        the binaries.

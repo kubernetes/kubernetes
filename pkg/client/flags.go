@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@ type FlagSet interface {
 	BoolVar(p *bool, name string, value bool, usage string)
 	UintVar(p *uint, name string, value uint, usage string)
 	DurationVar(p *time.Duration, name string, value time.Duration, usage string)
+	Float32Var(p *float32, name string, value float32, usage string)
+	IntVar(p *int, name string, value int, usage string)
 }
 
 // BindClientConfigFlags registers a standard set of CLI flags for connecting to a Kubernetes API server.
@@ -38,6 +40,8 @@ func BindClientConfigFlags(flags FlagSet, config *Config) {
 	flags.StringVar(&config.CertFile, "client_certificate", config.CertFile, "Path to a client key file for TLS.")
 	flags.StringVar(&config.KeyFile, "client_key", config.KeyFile, "Path to a client key file for TLS.")
 	flags.StringVar(&config.CAFile, "certificate_authority", config.CAFile, "Path to a cert. file for the certificate authority.")
+	flags.Float32Var(&config.QPS, "max_outgoing_qps", config.QPS, "Maximum number of queries per second that could be issued by this client.")
+	flags.IntVar(&config.Burst, "max_outgoing_burst", config.Burst, "Maximum throttled burst")
 }
 
 func BindKubeletClientConfigFlags(flags FlagSet, config *KubeletConfig) {

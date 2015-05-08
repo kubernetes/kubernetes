@@ -34,8 +34,16 @@ will be lost along with the rest of the resource.
     [\-all] to select all the specified resources
 
 .PP
+\fB\-\-cascade\fP=true
+    If true, cascade the delete resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.
+
+.PP
 \fB\-f\fP, \fB\-\-filename\fP=[]
     Filename, directory, or URL to a file containing the resource to delete
+
+.PP
+\fB\-\-grace\-period\fP=\-1
+    Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.
 
 .PP
 \fB\-h\fP, \fB\-\-help\fP=false

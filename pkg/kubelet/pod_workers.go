@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,14 +22,13 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
-type syncPodFnType func(*api.Pod, *api.Pod, container.Pod) error
+type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod) error
 
 type podWorkers struct {
 	// Protects all per worker fields.
@@ -45,8 +44,8 @@ type podWorkers struct {
 	// Tracks the last undelivered work item for this pod - a work item is
 	// undelivered if it comes in while the worker is working.
 	lastUndeliveredWorkUpdate map[types.UID]workUpdate
-	// DockerCache is used for listing running containers.
-	dockerCache dockertools.DockerCache
+	// runtimeCache is used for listing running containers.
+	runtimeCache kubecontainer.RuntimeCache
 
 	// This function is run to sync the desired stated of pod.
 	// NOTE: This function has to be thread-safe - it can be called for
@@ -68,43 +67,43 @@ type workUpdate struct {
 	updateCompleteFn func()
 }
 
-func newPodWorkers(dockerCache dockertools.DockerCache, syncPodFn syncPodFnType,
+func newPodWorkers(runtimeCache kubecontainer.RuntimeCache, syncPodFn syncPodFnType,
 	recorder record.EventRecorder) *podWorkers {
 	return &podWorkers{
 		podUpdates:                map[types.UID]chan workUpdate{},
 		isWorking:                 map[types.UID]bool{},
 		lastUndeliveredWorkUpdate: map[types.UID]workUpdate{},
-		dockerCache:               dockerCache,
+		runtimeCache:              runtimeCache,
 		syncPodFn:                 syncPodFn,
 		recorder:                  recorder,
 	}
 }
 
 func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
-	var minDockerCacheTime time.Time
+	var minRuntimeCacheTime time.Time
 	for newWork := range podUpdates {
 		func() {
 			defer p.checkForUpdates(newWork.pod.UID, newWork.updateCompleteFn)
 			// We would like to have the state of Docker from at least the moment
 			// when we finished the previous processing of that pod.
-			if err := p.dockerCache.ForceUpdateIfOlder(minDockerCacheTime); err != nil {
+			if err := p.runtimeCache.ForceUpdateIfOlder(minRuntimeCacheTime); err != nil {
 				glog.Errorf("Error updating docker cache: %v", err)
 				return
 			}
-			pods, err := p.dockerCache.GetPods()
+			pods, err := p.runtimeCache.GetPods()
 			if err != nil {
 				glog.Errorf("Error getting pods while syncing pod: %v", err)
 				return
 			}
 
 			err = p.syncPodFn(newWork.pod, newWork.mirrorPod,
-				container.Pods(pods).FindPodByID(newWork.pod.UID))
+				kubecontainer.Pods(pods).FindPodByID(newWork.pod.UID))
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
 				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)
 				return
 			}
-			minDockerCacheTime = time.Now()
+			minRuntimeCacheTime = time.Now()
 
 			newWork.updateCompleteFn()
 		}()

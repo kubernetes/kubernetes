@@ -1,21 +1,24 @@
-id: hazelcast
+apiVersion: v1beta3
 kind: ReplicationController
-apiVersion: v1beta1
-desiredState:
-  replicas: 1
-  replicaSelector:
+metadata: 
+  labels: 
     name: hazelcast
-  podTemplate:
-    desiredState:
-      manifest:
-        version: v1beta1
-        id: hazelcast
-        containers:
-          - name: hazelcast
-            image: pires/hazelcast-k8s
-            cpu: 1000
-            ports:
-              - name: hazelcast
-                containerPort: 5701
-    labels:
-      name: hazelcast
+  name: hazelcast
+spec: 
+  replicas: 1
+  selector: 
+    name: hazelcast
+  template: 
+    metadata: 
+      labels: 
+        name: hazelcast
+    spec: 
+      containers: 
+        - resources:
+            limits:
+              cpu: 1
+          image: pires/hazelcast-k8s
+          name: hazelcast
+          ports: 
+            - containerPort: 5701
+              name: hazelcast

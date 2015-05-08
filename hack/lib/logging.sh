@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -116,6 +116,13 @@ kube::log::usage_from_stdin() {
 kube::log::info() {
   for message; do
     echo "$message"
+  done
+}
+
+# Just like kube::log::info, but no \n, so you can make a progress bar
+kube::log::progress() {
+  for message; do
+    echo -e -n "$message"
   done
 }
 

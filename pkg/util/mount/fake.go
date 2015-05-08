@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,13 +38,13 @@ func (f *FakeMounter) ResetLog() {
 	f.Log = []FakeAction{}
 }
 
-func (f *FakeMounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+func (f *FakeMounter) Mount(source string, target string, fstype string, options []string) error {
 	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: target, Type: fstype})
 	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: target, Source: source, FSType: fstype})
 	return nil
 }
 
-func (f *FakeMounter) Unmount(target string, flags int) error {
+func (f *FakeMounter) Unmount(target string) error {
 	newMountpoints := []MountPoint{}
 	for _, mp := range f.MountPoints {
 		if mp.Path != target {

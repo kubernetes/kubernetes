@@ -1,0 +1,73 @@
+.dashboard {
+  .body-wrapper {
+    padding: 25px;
+  }
+  // analagous to float:right when used with row layout
+  [flex-align-self="end"] {
+    -webkit-align-self: flex-end;
+    -ms-flex-align-self: end;
+    align-self: flex-end;
+  }
+
+  .back {
+    font-size: 18px;
+    line-height: 27px;
+    margin-bottom: 30px;
+  }
+
+  .heading {
+    font-size: 18px;
+    line-height: 21px;
+    color: #222222;
+    margin-bottom: 25px;
+
+    .label {
+      color: #777777;
+    }
+  }
+
+  @import "dashboard/pods";
+  @import "dashboard/tables";
+  @import "dashboard/servers";
+  @import "dashboard/groups";
+
+  .detail {
+    color: #222222;
+
+    .back {
+      font-size: 18px;
+      line-height: 27px;
+      margin-bottom: 30px;
+    }
+
+    .heading {
+      font-size: 18px;
+      line-height: 21px;
+      color: #222222;
+      margin-bottom: 25px;
+
+      .label {
+        color: #777777;
+      }
+    }
+
+    td.name {
+      font-size: 14px;
+      color: #222222;
+      line-height: 24px;
+    }
+
+    td.value {
+      margin-left: 50px;
+      font-size: 14px;
+      color: #888888;
+      line-height: 24px;
+    }
+
+    .containerTable {
+      td {
+        padding-right: 20px;
+      }
+    }
+  }
+}

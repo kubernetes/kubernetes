@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,16 +59,13 @@ func (plugin *gcePersistentDiskPlugin) Name() string {
 	return gcePersistentDiskPluginName
 }
 
-func (plugin *gcePersistentDiskPlugin) CanSupport(spec *api.Volume) bool {
+func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return false
 	}
 
-	if spec.GCEPersistentDisk != nil {
-		return true
-	}
-	return false
+	return spec.VolumeSource.GCEPersistentDisk != nil || spec.PersistentVolumeSource.GCEPersistentDisk != nil
 }
 
 func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.AccessModeType {
@@ -78,24 +75,31 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, podRef.UID, &GCEDiskUtil{}, mount.New())
+	return plugin.newBuilderInternal(spec, podRef.UID, &GCEDiskUtil{}, mounter)
 }
 
-func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
 
-	pdName := spec.GCEPersistentDisk.PDName
-	fsType := spec.GCEPersistentDisk.FSType
-	partition := ""
-	if spec.GCEPersistentDisk.Partition != 0 {
-		partition = strconv.Itoa(spec.GCEPersistentDisk.Partition)
+	var gce *api.GCEPersistentDiskVolumeSource
+	if spec.VolumeSource.GCEPersistentDisk != nil {
+		gce = spec.VolumeSource.GCEPersistentDisk
+	} else {
+		gce = spec.PersistentVolumeSource.GCEPersistentDisk
 	}
-	readOnly := spec.GCEPersistentDisk.ReadOnly
+
+	pdName := gce.PDName
+	fsType := gce.FSType
+	partition := ""
+	if gce.Partition != 0 {
+		partition = strconv.Itoa(gce.Partition)
+	}
+	readOnly := gce.ReadOnly
 
 	return &gcePersistentDisk{
 		podUID:      podUID,
@@ -112,9 +116,9 @@ func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podU
 	}, nil
 }
 
-func (plugin *gcePersistentDiskPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *gcePersistentDiskPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &GCEDiskUtil{}, mount.New())
+	return plugin.newCleanerInternal(volName, podUID, &GCEDiskUtil{}, mounter)
 }
 
 func (plugin *gcePersistentDiskPlugin) newCleanerInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Cleaner, error) {
@@ -197,11 +201,6 @@ func (pd *gcePersistentDisk) SetUpAt(dir string) error {
 		return err
 	}
 
-	flags := uintptr(0)
-	if pd.readOnly {
-		flags = mount.FlagReadOnly
-	}
-
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		// TODO: we should really eject the attach/detach out into its own control loop.
 		detachDiskLogError(pd)
@@ -209,7 +208,11 @@ func (pd *gcePersistentDisk) SetUpAt(dir string) error {
 	}
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	err = pd.mounter.Mount(globalPDPath, dir, "", mount.FlagBind|flags, "")
+	options := []string{"bind"}
+	if pd.readOnly {
+		options = append(options, "ro")
+	}
+	err = pd.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
 		mountpoint, mntErr := pd.mounter.IsMountPoint(dir)
 		if mntErr != nil {
@@ -217,7 +220,7 @@ func (pd *gcePersistentDisk) SetUpAt(dir string) error {
 			return err
 		}
 		if mountpoint {
-			if mntErr = pd.mounter.Unmount(dir, 0); mntErr != nil {
+			if mntErr = pd.mounter.Unmount(dir); mntErr != nil {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
@@ -275,7 +278,7 @@ func (pd *gcePersistentDisk) TearDownAt(dir string) error {
 		return err
 	}
 	// Unmount the bind-mount inside this pod
-	if err := pd.mounter.Unmount(dir, 0); err != nil {
+	if err := pd.mounter.Unmount(dir); err != nil {
 		return err
 	}
 	// If len(refs) is 1, then all bind mounts have been removed, and the

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2014 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -185,7 +185,7 @@ func (f *FIFO) Pop() interface{} {
 }
 
 // Replace will delete the contents of 'f', using instead the given map.
-// 'f' takes ownersip of the map, you should not reference the map again
+// 'f' takes ownership of the map, you should not reference the map again
 // after calling this function. f's queue is reset, too; upon return, it
 // will contain the items in the map, in no particular order.
 func (f *FIFO) Replace(list []interface{}) error {

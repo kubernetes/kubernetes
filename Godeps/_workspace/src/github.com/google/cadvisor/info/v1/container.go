@@ -43,6 +43,9 @@ type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
 
+	// Metadata labels associated with this container.
+	Labels map[string]string `json:"labels,omitempty"`
+
 	HasCpu bool    `json:"has_cpu"`
 	Cpu    CpuSpec `json:"cpu,omitempty"`
 
@@ -479,27 +482,41 @@ func calculateCpuUsage(prev, cur uint64) uint64 {
 // differentiated by the EventType field of Event.
 type Event struct {
 	// the absolute container name for which the event occurred
-	ContainerName string
+	ContainerName string `json:"container_name"`
+
 	// the time at which the event occurred
-	Timestamp time.Time
+	Timestamp time.Time `json:"timestamp"`
+
 	// the type of event. EventType is an enumerated type
-	EventType EventType
+	EventType EventType `json:"event_type"`
+
 	// the original event object and all of its extraneous data, ex. an
 	// OomInstance
-	EventData EventDataInterface
+	EventData EventData `json:"event_data,omitempty"`
 }
 
 // EventType is an enumerated type which lists the categories under which
 // events may fall. The Event field EventType is populated by this enum.
-type EventType int
+type EventType string
 
 const (
-	EventOom EventType = iota
-	EventContainerCreation
-	EventContainerDeletion
+	EventOom               EventType = "oom"
+	EventOomKill                     = "oomKill"
+	EventContainerCreation           = "containerCreation"
+	EventContainerDeletion           = "containerDeletion"
 )
 
-// a general interface which populates the Event field EventData. The actual
-// object, such as an OomInstance, is set as an Event's EventData
-type EventDataInterface interface {
+// Extra information about an event. Only one type will be set.
+type EventData struct {
+	// Information about an OOM kill event.
+	OomKill *OomKillEventData `json:"oom,omitempty"`
+}
+
+// Information related to an OOM kill instance
+type OomKillEventData struct {
+	// process id of the killed process
+	Pid int `json:"pid"`
+
+	// The name of the killed process
+	ProcessName string `json:"process_name"`
 }
