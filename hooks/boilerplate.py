@@ -25,7 +25,7 @@ import sys
 def PrintError(*err):
   print(*err, file=sys.stderr)
 
-def file_passes(filename, extention, ref, regexs):
+def file_passes(filename, extension, ref, regexs):
     try:
         f = open(filename, 'r')
     except:
@@ -34,7 +34,7 @@ def file_passes(filename, extention, ref, regexs):
     data = f.read()
 
     # remove build tags from the top of Go file
-    if extention == "go":
+    if extension == "go":
         p = regexs["go_build_constraints"]
         (data, found) = p.subn("", data, 1)
 
@@ -68,11 +68,11 @@ def main():
 
     basedir = os.path.dirname(os.path.abspath(__file__))
 
-    extention = sys.argv[1]
+    extension = sys.argv[1]
     # argv[0] is the binary, argv[1] is the extension (go, sh, py, whatever)
     filenames = sys.argv[2:]
 
-    ref_filename = basedir + "/boilerplate." + extention + ".txt"
+    ref_filename = basedir + "/boilerplate." + extension + ".txt"
     try:
         ref_file = open(ref_filename, 'r')
     except:
@@ -87,7 +87,7 @@ def main():
     regexs["go_build_constraints"] = re.compile(r"^(// \+build.*\n)+\n", re.MULTILINE)
 
     for filename in filenames:
-        if not file_passes(filename, extention, ref, regexs):
+        if not file_passes(filename, extension, ref, regexs):
             print(filename, file=sys.stdout)
 
 if __name__ == "__main__":
