@@ -474,6 +474,9 @@ func FilterNamespace(info *Info) error {
 // set. If info.Object is set, it will be mutated as well.
 func SetNamespace(namespace string) VisitorFunc {
 	return func(info *Info) error {
+		if !info.Namespaced() {
+			return nil
+		}
 		if len(info.Namespace) == 0 {
 			info.Namespace = namespace
 			UpdateObjectNamespace(info)
