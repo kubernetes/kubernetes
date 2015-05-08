@@ -313,9 +313,13 @@ type Proxier struct {
 	mu            sync.Mutex // protects serviceMap
 	serviceMap    map[ServicePortName]*serviceInfo
 	numProxyLoops int32 // use atomic ops to access this; mostly for testing
-	listenIP      net.IP
 	portalManager PortalManager
-	hostIP        net.IP
+	*ProxierIPs
+}
+
+type ProxierIPs struct {
+	listenIP net.IP
+	hostIP   net.IP
 }
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
@@ -355,9 +359,11 @@ func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 	return &Proxier{
 		loadBalancer:  loadBalancer,
 		serviceMap:    make(map[ServicePortName]*serviceInfo),
-		listenIP:      listenIP,
 		portalManager: portalManager,
-		hostIP:        hostIP,
+		ProxierIPs: &ProxierIPs{
+			listenIP: listenIP,
+			hostIP:   hostIP,
+		},
 	}
 }
 
@@ -385,7 +391,7 @@ func (proxier *Proxier) ensurePortals() {
 	defer proxier.mu.Unlock()
 	// NB: This does not remove rules that should not be present.
 	for name, info := range proxier.serviceMap {
-		err := proxier.portalManager.OpenPortal(proxier, name, info)
+		err := proxier.portalManager.OpenPortal(proxier.ProxierIPs, name, info)
 		if err != nil {
 			glog.Errorf("Failed to ensure portal for %q: %v", name, err)
 		}
@@ -496,7 +502,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			}
 			if exists {
 				glog.V(4).Infof("Something changed for service %q: stopping it", serviceName)
-				err := proxier.portalManager.ClosePortal(proxier, serviceName, info)
+				err := proxier.portalManager.ClosePortal(proxier.ProxierIPs, serviceName, info)
 				if err != nil {
 					glog.Errorf("Failed to close portal for %q: %v", serviceName, err)
 				}
@@ -517,7 +523,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			info.sessionAffinityType = service.Spec.SessionAffinity
 			glog.V(4).Infof("info: %+v", info)
 
-			err = proxier.portalManager.OpenPortal(proxier, serviceName, info)
+			err = proxier.portalManager.OpenPortal(proxier.ProxierIPs, serviceName, info)
 			if err != nil {
 				glog.Errorf("Failed to open portal for %q: %v", serviceName, err)
 			}
@@ -529,7 +535,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 	for name, info := range proxier.serviceMap {
 		if !activeServices[name] {
 			glog.V(1).Infof("Stopping service %q", name)
-			err := proxier.portalManager.ClosePortal(proxier, name, info)
+			err := proxier.portalManager.ClosePortal(proxier.ProxierIPs, name, info)
 			if err != nil {
 				glog.Errorf("Failed to close portal for %q: %v", name, err)
 			}

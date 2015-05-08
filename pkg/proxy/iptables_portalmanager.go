@@ -96,13 +96,13 @@ func (i *IptablesPortalManager) Flush() error {
 }
 
 //Opens a portal
-func (i *IptablesPortalManager) OpenPortal(proxier *Proxier, service ServicePortName, info *serviceInfo) error {
-	err := i.openOnePortal(proxier, info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+func (i *IptablesPortalManager) OpenPortal(proxierIPs *ProxierIPs, service ServicePortName, info *serviceInfo) error {
+	err := i.openOnePortal(proxierIPs, info.portalIP, info.portalPort, info.protocol, proxierIPs.listenIP, info.proxyPort, service)
 	if err != nil {
 		return err
 	}
 	for _, publicIP := range info.publicIPs {
-		err = i.openOnePortal(proxier, net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+		err = i.openOnePortal(proxierIPs, net.ParseIP(publicIP), info.portalPort, info.protocol, proxierIPs.listenIP, info.proxyPort, service)
 		if err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ func (i *IptablesPortalManager) OpenPortal(proxier *Proxier, service ServicePort
 	return nil
 }
 
-func (i *IptablesPortalManager) openOnePortal(proxier *Proxier, portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name ServicePortName) error {
+func (i *IptablesPortalManager) openOnePortal(proxierIPs *ProxierIPs, portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name ServicePortName) error {
 	// Handle traffic from containers.
 	args := i.iptablesContainerPortalArgs(portalIP, portalPort, protocol, proxyIP, proxyPort, name)
 	existed, err := i.iptables.EnsureRule(iptables.TableNAT, iptablesContainerPortalChain, args...)
@@ -123,7 +123,7 @@ func (i *IptablesPortalManager) openOnePortal(proxier *Proxier, portalIP net.IP,
 	}
 
 	// Handle traffic from the host.
-	args = i.iptablesHostPortalArgs(proxier, portalIP, portalPort, protocol, proxyIP, proxyPort, name)
+	args = i.iptablesHostPortalArgs(proxierIPs, portalIP, portalPort, protocol, proxyIP, proxyPort, name)
 	existed, err = i.iptables.EnsureRule(iptables.TableNAT, iptablesHostPortalChain, args...)
 	if err != nil {
 		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesHostPortalChain, name)
@@ -136,11 +136,11 @@ func (i *IptablesPortalManager) openOnePortal(proxier *Proxier, portalIP net.IP,
 }
 
 //Closes a portal.
-func (i *IptablesPortalManager) ClosePortal(proxier *Proxier, service ServicePortName, info *serviceInfo) error {
+func (i *IptablesPortalManager) ClosePortal(proxierIPs *ProxierIPs, service ServicePortName, info *serviceInfo) error {
 	// Collect errors and report them all at the end.
-	el := i.closeOnePortal(proxier, info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+	el := i.closeOnePortal(proxierIPs, info.portalIP, info.portalPort, info.protocol, proxierIPs.listenIP, info.proxyPort, service)
 	for _, publicIP := range info.publicIPs {
-		el = append(el, i.closeOnePortal(proxier, net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+		el = append(el, i.closeOnePortal(proxierIPs, net.ParseIP(publicIP), info.portalPort, info.protocol, proxierIPs.listenIP, info.proxyPort, service)...)
 	}
 	if len(el) == 0 {
 		glog.Infof("Closed iptables portals for service %q", service)
@@ -150,7 +150,7 @@ func (i *IptablesPortalManager) ClosePortal(proxier *Proxier, service ServicePor
 	return errors.NewAggregate(el)
 }
 
-func (i *IptablesPortalManager) closeOnePortal(proxier *Proxier, portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name ServicePortName) []error {
+func (i *IptablesPortalManager) closeOnePortal(proxierIPs *ProxierIPs, portalIP net.IP, portalPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name ServicePortName) []error {
 	el := []error{}
 
 	// Handle traffic from containers.
@@ -161,7 +161,7 @@ func (i *IptablesPortalManager) closeOnePortal(proxier *Proxier, portalIP net.IP
 	}
 
 	// Handle traffic from the host.
-	args = i.iptablesHostPortalArgs(proxier, portalIP, portalPort, protocol, proxyIP, proxyPort, name)
+	args = i.iptablesHostPortalArgs(proxierIPs, portalIP, portalPort, protocol, proxyIP, proxyPort, name)
 	if err := i.iptables.DeleteRule(iptables.TableNAT, iptablesHostPortalChain, args...); err != nil {
 		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesHostPortalChain, name)
 		el = append(el, err)
@@ -246,7 +246,7 @@ func (i *IptablesPortalManager) iptablesContainerPortalArgs(destIP net.IP, destP
 }
 
 // Build a slice of iptables args for a from-host portal rule.
-func (i *IptablesPortalManager) iptablesHostPortalArgs(proxier *Proxier, destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service ServicePortName) []string {
+func (i *IptablesPortalManager) iptablesHostPortalArgs(proxierIPs *ProxierIPs, destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service ServicePortName) []string {
 	args := iptablesCommonPortalArgs(destIP, destPort, protocol, service)
 
 	// This is tricky.
@@ -271,7 +271,7 @@ func (i *IptablesPortalManager) iptablesHostPortalArgs(proxier *Proxier, destIP 
 	// If the proxy is bound to localhost only, this should work, but we
 	// don't allow it for now.
 	if proxyIP.Equal(zeroIPv4) || proxyIP.Equal(zeroIPv6) {
-		proxyIP = proxier.hostIP
+		proxyIP = proxierIPs.hostIP
 	}
 	// TODO: Can we DNAT with IPv6?
 	args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))

@@ -20,8 +20,8 @@ package proxy
 //See IptablesPortalManager for an implementation.
 type PortalManager interface {
 	Init() error
-	OpenPortal(proxier *Proxier, service ServicePortName, info *serviceInfo) error
-	ClosePortal(proxier *Proxier, service ServicePortName, info *serviceInfo) error
+	OpenPortal(proxierIPs *ProxierIPs, service ServicePortName, info *serviceInfo) error
+	ClosePortal(proxierIPs *ProxierIPs, service ServicePortName, info *serviceInfo) error
 	DeleteOld()
 	Flush() error
 }
