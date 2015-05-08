@@ -1,10 +1,8 @@
-apiVersion: v1beta1
+apiVersion: v1beta3
 kind: Pod
-id: www
-desiredState:
-  manifest:
-    version: v1beta1
-    id: www
-    containers:
-      - name: nginx
-        image: nginx
+metadata:
+  name: www
+spec:
+  containers:
+    - name: nginx
+      image: nginx
