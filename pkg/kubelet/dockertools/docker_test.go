@@ -90,6 +90,36 @@ func TestGetContainerID(t *testing.T) {
 	}
 }
 
+func TestGetDockerContainerLists(t *testing.T) {
+	fakeDocker := &FakeDockerClient{}
+	k8sContainers := []docker.APIContainers{
+		{
+			ID:    "foobar",
+			Names: []string{"/k8s_foo_qux_ns_1234_42"},
+		},
+		{
+			ID:    "barbar",
+			Names: []string{"/k8s_bar_qux_ns_2565_42"},
+		},
+	}
+	alienContainers := []docker.APIContainers{
+		{
+			ID: "alien",
+		},
+	}
+	fakeDocker.ContainerList = append(k8sContainers, alienContainers...)
+	actualK8s, actualAliens, err := getContainerLists(fakeDocker, false)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if reflect.DeepEqual(k8sContainers, actualK8s) {
+		t.Error("expected %#v, got %#v", k8sContainers, actualK8s)
+	}
+	if reflect.DeepEqual(alienContainers, actualAliens) {
+		t.Error("expected %#v, got %#v", alienContainers, actualAliens)
+	}
+}
+
 func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName string) {
 	container := &api.Container{Name: containerName}
 	hasher := adler32.New()

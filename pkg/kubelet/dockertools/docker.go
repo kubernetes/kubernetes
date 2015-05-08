@@ -312,3 +312,37 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (Doc
 	}
 	return result, nil
 }
+
+// Returns true if the container is managed by kubelet.
+func isManagedByKubelet(c *docker.APIContainers) bool {
+	if len(c.Names) == 0 {
+		return false
+	}
+	// TODO(dchen1107): Remove the old separator "--" by end of Oct
+	if !strings.HasPrefix(c.Names[0], "/"+containerNamePrefix+"_") &&
+		!strings.HasPrefix(c.Names[0], "/"+containerNamePrefix+"--") {
+		return false
+	}
+	return true
+}
+
+// Get a list of containers managed by kubelet, and a list of containers which
+// are not managed by kubelet.
+func getContainerLists(client DockerInterface, allContainers bool) ([]*docker.APIContainers, []*docker.APIContainers, error) {
+	containers, err := client.ListContainers(docker.ListContainersOptions{All: allContainers})
+	if err != nil {
+		return nil, nil, err
+	}
+	var k8sContainers []*docker.APIContainers
+	var alienContainers []*docker.APIContainers
+	for i := range containers {
+		c := &containers[i]
+		if !isManagedByKubelet(&containers[i]) {
+			glog.V(3).Infof("Docker Container: %q is not managed by kubelet.", c.ID)
+			alienContainers = append(alienContainers, c)
+			continue
+		}
+		k8sContainers = append(k8sContainers, c)
+	}
+	return k8sContainers, alienContainers, nil
+}

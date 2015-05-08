@@ -18,6 +18,13 @@ package types
 
 import "net/http"
 
+const (
+	// Name of the pod grouping unidentified kubelet-managed containers.
+	DefaultK8sPodName = "/unknown-kubernetes"
+	// Name of the pod grouping unidentified non-kubelet-managed containers.
+	DefaultAlienPodName = "/unknown-containers"
+)
+
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
 type DockerID string
 

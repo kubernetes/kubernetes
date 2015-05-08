@@ -49,11 +49,32 @@ func TestToRuntimeContainer(t *testing.T) {
 	}
 }
 
+func TestUnknownToRuntimeContainer(t *testing.T) {
+	original := &docker.APIContainers{
+		ID:      "ab2cdf",
+		Image:   "bar_image",
+		Created: 12345,
+	}
+	expected := &kubecontainer.Container{
+		ID:      types.UID("ab2cdf"),
+		Image:   "bar_image",
+		Created: 12345,
+	}
+
+	actual, err := unknownToRuntimeContainer(original)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("expected %#v, got %#v", expected, actual)
+	}
+}
+
 func TestToRuntimeImage(t *testing.T) {
 	original := &docker.APIImages{
-		ID:       "aeeea",
-		RepoTags: []string{"abc", "def"},
-		Size:     1234,
+		ID:          "aeeea",
+		RepoTags:    []string{"abc", "def"},
+		VirtualSize: 1234,
 	}
 	expected := &kubecontainer.Image{
 		ID:   "aeeea",

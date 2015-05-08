@@ -46,6 +46,23 @@ func toRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, erro
 	}, nil
 }
 
+// unknownToRuntimeContainer converts a docker container with insufficient
+// kubelet-related information to a runtime container. Example usage of this
+// function would be to convert an alien (not managed by kubelet) container or
+// to convert a kubelet-managed container with old, incompatible naming
+// convention.
+func unknownToRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, error) {
+	if c == nil {
+		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
+	}
+
+	return &kubecontainer.Container{
+		ID:      types.UID(c.ID),
+		Image:   c.Image,
+		Created: c.Created,
+	}, nil
+}
+
 // Converts docker.APIImages to kubecontainer.Image.
 func toRuntimeImage(image *docker.APIImages) (*kubecontainer.Image, error) {
 	if image == nil {
@@ -55,6 +72,6 @@ func toRuntimeImage(image *docker.APIImages) (*kubecontainer.Image, error) {
 	return &kubecontainer.Image{
 		ID:   image.ID,
 		Tags: image.RepoTags,
-		Size: image.Size,
+		Size: image.VirtualSize,
 	}, nil
 }
