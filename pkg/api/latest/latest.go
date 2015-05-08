@@ -18,6 +18,8 @@ package latest
 
 import (
 	"fmt"
+	"os"
+	"sort"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -28,10 +30,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 )
 
 // Version is the string that represents the current external default version.
-const Version = "v1beta3"
+var Version string
 
 // OldestVersion is the string that represents the oldest server version supported,
 // for client code that wants to hardcode the lowest common denominator.
@@ -41,13 +44,13 @@ const OldestVersion = "v1beta1"
 // may be assumed to be least feature rich to most feature rich, and clients may
 // choose to prefer the latter items in the list over the former items when presented
 // with a set of versions to choose.
-var Versions = []string{"v1beta1", "v1beta2", "v1beta3", "v1"}
+var Versions []string
 
 // Codec is the default codec for serializing output that should use
 // the latest supported version.  Use this Codec when writing to
 // disk, a data store that is not dynamically versioned, or in tests.
 // This codec can decode any object that Kubernetes is aware of.
-var Codec = v1beta3.Codec
+var Codec runtime.Codec
 
 // accessor is the shared static metadata accessor for the API.
 var accessor = meta.NewAccessor()
@@ -99,8 +102,34 @@ func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
 }
 
 func init() {
+	// The list of valid API versions to test that KUBE_API_VERSIONS does not contain an invalid version.
+	// Note that the list is in ascending sorted order.
+	validAPIVersions := []string{"v1", "v1beta1", "v1beta2", "v1beta3"}
+	// Env var KUBE_API_VERSIONS is a comma separated list of supported API versions.
+	// The versions should be in the order of most preferred to the least.
+	supportedVersions := os.Getenv("KUBE_API_VERSIONS")
+	if supportedVersions == "" {
+		supportedVersions = "v1beta3,v1beta1,v1beta2,v1"
+	}
+	versions := strings.Split(supportedVersions, ",")
+	// The first version in the list is the latest version.
+	Version = versions[0]
+	Codec = runtime.CodecFor(api.Scheme, Version)
+	// Put the versions in Versions in reverse order.
+	Versions = []string{}
+	for i := len(versions) - 1; i >= 0; i-- {
+		version := versions[i]
+		// Verify that the version is valid.
+		searchIndex := sort.SearchStrings(validAPIVersions, version)
+		if searchIndex == len(validAPIVersions) || validAPIVersions[searchIndex] != version {
+			// Not a valid API version.
+			glog.Fatalf("invalid api version: %s in KUBE_API_VERSIONS: %s. List of valid API versions: %s", version, os.Getenv("KUBE_API_VERSIONS"), strings.Join(validAPIVersions, ", "))
+		}
+		Versions = append(Versions, versions[i])
+	}
+
 	mapper := meta.NewDefaultRESTMapper(
-		Versions,
+		versions,
 		func(version string) (*meta.VersionInterfaces, bool) {
 			interfaces, err := InterfacesFor(version)
 			if err != nil {
@@ -109,9 +138,6 @@ func init() {
 			return interfaces, true
 		},
 	)
-	// list of versions we support on the server
-	// versions should be listed in the order of perferred versions first
-	versions := []string{"v1beta3", "v1beta2", "v1beta1", "v1"}
 
 	// versions that used mixed case URL formats
 	versionMixedCase := map[string]bool{
@@ -149,7 +175,7 @@ func init() {
 		"PodExecOptions",
 		"PodProxyOptions")
 
-	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources
+	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources.
 	for _, version := range versions {
 		for kind := range api.Scheme.KnownTypes(version) {
 			if ignoredKinds.Has(kind) {
