@@ -55,6 +55,9 @@ func (podStrategy) PrepareForCreate(obj runtime.Object) {
 	pod.Status = api.PodStatus{
 		Phase: api.PodPending,
 	}
+	for i := range pod.Spec.ImagePullSecrets {
+		pod.Spec.ImagePullSecrets[i] = api.ObjectReference{Name: pod.Spec.ImagePullSecrets[i].Name}
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -62,6 +65,10 @@ func (podStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
+
+	for i := range newPod.Spec.ImagePullSecrets {
+		newPod.Spec.ImagePullSecrets[i] = api.ObjectReference{Name: newPod.Spec.ImagePullSecrets[i].Name}
+	}
 }
 
 // Validate validates a new pod.

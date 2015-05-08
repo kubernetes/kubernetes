@@ -78,7 +78,7 @@ type KubeletContainerName struct {
 
 // DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
 type DockerPuller interface {
-	Pull(image string) error
+	Pull(image string, secrets []api.Secret) error
 	IsImagePresent(image string) (bool, error)
 }
 
@@ -113,7 +113,7 @@ func parseImageName(image string) (string, string) {
 	return parsers.ParseRepositoryTag(image)
 }
 
-func (p dockerPuller) Pull(image string) error {
+func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 	repoToPull, tag := parseImageName(image)
 
 	// If no tag was specified, use the default "latest".
@@ -126,7 +126,12 @@ func (p dockerPuller) Pull(image string) error {
 		Tag:        tag,
 	}
 
-	creds, haveCredentials := p.keyring.Lookup(repoToPull)
+	keyring, err := credentialprovider.MakeDockerKeyring(secrets, p.keyring)
+	if err != nil {
+		return err
+	}
+
+	creds, haveCredentials := keyring.Lookup(repoToPull)
 	if !haveCredentials {
 		glog.V(1).Infof("Pulling image %s without credentials", image)
 
@@ -161,9 +166,9 @@ func (p dockerPuller) Pull(image string) error {
 	return utilerrors.NewAggregate(pullErrs)
 }
 
-func (p throttledDockerPuller) Pull(image string) error {
+func (p throttledDockerPuller) Pull(image string, secrets []api.Secret) error {
 	if p.limiter.CanAccept() {
-		return p.puller.Pull(image)
+		return p.puller.Pull(image, secrets)
 	}
 	return fmt.Errorf("pull QPS exceeded.")
 }

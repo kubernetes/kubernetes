@@ -17,6 +17,7 @@ limitations under the License.
 package credentialprovider
 
 import (
+	"encoding/json"
 	"net/url"
 	"sort"
 	"strings"
@@ -24,6 +25,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -163,4 +165,51 @@ type FakeKeyring struct {
 
 func (f *FakeKeyring) Lookup(image string) ([]docker.AuthConfiguration, bool) {
 	return f.auth, f.ok
+}
+
+// unionDockerKeyring delegates to a set of keyrings.
+type unionDockerKeyring struct {
+	keyrings []DockerKeyring
+}
+
+func (k *unionDockerKeyring) Lookup(image string) ([]docker.AuthConfiguration, bool) {
+	authConfigs := []docker.AuthConfiguration{}
+
+	for _, subKeyring := range k.keyrings {
+		if subKeyring == nil {
+			continue
+		}
+
+		currAuthResults, _ := subKeyring.Lookup(image)
+		authConfigs = append(authConfigs, currAuthResults...)
+	}
+
+	return authConfigs, (len(authConfigs) > 0)
+}
+
+// MakeDockerKeyring inspects the passedSecrets to see if they contain any DockerConfig secrets.  If they do,
+// then a DockerKeyring is built based on every hit and unioned with the defaultKeyring.
+// If they do not, then the default keyring is returned
+func MakeDockerKeyring(passedSecrets []api.Secret, defaultKeyring DockerKeyring) (DockerKeyring, error) {
+	passedCredentials := []DockerConfig{}
+	for _, passedSecret := range passedSecrets {
+		if dockercfgBytes, dockercfgExists := passedSecret.Data[api.DockerConfigKey]; (passedSecret.Type == api.SecretTypeDockercfg) && dockercfgExists && (len(dockercfgBytes) > 0) {
+			dockercfg := DockerConfig{}
+			if err := json.Unmarshal(dockercfgBytes, &dockercfg); err != nil {
+				return nil, err
+			}
+
+			passedCredentials = append(passedCredentials, dockercfg)
+		}
+	}
+
+	if len(passedCredentials) > 0 {
+		basicKeyring := &BasicDockerKeyring{}
+		for _, currCredentials := range passedCredentials {
+			basicKeyring.Add(currCredentials)
+		}
+		return &unionDockerKeyring{[]DockerKeyring{basicKeyring, defaultKeyring}}, nil
+	}
+
+	return defaultKeyring, nil
 }

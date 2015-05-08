@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -890,6 +891,18 @@ func validateHostNetwork(hostNetwork bool, containers []api.Container) errs.Vali
 	return allErrors
 }
 
+func validateImagePullSecrets(imagePullSecrets []api.ObjectReference) errs.ValidationErrorList {
+	allErrors := errs.ValidationErrorList{}
+	for i, currPullSecret := range imagePullSecrets {
+		strippedRef := api.ObjectReference{Name: currPullSecret.Name}
+
+		if !reflect.DeepEqual(strippedRef, currPullSecret) {
+			allErrors = append(allErrors, errs.NewFieldInvalid(fmt.Sprintf("[%d]", i), currPullSecret, "only name may be set"))
+		}
+	}
+	return allErrors
+}
+
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -913,6 +926,7 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy).Prefix("dnsPolicy")...)
 	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, "nodeSelector")...)
 	allErrs = append(allErrs, validateHostNetwork(spec.HostNetwork, spec.Containers).Prefix("hostNetwork")...)
+	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets).Prefix("imagePullSecrets")...)
 
 	if spec.ActiveDeadlineSeconds != nil {
 		if *spec.ActiveDeadlineSeconds <= 0 {
