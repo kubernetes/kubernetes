@@ -107,7 +107,7 @@ function detect-minions () {
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip
-    if [[ "$ENABLE_MINION_PUBLIC_IP" == "true" ]]; then
+    if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
       minion_ip=$(get_instance_public_ip ${MINION_NAMES[$i]})
     else
       minion_ip=$(get_instance_private_ip ${MINION_NAMES[$i]})
@@ -557,7 +557,7 @@ function kube-up {
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
 
     local public_ip_option
-    if [[ "ENABLE_MINION_PUBLIC_IP" == "true" ]]; then
+    if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
       public_ip_option="--associate-public-ip-address"
     else
       public_ip_option="--no-associate-public-ip-address"
