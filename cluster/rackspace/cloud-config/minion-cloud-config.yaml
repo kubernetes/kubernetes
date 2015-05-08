@@ -8,7 +8,7 @@ write_files:
       m=$(echo $(etcdctl ls --recursive /corekube/apiservers | cut -d/ -f4 | sort) | tr ' ' ,)
       mkdir -p /run/kubelet
       echo "APISERVER_IPS=$m" > /run/kubelet/apiservers.env
-      echo "FIRST_APISERVER_URL=http://${m%%\,*}:6443" >> /run/kubelet/apiservers.env
+      echo "FIRST_APISERVER_URL=https://${m%%\,*}:6443" >> /run/kubelet/apiservers.env
   - path: /opt/bin/download-release.sh
     permissions: 0755
     content: |
@@ -26,6 +26,37 @@ write_files:
       else
         echo "kubernetes release found. Skipping download."
       fi
+  - path: /run/setup-auth.sh
+    permissions: 0755
+    content: |
+      #!/bin/bash -e
+      set -x
+      /usr/bin/mkdir -p /var/lib/kubelet
+      /bin/echo  "{\"BearerToken\": \"KUBE_BEARER_TOKEN\", \"Insecure\": true }" > /var/lib/kubelet/kubernetes_auth
+  - path: /run/config-kube-proxy.sh
+    permissions: 0755
+    content: |
+      #!/bin/bash -e
+      set -x
+      /usr/bin/mkdir -p /var/lib/kube-proxy
+      cat > /var/lib/kube-proxy/kubeconfig << EOF
+      apiVersion: v1
+      kind: Config
+      users:
+      - name: kube-proxy
+        user:
+          token: KUBE_PROXY_TOKEN
+      clusters:
+      - name: local
+        cluster:
+          insecure-skip-tls-verify: true
+      contexts:
+      - context:
+          cluster: local
+          user: kube-proxy
+        name: service-account-context
+      current-context: service-account-context
+      EOF
 
 coreos:
   etcd:
@@ -53,7 +84,7 @@ coreos:
       - name: 50-network-config.conf
         content: |
           [Service]
-          ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "10.240.0.0/16", "Backend": {"Type": "host-gw"}}'
+          ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "KUBE_NETWORK", "Backend": {"Type": "host-gw"}}'
           ExecStart=
           ExecStart=/usr/libexec/sdnotify-proxy /run/flannel/sd.sock \
             /usr/bin/docker run --net=host --privileged=true --rm \
@@ -83,7 +114,7 @@ coreos:
         Type=oneshot
         RemainAfterExit=yes
         ExecStart=/usr/bin/bash /opt/bin/download-release.sh
-    - name: minion-kubelet.service
+    - name: kubelet.service
       command: start
       content: |
         [Unit]
@@ -97,11 +128,20 @@ coreos:
         Requires=download-release.service
         [Service]
         EnvironmentFile=/run/kubelet/apiservers.env
+        ExecStartPre=/run/setup-auth.sh
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kubelet /opt/bin/kubelet
-        ExecStart=/opt/bin/kubelet --address=$private_ipv4 --hostname_override=$private_ipv4 --api_servers=${FIRST_APISERVER_URL} --logtostderr=true --cluster_dns=DNS_SERVER_IP --cluster_domain=DNS_DOMAIN
+        ExecStart=/opt/bin/kubelet \
+        --address=$private_ipv4 \
+        --api_servers=${FIRST_APISERVER_URL} \
+        --cluster_dns=DNS_SERVER_IP \
+        --cluster_domain=DNS_DOMAIN \
+        --healthz-bind-address=$private_ipv4 \
+        --hostname_override=$private_ipv4 \
+        --logtostderr=true \
+        --v=2
         Restart=always
-        RestartSec=2
-    - name: minion-proxy.service
+        RestartSec=5
+    - name: kube-proxy.service
       command: start
       content: |
         [Unit]
@@ -115,10 +155,15 @@ coreos:
         Requires=download-release.service
         [Service]
         EnvironmentFile=/run/kubelet/apiservers.env
+        ExecStartPre=/run/config-kube-proxy.sh
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-proxy /opt/bin/kube-proxy
-        ExecStart=/opt/bin/kube-proxy --bind_address=$private_ipv4 --master=${FIRST_APISERVER_URL} --logtostderr=true
+        ExecStart=/opt/bin/kube-proxy \
+        --bind_address=$private_ipv4 \
+        --kubeconfig=/var/lib/kube-proxy/kubeconfig \
+        --logtostderr=true \
+        --master=${FIRST_APISERVER_URL}
         Restart=always
-        RestartSec=2
+        RestartSec=5
     - name: kubelet-sighup.path
       command: start
       content: |
@@ -139,18 +184,6 @@ coreos:
       content: |
         [Service]
         ExecStart=/usr/bin/pkill -SIGHUP -f kube-proxy
-    - name: minion-advertiser.service
-      command: start
-      content: |
-        [Unit]
-        Description=Kubernetes Minion Advertiser
-        After=etcd.service
-        Requires=etcd.service
-        After=minion-kubelet.service
-        [Service]
-        ExecStart=/bin/sh -c 'while :; do etcdctl set /corekube/minions/$private_ipv4 $private_ipv4 --ttl 300; sleep 120; done'
-        Restart=always
-        RestartSec=120
     - name: apiserver-finder.service
       command: start
       content: |

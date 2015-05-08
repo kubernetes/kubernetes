@@ -137,7 +137,7 @@ copy_dev_tarballs() {
 prep_known_tokens() {
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     generate_kubelet_tokens ${MINION_NAMES[i]}
-    cat ${KUBE_TEMP}/${MINION_NAMES[i]}_token.csv >> ${KUBE_TEMP}/known_tokens.csv
+    cat ${KUBE_TEMP}/${MINION_NAMES[i]}_tokens.csv >> ${KUBE_TEMP}/known_tokens.csv
   done
 
     # Generate tokens for other "service accounts".  Append to known_tokens.
@@ -180,7 +180,7 @@ rax-boot-master() {
 --meta ${MASTER_TAG} \
 --meta ETCD=${DISCOVERY_ID} \
 --user-data ${KUBE_TEMP}/master-cloud-config.yaml \
---file /var/lib/kubernetes/apiserver/known_tokens.csv=${KUBE_TEMP}/known_tokens.csv \
+--file /var/lib/kube-apiserver/known_tokens.csv=${KUBE_TEMP}/known_tokens.csv \
 --config-drive true \
 --nic net-id=${NETWORK_UUID} \
 ${MASTER_NAME}"
@@ -208,6 +208,7 @@ rax-boot-minions() {
         -e "s|ENABLE_NODE_LOGGING|${ENABLE_NODE_LOGGING:-false}|" \
         -e "s|INDEX|$((i + 1))|g" \
         -e "s|KUBE_BEARER_TOKEN|${KUBE_BEARER_TOKEN}|" \
+        -e "s|KUBE_NETWORK|${KUBE_NETWORK}|" \
         -e "s|KUBE_PROXY_TOKEN|${KUBE_PROXY_TOKEN}|" \
         -e "s|LOGGING_DESTINATION|${LOGGING_DESTINATION:-}|" \
     $(dirname $0)/rackspace/cloud-config/minion-cloud-config.yaml > $KUBE_TEMP/minion-cloud-config-$(($i + 1)).yaml

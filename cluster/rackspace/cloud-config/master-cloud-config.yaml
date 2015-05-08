@@ -72,7 +72,7 @@ coreos:
         Type=oneshot
         RemainAfterExit=yes
         ExecStart=/usr/bin/bash /opt/bin/download-release.sh
-    - name: master-apiserver.service
+    - name: kube-apiserver.service
       command: start
       content: |
         [Unit]
@@ -84,9 +84,20 @@ coreos:
         Requires=download-release.service
         [Service]
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-apiserver /opt/bin/kube-apiserver
-        ExecStart=/opt/bin/kube-apiserver --token-auth-file=/var/lib/kubernetes/apiserver/known_tokens.csv --address=127.0.0.1 --port=8080 --etcd_servers=http://127.0.0.1:4001 --portal_net=PORTAL_NET --logtostderr=true --cloud_provider=rackspace --cloud_config=/etc/cloud.conf --v=2
+        ExecStartPre=/usr/bin/mkdir -p /var/lib/kube-apiserver
+        ExecStartPre=/usr/bin/cp /media/configdrive/openstack/content/0000 /var/lib/kube-apiserver/known_tokens.csv
+        ExecStart=/opt/bin/kube-apiserver \
+        --address=127.0.0.1 \
+        --cloud_provider=rackspace \
+        --cloud_config=/etc/cloud.conf \
+        --etcd_servers=http://127.0.0.1:4001 \
+        --logtostderr=true \
+        --port=8080 \
+        --portal_net=PORTAL_NET \
+        --token-auth-file=/var/lib/kube-apiserver/known_tokens.csv \
+        --v=2
         Restart=always
-        RestartSec=2
+        RestartSec=5
     - name: apiserver-advertiser.service
       command: start
       content: |
@@ -99,7 +110,7 @@ coreos:
         ExecStart=/bin/sh -c 'etcdctl set /corekube/apiservers/$public_ipv4 $public_ipv4'
         Restart=always
         RestartSec=120
-    - name: master-controller-manager.service
+    - name: kube-controller-manager.service
       command: start
       content: |
         [Unit]
@@ -107,14 +118,19 @@ coreos:
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
         After=network-online.target
         Requires=network-online.target
-        After=master-apiserver.service
-        Requires=master-apiserver.service
+        After=kube-apiserver.service
+        Requires=kube-apiserver.service
         [Service]
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-controller-manager /opt/bin/kube-controller-manager
-        ExecStart=/opt/bin/kube-controller-manager --master=127.0.0.1:8080 --logtostderr=true --cloud_provider=rackspace --cloud_config=/etc/cloud.conf --v=2
+        ExecStart=/opt/bin/kube-controller-manager \
+        --cloud_provider=rackspace \
+        --cloud_config=/etc/cloud.conf \
+        --logtostderr=true \
+        --master=127.0.0.1:8080 \
+        --v=2
         Restart=always
-        RestartSec=2
-    - name: master-scheduler.service
+        RestartSec=5
+    - name: kube-scheduler.service
       command: start
       content: |
         [Unit]
@@ -122,27 +138,33 @@ coreos:
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
         After=network-online.target
         Requires=network-online.target
-        After=master-apiserver.service
-        Requires=master-apiserver.service
+        After=kube-apiserver.service
+        Requires=kube-apiserver.service
         [Service]
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-scheduler /opt/bin/kube-scheduler
-        ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080 --logtostderr=true
+        ExecStart=/opt/bin/kube-scheduler \
+        --logtostderr=true \
+        --master=127.0.0.1:8080
         Restart=always
-        RestartSec=10
-    - name: master-register.service
+        RestartSec=5
+    - name: kube-register.service
       command: start
       content: |
         [Unit]
         Description=Kubernetes Registration Service
         Documentation=https://github.com/kelseyhightower/kube-register
-
+        Requires=kube-apiserver.service
+        After=kube-apiserver.service
+        Requires=fleet.service
+        After=fleet.service
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes/kube-register
+        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-register -z /opt/bin/kube-register https://github.com/kelseyhightower/kube-register/releases/download/v0.0.3/kube-register-0.0.3-linux-amd64
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register
         ExecStart=/opt/bin/kube-register \
-        --metadata=kubernetes_role=minion \
+        --api-endpoint=http://127.0.0.1:8080 \
         --fleet-endpoint=unix:///var/run/fleet.sock \
-        --api-endpoint=http://127.0.0.1:8080
+        --healthz-port=10248 \
+        --metadata=kubernetes_role=minion
         Restart=always
         RestartSec=10
     #Running nginx service with --net="host" is a necessary evil until running all k8s services in docker.

@@ -35,7 +35,7 @@ KUBE_MINION_FLAVOR="${KUBE_MINION_FLAVOR-performance1-2}"
 RAX_NUM_MINIONS="${RAX_NUM_MINIONS-4}"
 MINION_TAG="tags=${INSTANCE_PREFIX}-minion"
 MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${RAX_NUM_MINIONS}}))
-KUBE_NETWORK=($(eval echo "10.240.{1..${RAX_NUM_MINIONS}}.0/24"))
+KUBE_NETWORK="10.240.0.0/16"
 PORTAL_NET="10.0.0.0/16"
 
 # Optional: Install node monitoring.
