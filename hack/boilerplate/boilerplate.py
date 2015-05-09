@@ -16,22 +16,44 @@
 
 from __future__ import print_function
 
+import argparse
+import glob
 import json
 import mmap
 import os
 import re
 import sys
 
-def PrintError(*err):
-  print(*err, file=sys.stderr)
+parser = argparse.ArgumentParser()
+parser.add_argument("filenames", help="list of files to check, all files if unspecified", nargs='*')
+args = parser.parse_args()
 
-def file_passes(filename, extension, ref, regexs):
+rootdir = os.path.dirname(__file__) + "/../../"
+rootdir = os.path.abspath(rootdir)
+
+def get_refs():
+    refs = {}
+    for path in glob.glob(os.path.join(rootdir, "hack/boilerplate/boilerplate.*.txt")):
+        extension = os.path.basename(path).split(".")[1]
+
+        ref_file = open(path, 'r')
+        ref = ref_file.read().splitlines()
+        ref_file.close()
+        refs[extension] = ref
+
+    return refs
+
+def file_passes(filename, refs, regexs):
     try:
         f = open(filename, 'r')
     except:
         return False
 
     data = f.read()
+    f.close()
+
+    extension = file_extension(filename)
+    ref = refs[extension]
 
     # remove build tags from the top of Go files
     if extension == "go":
@@ -70,25 +92,48 @@ def file_passes(filename, extension, ref, regexs):
 
     return True
 
-def main():
-    if len(sys.argv) < 3:
-        PrintError("usage: %s extension FILENAME [FILENAMES]" % sys.argv[0])
-        return False
+def file_extension(filename):
+    return os.path.splitext(filename)[1].split(".")[-1].lower()
 
-    basedir = os.path.dirname(os.path.abspath(__file__))
+skipped_dirs = ['Godeps', 'third_party', '_output', '.git']
+def normalize_files(files):
+    newfiles = []
+    for pathname in files:
+        if any(x in pathname for x in skipped_dirs):
+            continue
+        newfiles.append(pathname)
+    for i, pathname in enumerate(newfiles):
+        if not os.path.isabs(pathname):
+            newfiles[i] = os.path.join(rootdir, pathname)
+    return newfiles
 
-    extension = sys.argv[1]
-    # argv[0] is the binary, argv[1] is the extension (go, sh, py, whatever)
-    filenames = sys.argv[2:]
+def get_files(extensions):
+    files = []
+    if len(args.filenames) > 0:
+        files = args.filenames
+    else:
+        for root, dirs, walkfiles in os.walk(rootdir):
+            # don't visit certain dirs. This is just a performance improvement
+            # as we would prune these later in normalize_files(). But doing it
+            # cuts down the amount of filesystem walking we do and cuts down
+            # the size of the file list
+            for d in skipped_dirs:
+                if d in dirs:
+                    dirs.remove(d)
 
-    ref_filename = basedir + "/boilerplate." + extension + ".txt"
-    try:
-        ref_file = open(ref_filename, 'r')
-    except:
-        # No boilerplate template is success
-        return True
-    ref = ref_file.read().splitlines()
+            for name in walkfiles:
+                pathname = os.path.join(root, name)
+                files.append(pathname)
 
+    files = normalize_files(files)
+    outfiles = []
+    for pathname in files:
+        extension = file_extension(pathname)
+        if extension in extensions:
+            outfiles.append(pathname)
+    return outfiles
+
+def get_regexs():
     regexs = {}
     # Search for "YEAR" which exists in the boilerplate, but shouldn't in the real thing
     regexs["year"] = re.compile( 'YEAR' )
@@ -98,9 +143,15 @@ def main():
     regexs["go_build_constraints"] = re.compile(r"^(// \+build.*\n)+\n", re.MULTILINE)
     # strip #!.* from shell scripts
     regexs["shebang"] = re.compile(r"^(#!.*\n)\n*", re.MULTILINE)
+    return regexs
+
+def main():
+    regexs = get_regexs()
+    refs = get_refs()
+    filenames = get_files(refs.keys())
 
     for filename in filenames:
-        if not file_passes(filename, extension, ref, regexs):
+        if not file_passes(filename, refs, regexs):
             print(filename, file=sys.stdout)
 
 if __name__ == "__main__":

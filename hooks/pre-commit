@@ -39,11 +39,12 @@ fi
 echo "${reset}"
 
 echo -ne "Checking for files that need boilerplate... "
-out=($(hack/verify-boilerplate.sh))
-if [[ $? -ne 0 ]]; then
+files=($(git diff --cached --name-only --diff-filter ACM))
+out=($(hack/boilerplate/boilerplate.py "${files[@]}"))
+if [[ "${#out}" -ne 0 ]]; then
   echo "${red}ERROR!"
   echo "Some files are missing the required boilerplate header"
-  echo "from hooks/boilerplate.txt:"
+  echo "from hack/boilerplate/boilerplate.*.txt:"
   for f in "${out[@]}"; do
     echo "  ${f}"
   done
