@@ -10,8 +10,8 @@ spec:
     - /run.sh
     resources:
       limits:
-        cpu: "1"
-    image: kubernetes/cassandra:v2
+        cpu: "1"      
+    image: gcr.io/google_containers/cassandra:v3
     name: cassandra
     ports:
     - name: cql

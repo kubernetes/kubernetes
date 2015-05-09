@@ -24,7 +24,7 @@ spec:
               value: 512M
             - name: HEAP_NEWSIZE
               value: 100M
-          image: "kubernetes/cassandra:v2"
+          image: gcr.io/google_containers/cassandra:v3
           name: cassandra
           ports:
             - containerPort: 9042
