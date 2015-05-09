@@ -3754,6 +3754,59 @@ func TestHostNetworkDisallowed(t *testing.T) {
 	}
 }
 
+func TestPrivilegeContainerAllowed(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+
+	capabilities.SetForTests(capabilities.Capabilities{
+		AllowPrivileged: true,
+	})
+	privileged := true
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "foo", SecurityContext: &api.SecurityContext{Privileged: &privileged}},
+			},
+		},
+	}
+	kubelet.podManager.SetPods([]*api.Pod{pod})
+	err := kubelet.syncPod(pod, nil, container.Pod{})
+	if err != nil {
+		t.Errorf("expected pod infra creation to succeed: %v", err)
+	}
+}
+
+func TestPrivilegeContainerDisallowed(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+
+	capabilities.SetForTests(capabilities.Capabilities{
+		AllowPrivileged: false,
+	})
+	privileged := true
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "foo", SecurityContext: &api.SecurityContext{Privileged: &privileged}},
+			},
+		},
+	}
+	err := kubelet.syncPod(pod, nil, container.Pod{})
+	if err == nil {
+		t.Errorf("expected pod infra creation to fail")
+	}
+}
+
 func TestSyncPodsWithRestartPolicy(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)

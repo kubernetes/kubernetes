@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
@@ -48,7 +49,14 @@ func canRunPod(pod *api.Pod) error {
 			return fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID)
 		}
 	}
-	// TODO(vmarmol): Check Privileged too.
+
+	if !capabilities.Get().AllowPrivileged {
+		for _, container := range pod.Spec.Containers {
+			if securitycontext.HasPrivilegedRequest(&container) {
+				return fmt.Errorf("pod with UID %q specified privileged container, but is disallowed", pod.UID)
+			}
+		}
+	}
 	return nil
 }
 

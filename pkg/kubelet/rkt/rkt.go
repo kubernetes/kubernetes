@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
@@ -213,13 +212,10 @@ func setIsolators(app *appctypes.App, c *api.Container) error {
 
 	// Retained capabilities/privileged.
 	privileged := false
-	if !capabilities.Get().AllowPrivileged && securitycontext.HasPrivilegedRequest(c) {
-		return fmt.Errorf("container requested privileged mode, but it is disallowed globally.")
-	} else {
-		if c.SecurityContext != nil && c.SecurityContext.Privileged != nil {
-			privileged = *c.SecurityContext.Privileged
-		}
+	if c.SecurityContext != nil && c.SecurityContext.Privileged != nil {
+		privileged = *c.SecurityContext.Privileged
 	}
+
 	var addCaps string
 	if privileged {
 		addCaps = getAllCapabilities()
