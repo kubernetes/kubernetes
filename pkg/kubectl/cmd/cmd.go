@@ -28,14 +28,13 @@ import (
 
 const (
 	bash_completion_func = `# call kubectl get $1,
-# use the first column in compgen
-# we could use templates, but then would need a template per resource
 __kubectl_parse_get()
 {
-    local kubectl_output out
-    if kubectl_output=$(kubectl get --no-headers "$1" 2>/dev/null); then
-        out=($(echo "${kubectl_output}" | awk '{print $1}'))
-        COMPREPLY=( $( compgen -W "${out[*]}" -- "$cur" ) )
+    local template
+    template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
+    local kubectl_out
+    if kubectl_out=$(kubectl get -o template --template="${template}" "$1" 2>/dev/null); then
+        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
 
@@ -51,7 +50,7 @@ __kubectl_get_resource()
 __kubectl_get_containers()
 {
     local template
-    template="{{ range .desiredState.manifest.containers  }}{{ .name }} {{ end }}"
+    template="{{ range .spec.containers  }}{{ .name }} {{ end }}"
     __debug "${FUNCNAME} nouns are ${nouns[*]}"
 
     local len="${#nouns[@]}"
