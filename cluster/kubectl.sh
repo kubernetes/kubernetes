@@ -109,7 +109,7 @@ if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   # in a separate location. If the file doesn't exist, then use
   # the default kubeconfig file.
   # TODO(roberthbailey): Remove this once gcloud 0.9.59 is released.
-  if [[ ! -e "${HOME}/.config/gcloud/kubernetes/kubeconfig" ]]; then
+  if [[ -e "${HOME}/.config/gcloud/kubernetes/kubeconfig" ]]; then
     config+=(
       "--kubeconfig=${HOME}/.config/gcloud/kubernetes/kubeconfig"
     )
