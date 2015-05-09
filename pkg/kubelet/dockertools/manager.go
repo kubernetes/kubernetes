@@ -435,8 +435,6 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 			containerStatus.LastTerminationState = oldStatus.LastTerminationState
 		}
 		//Check image is ready on the node or not.
-		// TODO: If we integrate DockerPuller into DockerManager, we can
-		// record the pull failure and eliminate the image checking below.
 		image := container.Image
 		// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
 		_, err := dm.client.InspectImage(image)
@@ -473,19 +471,6 @@ func (dm *DockerManager) GetPodInfraContainer(pod kubecontainer.Pod) (kubecontai
 		}
 	}
 	return kubecontainer.Container{}, fmt.Errorf("unable to find pod infra container for pod %v", pod.ID)
-}
-
-func (dm *DockerManager) runContainerRecordErrorReason(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions, ref *api.ObjectReference) (string, error) {
-	dockerID, err := dm.runContainer(pod, container, opts, ref)
-	if err != nil {
-		errString := err.Error()
-		if errString != "" {
-			dm.reasonCache.Add(pod.UID, container.Name, errString)
-		} else {
-			dm.reasonCache.Remove(pod.UID, container.Name)
-		}
-	}
-	return dockerID, err
 }
 
 func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions, ref *api.ObjectReference) (string, error) {
@@ -1100,7 +1085,7 @@ func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, ne
 		return "", err
 	}
 
-	id, err := dm.runContainerRecordErrorReason(pod, container, opts, ref)
+	id, err := dm.runContainer(pod, container, opts, ref)
 	if err != nil {
 		return "", err
 	}
@@ -1323,10 +1308,25 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 	}, nil
 }
 
+// updateReasonCache updates the failure reason based on the latest error.
+func (dm *DockerManager) updateReasonCache(pod *api.Pod, container *api.Container, err error) {
+	if err == nil {
+		return
+	}
+	errString := err.Error()
+	dm.reasonCache.Add(pod.UID, container.Name, errString)
+}
+
+// clearReasonCache removes the entry in the reason cache.
+func (dm *DockerManager) clearReasonCache(pod *api.Pod, container *api.Container) {
+	dm.reasonCache.Remove(pod.UID, container.Name)
+}
+
 // Pull the image for the specified pod and container.
 func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container) error {
 	spec := kubecontainer.ImageSpec{container.Image}
 	present, err := dm.IsImagePresent(spec)
+
 	if err != nil {
 		ref, err := kubecontainer.GenerateContainerRef(pod, container)
 		if err != nil {
@@ -1337,7 +1337,6 @@ func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container) error
 		}
 		return fmt.Errorf("failed to inspect image %q: %v", container.Image, err)
 	}
-
 	if !dm.runtimeHooks.ShouldPullImage(pod, container, present) {
 		return nil
 	}
@@ -1399,20 +1398,28 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	}
 
 	// Start everything
-	for container := range containerChanges.ContainersToStart {
-		glog.V(4).Infof("Creating container %+v", pod.Spec.Containers[container])
-		containerSpec := &pod.Spec.Containers[container]
-		if err := dm.pullImage(pod, containerSpec); err != nil {
-			glog.Warningf("Failed to pull image %q from pod %q and container %q: %v", containerSpec.Image, kubecontainer.GetPodFullName(pod), containerSpec.Name, err)
+	for idx := range containerChanges.ContainersToStart {
+		container := &pod.Spec.Containers[idx]
+		glog.V(4).Infof("Creating container %+v", container)
+		err := dm.pullImage(pod, container)
+		dm.updateReasonCache(pod, container, err)
+		if err != nil {
+			glog.Warningf("Failed to pull image %q from pod %q and container %q: %v", container.Image, kubecontainer.GetPodFullName(pod), container.Name, err)
 			continue
 		}
+
 		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-		_, err := dm.RunContainer(pod, containerSpec, namespaceMode, namespaceMode)
+		_, err = dm.RunContainer(pod, container, namespaceMode, namespaceMode)
+		dm.updateReasonCache(pod, container, err)
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?
-			glog.Errorf("Error running pod %q container %q: %v", kubecontainer.GetPodFullName(pod), containerSpec.Name, err)
+			glog.Errorf("Error running pod %q container %q: %v", kubecontainer.GetPodFullName(pod), container.Name, err)
+			continue
 		}
+		// Successfully started the container; clear the entry in the failure
+		// reason cache.
+		dm.clearReasonCache(pod, container)
 	}
 
 	return nil
