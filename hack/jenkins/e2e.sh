@@ -150,9 +150,13 @@ if [[ ! "${CIRCLECI:-}" == "true" ]]; then
   # Move the permissions to jenkins.
   # $ sudo chown -R jenkins /var/lib/jenkins/gce_keys/
   # $ sudo chgrp -R jenkins /var/lib/jenkins/gce_keys/
-  mkdir -p ${WORKSPACE}/.ssh/
-  cp /var/lib/jenkins/gce_keys/google_compute_engine ${WORKSPACE}/.ssh/
-  cp /var/lib/jenkins/gce_keys/google_compute_engine.pub ${WORKSPACE}/.ssh/
+  if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+    echo "Skipping SSH key copying for AWS"
+  else
+    mkdir -p ${WORKSPACE}/.ssh/
+    cp /var/lib/jenkins/gce_keys/google_compute_engine ${WORKSPACE}/.ssh/
+    cp /var/lib/jenkins/gce_keys/google_compute_engine.pub ${WORKSPACE}/.ssh/
+  fi
 fi
 
 md5sum kubernetes*.tar.gz
