@@ -597,7 +597,7 @@ func (b *Builder) visitorResult() *Result {
 		return &Result{singular: singular, visitor: visitors, sources: b.paths}
 	}
 
-	return &Result{err: fmt.Errorf("you must provide one or more resources by argument or filename")}
+	return &Result{err: fmt.Errorf(`you must provide one or more resources by argument or filename, try "kubectl help [command]" for help`)}
 }
 
 // Do returns a Result object with a Visitor for the resources identified by the Builder.
