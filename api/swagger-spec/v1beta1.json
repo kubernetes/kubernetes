@@ -1932,6 +1932,66 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "proxy HEAD requests to Node",
+      "nickname": "proxyHEADNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "TRACE",
+      "summary": "proxy TRACE requests to Node",
+      "nickname": "proxyTRACENode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -2010,6 +2070,50 @@
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "proxy HEAD requests to Node",
+      "nickname": "proxyHEADNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "TRACE",
+      "summary": "proxy TRACE requests to Node",
+      "nickname": "proxyTRACENode",
       "parameters": [
        {
         "type": "string",
@@ -3033,6 +3137,66 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "proxy HEAD requests to Node",
+      "nickname": "proxyHEADNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "TRACE",
+      "summary": "proxy TRACE requests to Node",
+      "nickname": "proxyTRACENode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -3111,6 +3275,50 @@
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "proxy HEAD requests to Node",
+      "nickname": "proxyHEADNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "TRACE",
+      "summary": "proxy TRACE requests to Node",
+      "nickname": "proxyTRACENode",
       "parameters": [
        {
         "type": "string",
@@ -4672,6 +4880,82 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "proxy HEAD requests to Pod",
+      "nickname": "proxyHEADPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "TRACE",
+      "summary": "proxy TRACE requests to Pod",
+      "nickname": "proxyTRACEPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -4774,6 +5058,66 @@
       "method": "DELETE",
       "summary": "proxy DELETE requests to Pod",
       "nickname": "proxyDELETEPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "proxy HEAD requests to Pod",
+      "nickname": "proxyHEADPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "TRACE",
+      "summary": "proxy TRACE requests to Pod",
+      "nickname": "proxyTRACEPod",
       "parameters": [
        {
         "type": "string",
@@ -7090,6 +7434,82 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "proxy HEAD requests to Service",
+      "nickname": "proxyHEADService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "TRACE",
+      "summary": "proxy TRACE requests to Service",
+      "nickname": "proxyTRACEService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -7192,6 +7612,66 @@
       "method": "DELETE",
       "summary": "proxy DELETE requests to Service",
       "nickname": "proxyDELETEService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "proxy HEAD requests to Service",
+      "nickname": "proxyHEADService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "TRACE",
+      "summary": "proxy TRACE requests to Service",
+      "nickname": "proxyTRACEService",
       "parameters": [
        {
         "type": "string",
@@ -7603,6 +8083,10 @@
      "containers"
     ],
     "properties": {
+     "activeDeadlineSeconds": {
+      "type": "integer",
+      "format": "int64"
+     },
      "containers": {
       "type": "array",
       "items": {
@@ -9251,7 +9735,8 @@
      "persistentDisk",
      "awsElasticBlockStore",
      "hostPath",
-     "glusterfs"
+     "glusterfs",
+     "nfs"
     ],
     "properties": {
      "accessModes": {
@@ -9280,6 +9765,10 @@
      "hostPath": {
       "$ref": "v1beta1.HostPathVolumeSource",
       "description": "a HostPath provisioned by a developer or tester; for develment use only"
+     },
+     "nfs": {
+      "$ref": "v1beta1.NFSVolumeSource",
+      "description": "NFS volume resource provisioned by an admin"
      },
      "persistentDisk": {
       "$ref": "v1beta1.GCEPersistentDiskVolumeSource",

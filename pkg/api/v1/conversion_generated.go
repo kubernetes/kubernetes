@@ -2652,6 +2652,12 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s conver
 	} else {
 		out.TerminationGracePeriodSeconds = nil
 	}
+	if in.ActiveDeadlineSeconds != nil {
+		out.ActiveDeadlineSeconds = new(int64)
+		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
 	out.DNSPolicy = newer.DNSPolicy(in.DNSPolicy)
 	if in.NodeSelector != nil {
 		out.NodeSelector = make(map[string]string)
@@ -2698,6 +2704,12 @@ func convert_api_PodSpec_To_v1_PodSpec(in *newer.PodSpec, out *PodSpec, s conver
 	} else {
 		out.TerminationGracePeriodSeconds = nil
 	}
+	if in.ActiveDeadlineSeconds != nil {
+		out.ActiveDeadlineSeconds = new(int64)
+		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
 	out.DNSPolicy = DNSPolicy(in.DNSPolicy)
 	if in.NodeSelector != nil {
 		out.NodeSelector = make(map[string]string)
@@ -2731,6 +2743,13 @@ func convert_v1_PodStatus_To_api_PodStatus(in *PodStatus, out *newer.PodStatus, 
 	out.Message = in.Message
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
+	if in.StartTime != nil {
+		if err := s.Convert(&in.StartTime, &out.StartTime, 0); err != nil {
+			return err
+		}
+	} else {
+		out.StartTime = nil
+	}
 	if in.ContainerStatuses != nil {
 		out.ContainerStatuses = make([]newer.ContainerStatus, len(in.ContainerStatuses))
 		for i := range in.ContainerStatuses {
@@ -2762,6 +2781,13 @@ func convert_api_PodStatus_To_v1_PodStatus(in *newer.PodStatus, out *PodStatus, 
 	out.Message = in.Message
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
+	if in.StartTime != nil {
+		if err := s.Convert(&in.StartTime, &out.StartTime, 0); err != nil {
+			return err
+		}
+	} else {
+		out.StartTime = nil
+	}
 	if in.ContainerStatuses != nil {
 		out.ContainerStatuses = make([]ContainerStatus, len(in.ContainerStatuses))
 		for i := range in.ContainerStatuses {

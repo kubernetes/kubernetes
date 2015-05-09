@@ -74,6 +74,25 @@ func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	s.podStatusesLock.Lock()
 	defer s.podStatusesLock.Unlock()
 	oldStatus, found := s.podStatuses[podFullName]
+
+	// ensure that the start time does not change across updates.
+	if found && oldStatus.StartTime != nil {
+		status.StartTime = oldStatus.StartTime
+	}
+
+	// if the status has no start time, we need to set an initial time
+	if status.StartTime.IsZero() {
+		if pod.Status.StartTime.IsZero() {
+			// the pod did not have a previously recorded value so set to now
+			now := util.Now()
+			status.StartTime = &now
+		} else {
+			// the pod had a recorded value, but the kubelet restarted so we need to rebuild cache
+			// based on last observed value
+			status.StartTime = pod.Status.StartTime
+		}
+	}
+
 	if !found || !reflect.DeepEqual(oldStatus, status) {
 		s.podStatuses[podFullName] = status
 		s.podStatusChannel <- podStatusSyncRequest{pod, status}
