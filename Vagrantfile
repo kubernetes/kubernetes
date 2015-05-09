@@ -70,14 +70,16 @@ $kube_provider_boxes = {
   }
 }
 
-# This stuff is cargo-culted from http://www.stefanwrobel.com/how-to-make-vagrant-performance-not-suck
-# Give access to half of all cpu cores on the host. We divide by 2 as we assume
-# that users are running with hyperthreads.
+# Give access to all physical cpu cores
+# Previously cargo-culted from here:
+# http://www.stefanwrobel.com/how-to-make-vagrant-performance-not-suck
+# Rewritten to actually determine the number of hardware cores instead of assuming
+# that the host has hyperthreading enabled.
 host = RbConfig::CONFIG['host_os']
 if host =~ /darwin/
-  $vm_cpus = (`sysctl -n hw.ncpu`.to_i/2.0).ceil
+  $vm_cpus = `sysctl -n hw.physicalcpu`.to_i
 elsif host =~ /linux/
-  $vm_cpus = (`nproc`.to_i/2.0).ceil
+  $vm_cpus = `cat /proc/cpuinfo | grep 'core id' | wc -l`.to_i
 else # sorry Windows folks, I can't help you
   $vm_cpus = 2
 end
