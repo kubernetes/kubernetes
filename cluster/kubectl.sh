@@ -100,13 +100,20 @@ elif [[ ! -x "${KUBECTL_PATH}" ]]; then
 fi
 kubectl="${KUBECTL_PATH:-${kubectl}}"
 
-# GKE stores it's kubeconfig in a separate location.
 if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
   config=(
-    "--kubeconfig=${HOME}/.config/gcloud/kubernetes/kubeconfig"
     "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
   )
+  # In gcloud versions prior to 0.9.59, GKE stores it's kubeconfig
+  # in a separate location. If the file doesn't exist, then use
+  # the default kubeconfig file.
+  # TODO(roberthbailey): Remove this once gcloud 0.9.59 is released.
+  if [[ ! -e "${HOME}/.config/gcloud/kubernetes/kubeconfig" ]]; then
+    config+=(
+      "--kubeconfig=${HOME}/.config/gcloud/kubernetes/kubeconfig"
+    )
+  fi
 elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" ]]; then
   detect-master > /dev/null
   config=(
