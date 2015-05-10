@@ -209,7 +209,7 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 		for i := 0; i < MaxRetries; i++ {
 			_, err = client.Pods(namespace).Update(pod)
 			if err != nil {
-				fmt.Fprint(out, "Error updating pod (%v), retrying after %d seconds", err, delay)
+				fmt.Fprintf(out, "Error updating pod (%v), retrying after %d seconds", err, delay)
 				time.Sleep(time.Second * time.Duration(delay))
 				delay *= delay
 			} else {
