@@ -26,7 +26,7 @@ In this case, we shall not run a single Hazelcast pod, because the discovery mec
 
 
 ### Adding a Hazelcast Service
-In Kubernetes a _Service_ describes a set of Pods that perform the same task.  For example, the set of nodes in a Hazelcast cluster, or even the single node we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.  This is the way that we use initially use Services with Hazelcast.
+In Kubernetes a _Service_ describes a set of Pods that perform the same task.  For example, the set of nodes in a Hazelcast cluster.  An important use for a Service is to create a load balancer which distributes traffic across members of the set.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods available via the Kubernetes API.  This is actually how our discovery mechanism works, by relying on the service to discover other Hazelcast pods.
 
 Here is the service description:
 ```yaml
