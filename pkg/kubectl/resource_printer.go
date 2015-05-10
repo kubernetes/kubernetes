@@ -250,7 +250,6 @@ var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP(S)", "PORT(S)"}
 var endpointColumns = []string{"NAME", "ENDPOINTS"}
 var nodeColumns = []string{"NAME", "LABELS", "STATUS"}
-var statusColumns = []string{"STATUS"}
 var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME"}
 var resourceQuotaColumns = []string{"NAME"}
@@ -274,7 +273,6 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(endpointColumns, printEndpointsList)
 	h.Handler(nodeColumns, printNode)
 	h.Handler(nodeColumns, printNodeList)
-	h.Handler(statusColumns, printStatus)
 	h.Handler(eventColumns, printEvent)
 	h.Handler(eventColumns, printEventList)
 	h.Handler(limitRangeColumns, printLimitRange)
@@ -676,11 +674,6 @@ func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, w io.Wr
 		}
 	}
 	return nil
-}
-
-func printStatus(status *api.Status, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%v\n", status.Status)
-	return err
 }
 
 func printEvent(event *api.Event, w io.Writer) error {
