@@ -1123,7 +1123,7 @@ type NodeSystemInfo struct {
 	// BootID is the boot-id reported by the node
 	BootID string `json:"bootID"`
 	// Kernel version reported by the node
-	KernelVersion string `json:"kernelVersion""`
+	KernelVersion string `json:"kernelVersion"`
 	// OS image used reported by the node
 	OsImage string `json:"osImage"`
 	// Container runtime version reported by the node
