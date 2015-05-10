@@ -24,37 +24,24 @@ field is the version of the API schema that the `fieldPath` is written in terms 
 
 This is an example of a pod that consumes its name and namespace via the downward API:
 
-```json
-{
-  "apiVersion":"v1beta3",
-  "name": "downward-api-pod",
-  "kind": "Pod",
-  "spec": {
-    "manifest": {
-      "containers": [{
-        "name": "example-container",
-        "image": "gcr.io/google_containers/busybox",
-        "command": [ "sh", "-c", "env" ]
-        "env": [{
-          "name": "POD_NAMESPACE",
-          "valueFrom": {
-            "fieldPath": {
-              "apiVersion": "v1beta3",
-              "fieldPath": "metadata.namespace"
-            }
-          }
-        },
-        {
-          "name": "POD_NAME",
-          "valueFrom": {
-            "fieldPath": {
-              "apiVersion": "v1beta3",
-              "fieldPath": "metadata.name"
-            }
-          }
-        }]
-      }]
-    }
-  }
-}]
+```yaml
+apiVersion: v1beta3
+kind: Pod
+metadata:
+  name: dapi-test-pod
+spec:
+  containers:
+    - name: test-container
+      image: gcr.io/google_containers/busybox
+      command: [ "/bin/sh", "-c", "env" ]
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+  restartPolicy: Never
 ```
