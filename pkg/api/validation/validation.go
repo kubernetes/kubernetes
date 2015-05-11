@@ -980,7 +980,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	}
 	allPortNames := util.StringSet{}
 	for i := range service.Spec.Ports {
-		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], i, &allPortNames).PrefixIndex(i).Prefix("spec.ports")...)
+		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, &allPortNames).PrefixIndex(i).Prefix("spec.ports")...)
 	}
 
 	if service.Spec.Selector != nil {
@@ -1018,18 +1018,17 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	return allErrs
 }
 
-func validateServicePort(sp *api.ServicePort, index int, allNames *util.StringSet) errs.ValidationErrorList {
+func validateServicePort(sp *api.ServicePort, requireName bool, allNames *util.StringSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	if len(sp.Name) == 0 {
-		// Allow empty names if they are the first port (mostly for compat).
-		if index != 0 {
-			allErrs = append(allErrs, errs.NewFieldRequired("name"))
+	if requireName && sp.Name == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("name"))
+	} else if sp.Name != "" {
+		if !util.IsDNS1123Label(sp.Name) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("name", sp.Name, dns1123LabelErrorMsg))
+		} else if allNames.Has(sp.Name) {
+			allErrs = append(allErrs, errs.NewFieldDuplicate("name", sp.Name))
 		}
-	} else if !util.IsDNS1123Label(sp.Name) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", sp.Name, dns1123LabelErrorMsg))
-	} else if allNames.Has(sp.Name) {
-		allErrs = append(allErrs, errs.NewFieldDuplicate("name", sp.Name))
 	}
 
 	if !util.IsValidPortNum(sp.Port) {

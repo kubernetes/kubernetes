@@ -1601,6 +1601,14 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "empty multi-port port[0] name",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Name = ""
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Protocol: "TCP", Port: 12345})
+			},
+			numErrs: 1,
+		},
+		{
 			name: "invalid port name",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Ports[0].Name = "INVALID"
