@@ -29,6 +29,7 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
@@ -180,6 +181,20 @@ func (l EagerVisitorList) Visit(fn VisitorFunc) error {
 	return errors.NewAggregate(errs)
 }
 
+func ValidateSchema(data []byte, schema validation.Schema) error {
+	if schema == nil {
+		return nil
+	}
+	data, err := yaml.ToJSON(data)
+	if err != nil {
+		return fmt.Errorf("error converting to YAML: %v", err)
+	}
+	if err := schema.ValidateBytes(data); err != nil {
+		return fmt.Errorf("error validating data: %v", err)
+	}
+	return nil
+}
+
 // PathVisitor visits a given path and returns an object representing the file
 // at that path.
 type PathVisitor struct {
@@ -188,12 +203,17 @@ type PathVisitor struct {
 	Path string
 	// Whether to ignore files that are not recognized as API objects
 	IgnoreErrors bool
+	// Schema for validation
+	Schema validation.Schema
 }
 
 func (v *PathVisitor) Visit(fn VisitorFunc) error {
 	data, err := ioutil.ReadFile(v.Path)
 	if err != nil {
 		return fmt.Errorf("unable to read %q: %v", v.Path, err)
+	}
+	if err := ValidateSchema(data, v.Schema); err != nil {
+		return err
 	}
 	info, err := v.Mapper.InfoForData(data, v.Path)
 	if err != nil {
@@ -218,6 +238,8 @@ type DirectoryVisitor struct {
 	Extensions []string
 	// Whether to ignore files that are not recognized as API objects
 	IgnoreErrors bool
+	// Schema for validation
+	Schema validation.Schema
 }
 
 func (v *DirectoryVisitor) ignoreFile(path string) bool {
@@ -253,6 +275,9 @@ func (v *DirectoryVisitor) Visit(fn VisitorFunc) error {
 		if err != nil {
 			return fmt.Errorf("unable to read %q: %v", path, err)
 		}
+		if err := ValidateSchema(data, v.Schema); err != nil {
+			return err
+		}
 		info, err := v.Mapper.InfoForData(data, path)
 		if err != nil {
 			if v.IgnoreErrors {
@@ -269,7 +294,8 @@ func (v *DirectoryVisitor) Visit(fn VisitorFunc) error {
 // an info object representing the downloaded object.
 type URLVisitor struct {
 	*Mapper
-	URL *url.URL
+	URL    *url.URL
+	Schema validation.Schema
 }
 
 func (v *URLVisitor) Visit(fn VisitorFunc) error {
@@ -284,6 +310,9 @@ func (v *URLVisitor) Visit(fn VisitorFunc) error {
 	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return fmt.Errorf("unable to read URL %q: %v\n", v.URL, err)
+	}
+	if err := ValidateSchema(data, v.Schema); err != nil {
+		return err
 	}
 	info, err := v.Mapper.InfoForData(data, v.URL.String())
 	if err != nil {
@@ -379,6 +408,7 @@ type StreamVisitor struct {
 
 	Source       string
 	IgnoreErrors bool
+	Schema       validation.Schema
 }
 
 // NewStreamVisitor creates a visitor that will return resources that were encoded into the provided
@@ -386,8 +416,8 @@ type StreamVisitor struct {
 // empty stream is treated as an error for now.
 // TODO: convert ignoreErrors into a func(data, error, count) bool that consumers can use to decide
 // what to do with ignored errors.
-func NewStreamVisitor(r io.Reader, mapper *Mapper, source string, ignoreErrors bool) Visitor {
-	return &StreamVisitor{r, mapper, source, ignoreErrors}
+func NewStreamVisitor(r io.Reader, mapper *Mapper, schema validation.Schema, source string, ignoreErrors bool) Visitor {
+	return &StreamVisitor{r, mapper, source, ignoreErrors, schema}
 }
 
 // Visit implements Visitor over a stream.
@@ -404,6 +434,9 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 		ext.RawJSON = bytes.TrimSpace(ext.RawJSON)
 		if len(ext.RawJSON) == 0 || bytes.Equal(ext.RawJSON, []byte("null")) {
 			continue
+		}
+		if err := ValidateSchema(ext.RawJSON, v.Schema); err != nil {
+			return err
 		}
 		info, err := v.InfoForData(ext.RawJSON, v.Source)
 		if err != nil {

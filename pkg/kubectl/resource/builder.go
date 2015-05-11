@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -62,6 +63,8 @@ type Builder struct {
 
 	singleResourceType bool
 	continueOnError    bool
+
+	schema validation.Schema
 }
 
 type resourceTuple struct {
@@ -75,6 +78,11 @@ func NewBuilder(mapper meta.RESTMapper, typer runtime.ObjectTyper, clientMapper 
 		mapper:        &Mapper{typer, mapper, clientMapper},
 		requireObject: true,
 	}
+}
+
+func (b *Builder) Schema(schema validation.Schema) *Builder {
+	b.schema = schema
+	return b
 }
 
 // Filename is parameters passed via a filename argument which may be URLs, the "-" argument indicating
@@ -105,6 +113,7 @@ func (b *Builder) URL(urls ...*url.URL) *Builder {
 		b.paths = append(b.paths, &URLVisitor{
 			Mapper: b.mapper,
 			URL:    u,
+			Schema: b.schema,
 		})
 	}
 	return b
@@ -123,7 +132,7 @@ func (b *Builder) Stdin() *Builder {
 // will be ignored (but logged at V(2)).
 func (b *Builder) Stream(r io.Reader, name string) *Builder {
 	b.stream = true
-	b.paths = append(b.paths, NewStreamVisitor(r, b.mapper, name, b.continueOnError))
+	b.paths = append(b.paths, NewStreamVisitor(r, b.mapper, b.schema, name, b.continueOnError))
 	return b
 }
 
@@ -150,12 +159,14 @@ func (b *Builder) Path(paths ...string) *Builder {
 				Extensions:   []string{".json", ".yaml", ".yml"},
 				Recursive:    false,
 				IgnoreErrors: b.continueOnError,
+				Schema:       b.schema,
 			}
 		} else {
 			visitor = &PathVisitor{
 				Mapper:       b.mapper,
 				Path:         p,
 				IgnoreErrors: b.continueOnError,
+				Schema:       b.schema,
 			}
 		}
 		b.paths = append(b.paths, visitor)
