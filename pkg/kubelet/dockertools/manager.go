@@ -1067,9 +1067,8 @@ func (dm *DockerManager) killContainer(containerID types.UID) error {
 	return err
 }
 
-// TODO(vmarmol): Unexport this as it is no longer used externally.
 // Run a single container from a pod. Returns the docker container ID
-func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, netMode, ipcMode string) (kubeletTypes.DockerID, error) {
+func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode string) (kubeletTypes.DockerID, error) {
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -1157,7 +1156,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 		dm.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
 	}
 
-	id, err := dm.RunContainer(pod, container, netNamespace, "")
+	id, err := dm.runContainerInPod(pod, container, netNamespace, "")
 	if err != nil {
 		return "", err
 	}
@@ -1405,7 +1404,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 
 		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-		_, err = dm.RunContainer(pod, container, namespaceMode, namespaceMode)
+		_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode)
 		dm.updateReasonCache(pod, container, err)
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?
