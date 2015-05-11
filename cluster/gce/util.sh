@@ -23,11 +23,10 @@ source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
 if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
-  echo "Starting cluster using os distro: ${OS_DISTRIBUTION}" >&2
   source "${KUBE_ROOT}/cluster/gce/${OS_DISTRIBUTION}/helper.sh"
 else
-  echo "Cannot start cluster using os distro: ${OS_DISTRIBUTION}" >&2
-  return
+  echo "Cannot operate on cluster using os distro: ${OS_DISTRIBUTION}" >&2
+  exit 1
 fi
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
