@@ -530,11 +530,19 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		t.Errorf("Unexpected PortalIP: %s", created_service_2.Spec.PortalIP)
 	}
 
+	testIPs := []string{"1.2.3.93", "1.2.3.94", "1.2.3.95", "1.2.3.96"}
+	testIP := ""
+	for _, ip := range testIPs {
+		if !rest.portals.(*ipallocator.Range).Has(net.ParseIP(ip)) {
+			testIP = ip
+		}
+	}
+
 	svc3 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "quux"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			PortalIP:        "1.2.3.93",
+			PortalIP:        testIP,
 			SessionAffinity: api.AffinityTypeNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
@@ -548,7 +556,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	created_service_3 := created_svc3.(*api.Service)
-	if created_service_3.Spec.PortalIP != "1.2.3.93" { // specific IP
+	if created_service_3.Spec.PortalIP != testIP { // specific IP
 		t.Errorf("Unexpected PortalIP: %s", created_service_3.Spec.PortalIP)
 	}
 }
