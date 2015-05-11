@@ -30,7 +30,6 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/lifecycle"
@@ -540,10 +539,6 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
 			opts.Binds = append(opts.Binds, b)
 		}
-	}
-
-	if !capabilities.Get().AllowPrivileged && securitycontext.HasPrivilegedRequest(container) {
-		return "", fmt.Errorf("container requested privileged mode, but it is disallowed globally.")
 	}
 
 	hc := &docker.HostConfig{
