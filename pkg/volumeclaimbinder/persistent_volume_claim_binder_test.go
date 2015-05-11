@@ -185,7 +185,7 @@ func TestBindingWithExamples(t *testing.T) {
 
 	claim, error := client.PersistentVolumeClaims("ns").Get("any")
 	if error != nil {
-		t.Error("Unexpected error getting PVC from client: %v", err)
+		t.Errorf("Unexpected error getting PVC from client: %v", err)
 	}
 
 	volumeIndex := NewPersistentVolumeOrderedIndex()
