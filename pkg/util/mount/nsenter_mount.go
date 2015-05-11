@@ -73,7 +73,7 @@ func (*NsenterMounter) Mount(source string, target string, fstype string, option
 	return doNsenterMount(source, target, fstype, options)
 }
 
-// doNsenterMount nsenter's the host's mount namespace and performs the
+// doNsenterMount nsenters the host's mount namespace and performs the
 // requested mount.
 func doNsenterMount(source, target, fstype string, options []string) error {
 	glog.V(5).Infof("nsenter Mounting %s %s %s %v", source, target, fstype, options)
