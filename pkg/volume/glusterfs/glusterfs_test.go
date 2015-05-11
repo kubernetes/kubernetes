@@ -94,7 +94,8 @@ func TestPlugin(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	builder, err := plug.(*glusterfsPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), ep, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, &fake)
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	builder, err := plug.(*glusterfsPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), ep, pod, &mount.FakeMounter{}, &fake)
 	volumePath := builder.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)

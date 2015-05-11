@@ -62,8 +62,8 @@ type VolumePlugin interface {
 	// NewBuilder creates a new volume.Builder from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec
-	// - podRef: a reference to the enclosing pod
-	NewBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions, mounter mount.Interface) (Builder, error)
+	// - pod: The enclosing pod
+	NewBuilder(spec *Spec, podRef *api.Pod, opts VolumeOptions, mounter mount.Interface) (Builder, error)
 
 	// NewCleaner creates a new volume.Cleaner from recoverable state.
 	// - name: The volume name, as per the api.Volume spec.
@@ -106,7 +106,7 @@ type VolumeHost interface {
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
-	NewWrapperBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions, mounter mount.Interface) (Builder, error)
+	NewWrapperBuilder(spec *Spec, pod *api.Pod, opts VolumeOptions, mounter mount.Interface) (Builder, error)
 
 	// NewWrapperCleaner finds an appropriate plugin with which to handle
 	// the provided spec.  See comments on NewWrapperBuilder for more
