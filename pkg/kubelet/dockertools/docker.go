@@ -157,9 +157,7 @@ func (p dockerPuller) IsImagePresent(image string) (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	// This is super brittle, but its the best we got.
-	// TODO: Land code in the docker client to use docker.Error here instead.
-	if err.Error() == "no such image" {
+	if err == docker.ErrNoSuchImage {
 		return false, nil
 	}
 	return false, err
