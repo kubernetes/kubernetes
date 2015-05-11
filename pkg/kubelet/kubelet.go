@@ -1173,7 +1173,7 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metri
 	}
 
 	// Note that we just killed the unwanted pods. This may not have reflected
-	// in the cache. We need to bypass the cach to get the latest set of
+	// in the cache. We need to bypass the cache to get the latest set of
 	// running pods to clean up the volumes.
 	// TODO: Evaluate the performance impact of bypassing the runtime cache.
 	runningPods, err = kl.containerRuntime.GetPods(false)
@@ -1696,7 +1696,8 @@ func getPodReadyCondition(spec *api.PodSpec, statuses []api.ContainerStatus) []a
 	return ready
 }
 
-// GetPodStatus returns information from Docker about the containers in a pod
+// GetPodStatus returns information of the containers in the pod from the
+// container runtime.
 func (kl *Kubelet) GetPodStatus(podFullName string) (api.PodStatus, error) {
 	// Check to see if we have a cached version of the status.
 	cachedPodStatus, found := kl.statusManager.GetPodStatus(podFullName)
@@ -1722,14 +1723,14 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	if err != nil {
 		// Error handling
-		glog.Infof("Query docker container info for pod %q failed with error (%v)", podFullName, err)
+		glog.Infof("Query container info for pod %q failed with error (%v)", podFullName, err)
 		if strings.Contains(err.Error(), "resource temporarily unavailable") {
 			// Leave upstream layer to decide what to do
 			return api.PodStatus{}, err
 		} else {
 			pendingStatus := api.PodStatus{
 				Phase:   api.PodPending,
-				Message: fmt.Sprintf("Query docker container info failed with error (%v)", err),
+				Message: fmt.Sprintf("Query container info failed with error (%v)", err),
 			}
 			return pendingStatus, nil
 		}
