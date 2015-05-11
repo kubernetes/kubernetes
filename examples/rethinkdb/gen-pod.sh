@@ -32,41 +32,42 @@ if [[ ${NAME} == "admin" ]]; then
 fi
 
 NODE=""
+# One needs to label a node with the same key/value pair, 
+# i.e., 'kubectl label nodes <node-name> name=${2}'
 if [[ ! -z "${2-}" ]]; then
   NODE="nodeSelector: { name: ${2} }"
 fi
 
 cat << EOF
-apiVersion: v1beta1
-namespace: rethinkdb
+apiVersion: v1beta3
 kind: Pod
-id: rethinkdb-${NAME}-${VERSION}
-${NODE}
-labels:
-  db: rethinkdb
-  ${ADMIN}
-desiredState:
-  manifest:
-    version: v1beta1
-    id: rethinkdb
-    containers:
-      - name: rethinkdb
-        image: antmanler/rethinkdb:${VERSION}
-        ports:
-          - name: admin-port
-            containerPort: 8080
-          - name: driver-port
-            containerPort: 28015
-          - name: cluster-port
-            containerPort: 29015
-        volumeMounts:
-          - name: rethinkdb-storage
-            mountPath: /data/rethinkdb_data
-    volumes:
-      - name: rethinkdb-storage
-        source:
-          hostDir:
-            path: /data/db/rethinkdb
-    restartPolicy:
-      always: {}
+metadata:
+  labels:
+    ${ADMIN}
+    db: rethinkdb
+  name: rethinkdb-${NAME}-${VERSION}
+  namespace: rethinkdb
+spec:
+  containers:
+  - image: antmanler/rethinkdb:${VERSION}
+    name: rethinkdb
+    ports:
+    - containerPort: 8080
+      name: admin-port
+      protocol: TCP
+    - containerPort: 28015
+      name: driver-port
+      protocol: TCP
+    - containerPort: 29015
+      name: cluster-port
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /data/rethinkdb_data
+      name: rethinkdb-storage
+  ${NODE}
+  restartPolicy: Always
+  volumes:
+  - hostPath:
+      path: /data/db/rethinkdb
+    name: rethinkdb-storage
 EOF

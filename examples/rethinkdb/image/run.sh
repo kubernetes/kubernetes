@@ -22,8 +22,8 @@ if [[ -n "${KUBERNETES_RO_SERVICE_HOST}" ]]; then
   : ${NAMESPACE:=rethinkdb}
   # try to pick up first different ip from endpoints
   MYHOST=$(ip addr | grep 'state UP' -A2 | tail -n1 | awk '{print $2}' | cut -f1  -d'/')
-  URL="${KUBERNETES_RO_SERVICE_HOST}/api/v1beta1/endpoints/rethinkdb-driver?namespace=${NAMESPACE}"
-  IP=$(curl -s ${URL} | jq -s -r --arg h "${MYHOST}" '.[0].endpoints | [ .[]? | split(":") ] | map(select(.[0] != $h)) | .[0][0]') || exit 1
+  URL="${KUBERNETES_RO_SERVICE_HOST}/api/v1beta3/namespaces/${NAMESPACE}/endpoints/rethinkdb-driver"
+  IP=$(curl -s ${URL} | jq -s -r --arg h "${MYHOST}" '.[0].subsets | .[].addresses | [ .[].IP ] | map(select(. != $h)) | .[0]') || exit 1
   [[ "${IP}" == null ]] && IP=""
 fi
 
