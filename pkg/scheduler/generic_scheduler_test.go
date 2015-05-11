@@ -44,8 +44,7 @@ func numericPriority(pod *api.Pod, podLister PodLister, minionLister MinionListe
 	result := []HostPriority{}
 
 	if err != nil {
-		fmt.Errorf("failed to list nodes: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to list nodes: %v", err)
 	}
 	for _, minion := range nodes.Items {
 		score, err := strconv.Atoi(minion.Name)
