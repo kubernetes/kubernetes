@@ -332,7 +332,7 @@ type Kubelet struct {
 	runtimeCache   kubecontainer.RuntimeCache
 	kubeClient     client.Interface
 	rootDirectory  string
-	podWorkers     *podWorkers
+	podWorkers     PodWorkers
 	resyncInterval time.Duration
 	sourcesReady   SourcesReadyFn
 
