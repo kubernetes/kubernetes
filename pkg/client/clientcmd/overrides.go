@@ -44,7 +44,6 @@ type ConfigOverrideFlags struct {
 
 // AuthOverrideFlags holds the flag names to be used for binding command line flags for AuthInfo objects
 type AuthOverrideFlags struct {
-	AuthPath          FlagInfo
 	ClientCertificate FlagInfo
 	ClientKey         FlagInfo
 	Token             FlagInfo
@@ -81,7 +80,6 @@ const (
 	FlagNamespace    = "namespace"
 	FlagAPIServer    = "server"
 	FlagAPIVersion   = "api-version"
-	FlagAuthPath     = "auth-path"
 	FlagInsecure     = "insecure-skip-tls-verify"
 	FlagCertFile     = "client-certificate"
 	FlagKeyFile      = "client-key"
@@ -95,7 +93,6 @@ const (
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 	return AuthOverrideFlags{
-		AuthPath:          FlagInfo{prefix + FlagAuthPath, "", "", "Path to the auth info file. If missing, prompt the user. Only used if using https."},
 		ClientCertificate: FlagInfo{prefix + FlagCertFile, "", "", "Path to a client key file for TLS."},
 		ClientKey:         FlagInfo{prefix + FlagKeyFile, "", "", "Path to a client key file for TLS."},
 		Token:             FlagInfo{prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server."},
@@ -135,20 +132,11 @@ func RecommendedContextOverrideFlags(prefix string) ContextOverrideFlags {
 
 // BindAuthInfoFlags is a convenience method to bind the specified flags to their associated variables
 func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, flagNames AuthOverrideFlags) {
-	deadString := ""
-	bindStringFlag(flags, &deadString, flagNames.AuthPath)
 	bindStringFlag(flags, &authInfo.ClientCertificate, flagNames.ClientCertificate)
 	bindStringFlag(flags, &authInfo.ClientKey, flagNames.ClientKey)
 	bindStringFlag(flags, &authInfo.Token, flagNames.Token)
 	bindStringFlag(flags, &authInfo.Username, flagNames.Username)
 	bindStringFlag(flags, &authInfo.Password, flagNames.Password)
-
-	if len(flagNames.AuthPath.LongName) > 0 {
-		flags.MarkDeprecated(flagNames.AuthPath.LongName, flagNames.AuthPath.LongName+" has been removed and is no longer respected")
-	}
-	if len(flagNames.AuthPath.ShortName) > 0 {
-		flags.MarkDeprecated(flagNames.AuthPath.ShortName, flagNames.AuthPath.ShortName+" has been removed and is no longer respected")
-	}
 }
 
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables

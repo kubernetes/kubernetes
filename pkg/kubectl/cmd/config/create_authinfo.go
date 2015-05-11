@@ -94,8 +94,6 @@ func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Co
 	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.embedCertData, clientcmd.FlagEmbedCerts, "embed client cert/key for the user entry in kubeconfig")
 
-	cmd.Flags().String(clientcmd.FlagAuthPath, "", clientcmd.FlagAuthPath+" for the user entry in kubeconfig")
-	cmd.Flags().MarkDeprecated(clientcmd.FlagAuthPath, clientcmd.FlagAuthPath+" has been removed and is no longer respected")
 	return cmd
 }
 
@@ -125,10 +123,6 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	modifiedAuthInfo := existingAuthInfo
 
 	var setToken, setBasic bool
-
-	if o.authPath.Provided() {
-		modifiedAuthInfo.AuthPath = o.authPath.Value()
-	}
 
 	if o.clientCertificate.Provided() {
 		certPath := o.clientCertificate.Value()

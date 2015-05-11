@@ -33,7 +33,7 @@ func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
 		CertificateAuthority: "missing",
 	}
 	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
-		AuthPath: "anything",
+		Username: "anything",
 		Token:    "here",
 	}
 	config.Contexts["dirty"] = clientcmdapi.Context{
@@ -53,7 +53,7 @@ func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
 
 	badValidation := configValidationTest{
 		config:                 config,
-		expectedErrorSubstring: []string{"unable to read auth-path", "unable to read certificate-authority"},
+		expectedErrorSubstring: []string{"unable to read certificate-authority"},
 	}
 	okTest := configValidationTest{
 		config: config,
@@ -69,7 +69,7 @@ func TestConfirmUsableBadInfoConfig(t *testing.T) {
 		CertificateAuthority: "missing",
 	}
 	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
-		AuthPath: "anything",
+		Username: "anything",
 		Token:    "here",
 	}
 	config.Contexts["first"] = clientcmdapi.Context{
@@ -78,7 +78,7 @@ func TestConfirmUsableBadInfoConfig(t *testing.T) {
 	}
 	test := configValidationTest{
 		config:                 config,
-		expectedErrorSubstring: []string{"unable to read auth-path", "unable to read certificate-authority"},
+		expectedErrorSubstring: []string{"unable to read certificate-authority"},
 	}
 
 	test.testConfirmUsable("first", t)
@@ -236,19 +236,6 @@ func TestValidateEmptyAuthInfo(t *testing.T) {
 	test.testAuthInfo("error", t)
 	test.testConfig(t)
 }
-func TestValidatePathNotFoundAuthInfo(t *testing.T) {
-	config := clientcmdapi.NewConfig()
-	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
-		AuthPath: "missing",
-	}
-	test := configValidationTest{
-		config:                 config,
-		expectedErrorSubstring: []string{"unable to read auth-path"},
-	}
-
-	test.testAuthInfo("error", t)
-	test.testConfig(t)
-}
 func TestValidateCertFilesNotFoundAuthInfo(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
@@ -290,21 +277,6 @@ func TestValidateCleanCertFilesAuthInfo(t *testing.T) {
 	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
 		ClientCertificate: tempFile.Name(),
 		ClientKey:         tempFile.Name(),
-	}
-	test := configValidationTest{
-		config: config,
-	}
-
-	test.testAuthInfo("clean", t)
-	test.testConfig(t)
-}
-func TestValidateCleanPathAuthInfo(t *testing.T) {
-	tempFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(tempFile.Name())
-
-	config := clientcmdapi.NewConfig()
-	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
-		AuthPath: tempFile.Name(),
 	}
 	test := configValidationTest{
 		config: config,

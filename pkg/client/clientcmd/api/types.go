@@ -69,8 +69,6 @@ type Cluster struct {
 type AuthInfo struct {
 	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
 	LocationOfOrigin string
-	// AuthPath is the path to a kubernetes auth file (~/.kubernetes_auth).  If you provide an AuthPath, the other options specified are ignored
-	AuthPath string `json:"auth-path,omitempty"`
 	// ClientCertificate is the path to a client cert file for TLS.
 	ClientCertificate string `json:"client-certificate,omitempty"`
 	// ClientCertificateData contains PEM-encoded data from a client cert file for TLS. Overrides ClientCertificate

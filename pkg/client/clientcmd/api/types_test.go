@@ -53,9 +53,6 @@ func ExampleOfOptionsConfig() {
 		APIVersion:            "v1beta1",
 		InsecureSkipTLSVerify: false,
 	}
-	defaultConfig.AuthInfos["black-mage-via-file"] = AuthInfo{
-		AuthPath: "path/to/my/.kubernetes_auth",
-	}
 	defaultConfig.AuthInfos["white-mage-via-cert"] = AuthInfo{
 		ClientCertificate: "path/to/my/client-cert-filename",
 		ClientKey:         "path/to/my/client-key-filename",
@@ -116,9 +113,6 @@ func ExampleOfOptionsConfig() {
 	// preferences:
 	//   colors: true
 	// users:
-	//   black-mage-via-file:
-	//     LocationOfOrigin: ""
-	//     auth-path: path/to/my/.kubernetes_auth
 	//   red-mage-via-token:
 	//     LocationOfOrigin: ""
 	//     token: my-secret-token

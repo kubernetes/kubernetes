@@ -307,7 +307,6 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 }
 
 // kubectlCmd runs the kubectl executable.
-// kubectlCmd runs the kubectl executable.
 func kubectlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
 
@@ -324,7 +323,6 @@ func kubectlCmd(args ...string) *exec.Cmd {
 		}
 
 	} else {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAuthPath+"="+testContext.AuthConfig)
 		if testContext.CertDir != "" {
 			defaultArgs = append(defaultArgs,
 				fmt.Sprintf("--certificate-authority=%s", filepath.Join(testContext.CertDir, "ca.crt")),
