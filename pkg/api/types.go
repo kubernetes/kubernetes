@@ -1825,7 +1825,8 @@ type Secret struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.
+	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN
+	// or leading dot followed by valid DNS_SUBDOMAIN.
 	// The serialized form of the secret data is a base64 encoded string,
 	// representing the arbitrary (possibly non-string) data value here.
 	Data map[string][]byte `json:"data,omitempty"`
