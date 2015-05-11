@@ -192,9 +192,12 @@ var _ = Describe("Services", func() {
 		Expect(foundRO).To(Equal(true))
 	})
 
-	It("should serve a basic endpoint from pods", func(done Done) {
+	It("should serve a basic endpoint from pods", func() {
+
 		serviceName := "endpoint-test2"
-		ns := api.NamespaceDefault
+		ns_, err := createTestingNS(namespace0, c)
+		ns := ns_.Name
+
 		labels := map[string]string{
 			"foo": "bar",
 			"baz": "blah",
@@ -202,6 +205,8 @@ var _ = Describe("Services", func() {
 
 		defer func() {
 			err := c.Services(ns).Delete(serviceName)
+			Expect(err).NotTo(HaveOccurred())
+			err = c.Namespaces().Delete(ns)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
@@ -217,7 +222,7 @@ var _ = Describe("Services", func() {
 				}},
 			},
 		}
-		_, err := c.Services(ns).Create(service)
+		_, err = c.Services(ns).Create(service)
 		Expect(err).NotTo(HaveOccurred())
 		expectedPort := 80
 
@@ -230,36 +235,34 @@ var _ = Describe("Services", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}()
+		const timeout = 4 * time.Minute
 
-		name1 := "test1"
-		addEndpointPodOrFail(c, ns, name1, labels)
-		names = append(names, name1)
+		for start := time.Now(); time.Since(start) < timeout; {
+			name1 := "test1"
+			addEndpointPodOrFail(c, ns, name1, labels)
+			names = append(names, name1)
 
-		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
+			validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
 
-		name2 := "test2"
-		addEndpointPodOrFail(c, ns, name2, labels)
-		names = append(names, name2)
+			name2 := "test2"
+			addEndpointPodOrFail(c, ns, name2, labels)
+			names = append(names, name2)
 
-		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
+			validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
 
-		err = c.Pods(ns).Delete(name1, nil)
-		Expect(err).NotTo(HaveOccurred())
-		names = []string{name2}
+			err = c.Pods(ns).Delete(name1, nil)
+			Expect(err).NotTo(HaveOccurred())
+			names = []string{name2}
 
-		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
+			validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
 
-		err = c.Pods(ns).Delete(name2, nil)
-		Expect(err).NotTo(HaveOccurred())
-		names = []string{}
+			err = c.Pods(ns).Delete(name2, nil)
+			Expect(err).NotTo(HaveOccurred())
+			names = []string{}
 
-		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
-
-		// We deferred Gingko pieces that may Fail, we aren't done.
-		defer func() {
-			close(done)
-		}()
-	}, 240.0)
+			validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
+		}
+	})
 
 	It("should be able to create a functioning external load balancer", func() {
 		if !providerIs("gce", "gke") {
