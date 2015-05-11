@@ -317,7 +317,6 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	overrides := &clientcmd.ConfigOverrides{}
 	flagNames := clientcmd.RecommendedConfigOverrideFlags("")
 	// short flagnames are disabled by default.  These are here for compatibility with existing scripts
-	flagNames.AuthOverrideFlags.AuthPath.ShortName = "a"
 	flagNames.ClusterOverrideFlags.APIServer.ShortName = "s"
 
 	clientcmd.BindOverrideFlags(overrides, flags, flagNames)

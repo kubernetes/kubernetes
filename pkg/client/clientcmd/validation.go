@@ -177,17 +177,6 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 	if len(authInfo.Username) != 0 || len(authInfo.Password) != 0 {
 		methods = append(methods, "basicAuth")
 	}
-	if len(authInfo.AuthPath) != 0 {
-		usingAuthPath = true
-		methods = append(methods, "authFile")
-
-		file, err := os.Open(authInfo.AuthPath)
-		os.IsNotExist(err)
-		defer file.Close()
-		if err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("unable to read auth-path %v for %v due to %v", authInfo.AuthPath, authInfoName, err))
-		}
-	}
 
 	if len(authInfo.ClientCertificate) != 0 || len(authInfo.ClientCertificateData) != 0 {
 		// Make sure cert data and file aren't both specified

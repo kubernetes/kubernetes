@@ -193,6 +193,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.MaxPerPodContainerCount, "maximum-dead-containers-per-container", s.MaxPerPodContainerCount, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
 	fs.IntVar(&s.MaxContainerCount, "maximum-dead-containers", s.MaxContainerCount, "Maximum number of old instances of a containers to retain globally.  Each container takes up some disk space.  Default: 100.")
 	fs.StringVar(&s.AuthPath, "auth-path", s.AuthPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
+	fs.MarkDeprecated("auth-path", "will be removed in a future version")
 	fs.UintVar(&s.CadvisorPort, "cadvisor-port", s.CadvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
 	fs.Var(&s.HealthzBindAddress, "healthz-bind-address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")

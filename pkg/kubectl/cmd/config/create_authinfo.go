@@ -71,7 +71,7 @@ func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Co
 	options := &createAuthInfoOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:     fmt.Sprintf("set-credentials NAME [--%v=/path/to/authfile] [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password]", clientcmd.FlagAuthPath, clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword),
+		Use:     fmt.Sprintf("set-credentials NAME [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password]", clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword),
 		Short:   "Sets a user entry in kubeconfig",
 		Long:    create_authinfo_long,
 		Example: create_authinfo_example,
@@ -87,7 +87,6 @@ func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Co
 		},
 	}
 
-	cmd.Flags().Var(&options.authPath, clientcmd.FlagAuthPath, clientcmd.FlagAuthPath+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.clientCertificate, clientcmd.FlagCertFile, "path to "+clientcmd.FlagCertFile+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.clientKey, clientcmd.FlagKeyFile, "path to "+clientcmd.FlagKeyFile+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.token, clientcmd.FlagBearerToken, clientcmd.FlagBearerToken+" for the user entry in kubeconfig")
@@ -124,10 +123,6 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	modifiedAuthInfo := existingAuthInfo
 
 	var setToken, setBasic bool
-
-	if o.authPath.Provided() {
-		modifiedAuthInfo.AuthPath = o.authPath.Value()
-	}
 
 	if o.clientCertificate.Provided() {
 		certPath := o.clientCertificate.Value()

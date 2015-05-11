@@ -235,7 +235,6 @@ func ResolveLocalPaths(filename string, config *clientcmdapi.Config) error {
 
 	resolvedAuthInfos := make(map[string]clientcmdapi.AuthInfo)
 	for key, authInfo := range config.AuthInfos {
-		authInfo.AuthPath = resolveLocalPath(configDir, authInfo.AuthPath)
 		authInfo.ClientCertificate = resolveLocalPath(configDir, authInfo.ClientCertificate)
 		authInfo.ClientKey = resolveLocalPath(configDir, authInfo.ClientKey)
 		resolvedAuthInfos[key] = authInfo
