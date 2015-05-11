@@ -1,0 +1,29 @@
+apiVersion: v1beta3
+kind: Pod
+metadata:
+  name: fluentd-elasticsearch
+spec:
+  containers:
+  - name: fluentd-elasticsearch
+    image: gcr.io/google_containers/fluentd-elasticsearch:1.5
+    env:
+    - name: "FLUENTD_ARGS"
+      value: "-qq"
+    volumeMounts:
+    - name: varlog
+      mountPath: /varlog
+    - name: containers
+      mountPath: /var/lib/docker/containers
+    - name: token-admin
+      mountPath: /etc/token-admin
+      readOnly: true
+  volumes:
+  - name: varlog
+    hostPath:
+      path: /var/log
+  - name: containers
+    hostPath:
+      path: /var/lib/docker/containers
+  - name: token-admin
+    secret:
+    secretName: token-admin
