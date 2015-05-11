@@ -1575,6 +1575,7 @@ func (f *fakeContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port ui
 	f.Stream = stream
 	return nil
 }
+
 func TestRunInContainerNoSuchPod(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	testKubelet := newTestKubelet(t)

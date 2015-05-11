@@ -58,17 +58,6 @@ type Runtime interface {
 	// GetPodStatus retrieves the status of the pod, including the information of
 	// all containers in the pod.
 	GetPodStatus(*api.Pod) (*api.PodStatus, error)
-	// TODO(vmarmol): Merge RunInContainer and ExecInContainer.
-	// Runs the command in the container of the specified pod using nsinit.
-	// TODO(yifan): Use strong type for containerID.
-	RunInContainer(containerID string, cmd []string) ([]byte, error)
-	// Runs the command in the container of the specified pod using nsenter.
-	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
-	// tty.
-	// TODO(yifan): Use strong type for containerID.
-	ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
-	// Forward the specified port from the specified pod to the stream.
-	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
 	PullImage(image ImageSpec, secrets []api.Secret) error
@@ -84,6 +73,23 @@ type Runtime interface {
 	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
 	// "100" or "all") to tail the log.
 	GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error)
+	// ContainerCommandRunner encapsulates the command runner interfaces for testability.
+	ContainerCommandRunner
+}
+
+// CommandRunner encapsulates the command runner interfaces for testability.
+type ContainerCommandRunner interface {
+	// TODO(vmarmol): Merge RunInContainer and ExecInContainer.
+	// Runs the command in the container of the specified pod using nsinit.
+	// TODO(yifan): Use strong type for containerID.
+	RunInContainer(containerID string, cmd []string) ([]byte, error)
+	// Runs the command in the container of the specified pod using nsenter.
+	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
+	// tty.
+	// TODO(yifan): Use strong type for containerID.
+	ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
+	// Forward the specified port from the specified pod to the stream.
+	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
 }
 
 // Customizable hooks injected into container runtimes.
