@@ -44,7 +44,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/rkt"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -345,7 +344,7 @@ type Kubelet struct {
 	// Optional, defaults to /logs/ from /var/log
 	logServer http.Handler
 	// Optional, defaults to simple Docker implementation
-	runner prober.ContainerCommandRunner
+	runner kubecontainer.ContainerCommandRunner
 	// Optional, client for http requests, defaults to empty client
 	httpClient kubeletTypes.HttpGetter
 
@@ -1781,9 +1780,6 @@ func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, container
 func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
 	podUID = kl.podManager.TranslatePodUID(podUID)
 
-	if kl.runner == nil {
-		return nil, fmt.Errorf("no runner specified.")
-	}
 	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
@@ -1799,9 +1795,6 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
 	podUID = kl.podManager.TranslatePodUID(podUID)
 
-	if kl.runner == nil {
-		return fmt.Errorf("no runner specified.")
-	}
 	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return err
@@ -1816,10 +1809,6 @@ func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, contain
 // and the stream.
 func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16, stream io.ReadWriteCloser) error {
 	podUID = kl.podManager.TranslatePodUID(podUID)
-
-	if kl.runner == nil {
-		return fmt.Errorf("no runner specified.")
-	}
 
 	pods, err := kl.containerRuntime.GetPods(false)
 	if err != nil {
