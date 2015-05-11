@@ -583,7 +583,7 @@ func (m *Master) NewBootstrapController() *Controller {
 
 		ReadOnlyServiceIP:         m.serviceReadOnlyIP,
 		ReadOnlyServicePort:       m.serviceReadOnlyPort,
-		PublicReadOnlyServicePort: m.serviceReadOnlyPort,
+		PublicReadOnlyServicePort: m.publicReadOnlyPort,
 	}
 }
 
