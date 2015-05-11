@@ -250,7 +250,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 			t.Errorf("Pod scheduled successfully on unschedulable nodes")
 		}
 		if err != wait.ErrWaitTimeout {
-			t.Errorf("Test %d: failed while trying to confirm the pod does not get scheduled on the node: %v", err)
+			t.Errorf("Test %d: failed while trying to confirm the pod does not get scheduled on the node: %v", i, err)
 		} else {
 			t.Logf("Test %d: Pod did not get scheduled on an unschedulable node", i)
 		}
@@ -265,7 +265,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		// Wait until the pod is scheduled.
 		err = wait.Poll(time.Second, time.Second*10, podScheduled(restClient, myPod.Namespace, myPod.Name))
 		if err != nil {
-			t.Errorf("Test %d: failed to schedule a pod: %v", err)
+			t.Errorf("Test %d: failed to schedule a pod: %v", i, err)
 		} else {
 			t.Logf("Test %d: Pod got scheduled on a schedulable node", i)
 		}
