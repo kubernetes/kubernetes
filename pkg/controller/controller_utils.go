@@ -84,7 +84,7 @@ func (r *RCExpectations) SatisfiedExpectations(rc *api.ReplicationController) bo
 		if podExp.Fulfilled() {
 			return true
 		} else {
-			glog.V(4).Infof("Controller %v still waiting on expectations %#v", podExp)
+			glog.V(4).Infof("Controller still waiting on expectations %#v", podExp)
 			return false
 		}
 	} else if err != nil {

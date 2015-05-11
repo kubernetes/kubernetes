@@ -225,7 +225,7 @@ func startManagerAndWait(manager *ReplicationManager, pods int, t *testing.T) ch
 func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
 	fakePodControl := FakePodControl{}
-	manager := NewReplicationManager(client)
+	manager := NewReplicationManager(client, BurstReplicas)
 
 	// 2 running pods, a controller with 2 replicas, sync is a no-op
 	controllerSpec := newReplicationController(2)
@@ -240,7 +240,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 func TestSyncReplicationControllerDeletes(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
 	fakePodControl := FakePodControl{}
-	manager := NewReplicationManager(client)
+	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podControl = &fakePodControl
 
 	// 2 running pods and a controller with 1 replica, one pod delete expected
@@ -254,7 +254,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
-	manager := NewReplicationManager(client)
+	manager := NewReplicationManager(client, BurstReplicas)
 
 	// A controller with 2 replicas and no pods in the store, 2 creates expected
 	controller := newReplicationController(2)
@@ -319,7 +319,7 @@ func TestControllerNoReplicaUpdate(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	manager := NewReplicationManager(client)
+	manager := NewReplicationManager(client, BurstReplicas)
 
 	// Steady state for the replication controller, no Status.Replicas updates expected
 	activePods := 5
@@ -348,7 +348,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	defer testServer.Close()
 
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	manager := NewReplicationManager(client)
+	manager := NewReplicationManager(client, BurstReplicas)
 
 	// Insufficient number of pods in the system, and Status.Replicas is wrong;
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
@@ -533,7 +533,7 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 
 	fakePodControl := FakePodControl{}
-	manager := NewReplicationManager(client)
+	manager := NewReplicationManager(client, BurstReplicas)
 	manager.podControl = &fakePodControl
 
 	controllerSpec := newReplicationController(2)
@@ -572,7 +572,7 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 }
 
 func TestPodControllerLookup(t *testing.T) {
-	manager := NewReplicationManager(client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()}))
+	manager := NewReplicationManager(client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()}), BurstReplicas)
 	testCases := []struct {
 		inRCs     []*api.ReplicationController
 		pod       *api.Pod
@@ -638,7 +638,7 @@ type FakeWatcher struct {
 func TestWatchControllers(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	client := &testclient.Fake{Watch: fakeWatch}
-	manager := NewReplicationManager(client)
+	manager := NewReplicationManager(client, BurstReplicas)
 
 	var testControllerSpec api.ReplicationController
 	received := make(chan string)
@@ -679,7 +679,7 @@ func TestWatchControllers(t *testing.T) {
 func TestWatchPods(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	client := &testclient.Fake{Watch: fakeWatch}
-	manager := NewReplicationManager(client)
+	manager := NewReplicationManager(client, BurstReplicas)
 
 	// Put one rc and one pod into the controller's stores
 	testControllerSpec := newReplicationController(1)
@@ -722,7 +722,7 @@ func TestWatchPods(t *testing.T) {
 func TestUpdatePods(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	client := &testclient.Fake{Watch: fakeWatch}
-	manager := NewReplicationManager(client)
+	manager := NewReplicationManager(client, BurstReplicas)
 
 	received := make(chan string)
 
@@ -780,7 +780,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	defer testServer.Close()
 
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	manager := NewReplicationManager(client)
+	manager := NewReplicationManager(client, BurstReplicas)
 
 	rc := newReplicationController(1)
 	manager.controllerStore.Store.Add(rc)
@@ -851,4 +851,105 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	if gets != 1 || updates != 2 {
 		t.Errorf("Expected 1 get and 2 updates, got %d gets %d updates", gets, updates)
 	}
+}
+
+func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int) {
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	fakePodControl := FakePodControl{}
+	manager := NewReplicationManager(client, burstReplicas)
+	manager.podControl = &fakePodControl
+
+	controllerSpec := newReplicationController(numReplicas)
+	manager.controllerStore.Store.Add(controllerSpec)
+
+	expectedPods := 0
+	pods := newPodList(nil, numReplicas, api.PodPending, controllerSpec)
+
+	// Size up the controller, then size it down, and confirm the expected create/delete pattern
+	for _, replicas := range []int{numReplicas, 0} {
+
+		controllerSpec.Spec.Replicas = replicas
+		manager.controllerStore.Store.Add(controllerSpec)
+
+		for i := 0; i < numReplicas; i += burstReplicas {
+			manager.syncReplicationController(getKey(controllerSpec, t))
+
+			// The store accrues active pods. It's also used by the rc to determine how many
+			// replicas to create.
+			activePods := len(manager.podStore.Store.List())
+			if replicas != 0 {
+				// This is the number of pods currently "in flight". They were created by the rc manager above,
+				// which then puts the rc to sleep till all of them have been observed.
+				expectedPods = replicas - activePods
+				if expectedPods > burstReplicas {
+					expectedPods = burstReplicas
+				}
+				// This validates the rc manager sync actually created pods
+				validateSyncReplication(t, &fakePodControl, expectedPods, 0)
+
+				// This simulates the watch events for all but 1 of the expected pods.
+				// None of these should wake the controller because it has expectations==BurstReplicas.
+				for _, pod := range pods.Items[:expectedPods-1] {
+					manager.podStore.Store.Add(&pod)
+					manager.addPod(&pod)
+				}
+
+				podExp, exists, err := manager.expectations.GetExpectations(controllerSpec)
+				if !exists || err != nil {
+					t.Fatalf("Did not find expectations for rc.")
+				}
+				if add, _ := podExp.getExpectations(); add != 1 {
+					t.Fatalf("Expectations are wrong %v", podExp)
+				}
+			} else {
+				expectedPods = (replicas - activePods) * -1
+				if expectedPods > burstReplicas {
+					expectedPods = burstReplicas
+				}
+				validateSyncReplication(t, &fakePodControl, 0, expectedPods)
+				for _, pod := range pods.Items[:expectedPods-1] {
+					manager.podStore.Store.Delete(&pod)
+					manager.deletePod(&pod)
+				}
+				podExp, exists, err := manager.expectations.GetExpectations(controllerSpec)
+				if !exists || err != nil {
+					t.Fatalf("Did not find expectations for rc.")
+				}
+				if _, del := podExp.getExpectations(); del != 1 {
+					t.Fatalf("Expectations are wrong %v", podExp)
+				}
+			}
+
+			// Check that the rc didn't take any action for all the above pods
+			fakePodControl.clear()
+			manager.syncReplicationController(getKey(controllerSpec, t))
+			validateSyncReplication(t, &fakePodControl, 0, 0)
+
+			// Create/Delete the last pod
+			// The last add pod will decrease the expectation of the rc to 0,
+			// which will cause it to create/delete the remaining replicas upto burstReplicas.
+			if replicas != 0 {
+				manager.podStore.Store.Add(&pods.Items[expectedPods-1])
+				manager.addPod(&pods.Items[expectedPods-1])
+			} else {
+				manager.podStore.Store.Delete(&pods.Items[expectedPods-1])
+				manager.deletePod(&pods.Items[expectedPods-1])
+			}
+			pods.Items = pods.Items[expectedPods:]
+		}
+
+		// Confirm that we've created the right number of replicas
+		activePods := len(manager.podStore.Store.List())
+		if activePods != controllerSpec.Spec.Replicas {
+			t.Fatalf("Unexpected number of active pods, expected %d, got %d", controllerSpec.Spec.Replicas, activePods)
+		}
+		// Replenish the pod list, since we cut it down sizing up
+		pods = newPodList(nil, replicas, api.PodRunning, controllerSpec)
+	}
+}
+
+func TestControllerBurstReplicas(t *testing.T) {
+	doTestControllerBurstReplicas(t, 5, 30)
+	doTestControllerBurstReplicas(t, 5, 12)
+	doTestControllerBurstReplicas(t, 3, 2)
 }

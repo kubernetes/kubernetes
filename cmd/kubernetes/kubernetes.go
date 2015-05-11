@@ -144,7 +144,7 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 	endpoints := service.NewEndpointController(cl)
 	go endpoints.Run(5, util.NeverStop)
 
-	controllerManager := controller.NewReplicationManager(cl)
+	controllerManager := controller.NewReplicationManager(cl, controller.BurstReplicas)
 	go controllerManager.Run(5, util.NeverStop)
 }
 

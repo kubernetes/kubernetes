@@ -215,7 +215,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
 	go endpoints.Run(3, util.NeverStop)
 
-	controllerManager := replicationControllerPkg.NewReplicationManager(cl)
+	controllerManager := replicationControllerPkg.NewReplicationManager(cl, replicationControllerPkg.BurstReplicas)
 
 	// TODO: Write an integration test for the replication controllers watch.
 	go controllerManager.Run(3, util.NeverStop)
