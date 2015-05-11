@@ -298,7 +298,7 @@ type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim
 	Phase PersistentVolumeClaimPhase `json:"phase,omitempty"`
 	// AccessModes contains all ways the volume backing the PVC can be mounted
-	AccessModes []AccessModeType `json:"accessModes,omitempty`
+	AccessModes []AccessModeType `json:"accessModes,omitempty"`
 	// Represents the actual resources of the underlying volume
 	Capacity ResourceList `json:"capacity,omitempty"`
 	// VolumeRef is a reference to the PersistentVolume bound to the PersistentVolumeClaim
