@@ -348,6 +348,7 @@ func podRunning(c *client.Client, podNamespace string, podName string) wait.Cond
 	}
 }
 
+// runStaticPodTest is disabled until #6651 is resolved.
 func runStaticPodTest(c *client.Client, configFilePath string) {
 	var testCases = []struct {
 		desc         string
@@ -976,7 +977,7 @@ func main() {
 
 	firstManifestURL := ServeCachedManifestFile(testPodSpecFile)
 	secondManifestURL := ServeCachedManifestFile(testManifestFile)
-	apiServerURL, configFilePath := startComponents(firstManifestURL, secondManifestURL, apiVersion)
+	apiServerURL, _ := startComponents(firstManifestURL, secondManifestURL, apiVersion)
 
 	// Ok. we're good to go.
 	glog.Infof("API Server started on %s", apiServerURL)
@@ -996,9 +997,6 @@ func main() {
 		func(c *client.Client) {
 			runSelfLinkTestOnNamespace(c, api.NamespaceDefault)
 			runSelfLinkTestOnNamespace(c, "other")
-		},
-		func(c *client.Client) {
-			runStaticPodTest(c, configFilePath)
 		},
 	}
 
@@ -1043,12 +1041,10 @@ func main() {
 	//              1 pod infra container + 2 containers from the URL on first Kubelet +
 	//              1 pod infra container + 2 containers from the URL on second Kubelet +
 	//              1 pod infra container + 1 container from the service test.
-	// In addition, runStaticPodTest creates 2 pod infra containers +
-	//                                       2 pod containers from the file (1 for manifest and 1 for spec)
-	// The total number of container created is 13
+	// The total number of container created is 9
 
-	if len(createdConts) != 16 {
-		glog.Fatalf("Expected 16 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
+	if len(createdConts) != 12 {
+		glog.Fatalf("Expected 12 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK - found created containers: %#v", createdConts.List())
 
