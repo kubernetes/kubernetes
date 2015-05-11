@@ -252,7 +252,7 @@ func TestMultiWatch(t *testing.T) {
 				rv,
 			)
 			if err != nil {
-				panic(fmt.Sprintf("watch error for %v: %", name, err))
+				panic(fmt.Sprintf("watch error for %v: %v", name, err))
 			}
 			defer w.Stop()
 			watchesStarted.Done()
