@@ -531,7 +531,8 @@ function kube-up {
   gcloud compute disks create "${MASTER_NAME}-pd" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
-    --size "10GB"
+    --type "${MASTER_DISK_TYPE}" \
+    --size "${MASTER_DISK_SIZE}"
 
   # Generate a bearer token for this cluster. We push this separately
   # from the other cluster variables so that the client (this
