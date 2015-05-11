@@ -29,7 +29,7 @@ var cidrRegexp = regexp.MustCompile(`inet ([0-9a-fA-F.:]*/[0-9]*)`)
 
 func ensureCbr0(wantCIDR *net.IPNet) error {
 	if !cbr0CidrCorrect(wantCIDR) {
-		glog.V(5).Infof("Attempting to recreate cbr0 with address range: %s", wantCIDR)
+		glog.V(2).Infof("Attempting to recreate cbr0 with address range: %s", wantCIDR)
 
 		// delete cbr0
 		if err := exec.Command("ip", "link", "set", "dev", "cbr0", "down").Run(); err != nil {
@@ -56,9 +56,10 @@ func ensureCbr0(wantCIDR *net.IPNet) error {
 		// restart docker
 		if err := exec.Command("service", "docker", "restart").Run(); err != nil {
 			glog.Error(err)
-			return err
+			// For now just log the error. The containerRuntime check will catch docker failures.
+			// TODO (dawnchen) figure out what we should do for rkt here.
 		}
-		glog.V(5).Info("Recreated cbr0 and restarted docker")
+		glog.V(2).Info("Recreated cbr0 and restarted docker")
 	}
 	return nil
 }
@@ -73,11 +74,11 @@ func cbr0CidrCorrect(wantCIDR *net.IPNet) bool {
 		return false
 	}
 	cbr0IP, cbr0CIDR, err := net.ParseCIDR(string(match[1]))
-	cbr0CIDR.IP = cbr0IP
 	if err != nil {
 		glog.Errorf("Couldn't parse CIDR: %q", match[1])
 		return false
 	}
+	cbr0CIDR.IP = cbr0IP
 	glog.V(5).Infof("Want cbr0 CIDR: %s, have cbr0 CIDR: %s", wantCIDR, cbr0CIDR)
 	return wantCIDR.IP.Equal(cbr0IP) && bytes.Equal(wantCIDR.Mask, cbr0CIDR.Mask)
 }

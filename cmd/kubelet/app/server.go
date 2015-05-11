@@ -104,6 +104,7 @@ type KubeletServer struct {
 	CgroupRoot                     string
 	ContainerRuntime               string
 	DockerDaemonContainer          string
+	ConfigureCBR0                  bool
 
 	// Flags intended for testing
 
@@ -162,6 +163,7 @@ func NewKubeletServer() *KubeletServer {
 		CgroupRoot:                  "/",
 		ContainerRuntime:            "docker",
 		DockerDaemonContainer:       "/docker-daemon",
+		ConfigureCBR0:               false,
 	}
 }
 
@@ -218,6 +220,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CgroupRoot, "cgroup_root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '/', which means top-level.")
 	fs.StringVar(&s.ContainerRuntime, "container_runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
 	fs.StringVar(&s.DockerDaemonContainer, "docker-daemon-container", s.DockerDaemonContainer, "Optional resource-only container in which to place the Docker Daemon. Empty for no container (Default: /docker-daemon).")
+	fs.BoolVar(&s.ConfigureCBR0, "configure-cbr0", s.ConfigureCBR0, "If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
@@ -333,6 +336,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		ContainerRuntime:          s.ContainerRuntime,
 		Mounter:                   mounter,
 		DockerDaemonContainer:     s.DockerDaemonContainer,
+		ConfigureCBR0:             s.ConfigureCBR0,
 	}
 
 	RunKubelet(&kcfg, nil)
@@ -582,6 +586,7 @@ type KubeletConfig struct {
 	ContainerRuntime               string
 	Mounter                        mount.Interface
 	DockerDaemonContainer          string
+	ConfigureCBR0                  bool
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -631,7 +636,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
 		kc.Mounter,
-		kc.DockerDaemonContainer)
+		kc.DockerDaemonContainer,
+		kc.ConfigureCBR0)
 
 	if err != nil {
 		return nil, nil, err
