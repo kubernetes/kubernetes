@@ -69,11 +69,10 @@ type Factory struct {
 	Resizer func(mapping *meta.RESTMapping) (kubectl.Resizer, error)
 	// Returns a Reaper for gracefully shutting down resources.
 	Reaper func(mapping *meta.RESTMapping) (kubectl.Reaper, error)
-	// PodSelectorForResource returns the pod selector associated with the provided resource name
-	// or an error.
-	PodSelectorForResource func(mapping *meta.RESTMapping, namespace, name string) (string, error)
-	// PortForResource returns the ports associated with the provided resource name or an error
-	PortsForResource func(mapping *meta.RESTMapping, namespace, name string) ([]string, error)
+	// PodSelectorForObject returns the pod selector associated with the provided object
+	PodSelectorForObject func(object runtime.Object) (string, error)
+	// PortsForObject returns the ports associated with the provided object
+	PortsForObject func(object runtime.Object) ([]string, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func() (validation.Schema, error)
 	// Returns the default namespace to use in cases where no other namespace is specified
@@ -145,62 +144,42 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
 			return kubectl.NewHumanReadablePrinter(noHeaders), nil
 		},
-		PodSelectorForResource: func(mapping *meta.RESTMapping, namespace, name string) (string, error) {
+		PodSelectorForObject: func(object runtime.Object) (string, error) {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
-			client, err := clients.ClientForVersion("")
-			if err != nil {
-				return "", err
-			}
-			switch mapping.Kind {
-			case "ReplicationController":
-				rc, err := client.ReplicationControllers(namespace).Get(name)
-				if err != nil {
-					return "", err
-				}
-				return kubectl.MakeLabels(rc.Spec.Selector), nil
-			case "Pod":
-				pod, err := client.Pods(namespace).Get(name)
-				if err != nil {
-					return "", err
-				}
-				if len(pod.Labels) == 0 {
+			switch t := object.(type) {
+			case *api.ReplicationController:
+				return kubectl.MakeLabels(t.Spec.Selector), nil
+			case *api.Pod:
+				if len(t.Labels) == 0 {
 					return "", fmt.Errorf("the pod has no labels and cannot be exposed")
 				}
-				return kubectl.MakeLabels(pod.Labels), nil
-			case "Service":
-				svc, err := client.Services(namespace).Get(name)
+				return kubectl.MakeLabels(t.Labels), nil
+			case *api.Service:
+				if t.Spec.Selector == nil {
+					return "", fmt.Errorf("the service has no pod selector set")
+				}
+				return kubectl.MakeLabels(t.Spec.Selector), nil
+			default:
+				kind, err := meta.NewAccessor().Kind(object)
 				if err != nil {
 					return "", err
 				}
-				if svc.Spec.Selector == nil {
-					return "", fmt.Errorf("the service has no pod selector set")
-				}
-				return kubectl.MakeLabels(svc.Spec.Selector), nil
-			default:
-				return "", fmt.Errorf("it is not possible to get a pod selector from %s", mapping.Kind)
+				return "", fmt.Errorf("it is not possible to get a pod selector from %s", kind)
 			}
 		},
-		PortsForResource: func(mapping *meta.RESTMapping, namespace, name string) ([]string, error) {
+		PortsForObject: func(object runtime.Object) ([]string, error) {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
-			client, err := clients.ClientForVersion("")
-			if err != nil {
-				return nil, err
-			}
-			switch mapping.Kind {
-			case "ReplicationController":
-				rc, err := client.ReplicationControllers(namespace).Get(name)
-				if err != nil {
-					return nil, err
-				}
-				return getPorts(rc.Spec.Template.Spec), nil
-			case "Pod":
-				pod, err := client.Pods(namespace).Get(name)
-				if err != nil {
-					return nil, err
-				}
-				return getPorts(pod.Spec), nil
+			switch t := object.(type) {
+			case *api.ReplicationController:
+				return getPorts(t.Spec.Template.Spec), nil
+			case *api.Pod:
+				return getPorts(t.Spec), nil
 			default:
-				return nil, fmt.Errorf("it is not possible to get ports from %s", mapping.Kind)
+				kind, err := meta.NewAccessor().Kind(object)
+				if err != nil {
+					return nil, err
+				}
+				return nil, fmt.Errorf("it is not possible to get ports from %s", kind)
 			}
 		},
 		Resizer: func(mapping *meta.RESTMapping) (kubectl.Resizer, error) {
