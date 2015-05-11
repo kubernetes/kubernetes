@@ -479,6 +479,64 @@ function write-node-env {
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
 }
 
+# Create certificate pairs for the cluster.
+# $1: The public IP for the master.
+#
+# These are used for static cert distribution (e.g. static clustering) at
+# cluster creation time. This will be obsoleted once we implement dynamic
+# clustering.
+#
+# The following certificate pairs are created:
+#
+#  - ca (the cluster's certificate authority)
+#  - server
+#  - kubelet
+#  - kubecfg (for kubectl)
+#
+# TODO(roberthbailey): Replace easyrsa with a simple Go program to generate
+# the certs that we need.
+#
+# Assumed vars
+#   KUBE_TEMP
+#
+# Vars set:
+#   CERT_DIR
+#   CA_CERT_BASE64
+#   MASTER_CERT_BASE64
+#   MASTER_KEY_BASE64
+#   KUBELET_CERT_BASE64
+#   KUBELET_KEY_BASE64
+#   KUBECFG_CERT_BASE64
+#   KUBECFG_KEY_BASE64
+function create-certs {
+  local cert_ip
+  cert_ip="${1}"
+
+  # Note: This was heavily cribbed from make-ca-cert.sh
+  (cd "${KUBE_TEMP}"
+    curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
+    tar xzf easy-rsa.tar.gz > /dev/null 2>&1
+    cd easy-rsa-master/easyrsa3
+    ./easyrsa init-pki > /dev/null 2>&1
+    ./easyrsa --batch "--req-cn=${cert_ip}@$(date +%s)" build-ca nopass > /dev/null 2>&1
+    ./easyrsa --subject-alt-name=IP:"${cert_ip}" build-server-full "${MASTER_NAME}" nopass > /dev/null 2>&1
+    ./easyrsa build-client-full kubelet nopass > /dev/null 2>&1
+    ./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1) || {
+    # If there was an error in the subshell, just die.
+    # TODO(roberthbailey): add better error handling here
+    echo "=== Failed to generate certificates: Aborting ==="
+    exit 2
+  }
+  CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
+  CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64)
+  MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64)
+  MASTER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | base64)
+  KUBELET_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubelet.crt" | base64)
+  KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64)
+  KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64)
+  KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64)
+}
+
 # Instantiate a kubernetes cluster
 #
 # Assumed vars
@@ -549,7 +607,9 @@ function kube-up {
     --project "${PROJECT}" \
     --region "${REGION}" -q --format yaml | awk '/^address:/ { print $2 }')
 
-  create-master-instance $MASTER_RESERVED_IP &
+  create-certs "${MASTER_RESERVED_IP}"
+
+  create-master-instance "${MASTER_RESERVED_IP}" &
 
   # Create a single firewall rule for all minions.
   create-firewall-rule "${MINION_TAG}-all" "${CLUSTER_IP_RANGE}" "${MINION_TAG}" &
@@ -594,7 +654,8 @@ function kube-up {
   echo "  up."
   echo
 
-  until curl --insecure -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
+  until curl --cacert "${CERT_DIR}/pki/ca.crt" \
+          -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
           --max-time 5 --fail --output /dev/null --silent \
           "https://${KUBE_MASTER_IP}/api/v1beta3/pods"; do
       printf "."
@@ -603,20 +664,12 @@ function kube-up {
 
   echo "Kubernetes cluster created."
 
-  # TODO use token instead of basic auth
-  export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
-  export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
-  export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
+  export KUBE_CERT="${CERT_DIR}/pki/issued/kubecfg.crt"
+  export KUBE_KEY="${CERT_DIR}/pki/private/kubecfg.key"
+  export CA_CERT="${CERT_DIR}/pki/ca.crt"
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
-
-  # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
-  # config file.  Distribute the same way the htpasswd is done.
   (
    umask 077
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.crt" >"${KUBE_CERT}" 2>/dev/null
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.key" >"${KUBE_KEY}" 2>/dev/null
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/ca.crt" >"${CA_CERT}" 2>/dev/null
-
    create-kubeconfig
   )
 

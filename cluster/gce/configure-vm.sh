@@ -245,14 +245,34 @@ admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 EOF
 }
 
-# This should only happen on cluster initialization. Uses
-# KUBE_PASSWORD and KUBE_USER to generate basic_auth.csv. Uses
-# KUBE_BEARER_TOKEN, KUBELET_TOKEN, and KUBE_PROXY_TOKEN to generate
-# known_tokens.csv (KNOWN_TOKENS_FILE). After the first boot and
-# on upgrade, this file exists on the master-pd and should never
-# be touched again (except perhaps an additional service account,
-# see NB below.)
+# This should only happen on cluster initialization.
+#
+#  - Uses KUBE_PASSWORD and KUBE_USER to generate basic_auth.csv.
+#  - Uses KUBE_BEARER_TOKEN, KUBELET_TOKEN, and KUBE_PROXY_TOKEN to generate
+#    known_tokens.csv (KNOWN_TOKENS_FILE).
+#  - Uses CA_CERT, MASTER_CERT, and MASTER_KEY to populate the SSL credentials
+#    for the apiserver.
+#  - Optionally uses KUBECFG_CERT and KUBECFG_KEY to store a copy of the client
+#    cert credentials.
+#
+# After the first boot and on upgrade, these files exists on the master-pd
+# and should never be touched again (except perhaps an additional service
+# account, see NB below.)
 function create-salt-master-auth() {
+  if [[ ! -e /srv/kubernetes/ca.crt ]]; then
+    if  [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${MASTER_CERT:-}" ]] && [[ ! -z "${MASTER_KEY:-}" ]]; then
+      mkdir -p /srv/kubernetes
+      (umask 077;
+        echo "${CA_CERT}" | base64 -d > /srv/kubernetes/ca.crt;
+        echo "${MASTER_CERT}" | base64 -d > /srv/kubernetes/server.cert;
+        echo "${MASTER_KEY}" | base64 -d > /srv/kubernetes/server.key;
+        # Kubecfg cert/key are optional and included for backwards compatibility.
+        # TODO(roberthbailey): Remove these two lines once GKE no longer requires
+        # fetching clients certs from the master VM.
+        echo "${KUBECFG_CERT:-}" | base64 -d > /srv/kubernetes/kubecfg.crt;
+        echo "${KUBECFG_KEY:-}" | base64 -d > /srv/kubernetes/kubecfg.key)
+    fi
+  fi
   if [ ! -e "${BASIC_AUTH_FILE}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
     (umask 077;
@@ -278,12 +298,46 @@ function create-salt-master-auth() {
   fi
 }
 
+# TODO(roberthbailey): Remove the insecure kubeconfig configuration files
+# once the certs are being plumbed through for GKE.
 function create-salt-node-auth() {
+  if [[ ! -e /srv/kubernetes/ca.crt ]]; then
+    if [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
+      mkdir -p /srv/kubernetes
+      (umask 077;
+        echo "${CA_CERT}" | base64 -d > /srv/kubernetes/ca.crt;
+        echo "${KUBELET_CERT}" | base64 -d > /srv/kubernetes/kubelet.crt;
+        echo "${KUBELET_KEY}" | base64 -d > /srv/kubernetes/kubelet.key)
+    fi
+  fi
   kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
   if [ ! -e "${kubelet_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kubelet
-    (umask 077;
-    cat > "${kubelet_kubeconfig_file}" <<EOF
+    if [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
+      (umask 077;
+        cat > "${kubelet_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+  user:
+    client-certificate-data: ${KUBELET_CERT}
+    client-key-data: ${KUBELET_KEY}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${CA_CERT}
+contexts:
+- context:
+    cluster: local
+    user: kubelet
+  name: service-account-context
+current-context: service-account-context
+EOF
+)
+    else
+      (umask 077;
+      cat > "${kubelet_kubeconfig_file}" <<EOF
 apiVersion: v1
 kind: Config
 users:
@@ -302,17 +356,36 @@ contexts:
 current-context: service-account-context
 EOF
 )
+    fi
   fi
 
   kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
   if [ ! -e "${kube_proxy_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-proxy
-
-    # Make a kubeconfig file with the token.
-    # TODO(etune): put apiserver certs into secret too, and reference from authfile,
-    # so that "Insecure" is not needed.
-    (umask 077;
-    cat > "${kube_proxy_kubeconfig_file}" <<EOF
+    if [[ ! -z "${CA_CERT}" ]]; then
+      (umask 077;
+        cat > "${kube_proxy_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kube-proxy
+  user:
+    token: ${KUBE_PROXY_TOKEN}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${CA_CERT}
+contexts:
+- context:
+    cluster: local
+    user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+)
+    else
+      (umask 077;
+      cat > "${kube_proxy_kubeconfig_file}" <<EOF
 apiVersion: v1
 kind: Config
 users:
@@ -331,6 +404,7 @@ contexts:
 current-context: service-account-context
 EOF
 )
+    fi
   fi
 }
 
@@ -430,14 +504,8 @@ EOF
 }
 
 function salt-set-apiserver() {
-  local kube_master_fqdn
-  until kube_master_fqdn=$(getent hosts ${KUBERNETES_MASTER_NAME} | awk '{ print $2 }'); do
-    echo 'Waiting for DNS resolution of ${KUBERNETES_MASTER_NAME}...'
-    sleep 3
-  done
-
   cat <<EOF >>/etc/salt/minion.d/grains.conf
-  api_servers: '${kube_master_fqdn}'
+  api_servers: '${KUBERNETES_MASTER_NAME}'
 EOF
 }
 
