@@ -41,9 +41,9 @@ var _ = Describe("Cluster level logging using Elasticsearch", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should check that logs from pods on all nodes are ingested into Elasticsearch", func() {
-		ClusterLevelLoggingWithElasticsearch(c)
-	})
+	//It("should check that logs from pods on all nodes are ingested into Elasticsearch", func() {
+	ClusterLevelLoggingWithElasticsearch(c)
+	//})
 })
 
 func bodyToJSON(body []byte) (map[string]interface{}, error) {
@@ -57,87 +57,92 @@ func bodyToJSON(body []byte) (map[string]interface{}, error) {
 
 // ClusterLevelLoggingWithElasticsearch is an end to end test for cluster level logging.
 func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
+	defer GinkgoRecover()
 	// TODO: For now assume we are only testing cluster logging with Elasticsearch
 	// on GCE. Once we are sure that Elasticsearch cluster level logging
 	// works for other providers we should widen this scope of this test.
+	var prefix string = ""
+	var err error
+	const graceTime = 10 * time.Minute
+
 	if !providerIs("gce") {
 		Logf("Skipping cluster level logging test for provider %s", testContext.Provider)
-		return
+		//This prefix tells ginkgo to skip a test.
+		prefix = "[Skipped] "
 	}
 
 	// Check for the existence of the Elasticsearch service.
-	By("Checking the Elasticsearch service exists.")
-	s := c.Services(api.NamespaceDefault)
-	// Make a few attempts to connect. This makes the test robust against
-	// being run as the first e2e test just after the e2e cluster has been created.
-	var err error
-	const graceTime = 10 * time.Minute
-	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
-		if _, err = s.Get("elasticsearch-logging"); err == nil {
-			break
+	It(prefix+"Checking the Elasticsearch service exists.", func() {
+		s := c.Services(api.NamespaceDefault)
+		// Make a few attempts to connect. This makes the test robust against
+		// being run as the first e2e test just after the e2e cluster has been created.
+		for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
+			if _, err = s.Get("elasticsearch-logging"); err == nil {
+				break
+			}
+			Logf("Attempt to check for the existence of the Elasticsearch service failed after %v", time.Since(start))
 		}
-		Logf("Attempt to check for the existence of the Elasticsearch service failed after %v", time.Since(start))
-	}
-	Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
+	})
 
 	// Wait for the Elasticsearch pods to enter the running state.
-	By("Checking to make sure the Elasticsearch pods are running")
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "elasticsearch-logging"}))
-	pods, err := c.Pods(api.NamespaceDefault).List(label, fields.Everything())
-	Expect(err).NotTo(HaveOccurred())
-	for _, pod := range pods.Items {
-		err = waitForPodRunning(c, pod.Name)
+	It(prefix+"Checking to make sure the Elasticsearch pods are running", func() {
+		label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "elasticsearch-logging"}))
+		pods, err := c.Pods(api.NamespaceDefault).List(label, fields.Everything())
 		Expect(err).NotTo(HaveOccurred())
-	}
-
-	By("Checking to make sure we are talking to an Elasticsearch service.")
-	// Perform a few checks to make sure this looks like an Elasticsearch cluster.
-	var statusCode float64
-	var esResponse map[string]interface{}
-	err = nil
-	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
-		// Query against the root URL for Elasticsearch.
-		body, err := c.Get().
-			Namespace(api.NamespaceDefault).
-			Prefix("proxy").
-			Resource("services").
-			Name("elasticsearch-logging").
-			DoRaw()
-		if err != nil {
-			Logf("After %v proxy call to elasticsearch-loigging failed: %v", time.Since(start), err)
-			continue
+		for _, pod := range pods.Items {
+			err = waitForPodRunning(c, pod.Name)
+			Expect(err).NotTo(HaveOccurred())
 		}
-		esResponse, err = bodyToJSON(body)
-		if err != nil {
-			Logf("After %v failed to convert Elasticsearch JSON response %v to map[string]interface{}: %v", time.Since(start), string(body), err)
-			continue
+	})
+	It(prefix+"Checking to make sure we are talking to an Elasticsearch service.", func() {
+		// Perform a few checks to make sure this looks like an Elasticsearch cluster.
+		var statusCode float64
+		var esResponse map[string]interface{}
+		var err error = nil
+		for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
+			// Query against the root URL for Elasticsearch.
+			body, err := c.Get().
+				Namespace(api.NamespaceDefault).
+				Prefix("proxy").
+				Resource("services").
+				Name("elasticsearch-logging").
+				DoRaw()
+			if err != nil {
+				Logf("After %v proxy call to elasticsearch-loigging failed: %v", time.Since(start), err)
+				continue
+			}
+			esResponse, err = bodyToJSON(body)
+			if err != nil {
+				Logf("After %v failed to convert Elasticsearch JSON response %v to map[string]interface{}: %v", time.Since(start), string(body), err)
+				continue
+			}
+			statusIntf, ok := esResponse["status"]
+			if !ok {
+				Logf("After %v Elasticsearch response has no status field: %v", time.Since(start), esResponse)
+				continue
+			}
+			statusCode, ok = statusIntf.(float64)
+			if !ok {
+				// Assume this is a string returning Failure. Retry.
+				Logf("After %v expected status to be a float64 but got %v of type %T", time.Since(start), statusIntf, statusIntf)
+				continue
+			}
+			break
 		}
-		statusIntf, ok := esResponse["status"]
+		Expect(err).NotTo(HaveOccurred())
+		if int(statusCode) != 200 {
+			Failf("Elasticsearch cluster has a bad status: %v", statusCode)
+		}
+		// Check to see if have a cluster_name field.
+		clusterName, ok := esResponse["cluster_name"]
 		if !ok {
-			Logf("After %v Elasticsearch response has no status field: %v", time.Since(start), esResponse)
-			continue
+			Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
 		}
-		statusCode, ok = statusIntf.(float64)
-		if !ok {
-			// Assume this is a string returning Failure. Retry.
-			Logf("After %v expected status to be a float64 but got %v of type %T", time.Since(start), statusIntf, statusIntf)
-			continue
+		if clusterName != "kubernetes_logging" {
+			Failf("Connected to wrong cluster %q (expecting kubernetes_logging)", clusterName)
 		}
-		break
-	}
-	Expect(err).NotTo(HaveOccurred())
-	if int(statusCode) != 200 {
-		Failf("Elasticsearch cluster has a bad status: %v", statusCode)
-	}
-	// Check to see if have a cluster_name field.
-	clusterName, ok := esResponse["cluster_name"]
-	if !ok {
-		Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
-	}
-	if clusterName != "kubernetes_logging" {
-		Failf("Connected to wrong cluster %q (expecting kubernetes_logging)", clusterName)
-	}
-
+	})
 	// Now assume we really are talking to an Elasticsearch instance.
 	// Check the cluster health.
 	By("Checking health of Elasticsearch service.")
@@ -229,110 +234,112 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	// Wait a bit for the log information to make it into Elasticsearch.
 	time.Sleep(30 * time.Second)
 
+	// Tests start here...
 	// Make several attempts to observe the logs ingested into Elasticsearch.
-	By("Checking all the log lines were ingested into Elasticsearch")
-	missing := 0
-	expected := nodeCount * countTo
-	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(10 * time.Second) {
-		// Ask Elasticsearch to return all the log lines that were tagged with the underscore
-		// verison of the name. Ask for twice as many log lines as we expect to check for
-		// duplication bugs.
-		body, err = c.Get().
-			Namespace(api.NamespaceDefault).
-			Prefix("proxy").
-			Resource("services").
-			Name("elasticsearch-logging").
-			Suffix("_search").
-			Param("q", fmt.Sprintf("log:%s", taintName)).
-			Param("size", strconv.Itoa(2*expected)).
-			DoRaw()
-		if err != nil {
-			Logf("After %v failed to make proxy call to elasticsearch-logging: %v", time.Since(start), err)
-			continue
-		}
+	It("Checking all the log lines were ingested into Elasticsearch", func() {
+		missing := 0
+		expected := nodeCount * countTo
+		for start := time.Now(); time.Since(start) < graceTime; time.Sleep(10 * time.Second) {
+			// Ask Elasticsearch to return all the log lines that were tagged with the underscore
+			// verison of the name. Ask for twice as many log lines as we expect to check for
+			// duplication bugs.
+			body, err = c.Get().
+				Namespace(api.NamespaceDefault).
+				Prefix("proxy").
+				Resource("services").
+				Name("elasticsearch-logging").
+				Suffix("_search").
+				Param("q", fmt.Sprintf("log:%s", taintName)).
+				Param("size", strconv.Itoa(2*expected)).
+				DoRaw()
+			if err != nil {
+				Logf("After %v failed to make proxy call to elasticsearch-logging: %v", time.Since(start), err)
+				continue
+			}
 
-		response, err := bodyToJSON(body)
-		if err != nil {
-			Logf("After %v failed to unmarshal response: %v", time.Since(start), err)
-			continue
-		}
-		hits, ok := response["hits"].(map[string]interface{})
-		if !ok {
-			Failf("response[hits] not of the expected type: %T", response["hits"])
-		}
-		totalF, ok := hits["total"].(float64)
-		if !ok {
-			Logf("After %v hits[total] not of the expected type: %T", time.Since(start), hits["total"])
-			continue
-		}
-		total := int(totalF)
-		if total < expected {
-			Logf("After %v expecting to find %d log lines but saw only %d", time.Since(start), expected, total)
-			continue
-		}
-		h, ok := hits["hits"].([]interface{})
-		if !ok {
-			Logf("After %v hits not of the expected type: %T", time.Since(start), hits["hits"])
-			continue
-		}
-		// Initialize data-structure for observing counts.
-		observed := make([][]int, nodeCount)
-		for i := range observed {
-			observed[i] = make([]int, countTo)
-		}
-		// Iterate over the hits and populate the observed array.
-		for _, e := range h {
-			l, ok := e.(map[string]interface{})
-			if !ok {
-				Failf("element of hit not of expected type: %T", e)
-			}
-			source, ok := l["_source"].(map[string]interface{})
-			if !ok {
-				Failf("_source not of the expected type: %T", l["_source"])
-			}
-			msg, ok := source["log"].(string)
-			if !ok {
-				Failf("log not of the expected type: %T", source["log"])
-			}
-			words := strings.Split(msg, " ")
-			if len(words) < 4 {
-				Failf("Malformed log line: %s", msg)
-			}
-			n, err := strconv.ParseUint(words[0], 10, 0)
+			response, err := bodyToJSON(body)
 			if err != nil {
-				Failf("Expecting numer of node as first field of %s", msg)
+				Logf("After %v failed to unmarshal response: %v", time.Since(start), err)
+				continue
 			}
-			if n < 0 || int(n) >= nodeCount {
-				Failf("Node count index out of range: %d", nodeCount)
+			hits, ok := response["hits"].(map[string]interface{})
+			if !ok {
+				Failf("response[hits] not of the expected type: %T", response["hits"])
 			}
-			index, err := strconv.ParseUint(words[2], 10, 0)
-			if err != nil {
-				Failf("Expecting number as third field of %s", msg)
+			totalF, ok := hits["total"].(float64)
+			if !ok {
+				Logf("After %v hits[total] not of the expected type: %T", time.Since(start), hits["total"])
+				continue
 			}
-			if index < 0 || index >= countTo {
-				Failf("Index value out of range: %d", index)
+			total := int(totalF)
+			if total < expected {
+				Logf("After %v expecting to find %d log lines but saw only %d", time.Since(start), expected, total)
+				continue
 			}
-			// Record the observation of a log line from node n at the given index.
-			observed[n][index]++
-		}
-		// Make sure we correctly observed the expected log lines from each node.
-		missing = 0
-		for n := range observed {
-			for i, c := range observed[n] {
-				if c == 0 {
-					missing++
+			h, ok := hits["hits"].([]interface{})
+			if !ok {
+				Logf("After %v hits not of the expected type: %T", time.Since(start), hits["hits"])
+				continue
+			}
+			// Initialize data-structure for observing counts.
+			observed := make([][]int, nodeCount)
+			for i := range observed {
+				observed[i] = make([]int, countTo)
+			}
+			// Iterate over the hits and populate the observed array.
+			for _, e := range h {
+				l, ok := e.(map[string]interface{})
+				if !ok {
+					Failf("element of hit not of expected type: %T", e)
 				}
-				if c < 0 || c > 1 {
-					Failf("Got incorrect count for node %d index %d: %d", n, i, c)
+				source, ok := l["_source"].(map[string]interface{})
+				if !ok {
+					Failf("_source not of the expected type: %T", l["_source"])
+				}
+				msg, ok := source["log"].(string)
+				if !ok {
+					Failf("log not of the expected type: %T", source["log"])
+				}
+				words := strings.Split(msg, " ")
+				if len(words) < 4 {
+					Failf("Malformed log line: %s", msg)
+				}
+				n, err := strconv.ParseUint(words[0], 10, 0)
+				if err != nil {
+					Failf("Expecting numer of node as first field of %s", msg)
+				}
+				if n < 0 || int(n) >= nodeCount {
+					Failf("Node count index out of range: %d", nodeCount)
+				}
+				index, err := strconv.ParseUint(words[2], 10, 0)
+				if err != nil {
+					Failf("Expecting number as third field of %s", msg)
+				}
+				if index < 0 || index >= countTo {
+					Failf("Index value out of range: %d", index)
+				}
+				// Record the observation of a log line from node n at the given index.
+				observed[n][index]++
+			}
+			// Make sure we correctly observed the expected log lines from each node.
+			missing = 0
+			for n := range observed {
+				for i, c := range observed[n] {
+					if c == 0 {
+						missing++
+					}
+					if c < 0 || c > 1 {
+						Failf("Got incorrect count for node %d index %d: %d", n, i, c)
+					}
 				}
 			}
+			if missing != 0 {
+				Logf("After %v still missing %d log lines", time.Since(start), missing)
+				continue
+			}
+			Logf("After %s found all %d log lines", time.Since(start), expected)
+			return
 		}
-		if missing != 0 {
-			Logf("After %v still missing %d log lines", time.Since(start), missing)
-			continue
-		}
-		Logf("After %s found all %d log lines", time.Since(start), expected)
-		return
-	}
-	Failf("Failed to find all %d log lines", expected)
+		Failf("Failed to find all %d log lines", expected)
+	})
 }
