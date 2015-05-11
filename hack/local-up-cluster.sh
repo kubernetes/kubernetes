@@ -109,17 +109,17 @@ cleanup_dockerized_kubelet()
 cleanup()
 {
     echo "Cleaning up..."
-    [[ -n "${APISERVER_PID-}" ]] && sudo kill "${APISERVER_PID}"
-    [[ -n "${CTLRMGR_PID-}" ]] && sudo kill "${CTLRMGR_PID}"
+    [[ -n "${APISERVER_PID-}" ]] && sudo kill $(ps --ppid=${APISERVER_PID} --pid=${APISERVER_PID} | cut -d' ' -f1)
+    [[ -n "${CTLRMGR_PID-}" ]] && sudo kill $(ps --ppid=${CTLRMGR_PID} --pid=${CTLRMGR_PID} | cut -d' ' -f1)
     
     if [[ -n "$DOCKERIZE_KUBELET" ]]; then
       cleanup_dockerized_kubelet
     else 
-      [[ -n "${KUBELET_PID-}" ]] && sudo kill "${KUBELET_PID}"
+      [[ -n "${KUBELET_PID-}" ]] && sudo kill $(ps --ppid=${KUBELET_PID} --pid=${KUBELET_PID} | cut -d' ' -f1)
     fi
 
-    [[ -n "${PROXY_PID-}" ]] && sudo kill "${PROXY_PID}"
-    [[ -n "${SCHEDULER_PID-}" ]] && sudo kill "${SCHEDULER_PID}"
+    [[ -n "${PROXY_PID-}" ]] && sudo kill $(ps --ppid=${PROXY_PID} --pid=${PROXY_PID} | cut -d' ' -f1)
+    [[ -n "${SCHEDULER_PID-}" ]] && sudo kill $(ps --ppid=${SCHEDULER_PID} --pid=${SCHEDULER_PID} | cut -d' ' -f1)
 
     [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
     [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
