@@ -1173,7 +1173,7 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metri
 	}
 
 	// Note that we just killed the unwanted pods. This may not have reflected
-	// in the cache. We need to bypass the cach to get the latest set of
+	// in the cache. We need to bypass the cache to get the latest set of
 	// running pods to clean up the volumes.
 	// TODO: Evaluate the performance impact of bypassing the runtime cache.
 	runningPods, err = kl.containerRuntime.GetPods(false)
