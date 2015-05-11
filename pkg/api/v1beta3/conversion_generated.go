@@ -3427,6 +3427,24 @@ func convert_api_Secret_To_v1beta3_Secret(in *newer.Secret, out *Secret, s conve
 	return nil
 }
 
+func convert_v1beta3_SecretFileMode_To_api_SecretFileMode(in *SecretFileMode, out *newer.SecretFileMode, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*SecretFileMode))(in)
+	}
+	out.Name = in.Name
+	out.Mode = in.Mode
+	return nil
+}
+
+func convert_api_SecretFileMode_To_v1beta3_SecretFileMode(in *newer.SecretFileMode, out *SecretFileMode, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*newer.SecretFileMode))(in)
+	}
+	out.Name = in.Name
+	out.Mode = in.Mode
+	return nil
+}
+
 func convert_v1beta3_SecretList_To_api_SecretList(in *SecretList, out *newer.SecretList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*SecretList))(in)
@@ -3478,6 +3496,16 @@ func convert_v1beta3_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolu
 		defaulting.(func(*SecretVolumeSource))(in)
 	}
 	out.SecretName = in.SecretName
+	if in.Modes != nil {
+		out.Modes = make([]newer.SecretFileMode, len(in.Modes))
+		for i := range in.Modes {
+			if err := convert_v1beta3_SecretFileMode_To_api_SecretFileMode(&in.Modes[i], &out.Modes[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Modes = nil
+	}
 	return nil
 }
 
@@ -3486,6 +3514,16 @@ func convert_api_SecretVolumeSource_To_v1beta3_SecretVolumeSource(in *newer.Secr
 		defaulting.(func(*newer.SecretVolumeSource))(in)
 	}
 	out.SecretName = in.SecretName
+	if in.Modes != nil {
+		out.Modes = make([]SecretFileMode, len(in.Modes))
+		for i := range in.Modes {
+			if err := convert_api_SecretFileMode_To_v1beta3_SecretFileMode(&in.Modes[i], &out.Modes[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Modes = nil
+	}
 	return nil
 }
 
@@ -4237,6 +4275,7 @@ func init() {
 		convert_api_ResourceQuota_To_v1beta3_ResourceQuota,
 		convert_api_ResourceRequirements_To_v1beta3_ResourceRequirements,
 		convert_api_SELinuxOptions_To_v1beta3_SELinuxOptions,
+		convert_api_SecretFileMode_To_v1beta3_SecretFileMode,
 		convert_api_SecretList_To_v1beta3_SecretList,
 		convert_api_SecretVolumeSource_To_v1beta3_SecretVolumeSource,
 		convert_api_Secret_To_v1beta3_Secret,
@@ -4343,6 +4382,7 @@ func init() {
 		convert_v1beta3_ResourceQuota_To_api_ResourceQuota,
 		convert_v1beta3_ResourceRequirements_To_api_ResourceRequirements,
 		convert_v1beta3_SELinuxOptions_To_api_SELinuxOptions,
+		convert_v1beta3_SecretFileMode_To_api_SecretFileMode,
 		convert_v1beta3_SecretList_To_api_SecretList,
 		convert_v1beta3_SecretVolumeSource_To_api_SecretVolumeSource,
 		convert_v1beta3_Secret_To_api_Secret,

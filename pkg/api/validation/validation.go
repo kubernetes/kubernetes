@@ -396,6 +396,11 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource) errs.Valid
 	if secretSource.SecretName == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("secretName"))
 	}
+	for _, mode := range secretSource.Modes {
+		if mode.Mode|0444 != 0444 {
+			allErrs = append(allErrs, errs.NewFieldForbidden("modes.mode", "Not allowed mode set"))
+		}
+	}
 	return allErrs
 }
 

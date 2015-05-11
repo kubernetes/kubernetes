@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"os"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -365,6 +367,16 @@ type SecretVolumeSource struct {
 	// Reference to a Secret to use.  Only the ID field of this reference is used; a
 	// secret can only be used by pods in its namespace.
 	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
+	// Modes describes access permissions to be applied per Secret's data key while mounting
+	Modes []SecretFileMode `json:"modes"`
+}
+
+// SecretFileMode sets up access permissions per Secret's data key
+type SecretFileMode struct {
+	// Name is the name of the Secret's data key
+	Name string `json:"name"`
+	// Mode is os.FileMode to be applied
+	Mode os.FileMode `json:"mode"`
 }
 
 // ContainerPort represents a network port in a single container

@@ -17,6 +17,8 @@ limitations under the License.
 package api
 
 import (
+	"os"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -452,6 +454,16 @@ type GitRepoVolumeSource struct {
 type SecretVolumeSource struct {
 	// Name of the secret in the pod's namespace to use
 	SecretName string `json:"secretName"`
+	// Modes describes access permissions to be applied per Secret's data key while mounting
+	Modes []SecretFileMode `json:"modes"`
+}
+
+// SecretFileMode sets up access permissions per Secret's data key
+type SecretFileMode struct {
+	// Name is the name of the Secret's data key
+	Name string `json:"name"`
+	// Mode is os.FileMode to be applied
+	Mode os.FileMode `json:"mode"`
 }
 
 // NFSVolumeSource represents an NFS Mount that lasts the lifetime of a pod

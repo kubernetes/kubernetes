@@ -19,6 +19,7 @@ package secret
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -61,7 +62,7 @@ func (plugin *secretPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectRefe
 }
 
 func (plugin *secretPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	return &secretVolume{spec.Name, *podRef, plugin, spec.VolumeSource.Secret.SecretName, &opts, mounter}, nil
+	return &secretVolume{spec.Name, *podRef, plugin, spec.VolumeSource.Secret, &opts, mounter}, nil
 }
 
 func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
@@ -69,18 +70,18 @@ func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID, mounter
 }
 
 func (plugin *secretPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
-	return &secretVolume{volName, api.ObjectReference{UID: podUID}, plugin, "", nil, mounter}, nil
+	return &secretVolume{volName, api.ObjectReference{UID: podUID}, plugin, nil, nil, mounter}, nil
 }
 
 // secretVolume handles retrieving secrets from the API server
 // and placing them into the volume on the host.
 type secretVolume struct {
-	volName    string
-	podRef     api.ObjectReference
-	plugin     *secretPlugin
-	secretName string
-	opts       *volume.VolumeOptions
-	mounter    mount.Interface
+	volName string
+	podRef  api.ObjectReference
+	plugin  *secretPlugin
+	secret  *api.SecretVolumeSource
+	opts    *volume.VolumeOptions
+	mounter mount.Interface
 }
 
 func (sv *secretVolume) SetUp() error {
@@ -114,24 +115,31 @@ func (sv *secretVolume) SetUpAt(dir string) error {
 		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", sv)
 	}
 
-	secret, err := kubeClient.Secrets(sv.podRef.Namespace).Get(sv.secretName)
+	secret, err := kubeClient.Secrets(sv.podRef.Namespace).Get(sv.secret.SecretName)
 	if err != nil {
-		glog.Errorf("Couldn't get secret %v/%v", sv.podRef.Namespace, sv.secretName)
+		glog.Errorf("Couldn't get secret %v/%v", sv.podRef.Namespace, sv.secret.SecretName)
 		return err
 	} else {
 		totalBytes := totalSecretBytes(secret)
 		glog.V(3).Infof("Received secret %v/%v containing (%v) pieces of data, %v total bytes",
 			sv.podRef.Namespace,
-			sv.secretName,
+			sv.secret.SecretName,
 			len(secret.Data),
 			totalBytes)
 	}
 
+	customFileModes := make(map[string]os.FileMode)
+	for _, mode := range sv.secret.Modes {
+		customFileModes[mode.Name] = mode.Mode
+	}
 	for name, data := range secret.Data {
 		hostFilePath := path.Join(dir, name)
-		glog.V(3).Infof("Writing secret data %v/%v/%v (%v bytes) to host file %v", sv.podRef.Namespace, sv.secretName, name, len(data), hostFilePath)
-		err := ioutil.WriteFile(hostFilePath, data, 0444)
-		if err != nil {
+		glog.V(3).Infof("Writing secret data %v/%v/%v (%v bytes) to host file %v", sv.podRef.Namespace, sv.secret.SecretName, name, len(data), hostFilePath)
+		var fileMode os.FileMode = 0444
+		if customFileMode, ok := customFileModes[name]; ok {
+			fileMode = customFileMode
+		}
+		if err := ioutil.WriteFile(hostFilePath, data, fileMode); err != nil {
 			glog.Errorf("Error writing secret data to host path: %v, %v", hostFilePath, err)
 			return err
 		}

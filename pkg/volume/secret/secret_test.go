@@ -71,6 +71,10 @@ func TestPlugin(t *testing.T) {
 		VolumeSource: api.VolumeSource{
 			Secret: &api.SecretVolumeSource{
 				SecretName: testName,
+				Modes: []api.SecretFileMode{
+					{"data-1", 0400},
+					{"data-2", 0404},
+				},
 			},
 		},
 	}
@@ -124,7 +128,7 @@ func TestPlugin(t *testing.T) {
 
 	for key, value := range secret.Data {
 		secretDataHostPath := path.Join(volumePath, key)
-		if _, err := os.Stat(secretDataHostPath); err != nil {
+		if fileInfo, err := os.Stat(secretDataHostPath); err != nil {
 			t.Fatalf("SetUp() failed, couldn't find secret data on disk: %v", secretDataHostPath)
 		} else {
 			actualSecretBytes, err := ioutil.ReadFile(secretDataHostPath)
@@ -135,6 +139,15 @@ func TestPlugin(t *testing.T) {
 			actualSecretValue := string(actualSecretBytes)
 			if string(value) != actualSecretValue {
 				t.Errorf("Unexpected value; expected %q, got %q", value, actualSecretValue)
+			}
+			var expectedFileMode os.FileMode = 0444
+			for _, customFileMode := range volumeSpec.VolumeSource.Secret.Modes {
+				if customFileMode.Name == key {
+					expectedFileMode = customFileMode.Mode
+				}
+			}
+			if fileInfo.Mode() != expectedFileMode {
+				t.Errorf("Unexpected secret access permissions; expected %v, got %v", expectedFileMode, fileInfo.Mode())
 			}
 		}
 	}
