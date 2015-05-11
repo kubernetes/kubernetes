@@ -67,13 +67,13 @@ func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.GitRepo != nil
 }
 
-func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
 	return &gitRepo{
-		podRef:     *podRef,
+		pod:        *pod,
 		volName:    spec.Name,
 		source:     spec.VolumeSource.GitRepo.Repository,
 		revision:   spec.VolumeSource.GitRepo.Revision,
@@ -91,7 +91,7 @@ func (plugin *gitRepoPlugin) NewCleaner(volName string, podUID types.UID, mounte
 		legacy = true
 	}
 	return &gitRepo{
-		podRef:     api.ObjectReference{UID: podUID},
+		pod:        api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
 		volName:    volName,
 		plugin:     plugin,
 		legacyMode: legacy,
@@ -103,7 +103,7 @@ func (plugin *gitRepoPlugin) NewCleaner(volName string, podUID types.UID, mounte
 // These do not persist beyond the lifetime of a pod.
 type gitRepo struct {
 	volName    string
-	podRef     api.ObjectReference
+	pod        api.Pod
 	source     string
 	revision   string
 	exec       exec.Interface
@@ -134,7 +134,7 @@ func (gr *gitRepo) SetUpAt(dir string) error {
 	}
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := gr.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &gr.podRef, gr.opts, gr.mounter)
+	wrapped, err := gr.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &gr.pod, gr.opts, gr.mounter)
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func (gr *gitRepo) SetUpAt(dir string) error {
 }
 
 func (gr *gitRepo) getMetaDir() string {
-	return path.Join(gr.plugin.host.GetPodPluginDir(gr.podRef.UID, util.EscapeQualifiedNameForDisk(gitRepoPluginName)), gr.volName)
+	return path.Join(gr.plugin.host.GetPodPluginDir(gr.pod.UID, util.EscapeQualifiedNameForDisk(gitRepoPluginName)), gr.volName)
 }
 
 func (gr *gitRepo) execCommand(command string, args []string, dir string) ([]byte, error) {
@@ -186,7 +186,7 @@ func (gr *gitRepo) GetPath() string {
 	if gr.legacyMode {
 		name = gitRepoPluginLegacyName
 	}
-	return gr.plugin.host.GetPodVolumeDir(gr.podRef.UID, util.EscapeQualifiedNameForDisk(name), gr.volName)
+	return gr.plugin.host.GetPodVolumeDir(gr.pod.UID, util.EscapeQualifiedNameForDisk(name), gr.volName)
 }
 
 // TearDown simply deletes everything in the directory.
@@ -197,7 +197,7 @@ func (gr *gitRepo) TearDown() error {
 // TearDownAt simply deletes everything in the directory.
 func (gr *gitRepo) TearDownAt(dir string) error {
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := gr.plugin.host.NewWrapperCleaner(wrappedVolumeSpec, gr.podRef.UID, gr.mounter)
+	wrapped, err := gr.plugin.host.NewWrapperCleaner(wrappedVolumeSpec, gr.pod.UID, gr.mounter)
 	if err != nil {
 		return err
 	}

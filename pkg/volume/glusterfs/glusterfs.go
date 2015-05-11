@@ -64,19 +64,19 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	ep_name := spec.VolumeSource.Glusterfs.EndpointsName
-	ns := podRef.Namespace
+	ns := pod.Namespace
 	ep, err := plugin.host.GetKubeClient().Endpoints(ns).Get(ep_name)
 	if err != nil {
 		glog.Errorf("Glusterfs: failed to get endpoints %s[%v]", ep_name, err)
 		return nil, err
 	}
 	glog.V(1).Infof("Glusterfs: endpoints %v", ep)
-	return plugin.newBuilderInternal(spec, ep, podRef, mounter, exec.New())
+	return plugin.newBuilderInternal(spec, ep, pod, mounter, exec.New())
 }
 
-func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.Endpoints, podRef *api.ObjectReference, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.Endpoints, pod *api.Pod, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
 	return &glusterfs{
 		volName:  spec.Name,
 		hosts:    ep,
@@ -84,7 +84,7 @@ func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.End
 		readonly: spec.VolumeSource.Glusterfs.ReadOnly,
 		mounter:  mounter,
 		exe:      exe,
-		podRef:   podRef,
+		pod:      pod,
 		plugin:   plugin,
 	}, nil
 }
@@ -97,7 +97,7 @@ func (plugin *glusterfsPlugin) newCleanerInternal(volName string, podUID types.U
 	return &glusterfs{
 		volName: volName,
 		mounter: mounter,
-		podRef:  &api.ObjectReference{UID: podUID},
+		pod:     &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
 		plugin:  plugin,
 	}, nil
 }
@@ -105,7 +105,7 @@ func (plugin *glusterfsPlugin) newCleanerInternal(volName string, podUID types.U
 // Glusterfs volumes represent a bare host file or directory mount of an Glusterfs export.
 type glusterfs struct {
 	volName  string
-	podRef   *api.ObjectReference
+	pod      *api.Pod
 	hosts    *api.Endpoints
 	path     string
 	readonly bool
@@ -142,7 +142,7 @@ func (glusterfsVolume *glusterfs) SetUpAt(dir string) error {
 
 func (glusterfsVolume *glusterfs) GetPath() string {
 	name := glusterfsPluginName
-	return glusterfsVolume.plugin.host.GetPodVolumeDir(glusterfsVolume.podRef.UID, util.EscapeQualifiedNameForDisk(name), glusterfsVolume.volName)
+	return glusterfsVolume.plugin.host.GetPodVolumeDir(glusterfsVolume.pod.UID, util.EscapeQualifiedNameForDisk(name), glusterfsVolume.volName)
 }
 
 func (glusterfsVolume *glusterfs) TearDown() error {
