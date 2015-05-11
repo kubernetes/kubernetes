@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package conversion_test
+package runtime_test
 
 import (
 	"bufio"
@@ -26,13 +26,13 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
 )
 
 func generateConversions(t *testing.T, version string) (bytes.Buffer, bytes.Buffer) {
-	g := conversion.NewGenerator(api.Scheme.Raw())
+	g := runtime.NewGenerator(api.Scheme.Raw())
 	g.OverwritePackage(version, "")
 	g.OverwritePackage("api", "newer")
 	for _, knownType := range api.Scheme.KnownTypes(version) {

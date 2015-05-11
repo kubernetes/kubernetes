@@ -131,6 +131,9 @@ func init() {
 }
 
 func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Container, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Container))(in)
+	}
 	out.Name = in.Name
 	out.Image = in.Image
 	if in.Command != nil {
@@ -212,13 +215,21 @@ func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Contai
 			}
 		}
 	}
-	if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
-		return err
+	if in.SecurityContext != nil {
+		out.SecurityContext = new(newer.SecurityContext)
+		if err := convert_v1beta3_SecurityContext_To_api_SecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecurityContext = nil
 	}
 	return nil
 }
 
 func convert_api_Container_To_v1beta3_Container(in *newer.Container, out *Container, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*newer.Container))(in)
+	}
 	out.Name = in.Name
 	out.Image = in.Image
 	if in.Command != nil {
@@ -287,8 +298,13 @@ func convert_api_Container_To_v1beta3_Container(in *newer.Container, out *Contai
 	}
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.ImagePullPolicy = PullPolicy(in.ImagePullPolicy)
-	if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
-		return err
+	if in.SecurityContext != nil {
+		out.SecurityContext = new(SecurityContext)
+		if err := convert_api_SecurityContext_To_v1beta3_SecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecurityContext = nil
 	}
 	// now that we've converted set the container field from security context
 	if out.SecurityContext != nil && out.SecurityContext.Privileged != nil {

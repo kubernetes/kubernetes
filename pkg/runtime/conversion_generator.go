@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package conversion
+package runtime
 
 import (
 	"fmt"
@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
 type Generator interface {
@@ -31,7 +33,7 @@ type Generator interface {
 	OverwritePackage(pkg, overwrite string)
 }
 
-func NewGenerator(scheme *Scheme) Generator {
+func NewGenerator(scheme *conversion.Scheme) Generator {
 	return &generator{
 		scheme:        scheme,
 		convertibles:  make(map[reflect.Type]reflect.Type),
@@ -42,7 +44,7 @@ func NewGenerator(scheme *Scheme) Generator {
 var complexTypes []reflect.Kind = []reflect.Kind{reflect.Map, reflect.Ptr, reflect.Slice, reflect.Interface, reflect.Struct}
 
 type generator struct {
-	scheme       *Scheme
+	scheme       *conversion.Scheme
 	convertibles map[reflect.Type]reflect.Type
 	// If pkgOverwrites is set for a given package name, that package name
 	// will be replaced while writing conversion function. If empty, package
@@ -449,7 +451,7 @@ func (g *generator) writeConversionForSlice(w io.Writer, inField, outField refle
 	}
 	if !assigned {
 		assignStmt := ""
-		if g.existsConvertionFunction(inField.Type.Elem(), outField.Type.Elem()) {
+		if g.existsDedicatedConversionFunction(inField.Type.Elem(), outField.Type.Elem()) {
 			assignFormat := "if err := %s(&in.%s[i], &out.%s[i], s); err != nil {\n"
 			funcName := conversionFunctionName(inField.Type.Elem(), outField.Type.Elem())
 			assignStmt = fmt.Sprintf(assignFormat, funcName, inField.Name, outField.Name)
@@ -539,7 +541,7 @@ func (g *generator) writeConversionForPtr(w io.Writer, inField, outField reflect
 		return err
 	}
 	assignStmt := ""
-	if g.existsConvertionFunction(inField.Type.Elem(), outField.Type.Elem()) {
+	if g.existsDedicatedConversionFunction(inField.Type.Elem(), outField.Type.Elem()) {
 		newFormat := "out.%s = new(%s)\n"
 		newStmt := fmt.Sprintf(newFormat, outField.Name, g.typeName(outField.Type.Elem()))
 		if err := writeLine(w, indent+1, newStmt); err != nil {
@@ -580,7 +582,8 @@ func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflec
 		inField := inType.Field(i)
 		outField, _ := outType.FieldByName(inField.Name)
 
-		if g.scheme.Converter().HasConversionFunc(inField.Type, outField.Type) {
+		existsConversion := g.scheme.Converter().HasConversionFunc(inField.Type, outField.Type)
+		if existsConversion && !g.existsDedicatedConversionFunction(inField.Type, outField.Type) {
 			// Use the conversion method that is already defined.
 			assignFormat := "if err := s.Convert(&in.%s, &out.%s, 0); err != nil {\n"
 			assignStmt := fmt.Sprintf(assignFormat, inField.Name, outField.Name)
@@ -644,7 +647,7 @@ func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflec
 		}
 
 		assignStmt := ""
-		if g.existsConvertionFunction(inField.Type, outField.Type) {
+		if g.existsDedicatedConversionFunction(inField.Type, outField.Type) {
 			assignFormat := "if err := %s(&in.%s, &out.%s, s); err != nil {\n"
 			funcName := conversionFunctionName(inField.Type, outField.Type)
 			assignStmt = fmt.Sprintf(assignFormat, funcName, inField.Name, outField.Name)
@@ -690,7 +693,7 @@ func (g *generator) writeConversionForType(w io.Writer, inType, outType reflect.
 	return nil
 }
 
-func (g *generator) existsConvertionFunction(inType, outType reflect.Type) bool {
+func (g *generator) existsConversionFunction(inType, outType reflect.Type) bool {
 	if val, found := g.convertibles[inType]; found && val == outType {
 		return true
 	}
@@ -698,6 +701,39 @@ func (g *generator) existsConvertionFunction(inType, outType reflect.Type) bool 
 		return true
 	}
 	return false
+}
+
+// TODO(wojtek-t): We should somehow change the conversion methods registered under:
+// pkg/runtime/scheme.go to implement the naming convention for conversion functions
+// and get rid of this hack.
+type typePair struct {
+	inType  reflect.Type
+	outType reflect.Type
+}
+
+var defaultConversions []typePair = []typePair{
+	{reflect.TypeOf([]RawExtension{}), reflect.TypeOf([]Object{})},
+	{reflect.TypeOf([]Object{}), reflect.TypeOf([]RawExtension{})},
+	{reflect.TypeOf(RawExtension{}), reflect.TypeOf(EmbeddedObject{})},
+	{reflect.TypeOf(EmbeddedObject{}), reflect.TypeOf(RawExtension{})},
+}
+
+func (g *generator) existsDedicatedConversionFunction(inType, outType reflect.Type) bool {
+	if inType == outType {
+		// Assume that conversion are not defined for "deep copies".
+		return false
+	}
+
+	if g.existsConversionFunction(inType, outType) {
+		return true
+	}
+
+	for _, conv := range defaultConversions {
+		if conv.inType == inType && conv.outType == outType {
+			return false
+		}
+	}
+	return g.scheme.Converter().HasConversionFunc(inType, outType)
 }
 
 func (g *generator) OverwritePackage(pkg, overwrite string) {
