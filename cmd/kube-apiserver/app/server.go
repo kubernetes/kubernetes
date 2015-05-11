@@ -242,6 +242,11 @@ func (s *APIServer) Run(_ []string) error {
 
 	_, enableV1 := s.RuntimeConfig["api/v1"]
 
+	disableLegacyAPIs := false
+	legacyAPIFlagValue, ok := s.RuntimeConfig["api/legacy"]
+	if ok && legacyAPIFlagValue == "false" {
+		disableLegacyAPIs = true
+	}
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
@@ -324,6 +329,7 @@ func (s *APIServer) Run(_ []string) error {
 		SupportsBasicAuth:      len(s.BasicAuthFile) > 0,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
+		DisableLegacyAPIs:      disableLegacyAPIs,
 		DisableV1Beta3:         disableV1beta3,
 		EnableV1:               enableV1,
 		MasterServiceNamespace: s.MasterServiceNamespace,
