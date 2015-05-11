@@ -79,7 +79,7 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 			} else {
 				link = client.Host + "/api/v1beta3/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
 			}
-			printService(out, service.ObjectMeta.Labels["name"], link)
+			printService(out, service.ObjectMeta.Labels["kubernetes.io/name"], link)
 		}
 		return nil
 	})
