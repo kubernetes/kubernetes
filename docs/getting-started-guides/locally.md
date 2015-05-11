@@ -74,7 +74,7 @@ However you can't view the nginx start page on localhost. To verify that nginx i
 You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:
 
 ```
-cluster/kubectl.sh create -f docs/getting-started-guides/pod.json
+cluster/kubectl.sh create -f examples/pod.yaml
 ```
 
 Congratulations!
