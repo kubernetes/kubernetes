@@ -73,14 +73,15 @@ func runAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 	}
 
 	m := master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableProfiling:   true,
-		EnableUISupport:   false,
-		APIPrefix:         "/api",
-		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EtcdHelper:            helper,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableProfiling:       true,
+		EnableUISupport:       false,
+		APIPrefix:             "/api",
+		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

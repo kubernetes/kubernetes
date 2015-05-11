@@ -63,6 +63,8 @@ import (
 	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
 	secretetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
+	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
+	etcdipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -78,13 +80,15 @@ const (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	EtcdHelper        tools.EtcdHelper
-	EventTTL          time.Duration
-	MinionRegexp      string
-	KubeletClient     client.KubeletClient
-	PortalNet         *net.IPNet
-	EnableLogsSupport bool
-	EnableUISupport   bool
+	EtcdHelper    tools.EtcdHelper
+	EventTTL      time.Duration
+	MinionRegexp  string
+	KubeletClient client.KubeletClient
+	PortalNet     *net.IPNet
+	// allow downstream consumers to disable the core controller loops
+	EnableCoreControllers bool
+	EnableLogsSupport     bool
+	EnableUISupport       bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
 	// allow v1beta3 to be conditionally disabled
@@ -144,6 +148,7 @@ type Master struct {
 	muxHelper             *apiserver.MuxHelper
 	handlerContainer      *restful.Container
 	rootWebService        *restful.WebService
+	enableCoreControllers bool
 	enableLogsSupport     bool
 	enableUISupport       bool
 	enableSwaggerSupport  bool
@@ -180,6 +185,7 @@ type Master struct {
 	namespaceRegistry namespace.Registry
 	serviceRegistry   service.Registry
 	endpointRegistry  endpoint.Registry
+	portalAllocator   service.IPRegistry
 
 	// "Outputs"
 	Handler         http.Handler
@@ -207,6 +213,9 @@ func setDefaults(c *Config) {
 		_, portalNet, err := net.ParseCIDR(defaultNet)
 		if err != nil {
 			glog.Fatalf("Unable to parse CIDR: %v", err)
+		}
+		if size := ipallocator.RangeSize(portalNet); size < 8 {
+			glog.Fatalf("The portal net range must be at least %d IP addresses", 8)
 		}
 		c.PortalNet = portalNet
 	}
@@ -271,11 +280,11 @@ func New(c *Config) *Master {
 	}
 
 	// Select the first two valid IPs from portalNet to use as the master service portalIPs
-	serviceReadOnlyIP, err := service.GetIndexedIP(c.PortalNet, 1)
+	serviceReadOnlyIP, err := ipallocator.GetIndexedIP(c.PortalNet, 1)
 	if err != nil {
 		glog.Fatalf("Failed to generate service read-only IP for master service: %v", err)
 	}
-	serviceReadWriteIP, err := service.GetIndexedIP(c.PortalNet, 2)
+	serviceReadWriteIP, err := ipallocator.GetIndexedIP(c.PortalNet, 2)
 	if err != nil {
 		glog.Fatalf("Failed to generate service read-write IP for master service: %v", err)
 	}
@@ -284,6 +293,7 @@ func New(c *Config) *Master {
 	m := &Master{
 		portalNet:             c.PortalNet,
 		rootWebService:        new(restful.WebService),
+		enableCoreControllers: c.EnableCoreControllers,
 		enableLogsSupport:     c.EnableLogsSupport,
 		enableUISupport:       c.EnableUISupport,
 		enableSwaggerSupport:  c.EnableSwaggerSupport,
@@ -324,7 +334,6 @@ func New(c *Config) *Master {
 	m.handlerContainer.Router(restful.CurlyRouter{})
 	m.muxHelper = &apiserver.MuxHelper{m.mux, []string{}}
 
-	m.masterServices = util.NewRunner(m.serviceWriterLoop, m.roServiceWriterLoop)
 	m.init(c)
 	return m
 }
@@ -405,6 +414,10 @@ func (m *Master) init(c *Config) {
 	registry := etcd.NewRegistry(c.EtcdHelper, podRegistry, m.endpointRegistry)
 	m.serviceRegistry = registry
 
+	ipAllocator := ipallocator.NewCIDRRange(m.portalNet)
+	portalAllocator := etcdipallocator.NewEtcd(ipAllocator, c.EtcdHelper)
+	m.portalAllocator = portalAllocator
+
 	controllerStorage := controlleretcd.NewREST(c.EtcdHelper)
 
 	// TODO: Factor out the core API registration
@@ -421,7 +434,7 @@ func (m *Master) init(c *Config) {
 		"podTemplates": podTemplateStorage,
 
 		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, m.portalNet, c.ClusterName),
+		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, portalAllocator, c.ClusterName),
 		"endpoints":              endpointsStorage,
 		"minions":                nodeStorage,
 		"minions/status":         nodeStatusStorage,
@@ -544,7 +557,34 @@ func (m *Master) init(c *Config) {
 	}
 
 	// TODO: Attempt clean shutdown?
-	m.masterServices.Start()
+	if m.enableCoreControllers {
+		m.NewBootstrapController().Start()
+	}
+}
+
+// NewBootstrapController returns a controller for watching the core capabilities of the master.
+func (m *Master) NewBootstrapController() *Controller {
+	return &Controller{
+		NamespaceRegistry: m.namespaceRegistry,
+		ServiceRegistry:   m.serviceRegistry,
+		ServiceIPRegistry: m.portalAllocator,
+		EndpointRegistry:  m.endpointRegistry,
+		PortalNet:         m.portalNet,
+		MasterCount:       m.masterCount,
+
+		PortalIPInterval: 3 * time.Minute,
+		EndpointInterval: 10 * time.Second,
+
+		PublicIP: m.clusterIP,
+
+		ServiceIP:         m.serviceReadWriteIP,
+		ServicePort:       m.serviceReadWritePort,
+		PublicServicePort: m.publicReadWritePort,
+
+		ReadOnlyServiceIP:         m.serviceReadOnlyIP,
+		ReadOnlyServicePort:       m.serviceReadOnlyPort,
+		PublicReadOnlyServicePort: m.serviceReadOnlyPort,
+	}
 }
 
 // InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery

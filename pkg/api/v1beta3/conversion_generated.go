@@ -2909,6 +2909,40 @@ func convert_api_Probe_To_v1beta3_Probe(in *newer.Probe, out *Probe, s conversio
 	return nil
 }
 
+func convert_v1beta3_RangeAllocation_To_api_RangeAllocation(in *RangeAllocation, out *newer.RangeAllocation, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*RangeAllocation))(in)
+	}
+	if err := convert_v1beta3_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1beta3_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	out.Range = in.Range
+	if err := s.Convert(&in.Data, &out.Data, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_RangeAllocation_To_v1beta3_RangeAllocation(in *newer.RangeAllocation, out *RangeAllocation, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*newer.RangeAllocation))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1beta3_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	out.Range = in.Range
+	if err := s.Convert(&in.Data, &out.Data, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1beta3_ReplicationController_To_api_ReplicationController(in *ReplicationController, out *newer.ReplicationController, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationController))(in)
@@ -4192,6 +4226,7 @@ func init() {
 		convert_api_PodTemplate_To_v1beta3_PodTemplate,
 		convert_api_Pod_To_v1beta3_Pod,
 		convert_api_Probe_To_v1beta3_Probe,
+		convert_api_RangeAllocation_To_v1beta3_RangeAllocation,
 		convert_api_ReplicationControllerList_To_v1beta3_ReplicationControllerList,
 		convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec,
 		convert_api_ReplicationControllerStatus_To_v1beta3_ReplicationControllerStatus,
@@ -4297,6 +4332,7 @@ func init() {
 		convert_v1beta3_PodTemplate_To_api_PodTemplate,
 		convert_v1beta3_Pod_To_api_Pod,
 		convert_v1beta3_Probe_To_api_Probe,
+		convert_v1beta3_RangeAllocation_To_api_RangeAllocation,
 		convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList,
 		convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
 		convert_v1beta3_ReplicationControllerStatus_To_api_ReplicationControllerStatus,

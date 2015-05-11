@@ -309,6 +309,7 @@ func (s *APIServer) Run(_ []string) error {
 		EventTTL:               s.EventTTL,
 		KubeletClient:          kubeletClient,
 		PortalNet:              &n,
+		EnableCoreControllers:  true,
 		EnableLogsSupport:      s.EnableLogsSupport,
 		EnableUISupport:        true,
 		EnableSwaggerSupport:   true,
