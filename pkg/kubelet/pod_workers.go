@@ -84,10 +84,10 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 	for newWork := range podUpdates {
 		func() {
 			defer p.checkForUpdates(newWork.pod.UID, newWork.updateCompleteFn)
-			// We would like to have the state of Docker from at least the moment
-			// when we finished the previous processing of that pod.
+			// We would like to have the state of the containers from at least
+			// the moment when we finished the previous processing of that pod.
 			if err := p.runtimeCache.ForceUpdateIfOlder(minRuntimeCacheTime); err != nil {
-				glog.Errorf("Error updating docker cache: %v", err)
+				glog.Errorf("Error updating the container runtime cache: %v", err)
 				return
 			}
 			pods, err := p.runtimeCache.GetPods()
