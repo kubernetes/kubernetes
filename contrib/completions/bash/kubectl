@@ -259,7 +259,6 @@ _kubectl_get()
     must_have_one_noun+=("resourcequota")
     must_have_one_noun+=("secret")
     must_have_one_noun+=("service")
-    must_have_one_noun+=("status")
 }
 
 _kubectl_describe()
