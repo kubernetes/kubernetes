@@ -26,6 +26,13 @@ MASTER=""
 MASTER_IP=""
 MINION_IPS=""
 
+# Assumed Vars:
+#   KUBE_ROOT
+function test-build-release {
+  # Make a release
+  "${KUBE_ROOT}/build/release.sh"
+}
+
 # From user input set the necessary k8s and etcd configuration infomation
 function setClusterInfo() {
   ii=0
