@@ -75,6 +75,13 @@ var _ = Describe("Density", func() {
 		if err := c.Namespaces().Delete(ns); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
+
+		// Verify latency metrics
+		// TODO: Update threshold to 1s once we reach this goal
+		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
+		highLatencyRequests, err := HighLatencyRequests(c, 10*time.Second, util.NewStringSet("events"))
+		expectNoError(err)
+		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
 
 	// Tests with "Skipped" substring in their name will be skipped when running
@@ -154,13 +161,6 @@ var _ = Describe("Density", func() {
 			// Tune the threshold for allowed failures.
 			badEvents := BadEvents(events)
 			Expect(badEvents).NotTo(BeNumerically(">", int(math.Floor(0.01*float64(totalPods)))))
-
-			// Verify latency metrics
-			// TODO: Update threshold to 1s once we reach this goal
-			// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
-			highLatencyRequests, err := HighLatencyRequests(c, 10*time.Second, util.NewStringSet("events"))
-			expectNoError(err)
-			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 		})
 	}
 })
