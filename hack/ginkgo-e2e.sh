@@ -87,7 +87,10 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
 
     detect-master >/dev/null
 
-    if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+    # In gcloud versions < 0.9.59, GKE stores its kubeconfig in a separate
+    # location.
+    # TODO: Remove this once gcloud 0.9.59 or above is released.
+    if [[ "${KUBERNETES_PROVIDER}" == "gke" && -e "${GCLOUD_CONFIG_DIR}/kubeconfig" ]]; then
       # GKE stores its own kubeconfig in gcloud's config directory.
       detect-project &> /dev/null
       auth_config=(

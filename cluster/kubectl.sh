@@ -105,10 +105,10 @@ if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   config=(
     "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
   )
-  # In gcloud versions prior to 0.9.59, GKE stores it's kubeconfig
+  # In gcloud versions prior to 0.9.59, GKE stores its kubeconfig
   # in a separate location. If the file doesn't exist, then use
   # the default kubeconfig file.
-  # TODO(roberthbailey): Remove this once gcloud 0.9.59 is released.
+  # TODO(roberthbailey): Remove this once gcloud 0.9.59 or above is released.
   if [[ -e "${HOME}/.config/gcloud/kubernetes/kubeconfig" ]]; then
     config+=(
       "--kubeconfig=${HOME}/.config/gcloud/kubernetes/kubeconfig"
