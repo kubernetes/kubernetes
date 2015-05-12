@@ -34,8 +34,7 @@ $ kubectl config view
 }
 ```
 
-To access a service endpoint `/alpha/beta/gamma/` via the proxy service for your service `myservice` you need to specify an HTTPS address
-for the Kubernetes master followed by `/api/v1beta3/proxy/namespaces/default/services/myservice/alpha/beta/gamma`.
+To access a cluster service endpoint via the proxy you should prefix the name of the service with `/api/v1beta3/proxy/namespaces/default/services`, for example, `/api/v1beta3/proxy/namespaces/default/services/elasticsearch` or `/api/v1beta3/proxy/namespaces/default/services/elasticsearch/_search?q=user:kimchy`.
 
 Here is a list of representative cluster-level system services:
 ```
