@@ -46,6 +46,12 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	// Maximum duration before timing out read/write requests
+	// Set to a value larger than the timeouts in each watch server.
+	ReadWriteTimeout = time.Minute * 60
+)
+
 // APIServer runs a kubernetes api server.
 type APIServer struct {
 	InsecureBindAddress        util.IP
@@ -393,8 +399,8 @@ func (s *APIServer) Run(_ []string) error {
 		readOnlyServer := &http.Server{
 			Addr:           roLocation,
 			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, m.InsecureHandler)))),
-			ReadTimeout:    5 * time.Minute,
-			WriteTimeout:   5 * time.Minute,
+			ReadTimeout:    ReadWriteTimeout,
+			WriteTimeout:   ReadWriteTimeout,
 			MaxHeaderBytes: 1 << 20,
 		}
 		glog.Infof("Serving read-only insecurely on %s", roLocation)
@@ -413,8 +419,8 @@ func (s *APIServer) Run(_ []string) error {
 		secureServer := &http.Server{
 			Addr:           secureLocation,
 			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(m.Handler)),
-			ReadTimeout:    5 * time.Minute,
-			WriteTimeout:   5 * time.Minute,
+			ReadTimeout:    ReadWriteTimeout,
+			WriteTimeout:   ReadWriteTimeout,
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
@@ -454,12 +460,11 @@ func (s *APIServer) Run(_ []string) error {
 			}
 		}()
 	}
-
 	http := &http.Server{
 		Addr:           insecureLocation,
 		Handler:        apiserver.RecoverPanics(m.InsecureHandler),
-		ReadTimeout:    5 * time.Minute,
-		WriteTimeout:   5 * time.Minute,
+		ReadTimeout:    ReadWriteTimeout,
+		WriteTimeout:   ReadWriteTimeout,
 		MaxHeaderBytes: 1 << 20,
 	}
 	glog.Infof("Serving insecurely on %s", insecureLocation)
