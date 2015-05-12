@@ -53,13 +53,13 @@ Use the file `examples/kubernetes-namespaces/namespace-dev.json` which describes
 ```js
 {
   "kind": "Namespace",
-  "apiVersion":"v1beta1",
-  "id": "development",
-  "spec": {},
-  "status": {},
-  "labels": {
-    "name": "development"
-  },
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "development",
+    "labels": {
+      "name": "development"
+    }
+  }
 }
 ```
 
@@ -79,11 +79,12 @@ To be sure things are right, let's list all of the namespaces in our cluster.
 
 ```shell
 $ cluster/kubectl.sh get namespaces
-NAME                LABELS
-default             <none>
-development         name=development
-production          name=production
+NAME          LABELS             STATUS
+default       <none>             Active
+development   name=development   Active
+production    name=production    Active
 ```
+
 
 ### Step Three: Create pods in each namespace
 
@@ -93,11 +94,40 @@ Users interacting with one namespace do not see the content in another namespace
 
 To demonstrate this, let's spin up a simple replication controller and pod in the development namespace.
 
-The first step is to define a context for the kubectl client to work in each namespace.
+We first check what is the current context:
 
 ```shell
-$ cluster/kubectl.sh config set-context dev --namespace=development
-$ cluster/kubectl.sh config set-context prod --namespace=production
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: REDACTED
+    server: https://130.211.122.180
+  name: lithe-cocoa-92103_kubernetes
+contexts:
+- context:
+    cluster: lithe-cocoa-92103_kubernetes
+    user: lithe-cocoa-92103_kubernetes
+  name: lithe-cocoa-92103_kubernetes
+current-context: lithe-cocoa-92103_kubernetes
+kind: Config
+preferences: {}
+users:
+- name: lithe-cocoa-92103_kubernetes
+  user:
+    client-certificate-data: REDACTED
+    client-key-data: REDACTED
+    token: 65rZW78y8HbwXXtSXuUw9DbP4FLjHi4b
+- name: lithe-cocoa-92103_kubernetes-basic-auth
+  user:
+    password: h5M0FtUUIflBSdI7
+    username: admin
+```
+
+The next step is to define a context for the kubectl client to work in each namespace. The value of "cluster" and "user" fields are copied from the current context.
+
+```shell
+$ cluster/kubectl.sh config set-context dev --namespace=development --cluster=lithe-cocoa-92103_kubernetes --user=lithe-cocoa-92103_kubernetes
+$ cluster/kubectl.sh config set-context prod --namespace=production --cluster=lithe-cocoa-92103_kubernetes --user=lithe-cocoa-92103_kubernetes
 ```
 
 The above commands provided two request contexts you can alternate against depending on what namespace you
@@ -113,19 +143,40 @@ You can verify your current context by doing the following:
 
 ```shell
 $ cluster/kubectl.sh config view
-clusters: {}
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: REDACTED
+    server: https://130.211.122.180
+  name: lithe-cocoa-92103_kubernetes
 contexts:
-  dev:
-    cluster: ""
+- context:
+    cluster: lithe-cocoa-92103_kubernetes
     namespace: development
-    user: ""
-  prod:
-    cluster: ""
+    user: lithe-cocoa-92103_kubernetes
+  name: dev
+- context:
+    cluster: lithe-cocoa-92103_kubernetes
+    user: lithe-cocoa-92103_kubernetes
+  name: lithe-cocoa-92103_kubernetes
+- context:
+    cluster: lithe-cocoa-92103_kubernetes
     namespace: production
-    user: ""
+    user: lithe-cocoa-92103_kubernetes
+  name: prod
 current-context: dev
+kind: Config
 preferences: {}
-users: {}
+users:
+- name: lithe-cocoa-92103_kubernetes
+  user:
+    client-certificate-data: REDACTED
+    client-key-data: REDACTED
+    token: 65rZW78y8HbwXXtSXuUw9DbP4FLjHi4b
+- name: lithe-cocoa-92103_kubernetes-basic-auth
+  user:
+    password: h5M0FtUUIflBSdI7
+    username: admin
 ```
 
 At this point, all requests we make to the Kubernetes cluster from the command line are scoped to the development namespace.
@@ -144,9 +195,11 @@ CONTROLLER          CONTAINER(S)        IMAGE(S)                    SELECTOR    
 snowflake           snowflake           kubernetes/serve_hostname   run-container=snowflake   2
 
 $ cluster/kubectl.sh get pods
-POD                 IP                  CONTAINER(S)        IMAGE(S)                    HOST                    LABELS                    STATUS
-snowflake-fplln     10.246.0.5          snowflake           kubernetes/serve_hostname   10.245.1.3/10.245.1.3   run-container=snowflake   Running
-snowflake-gziey     10.246.0.4          snowflake           kubernetes/serve_hostname   10.245.1.3/10.245.1.3   run-container=snowflake   Running
+POD               IP           CONTAINER(S)   IMAGE(S)                    HOST                                   LABELS                    STATUS    CREATED         MESSAGE
+snowflake-mbrfi   10.244.2.4                                              kubernetes-minion-ilqx/104.197.8.214   run-container=snowflake   Running   About an hour   
+                               snowflake      kubernetes/serve_hostname                                                                    Running   About an hour   
+snowflake-p78ev   10.244.2.5                                              kubernetes-minion-ilqx/104.197.8.214   run-container=snowflake   Running   About an hour   
+                               snowflake      kubernetes/serve_hostname                                                                    Running   About an hour   
 ```
 
 And this is great, developers are able to do what they want, and they do not have to worry about affecting content in the production namespace.
@@ -164,7 +217,7 @@ $ cluster/kubectl.sh get rc
 CONTROLLER          CONTAINER(S)        IMAGE(S)            SELECTOR            REPLICAS
 
 $ cluster/kubectl.sh get pods
-POD                 IP                  CONTAINER(S)        IMAGE(S)            HOST                LABELS              STATUS
+POD                 IP                  CONTAINER(S)        IMAGE(S)            HOST                LABELS              STATUS          CREATED       MESSAGE
 ```
 
 Production likes to run cattle, so let's create some cattle pods.
@@ -177,12 +230,17 @@ CONTROLLER          CONTAINER(S)        IMAGE(S)                    SELECTOR    
 cattle              cattle              kubernetes/serve_hostname   run-container=cattle   5
 
 $ cluster/kubectl.sh get pods
-POD                 IP                  CONTAINER(S)        IMAGE(S)                    HOST                    LABELS                 STATUS
-cattle-0133o        10.246.0.7          cattle              kubernetes/serve_hostname   10.245.1.3/10.245.1.3   run-container=cattle   Running
-cattle-hh2gd        10.246.0.10         cattle              kubernetes/serve_hostname   10.245.1.3/10.245.1.3   run-container=cattle   Running
-cattle-ls6k1        10.246.0.9          cattle              kubernetes/serve_hostname   10.245.1.3/10.245.1.3   run-container=cattle   Running
-cattle-nyxxv        10.246.0.8          cattle              kubernetes/serve_hostname   10.245.1.3/10.245.1.3   run-container=cattle   Running
-cattle-oh43e        10.246.0.6          cattle              kubernetes/serve_hostname   10.245.1.3/10.245.1.3   run-container=cattle   Running
+POD            IP           CONTAINER(S)   IMAGE(S)                    HOST                                    LABELS                 STATUS    CREATED         MESSAGE
+cattle-1kyvj   10.244.0.4                                              kubernetes-minion-7s1y/23.236.54.97     run-container=cattle   Running   About an hour   
+                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour   
+cattle-kobrk   10.244.1.4                                              kubernetes-minion-cfs6/104.154.61.231   run-container=cattle   Running   About an hour   
+                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour   
+cattle-l1v9t   10.244.0.5                                              kubernetes-minion-7s1y/23.236.54.97     run-container=cattle   Running   About an hour   
+                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour   
+cattle-ne2sj   10.244.3.7                                              kubernetes-minion-x8gx/104.154.47.83    run-container=cattle   Running   About an hour   
+                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour   
+cattle-qrk4x   10.244.0.6                                              kubernetes-minion-7s1y/23.236.54.97     run-container=cattle   Running   About an hour   
+                            cattle         kubernetes/serve_hostname  
 ```
 
 At this point, it should be clear that the resources users create in one namespace are hidden from the other namespace.
