@@ -78,7 +78,6 @@ kube::log::status "Starting kubelet in masterful mode"
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
   --api_servers="${API_HOST}:${API_PORT}" \
-  --auth_path="${KUBE_ROOT}/hack/.test-cmd-auth" \
   --port="$KUBELET_PORT" \
   --healthz_port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
 KUBELET_PID=$!

@@ -33,6 +33,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/chaosclient"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
+	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
@@ -80,7 +82,8 @@ type KubeletServer struct {
 	MinimumGCAge                   time.Duration
 	MaxPerPodContainerCount        int
 	MaxContainerCount              int
-	AuthPath                       string
+	AuthPath                       util.StringFlag // Deprecated -- use KubeConfig instead
+	KubeConfig                     util.StringFlag
 	CadvisorPort                   uint
 	HealthzPort                    int
 	HealthzBindAddress             util.IP
@@ -145,7 +148,8 @@ func NewKubeletServer() *KubeletServer {
 		MinimumGCAge:                1 * time.Minute,
 		MaxPerPodContainerCount:     5,
 		MaxContainerCount:           100,
-		AuthPath:                    "/var/lib/kubelet/kubernetes_auth",
+		AuthPath:                    util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
+		KubeConfig:                  util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		CadvisorPort:                4194,
 		HealthzPort:                 10248,
 		HealthzBindAddress:          util.IP(net.ParseIP("127.0.0.1")),
@@ -196,8 +200,9 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.MinimumGCAge, "minimum-container-ttl-duration", s.MinimumGCAge, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	fs.IntVar(&s.MaxPerPodContainerCount, "maximum-dead-containers-per-container", s.MaxPerPodContainerCount, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
 	fs.IntVar(&s.MaxContainerCount, "maximum-dead-containers", s.MaxContainerCount, "Maximum number of old instances of a containers to retain globally.  Each container takes up some disk space.  Default: 100.")
-	fs.StringVar(&s.AuthPath, "auth-path", s.AuthPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
+	fs.Var(&s.AuthPath, "auth-path", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.MarkDeprecated("auth-path", "will be removed in a future version")
+	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
 	fs.UintVar(&s.CadvisorPort, "cadvisor-port", s.CadvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
 	fs.Var(&s.HealthzBindAddress, "healthz-bind-address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
@@ -352,20 +357,59 @@ func (s *KubeletServer) Run(_ []string) error {
 
 }
 
-// TODO: replace this with clientcmd
-func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
-	authInfo, err := clientauth.LoadFromFile(s.AuthPath)
+func (s *KubeletServer) authPathClientConfig(useDefaults bool) (*client.Config, error) {
+	authInfo, err := clientauth.LoadFromFile(s.AuthPath.Value())
+	if err != nil && !useDefaults {
+		return nil, err
+	}
+	// If loading the default auth path, for backwards compatibility keep going
+	// with the default auth.
 	if err != nil {
-		glog.Warningf("Could not load kubernetes auth path: %v. Continuing with defaults.", err)
+		glog.Warningf("Could not load kubernetes auth path %s: %v. Continuing with defaults.", s.AuthPath, err)
 	}
 	if authInfo == nil {
 		// authInfo didn't load correctly - continue with defaults.
 		authInfo = &clientauth.Info{}
 	}
-	clientConfig, err := authInfo.MergeWithConfig(client.Config{})
+	authConfig, err := authInfo.MergeWithConfig(client.Config{})
 	if err != nil {
 		return nil, err
 	}
+	authConfig.Host = s.APIServerList[0]
+	return &authConfig, nil
+}
+
+func (s *KubeletServer) kubeconfigClientConfig() (*client.Config, error) {
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig()
+}
+
+// createClientConfig creates a client configuration from the command line
+// arguments. If either --auth-path or --kubeconfig is explicitly set, it
+// will be used (setting both is an error). If neither are set first attempt
+// to load the default kubeconfig file, then the default auth path file, and
+// fall back to the default auth (none) without an error.
+// TODO(roberthbailey): Remove support for --auth-path
+func (s *KubeletServer) createClientConfig() (*client.Config, error) {
+	if s.KubeConfig.Provided() && s.AuthPath.Provided() {
+		return nil, fmt.Errorf("cannot specify both --kubeconfig and --auth-path")
+	}
+	if s.KubeConfig.Provided() {
+		return s.kubeconfigClientConfig()
+	} else if s.AuthPath.Provided() {
+		return s.authPathClientConfig(false)
+	}
+	// Try the kubeconfig default first, falling back to the auth path default.
+	clientConfig, err := s.kubeconfigClientConfig()
+	if err != nil {
+		glog.Warningf("Could not load kubeconfig file %s: %v. Trying auth path instead.", s.KubeConfig, err)
+		return s.authPathClientConfig(true)
+	}
+	return clientConfig, nil
+}
+
+func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
 	if len(s.APIServerList) < 1 {
 		return nil, fmt.Errorf("no api servers specified")
 	}
@@ -373,15 +417,17 @@ func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
 	if len(s.APIServerList) > 1 {
 		glog.Infof("Multiple api servers specified.  Picking first one")
 	}
-	clientConfig.Host = s.APIServerList[0]
 
-	s.addChaosToClientConfig(&clientConfig)
-
-	c, err := client.New(&clientConfig)
+	clientConfig, err := s.createClientConfig()
 	if err != nil {
 		return nil, err
 	}
-	return c, nil
+	s.addChaosToClientConfig(clientConfig)
+	client, err := client.New(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 // addChaosToClientConfig injects random errors into client connections if configured.

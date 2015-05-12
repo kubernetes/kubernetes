@@ -24,6 +24,10 @@ type StringFlag struct {
 	value string
 }
 
+func NewStringFlag(defaultVal string) StringFlag {
+	return StringFlag{value: defaultVal}
+}
+
 func (f *StringFlag) Default(value string) {
 	f.value = value
 }
