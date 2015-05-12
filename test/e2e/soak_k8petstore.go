@@ -45,8 +45,11 @@ var (
 	ns        string         = ""
 )
 
-//This must run on a machine which is in the kube-proxy ring.  Otherwise, the publicIP binding will fail.
-//The IP Below ~ letter->number cipher for k8petstore (most likely it won't be bound by any other process)
+//TODO This will work on some simple kube setups,
+//but not in all cases.
+//We need to enable these tests, by coming up with
+//a way to set publicIPs when we run in arbitrary clusters.
+//once that is done, we can unset the Pending ginkgoflags (PIt).
 var ip = "165.201.92.15"
 
 // i.e. after 50 trials, expect 3000 transactions... minimum we settle for is 500.
@@ -132,7 +135,7 @@ T:
 	Ω(totalTransactions).Should(BeNumerically(">", minExpected))
 }
 
-var _ = Describe("k8bps", func() {
+var _ = PDescribe("k8bps", func() {
 	BeforeEach(func() {
 		By("Creating a kubernetes client")
 		c, err = loadClient()
@@ -163,7 +166,7 @@ var _ = Describe("k8bps", func() {
 
 	//On a single node cluster, we expect about 10 transactions every second on average.
 	//admittedly, this is a very rough estimate given that the ETL is done in batches...
-	It(fmt.Sprintf("k8petstore-FUNCTIONAL : Should quickly acquire 500 petstore transactions."), func() {
+	PIt(fmt.Sprintf("k8petstore-FUNCTIONAL : Should quickly acquire 500 petstore transactions."), func() {
 
 		//max number of trial before k8petstore.sh dies.
 		var loadGenerators int = minionCount
@@ -177,7 +180,7 @@ var _ = Describe("k8bps", func() {
 	})
 
 	//This test takes a few minutes... for simple CI setups testing pure functionality, filter it out.
-	It(fmt.Sprintf("k8petstore-SCALE : Should support acquiring up to 5000 petstore transactions per minion"), func() {
+	PIt(fmt.Sprintf("k8petstore-SCALE : Should support acquiring up to 5000 petstore transactions per minion"), func() {
 
 		//We double the load generators, to increase the load.  Maybe parameterize this later,
 		//the more generators -> the more transactions and the more bursty CPU used per minion.
