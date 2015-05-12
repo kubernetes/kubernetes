@@ -90,6 +90,9 @@ type Manager interface {
 	// Returns information for all global filesystems if label is empty.
 	GetFsInfo(label string) ([]v2.FsInfo, error)
 
+	// Get ps output for a container.
+	GetProcessList(containerName string, options v2.RequestOptions) ([]v2.ProcessInfo, error)
+
 	// Get events streamed through passedChannel that fit the request.
 	WatchForEvents(request *events.Request) (*events.EventChannel, error)
 
@@ -609,6 +612,7 @@ func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 			Mountpoint: mountpoint,
 			Capacity:   fs.Limit,
 			Usage:      fs.Usage,
+			Available:  fs.Available,
 			Labels:     labels,
 		}
 		fsInfo = append(fsInfo, fi)
@@ -638,6 +642,27 @@ func (m *manager) Exists(containerName string) bool {
 		return true
 	}
 	return false
+}
+
+func (m *manager) GetProcessList(containerName string, options v2.RequestOptions) ([]v2.ProcessInfo, error) {
+	// override recursive. Only support single container listing.
+	options.Recursive = false
+	conts, err := m.getRequestedContainers(containerName, options)
+	if err != nil {
+		return nil, err
+	}
+	if len(conts) != 1 {
+		return nil, fmt.Errorf("Expected the request to match only one container")
+	}
+	// TODO(rjnagal): handle count? Only if we can do count by type (eg. top 5 cpu users)
+	ps := []v2.ProcessInfo{}
+	for _, cont := range conts {
+		ps, err = cont.GetProcessList()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ps, nil
 }
 
 // Create a container.

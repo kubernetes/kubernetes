@@ -38,6 +38,7 @@ const (
 	storageApi       = "storage"
 	attributesApi    = "attributes"
 	versionApi       = "version"
+	psApi            = "ps"
 )
 
 // Interface for a cAdvisor API version
@@ -304,7 +305,7 @@ func (self *version2_0) Version() string {
 }
 
 func (self *version2_0) SupportedRequestTypes() []string {
-	return []string{versionApi, attributesApi, eventsApi, machineApi, summaryApi, statsApi, specApi, storageApi}
+	return []string{versionApi, attributesApi, eventsApi, machineApi, summaryApi, statsApi, specApi, storageApi, psApi}
 }
 
 func (self *version2_0) HandleRequest(requestType string, request []string, m manager.Manager, w http.ResponseWriter, r *http.Request) error {
@@ -391,6 +392,17 @@ func (self *version2_0) HandleRequest(requestType string, request []string, m ma
 		return writeResult(fi, w)
 	case eventsApi:
 		return handleEventRequest(request, m, w, r)
+	case psApi:
+		// reuse container type from request.
+		// ignore recursive.
+		// TODO(rjnagal): consider count to limit ps output.
+		name := getContainerName(request)
+		glog.V(4).Infof("Api - Spec for container %q, options %+v", name, opt)
+		ps, err := m.GetProcessList(name, opt)
+		if err != nil {
+			return fmt.Errorf("process listing failed: %v", err)
+		}
+		return writeResult(ps, w)
 	default:
 		return fmt.Errorf("unknown request type %q", requestType)
 	}

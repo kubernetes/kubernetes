@@ -18,7 +18,10 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"os/exec"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -111,6 +114,63 @@ func (c *containerData) DerivedStats() (v2.DerivedStats, error) {
 		return v2.DerivedStats{}, fmt.Errorf("derived stats not enabled for container %q", c.info.Name)
 	}
 	return c.summaryReader.DerivedStats()
+}
+
+func (c *containerData) GetProcessList() ([]v2.ProcessInfo, error) {
+	// report all processes for root.
+	isRoot := c.info.Name == "/"
+	pidMap := map[int]bool{}
+	if !isRoot {
+		pids, err := c.handler.ListProcesses(container.ListSelf)
+		if err != nil {
+			return nil, err
+		}
+		for _, pid := range pids {
+			pidMap[pid] = true
+		}
+	}
+	// TODO(rjnagal): Take format as an option?
+	format := "user,pid,ppid,stime,pcpu,rss,vsz,stat,time,comm"
+	args := []string{"-e", "-o", format}
+	expectedFields := 10
+	out, err := exec.Command("ps", args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute ps command: %v", err)
+	}
+	processes := []v2.ProcessInfo{}
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines[1:] {
+		if len(line) == 0 {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < expectedFields {
+			return nil, fmt.Errorf("expected at least %d fields, found %d: output: %q", expectedFields, len(fields), line)
+		}
+		pid, err := strconv.Atoi(fields[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid pid %q: %v", fields[1], err)
+		}
+		ppid, err := strconv.Atoi(fields[2])
+		if err != nil {
+			return nil, fmt.Errorf("invalid ppid %q: %v", fields[2], err)
+		}
+		if isRoot || pidMap[pid] == true {
+			processes = append(processes, v2.ProcessInfo{
+				User:        fields[0],
+				Pid:         pid,
+				Ppid:        ppid,
+				StartTime:   fields[3],
+				PercentCpu:  fields[4],
+				RSS:         fields[5],
+				VirtualSize: fields[6],
+				Status:      fields[7],
+				RunningTime: fields[8],
+				Cmd:         strings.Join(fields[9:], " "),
+			})
+		}
+	}
+	return processes, nil
 }
 
 func newContainerData(containerName string, memoryStorage *memory.InMemoryStorage, handler container.ContainerHandler, loadReader cpuload.CpuLoadReader, logUsage bool, collectorManager collector.CollectorManager) (*containerData, error) {
@@ -232,8 +292,9 @@ func (c *containerData) housekeeping() {
 			}
 		}
 
+		// TODO(vmarmol): Export metrics.
 		// Run custom collectors.
-		nextCollectionTime, err := c.collectorManager.Collect()
+		nextCollectionTime, _, err := c.collectorManager.Collect()
 		if err != nil && c.allowErrorLogging() {
 			glog.Warningf("[%s] Collection failed: %v", c.info.Name, err)
 		}

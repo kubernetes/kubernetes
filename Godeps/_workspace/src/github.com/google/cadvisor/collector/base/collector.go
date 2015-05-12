@@ -12,22 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector
+package base
 
 import (
 	"time"
 
+	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/info/v2"
 )
 
-type FakeCollectorManager struct {
+type Collector struct {
 }
 
-func (fkm *FakeCollectorManager) RegisterCollector(collector Collector) error {
-	return nil
+var _ collector.Collector = &Collector{}
+
+func (c *Collector) Collect() (time.Time, []v2.Metric, error) {
+	return time.Now(), []v2.Metrics{}, nil
 }
 
-func (fkm *FakeCollectorManager) Collect() (time.Time, []v2.Metric, error) {
-	var zero time.Time
-	return zero, []v2.Metric{}, nil
+func (c *Collector) Name() string {
+	return "default"
 }

@@ -20,6 +20,7 @@ package fs
 /*
  extern int getBytesFree(const char *path, unsigned long long *bytes);
  extern int getBytesTotal(const char *path, unsigned long long *bytes);
+ extern int getBytesAvail(const char *path, unsigned long long *bytes);
 */
 import "C"
 
@@ -176,7 +177,7 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 		_, hasMount := mountSet[partition.mountpoint]
 		_, hasDevice := deviceSet[device]
 		if mountSet == nil || (hasMount && !hasDevice) {
-			total, free, err := getVfsStats(partition.mountpoint)
+			total, free, avail, err := getVfsStats(partition.mountpoint)
 			if err != nil {
 				glog.Errorf("Statvfs failed. Error: %v", err)
 			} else {
@@ -186,7 +187,7 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 					Major:  uint(partition.major),
 					Minor:  uint(partition.minor),
 				}
-				fs := Fs{deviceInfo, total, free, diskStatsMap[device]}
+				fs := Fs{deviceInfo, total, free, avail, diskStatsMap[device]}
 				filesystems = append(filesystems, fs)
 			}
 		}
@@ -287,18 +288,22 @@ func (self *RealFsInfo) GetDirUsage(dir string) (uint64, error) {
 	return usageInKb * 1024, nil
 }
 
-func getVfsStats(path string) (total uint64, free uint64, err error) {
+func getVfsStats(path string) (total uint64, free uint64, avail uint64, err error) {
 	_p0, err := syscall.BytePtrFromString(path)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	res, err := C.getBytesFree((*C.char)(unsafe.Pointer(_p0)), (*_Ctype_ulonglong)(unsafe.Pointer(&free)))
 	if res != 0 {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	res, err = C.getBytesTotal((*C.char)(unsafe.Pointer(_p0)), (*_Ctype_ulonglong)(unsafe.Pointer(&total)))
 	if res != 0 {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
-	return total, free, nil
+	res, err = C.getBytesAvail((*C.char)(unsafe.Pointer(_p0)), (*_Ctype_ulonglong)(unsafe.Pointer(&avail)))
+	if res != 0 {
+		return 0, 0, 0, err
+	}
+	return total, free, avail, nil
 }
