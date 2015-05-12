@@ -2,7 +2,7 @@
 # MAINTAINER: Tim Hockin <thockin@google.com>
 # If you update this image please bump the tag value before pushing.
 
-.PHONY: all kube2sky container push clean
+.PHONY: all kube2sky container push clean test
 
 TAG = 1.5
 PREFIX = gcr.io/google_containers
@@ -20,3 +20,6 @@ push:
 
 clean:
 	rm -f kube2sky
+
+test: clean
+	godep go test -v --vmodule=*=4
