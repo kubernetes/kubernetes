@@ -228,6 +228,9 @@ type PersistentVolumeSource struct {
 	NFS *NFSVolumeSource `json:"nfs"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
 	RBD *RBDVolumeSource `json:"rbd"`
+	// ISCSIVolumeSource represents an ISCSI resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	ISCSI *ISCSIVolumeSource `json:"iscsi"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
