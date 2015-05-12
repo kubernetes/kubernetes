@@ -1028,6 +1028,8 @@ func validateServicePort(sp *api.ServicePort, requireName bool, allNames *util.S
 			allErrs = append(allErrs, errs.NewFieldInvalid("name", sp.Name, dns1123LabelErrorMsg))
 		} else if allNames.Has(sp.Name) {
 			allErrs = append(allErrs, errs.NewFieldDuplicate("name", sp.Name))
+		} else {
+			allNames.Insert(sp.Name)
 		}
 	}
 
