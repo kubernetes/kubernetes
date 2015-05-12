@@ -30,12 +30,11 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&nfsPlugin{nil, mount.New()}}
+	return []volume.VolumePlugin{&nfsPlugin{nil}}
 }
 
 type nfsPlugin struct {
-	host    volume.VolumeHost
-	mounter mount.Interface
+	host volume.VolumeHost
 }
 
 var _ volume.VolumePlugin = &nfsPlugin{}
@@ -64,8 +63,8 @@ func (plugin *nfsPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, pod, plugin.mounter)
+func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+	return plugin.newBuilderInternal(spec, pod, mounter)
 }
 
 func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface) (volume.Builder, error) {
@@ -80,8 +79,8 @@ func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mou
 	}, nil
 }
 
-func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID, _ mount.Interface) (volume.Cleaner, error) {
-	return plugin.newCleanerInternal(volName, podUID, plugin.mounter)
+func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+	return plugin.newCleanerInternal(volName, podUID, mounter)
 }
 
 func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
