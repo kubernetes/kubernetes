@@ -864,8 +864,12 @@ func (kl *Kubelet) getClusterDNS(pod *api.Pod) ([]string, []string, error) {
 		dns = append([]string{kl.clusterDNS.String()}, hostDNS...)
 	}
 	if kl.clusterDomain != "" {
-		nsDomain := fmt.Sprintf("%s.%s", pod.Namespace, kl.clusterDomain)
-		dnsSearch = append([]string{nsDomain, kl.clusterDomain}, hostSearch...)
+		// TODO(vishh): Remove the oldNsDomain entry once the DNS crossover to inject
+		// "svc" is done.
+		oldNsDomain := fmt.Sprintf("%s.%s", pod.Namespace, kl.clusterDomain)
+		nsSvcDomain := fmt.Sprintf("%s.svc.%s", pod.Namespace, kl.clusterDomain)
+		svcDomain := fmt.Sprintf("svc.%s", kl.clusterDomain)
+		dnsSearch = append([]string{oldNsDomain, nsSvcDomain, svcDomain, kl.clusterDomain}, hostSearch...)
 	}
 	return dns, dnsSearch, nil
 }
