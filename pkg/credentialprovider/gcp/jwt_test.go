@@ -104,10 +104,15 @@ func TestJwtProvider(t *testing.T) {
 	// Verify that we get the expected username/password combo for
 	// a gcr.io image name.
 	registryUrl := "gcr.io/foo/bar"
-	val, ok := keyring.Lookup(registryUrl)
+	creds, ok := keyring.Lookup(registryUrl)
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", registryUrl)
+		return
 	}
+	if len(creds) > 1 {
+		t.Errorf("Got more hits than expected: %s", creds)
+	}
+	val := creds[0]
 
 	if "_token" != val.Username {
 		t.Errorf("Unexpected username value, want: _token, got: %s", val.Username)

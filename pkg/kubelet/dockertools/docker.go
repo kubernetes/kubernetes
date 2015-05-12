@@ -30,6 +30,7 @@ import (
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/docker/docker/pkg/parsers"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -124,25 +125,39 @@ func (p dockerPuller) Pull(image string) error {
 		Tag:        tag,
 	}
 
-	creds, ok := p.keyring.Lookup(repoToPull)
-	if !ok {
+	creds, haveCredentials := p.keyring.Lookup(repoToPull)
+	if !haveCredentials {
 		glog.V(1).Infof("Pulling image %s without credentials", image)
-	}
 
-	err := p.client.PullImage(opts, creds)
-	// If there was no error, or we had credentials, just return the error.
-	if err == nil || ok {
+		err := p.client.PullImage(opts, docker.AuthConfiguration{})
+		if err == nil {
+			return nil
+		}
+
+		// Image spec: [<registry>/]<repository>/<image>[:<version] so we count '/'
+		explicitRegistry := (strings.Count(image, "/") == 2)
+		// Hack, look for a private registry, and decorate the error with the lack of
+		// credentials.  This is heuristic, and really probably could be done better
+		// by talking to the registry API directly from the kubelet here.
+		if explicitRegistry {
+			return fmt.Errorf("image pull failed for %s, this may be because there are no credentials on this request.  details: (%v)", image, err)
+		}
+
 		return err
 	}
-	// Image spec: [<registry>/]<repository>/<image>[:<version] so we count '/'
-	explicitRegistry := (strings.Count(image, "/") == 2)
-	// Hack, look for a private registry, and decorate the error with the lack of
-	// credentials.  This is heuristic, and really probably could be done better
-	// by talking to the registry API directly from the kubelet here.
-	if explicitRegistry {
-		return fmt.Errorf("image pull failed for %s, this may be because there are no credentials on this request.  details: (%v)", image, err)
+
+	var pullErrs []error
+	for _, currentCreds := range creds {
+		err := p.client.PullImage(opts, currentCreds)
+		// If there was no error, return success
+		if err == nil {
+			return nil
+		}
+
+		pullErrs = append(pullErrs, err)
 	}
-	return err
+
+	return utilerrors.NewAggregate(pullErrs)
 }
 
 func (p throttledDockerPuller) Pull(image string) error {

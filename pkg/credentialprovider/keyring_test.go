@@ -42,10 +42,15 @@ func TestDockerKeyringFromBytes(t *testing.T) {
 		keyring.Add(cfg)
 	}
 
-	val, ok := keyring.Lookup(url + "/foo/bar")
+	creds, ok := keyring.Lookup(url + "/foo/bar")
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", url)
+		return
 	}
+	if len(creds) > 1 {
+		t.Errorf("Got more hits than expected: %s", creds)
+	}
+	val := creds[0]
 
 	if username != val.Username {
 		t.Errorf("Unexpected username value, want: %s, got: %s", username, val.Username)
@@ -130,10 +135,15 @@ func TestKeyringHitWithUnqualifiedDockerHub(t *testing.T) {
 		keyring.Add(cfg)
 	}
 
-	val, ok := keyring.Lookup("google/docker-registry")
+	creds, ok := keyring.Lookup("google/docker-registry")
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", url)
+		return
 	}
+	if len(creds) > 1 {
+		t.Errorf("Got more hits than expected: %s", creds)
+	}
+	val := creds[0]
 
 	if username != val.Username {
 		t.Errorf("Unexpected username value, want: %s, got: %s", username, val.Username)
@@ -166,10 +176,15 @@ func TestKeyringHitWithUnqualifiedLibraryDockerHub(t *testing.T) {
 		keyring.Add(cfg)
 	}
 
-	val, ok := keyring.Lookup("jenkins")
+	creds, ok := keyring.Lookup("jenkins")
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", url)
+		return
 	}
+	if len(creds) > 1 {
+		t.Errorf("Got more hits than expected: %s", creds)
+	}
+	val := creds[0]
 
 	if username != val.Username {
 		t.Errorf("Unexpected username value, want: %s, got: %s", username, val.Username)
@@ -202,10 +217,15 @@ func TestKeyringHitWithQualifiedDockerHub(t *testing.T) {
 		keyring.Add(cfg)
 	}
 
-	val, ok := keyring.Lookup(url + "/google/docker-registry")
+	creds, ok := keyring.Lookup(url + "/google/docker-registry")
 	if !ok {
 		t.Errorf("Didn't find expected URL: %s", url)
+		return
 	}
+	if len(creds) > 2 {
+		t.Errorf("Got more hits than expected: %s", creds)
+	}
+	val := creds[0]
 
 	if username != val.Username {
 		t.Errorf("Unexpected username value, want: %s, got: %s", username, val.Username)

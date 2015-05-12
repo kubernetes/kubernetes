@@ -696,7 +696,13 @@ func (r *runtime) Version() (kubecontainer.Version, error) {
 
 // writeDockerAuthConfig writes the docker credentials to rkt auth config files.
 // This enables rkt to pull docker images from docker registry with credentials.
-func (r *runtime) writeDockerAuthConfig(image string, creds docker.AuthConfiguration) error {
+func (r *runtime) writeDockerAuthConfig(image string, credsSlice []docker.AuthConfiguration) error {
+	creds := docker.AuthConfiguration{}
+	// TODO handle multiple creds
+	if len(credsSlice) >= 1 {
+		creds = credsSlice[0]
+	}
+
 	registry := "index.docker.io"
 	// Image spec: [<registry>/]<repository>/<image>[:<version]
 	explicitRegistry := (strings.Count(image, "/") == 2)
@@ -735,7 +741,7 @@ func (r *runtime) writeDockerAuthConfig(image string, creds docker.AuthConfigura
 //
 // https://github.com/GoogleCloudPlatform/kubernetes/issues/7203
 //
-func (r *runtime) PullImage(image kubecontainer.ImageSpec, _ []api.Secret) error {
+func (r *runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Secret) error {
 	img := image.Image
 	// TODO(yifan): The credential operation is a copy from dockertools package,
 	// Need to resolve the code duplication.

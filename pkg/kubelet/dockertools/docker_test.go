@@ -198,18 +198,18 @@ func TestParseImageName(t *testing.T) {
 	}
 }
 
-func TestPull(t *testing.T) {
+func TestPullWithNoSecrets(t *testing.T) {
 	tests := []struct {
 		imageName     string
 		expectedImage string
 	}{
-		{"ubuntu", "ubuntu:latest"},
-		{"ubuntu:2342", "ubuntu:2342"},
-		{"ubuntu:latest", "ubuntu:latest"},
-		{"foo/bar:445566", "foo/bar:445566"},
-		{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar:latest"},
-		{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar:5342"},
-		{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar:latest"},
+		{"ubuntu", "ubuntu:latest using {}"},
+		{"ubuntu:2342", "ubuntu:2342 using {}"},
+		{"ubuntu:latest", "ubuntu:latest using {}"},
+		{"foo/bar:445566", "foo/bar:445566 using {}"},
+		{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar:latest using {}"},
+		{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar:5342 using {}"},
+		{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar:latest using {}"},
 	}
 	for _, test := range tests {
 		fakeKeyring := &credentialprovider.FakeKeyring{}
@@ -259,7 +259,6 @@ func TestDockerKeyringLookupFails(t *testing.T) {
 }
 
 func TestDockerKeyringLookup(t *testing.T) {
-	empty := docker.AuthConfiguration{}
 
 	ada := docker.AuthConfiguration{
 		Username: "ada",
@@ -289,27 +288,27 @@ func TestDockerKeyringLookup(t *testing.T) {
 
 	tests := []struct {
 		image string
-		match docker.AuthConfiguration
+		match []docker.AuthConfiguration
 		ok    bool
 	}{
 		// direct match
-		{"bar.example.com", ada, true},
+		{"bar.example.com", []docker.AuthConfiguration{ada}, true},
 
 		// direct match deeper than other possible matches
-		{"bar.example.com/pong", grace, true},
+		{"bar.example.com/pong", []docker.AuthConfiguration{grace, ada}, true},
 
 		// no direct match, deeper path ignored
-		{"bar.example.com/ping", ada, true},
+		{"bar.example.com/ping", []docker.AuthConfiguration{ada}, true},
 
 		// match first part of path token
-		{"bar.example.com/pongz", grace, true},
+		{"bar.example.com/pongz", []docker.AuthConfiguration{grace, ada}, true},
 
 		// match regardless of sub-path
-		{"bar.example.com/pong/pang", grace, true},
+		{"bar.example.com/pong/pang", []docker.AuthConfiguration{grace, ada}, true},
 
 		// no host match
-		{"example.com", empty, false},
-		{"foo.example.com", empty, false},
+		{"example.com", []docker.AuthConfiguration{}, false},
+		{"foo.example.com", []docker.AuthConfiguration{}, false},
 	}
 
 	for i, tt := range tests {
@@ -345,15 +344,15 @@ func TestIssue3797(t *testing.T) {
 
 	tests := []struct {
 		image string
-		match docker.AuthConfiguration
+		match []docker.AuthConfiguration
 		ok    bool
 	}{
 		// direct match
-		{"quay.io", rex, true},
+		{"quay.io", []docker.AuthConfiguration{rex}, true},
 
 		// partial matches
-		{"quay.io/foo", rex, true},
-		{"quay.io/foo/bar", rex, true},
+		{"quay.io/foo", []docker.AuthConfiguration{rex}, true},
+		{"quay.io/foo/bar", []docker.AuthConfiguration{rex}, true},
 	}
 
 	for i, tt := range tests {

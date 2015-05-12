@@ -723,7 +723,7 @@ func (dm *DockerManager) ListImages() ([]kubecontainer.Image, error) {
 
 // TODO(vmarmol): Consider unexporting.
 // PullImage pulls an image from network to local storage.
-func (dm *DockerManager) PullImage(image kubecontainer.ImageSpec, _ []api.Secret) error {
+func (dm *DockerManager) PullImage(image kubecontainer.ImageSpec, secrets []api.Secret) error {
 	return dm.Puller.Pull(image.Image)
 }
 
@@ -1145,6 +1145,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 		return "", err
 	}
 	if !ok {
+		// TODO get the pull secrets from the container's ImageSpec and the pod's service account
 		if err := dm.PullImage(spec, nil); err != nil {
 			if ref != nil {
 				dm.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, err)
@@ -1335,6 +1336,7 @@ func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container) error
 		return nil
 	}
 
+	// TODO get the pull secrets from the container's ImageSpec and the pod's service account
 	err = dm.PullImage(spec, nil)
 	dm.runtimeHooks.ReportImagePull(pod, container, err)
 	return err
