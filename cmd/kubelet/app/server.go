@@ -92,6 +92,7 @@ type KubeletServer struct {
 	StreamingConnectionIdleTimeout time.Duration
 	ImageGCHighThresholdPercent    int
 	ImageGCLowThresholdPercent     int
+	LowDiskSpaceThresholdMB        int
 	NetworkPluginName              string
 	CloudProvider                  string
 	CloudConfigFile                string
@@ -152,6 +153,7 @@ func NewKubeletServer() *KubeletServer {
 		MasterServiceNamespace:      api.NamespaceDefault,
 		ImageGCHighThresholdPercent: 90,
 		ImageGCLowThresholdPercent:  80,
+		LowDiskSpaceThresholdMB:     256,
 		NetworkPluginName:           "",
 		HostNetworkSources:          kubelet.FileSource,
 		CertDirectory:               "/var/run/kubernetes",
@@ -208,6 +210,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.NodeStatusUpdateFrequency, "node-status-update-frequency", s.NodeStatusUpdateFrequency, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s")
 	fs.IntVar(&s.ImageGCHighThresholdPercent, "image-gc-high-threshold", s.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Default: 90%%")
 	fs.IntVar(&s.ImageGCLowThresholdPercent, "image-gc-low-threshold", s.ImageGCLowThresholdPercent, "The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to. Default: 80%%")
+	fs.IntVar(&s.LowDiskSpaceThresholdMB, "low-diskspace-threshold-mb", s.LowDiskSpaceThresholdMB, "The absolute free disk space, in MB, to maintain. When disk space falls below this threshold, new pods would be rejected. Default: 256")
 	fs.StringVar(&s.NetworkPluginName, "network-plugin", s.NetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
@@ -251,6 +254,10 @@ func (s *KubeletServer) Run(_ []string) error {
 		LowThresholdPercent:  s.ImageGCLowThresholdPercent,
 	}
 
+	diskSpacePolicy := kubelet.DiskSpacePolicy{
+		DockerFreeDiskMB: s.LowDiskSpaceThresholdMB,
+		RootFreeDiskMB:   s.LowDiskSpaceThresholdMB,
+	}
 	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	glog.Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
 
@@ -318,6 +325,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 		TLSOptions:                     tlsOptions,
 		ImageGCPolicy:                  imageGCPolicy,
+		DiskSpacePolicy:                diskSpacePolicy,
 		Cloud:                          cloud,
 		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
 		ResourceContainer:         s.ResourceContainer,
@@ -406,6 +414,10 @@ func SimpleKubelet(client *client.Client,
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
+	diskSpacePolicy := kubelet.DiskSpacePolicy{
+		DockerFreeDiskMB: 256,
+		RootFreeDiskMB:   256,
+	}
 	kcfg := KubeletConfig{
 		KubeClient:             client,
 		DockerClient:           dockerClient,
@@ -429,6 +441,7 @@ func SimpleKubelet(client *client.Client,
 		CadvisorInterface:       cadvisorInterface,
 		ConfigFile:              configFilePath,
 		ImageGCPolicy:           imageGCPolicy,
+		DiskSpacePolicy:         diskSpacePolicy,
 		Cloud:                   cloud,
 		NodeStatusUpdateFrequency: 10 * time.Second,
 		ResourceContainer:         "/kubelet",
@@ -560,6 +573,7 @@ type KubeletConfig struct {
 	Recorder                       record.EventRecorder
 	TLSOptions                     *kubelet.TLSOptions
 	ImageGCPolicy                  kubelet.ImageGCPolicy
+	DiskSpacePolicy                kubelet.DiskSpacePolicy
 	Cloud                          cloudprovider.Interface
 	NodeStatusUpdateFrequency      time.Duration
 	ResourceContainer              string
@@ -609,6 +623,7 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.Recorder,
 		kc.CadvisorInterface,
 		kc.ImageGCPolicy,
+		kc.DiskSpacePolicy,
 		kc.Cloud,
 		kc.NodeStatusUpdateFrequency,
 		kc.ResourceContainer,

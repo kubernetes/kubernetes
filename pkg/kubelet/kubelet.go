@@ -130,6 +130,7 @@ func NewMainKubelet(
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
 	imageGCPolicy ImageGCPolicy,
+	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
 	nodeStatusUpdateFrequency time.Duration,
 	resourceContainer string,
@@ -197,6 +198,10 @@ func NewMainKubelet(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
+	diskSpaceManager, err := newDiskSpaceManager(cadvisorInterface, diskSpacePolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
+	}
 	statusManager := newStatusManager(kubeClient)
 	readinessManager := kubecontainer.NewReadinessManager()
 	containerRefManager := kubecontainer.NewRefManager()
@@ -228,6 +233,7 @@ func NewMainKubelet(
 		cadvisor:                       cadvisorInterface,
 		containerGC:                    containerGC,
 		imageManager:                   imageManager,
+		diskSpaceManager:               diskSpaceManager,
 		statusManager:                  statusManager,
 		volumeManager:                  volumeManager,
 		cloud:                          cloud,
@@ -398,6 +404,9 @@ type Kubelet struct {
 
 	// Manager for images.
 	imageManager imageManager
+
+	// Diskspace manager.
+	diskSpaceManager diskSpaceManager
 
 	// Cached MachineInfo returned by cadvisor.
 	machineInfo *cadvisorApi.MachineInfo
@@ -1136,6 +1145,9 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metri
 	// Reject pods that we cannot run.
 	kl.handleNotFittingPods(allPods)
 
+	// Reject new creation requests if diskspace is running low.
+	kl.handleOutOfDisk(allPods, podSyncTypes)
+
 	// Pod phase progresses monotonically. Once a pod has reached a final state,
 	// it should never leave irregardless of the restart policy. The statuses
 	// of such pods should not be changed, and there is no need to sync them.
@@ -1304,6 +1316,44 @@ func (kl *Kubelet) checkCapacityExceeded(pods []*api.Pod) (fitting []*api.Pod, n
 
 	capacity := CapacityFromMachineInfo(info)
 	return scheduler.CheckPodsExceedingCapacity(pods, capacity)
+}
+
+// handleOutOfDisk detects if pods can't fit due to lack of disk space.
+func (kl *Kubelet) handleOutOfDisk(pods []*api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType) {
+	if len(podSyncTypes) == 0 {
+		// regular sync. no new pods
+		return
+	}
+	outOfDockerDisk := false
+	outOfRootDisk := false
+	// Check disk space once globally and reject or accept all new pods.
+	withinBounds, err := kl.diskSpaceManager.IsDockerDiskSpaceAvailable()
+	// Assume enough space in case of errors.
+	if err == nil && !withinBounds {
+		outOfDockerDisk = true
+	}
+
+	withinBounds, err = kl.diskSpaceManager.IsRootDiskSpaceAvailable()
+	// Assume enough space in case of errors.
+	if err == nil && !withinBounds {
+		outOfRootDisk = true
+	}
+	// Kubelet would indicate all pods as newly created on the first run after restart.
+	// We ignore the first disk check to ensure that running pods are not killed.
+	// Disk manager will only declare out of disk problems if unfreeze has been called.
+	kl.diskSpaceManager.Unfreeze()
+	if outOfDockerDisk || outOfRootDisk {
+		for _, pod := range pods {
+			// Only reject pods that didn't start yet.
+			if podSyncTypes[pod.UID] == metrics.SyncPodCreate {
+				kl.recorder.Eventf(pod, "OutOfDisk", "Cannot start the pod due to lack of disk space.")
+				kl.statusManager.SetPodStatus(pod, api.PodStatus{
+					Phase:   api.PodFailed,
+					Message: "Pod cannot be started due to lack of disk space."})
+				continue
+			}
+		}
+	}
 }
 
 // checkNodeSelectorMatching detects pods that do not match node's labels.

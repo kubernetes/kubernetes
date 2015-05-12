@@ -61,6 +61,10 @@ func (cu *cadvisorUnsupported) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error
 	return cadvisorApiV2.FsInfo{}, unsupportedErr
 }
 
+func (cu *cadvisorUnsupported) RootFsInfo() (cadvisorApiV2.FsInfo, error) {
+	return cadvisorApiV2.FsInfo{}, unsupportedErr
+}
+
 func (cu *cadvisorUnsupported) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return nil, unsupportedErr
 }

@@ -62,6 +62,11 @@ func (c *Mock) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	return args.Get(0).(cadvisorApiV2.FsInfo), args.Error(1)
 }
 
+func (c *Mock) RootFsInfo() (cadvisorApiV2.FsInfo, error) {
+	args := c.Called()
+	return args.Get(0).(cadvisorApiV2.FsInfo), args.Error(1)
+}
+
 func (c *Mock) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	args := c.Called()
 	return args.Get(0).(*events.EventChannel), args.Error(1)
