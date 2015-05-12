@@ -114,13 +114,13 @@ func init() {
 	// api.Status is returned in errors
 
 	// "internal" version
-	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{}, &api.Status{}, &api.ListOptions{}, &SimpleGetOptions{})
+	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{}, &api.Status{}, &api.ListOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
 	// "version" version
 	// TODO: Use versioned api objects?
-	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &v1beta1.Status{}, &SimpleGetOptions{})
+	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &v1beta1.Status{}, &SimpleGetOptions{}, &SimpleRoot{})
 	// "version2" version
 	// TODO: Use versioned api objects?
-	api.Scheme.AddKnownTypes(testVersion2, &Simple{}, &SimpleList{}, &v1beta3.Status{}, &SimpleGetOptions{})
+	api.Scheme.AddKnownTypes(testVersion2, &Simple{}, &SimpleList{}, &v1beta3.Status{}, &SimpleGetOptions{}, &SimpleRoot{})
 
 	// Register SimpleGetOptions with the server versions to convert query params to it
 	api.Scheme.AddKnownTypes("v1beta1", &SimpleGetOptions{})
@@ -132,8 +132,14 @@ func init() {
 	for _, version := range versions {
 		for kind := range api.Scheme.KnownTypes(version) {
 			mixedCase := true
-			legacyNsMapper.Add(meta.RESTScopeNamespaceLegacy, kind, version, mixedCase)
-			nsMapper.Add(meta.RESTScopeNamespace, kind, version, mixedCase)
+			root := kind == "SimpleRoot"
+			if root {
+				legacyNsMapper.Add(meta.RESTScopeRoot, kind, version, mixedCase)
+				nsMapper.Add(meta.RESTScopeRoot, kind, version, mixedCase)
+			} else {
+				legacyNsMapper.Add(meta.RESTScopeNamespaceLegacy, kind, version, mixedCase)
+				nsMapper.Add(meta.RESTScopeNamespace, kind, version, mixedCase)
+			}
 		}
 	}
 
@@ -234,6 +240,15 @@ type Simple struct {
 }
 
 func (*Simple) IsAnAPIObject() {}
+
+type SimpleRoot struct {
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata"`
+	Other          string            `json:"other,omitempty"`
+	Labels         map[string]string `json:"labels,omitempty"`
+}
+
+func (*SimpleRoot) IsAnAPIObject() {}
 
 type SimpleGetOptions struct {
 	api.TypeMeta `json:",inline"`
@@ -548,6 +563,28 @@ func (storage *NamedCreaterRESTStorage) Create(ctx api.Context, name string, obj
 		obj, err = storage.injectedFunction(obj)
 	}
 	return obj, err
+}
+
+type SimpleTypedStorage struct {
+	errors   map[string]error
+	item     runtime.Object
+	baseType runtime.Object
+
+	actualNamespace  string
+	namespacePresent bool
+}
+
+func (storage *SimpleTypedStorage) New() runtime.Object {
+	return storage.baseType
+}
+
+func (storage *SimpleTypedStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
+	storage.checkContext(ctx)
+	return api.Scheme.CopyOrDie(storage.item), storage.errors["get"]
+}
+
+func (storage *SimpleTypedStorage) checkContext(ctx api.Context) {
+	storage.actualNamespace, storage.namespacePresent = api.NamespaceFrom(ctx)
 }
 
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
@@ -1182,6 +1219,7 @@ func TestConnect(t *testing.T) {
 		},
 	}
 	storage := map[string]rest.Storage{
+		"simple":         &SimpleRESTStorage{},
 		"simple/connect": connectStorage,
 	}
 	handler := handle(storage)
@@ -1219,6 +1257,7 @@ func TestConnectWithOptions(t *testing.T) {
 		emptyConnectOptions: &SimpleGetOptions{},
 	}
 	storage := map[string]rest.Storage{
+		"simple":         &SimpleRESTStorage{},
 		"simple/connect": connectStorage,
 	}
 	handler := handle(storage)
@@ -1265,6 +1304,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 		takesPath:           "atAPath",
 	}
 	storage := map[string]rest.Storage{
+		"simple":         &SimpleRESTStorage{},
 		"simple/connect": connectStorage,
 	}
 	handler := handle(storage)
@@ -1829,10 +1869,87 @@ func TestCreateChecksDecode(t *testing.T) {
 	}
 }
 
+func TestParentResourceIsRequired(t *testing.T) {
+	storage := &SimpleTypedStorage{
+		baseType: &SimpleRoot{}, // a root scoped type
+		item:     &SimpleRoot{},
+	}
+	group := &APIGroupVersion{
+		Storage: map[string]rest.Storage{
+			"simple/sub": storage,
+		},
+		Root:      "/api",
+		Creater:   api.Scheme,
+		Convertor: api.Scheme,
+		Typer:     api.Scheme,
+		Linker:    selfLinker,
+
+		Admit:   admissionControl,
+		Context: requestContextMapper,
+		Mapper:  namespaceMapper,
+
+		Version:       testVersion2,
+		ServerVersion: "v1beta3",
+		Codec:         codec,
+	}
+	container := restful.NewContainer()
+	if err := group.InstallREST(container); err == nil {
+		t.Fatal("expected error")
+	}
+
+	storage = &SimpleTypedStorage{
+		baseType: &SimpleRoot{}, // a root scoped type
+		item:     &SimpleRoot{},
+	}
+	group = &APIGroupVersion{
+		Storage: map[string]rest.Storage{
+			"simple":     &SimpleRESTStorage{},
+			"simple/sub": storage,
+		},
+		Root:      "/api",
+		Creater:   api.Scheme,
+		Convertor: api.Scheme,
+		Typer:     api.Scheme,
+		Linker:    selfLinker,
+
+		Admit:   admissionControl,
+		Context: requestContextMapper,
+		Mapper:  namespaceMapper,
+
+		Version:       testVersion2,
+		ServerVersion: "v1beta3",
+		Codec:         codec,
+	}
+	container = restful.NewContainer()
+	if err := group.InstallREST(container); err != nil {
+		t.Fatal(err)
+	}
+
+	// resource is NOT registered in the root scope
+	w := httptest.NewRecorder()
+	container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/api/simple/test/sub"}})
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected not found: %#v", w)
+	}
+
+	// resource is registered in the namespace scope
+	w = httptest.NewRecorder()
+	container.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/api/version2/namespaces/test/simple/test/sub"}})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected OK: %#v", w)
+	}
+	if storage.actualNamespace != "test" {
+		t.Errorf("namespace should be set %#v", storage)
+	}
+}
+
 func TestCreateWithName(t *testing.T) {
 	pathName := "helloworld"
 	storage := &NamedCreaterRESTStorage{SimpleRESTStorage: &SimpleRESTStorage{}}
-	handler := handle(map[string]rest.Storage{"simple/sub": storage})
+	handler := handle(map[string]rest.Storage{
+		"simple":     &SimpleRESTStorage{},
+		"simple/sub": storage,
+	})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}

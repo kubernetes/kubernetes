@@ -128,6 +128,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return err
 	}
 
+	// subresources must have parent resources, and follow the namespacing rules of their parent
+	if hasSubresource {
+		parentStorage, ok := a.group.Storage[resource]
+		if !ok {
+			return fmt.Errorf("subresources can only be declared when the parent is also registered: %s needs %s", path, resource)
+		}
+		parentObject := parentStorage.New()
+		_, parentKind, err := a.group.Typer.ObjectVersionAndKind(parentObject)
+		if err != nil {
+			return err
+		}
+		parentMapping, err := a.group.Mapper.RESTMapping(parentKind, a.group.Version)
+		if err != nil {
+			return err
+		}
+		mapping.Scope = parentMapping.Scope
+	}
+
 	// what verbs are supported by the storage, used to know what verbs we support per path
 	creater, isCreater := storage.(rest.Creater)
 	namedCreater, isNamedCreater := storage.(rest.NamedCreater)
@@ -302,9 +320,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
 			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
 
-			// list across namespace.
+			// list or post across namespace.
+			// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
 			namer = scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), true}
 			actions = appendIf(actions, action{"LIST", resource, params, namer}, isLister)
+			actions = appendIf(actions, action{"POST", resource, params, namer}, isCreater)
 			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer}, allowWatchList)
 
 		} else {
@@ -691,6 +711,9 @@ var _ ScopeNamer = legacyScopeNaming{}
 
 // Namespace returns the namespace from the query or the default.
 func (n legacyScopeNaming) Namespace(req *restful.Request) (namespace string, err error) {
+	if n.scope.Name() == meta.RESTScopeNameRoot {
+		return api.NamespaceNone, nil
+	}
 	values, ok := req.Request.URL.Query()[n.scope.ParamName()]
 	if !ok || len(values) == 0 {
 		// legacy behavior
