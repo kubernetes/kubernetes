@@ -11,7 +11,7 @@ spec:
         # an http probe
         httpGet:
           path: /_status/healthz
-          port: 8080
+          port: 80
         # length of time to wait for a pod to initialize
         # after pod startup, before applying health checking
         initialDelaySeconds: 30
