@@ -71,7 +71,7 @@ EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
 ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
