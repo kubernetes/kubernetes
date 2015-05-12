@@ -42,6 +42,14 @@ var specialVerbs = map[string]bool{
 	"watch":    true,
 }
 
+// specialSubresources captures subresources that have semantic meaning.  For example, no matter what resource it is attached to
+// a "proxy" subresources is proving a "proxy" verb for some resource.  These should be permissioned based on their actual verbs.
+var specialSubresources = map[string]string{
+	"exec":        "exec",
+	"portforward": "proxy",
+	"proxy":       "proxy",
+}
+
 // Constant for the retry-after interval on rate limiting.
 // TODO: maybe make this dynamic? or user-adjustable?
 const RetryAfter = "1"
@@ -370,6 +378,11 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 		fallthrough
 	case len(requestInfo.Parts) == 1:
 		requestInfo.Resource = requestInfo.Parts[0]
+	}
+
+	// check to see if the subresource is one with semantic meaning that affects the verb
+	if subresourceVerb, exists := specialSubresources[requestInfo.Subresource]; exists {
+		requestInfo.Verb = subresourceVerb
 	}
 
 	// if there's no name on the request and we thought it was a get before, then the actual verb is a list
