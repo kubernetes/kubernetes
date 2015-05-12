@@ -99,7 +99,7 @@ type ObjectMeta struct {
 	// equivalent to the "default" namespace, but "default" is the canonical representation.
 	// Not all objects are required to be scoped to a namespace - the value of this field for
 	// those objects will be empty.
-	Namespace string `json:"namespace,omitempty" description:"namespace of the object; cannot be updated"`
+	Namespace string `json:"namespace,omitempty" description:"namespace of the object; must be a DNS_LABEL; cannot be updated"`
 
 	// SelfLink is a URL representing this object.
 	SelfLink string `json:"selfLink,omitempty" description:"URL for the object; populated by the system, read-only"`
