@@ -183,6 +183,9 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/redirect/pods/foo", "redirect", "", api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
 		{"GET", "/watch/pods", "watch", "", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
 		{"GET", "/watch/namespaces/other/pods", "watch", "", "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/namespaces/other/pods/foo/exec", "exec", "", "other", "pods", "exec", "Pod", "foo", []string{"pods", "foo", "exec"}},
+		{"GET", "/namespaces/other/pods/foo/proxy", "proxy", "", "other", "pods", "proxy", "Pod", "foo", []string{"pods", "foo", "proxy"}},
+		{"GET", "/namespaces/other/pods/foo/portforward", "proxy", "", "other", "pods", "portforward", "Pod", "foo", []string{"pods", "foo", "portforward"}},
 
 		// fully-qualified paths
 		{"GET", pathWithNamespaceQuery("pods", "other", ""), "list", testapi.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
