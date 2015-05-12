@@ -28,9 +28,8 @@ import (
 )
 
 func TestIPAddress(t *testing.T) {
-	c := &MesosCloud{}
 	expected4 := net.IPv4(127, 0, 0, 1)
-	ip, err := c.ipAddress("127.0.0.1")
+	ip, err := ipAddress("127.0.0.1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -42,7 +41,7 @@ func TestIPAddress(t *testing.T) {
 	if expected6 == nil {
 		t.Fatalf("failed to parse ipv6 ::1")
 	}
-	ip, err = c.ipAddress("::1")
+	ip, err = ipAddress("::1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -50,7 +49,7 @@ func TestIPAddress(t *testing.T) {
 		t.Fatalf("expected %#v instead of %#v", expected6, ip)
 	}
 
-	ip, err = c.ipAddress("localhost")
+	ip, err = ipAddress("localhost")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -58,7 +57,7 @@ func TestIPAddress(t *testing.T) {
 		t.Fatalf("expected %#v or %#v instead of %#v", expected4, expected6, ip)
 	}
 
-	_, err = c.ipAddress("")
+	_, err = ipAddress("")
 	if err != noHostNameSpecified {
 		t.Fatalf("expected error noHostNameSpecified but got none")
 	}

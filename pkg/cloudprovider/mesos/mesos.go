@@ -114,7 +114,7 @@ func (c *MesosCloud) ListClusters() ([]string, error) {
 	return []string{name}, err
 }
 
-// Master gets back the address (either DNS name or IP address) of the master node for the cluster.
+// Master gets back the address (either DNS name or IP address) of the leading Mesos master node for the cluster.
 func (c *MesosCloud) Master(clusterName string) (string, error) {
 	clusters, err := c.ListClusters()
 	if err != nil {
@@ -138,7 +138,7 @@ func (c *MesosCloud) Master(clusterName string) (string, error) {
 }
 
 // ipAddress returns an IP address of the specified instance.
-func (c *MesosCloud) ipAddress(name string) (net.IP, error) {
+func ipAddress(name string) (net.IP, error) {
 	if name == "" {
 		return nil, noHostNameSpecified
 	}
@@ -158,7 +158,7 @@ func (c *MesosCloud) ipAddress(name string) (net.IP, error) {
 
 // ExternalID returns the cloud provider ID of the specified instance.
 func (c *MesosCloud) ExternalID(instance string) (string, error) {
-	ip, err := c.ipAddress(instance)
+	ip, err := ipAddress(instance)
 	if err != nil {
 		return "", err
 	}
@@ -218,7 +218,7 @@ func (c *MesosCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 
 // NodeAddresses returns the addresses of the specified instance.
 func (c *MesosCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	ip, err := c.ipAddress(name)
+	ip, err := ipAddress(name)
 	if err != nil {
 		return nil, err
 	}
