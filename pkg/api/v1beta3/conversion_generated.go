@@ -2639,6 +2639,7 @@ func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s c
 	} else {
 		out.NodeSelector = nil
 	}
+	out.ServiceAccount = in.ServiceAccount
 	out.Host = in.Host
 	out.HostNetwork = in.HostNetwork
 	return nil
@@ -2684,6 +2685,7 @@ func convert_api_PodSpec_To_v1beta3_PodSpec(in *newer.PodSpec, out *PodSpec, s c
 	} else {
 		out.NodeSelector = nil
 	}
+	out.ServiceAccount = in.ServiceAccount
 	out.Host = in.Host
 	out.HostNetwork = in.HostNetwork
 	return nil
@@ -3625,6 +3627,98 @@ func convert_api_Service_To_v1beta3_Service(in *newer.Service, out *Service, s c
 	return nil
 }
 
+func convert_v1beta3_ServiceAccount_To_api_ServiceAccount(in *ServiceAccount, out *newer.ServiceAccount, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ServiceAccount))(in)
+	}
+	if err := convert_v1beta3_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1beta3_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if in.Secrets != nil {
+		out.Secrets = make([]newer.ObjectReference, len(in.Secrets))
+		for i := range in.Secrets {
+			if err := convert_v1beta3_ObjectReference_To_api_ObjectReference(&in.Secrets[i], &out.Secrets[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Secrets = nil
+	}
+	return nil
+}
+
+func convert_api_ServiceAccount_To_v1beta3_ServiceAccount(in *newer.ServiceAccount, out *ServiceAccount, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*newer.ServiceAccount))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1beta3_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if in.Secrets != nil {
+		out.Secrets = make([]ObjectReference, len(in.Secrets))
+		for i := range in.Secrets {
+			if err := convert_api_ObjectReference_To_v1beta3_ObjectReference(&in.Secrets[i], &out.Secrets[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Secrets = nil
+	}
+	return nil
+}
+
+func convert_v1beta3_ServiceAccountList_To_api_ServiceAccountList(in *ServiceAccountList, out *newer.ServiceAccountList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ServiceAccountList))(in)
+	}
+	if err := convert_v1beta3_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1beta3_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]newer.ServiceAccount, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1beta3_ServiceAccount_To_api_ServiceAccount(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_api_ServiceAccountList_To_v1beta3_ServiceAccountList(in *newer.ServiceAccountList, out *ServiceAccountList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*newer.ServiceAccountList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1beta3_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ServiceAccount, len(in.Items))
+		for i := range in.Items {
+			if err := convert_api_ServiceAccount_To_v1beta3_ServiceAccount(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
 func convert_v1beta3_ServiceList_To_api_ServiceList(in *ServiceList, out *newer.ServiceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceList))(in)
@@ -4244,6 +4338,8 @@ func init() {
 		convert_api_Secret_To_v1beta3_Secret,
 		convert_api_SecurityContext_To_v1beta3_SecurityContext,
 		convert_api_SerializedReference_To_v1beta3_SerializedReference,
+		convert_api_ServiceAccountList_To_v1beta3_ServiceAccountList,
+		convert_api_ServiceAccount_To_v1beta3_ServiceAccount,
 		convert_api_ServiceList_To_v1beta3_ServiceList,
 		convert_api_ServicePort_To_v1beta3_ServicePort,
 		convert_api_ServiceSpec_To_v1beta3_ServiceSpec,
@@ -4350,6 +4446,8 @@ func init() {
 		convert_v1beta3_Secret_To_api_Secret,
 		convert_v1beta3_SecurityContext_To_api_SecurityContext,
 		convert_v1beta3_SerializedReference_To_api_SerializedReference,
+		convert_v1beta3_ServiceAccountList_To_api_ServiceAccountList,
+		convert_v1beta3_ServiceAccount_To_api_ServiceAccount,
 		convert_v1beta3_ServiceList_To_api_ServiceList,
 		convert_v1beta3_ServicePort_To_api_ServicePort,
 		convert_v1beta3_ServiceSpec_To_api_ServiceSpec,

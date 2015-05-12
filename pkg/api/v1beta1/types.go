@@ -755,6 +755,8 @@ type Pod struct {
 	Labels       map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize pods; may match selectors of replication controllers and services"`
 	DesiredState PodState          `json:"desiredState,omitempty" description:"specification of the desired state of the pod"`
 	CurrentState PodState          `json:"currentState,omitempty" description:"current state of the pod; populated by the system, read-only"`
+	// ServiceAccount is the name of the ServiceAccount to use to run this pod
+	ServiceAccount string `json:"serviceAccount,omitempty" description:"the name of the ServiceAccount to use to run this pod"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"selector which must match a node's labels for the pod to be scheduled on that node"`
 }
@@ -782,10 +784,11 @@ type ReplicationController struct {
 
 // PodTemplate holds the information used for creating pods.
 type PodTemplate struct {
-	DesiredState PodState          `json:"desiredState,omitempty" description:"specification of the desired state of pods created from this template"`
-	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"a selector which must be true for the pod to fit on a node"`
-	Labels       map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize the pods created from the template; must match the selector of the replication controller to which the template belongs; may match selectors of services"`
-	Annotations  map[string]string `json:"annotations,omitempty" description:"map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about pods created from the template"`
+	DesiredState   PodState          `json:"desiredState,omitempty" description:"specification of the desired state of pods created from this template"`
+	ServiceAccount string            `json:"serviceAccount,omitempty" description:"the name of the ServiceAccount to use to run this pod"`
+	NodeSelector   map[string]string `json:"nodeSelector,omitempty" description:"a selector which must be true for the pod to fit on a node"`
+	Labels         map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize the pods created from the template; must match the selector of the replication controller to which the template belongs; may match selectors of services"`
+	Annotations    map[string]string `json:"annotations,omitempty" description:"map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about pods created from the template"`
 }
 
 // Session Affinity Type string
@@ -882,6 +885,24 @@ type ServicePort struct {
 	// of Port is used (an identity map) - note this is a different default
 	// than Service.ContainerPort.
 	ContainerPort util.IntOrString `json:"containerPort" description:"the port to access on the containers belonging to pods targeted by the service; defaults to the service port"`
+}
+
+// ServiceAccount binds together:
+// * a name, understood by users, and perhaps by peripheral systems, for an identity
+// * a principal that can be authenticated and authorized
+// * a set of secrets
+type ServiceAccount struct {
+	TypeMeta `json:",inline"`
+
+	// Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount
+	Secrets []ObjectReference `json:"secrets" description:"list of secrets that can be used by pods running as this service account" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+// ServiceAccountList is a list of ServiceAccount objects
+type ServiceAccountList struct {
+	TypeMeta `json:",inline"`
+
+	Items []ServiceAccount `json:"items" description:"list of ServiceAccounts"`
 }
 
 // EndpointObjectReference is a reference to an object exposing the endpoint
@@ -1617,7 +1638,23 @@ const MaxSecretSize = 1 * 1024 * 1024
 type SecretType string
 
 const (
-	SecretTypeOpaque SecretType = "Opaque" // Default; arbitrary user-defined data
+	// SecretTypeOpaque is the default; arbitrary user-defined data
+	SecretTypeOpaque SecretType = "Opaque"
+
+	// SecretTypeServiceAccountToken contains a token that identifies a service account to the API
+	//
+	// Required fields:
+	// - Secret.Annotations["kubernetes.io/service-account.name"] - the name of the ServiceAccount the token identifies
+	// - Secret.Annotations["kubernetes.io/service-account.uid"] - the UID of the ServiceAccount the token identifies
+	// - Secret.Data["token"] - a token that identifies the service account to the API
+	SecretTypeServiceAccountToken SecretType = "kubernetes.io/service-account-token"
+
+	// ServiceAccountNameKey is the key of the required annotation for SecretTypeServiceAccountToken secrets
+	ServiceAccountNameKey = "kubernetes.io/service-account.name"
+	// ServiceAccountUIDKey is the key of the required annotation for SecretTypeServiceAccountToken secrets
+	ServiceAccountUIDKey = "kubernetes.io/service-account.uid"
+	// ServiceAccountTokenKey is the key of the required data for SecretTypeServiceAccountToken secrets
+	ServiceAccountTokenKey = "token"
 )
 
 type SecretList struct {

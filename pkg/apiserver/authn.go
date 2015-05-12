@@ -17,8 +17,12 @@ limitations under the License.
 package apiserver
 
 import (
+	"crypto/rsa"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/serviceaccount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
@@ -28,7 +32,7 @@ import (
 )
 
 // NewAuthenticator returns an authenticator.Request or an error
-func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile string) (authenticator.Request, error) {
+func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile, serviceAccountKeyFile string, serviceAccountLookup bool, client client.Interface) (authenticator.Request, error) {
 	var authenticators []authenticator.Request
 
 	if len(basicAuthFile) > 0 {
@@ -53,6 +57,14 @@ func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile string) (authentica
 			return nil, err
 		}
 		authenticators = append(authenticators, tokenAuth)
+	}
+
+	if len(serviceAccountKeyFile) > 0 {
+		serviceAccountAuth, err := newServiceAccountAuthenticator(serviceAccountKeyFile, serviceAccountLookup, client)
+		if err != nil {
+			return nil, err
+		}
+		authenticators = append(authenticators, serviceAccountAuth)
 	}
 
 	switch len(authenticators) {
@@ -82,6 +94,16 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request,
 		return nil, err
 	}
 
+	return bearertoken.New(tokenAuthenticator), nil
+}
+
+// newServiceAccountAuthenticator returns an authenticator.Request or an error
+func newServiceAccountAuthenticator(keyfile string, lookup bool, client client.Interface) (authenticator.Request, error) {
+	publicKey, err := serviceaccount.ReadPublicKey(keyfile)
+	if err != nil {
+		return nil, err
+	}
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]*rsa.PublicKey{publicKey}, lookup, client)
 	return bearertoken.New(tokenAuthenticator), nil
 }
 

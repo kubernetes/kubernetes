@@ -1880,6 +1880,7 @@ func init() {
 					out.NodeSelector[key] = val
 				}
 			}
+			out.ServiceAccount = in.ServiceAccount
 			out.Host = in.Host
 			out.HostNetwork = in.HostNetwork
 			return nil
@@ -1913,6 +1914,7 @@ func init() {
 					out.NodeSelector[key] = val
 				}
 			}
+			out.ServiceAccount = in.ServiceAccount
 			out.Host = in.Host
 			out.HostNetwork = in.HostNetwork
 			return nil
@@ -2474,6 +2476,74 @@ func init() {
 			}
 			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
 				return err
+			}
+			return nil
+		},
+		func(in *ServiceAccount, out *newer.ServiceAccount, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if in.Secrets != nil {
+				out.Secrets = make([]newer.ObjectReference, len(in.Secrets))
+				for i := range in.Secrets {
+					if err := s.Convert(&in.Secrets[i], &out.Secrets[i], 0); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+		func(in *newer.ServiceAccount, out *ServiceAccount, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if in.Secrets != nil {
+				out.Secrets = make([]ObjectReference, len(in.Secrets))
+				for i := range in.Secrets {
+					if err := s.Convert(&in.Secrets[i], &out.Secrets[i], 0); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+		func(in *ServiceAccountList, out *newer.ServiceAccountList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			if in.Items != nil {
+				out.Items = make([]newer.ServiceAccount, len(in.Items))
+				for i := range in.Items {
+					if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+		func(in *newer.ServiceAccountList, out *ServiceAccountList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			if in.Items != nil {
+				out.Items = make([]ServiceAccount, len(in.Items))
+				for i := range in.Items {
+					if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+						return err
+					}
+				}
 			}
 			return nil
 		},

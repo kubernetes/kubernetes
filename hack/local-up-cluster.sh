@@ -132,12 +132,21 @@ trap cleanup EXIT
 echo "Starting etcd"
 kube::etcd::start
 
+SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
+SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-"/var/run/kubernetes/serviceaccount.key"}
+# Generate ServiceAccount key if needed
+if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
+  openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+fi
+
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 
 APISERVER_LOG=/tmp/kube-apiserver.log
 sudo -E "${GO_OUT}/kube-apiserver" \
   --v=${LOG_LEVEL} \
+  --service_account_key_file="${SERVICE_ACCOUNT_KEY}" \
+  --service_account_lookup="${SERVICE_ACCOUNT_LOOKUP}" \
   --admission_control="${ADMISSION_CONTROL}" \
   --address="${API_HOST}" \
   --port="${API_PORT}" \
@@ -155,6 +164,7 @@ CTLRMGR_LOG=/tmp/kube-controller-manager.log
 sudo -E "${GO_OUT}/kube-controller-manager" \
   --v=${LOG_LEVEL} \
   --machines="127.0.0.1" \
+  --service_account_private_key_file="${SERVICE_ACCOUNT_KEY}" \
   --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
 CTLRMGR_PID=$!
 

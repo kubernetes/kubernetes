@@ -64,7 +64,9 @@ func describerMap(c *client.Client) map[string]Describer {
 	m := map[string]Describer{
 		"Pod": &PodDescriber{c},
 		"ReplicationController": &ReplicationControllerDescriber{c},
+		"Secret":                &SecretDescriber{c},
 		"Service":               &ServiceDescriber{c},
+		"ServiceAccount":        &ServiceAccountDescriber{c},
 		"Minion":                &NodeDescriber{c},
 		"Node":                  &NodeDescriber{c},
 		"LimitRange":            &LimitRangeDescriber{c},
@@ -421,6 +423,44 @@ func describeReplicationController(controller *api.ReplicationController, events
 	})
 }
 
+// SecretDescriber generates information about a secret
+type SecretDescriber struct {
+	client.Interface
+}
+
+func (d *SecretDescriber) Describe(namespace, name string) (string, error) {
+	c := d.Secrets(namespace)
+
+	secret, err := c.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	return describeSecret(secret)
+}
+
+func describeSecret(secret *api.Secret) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", secret.Name)
+		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(secret.Labels))
+		fmt.Fprintf(out, "Annotations:\t%s\n", formatLabels(secret.Annotations))
+
+		fmt.Fprintf(out, "\nType:\t%s\n", secret.Type)
+
+		fmt.Fprintf(out, "\nData\n====\n")
+		for k, v := range secret.Data {
+			switch {
+			case k == api.ServiceAccountTokenKey && secret.Type == api.SecretTypeServiceAccountToken:
+				fmt.Fprintf(out, "%s:\t%s\n", k, string(v))
+			default:
+				fmt.Fprintf(out, "%s:\t%d bytes\n", k, len(v))
+			}
+		}
+
+		return nil
+	})
+}
+
 // ServiceDescriber generates information about a service.
 type ServiceDescriber struct {
 	client.Interface
@@ -467,6 +507,67 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		if events != nil {
 			DescribeEvents(events, out)
 		}
+		return nil
+	})
+}
+
+// ServiceAccountDescriber generates information about a service.
+type ServiceAccountDescriber struct {
+	client.Interface
+}
+
+func (d *ServiceAccountDescriber) Describe(namespace, name string) (string, error) {
+	c := d.ServiceAccounts(namespace)
+
+	serviceAccount, err := c.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	tokens := []api.Secret{}
+
+	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
+	secrets, err := d.Secrets(namespace).List(labels.Everything(), tokenSelector)
+	if err == nil {
+		for _, s := range secrets.Items {
+			name, _ := s.Annotations[api.ServiceAccountNameKey]
+			uid, _ := s.Annotations[api.ServiceAccountUIDKey]
+			if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
+				tokens = append(tokens, s)
+			}
+		}
+	}
+
+	return describeServiceAccount(serviceAccount, tokens)
+}
+
+func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", serviceAccount.Name)
+		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(serviceAccount.Labels))
+
+		if len(serviceAccount.Secrets) == 0 {
+			fmt.Fprintf(out, "Secrets:\t<none>\n")
+		} else {
+			prefix := "Secrets:"
+			for _, s := range serviceAccount.Secrets {
+				fmt.Fprintf(out, "%s\t%s\n", prefix, s)
+				prefix = "        "
+			}
+			fmt.Fprintln(out)
+		}
+
+		if len(tokens) == 0 {
+			fmt.Fprintf(out, "Tokens: \t<none>\n")
+		} else {
+			prefix := "Tokens: "
+			for _, t := range tokens {
+				fmt.Fprintf(out, "%s\t%s\n", prefix, t.Name)
+				prefix = "        "
+			}
+			fmt.Fprintln(out)
+		}
+
 		return nil
 	})
 }

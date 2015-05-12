@@ -259,6 +259,7 @@ _kubectl_get()
     must_have_one_noun+=("resourcequota")
     must_have_one_noun+=("secret")
     must_have_one_noun+=("service")
+    must_have_one_noun+=("serviceaccount")
 }
 
 _kubectl_describe()
@@ -284,7 +285,9 @@ _kubectl_describe()
     must_have_one_noun+=("pod")
     must_have_one_noun+=("replicationcontroller")
     must_have_one_noun+=("resourcequota")
+    must_have_one_noun+=("secret")
     must_have_one_noun+=("service")
+    must_have_one_noun+=("serviceaccount")
 }
 
 _kubectl_create()
