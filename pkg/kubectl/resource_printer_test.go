@@ -248,7 +248,7 @@ func ErrorPrintHandler(obj *TestPrintType, w io.Writer) error {
 
 func TestCustomTypePrinting(t *testing.T) {
 	columns := []string{"Data"}
-	printer := NewHumanReadablePrinter(false)
+	printer := NewHumanReadablePrinter(false, false)
 	printer.Handler(columns, PrintCustomType)
 
 	obj := TestPrintType{"test object"}
@@ -265,7 +265,7 @@ func TestCustomTypePrinting(t *testing.T) {
 
 func TestPrintHandlerError(t *testing.T) {
 	columns := []string{"Data"}
-	printer := NewHumanReadablePrinter(false)
+	printer := NewHumanReadablePrinter(false, false)
 	printer.Handler(columns, ErrorPrintHandler)
 	obj := TestPrintType{"test object"}
 	buffer := &bytes.Buffer{}
@@ -276,7 +276,7 @@ func TestPrintHandlerError(t *testing.T) {
 }
 
 func TestUnknownTypePrinting(t *testing.T) {
-	printer := NewHumanReadablePrinter(false)
+	printer := NewHumanReadablePrinter(false, false)
 	buffer := &bytes.Buffer{}
 	err := printer.PrintObj(&TestUnknownType{}, buffer)
 	if err == nil {
@@ -465,8 +465,8 @@ func TestPrinters(t *testing.T) {
 		t.Fatal(err)
 	}
 	printers := map[string]ResourcePrinter{
-		"humanReadable":        NewHumanReadablePrinter(true),
-		"humanReadableHeaders": NewHumanReadablePrinter(false),
+		"humanReadable":        NewHumanReadablePrinter(true, false),
+		"humanReadableHeaders": NewHumanReadablePrinter(false, false),
 		"json":                 &JSONPrinter{},
 		"yaml":                 &YAMLPrinter{},
 		"template":             templatePrinter,
@@ -503,7 +503,7 @@ func TestPrinters(t *testing.T) {
 
 func TestPrintEventsResultSorted(t *testing.T) {
 	// Arrange
-	printer := NewHumanReadablePrinter(false /* noHeaders */)
+	printer := NewHumanReadablePrinter(false /* noHeaders */, false)
 
 	obj := api.EventList{
 		Items: []api.Event{
@@ -544,7 +544,7 @@ func TestPrintEventsResultSorted(t *testing.T) {
 }
 
 func TestPrintMinionStatus(t *testing.T) {
-	printer := NewHumanReadablePrinter(false)
+	printer := NewHumanReadablePrinter(false, false)
 	table := []struct {
 		minion api.Node
 		status string

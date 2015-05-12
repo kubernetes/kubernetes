@@ -177,16 +177,18 @@ type handlerEntry struct {
 // will only be printed if the object type changes. This makes it useful for printing items
 // recieved from watches.
 type HumanReadablePrinter struct {
-	handlerMap map[reflect.Type]*handlerEntry
-	noHeaders  bool
-	lastType   reflect.Type
+	handlerMap    map[reflect.Type]*handlerEntry
+	noHeaders     bool
+	withNamespace bool
+	lastType      reflect.Type
 }
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
-func NewHumanReadablePrinter(noHeaders bool) *HumanReadablePrinter {
+func NewHumanReadablePrinter(noHeaders, withNamespace bool) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
-		handlerMap: make(map[reflect.Type]*handlerEntry),
-		noHeaders:  noHeaders,
+		handlerMap:    make(map[reflect.Type]*handlerEntry),
+		noHeaders:     noHeaders,
+		withNamespace: withNamespace,
 	}
 	printer.addDefaultHandlers()
 	return printer

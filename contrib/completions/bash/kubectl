@@ -229,6 +229,7 @@ _kubectl_get()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--all-namespaces")
     flags+=("--help")
     flags+=("-h")
     flags+=("--no-headers")
