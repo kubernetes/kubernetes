@@ -38,6 +38,7 @@ import (
 	//Cloud providers
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/mesos"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/openstack"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/rackspace"
