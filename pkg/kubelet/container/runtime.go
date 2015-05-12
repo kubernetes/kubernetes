@@ -185,14 +185,43 @@ type Image struct {
 	Size int64
 }
 
+type EnvVar struct {
+	Name  string
+	Value string
+}
+
+type Mount struct {
+	// Name of the volume mount.
+	Name string
+	// Path of the mount within the container.
+	ContainerPath string
+	// Path of the mount on the host.
+	HostPath string
+	// Whether the mount is read-only.
+	ReadOnly bool
+}
+
+type PortMapping struct {
+	// Name of the port mapping
+	Name string
+	// Protocol of the port mapping.
+	Protocol api.Protocol
+	// The port number within the container.
+	ContainerPort int
+	// The port number on the host.
+	HostPort int
+	// The host IP.
+	HostIP string
+}
+
 // RunContainerOptions specify the options which are necessary for running containers
 type RunContainerOptions struct {
-	// The environment variables, they are in the form of 'key=value'.
-	Envs []string
-	// The mounts for the containers, they are in the form of:
-	// 'hostPath:containerPath', or
-	// 'hostPath:containerPath:ro', if the path read only.
-	Binds []string
+	// The environment variables list.
+	Envs []EnvVar
+	// The mounts for the containers.
+	Mounts []Mount
+	// The port mappings for the containers.
+	PortMappings []PortMapping
 	// If the container has specified the TerminationMessagePath, then
 	// this directory will be used to create and mount the log file to
 	// container.TerminationMessagePath

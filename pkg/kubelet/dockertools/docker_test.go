@@ -572,34 +572,32 @@ func TestFindContainersByPod(t *testing.T) {
 }
 
 func TestMakePortsAndBindings(t *testing.T) {
-	container := api.Container{
-		Ports: []api.ContainerPort{
-			{
-				ContainerPort: 80,
-				HostPort:      8080,
-				HostIP:        "127.0.0.1",
-			},
-			{
-				ContainerPort: 443,
-				HostPort:      443,
-				Protocol:      "tcp",
-			},
-			{
-				ContainerPort: 444,
-				HostPort:      444,
-				Protocol:      "udp",
-			},
-			{
-				ContainerPort: 445,
-				HostPort:      445,
-				Protocol:      "foobar",
-			},
+	ports := []kubecontainer.PortMapping{
+		{
+			ContainerPort: 80,
+			HostPort:      8080,
+			HostIP:        "127.0.0.1",
+		},
+		{
+			ContainerPort: 443,
+			HostPort:      443,
+			Protocol:      "tcp",
+		},
+		{
+			ContainerPort: 444,
+			HostPort:      444,
+			Protocol:      "udp",
+		},
+		{
+			ContainerPort: 445,
+			HostPort:      445,
+			Protocol:      "foobar",
 		},
 	}
-	exposedPorts, bindings := makePortsAndBindings(&container)
-	if len(container.Ports) != len(exposedPorts) ||
-		len(container.Ports) != len(bindings) {
-		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", container, exposedPorts, bindings)
+	exposedPorts, bindings := makePortsAndBindings(ports)
+	if len(ports) != len(exposedPorts) ||
+		len(ports) != len(bindings) {
+		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", ports, exposedPorts, bindings)
 	}
 	for key, value := range bindings {
 		switch value[0].HostPort {
