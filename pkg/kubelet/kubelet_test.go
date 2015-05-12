@@ -1994,18 +1994,17 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                   string         // the name of the test case
-		ns                     string         // the namespace to generate environment for
-		container              *api.Container // the container to use
-		masterServiceNamespace string         // the namespace to read master service info from
-		nilLister              bool           // whether the lister should be nil
-		expectedEnvs           util.StringSet // a set of expected environment vars
-		expectedEnvSize        int            // total number of expected env vars
+		name            string         // the name of the test case
+		ns              string         // the namespace to generate environment for
+		container       *api.Container // the container to use
+		masterServiceNs string         // the namespace to read master service info from
+		nilLister       bool           // whether the lister should be nil
+		expectedEnvs    util.StringSet // a set of expected environment vars
 	}{
 		{
-			"api server = Y, kubelet = Y",
-			"test1",
-			&api.Container{
+			name: "api server = Y, kubelet = Y",
+			ns:   "test1",
+			container: &api.Container{
 				Env: []api.EnvVar{
 					{Name: "FOO", Value: "BAR"},
 					{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
@@ -2017,9 +2016,10 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
 				},
 			},
-			api.NamespaceDefault,
-			false,
-			util.NewStringSet("FOO=BAR",
+			masterServiceNs: api.NamespaceDefault,
+			nilLister:       false,
+			expectedEnvs: util.NewStringSet(
+				"FOO=BAR",
 				"TEST_SERVICE_HOST=1.2.3.3",
 				"TEST_SERVICE_PORT=8083",
 				"TEST_PORT=tcp://1.2.3.3:8083",
@@ -2041,12 +2041,11 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				"KUBERNETES_RO_PORT_8082_TCP_PROTO=tcp",
 				"KUBERNETES_RO_PORT_8082_TCP_PORT=8082",
 				"KUBERNETES_RO_PORT_8082_TCP_ADDR=1.2.3.2"),
-			22,
 		},
 		{
-			"api server = Y, kubelet = N",
-			"test1",
-			&api.Container{
+			name: "api server = Y, kubelet = N",
+			ns:   "test1",
+			container: &api.Container{
 				Env: []api.EnvVar{
 					{Name: "FOO", Value: "BAR"},
 					{Name: "TEST_SERVICE_HOST", Value: "1.2.3.3"},
@@ -2058,9 +2057,10 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
 				},
 			},
-			api.NamespaceDefault,
-			true,
-			util.NewStringSet("FOO=BAR",
+			masterServiceNs: api.NamespaceDefault,
+			nilLister:       true,
+			expectedEnvs: util.NewStringSet(
+				"FOO=BAR",
 				"TEST_SERVICE_HOST=1.2.3.3",
 				"TEST_SERVICE_PORT=8083",
 				"TEST_PORT=tcp://1.2.3.3:8083",
@@ -2068,19 +2068,19 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				"TEST_PORT_8083_TCP_PROTO=tcp",
 				"TEST_PORT_8083_TCP_PORT=8083",
 				"TEST_PORT_8083_TCP_ADDR=1.2.3.3"),
-			8,
 		},
 		{
-			"api server = N; kubelet = Y",
-			"test1",
-			&api.Container{
+			name: "api server = N; kubelet = Y",
+			ns:   "test1",
+			container: &api.Container{
 				Env: []api.EnvVar{
 					{Name: "FOO", Value: "BAZ"},
 				},
 			},
-			api.NamespaceDefault,
-			false,
-			util.NewStringSet("FOO=BAZ",
+			masterServiceNs: api.NamespaceDefault,
+			nilLister:       false,
+			expectedEnvs: util.NewStringSet(
+				"FOO=BAZ",
 				"TEST_SERVICE_HOST=1.2.3.3",
 				"TEST_SERVICE_PORT=8083",
 				"TEST_PORT=tcp://1.2.3.3:8083",
@@ -2102,19 +2102,19 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				"KUBERNETES_RO_PORT_8082_TCP_PROTO=tcp",
 				"KUBERNETES_RO_PORT_8082_TCP_PORT=8082",
 				"KUBERNETES_RO_PORT_8082_TCP_ADDR=1.2.3.2"),
-			22,
 		},
 		{
-			"master service in pod ns",
-			"test2",
-			&api.Container{
+			name: "master service in pod ns",
+			ns:   "test2",
+			container: &api.Container{
 				Env: []api.EnvVar{
 					{Name: "FOO", Value: "ZAP"},
 				},
 			},
-			"kubernetes",
-			false,
-			util.NewStringSet("FOO=ZAP",
+			masterServiceNs: "kubernetes",
+			nilLister:       false,
+			expectedEnvs: util.NewStringSet(
+				"FOO=ZAP",
 				"TEST_SERVICE_HOST=1.2.3.5",
 				"TEST_SERVICE_PORT=8085",
 				"TEST_PORT=tcp://1.2.3.5:8085",
@@ -2136,15 +2136,14 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				"KUBERNETES_RO_PORT_8087_TCP_PROTO=tcp",
 				"KUBERNETES_RO_PORT_8087_TCP_PORT=8087",
 				"KUBERNETES_RO_PORT_8087_TCP_ADDR=1.2.3.7"),
-			22,
 		},
 		{
-			"pod in master service ns",
-			"kubernetes",
-			&api.Container{},
-			"kubernetes",
-			false,
-			util.NewStringSet(
+			name:            "pod in master service ns",
+			ns:              "kubernetes",
+			container:       &api.Container{},
+			masterServiceNs: "kubernetes",
+			nilLister:       false,
+			expectedEnvs: util.NewStringSet(
 				"NOT_SPECIAL_SERVICE_HOST=1.2.3.8",
 				"NOT_SPECIAL_SERVICE_PORT=8088",
 				"NOT_SPECIAL_PORT=tcp://1.2.3.8:8088",
@@ -2166,12 +2165,11 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				"KUBERNETES_RO_PORT_8087_TCP_PROTO=tcp",
 				"KUBERNETES_RO_PORT_8087_TCP_PORT=8087",
 				"KUBERNETES_RO_PORT_8087_TCP_ADDR=1.2.3.7"),
-			21,
 		},
 		{
-			"downward api pod",
-			"downward-api",
-			&api.Container{
+			name: "downward api pod",
+			ns:   "downward-api",
+			container: &api.Container{
 				Env: []api.EnvVar{
 					{
 						Name: "POD_NAME",
@@ -2193,20 +2191,19 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					},
 				},
 			},
-			"nothing",
-			true,
-			util.NewStringSet(
+			masterServiceNs: "nothing",
+			nilLister:       true,
+			expectedEnvs: util.NewStringSet(
 				"POD_NAME=dapi-test-pod-name",
 				"POD_NAMESPACE=downward-api",
 			),
-			2,
 		},
 	}
 
 	for _, tc := range testCases {
 		testKubelet := newTestKubelet(t)
 		kl := testKubelet.kubelet
-		kl.masterServiceNamespace = tc.masterServiceNamespace
+		kl.masterServiceNamespace = tc.masterServiceNs
 		if tc.nilLister {
 			kl.serviceLister = nil
 		} else {
@@ -2226,12 +2223,13 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		}
 
 		resultSet := util.NewStringSet(result...)
-		if !resultSet.IsSuperset(tc.expectedEnvs) {
+		if !resultSet.HasAll(tc.expectedEnvs.List()...) {
+
 			t.Errorf("[%v] Unexpected env entries; expected {%v}, got {%v}", tc.name, tc.expectedEnvs, resultSet)
 		}
 
-		if a := len(resultSet); a != tc.expectedEnvSize {
-			t.Errorf("[%v] Unexpected number of env vars; expected %v, got %v", tc.name, tc.expectedEnvSize, a)
+		if a, e := len(resultSet), len(tc.expectedEnvs); e != a {
+			t.Errorf("[%v] Unexpected number of env vars; expected %v, got %v", tc.name, e, a)
 		}
 	}
 }
