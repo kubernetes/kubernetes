@@ -1210,6 +1210,9 @@ type PodLogOptions struct {
 
 	// If true, follow the logs for the pod
 	Follow bool `json:"follow,omitempty" description:"follow the log stream of the pod; defaults to false"`
+
+	//  If true, return previous terminated container logs
+	Previous bool `json:"previous,omitempty" description:"return previous terminated container logs; defaults to false"`
 }
 
 // PodExecOptions is the query options to a Pod's remote exec call

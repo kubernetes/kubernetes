@@ -1332,6 +1332,9 @@ type PodLogOptions struct {
 
 	// If true, follow the logs for the pod
 	Follow bool
+
+	// If true, return previous terminated container logs
+	Previous bool
 }
 
 // PodExecOptions is the query options to a Pod's remote exec call

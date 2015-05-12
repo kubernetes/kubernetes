@@ -3134,6 +3134,9 @@ func TestValidateContainerStatus(t *testing.T) {
 					State: api.ContainerState{
 						Running: &api.ContainerStateRunning{},
 					},
+					LastTerminationState: api.ContainerState{
+						Termination: &api.ContainerStateTerminated{},
+					},
 				},
 			},
 			success: true,
@@ -3165,7 +3168,7 @@ func TestValidateContainerStatus(t *testing.T) {
 	for i, tc := range testCases {
 		_, err := kubelet.validateContainerStatus(&api.PodStatus{
 			ContainerStatuses: tc.statuses,
-		}, containerName)
+		}, containerName, false)
 		if tc.success {
 			if err != nil {
 				t.Errorf("[case %d]: unexpected failure - %v", i, err)
@@ -3176,8 +3179,18 @@ func TestValidateContainerStatus(t *testing.T) {
 	}
 	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
 		ContainerStatuses: testCases[0].statuses,
-	}, "blah"); err == nil {
+	}, "blah", false); err == nil {
 		t.Errorf("expected error with invalid container name")
+	}
+	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+		ContainerStatuses: testCases[0].statuses,
+	}, containerName, true); err != nil {
+		t.Errorf("unexpected error with for previous terminated container - %v", err)
+	}
+	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
+		ContainerStatuses: testCases[1].statuses,
+	}, containerName, true); err == nil {
+		t.Errorf("expected error with for previous terminated container")
 	}
 }
 

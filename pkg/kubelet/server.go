@@ -107,7 +107,7 @@ type HostInterface interface {
 	GetPodStatus(name string) (api.PodStatus, error)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
-	GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
+	GetKubeletContainerLogs(podFullName, containerName, tail string, follow, previous bool, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
 	StreamingConnectionIdleTimeout() time.Duration
@@ -230,6 +230,7 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 
 	uriValues := u.Query()
 	follow, _ := strconv.ParseBool(uriValues.Get("follow"))
+	previous, _ := strconv.ParseBool(uriValues.Get("previous"))
 	tail := uriValues.Get("tail")
 
 	pod, ok := s.host.GetPodByName(podNamespace, podID)
@@ -256,7 +257,7 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 	fw := flushwriter.Wrap(w)
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
-	err = s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, tail, follow, fw, fw)
+	err = s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, tail, follow, previous, fw, fw)
 	if err != nil {
 		s.error(w, err)
 		return

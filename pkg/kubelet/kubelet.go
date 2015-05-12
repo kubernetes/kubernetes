@@ -1386,21 +1386,31 @@ func (kl *Kubelet) validatePodPhase(podStatus *api.PodStatus) error {
 	return fmt.Errorf("pod is not in 'Running', 'Succeeded' or 'Failed' state - State: %q", podStatus.Phase)
 }
 
-func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerName string) (containerID string, err error) {
+func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerName string, previous bool) (containerID string, err error) {
+	var cID string
+
 	cStatus, found := api.GetContainerStatus(podStatus.ContainerStatuses, containerName)
 	if !found {
 		return "", fmt.Errorf("container %q not found in pod", containerName)
 	}
-	if cStatus.State.Waiting != nil {
-		return "", fmt.Errorf("container %q is in waiting state.", containerName)
+	if previous {
+		if cStatus.LastTerminationState.Termination == nil {
+			return "", fmt.Errorf("previous terminated container %q not found in pod", containerName)
+		}
+		cID = cStatus.LastTerminationState.Termination.ContainerID
+	} else {
+		if cStatus.State.Waiting != nil {
+			return "", fmt.Errorf("container %q is in waiting state.", containerName)
+		}
+		cID = cStatus.ContainerID
 	}
-	return kubecontainer.TrimRuntimePrefix(cStatus.ContainerID), nil
+	return kubecontainer.TrimRuntimePrefix(cID), nil
 }
 
 // GetKubeletContainerLogs returns logs from the container
 // TODO: this method is returning logs of random container attempts, when it should be returning the most recent attempt
 // or all of them.
-func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
+func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow, previous bool, stdout, stderr io.Writer) error {
 	// TODO(vmarmol): Refactor to not need the pod status and verification.
 	podStatus, err := kl.GetPodStatus(podFullName)
 	if err != nil {
@@ -1410,7 +1420,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 		// No log is available if pod is not in a "known" phase (e.g. Unknown).
 		return err
 	}
-	containerID, err := kl.validateContainerStatus(&podStatus, containerName)
+	containerID, err := kl.validateContainerStatus(&podStatus, containerName, previous)
 	if err != nil {
 		// No log is available if the container status is missing or is in the
 		// waiting state.

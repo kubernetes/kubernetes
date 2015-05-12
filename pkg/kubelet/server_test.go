@@ -53,7 +53,7 @@ type fakeKubelet struct {
 	containerVersionFunc               func() (kubecontainer.Version, error)
 	execFunc                           func(pod string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	portForwardFunc                    func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
-	containerLogsFunc                  func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
+	containerLogsFunc                  func(podFullName, containerName, tail string, follow, pervious bool, stdout, stderr io.Writer) error
 	streamingConnectionIdleTimeoutFunc func() time.Duration
 	hostnameFunc                       func() string
 }
@@ -90,8 +90,8 @@ func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 	fk.logFunc(w, req)
 }
 
-func (fk *fakeKubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
-	return fk.containerLogsFunc(podFullName, containerName, tail, follow, stdout, stderr)
+func (fk *fakeKubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow, previous bool, stdout, stderr io.Writer) error {
+	return fk.containerLogsFunc(podFullName, containerName, tail, follow, previous, stdout, stderr)
 }
 
 func (fk *fakeKubelet) GetHostname() string {
@@ -553,8 +553,8 @@ func setPodByNameFunc(fw *serverTestFramework, namespace, pod, container string)
 	}
 }
 
-func setGetContainerLogsFunc(fw *serverTestFramework, t *testing.T, expectedPodName, expectedContainerName, expectedTail string, expectedFollow bool, output string) {
-	fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
+func setGetContainerLogsFunc(fw *serverTestFramework, t *testing.T, expectedPodName, expectedContainerName, expectedTail string, expectedFollow, expectedPrevious bool, output string) {
+	fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow, previous bool, stdout, stderr io.Writer) error {
 		if podFullName != expectedPodName {
 			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
 		}
@@ -567,6 +567,10 @@ func setGetContainerLogsFunc(fw *serverTestFramework, t *testing.T, expectedPodN
 		if follow != expectedFollow {
 			t.Errorf("expected %t, got %t", expectedFollow, follow)
 		}
+		if previous != expectedPrevious {
+			t.Errorf("expected %t, got %t", expectedPrevious, previous)
+		}
+
 		io.WriteString(stdout, output)
 		return nil
 	}
@@ -581,8 +585,9 @@ func TestContainerLogs(t *testing.T) {
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := false
+	expectedPrevious := false
 	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
-	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, expectedTail, expectedFollow, output)
+	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, expectedTail, expectedFollow, expectedPrevious, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName)
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)
@@ -608,8 +613,9 @@ func TestContainerLogsWithTail(t *testing.T) {
 	expectedContainerName := "baz"
 	expectedTail := "5"
 	expectedFollow := false
+	expectedPrevious := false
 	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
-	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, expectedTail, expectedFollow, output)
+	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, expectedTail, expectedFollow, expectedPrevious, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?tail=5")
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)
@@ -635,8 +641,9 @@ func TestContainerLogsWithFollow(t *testing.T) {
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := true
+	expectedPrevious := false
 	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
-	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, expectedTail, expectedFollow, output)
+	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, expectedTail, expectedFollow, expectedPrevious, output)
 	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?follow=1")
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)

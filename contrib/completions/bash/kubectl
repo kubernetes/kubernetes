@@ -399,6 +399,8 @@ _kubectl_log()
     flags+=("--help")
     flags+=("-h")
     flags+=("--interactive")
+    flags+=("--previous")
+    flags+=("-p")
 
     must_have_one_flag=()
     must_have_one_noun=()
