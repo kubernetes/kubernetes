@@ -21,8 +21,12 @@ install:
   - GOPATH=$PWD/Godeps/_workspace:$GOPATH go install ./...
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/verify-gendocs.sh
 
+before_script:
+  - npm install karma karma-junit-reporter karma-phantomjs-launcher karma-jasmine
+
 script:
   - KUBE_RACE="-race" KUBE_COVER="y" KUBE_GOVERALLS_BIN="$HOME/gopath/bin/goveralls" KUBE_TIMEOUT='-timeout 300s' KUBE_COVERPROCS=8 KUBE_TEST_API_VERSIONS=$KUBE_TEST_API_VERSIONS ./hack/test-go.sh -- -p=2
+  - node_modules/karma/bin/karma start www/master/karma.conf.js --single-run --browsers PhantomJS
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH KUBE_TEST_API_VERSIONS=$KUBE_TEST_API_VERSIONS KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4 LOG_LEVEL=4 ./hack/test-integration.sh
 
