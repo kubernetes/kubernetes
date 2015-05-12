@@ -1,8 +1,6 @@
-# These are the Kubernetes-specific settings that differ
-# from the default values.
-cluster.name: kubernetes_logging
-
-path.data: /data/data
-path.work: /data/work
-path.logs: /data/logs
-path.plugins: /data/plugins
+cluster.name: kubernetes-logging
+node.master: ${NODE_MASTER}
+node.data: ${NODE_DATA}
+transport.tcp.port: ${TRANSPORT_PORT}
+http.port: ${HTTP_PORT}
+discovery.zen.ping.multicast.enabled: false
