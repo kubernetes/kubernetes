@@ -52,6 +52,10 @@ func (c *Fake) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	return cadvisorApiV2.FsInfo{}, nil
 }
 
+func (c *Fake) RootFsInfo() (cadvisorApiV2.FsInfo, error) {
+	return cadvisorApiV2.FsInfo{}, nil
+}
+
 func (c *Fake) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return new(events.EventChannel), nil
 }

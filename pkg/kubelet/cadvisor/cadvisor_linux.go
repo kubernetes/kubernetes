@@ -132,16 +132,24 @@ func (cc *cadvisorClient) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 }
 
 func (cc *cadvisorClient) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
-	res, err := cc.GetFsInfo(cadvisorFs.LabelDockerImages)
+	return cc.getFsInfo(cadvisorFs.LabelDockerImages)
+}
+
+func (cc *cadvisorClient) RootFsInfo() (cadvisorApiV2.FsInfo, error) {
+	return cc.getFsInfo(cadvisorFs.LabelSystemRoot)
+}
+
+func (cc *cadvisorClient) getFsInfo(label string) (cadvisorApiV2.FsInfo, error) {
+	res, err := cc.GetFsInfo(label)
 	if err != nil {
 		return cadvisorApiV2.FsInfo{}, err
 	}
 	if len(res) == 0 {
-		return cadvisorApiV2.FsInfo{}, fmt.Errorf("failed to find information for the filesystem containing Docker images")
+		return cadvisorApiV2.FsInfo{}, fmt.Errorf("failed to find information for the filesystem labeled %q", label)
 	}
-	// TODO(vmarmol): Handle this better when Docker has more than one image filesystem.
+	// TODO(vmarmol): Handle this better when a label has more than one image filesystem.
 	if len(res) > 1 {
-		glog.Warningf("More than one Docker images filesystem: %#v. Only using the first one", res)
+		glog.Warningf("More than one filesystem labeled %q: %#v. Only using the first one", label, res)
 	}
 
 	return res[0], nil
