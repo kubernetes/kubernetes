@@ -23,8 +23,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	//"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	//"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -57,7 +55,7 @@ func LaunchNetTestPodPerNode(nodes *api.NodeList, name string, c *client.Client,
 				Containers: []api.Container{
 					{
 						Name:  "webserver",
-						Image: "gcr.io/google_containers/nettest:1.1",
+						Image: "gcr.io/google_containers/nettest:1.3",
 						Args: []string{
 							"-service=" + name,
 							//peers >= totalPods should be asserted by the container.
