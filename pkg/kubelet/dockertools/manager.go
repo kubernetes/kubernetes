@@ -473,7 +473,14 @@ func (dm *DockerManager) GetPodInfraContainer(pod kubecontainer.Pod) (kubecontai
 	return kubecontainer.Container{}, fmt.Errorf("unable to find pod infra container for pod %v", pod.ID)
 }
 
-func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions, ref *api.ObjectReference) (string, error) {
+func (dm *DockerManager) runContainer(
+	pod *api.Pod,
+	container *api.Container,
+	opts *kubecontainer.RunContainerOptions,
+	ref *api.ObjectReference,
+	netMode string,
+	ipcMode string) (string, error) {
+
 	dockerName := KubeletContainerName{
 		PodFullName:   kubecontainer.GetPodFullName(pod),
 		PodUID:        pod.UID,
@@ -545,8 +552,8 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 	hc := &docker.HostConfig{
 		PortBindings: portBindings,
 		Binds:        opts.Binds,
-		NetworkMode:  opts.NetMode,
-		IpcMode:      opts.IpcMode,
+		NetworkMode:  netMode,
+		IpcMode:      ipcMode,
 	}
 	if len(opts.DNS) > 0 {
 		hc.DNS = opts.DNS
@@ -1112,12 +1119,12 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
 
-	opts, err := dm.generator.GenerateRunContainerOptions(pod, container, netMode, ipcMode)
+	opts, err := dm.generator.GenerateRunContainerOptions(pod, container)
 	if err != nil {
 		return "", err
 	}
 
-	id, err := dm.runContainer(pod, container, opts, ref)
+	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode)
 	if err != nil {
 		return "", err
 	}

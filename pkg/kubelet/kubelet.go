@@ -705,13 +705,9 @@ func makeBinds(container *api.Container, podVolumes kubecontainer.VolumeMap) (bi
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
-func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, netMode, ipcMode string) (*kubecontainer.RunContainerOptions, error) {
+func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*kubecontainer.RunContainerOptions, error) {
 	var err error
-	opts := &kubecontainer.RunContainerOptions{
-		NetMode:      netMode,
-		IpcMode:      ipcMode,
-		CgroupParent: kl.cgroupRoot,
-	}
+	opts := &kubecontainer.RunContainerOptions{CgroupParent: kl.cgroupRoot}
 
 	vol, ok := kl.volumeManager.GetVolumes(pod.UID)
 	if !ok {
