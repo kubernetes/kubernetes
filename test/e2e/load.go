@@ -70,19 +70,15 @@ var _ = Describe("Load", func() {
 	})
 
 	type Load struct {
-		skip        bool
 		podsPerNode int
 	}
 
 	loadTests := []Load{
-		{podsPerNode: 30, skip: true},
+		{podsPerNode: 30},
 	}
 
 	for _, testArg := range loadTests {
-		name := fmt.Sprintf("should be able to handle %v pods per node", testArg.podsPerNode)
-		if testArg.skip {
-			name = "[Skipped] " + name
-		}
+		name := fmt.Sprintf("[Performance suite] [Skipped] should be able to handle %v pods per node", testArg.podsPerNode)
 
 		It(name, func() {
 			totalPods := testArg.podsPerNode * nodeCount
