@@ -1,42 +1,39 @@
 apiVersion: v1beta3
 kind: ReplicationController
-metadata: 
-  labels: 
+metadata:
+  labels:
     name: cassandra
   name: cassandra
-spec: 
+spec:
   replicas: 1
-  selector: 
+  selector:
     name: cassandra
-  template: 
-    metadata: 
-      labels: 
+  template:
+    metadata:
+      labels:
         name: cassandra
-    spec: 
-      containers: 
-        - command: 
+    spec:
+      containers:
+        - command:
             - /run.sh
           resources:
             limits:
               cpu: 1
-          env: 
+          env:
             - name: MAX_HEAP_SIZE
-              key: MAX_HEAP_SIZE
               value: 512M
             - name: HEAP_NEWSIZE
-              key: HEAP_NEWSIZE
               value: 100M
           image: "kubernetes/cassandra:v2"
           name: cassandra
-          ports: 
+          ports:
             - containerPort: 9042
               name: cql
             - containerPort: 9160
               name: thrift
-          volumeMounts: 
+          volumeMounts:
             - mountPath: /cassandra_data
               name: data
-      volumes: 
+      volumes:
         - name: data
           emptyDir: {}
-

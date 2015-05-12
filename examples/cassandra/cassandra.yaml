@@ -10,7 +10,7 @@ spec:
     - /run.sh
     resources:
       limits:
-        cpu: "1"      
+        cpu: "1"
     image: kubernetes/cassandra:v2
     name: cassandra
     ports:
@@ -31,5 +31,3 @@ spec:
   volumes:
     - name: data
       emptyDir: {}
-
-    

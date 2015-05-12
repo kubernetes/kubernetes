@@ -1,12 +1,12 @@
 apiVersion: v1beta3
 kind: Service
-metadata: 
-  labels: 
+metadata:
+  labels:
     name: cassandra
   name: cassandra
-spec: 
+spec:
   ports:
     - port: 9042
       targetPort: 9042
-  selector: 
+  selector:
     name: cassandra
