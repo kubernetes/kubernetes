@@ -102,6 +102,7 @@ type KubeletServer struct {
 	ResourceContainer              string
 	CgroupRoot                     string
 	ContainerRuntime               string
+	DockerDaemonContainer          string
 
 	// Flags intended for testing
 
@@ -158,6 +159,7 @@ func NewKubeletServer() *KubeletServer {
 		ResourceContainer:           "/kubelet",
 		CgroupRoot:                  "/",
 		ContainerRuntime:            "docker",
+		DockerDaemonContainer:       "/docker-daemon",
 	}
 }
 
@@ -212,6 +214,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
 	fs.StringVar(&s.CgroupRoot, "cgroup_root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '/', which means top-level.")
 	fs.StringVar(&s.ContainerRuntime, "container_runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
+	fs.StringVar(&s.DockerDaemonContainer, "docker-daemon-container", s.DockerDaemonContainer, "Optional resource-only container in which to place the Docker Daemon. Empty for no container (Default: /docker-daemon).")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
@@ -321,6 +324,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		CgroupRoot:                s.CgroupRoot,
 		ContainerRuntime:          s.ContainerRuntime,
 		Mounter:                   mounter,
+		DockerDaemonContainer:     s.DockerDaemonContainer,
 	}
 
 	RunKubelet(&kcfg, nil)
@@ -432,6 +436,7 @@ func SimpleKubelet(client *client.Client,
 		CgroupRoot:                "/",
 		ContainerRuntime:          "docker",
 		Mounter:                   mount.New(),
+		DockerDaemonContainer:     "/docker-daemon",
 	}
 	return &kcfg
 }
@@ -562,6 +567,7 @@ type KubeletConfig struct {
 	CgroupRoot                     string
 	ContainerRuntime               string
 	Mounter                        mount.Interface
+	DockerDaemonContainer          string
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -609,7 +615,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.OSInterface,
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
-		kc.Mounter)
+		kc.Mounter,
+		kc.DockerDaemonContainer)
 
 	if err != nil {
 		return nil, nil, err
