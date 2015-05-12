@@ -832,7 +832,7 @@ type PodSpec struct {
 // state of a system.
 type PodStatus struct {
 	Phase      PodPhase       `json:"phase,omitempty"`
-	Conditions []PodCondition `json:"Condition,omitempty"`
+	Conditions []PodCondition `json:"conditions,omitempty"`
 	// A human readable message indicating details about why the pod is in this state.
 	Message string `json:"message,omitempty"`
 
