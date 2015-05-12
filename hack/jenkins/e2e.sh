@@ -107,27 +107,54 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
             echo $PWD not empty, bailing!
             exit 1
         fi
-    
+
         # Tell kube-up.sh to skip the update, it doesn't lock. An internal
         # gcloud bug can cause racing component updates to stomp on each
         # other.
         export KUBE_SKIP_UPDATE=y
         sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update -q" || true
 
-        # The "ci" bucket is for builds like "v0.15.0-468-gfa648c1"
-        bucket="ci"
-        # The "latest" version picks the most recent "ci" or "release" build.
-        version_file="latest"
-        if [[ ${JENKINS_USE_RELEASE_TARS:-} =~ ^[yY]$ ]]; then
-            # The "release" bucket is for builds like "v0.15.0"
+        # For GKE, we can get the server-specified version.
+        if [[ ${JENKINS_USE_SERVER_VERSION:-} =~ ^[yY]$ ]]; then
+            # We'll pull our TARs for tests from the release bucket.
             bucket="release"
-            if [[ ${JENKINS_USE_STABLE:-} =~ ^[yY]$ ]]; then
-                # The "stable" version picks the most recent "release" build.
-                version_file="stable"
-            fi
-        fi
 
-        githash=$(gsutil cat gs://kubernetes-release/${bucket}/${version_file}.txt)
+            # Get the latest available API version from the GKE apiserver.
+            # Trim whitespace out of the error message. This gives us something
+            # like: ERROR:(gcloud.alpha.container.clusters.create)ResponseError:
+            #       code=400,message=cluster.cluster_api_versionmustbeoneof:
+            #       0.15.0,0.16.0.
+            # The command should error, so we throw an || true on there.
+            msg=$(gcloud alpha container clusters create this-wont-work \
+                --cluster-api-version=0.0.0 2>&1 | tr -d '[[:space:]]') || true
+            # Strip out everything before the final colon, which gives us just
+            # the allowed versions; something like "0.15.0,0.16.0." or "0.16.0."
+            msg=${msg##*:}
+            # Take off the final period, which gives us just comma-separated
+            # allowed versions; something like "0.15.0,0.16.0" or "0.16.0"
+            msg=${msg%%\.}
+            # Split the version string by comma and read into an array, using
+            # the last element as the githash, which will be like "v0.16.0".
+            IFS=',' read -a varr <<< "${msg}"
+            githash="v${varr[${#varr[@]} - 1]}"
+        else
+            # The "ci" bucket is for builds like "v0.15.0-468-gfa648c1"
+            bucket="ci"
+            # The "latest" version picks the most recent "ci" or "release" build.
+            version_file="latest"
+            if [[ ${JENKINS_USE_RELEASE_TARS:-} =~ ^[yY]$ ]]; then
+                # The "release" bucket is for builds like "v0.15.0"
+                bucket="release"
+                if [[ ${JENKINS_USE_STABLE:-} =~ ^[yY]$ ]]; then
+                    # The "stable" version picks the most recent "release" build.
+                    version_file="stable"
+                fi
+            fi
+            githash=$(gsutil cat gs://kubernetes-release/${bucket}/${version_file}.txt)
+        fi
+        # At this point, we want to have the following vars set:
+        # - bucket
+        # - githash
         gsutil -m cp gs://kubernetes-release/${bucket}/${githash}/kubernetes.tar.gz gs://kubernetes-release/${bucket}/${githash}/kubernetes-test.tar.gz .
     fi
 
