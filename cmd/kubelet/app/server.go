@@ -156,7 +156,7 @@ func NewKubeletServer() *KubeletServer {
 		CertDirectory:               "/var/run/kubernetes",
 		NodeStatusUpdateFrequency:   10 * time.Second,
 		ResourceContainer:           "/kubelet",
-		CgroupRoot:                  "",
+		CgroupRoot:                  "/",
 		ContainerRuntime:            "docker",
 	}
 }
@@ -210,7 +210,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
-	fs.StringVar(&s.CgroupRoot, "cgroup_root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
+	fs.StringVar(&s.CgroupRoot, "cgroup_root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '/', which means top-level.")
 	fs.StringVar(&s.ContainerRuntime, "container_runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
 
 	// Flags intended for testing, not recommended used in production environments.
@@ -429,7 +429,7 @@ func SimpleKubelet(client *client.Client,
 		NodeStatusUpdateFrequency: 10 * time.Second,
 		ResourceContainer:         "/kubelet",
 		OSInterface:               osInterface,
-		CgroupRoot:                "",
+		CgroupRoot:                "/",
 		ContainerRuntime:          "docker",
 		Mounter:                   mount.New(),
 	}
