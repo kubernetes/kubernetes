@@ -644,10 +644,24 @@ function kube-down {
 
   echo "Bringing down cluster"
 
-  gcloud preview managed-instance-groups --zone "${ZONE}" delete \
+  deleteCmdOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" delete \
     --project "${PROJECT}" \
     --quiet \
-    "${NODE_INSTANCE_PREFIX}-group" || true
+    "${NODE_INSTANCE_PREFIX}-group" || true)
+  if [[ "$deleteCmdOutput" != ""  ]]; then
+    # Managed instance group deletion is done asyncronously, we must wait for it to complete, or subsequent steps fail
+    deleteCmdOperationId=$(echo $deleteCmdOutput | grep "Operation:" | sed "s/.*Operation:\s//" | sed "s/\s.*//" | sed "s/ //g")
+    if [[ "$deleteCmdOperationId" != ""  ]]; then
+      deleteCmdStatus="PENDING"
+      while [[ "$deleteCmdStatus" != "DONE" ]]
+      do
+	sleep 5
+        deleteCmdOperationOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" get-operation $deleteCmdOperationId)
+        deleteCmdStatus=$(echo $deleteCmdOperationOutput | grep -i "status:" | sed "s/.*status:\s//" | sed "s/\s.*//" | sed "s/ //g")
+        echo "Waiting for MIG deletion to complete. Current status: " $deleteCmdStatus
+      done
+    fi
+  fi
 
   gcloud compute instance-templates delete \
     --project "${PROJECT}" \
