@@ -4373,3 +4373,77 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
 	}
 }
+
+func TestMakePortMappings(t *testing.T) {
+	tests := []struct {
+		container            *api.Container
+		expectedPortMappings []kubecontainer.PortMapping
+	}{
+		{
+			&api.Container{
+				Name: "fooContainer",
+				Ports: []api.ContainerPort{
+					{
+						Protocol:      api.ProtocolTCP,
+						ContainerPort: 80,
+						HostPort:      8080,
+						HostIP:        "127.0.0.1",
+					},
+					{
+						Protocol:      api.ProtocolTCP,
+						ContainerPort: 443,
+						HostPort:      4343,
+						HostIP:        "192.168.0.1",
+					},
+					{
+						Name:          "foo",
+						Protocol:      api.ProtocolUDP,
+						ContainerPort: 555,
+						HostPort:      5555,
+					},
+					{
+						Name:          "foo", // Duplicated, should be ignored.
+						Protocol:      api.ProtocolUDP,
+						ContainerPort: 888,
+						HostPort:      8888,
+					},
+					{
+						Protocol:      api.ProtocolTCP, // Duplicated, should be ignored.
+						ContainerPort: 80,
+						HostPort:      8888,
+					},
+				},
+			},
+			[]kubecontainer.PortMapping{
+				{
+					Name:          "fooContainer-TCP:80",
+					Protocol:      api.ProtocolTCP,
+					ContainerPort: 80,
+					HostPort:      8080,
+					HostIP:        "127.0.0.1",
+				},
+				{
+					Name:          "fooContainer-TCP:443",
+					Protocol:      api.ProtocolTCP,
+					ContainerPort: 443,
+					HostPort:      4343,
+					HostIP:        "192.168.0.1",
+				},
+				{
+					Name:          "fooContainer-foo",
+					Protocol:      api.ProtocolUDP,
+					ContainerPort: 555,
+					HostPort:      5555,
+					HostIP:        "",
+				},
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		actual := makePortMappings(tt.container)
+		if !reflect.DeepEqual(tt.expectedPortMappings, actual) {
+			t.Errorf("%d: Expected: %#v, saw: %#v", i, tt.expectedPortMappings, actual)
+		}
+	}
+}
