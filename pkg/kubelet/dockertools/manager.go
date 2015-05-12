@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
@@ -874,8 +875,45 @@ func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byt
 		RawTerminal:  false,
 	}
 	err = dm.client.StartExec(execObj.ID, startOpts)
+	if err != nil {
+		return nil, err
+	}
+	tick := time.Tick(2 * time.Second)
+	for {
+		inspect, err2 := dm.client.InspectExec(execObj.ID)
+		if err2 != nil {
+			return buf.Bytes(), err2
+		}
+		if !inspect.Running {
+			if inspect.ExitCode != 0 {
+				err = &dockerExitError{inspect}
+			}
+			break
+		}
+		<-tick
+	}
 
 	return buf.Bytes(), err
+}
+
+type dockerExitError struct {
+	Inspect *docker.ExecInspect
+}
+
+func (d *dockerExitError) String() string {
+	return d.Error()
+}
+
+func (d *dockerExitError) Error() string {
+	return fmt.Sprintf("Error executing in Docker Container: %d", d.Inspect.ExitCode)
+}
+
+func (d *dockerExitError) Exited() bool {
+	return !d.Inspect.Running
+}
+
+func (d *dockerExitError) ExitStatus() int {
+	return d.Inspect.ExitCode
 }
 
 // ExecInContainer uses nsenter to run the command inside the container identified by containerID.

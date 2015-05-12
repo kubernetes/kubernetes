@@ -619,3 +619,12 @@ func TestProbeContainer(t *testing.T) {
 		}
 	}
 }
+
+func TestIsAExitError(t *testing.T) {
+	var err error
+	err = &dockerExitError{nil}
+	_, ok := err.(uexec.ExitError)
+	if !ok {
+		t.Error("couldn't cast dockerExitError to exec.ExitError")
+	}
+}

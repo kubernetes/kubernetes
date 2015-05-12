@@ -421,7 +421,7 @@ var _ = Describe("Pods", func() {
 					{
 						Name:    "liveness",
 						Image:   "gcr.io/google_containers/busybox",
-						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; echo fail >/tmp/health; sleep 600"},
+						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; rm -rf /tmp/health; sleep 600"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
 								Exec: &api.ExecAction{

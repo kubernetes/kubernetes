@@ -17,34 +17,35 @@ limitations under the License.
 package exec
 
 import (
-	"strings"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	uexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 
 	"github.com/golang/glog"
 )
-
-const defaultHealthyOutput = "ok"
 
 func New() ExecProber {
 	return execProber{}
 }
 
 type ExecProber interface {
-	Probe(e uexec.Cmd) (probe.Result, error)
+	Probe(e exec.Cmd) (probe.Result, error)
 }
 
 type execProber struct{}
 
-func (pr execProber) Probe(e uexec.Cmd) (probe.Result, error) {
+func (pr execProber) Probe(e exec.Cmd) (probe.Result, error) {
 	data, err := e.CombinedOutput()
 	glog.V(4).Infof("health check response: %s", string(data))
 	if err != nil {
+		exit, ok := err.(exec.ExitError)
+		if ok {
+			if exit.ExitStatus() == 0 {
+				return probe.Success, nil
+			} else {
+				return probe.Failure, nil
+			}
+		}
 		return probe.Unknown, err
-	}
-	if !strings.HasPrefix(strings.ToLower(string(data)), defaultHealthyOutput) {
-		return probe.Failure, nil
 	}
 	return probe.Success, nil
 }

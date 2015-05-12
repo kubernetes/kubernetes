@@ -47,6 +47,7 @@ type FakeDockerClient struct {
 	RemovedImages       util.StringSet
 	VersionInfo         docker.Env
 	Information         docker.Env
+	ExecInspect         *docker.ExecInspect
 }
 
 func (f *FakeDockerClient) ClearCalls() {
@@ -286,6 +287,10 @@ func (f *FakeDockerClient) CreateExec(_ docker.CreateExecOptions) (*docker.Exec,
 
 func (f *FakeDockerClient) StartExec(_ string, _ docker.StartExecOptions) error {
 	return nil
+}
+
+func (f *FakeDockerClient) InspectExec(id string) (*docker.ExecInspect, error) {
+	return f.ExecInspect, f.popError("inspect_exec")
 }
 
 func (f *FakeDockerClient) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
