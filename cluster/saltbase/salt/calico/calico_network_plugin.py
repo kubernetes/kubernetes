@@ -42,10 +42,12 @@ class NetworkPlugin():
 
     def delete(self, args):
         """Cleanup after a pod."""
+        self.pod_name = args[3].replace('-', '_')
         self.docker_id = args[4]
 
         # Remove the profile for the workload.
         calicoctl('container', 'remove', self.docker_id)
+        calicoctl('profile', 'remove', self.pod_name)
 
     def _configure_interface(self):
         """Configure the Calico interface for a pod."""
