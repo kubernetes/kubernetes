@@ -126,7 +126,8 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
             #       0.15.0,0.16.0.
             # The command should error, so we throw an || true on there.
             msg=$(gcloud alpha container clusters create this-wont-work \
-                --cluster-api-version=0.0.0 2>&1 | tr -d '[[:space:]]') || true
+                --zone=us-central1-f --cluster-api-version=0.0.0 2>&1 \
+                | tr -d '[[:space:]]') || true
             # Strip out everything before the final colon, which gives us just
             # the allowed versions; something like "0.15.0,0.16.0." or "0.16.0."
             msg=${msg##*:}
