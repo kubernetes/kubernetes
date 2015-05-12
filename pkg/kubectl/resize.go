@@ -105,6 +105,10 @@ type RetryParams struct {
 	interval, timeout time.Duration
 }
 
+func NewRetryParams(interval, timeout time.Duration) *RetryParams {
+	return &RetryParams{interval, timeout}
+}
+
 // ResizeCondition is a closure around Resize that facilitates retries via util.wait
 func ResizeCondition(r Resizer, precondition *ResizePrecondition, namespace, name string, count uint) wait.ConditionFunc {
 	return func() (bool, error) {

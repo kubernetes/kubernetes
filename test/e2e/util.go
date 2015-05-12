@@ -36,9 +36,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	"golang.org/x/crypto/ssh"
 
@@ -409,41 +409,6 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 	}
 }
 
-// Delete a Replication Controller and all pods it spawned
-func DeleteRC(c *client.Client, ns, name string) error {
-	rc, err := c.ReplicationControllers(ns).Get(name)
-	if err != nil {
-		return fmt.Errorf("Failed to find replication controller %s in namespace %s: %v", name, ns, err)
-	}
-
-	rc.Spec.Replicas = 0
-
-	if _, err := c.ReplicationControllers(ns).Update(rc); err != nil {
-		return fmt.Errorf("Failed to resize replication controller %s to zero: %v", name, err)
-	}
-
-	// Wait up to 20 minutes until all replicas are killed.
-	endTime := time.Now().Add(time.Minute * 20)
-	for {
-		if time.Now().After(endTime) {
-			return fmt.Errorf("Timeout while waiting for replication controller %s replicas to 0", name)
-		}
-		remainingTime := endTime.Sub(time.Now())
-		err := wait.Poll(time.Second, remainingTime, client.ControllerHasDesiredReplicas(c, rc))
-		if err != nil {
-			Logf("Error while waiting for replication controller %s replicas to read 0: %v", name, err)
-		} else {
-			break
-		}
-	}
-
-	// Delete the replication controller.
-	if err := c.ReplicationControllers(ns).Delete(name); err != nil {
-		return fmt.Errorf("Failed to delete replication controller %s: %v", name, err)
-	}
-	return nil
-}
-
 // RunRC Launches (and verifies correctness) of a Replication Controller
 // It will waits for all pods it spawns to become "Running".
 // It's the caller's responsibility to clean up externally (i.e. use the
@@ -572,6 +537,54 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 		return fmt.Errorf("Only %d pods started out of %d", current, replicas)
 	}
 	return nil
+}
+
+func ResizeRC(c *client.Client, ns, name string, size uint) error {
+	By(fmt.Sprintf("Resizing replication controller %s in namespace %s to %d", name, ns, size))
+	resizer, err := kubectl.ResizerFor("ReplicationController", kubectl.NewResizerClient(c))
+	if err != nil {
+		return err
+	}
+	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
+	if err = resizer.Resize(ns, name, size, nil, nil, waitForReplicas); err != nil {
+		return err
+	}
+	return waitForRCPodsRunning(c, ns, name)
+}
+
+// Wait up to 10 minutes for pods to become Running.
+func waitForRCPodsRunning(c *client.Client, ns, rcName string) error {
+	running := false
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
+	for start := time.Now(); time.Since(start) < 10*time.Minute; time.Sleep(5 * time.Second) {
+		pods, err := listPods(c, ns, label, fields.Everything())
+		if err != nil {
+			Logf("Error listing pods: %v", err)
+			continue
+		}
+		for _, p := range pods.Items {
+			if p.Status.Phase != api.PodRunning {
+				continue
+			}
+		}
+		running = true
+		break
+	}
+	if !running {
+		return fmt.Errorf("Timeout while waiting for replication controller %s pods to be running", rcName)
+	}
+	return nil
+}
+
+// Delete a Replication Controller and all pods it spawned
+func DeleteRC(c *client.Client, ns, name string) error {
+	By(fmt.Sprintf("Deleting replication controller %s in namespace %s", name, ns))
+	reaper, err := kubectl.ReaperFor("ReplicationController", c)
+	if err != nil {
+		return err
+	}
+	_, err = reaper.Stop(ns, name, api.NewDeleteOptions(0))
+	return err
 }
 
 // Convenient wrapper around listing pods supporting retries.
