@@ -31,7 +31,7 @@ spec:
         image: gcr.io/google_containers/kube2sky:1.4
         args:
         # entrypoint = "/kube2sky"
-        - -domain=kubernetes.local
+        - -domain=cluster.local
         - -kubecfg_file=/etc/dns_token/kubeconfig
         volumeMounts:
         - mountPath: /etc/dns_token
@@ -43,7 +43,7 @@ spec:
         # entrypoint = "/skydns"
         - -machines=http://localhost:4001
         - -addr=0.0.0.0:53
-        - -domain=kubernetes.local.
+        - -domain=cluster.local.
         ports:
         - containerPort: 53
           name: dns

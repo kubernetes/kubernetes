@@ -73,7 +73,7 @@ DOCKER_OPTS=""
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.247.0.10"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev

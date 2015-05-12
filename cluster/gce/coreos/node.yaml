@@ -129,7 +129,7 @@ coreos:
         --allow_privileged=False \
         --v=2 \
         --cluster_dns=10.0.0.10 \
-        --cluster_domain=kubernetes.local \
+        --cluster_domain=cluster.local \
         --logtostderr=true \
         --container-runtime=${KUBERNETES_CONTAINER_RUNTIME}
         Restart=always

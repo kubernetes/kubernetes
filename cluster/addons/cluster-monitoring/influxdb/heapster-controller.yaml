@@ -20,7 +20,7 @@ spec:
           name: heapster
           env: 
             - name: FLAGS
-              value: "--poll_duration=2m --stats_resolution=1m --sink influxdb:http://monitoring-influxdb.default.kubernetes.local:8086"
+              value: "--poll_duration=2m --stats_resolution=1m --sink influxdb:http://monitoring-influxdb.default:8086"
           volumeMounts: 
             - name: ssl-certs
               mountPath: /etc/ssl/certs
