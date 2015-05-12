@@ -23,7 +23,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 : ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
-: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
+: ${KUBECTL:=${KUBE_VERSION_ROOT}/cluster/kubectl.sh}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
 export KUBECTL KUBE_CONFIG_FILE
@@ -80,3 +80,16 @@ until [[ ${all_running} == 1 ]]; do
   all_running=${found_running}
 done
 echo "All pods are 'Running'" >&2
+
+# Before running tests, also ensure that all nodes can be SSH'd into. This
+# prevents a possible race with tests that need to SSH into nodes, where the SSH
+# public keys needed on the nodes have not yet been synced. The gcloud ssh
+# command will wait until the keys are present.
+if [[ ${KUBERNETES_PROVIDER} == "gce" || ${KUBERNETES_PROVIDER} == "gke" ]]; then
+  detect-minion-names
+  for minion in "${MINION_NAMES[@]}"; do
+    # Echo without a newline so the SSH key warning stays on this line.
+    echo -n "SSH'ing into ${minion} " >&2
+    gcloud compute ssh "${minion}" --project="${PROJECT}" --zone="${ZONE}" --command ":" >&2
+  done
+fi
