@@ -30,9 +30,8 @@ type HandlerRunner interface {
 
 // RunContainerOptionsGenerator generates the options that necessary for
 // container runtime to run a container.
-// TODO(yifan): Remove netMode, ipcMode.
 type RunContainerOptionsGenerator interface {
-	GenerateRunContainerOptions(pod *api.Pod, container *api.Container, netMode, ipcMode string) (*RunContainerOptions, error)
+	GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*RunContainerOptions, error)
 }
 
 // Trims runtime prefix from ID or image name (e.g.: docker://busybox -> busybox).

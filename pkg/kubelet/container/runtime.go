@@ -201,13 +201,6 @@ type RunContainerOptions struct {
 	DNS []string
 	// The list of DNS search domains.
 	DNSSearch []string
-	// Docker namespace identifiers(currently we have 'NetMode' and 'IpcMode'.
-	// These are for docker to attach a container in a pod to the pod infra
-	// container's namespace.
-	// TODO(yifan): Remove these after we pushed the pod infra container logic
-	// into docker's container runtime.
-	NetMode string
-	IpcMode string
 	// The parent cgroup to pass to Docker
 	CgroupParent string
 }
