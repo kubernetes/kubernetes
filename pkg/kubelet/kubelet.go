@@ -136,7 +136,8 @@ func NewMainKubelet(
 	osInterface kubecontainer.OSInterface,
 	cgroupRoot string,
 	containerRuntime string,
-	mounter mount.Interface) (*Kubelet, error) {
+	mounter mount.Interface,
+	dockerDaemonContainer string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -276,9 +277,18 @@ func NewMainKubelet(
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
+
+		// No Docker daemon to put in a container.
+		dockerDaemonContainer = ""
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
+
+	containerManager, err := newContainerManager(dockerDaemonContainer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create the Container Manager: %v", err)
+	}
+	klet.containerManager = containerManager
 
 	// Wait for the runtime to be up with a timeout.
 	if err := waitUntilRuntimeIsUp(klet.containerRuntime, maxWaitForContainerRuntime); err != nil {
@@ -434,6 +444,9 @@ type Kubelet struct {
 
 	// Mounter to use for volumes.
 	mounter mount.Interface
+
+	// Manager of non-Runtime containers.
+	containerManager containerManager
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -624,8 +637,14 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 
 	err := kl.imageManager.Start()
 	if err != nil {
-		kl.recorder.Eventf(kl.nodeRef, "imageManagerFailed", "Failed to start ImageManager %v", err)
+		kl.recorder.Eventf(kl.nodeRef, "kubeletSetupFailed", "Failed to start ImageManager %v", err)
 		glog.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
+	}
+
+	err = kl.containerManager.Start()
+	if err != nil {
+		kl.recorder.Eventf(kl.nodeRef, "kubeletSetupFailed", "Failed to start ContainerManager %v", err)
+		glog.Errorf("Failed to start ContainerManager, system may not be properly isolated: %v", err)
 	}
 
 	go util.Until(kl.updateRuntimeUp, 5*time.Second, util.NeverStop)
