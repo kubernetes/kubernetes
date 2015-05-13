@@ -217,7 +217,7 @@ func (v *PathVisitor) Visit(fn VisitorFunc) error {
 	}
 	info, err := v.Mapper.InfoForData(data, v.Path)
 	if err != nil {
-		if v.IgnoreErrors {
+		if !v.IgnoreErrors {
 			return err
 		}
 		glog.V(2).Infof("Unable to load file %q: %v", v.Path, err)
@@ -280,7 +280,7 @@ func (v *DirectoryVisitor) Visit(fn VisitorFunc) error {
 		}
 		info, err := v.Mapper.InfoForData(data, path)
 		if err != nil {
-			if v.IgnoreErrors {
+			if !v.IgnoreErrors {
 				return err
 			}
 			glog.V(2).Infof("Unable to load file %q: %v", path, err)

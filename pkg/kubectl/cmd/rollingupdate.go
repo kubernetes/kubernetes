@@ -22,6 +22,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/golang/glog"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
@@ -161,6 +163,10 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		var ok bool
 		newRc, ok = obj.(*api.ReplicationController)
 		if !ok {
+			if _, kind, err := typer.ObjectVersionAndKind(obj); err == nil {
+				return cmdutil.UsageError(cmd, "%s contains a %s not a ReplicationController", filename, kind)
+			}
+			glog.V(4).Infof("Object %#v is not a ReplicationController", obj)
 			return cmdutil.UsageError(cmd, "%s does not specify a valid ReplicationController", filename)
 		}
 	}
