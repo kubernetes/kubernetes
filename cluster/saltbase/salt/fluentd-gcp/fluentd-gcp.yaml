@@ -14,9 +14,6 @@ spec:
       mountPath: /varlog
     - name: containers
       mountPath: /var/lib/docker/containers
-    - name: token-system-logging
-      mountPath: /etc/token-system-logging
-      readOnly: true
   volumes:
   - name: varlog
     hostPath:
@@ -24,6 +21,4 @@ spec:
   - name: containers
     hostPath:
       path: /var/lib/docker/containers
-  - name: token-system-logging
-    secret:
-      secretName: token-system-logging
+
