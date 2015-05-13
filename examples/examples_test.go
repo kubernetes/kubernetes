@@ -151,6 +151,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"local-01": &api.PersistentVolume{},
 			"local-02": &api.PersistentVolume{},
 			"gce":      &api.PersistentVolume{},
+			"nfs":      &api.PersistentVolume{},
 		},
 		"../examples/persistent-volumes/claims": {
 			"claim-01": &api.PersistentVolumeClaim{},
