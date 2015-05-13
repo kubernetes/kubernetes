@@ -1,6 +1,6 @@
 .PHONY:	elasticsearch_logging_discovery build push
 
-TAG = 1.2
+TAG = 1.3
 
 build:	elasticsearch_logging_discovery	
 	docker build -t gcr.io/google_containers/elasticsearch:$(TAG) .
