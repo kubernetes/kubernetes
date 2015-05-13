@@ -81,15 +81,17 @@ func testRootFsAvailable(t *testing.T) {
 	require.NoError(t, err)
 
 	const mb = 1024 * 1024
-	// 500MB free
+	// 500MB available
 	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{
-		Usage:    9500 * mb,
-		Capacity: 10000 * mb,
+		Usage:     9500 * mb,
+		Capacity:  10000 * mb,
+		Available: 500 * mb,
 	}, nil)
-	// 10MB free
+	// 10MB available
 	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
-		Usage:    990 * mb,
-		Capacity: 1000 * mb,
+		Usage:     990 * mb,
+		Capacity:  1000 * mb,
+		Available: 10 * mb,
 	}, nil)
 	ok, err := dm.IsDockerDiskSpaceAvailable()
 	require.NoError(t, err)
@@ -124,12 +126,14 @@ func testCache(t *testing.T) {
 	require.NoError(t, err)
 	const mb = 1024 * 1024
 	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApi.FsInfo{
-		Usage:    400 * mb,
-		Capacity: 1000 * mb,
+		Usage:     400 * mb,
+		Capacity:  1000 * mb,
+		Available: 300 * mb,
 	}, nil).Once()
 	mockCadvisor.On("RootFsInfo").Return(cadvisorApi.FsInfo{
-		Usage:    9 * mb,
-		Capacity: 10 * mb,
+		Usage:     9 * mb,
+		Capacity:  10 * mb,
+		Available: 500,
 	}, nil).Once()
 	ok, err := dm.IsDockerDiskSpaceAvailable()
 	ok, err = dm.IsRootDiskSpaceAvailable()
