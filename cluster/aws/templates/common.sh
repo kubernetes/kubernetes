@@ -66,19 +66,6 @@ install-salt() {
     fi
   done
 
-  # Based on
-  # https://major.io/2014/06/26/install-debian-packages-without-starting-daemons/
-  # We do this to prevent Salt from starting the salt-minion
-  # daemon. The other packages don't have relevant daemons. (If you
-  # add a package that needs a daemon started, add it to a different
-  # list.)
-  cat > /usr/sbin/policy-rc.d <<EOF
-#!/bin/sh
-echo "Salt shall not start." >&2
-exit 101
-EOF
-  chmod 0755 /usr/sbin/policy-rc.d
-
   for deb in "${DEBS[@]}"; do
     echo "== Installing ${deb}, ignore dependency complaints (will fix later) =="
     dpkg --skip-same-version --force-depends -i "${deb}"
@@ -90,8 +77,6 @@ EOF
     echo "== apt-get install failed, retrying =="
     echo sleep 5
   done
-
-  rm /usr/sbin/policy-rc.d
 
   # Log a timestamp
   echo "== Finished installing Salt =="
