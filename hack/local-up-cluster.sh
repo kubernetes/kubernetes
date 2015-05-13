@@ -136,7 +136,7 @@ SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
 SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-"/var/run/kubernetes/serviceaccount.key"}
 # Generate ServiceAccount key if needed
 if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
-  openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+  sudo openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
 fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
