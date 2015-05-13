@@ -54,12 +54,9 @@ spec:
         livenessProbe:
           exec:
             command:
-            - "/bin/sh"
-            - "-c"
-            # The health check succeeds by virtue of not hanging. It'd be nice
-            # to also check local services are known, but if that's broken then
-            # etcd or kube2sky has to be restarted, not skydns.
-            - "nslookup foobar 127.0.0.1 &> /dev/null; echo ok"
+            - /bin/sh
+            - -c
+            - nslookup kubernetes.default.{{ pillar['dns_domain'] }} localhost >/dev/null"
           initialDelaySeconds: 30
           timeoutSeconds: 5
       dnsPolicy: Default  # Don't use cluster DNS.
