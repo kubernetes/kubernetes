@@ -20,6 +20,7 @@ COPY elasticsearch.yml /elasticsearch-1.5.2/config/elasticsearch.yml
 COPY run.sh /
 COPY elasticsearch_logging_discovery /
 
+VOLUME ["/data"]
 EXPOSE 9200 9300
 
 CMD ["/run.sh"]
