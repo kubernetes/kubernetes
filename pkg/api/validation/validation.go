@@ -40,7 +40,7 @@ func intervalErrorMsg(lo, hi int) string {
 }
 
 var labelValueErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.LabelValueMaxLength, util.LabelValueFmt)
-var qualifiedNameErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.QualifiedNameMaxLength, util.QualifiedNameFmt)
+var qualifiedNameErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s, with an optional DNS prefix", util.QualifiedNameMaxLength, util.QualifiedNameFmt)
 var dnsSubdomainErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS1123SubdomainMaxLength, util.DNS1123SubdomainFmt)
 var dns1123LabelErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS1123LabelMaxLength, util.DNS1123LabelFmt)
 var dns952LabelErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS952LabelMaxLength, util.DNS952LabelFmt)
