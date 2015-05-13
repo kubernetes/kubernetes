@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,9 +28,9 @@ type fakeCollector struct {
 	collectedFrom      int
 }
 
-func (fc *fakeCollector) Collect() (time.Time, error) {
+func (fc *fakeCollector) Collect() (time.Time, []v2.Metric, error) {
 	fc.collectedFrom++
-	return fc.nextCollectionTime, fc.err
+	return fc.nextCollectionTime, []v2.Metric{}, fc.err
 }
 
 func (fc *fakeCollector) Name() string {
@@ -53,7 +54,7 @@ func TestCollect(t *testing.T) {
 	assert.NoError(cm.RegisterCollector(f2))
 
 	// First collection, everyone gets collected from.
-	nextTime, err := cm.Collect()
+	nextTime, _, err := cm.Collect()
 	assert.Equal(firstTime, nextTime)
 	assert.NoError(err)
 	assert.Equal(1, f1.collectedFrom)
@@ -62,7 +63,7 @@ func TestCollect(t *testing.T) {
 	f1.nextCollectionTime = time.Now().Add(2 * time.Hour)
 
 	// Second collection, only the one that is ready gets collected from.
-	nextTime, err = cm.Collect()
+	nextTime, _, err = cm.Collect()
 	assert.Equal(secondTime, nextTime)
 	assert.NoError(err)
 	assert.Equal(2, f1.collectedFrom)

@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/google/cadvisor/info/v2"
 )
 
 type collectorManager struct {
@@ -46,17 +48,19 @@ func (cm *collectorManager) RegisterCollector(collector Collector) error {
 	return nil
 }
 
-func (cm *collectorManager) Collect() (time.Time, error) {
+func (cm *collectorManager) Collect() (time.Time, []v2.Metric, error) {
 	var errors []error
 
 	// Collect from all collectors that are ready.
 	var next time.Time
+	var metrics []v2.Metric
 	for _, c := range cm.collectors {
 		if c.nextCollectionTime.Before(time.Now()) {
-			nextCollection, err := c.collector.Collect()
+			nextCollection, newMetrics, err := c.collector.Collect()
 			if err != nil {
 				errors = append(errors, err)
 			}
+			metrics = append(metrics, newMetrics...)
 			c.nextCollectionTime = nextCollection
 		}
 
@@ -66,7 +70,7 @@ func (cm *collectorManager) Collect() (time.Time, error) {
 		}
 	}
 
-	return next, compileErrors(errors)
+	return next, metrics, compileErrors(errors)
 }
 
 // Make an error slice into a single error.

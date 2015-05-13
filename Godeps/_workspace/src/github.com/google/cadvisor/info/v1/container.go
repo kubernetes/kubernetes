@@ -341,6 +341,9 @@ type FsStats struct {
 	// Number of bytes that is consumed by the container on this filesystem.
 	Usage uint64 `json:"usage"`
 
+	// Number of bytes available for non-root user.
+	Available uint64 `json:"available"`
+
 	// Number of reads completed
 	// This is the total number of reads completed successfully.
 	ReadsCompleted uint64 `json:"reads_completed"`
