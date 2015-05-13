@@ -227,18 +227,32 @@ Thus, we are auto-generating conversion functions that are much more efficient
 than the generic ones (which are based on reflections and thus are highly
 inefficient).
 
-The conversion code resides with each versioned API -
-`pkg/api/<version>/conversion.go`.  To regenerate conversion functions:
+The conversion code resides with each versioned API. There are two files:
+   - `pkg/api/<version>/conversion.go` containing manually written conversion
+     functions
+   - `pkg/api/<version>/conversion_generated.go` containing auto-generated
+     conversion functions
+
+Since auto-generated conversion functions are using manually written ones,
+those manually written should be named with a defined convention, i.e. a function
+converting type X in pkg a to type Y in pkg b, should be named:
+`convert_a_X_To_b_Y`.
+
+Also note that you can (and for efficiency reasons should) use auto-generated
+conversion functions when writing your conversion functions.
+
+Once all the necessary manually written conversions are added, you need to
+regenerate auto-generated ones. To regenerate them:
    - run
 ```
    $ go run cmd/kube-conversion/conversion.go -v <version> -f <file1.txt> -n <file2.txt>
 ```
-   - replace all conversion functions (convert\* functions) in the above file
-     with the contents of \<file1.txt\>
-   - replace arguments of `newer.Scheme.AddGeneratedConversionFuncs`
-     with the contents of \<file2.txt\>
+   - replace all conversion functions (convert\* functions) in the
+     `pkg/api/<version>/conversion_generated.go` with the contents of \<file1.txt\>
+   - replace arguments of `newer.Scheme.AddGeneratedConversionFuncs` in the
+     `pkg/api/<version>/conversion_generated.go` with the contents of \<file2.txt\>
 
-Unsurprisingly, this also requires you to add tests to
+Unsurprisingly, adding manually written conversion also requires you to add tests to
 `pkg/api/<version>/conversion_test.go`.
 
 ## Update the fuzzer
