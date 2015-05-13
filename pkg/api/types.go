@@ -982,6 +982,8 @@ const (
 // Session Visibility Type string
 type VisibilityType string
 
+// TODO: API constants are name with Caps. Cluster, Public, LoadBalancer.
+// TODO: Choose good names once we agree on overall direction and semantics.
 const (
 	// VisibilityTypeCluster means a service will only be accessible inside the k8s cluster.
 	VisibilityTypeCluster VisibilityType = "cluster"
