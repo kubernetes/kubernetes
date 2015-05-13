@@ -34,9 +34,7 @@ $ kubectl config view
 }
 ```
 
-To access a service endpoint `/alpha/beta/gamma/` via the proxy service for your service `myservice` you need to specify an HTTPS address
-for the Kubernetes master followed by `/api/v1beta1/proxy/services/myservice/alpha/beta/gamma/`. Currently it is important to
-specify the trailing `/`.
+To access a cluster service endpoint via the proxy you should prefix the name of the service with `/api/v1beta3/proxy/namespaces/default/services`, for example, `/api/v1beta3/proxy/namespaces/default/services/elasticsearch` or `/api/v1beta3/proxy/namespaces/default/services/elasticsearch/_search?q=user:kimchy`.
 
 Here is a list of representative cluster-level system services:
 ```
@@ -53,7 +51,7 @@ monitoring-influxdb     kubernetes.io/cluster-service=true,name=influxdb        
 Using this information you can now issue the following `curl` command to get status information about
 the Elasticsearch logging service.
 ```
-$ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta1/proxy/services/elasticsearch-logging/
+$ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging
 {
   "status" : 200,
   "name" : "Senator Robert Kelly",
@@ -71,7 +69,7 @@ $ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta1/proxy/serv
 
 You can provide a suffix and parameters:
 ```
-$ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta1/proxy/services/elasticsearch-logging/_cluster/health?pretty=true
+$ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/_cluster/health?pretty=true
 {
   "cluster_name" : "kubernetes_logging",
   "status" : "yellow",
@@ -88,7 +86,7 @@ $ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta1/proxy/serv
 
 You can also visit the endpoint of a service via the proxy URL e.g.
 ```
-https://104.197.5.247/api/v1beta1/proxy/services/kibana-logging/
+https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/kibana-logging
 ```
 The first time you access the cluster using a proxy address from a browser you will be prompted
 for a username and password which can also be found in the `User` and `Password` fields of the `kubernetes_auth`
@@ -107,7 +105,7 @@ a GCE virtual machine `oban` that is running in the same project and GCE default
 cluster. The `-L` flag tells curl to follow the redirect information returned by the redirect call.
 
 ```
-satnam@oban:~$ curl -L -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta1/redirect/services/elasticsearch-logging/
+user@oban:~$ curl -L -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging
 {
   "status" : 200,
   "name" : "Skin",
@@ -126,7 +124,7 @@ satnam@oban:~$ curl -L -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1
 We can examine the actual redirect header:
 
 ```
-satnam@oban:~$ curl -v -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta1/redirect/services/elasticsearch-logging/
+user@oban:~$ curl -v -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging
 * About to connect() to 104.197.5.247 port 443 (#0)
 *   Trying 104.197.5.247...
 * connected
@@ -152,7 +150,7 @@ satnam@oban:~$ curl -v -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1
 * 	 issuer: CN=104.197.5.247@1425498024
 * 	 SSL certificate verify result: unable to get local issuer certificate (20), continuing anyway.
 * Server auth using Basic with user 'admin'
-> GET /api/v1beta1/redirect/services/elasticsearch-logging/ HTTP/1.1
+> GET /api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging/ HTTP/1.1
 > Authorization: Basic YWRtaW46M210eTBWbDluTkZmd0xKeg==
 > User-Agent: curl/7.26.0
 > Host: 104.197.5.247
@@ -171,22 +169,21 @@ satnam@oban:~$ curl -v -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1
 * Connection #0 to host 104.197.5.247 left intact
 * Closing connection #0
 * SSLv3, TLS alert, Client hello (1):
-
 ```
 
-This shows that the request to `https://104.197.5.247/api/v1beta1/redirect/services/elasticsearch-logging/` is redirected to `http://10.244.2.7:9200`.
+This shows that the request to `https://104.197.5.247/api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging` is redirected to `http://10.244.2.7:9200`.
 If we examine the pods on the cluster we can see that `http://10.244.2.7` is the address of a pod that is running the Elasticsearch service.
 
 
 ```
 $ kubectl get pods
 POD                                          IP                  CONTAINER(S)            IMAGE(S)                            HOST                                                                  LABELS                                                                      STATUS              CREATED
-elasticsearch-logging-controller-gziey       10.244.2.7          elasticsearch-logging   kubernetes/elasticsearch:1.0        kubernetes-minion-hqhv.c.kubernetes-satnam2.internal/104.154.33.252   kubernetes.io/cluster-service=true,name=elasticsearch-logging               Running             5 hours
-kibana-logging-controller-ls6k1              10.244.1.9          kibana-logging          kubernetes/kibana:1.1               kubernetes-minion-h5kt.c.kubernetes-satnam2.internal/146.148.80.37    kubernetes.io/cluster-service=true,name=kibana-logging                      Running             5 hours
-kube-dns-oh43e                               10.244.1.10         etcd                    quay.io/coreos/etcd:v2.0.3          kubernetes-minion-h5kt.c.kubernetes-satnam2.internal/146.148.80.37    k8s-app=kube-dns,kubernetes.io/cluster-service=true,name=kube-dns           Running             5 hours
+elasticsearch-logging-controller-gziey       10.244.2.7          elasticsearch-logging   kubernetes/elasticsearch:1.0        kubernetes-minion-hqhv.c.kubernetes-user2.internal/104.154.33.252   kubernetes.io/cluster-service=true,name=elasticsearch-logging               Running             5 hours
+kibana-logging-controller-ls6k1              10.244.1.9          kibana-logging          kubernetes/kibana:1.1               kubernetes-minion-h5kt.c.kubernetes-user2.internal/146.148.80.37    kubernetes.io/cluster-service=true,name=kibana-logging                      Running             5 hours
+kube-dns-oh43e                               10.244.1.10         etcd                    quay.io/coreos/etcd:v2.0.3          kubernetes-minion-h5kt.c.kubernetes-user2.internal/146.148.80.37    k8s-app=kube-dns,kubernetes.io/cluster-service=true,name=kube-dns           Running             5 hours
                                                                  kube2sky                kubernetes/kube2sky:1.0
                                                                  skydns                  kubernetes/skydns:2014-12-23-001
-monitoring-heapster-controller-fplln         10.244.0.4          heapster                kubernetes/heapster:v0.8            kubernetes-minion-2il2.c.kubernetes-satnam2.internal/130.211.155.16   kubernetes.io/cluster-service=true,name=heapster,uses=monitoring-influxdb   Running             5 hours
-monitoring-influx-grafana-controller-0133o   10.244.3.4          influxdb                kubernetes/heapster_influxdb:v0.3   kubernetes-minion-kmin.c.kubernetes-satnam2.internal/130.211.173.22   kubernetes.io/cluster-service=true,name=influxGrafana                       Running             5 hours
+monitoring-heapster-controller-fplln         10.244.0.4          heapster                kubernetes/heapster:v0.8            kubernetes-minion-2il2.c.kubernetes-user2.internal/130.211.155.16   kubernetes.io/cluster-service=true,name=heapster,uses=monitoring-influxdb   Running             5 hours
+monitoring-influx-grafana-controller-0133o   10.244.3.4          influxdb                kubernetes/heapster_influxdb:v0.3   kubernetes-minion-kmin.c.kubernetes-user2.internal/130.211.173.22   kubernetes.io/cluster-service=true,name=influxGrafana                       Running             5 hours
                                                                  grafana                 kubernetes/heapster_grafana:v0.4
 ```
