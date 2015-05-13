@@ -5,8 +5,8 @@ metadata:
   namespace: default
   labels:
     k8s-app: kube-dns
-    name: kube-dns
     kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "KubeDNS"
 spec:
   selector:
     k8s-app: kube-dns
