@@ -287,11 +287,29 @@ function create-salt-master-auth() {
 }
 
 function create-salt-node-auth() {
-  kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
-  if [ ! -e "${kubelet_auth_file}" ]; then
+  kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+  if [ ! -e "${kubelet_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kubelet
     (umask 077;
-      echo "{\"BearerToken\": \"${KUBELET_TOKEN}\", \"Insecure\": true }" > "${kubelet_auth_file}")
+    cat > "${kubelet_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+  user:
+    token: ${KUBELET_TOKEN}
+clusters:
+- name: local
+  cluster:
+     insecure-skip-tls-verify: true
+contexts:
+- context:
+    cluster: local
+    user: kubelet
+  name: service-account-context
+current-context: service-account-context
+EOF
+)
   fi
 
   kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
