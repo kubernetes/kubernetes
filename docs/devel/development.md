@@ -105,8 +105,7 @@ directory. This will keep you from accidentally committing non-gofmt'd go code.
 
 ```
 cd kubernetes/.git/hooks/
-ln -s ../../hooks/prepare-commit-msg .
-ln -s ../../hooks/commit-msg .
+ln -s ../../hooks/pre-commit .
 ```
 
 ## Unit tests

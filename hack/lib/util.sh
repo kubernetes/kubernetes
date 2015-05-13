@@ -130,7 +130,7 @@ kube::util::gen-doc() {
   # We do this in a tmpdir in case the dest has other non-autogenned files
   # We don't want to include them in the list of gen'd files
   local tmpdir="${KUBE_ROOT}/doc_tmp"
-  mkdir "${tmpdir}"
+  mkdir -p "${tmpdir}"
   # generate the new files
   ${cmd} "${tmpdir}"
   # create the list of generated files
