@@ -33,6 +33,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
@@ -40,6 +41,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
 
 	. "github.com/onsi/ginkgo"
@@ -56,6 +58,10 @@ const (
 
 	// How often to poll pods.
 	podPoll = 5 * time.Second
+
+	// Default limit used to filter out and log pseudo-real time request
+	// counts.
+	concurrencyLimit = 100
 )
 
 type CloudConfig struct {
@@ -609,7 +615,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	current = len(pods.Items)
 	failCount := 5
 	for same < failCount && current < replicas {
-		Logf("Controller %s: Found %d pods out of %d", name, current, replicas)
+		Logf("%v Controller %s: Found %d pods out of %d", time.Now(), name, current, replicas)
 		if last < current {
 			same = 0
 		} else if last == current {
@@ -674,7 +680,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 				unknown++
 			}
 		}
-		Logf("Pod States: %d running, %d pending, %d waiting, %d inactive, %d unknown ", current, pending, waiting, inactive, unknown)
+		Logf("[%v] Pod States: %d running, %d pending, %d waiting, %d inactive, %d unknown ", time.Now(), current, pending, waiting, inactive, unknown)
 
 		if len(currentPods.Items) != len(pods.Items) {
 
@@ -964,6 +970,129 @@ type LatencyMetric struct {
 	// 0 <= quantile <=1, e.g. 0.95 is 95%tile, 0.5 is median.
 	quantile float64
 	latency  time.Duration
+}
+
+// RealTimeMetric stores real time metric information.
+type RealTimeMetric struct {
+	Client   string
+	Verb     string
+	Resource string
+	Number   int
+}
+
+// RealTimeMetricList is a list of RealTimeMetrics, with a timestamp
+// of when the list of metrics were retrieved from the apiserver.
+type RealTimeMetricList struct {
+	Metrics   []RealTimeMetric
+	TimeStamp string
+}
+
+// ReadRealTimeMetrics scraped the apiserver's /metrics endpoint and returns a RealTimeMetricList with the results.
+func ReadRealTimeMetrics(c *client.Client) (*RealTimeMetricList, error) {
+	body, err := c.Get().AbsPath("/metrics").DoRaw()
+	if err != nil {
+		glog.Infof("Error %v", err)
+		return nil, err
+	}
+	metrics := make([]RealTimeMetric, 0)
+	for _, line := range strings.Split(string(body), "\n") {
+		if strings.HasPrefix(line, "apiserver_realtime_request_count{") {
+			// TODO: This parsing code is long and not readable. We should improve it.
+			// Example line:
+			// Eg: [apiserver_realtime_request_count{client="a b",resource="pods",verb="LIST"} 0]
+			// 0 apiserver_realtime_request_count{client="
+			// 1 a b"
+			// 2 ,resource="
+			// 3 pods"
+			// 4 ,verb="
+			// 5 LIST"
+			// 6 } 0 <- number of concurrent requests
+			keyElems := strings.Split(line, "\"")
+			if len(keyElems) != 7 {
+				return nil, fmt.Errorf("Error parsing metric %q", line)
+			}
+			client := keyElems[1]
+			resource := keyElems[3]
+			verb := keyElems[5]
+			numLine := strings.Split(keyElems[6], " ")
+			if len(numLine) != 2 {
+				return nil, fmt.Errorf("Error parsing line %q", line)
+			}
+			num, err := strconv.Atoi(numLine[1])
+			if err != nil {
+				return nil, fmt.Errorf("Error parsing metric %q", line)
+			}
+			metrics = append(metrics, RealTimeMetric{client, verb, resource, num})
+		}
+	}
+	return &RealTimeMetricList{metrics, fmt.Sprintf("%v", time.Now())}, nil
+}
+
+// RealTimeMetricKeyFunc is used to insert metrics into a store.
+func RealTimeMetricKeyFunc(obj interface{}) (string, error) {
+	if metric, ok := obj.(*RealTimeMetricList); !ok {
+		return "", fmt.Errorf("Expected list of RealTimeMetric, got %T", metric)
+	} else {
+		return metric.TimeStamp, nil
+	}
+}
+
+// MonitorConcurrentRequests periodically scrapes concurrent request counts from the apiserver.
+func MonitorConcurrentRequests(c *client.Client, stopCh chan struct{}, store cache.Store) {
+	for {
+		select {
+		case <-stopCh:
+			Logf("Closing concurrent reequest monitor")
+			return
+		case <-time.After(10 * time.Millisecond):
+			if metricList, err := ReadRealTimeMetrics(c); err != nil {
+				Logf("Unable to read concurrent requests from apiserver: %v", err)
+			} else {
+				store.Add(metricList)
+			}
+		}
+	}
+
+}
+
+// LogHighConcurrencyRequests aggregates metrics from the given store and emits logs lines
+// for those that exceed the counts in perVerbLimits. Meant for use with MonitorConcurrentRequests.
+func LogHighConcurrencyRequests(store cache.Store, perVerbLimits map[string]int) {
+	for _, metrics := range store.List() {
+		metricList := metrics.(*RealTimeMetricList)
+		verbMap := map[string][]RealTimeMetric{}
+
+		// Aggregate the number of List/Puts etc at each poll interval, compare them with
+		// the given limits, and log the metric if necessary. Note that we compare the
+		// accumulated count for a given Verb, not Client, but the metric list contains
+		// metrics with counts bucketed on Client.
+		for _, metric := range metricList.Metrics {
+			if _, ok := verbMap[metric.Verb]; ok {
+				verbMap[metric.Verb] = append(verbMap[metric.Verb], metric)
+			} else {
+				verbMap[metric.Verb] = []RealTimeMetric{metric}
+			}
+		}
+		for verb, verbMetrics := range verbMap {
+			verbCount := 0
+			for _, m := range verbMetrics {
+				verbCount += m.Number
+			}
+			// If the input doesn't contain a resource, default it to concurrencyLimit
+			perResourceLimit := concurrencyLimit
+			if limit, ok := perVerbLimits[verb]; ok {
+				perResourceLimit = limit
+			}
+			if verbCount >= perResourceLimit {
+				Logf("WARNING: At %v %v Exceeded limit %d %d", metricList.TimeStamp, verb, perResourceLimit, verbCount)
+				for _, metric := range verbMetrics {
+					if metric.Number > 0 {
+						Logf("\t-- %v concurrent %v %v from client %v", metric.Number, metric.Resource, metric.Verb, metric.Client)
+					}
+				}
+			}
+		}
+	}
 }
 
 func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {

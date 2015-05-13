@@ -36,6 +36,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// Number of expected watches from the master (rc manager, endpoints controller,
+// scheduler), and then some.
+const expectedMasterWatches = 30
+
 // This test suite can take a long time to run, so by default it is added to
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
@@ -70,7 +74,6 @@ var _ = Describe("Density", func() {
 			err := DeleteRC(c, ns, RCName)
 			expectNoError(err)
 		}
-
 		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
 		if err := c.Namespaces().Delete(ns); err != nil {
 			Failf("Couldn't delete ns %s", err)
@@ -111,6 +114,24 @@ var _ = Describe("Density", func() {
 		}
 		itArg := testArg
 		It(name, func() {
+
+			// Setup monitoring for the high concurrency requests.
+			metricsMonitorStopCh := make(chan struct{})
+			metricsStore := cache.NewStore(RealTimeMetricKeyFunc)
+			go MonitorConcurrentRequests(c, metricsMonitorStopCh, metricsStore)
+
+			// Unspecified resource limits default to the concurrencyLimit const.
+			perResourceLimits := map[string]int{
+				// Every node has at least 5 watches (services, nodes, pods, kube-proxy: services, endpoints)
+				"WATCHLIST": 5*minionCount + expectedMasterWatches,
+
+				// We want to know when all the above watches relist simultaneously.
+				// Even listing 3000*50 pods at once is potentially disruptive, so flag it.
+				"LIST": minionCount / 2,
+			}
+			defer LogHighConcurrencyRequests(metricsStore, perResourceLimits)
+			defer close(metricsMonitorStopCh)
+
 			totalPods := itArg.podsPerMinion * minionCount
 			nameStr := strconv.Itoa(totalPods) + "-" + string(util.NewUUID())
 			RCName = "my-hostname-density" + nameStr
