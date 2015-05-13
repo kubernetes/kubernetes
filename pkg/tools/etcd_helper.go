@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -238,7 +239,7 @@ func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
 	if found {
 		// We should not return the object itself to avoid poluting the cache if someone
 		// modifies returned values.
-		objCopy, err := conversion.DeepCopy(obj)
+		objCopy, err := api.Scheme.DeepCopy(obj)
 		trace.Step("Deep copied")
 		if err != nil {
 			glog.Errorf("Error during DeepCopy of cached object: %q", err)
@@ -256,7 +257,7 @@ func (h *EtcdHelper) addToCache(index uint64, obj runtime.Object) {
 	defer func() {
 		cacheAddLatency.Observe(float64(time.Since(startTime) / time.Microsecond))
 	}()
-	objCopy, err := conversion.DeepCopy(obj)
+	objCopy, err := api.Scheme.DeepCopy(obj)
 	if err != nil {
 		glog.Errorf("Error during DeepCopy of cached object: %q", err)
 		return

@@ -25,7 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
@@ -60,7 +59,7 @@ func makeIPNet(t *testing.T) *net.IPNet {
 }
 
 func deepCloneService(svc *api.Service) *api.Service {
-	value, err := conversion.DeepCopy(svc)
+	value, err := api.Scheme.DeepCopy(svc)
 	if err != nil {
 		panic("couldn't copy service")
 	}

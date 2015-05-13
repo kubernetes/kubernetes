@@ -24,7 +24,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
 func TestDeepCopyApiObjects(t *testing.T) {
@@ -37,7 +36,7 @@ func TestDeepCopyApiObjects(t *testing.T) {
 					t.Fatalf("Could not create a %s: %s", kind, err)
 				}
 				f.Fuzz(item)
-				itemCopy, err := conversion.DeepCopy(item)
+				itemCopy, err := api.Scheme.DeepCopy(item)
 				if err != nil {
 					t.Errorf("Could not deep copy a %s: %s", kind, err)
 					continue
