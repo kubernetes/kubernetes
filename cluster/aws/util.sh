@@ -386,17 +386,21 @@ function assign-ip-to-instance {
   fi
 }
 
-# Assigns elastic ip to a Amazon EC2 instance. If assigned public IP is empty,
-# then will request new one.
+# If MASTER_RESERVED_IP looks like IP address, will try to assign it to master instance
+# If MASTER_RESERVED_IP is "auto", will allocate new elastic ip and assign that
+# If none of the above or something fails, will output originally assigne IP
 # Output: assigned IP address
 function assign-elastic-ip {
   local assigned_public_ip=$1
   local master_instance_id=$2
 
-  if [[ -n "${MASTER_RESERVED_IP}" ]]; then
+  # Check that MASTER_RESERVED_IP looks like an IPv4 address
+  if [[ "${MASTER_RESERVED_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     assign-ip-to-instance "${MASTER_RESERVED_IP}" "${master_instance_id}" "${assigned_public_ip}"
-  else
+  elif [[ "${MASTER_RESERVED_IP}" = "auto" ]]; then
     assign-ip-to-instance $(allocate-elastic-ip) "${master_instance_id}" "${assigned_public_ip}"
+  else
+    echo "${assigned_public_ip}"
   fi
 }
 
