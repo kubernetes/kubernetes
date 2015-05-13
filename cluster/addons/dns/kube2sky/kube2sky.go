@@ -204,8 +204,12 @@ func newKubeClient() (*kclient.Client, error) {
 	return kclient.New(config)
 }
 
-func buildNameString(service, namespace, domain string) string {
+func buildOldNameString(service, namespace, domain string) string {
 	return fmt.Sprintf("%s.%s.%s.", service, namespace, domain)
+}
+
+func buildNewServiceNameString(service, namespace, domain string) string {
+	return fmt.Sprintf("%s.%s.svc.%s.", service, namespace, domain)
 }
 
 // Returns a cache.ListWatch that gets all changes to services.
@@ -215,15 +219,20 @@ func createServiceLW(kubeClient *kclient.Client) *cache.ListWatch {
 
 func (ks *kube2sky) newService(obj interface{}) {
 	if s, ok := obj.(*kapi.Service); ok {
-		name := buildNameString(s.Name, s.Namespace, ks.domain)
+		//TODO(artfulcoder) stop adding and deleting old-format string for service
+		name := buildOldNameString(s.Name, s.Namespace, ks.domain)
 		ks.mutateEtcdOrDie(func() error { return ks.addDNS(name, s) })
+		name1 := buildNewServiceNameString(s.Name, s.Namespace, ks.domain)
+		ks.mutateEtcdOrDie(func() error { return ks.addDNS(name1, s) })
 	}
 }
 
 func (ks *kube2sky) removeService(obj interface{}) {
 	if s, ok := obj.(*kapi.Service); ok {
-		name := buildNameString(s.Name, s.Namespace, ks.domain)
+		name := buildOldNameString(s.Name, s.Namespace, ks.domain)
 		ks.mutateEtcdOrDie(func() error { return ks.removeDNS(name) })
+		name1 := buildNewServiceNameString(s.Name, s.Namespace, ks.domain)
+		ks.mutateEtcdOrDie(func() error { return ks.removeDNS(name1) })
 	}
 }
 
