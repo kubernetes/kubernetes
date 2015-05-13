@@ -62,7 +62,6 @@ type CMServer struct {
 	ResourceQuotaSyncPeriod time.Duration
 	NamespaceSyncPeriod     time.Duration
 	PVClaimBinderSyncPeriod time.Duration
-	EnablePVCClaimBinder    bool
 	RegisterRetryCount      int
 	MachineList             util.StringList
 	SyncNodeList            bool
@@ -125,7 +124,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.ResourceQuotaSyncPeriod, "resource-quota-sync-period", s.ResourceQuotaSyncPeriod, "The period for syncing quota usage status in the system")
 	fs.DurationVar(&s.NamespaceSyncPeriod, "namespace-sync-period", s.NamespaceSyncPeriod, "The period for syncing namespace life-cycle updates")
 	fs.DurationVar(&s.PVClaimBinderSyncPeriod, "pvclaimbinder-sync-period", s.PVClaimBinderSyncPeriod, "The period for syncing persistent volumes and persistent volume claims")
-	fs.BoolVar(&s.EnablePVCClaimBinder, "enable-alpha-pvclaimbinder", s.EnablePVCClaimBinder, "Optionally enable persistent volume claim binding.  This feature is experimental and expected to change.")
 	fs.DurationVar(&s.PodEvictionTimeout, "pod-eviction-timeout", s.PodEvictionTimeout, "The grace peroid for deleting pods on failed nodes.")
 	fs.Float32Var(&s.DeletingPodsQps, "deleting-pods-qps", 0.1, "Number of nodes per second on which pods are deleted in case of node failure.")
 	fs.IntVar(&s.DeletingPodsBurst, "deleting-pods-burst", 10, "Number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.")
@@ -247,10 +245,8 @@ func (s *CMServer) Run(_ []string) error {
 	namespaceManager := namespace.NewNamespaceManager(kubeClient, s.NamespaceSyncPeriod)
 	namespaceManager.Run()
 
-	if s.EnablePVCClaimBinder {
-		pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
-		pvclaimBinder.Run()
-	}
+	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
+	pvclaimBinder.Run()
 
 	if len(s.ServiceAccountKeyFile) > 0 {
 		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)

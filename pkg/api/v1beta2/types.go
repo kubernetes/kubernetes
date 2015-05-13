@@ -136,8 +136,10 @@ type PersistentVolumeSpec struct {
 	PersistentVolumeSource `json:",inline" description:"the actual volume backing the persistent volume"`
 	// AccessModes contains all ways the volume can be mounted
 	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"all ways the volume can be mounted"`
-	// holds the binding reference to a PersistentVolumeClaim
-	ClaimRef *ObjectReference `json:"claimRef,omitempty" description:"the binding reference to a persistent volume claim"`
+	// ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
+	// ClaimRef is expected to be non-nil when bound.
+	// claim.VolumeName is the authoritative bind between PV and PVC.
+	ClaimRef *ObjectReference `json:"claimRef,omitempty" description:"when bound, a reference to the bound claim"`
 }
 
 type PersistentVolumeStatus struct {
@@ -173,6 +175,8 @@ type PersistentVolumeClaimSpec struct {
 	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"the desired access modes the volume should have"`
 	// Resources represents the minimum resources required
 	Resources ResourceRequirements `json:"resources,omitempty" description:"the desired resources the volume should have"`
+	// VolumeName is the binding reference to the PersistentVolume backing this claim
+	VolumeName string `json:"volumeName,omitempty" description:"the binding reference to the persistent volume backing this claim"`
 }
 
 type PersistentVolumeClaimStatus struct {
@@ -182,8 +186,6 @@ type PersistentVolumeClaimStatus struct {
 	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"the actual access modes the volume has"`
 	// Represents the actual resources of the underlying volume
 	Capacity ResourceList `json:"capacity,omitempty" description:"the actual resources the volume has"`
-	// VolumeRef is a reference to the PersistentVolume bound to the PersistentVolumeClaim
-	VolumeRef *ObjectReference `json:"volumeRef,omitempty" description:"a reference to the backing persistent volume, when bound"`
 }
 
 type AccessModeType string

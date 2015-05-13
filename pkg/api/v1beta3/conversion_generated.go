@@ -2060,6 +2060,7 @@ func convert_v1beta3_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(
 	if err := convert_v1beta3_ResourceRequirements_To_api_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
 		return err
 	}
+	out.VolumeName = in.VolumeName
 	return nil
 }
 
@@ -2078,6 +2079,7 @@ func convert_api_PersistentVolumeClaimSpec_To_v1beta3_PersistentVolumeClaimSpec(
 	if err := convert_api_ResourceRequirements_To_v1beta3_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
 		return err
 	}
+	out.VolumeName = in.VolumeName
 	return nil
 }
 
@@ -2106,14 +2108,6 @@ func convert_v1beta3_PersistentVolumeClaimStatus_To_api_PersistentVolumeClaimSta
 	} else {
 		out.Capacity = nil
 	}
-	if in.VolumeRef != nil {
-		out.VolumeRef = new(newer.ObjectReference)
-		if err := convert_v1beta3_ObjectReference_To_api_ObjectReference(in.VolumeRef, out.VolumeRef, s); err != nil {
-			return err
-		}
-	} else {
-		out.VolumeRef = nil
-	}
 	return nil
 }
 
@@ -2141,14 +2135,6 @@ func convert_api_PersistentVolumeClaimStatus_To_v1beta3_PersistentVolumeClaimSta
 		}
 	} else {
 		out.Capacity = nil
-	}
-	if in.VolumeRef != nil {
-		out.VolumeRef = new(ObjectReference)
-		if err := convert_api_ObjectReference_To_v1beta3_ObjectReference(in.VolumeRef, out.VolumeRef, s); err != nil {
-			return err
-		}
-	} else {
-		out.VolumeRef = nil
 	}
 	return nil
 }
