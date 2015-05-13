@@ -21,9 +21,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class KubernetesSeedProvider implements SeedProvider {
+    
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static class Address {
+        public String IP;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static class Subset {
+        public List<Address> addresses; 
+    }
+    
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Endpoints {
-        public String[] endpoints;
+        public List<Subset> subsets;
     }
     
     private static String getEnvOrDefault(String var, String def) {
@@ -64,20 +75,21 @@ public class KubernetesSeedProvider implements SeedProvider {
 
         String host = protocol + "://" + hostName + ":" + hostPort;
         String serviceName = getEnvOrDefault("CASSANDRA_SERVICE", "cassandra");
-        String path = "/api/v1beta3/endpoints/";
+        String path = "/api/v1beta3/namespaces/default/endpoints/";
         try {
-	    URL url = new URL(host + path + serviceName);
-	    ObjectMapper mapper = new ObjectMapper();
-	    Endpoints endpoints = mapper.readValue(url, Endpoints.class);
-	    if (endpoints != null) {
-            // Here is a problem point, endpoints.endpoints can be null in first node cases.
-            if (endpoints.endpoints != null){
-		for (String endpoint : endpoints.endpoints) {
-		    String[] parts = endpoint.split(":");
-		    list.add(InetAddress.getByName(parts[0]));
-		}
+            URL url = new URL(host + path + serviceName);
+            ObjectMapper mapper = new ObjectMapper();
+            Endpoints endpoints = mapper.readValue(url, Endpoints.class);
+            if (endpoints != null) {
+                // Here is a problem point, endpoints.subsets can be null in first node cases.
+                if (endpoints.subsets != null && !endpoints.subsets.isEmpty()){
+                    for (Subset subset : endpoints.subsets) {
+                        for (Address address : subset.addresses) {
+                            list.add(InetAddress.getByName(address.IP));
+                        }
+                    }
+                }
             }
-	    }
         } catch (IOException ex) {
 	    logger.warn("Request to kubernetes apiserver failed"); 
         }
