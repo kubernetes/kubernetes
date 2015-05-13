@@ -32,14 +32,15 @@ List pods in cluster to verify the master is running. You'll see a single redis 
 
 ```shell
 $ cluster/kubectl.sh get pods
-POD                      IP                  CONTAINER(S)        IMAGE(S)            HOST                                                             LABELS                   STATUS
-redis-master-pod-hh2gd   10.244.3.7          redis-master        gurpartap/redis     kubernetes-minion-4.c.lucid-walker-725.internal/104.154.49.134   name=redis,role=master   Running
+POD                  IP           CONTAINER(S)   IMAGE(S)          HOST                                    LABELS                   STATUS    CREATED     MESSAGE
+redis-master-y06lj   10.244.3.4                                    kubernetes-minion-bz1p/104.154.61.231   name=redis,role=master   Running   8 seconds   
+                                  redis-master   gurpartap/redis                                                                    Running   3 seconds  
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
 
 ```shell
-me@workstation$ gcloud compute ssh --zone us-central1-b kubernetes-minion-4
+me@workstation$ gcloud compute ssh --zone us-central1-b kubernetes-minion-bz1p
 
 me@kubernetes-minion-3:~$ sudo docker ps
 CONTAINER ID        IMAGE                                  COMMAND                CREATED             STATUS
@@ -57,8 +58,8 @@ The pod that you created in Step One has the label `name=redis` and `role=master
 $ cluster/kubectl.sh create -f examples/guestbook-go/redis-master-service.json
 
 $ cluster/kubectl.sh get services
-NAME                    LABELS                                    SELECTOR                     IP                  PORT
-redis-master            <none>                                    name=redis,role=master       10.0.186.234        6379
+NAME           LABELS                   SELECTOR                 IP(S)         PORT(S)
+redis-master   name=redis,role=master   name=redis,role=master   10.0.11.173   6379/TCP
 ```
 
 This will cause all new pods to see the redis master apparently running on $REDIS_MASTER_SERVICE_HOST at port 6379, or running on 'redis-master:6379'. Once created, the service proxy on each node is configured to set up a proxy on the specified port (in this case port 6379).
@@ -72,9 +73,9 @@ Use the file `examples/guestbook-go/redis-slave-controller.json` to create the r
 $ cluster/kubectl.sh create -f examples/guestbook-go/redis-slave-controller.json
 
 $ cluster/kubectl.sh get rc
-CONTROLLER                             CONTAINER(S)            IMAGE(S)                            SELECTOR                     REPLICAS
-redis-master-controller                redis-master            gurpartap/redis                     name=redis,role=master       1
-redis-slave-controller                 redis-slave             gurpartap/redis                     name=redis,role=slave        2
+CONTROLLER     CONTAINER(S)   IMAGE(S)          SELECTOR                 REPLICAS
+redis-master   redis-master   gurpartap/redis   name=redis,role=master   1
+redis-slave    redis-slave    gurpartap/redis   name=redis,role=slave    2
 ```
 
 The redis slave configures itself by looking for the redis-master service name:port pair. In particular, the redis slave is started with the following command:
@@ -87,10 +88,13 @@ Once that's up you can list the pods in the cluster, to verify that the master a
 
 ```shell
 $ cluster/kubectl.sh get pods
-POD                                          IP                  CONTAINER(S)            IMAGE(S)                            HOST                                                             LABELS                                   STATUS
-redis-master-pod-hh2gd                       10.244.3.7          redis-master            gurpartap/redis                     kubernetes-minion-4.c.lucid-walker-725.internal/104.154.49.134   name=redis,role=master                   Running
-redis-slave-controller-i7hvs                 10.244.2.7          redis-slave             gurpartap/redis                     kubernetes-minion-3.c.lucid-walker-725.internal/104.154.52.39    name=redis,role=slave                    Running
-redis-slave-controller-nyxxv                 10.244.1.6          redis-slave             gurpartap/redis                     kubernetes-minion-2.c.lucid-walker-725.internal/130.211.144.5    name=redis,role=slave                    Running
+POD                  IP           CONTAINER(S)   IMAGE(S)          HOST                                     LABELS                   STATUS    CREATED      MESSAGE
+redis-master-y06lj   10.244.3.4                                    kubernetes-minion-bz1p/104.154.61.231    name=redis,role=master   Running   5 minutes
+                                  redis-master   gurpartap/redis                                                                     Running   5 minutes
+redis-slave-3psic    10.244.0.4                                    kubernetes-minion-mluf/104.197.10.10     name=redis,role=slave    Running   38 seconds
+                                  redis-slave    gurpartap/redis                                                                     Running   33 seconds
+redis-slave-qtigf    10.244.2.4                                    kubernetes-minion-rcgd/130.211.122.180   name=redis,role=slave    Running   38 seconds
+                                  redis-slave    gurpartap/redis                                                                     Running   36 seconds
 ```
 
 You will see a single redis master pod and two redis slave pods.
@@ -107,9 +111,9 @@ Now that you have created the service specification, create it in your cluster w
 $ cluster/kubectl.sh create -f examples/guestbook-go/redis-slave-service.json
 
 $ cluster/kubectl.sh get services
-NAME                    LABELS                                    SELECTOR                     IP                  PORT
-redis-master            <none>                                    name=redis,role=master       10.0.186.234        6379
-redis-slave             name=redis,role=slave                     name=redis,role=slave        10.0.22.180         6379
+NAME           LABELS                   SELECTOR                 IP(S)         PORT(S)
+redis-master   name=redis,role=master   name=redis,role=master   10.0.11.173   6379/TCP
+redis-slave    name=redis,role=slave    name=redis,role=slave    10.0.234.24   6379/TCP
 ```
 
 ### Step Five: Create the guestbook pod.
@@ -122,23 +126,28 @@ The pod is described in the file `examples/guestbook-go/guestbook-controller.jso
 $ cluster/kubectl.sh create -f examples/guestbook-go/guestbook-controller.json
 
 $ cluster/kubectl.sh get replicationControllers
-CONTROLLER                             CONTAINER(S)            IMAGE(S)                            SELECTOR                     REPLICAS
-guestbook-controller                   guestbook               kubernetes/guestbook:v2             name=guestbook               3
-redis-master-controller                redis-master            gurpartap/redis                     name=redis,role=master       1
-redis-slave-controller                 redis-slave             gurpartap/redis                     name=redis,role=slave        2
+CONTROLLER     CONTAINER(S)   IMAGE(S)                  SELECTOR                 REPLICAS
+guestbook      guestbook      kubernetes/guestbook:v2   name=guestbook           3
+redis-master   redis-master   gurpartap/redis           name=redis,role=master   1
+redis-slave    redis-slave    gurpartap/redis           name=redis,role=slave    2
 ```
 
 Once that's up (it may take ten to thirty seconds to create the pods) you can list the pods in the cluster, to verify that the master, slaves and guestbook frontends are running:
 
 ```shell
-$ cluster/kubectl.sh get pods
-POD                                          IP                  CONTAINER(S)            IMAGE(S)                            HOST                                                             LABELS                                   STATUS
-guestbook-controller-182tv                   10.244.2.8          guestbook               kubernetes/guestbook:v2             kubernetes-minion-3.c.lucid-walker-725.internal/104.154.52.39    name=guestbook                           Running
-guestbook-controller-jzjpe                   10.244.0.7          guestbook               kubernetes/guestbook:v2             kubernetes-minion-1.c.lucid-walker-725.internal/104.154.37.86    name=guestbook                           Running
-guestbook-controller-zwk1b                   10.244.3.8          guestbook               kubernetes/guestbook:v2             kubernetes-minion-4.c.lucid-walker-725.internal/104.154.49.134   name=guestbook                           Running
-redis-master-pod-hh2gd                       10.244.3.7          redis-master            gurpartap/redis                     kubernetes-minion-4.c.lucid-walker-725.internal/104.154.49.134   name=redis,role=master                   Running
-redis-slave-controller-i7hvs                 10.244.2.7          redis-slave             gurpartap/redis                     kubernetes-minion-3.c.lucid-walker-725.internal/104.154.52.39    name=redis,role=slave                    Running
-redis-slave-controller-nyxxv                 10.244.1.6          redis-slave             gurpartap/redis                     kubernetes-minion-2.c.lucid-walker-725.internal/130.211.144.5    name=redis,role=slave                    Running
+POD                  IP           CONTAINER(S)   IMAGE(S)                  HOST                                     LABELS                   STATUS    CREATED      MESSAGE
+guestbook-1xzms      10.244.1.6                                            kubernetes-minion-q6w5/23.236.54.97      name=guestbook           Running   40 seconds   
+                                  guestbook      kubernetes/guestbook:v2                                                                     Running   35 seconds   
+guestbook-9ksu4      10.244.0.5                                            kubernetes-minion-mluf/104.197.10.10     name=guestbook           Running   40 seconds   
+                                  guestbook      kubernetes/guestbook:v2                                                                     Running   34 seconds   
+guestbook-lycwm      10.244.1.7                                            kubernetes-minion-q6w5/23.236.54.97      name=guestbook           Running   40 seconds   
+                                  guestbook      kubernetes/guestbook:v2                                                                     Running   35 seconds   
+redis-master-y06lj   10.244.3.4                                            kubernetes-minion-bz1p/104.154.61.231    name=redis,role=master   Running   8 minutes    
+                                  redis-master   gurpartap/redis                                                                             Running   8 minutes    
+redis-slave-3psic    10.244.0.4                                            kubernetes-minion-mluf/104.197.10.10     name=redis,role=slave    Running   3 minutes    
+                                  redis-slave    gurpartap/redis                                                                             Running   3 minutes    
+redis-slave-qtigf    10.244.2.4                                            kubernetes-minion-rcgd/130.211.122.180   name=redis,role=slave    Running   3 minutes    
+                                  redis-slave    gurpartap/redis                                                                             Running   3 minutes   
 ```
 
 You will see a single redis master pod, two redis slaves, and three guestbook pods.
@@ -151,10 +160,10 @@ Just like the others, you want a service to group your guestbook pods.  The serv
 $ cluster/kubectl.sh create -f examples/guestbook-go/guestbook-service.json
 
 $ cluster/kubectl.sh get services
-NAME                    LABELS                                    SELECTOR                     IP                  PORT
-guestbook               <none>                                    name=guestbook               10.0.12.110         3000
-redis-master            <none>                                    name=redis,role=master       10.0.186.234        6379
-redis-slave             name=redis,role=slave                     name=redis,role=slave        10.0.22.180         6379
+NAME           LABELS                   SELECTOR                 IP(S)          PORT(S)
+guestbook      name=guestbook           name=guestbook           10.0.114.109   3000/TCP
+redis-master   name=redis,role=master   name=redis,role=master   10.0.11.173    6379/TCP
+redis-slave    name=redis,role=slave    name=redis,role=slave    10.0.234.24    6379/TCP
 ```
 
 To play with the service itself, find the external IP of the load balancer:
@@ -162,11 +171,11 @@ To play with the service itself, find the external IP of the load balancer:
 ```shell
 $ cluster/kubectl.sh get services guestbook -o template --template='{{index . "publicIPs"}}'
 current-context: "kubernetes-satnam_kubernetes"
-Running: cluster/../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubectl get services guestbook -o template --template={{index . "publicIPs"}}
-[104.154.87.59]$
+Running: cluster/../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubectl get services guestbook -o template --template='{{.spec.publicIPs}}'
+[104.154.63.66]$
 
 ```
-and then visit port 3000 of that IP address e.g. `http://104.154.87.59:3000`.
+and then visit port 3000 of that IP address e.g. `http://104.154.63.66:3000`.
 
 You may need to open the firewall for port 3000 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
@@ -193,17 +202,6 @@ redis-master-controller
 redis-master
 redis-slave-controller
 redis-slave
-```
-
-However, the command will not delete the pods created by the replication controller. You can delete the pods manually.
-If you want to delete the pods together, you can use the commands below instead.
-``` shell
-cluster/kubectl.sh stop -f examples/guestbook-go/guestbook-controller.json
-cluster/kubectl.sh stop -f examples/guestbook-go/redis-slave-controller.json
-cluster/kubectl.sh stop -f examples/guestbook-go/redis-master-controller.json
-cluster/kubectl.sh delete -f examples/guestbook-go/guestbook-service.json
-cluster/kubectl.sh delete -f examples/guestbook-go/redis-slave-service.json
-cluster/kubectl.sh delete -f examples/guestbook-go/redis-master-service.json
 ```
 
 To turn down a Kubernetes cluster:
