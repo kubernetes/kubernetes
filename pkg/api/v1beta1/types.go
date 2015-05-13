@@ -904,9 +904,9 @@ type ServicePort struct {
 	// than Service.ContainerPort.
 	ContainerPort util.IntOrString `json:"containerPort" description:"the port to access on the containers belonging to pods targeted by the service; defaults to the service port"`
 
-	// Optional: A port that we will listen on, on every minion.
-	// This allows services to be exposed without necessarily using a load balancer.
-	PublicPort int `json:"publicPort" description:"the port number on which this service is exposed outside the cluster"`
+	// The port on each node on which this service is exposed.
+	// Default is to auto-allocate a port if the visibility of this Service requires one.
+	PublicPort int `json:"publicPort" description:"the port on each node on which this service is exposed"`
 }
 
 // ServiceAccount binds together:

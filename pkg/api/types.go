@@ -1053,9 +1053,9 @@ type ServicePort struct {
 	// identity map).
 	TargetPort util.IntOrString `json:"targetPort"`
 
-	// Optional: A port that we will listen on, on every minion.
-	// This allows services to be exposed without necessarily using a load balancer.
-	PublicPort int `json:"publicPort" description:"the port number on which this service is exposed outside the cluster"`
+	// The port on each node on which this service is exposed.
+	// Default is to auto-allocate a port if the visibility of this Service requires one.
+	PublicPort int `json:"publicPort" description:"the port on each node on which this service is exposed"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
