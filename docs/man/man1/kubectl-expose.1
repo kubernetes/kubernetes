@@ -47,6 +47,10 @@ re\-use the labels from the resource it exposes.
     Labels to apply to the service created by this call.
 
 .PP
+\fB\-\-name\fP=""
+    The name for the newly created service.
+
+.PP
 \fB\-\-no\-headers\fP=false
     When using the default output, don't print headers.
 
@@ -77,10 +81,6 @@ re\-use the labels from the resource it exposes.
 .PP
 \fB\-\-selector\fP=""
     A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
-
-.PP
-\fB\-\-service\-name\fP=""
-    The name for the newly created service.
 
 .PP
 \fB\-\-target\-port\fP=""
@@ -199,10 +199,10 @@ re\-use the labels from the resource it exposes.
 $ kubectl expose rc nginx \-\-port=80 \-\-target\-port=8000
 
 // Creates a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx\-https"
-$ kubectl expose service nginx \-\-port=443 \-\-target\-port=8443 \-\-service\-name=nginx\-https
+$ kubectl expose service nginx \-\-port=443 \-\-target\-port=8443 \-\-name=nginx\-https
 
 // Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video\-stream'.
-$ kubectl expose rc streamer \-\-port=4100 \-\-protocol=udp \-\-service\-name=video\-stream
+$ kubectl expose rc streamer \-\-port=4100 \-\-protocol=udp \-\-name=video\-stream
 
 .fi
 .RE
