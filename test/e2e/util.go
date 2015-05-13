@@ -420,7 +420,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	current := 0
 	same := 0
 
-	By(fmt.Sprintf("Creating replication controller %s", name))
+	By(fmt.Sprintf("Creating replication controller %s in namespace %s", name, ns))
 	_, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -450,7 +450,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 		return fmt.Errorf("Error creating replication controller: %v", err)
 	}
 
-	By(fmt.Sprintf("Making sure all %d replicas exist", replicas))
+	By(fmt.Sprintf("Making sure all %d replicas of rc %s in namespace %s exist", replicas, name, ns))
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	pods, err := listPods(c, ns, label, fields.Everything())
 	if err != nil {
