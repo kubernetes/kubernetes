@@ -31,20 +31,21 @@ var qualifiedNameRegexp = regexp.MustCompile("^" + QualifiedNameFmt + "$")
 
 func IsQualifiedName(value string) bool {
 	parts := strings.Split(value, "/")
-	var left, right string
+	var name string
 	switch len(parts) {
 	case 1:
-		left, right = "", parts[0]
+		name = parts[0]
 	case 2:
-		left, right = parts[0], parts[1]
+		var prefix string
+		prefix, name = parts[0], parts[1]
+		if prefix == "" || !IsDNS1123Subdomain(prefix) {
+			return false
+		}
 	default:
 		return false
 	}
 
-	if left != "" && !IsDNS1123Subdomain(left) {
-		return false
-	}
-	return right != "" && len(right) <= QualifiedNameMaxLength && qualifiedNameRegexp.MatchString(right)
+	return name != "" && len(name) <= QualifiedNameMaxLength && qualifiedNameRegexp.MatchString(name)
 }
 
 const LabelValueFmt string = "(" + QualifiedNameFmt + ")?"
