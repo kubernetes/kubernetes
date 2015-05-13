@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/lifecycle"
@@ -52,6 +53,9 @@ const (
 	podOomScoreAdj = -100
 
 	maxReasonCacheEntries = 200
+
+	kubernetesPodLabel       = "io.kubernetes.pod.data"
+	kubernetesContainerLabel = "io.kubernetes.container.name"
 )
 
 // DockerManager implements the Runtime interface.
@@ -498,6 +502,17 @@ func (dm *DockerManager) runContainer(
 	namespacedName := types.NamespacedName{pod.Namespace, pod.Name}
 	labels := map[string]string{
 		"io.kubernetes.pod.name": namespacedName.String(),
+	}
+	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
+		glog.V(1).Infof("Setting preStop hook")
+		// TODO: This is kind of hacky, we should really just encode the bits we need.
+		data, err := latest.Codec.Encode(pod)
+		if err != nil {
+			glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
+		} else {
+			labels[kubernetesPodLabel] = string(data)
+			labels[kubernetesContainerLabel] = container.Name
+		}
 	}
 	dockerOpts := docker.CreateContainerOptions{
 		Name: BuildDockerName(dockerName, container),
@@ -1099,9 +1114,41 @@ func (dm *DockerManager) KillContainer(containerID types.UID) error {
 func (dm *DockerManager) killContainer(containerID types.UID) error {
 	ID := string(containerID)
 	glog.V(2).Infof("Killing container with id %q", ID)
+	inspect, err := dm.client.InspectContainer(ID)
+	if err != nil {
+		return err
+	}
+	var found bool
+	var preStop string
+	if inspect != nil && inspect.Config != nil && inspect.Config.Labels != nil {
+		preStop, found = inspect.Config.Labels[kubernetesPodLabel]
+	}
+	if found {
+		var pod api.Pod
+		err := latest.Codec.DecodeInto([]byte(preStop), &pod)
+		if err != nil {
+			glog.Errorf("Failed to decode prestop: %s, %s", preStop, ID)
+		} else {
+			name := inspect.Config.Labels[kubernetesContainerLabel]
+			var container *api.Container
+			for ix := range pod.Spec.Containers {
+				if pod.Spec.Containers[ix].Name == name {
+					container = &pod.Spec.Containers[ix]
+					break
+				}
+			}
+			if container != nil {
+				glog.V(1).Infof("Running preStop hook")
+				if err := dm.runner.Run(ID, &pod, container, container.Lifecycle.PreStop); err != nil {
+					glog.Errorf("failed to run preStop hook: %v", err)
+				}
+			} else {
+				glog.Errorf("unable to find container %v, %s", pod, name)
+			}
+		}
+	}
 	dm.readinessManager.RemoveReadiness(ID)
-	err := dm.client.StopContainer(ID, 10)
-
+	err = dm.client.StopContainer(ID, 10)
 	ref, ok := dm.containerRefManager.GetRef(ID)
 	if !ok {
 		glog.Warningf("No ref for pod '%v'", ID)

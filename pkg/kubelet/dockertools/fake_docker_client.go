@@ -48,6 +48,7 @@ type FakeDockerClient struct {
 	VersionInfo         docker.Env
 	Information         docker.Env
 	ExecInspect         *docker.ExecInspect
+	execCmd             []string
 }
 
 func (f *FakeDockerClient) ClearCalls() {
@@ -281,11 +282,18 @@ func (f *FakeDockerClient) Info() (*docker.Env, error) {
 	return &f.Information, nil
 }
 
-func (f *FakeDockerClient) CreateExec(_ docker.CreateExecOptions) (*docker.Exec, error) {
+func (f *FakeDockerClient) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
+	f.Lock()
+	defer f.Unlock()
+	f.execCmd = opts.Cmd
+	f.called = append(f.called, "create_exec")
 	return &docker.Exec{"12345678"}, nil
 }
 
 func (f *FakeDockerClient) StartExec(_ string, _ docker.StartExecOptions) error {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, "start_exec")
 	return nil
 }
 
