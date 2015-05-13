@@ -35,11 +35,14 @@ func (pr PortRange) String() string {
 	if pr.Size == 0 {
 		return ""
 	}
-	return fmt.Sprintf("%d-%d", pr.Base, pr.Base+pr.Size-1)
+	return fmt.Sprintf("[%d-%d]", pr.Base, pr.Base+pr.Size-1)
 }
 
 func (pr *PortRange) Set(value string) error {
 	value = strings.TrimSpace(value)
+
+	// TODO: Accept "80" syntax
+	// TODO: Accept "80+8" syntax
 
 	if value == "" {
 		pr.Base = 0
