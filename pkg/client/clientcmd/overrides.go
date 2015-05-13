@@ -66,11 +66,40 @@ type ClusterOverrideFlags struct {
 	InsecureSkipTLSVerify FlagInfo
 }
 
+// FlagInfo contains information about how to register a flag.  This struct is useful if you want to provide a way for an extender to
+// get back a set of recommended flag names, descriptions, and defaults, but allow for customization by an extender.  This makes for
+// coherent extension, without full prescription
 type FlagInfo struct {
-	LongName    string
-	ShortName   string
-	Default     string
+	// LongName is the long string for a flag.  If this is empty, then the flag will not be bound
+	LongName string
+	// ShortName is the single character for a flag.  If this is empty, then there will be no short flag
+	ShortName string
+	// Default is the default value for the flag
+	Default string
+	// Description is the description for the flag
 	Description string
+}
+
+// BindStringFlag binds the flag based on the provided info.  If LongName == "", nothing is registered
+func (f FlagInfo) BindStringFlag(flags *pflag.FlagSet, target *string) {
+	// you can't register a flag without a long name
+	if len(f.LongName) > 0 {
+		flags.StringVarP(target, f.LongName, f.ShortName, f.Default, f.Description)
+	}
+}
+
+// BindBoolFlag binds the flag based on the provided info.  If LongName == "", nothing is registered
+func (f FlagInfo) BindBoolFlag(flags *pflag.FlagSet, target *bool) {
+	// you can't register a flag without a long name
+	if len(f.LongName) > 0 {
+		// try to parse Default as a bool.  If it fails, assume false
+		boolVal, err := strconv.ParseBool(f.Default)
+		if err != nil {
+			boolVal = false
+		}
+
+		flags.BoolVarP(target, f.LongName, f.ShortName, boolVal, f.Description)
+	}
 }
 
 const (
@@ -132,19 +161,19 @@ func RecommendedContextOverrideFlags(prefix string) ContextOverrideFlags {
 
 // BindAuthInfoFlags is a convenience method to bind the specified flags to their associated variables
 func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, flagNames AuthOverrideFlags) {
-	bindStringFlag(flags, &authInfo.ClientCertificate, flagNames.ClientCertificate)
-	bindStringFlag(flags, &authInfo.ClientKey, flagNames.ClientKey)
-	bindStringFlag(flags, &authInfo.Token, flagNames.Token)
-	bindStringFlag(flags, &authInfo.Username, flagNames.Username)
-	bindStringFlag(flags, &authInfo.Password, flagNames.Password)
+	flagNames.ClientCertificate.BindStringFlag(flags, &authInfo.ClientCertificate)
+	flagNames.ClientKey.BindStringFlag(flags, &authInfo.ClientKey)
+	flagNames.Token.BindStringFlag(flags, &authInfo.Token)
+	flagNames.Username.BindStringFlag(flags, &authInfo.Username)
+	flagNames.Password.BindStringFlag(flags, &authInfo.Password)
 }
 
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables
 func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, flagNames ClusterOverrideFlags) {
-	bindStringFlag(flags, &clusterInfo.Server, flagNames.APIServer)
-	bindStringFlag(flags, &clusterInfo.APIVersion, flagNames.APIVersion)
-	bindStringFlag(flags, &clusterInfo.CertificateAuthority, flagNames.CertificateAuthority)
-	bindBoolFlag(flags, &clusterInfo.InsecureSkipTLSVerify, flagNames.InsecureSkipTLSVerify)
+	flagNames.APIServer.BindStringFlag(flags, &clusterInfo.Server)
+	flagNames.APIVersion.BindStringFlag(flags, &clusterInfo.APIVersion)
+	flagNames.CertificateAuthority.BindStringFlag(flags, &clusterInfo.CertificateAuthority)
+	flagNames.InsecureSkipTLSVerify.BindBoolFlag(flags, &clusterInfo.InsecureSkipTLSVerify)
 }
 
 // BindOverrideFlags is a convenience method to bind the specified flags to their associated variables
@@ -152,32 +181,12 @@ func BindOverrideFlags(overrides *ConfigOverrides, flags *pflag.FlagSet, flagNam
 	BindAuthInfoFlags(&overrides.AuthInfo, flags, flagNames.AuthOverrideFlags)
 	BindClusterFlags(&overrides.ClusterInfo, flags, flagNames.ClusterOverrideFlags)
 	BindContextFlags(&overrides.Context, flags, flagNames.ContextOverrideFlags)
-	bindStringFlag(flags, &overrides.CurrentContext, flagNames.CurrentContext)
+	flagNames.CurrentContext.BindStringFlag(flags, &overrides.CurrentContext)
 }
 
 // BindFlags is a convenience method to bind the specified flags to their associated variables
 func BindContextFlags(contextInfo *clientcmdapi.Context, flags *pflag.FlagSet, flagNames ContextOverrideFlags) {
-	bindStringFlag(flags, &contextInfo.Cluster, flagNames.ClusterName)
-	bindStringFlag(flags, &contextInfo.AuthInfo, flagNames.AuthInfoName)
-	bindStringFlag(flags, &contextInfo.Namespace, flagNames.Namespace)
-}
-
-func bindStringFlag(flags *pflag.FlagSet, target *string, flagInfo FlagInfo) {
-	// you can't register a flag without a long name
-	if len(flagInfo.LongName) > 0 {
-		flags.StringVarP(target, flagInfo.LongName, flagInfo.ShortName, flagInfo.Default, flagInfo.Description)
-	}
-}
-
-func bindBoolFlag(flags *pflag.FlagSet, target *bool, flagInfo FlagInfo) {
-	// you can't register a flag without a long name
-	if len(flagInfo.LongName) > 0 {
-		// try to parse Default as a bool.  If it fails, assume false
-		boolVal, err := strconv.ParseBool(flagInfo.Default)
-		if err != nil {
-			boolVal = false
-		}
-
-		flags.BoolVarP(target, flagInfo.LongName, flagInfo.ShortName, boolVal, flagInfo.Description)
-	}
+	flagNames.ClusterName.BindStringFlag(flags, &contextInfo.Cluster)
+	flagNames.AuthInfoName.BindStringFlag(flags, &contextInfo.AuthInfo)
+	flagNames.Namespace.BindStringFlag(flags, &contextInfo.Namespace)
 }
