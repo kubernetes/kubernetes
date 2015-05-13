@@ -48,6 +48,7 @@ type DiskSpacePolicy struct {
 type fsInfo struct {
 	Usage     int64
 	Capacity  int64
+	Available int64
 	Timestamp time.Time
 }
 
@@ -77,6 +78,7 @@ func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorApi.F
 		fsi.Timestamp = time.Now()
 		fsi.Usage = int64(fs.Usage)
 		fsi.Capacity = int64(fs.Capacity)
+		fsi.Available = int64(fs.Available)
 		dm.cachedInfo[fsType] = fsi
 	}
 	return fsi, nil
@@ -99,17 +101,16 @@ func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f
 		return true, fmt.Errorf("failed to get fs info for %q: %v", fsType, err)
 	}
 	if fsInfo.Capacity == 0 {
-		return true, fmt.Errorf("could not determine capacity for %q fs.", fsType)
+		return true, fmt.Errorf("could not determine capacity for %q fs. Info: %+v", fsType, fsInfo)
 	}
-	free := fsInfo.Capacity - fsInfo.Usage
-	if free < 0 {
-		return true, fmt.Errorf("wrong fs usage for %q: capacity %d, usage %d", fsType, fsInfo.Capacity, fsInfo.Usage)
+	if fsInfo.Available < 0 {
+		return true, fmt.Errorf("wrong available space for %q: %+v", fsType, fsInfo)
 	}
 
 	const mb = int64(1024 * 1024)
 
-	if free < int64(threshold)*mb {
-		glog.Infof("Running out of space on disk for %q: free %d MB, threshold %d MB", fsType, free/mb, threshold)
+	if fsInfo.Available < int64(threshold)*mb {
+		glog.Infof("Running out of space on disk for %q: available %d MB, threshold %d MB", fsType, fsInfo.Available/mb, threshold)
 		return false, nil
 	}
 	return true, nil
