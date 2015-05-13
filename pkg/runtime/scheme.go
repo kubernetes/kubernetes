@@ -321,6 +321,19 @@ func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) err
 	return s.raw.AddGeneratedConversionFuncs(conversionFuncs...)
 }
 
+// AddDeepCopyFuncs adds a function to the list of deep-copy functions.
+// For the expected format of deep-copy function, see the comment for
+// Copier.RegisterDeepCopyFunction.
+func (s *Scheme) AddDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
+	return s.raw.AddDeepCopyFuncs(deepCopyFuncs...)
+}
+
+// Similar to AddDeepCopyFuncs, but registers deep-copy functions that were
+// automatically generated.
+func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
+	return s.raw.AddGeneratedDeepCopyFuncs(deepCopyFuncs...)
+}
+
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
 // of the given kind from the given version to internal version representation.
 func (s *Scheme) AddFieldLabelConversionFunc(version, kind string, conversionFunc FieldLabelConversionFunc) error {
@@ -345,6 +358,11 @@ func (s *Scheme) AddStructFieldConversion(srcFieldType interface{}, srcFieldName
 // comment for Converter.RegisterDefaultingFunction.
 func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 	return s.raw.AddDefaultingFuncs(defaultingFuncs...)
+}
+
+// Performs a deep copy of the given object.
+func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
+	return s.raw.DeepCopy(src)
 }
 
 // Convert will attempt to convert in into out. Both must be pointers.

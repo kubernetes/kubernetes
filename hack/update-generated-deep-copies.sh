@@ -20,7 +20,7 @@ set -o pipefail
 
 function generate_version() {
 	local version=$1
-	local TMPFILE="/tmp/conversion_generated.$(date +%s).go"
+	local TMPFILE="/tmp/deep_copy_generated.$(date +%s).go"
 
 	echo "Generating for version ${version}"
 
@@ -28,27 +28,24 @@ function generate_version() {
 	cat >> $TMPFILE <<EOF
 package ${version}
 
-import (
-	"reflect"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-)
-
 // AUTO-GENERATED FUNCTIONS START HERE
 EOF
 
-	GOPATH=$(godep path):$GOPATH go run cmd/genconversion/conversion.go -v ${version} -f - >>  $TMPFILE
+	GOPATH=$(godep path):$GOPATH go run cmd/gendeepcopy/deep_copy.go -v ${version} -f - -o "${version}=" >>  $TMPFILE
 
 	cat >> $TMPFILE <<EOF
 // AUTO-GENERATED FUNCTIONS END HERE
 EOF
 
-	mv $TMPFILE pkg/api/${version}/conversion_generated.go
+	gofmt -w -s $TMPFILE
+	if [ "${version}" == "api" ]; then
+		mv $TMPFILE pkg/api/deep_copy_generated.go
+	else
+		mv $TMPFILE pkg/api/${version}/deep_copy_generated.go
+	fi
 }
 
-VERSIONS="v1beta3 v1"
+VERSIONS="api v1beta3 v1"
 for ver in $VERSIONS; do 
 	generate_version "${ver}"
 done

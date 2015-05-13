@@ -47,9 +47,6 @@ func generateConversions(t *testing.T, version string) bytes.Buffer {
 	if err := g.WriteConversionFunctions(functionsWriter); err != nil {
 		t.Fatalf("couldn't generate conversion functions: %v", err)
 	}
-	if err := functionsWriter.Flush(); err != nil {
-		t.Fatalf("error while flushing writer")
-	}
 	if err := g.RegisterConversionFunctions(functionsWriter); err != nil {
 		t.Fatalf("couldn't generate conversion function names: %v", err)
 	}
@@ -81,7 +78,7 @@ func readLinesUntil(t *testing.T, reader *bufio.Reader, stop string, buffer *byt
 	return nil
 }
 
-func bufferExistingConversions(t *testing.T, fileName string) bytes.Buffer {
+func bufferExistingGeneratedCode(t *testing.T, fileName string) bytes.Buffer {
 	file, err := os.Open(fileName)
 	if err != nil {
 		t.Fatalf("couldn't open file %s", fileName)
@@ -139,7 +136,7 @@ func TestNoManualChangesToGenerateConversions(t *testing.T) {
 	for _, version := range versions {
 		fileName := fmt.Sprintf("../../pkg/api/%s/conversion_generated.go", version)
 
-		existingFunctions := bufferExistingConversions(t, fileName)
+		existingFunctions := bufferExistingGeneratedCode(t, fileName)
 		generatedFunctions := generateConversions(t, version)
 
 		functionsTxt := fmt.Sprintf("%s.functions.txt", version)

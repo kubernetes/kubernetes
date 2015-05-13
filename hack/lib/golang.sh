@@ -48,6 +48,8 @@ readonly KUBE_TEST_TARGETS=(
   cmd/gendocs
   cmd/genman
   cmd/genbashcomp
+  cmd/genconversion
+  cmd/gendeepcopy
   examples/k8petstore/web-server
   github.com/onsi/ginkgo/ginkgo
   test/e2e/e2e.test
