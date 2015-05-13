@@ -643,16 +643,33 @@ function kube-down {
   detect-project
 
   echo "Bringing down cluster"
+  set +e  # Do not stop on error
 
-  gcloud preview managed-instance-groups --zone "${ZONE}" delete \
+  # The gcloud APIs don't return machine parsable error codes/retry information. Therefore the best we can
+  # do is parse the output and special case particular responses we are interested in.
+  deleteCmdOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" delete \
     --project "${PROJECT}" \
     --quiet \
-    "${NODE_INSTANCE_PREFIX}-group" || true
+    "${NODE_INSTANCE_PREFIX}-group")
+  if [[ "$deleteCmdOutput" != ""  ]]; then
+    # Managed instance group deletion is done asyncronously, we must wait for it to complete, or subsequent steps fail
+    deleteCmdOperationId=$(echo $deleteCmdOutput | grep "Operation:" | sed "s/.*Operation:\s//" | sed "s/\s.*//" | sed "s/ //g")
+    if [[ "$deleteCmdOperationId" != ""  ]]; then
+      deleteCmdStatus="PENDING"
+      while [[ "$deleteCmdStatus" != "DONE" ]]
+      do
+	sleep 5
+        deleteCmdOperationOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" get-operation $deleteCmdOperationId)
+        deleteCmdStatus=$(echo $deleteCmdOperationOutput | grep -i "status:" | sed "s/.*status:\s//" | sed "s/\s.*//" | sed "s/ //g")
+        echo "Waiting for MIG deletion to complete. Current status: " $deleteCmdStatus
+      done
+    fi
+  fi
 
   gcloud compute instance-templates delete \
     --project "${PROJECT}" \
     --quiet \
-    "${NODE_INSTANCE_PREFIX}-template" || true
+    "${NODE_INSTANCE_PREFIX}-template"
 
   # First delete the master (if it exists).
   gcloud compute instances delete \
@@ -660,14 +677,14 @@ function kube-down {
     --quiet \
     --delete-disks all \
     --zone "${ZONE}" \
-    "${MASTER_NAME}" || true
+    "${MASTER_NAME}"
 
   # Delete the master pd (possibly leaked by kube-up if master create failed)
   gcloud compute disks delete \
     --project "${PROJECT}" \
     --quiet \
     --zone "${ZONE}" \
-    "${MASTER_NAME}"-pd || true
+    "${MASTER_NAME}"-pd
 
   # Find out what minions are running.
   local -a minions
@@ -683,7 +700,7 @@ function kube-down {
       --quiet \
       --delete-disks boot \
       --zone "${ZONE}" \
-      "${minions[@]::10}" || true
+      "${minions[@]::10}"
     minions=( "${minions[@]:10}" )
   done
 
@@ -691,13 +708,13 @@ function kube-down {
   gcloud compute firewall-rules delete  \
     --project "${PROJECT}" \
     --quiet \
-    "${MASTER_NAME}-https" || true
+    "${MASTER_NAME}-https"
 
   # Delete firewall rule for minions.
   gcloud compute firewall-rules delete  \
     --project "${PROJECT}" \
     --quiet \
-    "${MINION_TAG}-all" || true
+    "${MINION_TAG}-all"
 
   # Delete routes.
   local -a routes
@@ -709,7 +726,7 @@ function kube-down {
     gcloud compute routes delete \
       --project "${PROJECT}" \
       --quiet \
-      "${routes[@]::10}" || true
+      "${routes[@]::10}"
     routes=( "${routes[@]:10}" )
   done
 
@@ -719,10 +736,11 @@ function kube-down {
     --project "${PROJECT}" \
     --region "${REGION}" \
     --quiet \
-    "${MASTER_NAME}-ip" || true
+    "${MASTER_NAME}-ip"
 
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
   clear-kubeconfig
+  set -e
 }
 
 # Update a kubernetes cluster with latest source
