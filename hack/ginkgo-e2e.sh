@@ -87,18 +87,7 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
 
     detect-master >/dev/null
 
-    # In gcloud versions < 0.9.59, GKE stores its kubeconfig in a separate
-    # location.
-    # TODO: Remove this once gcloud 0.9.59 or above is released.
-    if [[ "${KUBERNETES_PROVIDER}" == "gke" && -e "${GCLOUD_CONFIG_DIR}/kubeconfig" ]]; then
-      # GKE stores its own kubeconfig in gcloud's config directory.
-      detect-project &> /dev/null
-      auth_config=(
-        "--kubeconfig=${GCLOUD_CONFIG_DIR}/kubeconfig"
-        # gcloud doesn't set the current-context, so we have to set it
-        "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
-      )
-    elif [[ "${KUBERNETES_PROVIDER}" == "conformance_test" ]]; then
+    if [[ "${KUBERNETES_PROVIDER}" == "conformance_test" ]]; then
       auth_config=(
         "--auth_config=${KUBERNETES_CONFORMANCE_TEST_AUTH_CONFIG:-}"
         "--cert_dir=${KUBERNETES_CONFORMANCE_TEST_CERT_DIR:-}"
@@ -106,7 +95,14 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
     else
       auth_config=(
       "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
-    )
+      )
+      if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+        # gcloud doesn't override the current-context, so we explicitly set it
+        detect-project &> /dev/null
+        auth_config+=(
+          "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
+        )
+      fi
     fi
 else
   echo "Conformance Test.  No cloud-provider-specific preparation."
