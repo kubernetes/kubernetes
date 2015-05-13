@@ -20,7 +20,7 @@ KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
 KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
 
 # default admission control policies
-KUBE_ADMISSION_CONTROL="--admission_control=NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ResourceQuota"
+KUBE_ADMISSION_CONTROL="--admission_control=NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
 
 # Add your own!
 KUBE_API_ARGS=""
