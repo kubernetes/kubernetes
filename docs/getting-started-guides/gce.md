@@ -33,15 +33,20 @@ wget -q -O - https://get.k8s.io | bash
 
 This will leave you with a ```kubernetes``` directory on your workstation, and a running cluster.
 
-Copy the appropriate ```kubectl``` binary to somewhere in your ```PATH```, for example:
+Add the appropriate binary folder to your ```PATH``` to access kubectl:
 
 ```bash
 # OS X
-sudo cp kubernetes/platforms/darwin/amd64/kubectl /usr/local/bin/kubectl
+export PATH=path/to/kubernetes/platforms/darwin/amd64:$PATH
 
 # Linux
-sudo cp kubernetes/platforms/linux/amd64/kubectl /usr/local/bin/kubectl
+export PATH=path/to/kubernetes/platforms/linux/amd64:$PATH
 ```
+
+Note: gcloud also ships with ```kubectl```, which by default is added to your path.
+However the gcloud bundled kubectl version may be older than the one downloaded by the
+get.k8s.io install script. We recommend you use the downloaded binary to avoid
+potential issues with client/server version skew.
 
 If you run into trouble please see the section on [troubleshooting](https://github.com/brendandburns/kubernetes/blob/docs/docs/getting-started-guides/gce.md#troubleshooting), or come ask questions on IRC at #google-containers on freenode.
 
