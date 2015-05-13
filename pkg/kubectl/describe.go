@@ -321,15 +321,15 @@ type PersistentVolumeClaimDescriber struct {
 func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (string, error) {
 	c := d.PersistentVolumeClaims(namespace)
 
-	psd, err := c.Get(name)
+	pvc, err := c.Get(name)
 	if err != nil {
 		return "", err
 	}
 
 	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "Name:\t%s\n", psd.Name)
-		fmt.Fprintf(out, "Status:\t%d\n", psd.Status.Phase)
-		fmt.Fprintf(out, "Volume:\t%d\n", psd.Status.VolumeRef.UID)
+		fmt.Fprintf(out, "Name:\t%s\n", pvc.Name)
+		fmt.Fprintf(out, "Status:\t%d\n", pvc.Status.Phase)
+		fmt.Fprintf(out, "Volume:\t%d\n", pvc.Spec.VolumeName)
 
 		return nil
 	})

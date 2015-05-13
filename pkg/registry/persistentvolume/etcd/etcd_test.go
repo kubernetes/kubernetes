@@ -55,6 +55,7 @@ func validNewPersistentVolume(name string) *api.PersistentVolume {
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 			},
+			AccessModes: []api.AccessModeType{api.ReadWriteOnce},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 			},

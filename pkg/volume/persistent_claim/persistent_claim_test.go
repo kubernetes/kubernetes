@@ -65,11 +65,12 @@ func TestCanSupport(t *testing.T) {
 
 func TestNewBuilder(t *testing.T) {
 	tests := []struct {
-		pv        *api.PersistentVolume
-		claim     *api.PersistentVolumeClaim
-		plugin    volume.VolumePlugin
-		podVolume api.VolumeSource
-		testFunc  func(builder volume.Builder, plugin volume.VolumePlugin) error
+		pv              *api.PersistentVolume
+		claim           *api.PersistentVolumeClaim
+		plugin          volume.VolumePlugin
+		podVolume       api.VolumeSource
+		testFunc        func(builder volume.Builder, plugin volume.VolumePlugin) error
+		expectedFailure bool
 	}{
 		{
 			pv: &api.PersistentVolume{
@@ -90,11 +91,11 @@ func TestNewBuilder(t *testing.T) {
 					Name:      "claimA",
 					Namespace: "nsA",
 				},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName: "pvA",
+				},
 				Status: api.PersistentVolumeClaimStatus{
 					Phase: api.ClaimBound,
-					VolumeRef: &api.ObjectReference{
-						Name: "pvA",
-					},
 				},
 			},
 			podVolume: api.VolumeSource{
@@ -110,6 +111,7 @@ func TestNewBuilder(t *testing.T) {
 				}
 				return nil
 			},
+			expectedFailure: false,
 		},
 		{
 			pv: &api.PersistentVolume{
@@ -130,10 +132,8 @@ func TestNewBuilder(t *testing.T) {
 					Name:      "claimB",
 					Namespace: "nsB",
 				},
-				Status: api.PersistentVolumeClaimStatus{
-					VolumeRef: &api.ObjectReference{
-						Name: "pvB",
-					},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName: "pvA",
 				},
 			},
 			podVolume: api.VolumeSource{
@@ -149,6 +149,88 @@ func TestNewBuilder(t *testing.T) {
 				}
 				return nil
 			},
+			expectedFailure: false,
+		},
+		{
+			pv: &api.PersistentVolume{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pvA",
+				},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+					},
+				},
+			},
+			claim: &api.PersistentVolumeClaim{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "claimA",
+					Namespace: "nsA",
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName: "pvA",
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Phase: api.ClaimBound,
+				},
+			},
+			podVolume: api.VolumeSource{
+				PersistentVolumeClaimVolumeSource: &api.PersistentVolumeClaimVolumeSource{
+					ReadOnly:  false,
+					ClaimName: "claimA",
+				},
+			},
+			plugin: gce_pd.ProbeVolumePlugins()[0],
+			testFunc: func(builder volume.Builder, plugin volume.VolumePlugin) error {
+				if builder != nil {
+					return fmt.Errorf("Unexpected non-nil builder: %+v", builder)
+				}
+				return nil
+			},
+			expectedFailure: true, // missing pv.Spec.ClaimRef
+		},
+		{
+			pv: &api.PersistentVolume{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pvA",
+				},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+					},
+					ClaimRef: &api.ObjectReference{
+						Name: "claimB",
+						UID:  types.UID("abc123"),
+					},
+				},
+			},
+			claim: &api.PersistentVolumeClaim{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "claimA",
+					Namespace: "nsA",
+					UID:       types.UID("def456"),
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName: "pvA",
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Phase: api.ClaimBound,
+				},
+			},
+			podVolume: api.VolumeSource{
+				PersistentVolumeClaimVolumeSource: &api.PersistentVolumeClaimVolumeSource{
+					ReadOnly:  false,
+					ClaimName: "claimA",
+				},
+			},
+			plugin: gce_pd.ProbeVolumePlugins()[0],
+			testFunc: func(builder volume.Builder, plugin volume.VolumePlugin) error {
+				if builder != nil {
+					return fmt.Errorf("Unexpected non-nil builder: %+v", builder)
+				}
+				return nil
+			},
+			expectedFailure: true, // mismatched pv.Spec.ClaimRef and pvc
 		},
 	}
 
@@ -171,17 +253,18 @@ func TestNewBuilder(t *testing.T) {
 		}
 		pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 		builder, err := plug.NewBuilder(spec, pod, volume.VolumeOptions{}, nil)
-		if err != nil {
-			t.Errorf("Failed to make a new Builder: %v", err)
-		}
-		if builder == nil {
-			t.Errorf("Got a nil Builder: %v", builder)
+
+		if !item.expectedFailure {
+			if err != nil {
+				t.Errorf("Failed to make a new Builder: %v", err)
+			}
+			if builder == nil {
+				t.Errorf("Got a nil Builder: %v", builder)
+			}
 		}
 
-		if builder != nil {
-			if err := item.testFunc(builder, item.plugin); err != nil {
-				t.Errorf("Unexpected error %+v", err)
-			}
+		if err := item.testFunc(builder, item.plugin); err != nil {
+			t.Errorf("Unexpected error %+v", err)
 		}
 	}
 }
@@ -195,17 +278,12 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
 			},
-			ClaimRef: nil,
 		},
 	}
 	claim := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "claimC",
 			Namespace: "nsA",
-		},
-		Status: api.PersistentVolumeClaimStatus{
-			Phase:     api.ClaimBound,
-			VolumeRef: nil,
 		},
 	}
 	podVolume := api.VolumeSource{

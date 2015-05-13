@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"path"
-	"reflect"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -29,7 +28,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
 )
@@ -447,12 +445,20 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName).Prefix("metadata")...)
 
+	if len(pv.Spec.AccessModes) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.AccessModes"))
+	}
+
 	if len(pv.Spec.Capacity) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.Capacity"))
 	}
 
 	if _, ok := pv.Spec.Capacity[api.ResourceStorage]; !ok || len(pv.Spec.Capacity) > 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.Capacity, fmt.Sprintf("only %s is expected", api.ResourceStorage)))
+	}
+
+	for _, qty := range pv.Spec.Capacity {
+		allErrs = append(allErrs, validateBasicResource(qty)...)
 	}
 
 	numVolumes := 0
@@ -517,16 +523,6 @@ func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) errs.Validati
 func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = ValidatePersistentVolumeClaim(newPvc)
-	if oldPvc.Status.VolumeRef != nil {
-		oldModesAsString := volume.GetAccessModesAsString(oldPvc.Spec.AccessModes)
-		newModesAsString := volume.GetAccessModesAsString(newPvc.Spec.AccessModes)
-		if oldModesAsString != newModesAsString {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.AccessModes", oldPvc.Spec.AccessModes, "field is immutable"))
-		}
-		if !reflect.DeepEqual(oldPvc.Spec.Resources, newPvc.Spec.Resources) {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Resources", oldPvc.Spec.Resources, "field is immutable"))
-		}
-	}
 	newPvc.Status = oldPvc.Status
 	return allErrs
 }
@@ -536,6 +532,12 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *api.PersistentVol
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldPvc.ObjectMeta, &newPvc.ObjectMeta).Prefix("metadata")...)
 	if newPvc.ResourceVersion == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("resourceVersion"))
+	}
+	if len(newPvc.Spec.AccessModes) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.AccessModes"))
+	}
+	for _, qty := range newPvc.Status.Capacity {
+		allErrs = append(allErrs, validateBasicResource(qty)...)
 	}
 	newPvc.Spec = oldPvc.Spec
 	return allErrs

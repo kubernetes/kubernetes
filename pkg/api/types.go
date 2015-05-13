@@ -252,7 +252,9 @@ type PersistentVolumeSpec struct {
 	PersistentVolumeSource `json:",inline"`
 	// AccessModes contains all ways the volume can be mounted
 	AccessModes []AccessModeType `json:"accessModes,omitempty"`
-	// holds the binding reference to a PersistentVolumeClaim
+	// ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
+	// ClaimRef is expected to be non-nil when bound.
+	// claim.VolumeName is the authoritative bind between PV and PVC.
 	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
 }
 
@@ -292,6 +294,8 @@ type PersistentVolumeClaimSpec struct {
 	AccessModes []AccessModeType `json:"accessModes,omitempty"`
 	// Resources represents the minimum resources required
 	Resources ResourceRequirements `json:"resources,omitempty"`
+	// VolumeName is the binding reference to the PersistentVolume backing this claim
+	VolumeName string `json:"volumeName,omitempty"`
 }
 
 type PersistentVolumeClaimStatus struct {
@@ -301,8 +305,6 @@ type PersistentVolumeClaimStatus struct {
 	AccessModes []AccessModeType `json:"accessModes,omitempty"`
 	// Represents the actual resources of the underlying volume
 	Capacity ResourceList `json:"capacity,omitempty"`
-	// VolumeRef is a reference to the PersistentVolume bound to the PersistentVolumeClaim
-	VolumeRef *ObjectReference `json:"volumeRef,omitempty"`
 }
 
 type AccessModeType string
