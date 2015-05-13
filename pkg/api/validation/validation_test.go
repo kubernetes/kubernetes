@@ -544,7 +544,7 @@ func TestValidateEnv(t *testing.T) {
 		{
 			name:          "name not a C identifier",
 			envs:          []api.EnvVar{{Name: "a.b.c"}},
-			expectedError: "[0].name: invalid value 'a.b.c': must match regex [A-Za-z_][A-Za-z0-9_]*",
+			expectedError: `[0].name: invalid value 'a.b.c': must be a C identifier (matching regex [A-Za-z_][A-Za-z0-9_]*): e.g. "my_name" or "MyName"`,
 		},
 		{
 			name: "value and valueFrom specified",
@@ -2413,10 +2413,6 @@ func TestValidateServiceUpdate(t *testing.T) {
 }
 
 func TestValidateResourceNames(t *testing.T) {
-	longString := "a"
-	for i := 0; i < 6; i++ {
-		longString += longString
-	}
 	table := []struct {
 		input   string
 		success bool
@@ -2432,7 +2428,8 @@ func TestValidateResourceNames(t *testing.T) {
 		{"my.favorite.app.co/_12345", false},
 		{"my.favorite.app.co/12345_", false},
 		{"kubernetes.io/..", false},
-		{"kubernetes.io/" + longString, true},
+		{"kubernetes.io/" + strings.Repeat("a", 63), true},
+		{"kubernetes.io/" + strings.Repeat("a", 64), false},
 		{"kubernetes.io//", false},
 		{"kubernetes.io", false},
 		{"kubernetes.io/will/not/work/", false},
