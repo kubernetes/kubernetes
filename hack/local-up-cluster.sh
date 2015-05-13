@@ -133,9 +133,10 @@ echo "Starting etcd"
 kube::etcd::start
 
 SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
-SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-"/var/run/kubernetes/serviceaccount.key"}
+SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-"/tmp/kube-serviceaccount.key"}
 # Generate ServiceAccount key if needed
 if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
+  mkdir -p "$(dirname ${SERVICE_ACCOUNT_KEY})"
   openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
 fi
 
