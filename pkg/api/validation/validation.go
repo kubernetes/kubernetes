@@ -32,18 +32,18 @@ import (
 	"github.com/golang/glog"
 )
 
-const cIdentifierErrorMsg string = "must match regex " + util.CIdentifierFmt
-const isNegativeErrorMsg string = "value must not be negative"
+const cIdentifierErrorMsg string = `must be a C identifier (matching regex ` + util.CIdentifierFmt + `): e.g. "my_name" or "MyName"`
+const isNegativeErrorMsg string = `must be non-negative`
 
 func intervalErrorMsg(lo, hi int) string {
-	return fmt.Sprintf("must be greater than %d and less than %d", lo, hi)
+	return fmt.Sprintf(`must be greater than %d and less than %d`, lo, hi)
 }
 
-var labelValueErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.LabelValueMaxLength, util.LabelValueFmt)
-var qualifiedNameErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s, with an optional DNS prefix", util.QualifiedNameMaxLength, util.QualifiedNameFmt)
-var dnsSubdomainErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS1123SubdomainMaxLength, util.DNS1123SubdomainFmt)
-var dns1123LabelErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS1123LabelMaxLength, util.DNS1123LabelFmt)
-var dns952LabelErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS952LabelMaxLength, util.DNS952LabelFmt)
+var labelValueErrorMsg string = fmt.Sprintf(`must have at most %d characters, matching regex %s: e.g. "MyValue" or ""`, util.LabelValueMaxLength, util.LabelValueFmt)
+var qualifiedNameErrorMsg string = fmt.Sprintf(`must be a qualified name (at most %d characters, matching regex %s), with an optional DNS subdomain prefix (at most %d characters, matching regex %s) and slash (/): e.g. "MyName" or "example.com/MyName"`, util.QualifiedNameMaxLength, util.QualifiedNameFmt, util.DNS1123SubdomainMaxLength, util.DNS1123SubdomainFmt)
+var dnsSubdomainErrorMsg string = fmt.Sprintf(`must be a DNS subdomain (at most %d characters, matching regex %s): e.g. "example.com"`, util.DNS1123SubdomainMaxLength, util.DNS1123SubdomainFmt)
+var dns1123LabelErrorMsg string = fmt.Sprintf(`must be a DNS label (at most %d characters, matching regex %s): e.g. "my-name"`, util.DNS1123LabelMaxLength, util.DNS1123LabelFmt)
+var dns952LabelErrorMsg string = fmt.Sprintf(`must be a DNS 952 label (at most %d characters, matching regex %s): e.g. "my-name"`, util.DNS952LabelMaxLength, util.DNS952LabelFmt)
 var pdPartitionErrorMsg string = intervalErrorMsg(0, 255)
 var portRangeErrorMsg string = intervalErrorMsg(0, 65536)
 
