@@ -464,6 +464,14 @@ func iptablesInit(ipt iptables.Interface) error {
 	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesContainerPortalChain); err != nil {
 		return err
 	}
+
+	// TODO (comment from thockin): This is a little scary - if somehow these rules get out of order, this will consume
+	// all accesses to a given port number regardless of destIP.
+	// Should this maybe use -m addrtype --dst-type LOCAL before -j ?
+	// And I think this should be installed in the OUTPUT chain too, no? PREROUTING is from off-machine or from
+	// containers. OUTPUT is from the node itself. I think that should work.
+	// I wrote that and then I had another thought - why do we need iptables here at all?
+	// Shouldn't this be as simple as passing publicPort to addServiceOnPort() instead of 0?
 	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainPrerouting, "-j", string(iptablesContainerPortalChain)); err != nil {
 		return err
 	}
