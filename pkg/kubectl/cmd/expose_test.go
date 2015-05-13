@@ -41,13 +41,15 @@ func TestRunExposeService(t *testing.T) {
 			args: []string{"service", "baz"},
 			input: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1beta3"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "service-name": "foo"},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "service-name": "foo", "labels": "svc=test"},
 			output: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "12"},
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "12", Labels: map[string]string{"svc": "test"}},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1beta3"},
 				Spec: api.ServiceSpec{
 					Ports: []api.ServicePort{
 						{

@@ -17,7 +17,8 @@ Take a replicated application and expose it as Kubernetes Service.
 
 .PP
 Looks up a replication controller or service by name and uses the selector for that resource as the
-selector for a new Service on the specified port.
+selector for a new Service on the specified port. If no labels are specified, the new service will
+re\-use the labels from the resource it exposes.
 
 
 .SH OPTIONS
