@@ -67,26 +67,9 @@ var _ = Describe("Services", func() {
 		}
 	})
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
-	It("should provide RW and RO services", func() {
-		svc := api.ServiceList{}
-		err := c.Get().
-			AbsPath("/api/v1beta3/proxy/namespaces/default/services/kubernetes-ro/api/v1beta3/services").
-			Do().
-			Into(&svc)
-		if err != nil {
-			Failf("unexpected error listing services using ro service: %v", err)
-		}
-		var foundRW, foundRO bool
-		for i := range svc.Items {
-			if svc.Items[i].Name == "kubernetes" {
-				foundRW = true
-			}
-			if svc.Items[i].Name == "kubernetes-ro" {
-				foundRO = true
-			}
-		}
-		Expect(foundRW).To(Equal(true))
-		Expect(foundRO).To(Equal(true))
+	It("should provide secure master service", func() {
+		_, err := c.Services(api.NamespaceDefault).Get("kubernetes")
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should serve a basic endpoint from pods", func(done Done) {
