@@ -696,18 +696,49 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 }
 
-func makeBinds(container *api.Container, podVolumes kubecontainer.VolumeMap) (binds []string) {
+func makeMounts(container *api.Container, podVolumes kubecontainer.VolumeMap) (mounts []kubecontainer.Mount) {
 	for _, mount := range container.VolumeMounts {
 		vol, ok := podVolumes[mount.Name]
 		if !ok {
 			glog.Warningf("Mount cannot be satisified for container %q, because the volume is missing: %q", container.Name, mount)
 			continue
 		}
-		b := fmt.Sprintf("%s:%s", vol.GetPath(), mount.MountPath)
-		if mount.ReadOnly {
-			b += ":ro"
+		mounts = append(mounts, kubecontainer.Mount{
+			Name:          mount.Name,
+			ContainerPath: mount.MountPath,
+			HostPath:      vol.GetPath(),
+			ReadOnly:      mount.ReadOnly,
+		})
+	}
+	return
+}
+
+func makePortMappings(container *api.Container) (ports []kubecontainer.PortMapping) {
+	names := make(map[string]struct{})
+	for _, p := range container.Ports {
+		pm := kubecontainer.PortMapping{
+			HostPort:      p.HostPort,
+			ContainerPort: p.ContainerPort,
+			Protocol:      p.Protocol,
+			HostIP:        p.HostIP,
 		}
-		binds = append(binds, b)
+
+		// We need to create some default port name if it's not specified, since
+		// this is necessary for rkt.
+		// https://github.com/GoogleCloudPlatform/kubernetes/issues/7710
+		if p.Name == "" {
+			pm.Name = fmt.Sprintf("%s-%s:%d", container.Name, p.Protocol, p.ContainerPort)
+		} else {
+			pm.Name = fmt.Sprintf("%s-%s", container.Name, p.Name)
+		}
+
+		// Protect against exposing the same protocol-port more than once in a container.
+		if _, ok := names[pm.Name]; ok {
+			glog.Warningf("Port name conflicted, %q is defined more than once", pm.Name)
+			continue
+		}
+		ports = append(ports, pm)
+		names[pm.Name] = struct{}{}
 	}
 	return
 }
@@ -722,7 +753,9 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 	if !ok {
 		return nil, fmt.Errorf("impossible: cannot find the mounted volumes for pod %q", kubecontainer.GetPodFullName(pod))
 	}
-	opts.Binds = makeBinds(container, vol)
+
+	opts.PortMappings = makePortMappings(container)
+	opts.Mounts = makeMounts(container, vol)
 	opts.Envs, err = kl.makeEnvironmentVariables(pod, container)
 	if err != nil {
 		return nil, err
@@ -801,8 +834,8 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 }
 
 // Make the service environment variables for a pod in the given namespace.
-func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Container) ([]string, error) {
-	var result []string
+func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Container) ([]kubecontainer.EnvVar, error) {
+	var result []kubecontainer.EnvVar
 	// Note:  These are added to the docker.Config, but are not included in the checksum computed
 	// by dockertools.BuildDockerName(...).  That way, we can still determine whether an
 	// api.Container is already running by its hash. (We don't want to restart a container just
@@ -830,12 +863,12 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 			return result, err
 		}
 
-		result = append(result, fmt.Sprintf("%s=%s", value.Name, runtimeValue))
+		result = append(result, kubecontainer.EnvVar{Name: value.Name, Value: runtimeValue})
 	}
 
 	// Append remaining service env vars.
 	for k, v := range serviceEnv {
-		result = append(result, fmt.Sprintf("%s=%s", k, v))
+		result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
 	}
 	return result, nil
 }

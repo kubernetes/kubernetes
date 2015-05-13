@@ -477,6 +477,65 @@ func (dm *DockerManager) GetPodInfraContainer(pod kubecontainer.Pod) (kubecontai
 	return kubecontainer.Container{}, fmt.Errorf("unable to find pod infra container for pod %v", pod.ID)
 }
 
+// makeEnvList converts EnvVar list to a list of strings, in the form of
+// '<key>=<value>', which can be understood by docker.
+func makeEnvList(envs []kubecontainer.EnvVar) (result []string) {
+	for _, env := range envs {
+		result = append(result, fmt.Sprintf("%s=%s", env.Name, env.Value))
+	}
+	return
+}
+
+// makeMountBindings converts the mount list to a list of strings that
+// can be understood by docker.
+// Each element in the string is in the form of:
+// '<HostPath>:<ContainerPath>', or
+// '<HostPath>:<ContainerPath>:ro', if the path is read only.
+func makeMountBindings(mounts []kubecontainer.Mount) (result []string) {
+	for _, m := range mounts {
+		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
+		if m.ReadOnly {
+			bind += ":ro"
+		}
+		result = append(result, bind)
+	}
+	return
+}
+
+func makePortsAndBindings(portMappings []kubecontainer.PortMapping) (map[docker.Port]struct{}, map[docker.Port][]docker.PortBinding) {
+	exposedPorts := map[docker.Port]struct{}{}
+	portBindings := map[docker.Port][]docker.PortBinding{}
+	for _, port := range portMappings {
+		exteriorPort := port.HostPort
+		if exteriorPort == 0 {
+			// No need to do port binding when HostPort is not specified
+			continue
+		}
+		interiorPort := port.ContainerPort
+		// Some of this port stuff is under-documented voodoo.
+		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api
+		var protocol string
+		switch strings.ToUpper(string(port.Protocol)) {
+		case "UDP":
+			protocol = "/udp"
+		case "TCP":
+			protocol = "/tcp"
+		default:
+			glog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
+			protocol = "/tcp"
+		}
+		dockerPort := docker.Port(strconv.Itoa(interiorPort) + protocol)
+		exposedPorts[dockerPort] = struct{}{}
+		portBindings[dockerPort] = []docker.PortBinding{
+			{
+				HostPort: strconv.Itoa(exteriorPort),
+				HostIP:   port.HostIP,
+			},
+		}
+	}
+	return exposedPorts, portBindings
+}
+
 func (dm *DockerManager) runContainer(
 	pod *api.Pod,
 	container *api.Container,
@@ -490,7 +549,7 @@ func (dm *DockerManager) runContainer(
 		PodUID:        pod.UID,
 		ContainerName: container.Name,
 	}
-	exposedPorts, portBindings := makePortsAndBindings(container)
+	exposedPorts, portBindings := makePortsAndBindings(opts.PortMappings)
 
 	// TODO(vmarmol): Handle better.
 	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
@@ -517,7 +576,7 @@ func (dm *DockerManager) runContainer(
 	dockerOpts := docker.CreateContainerOptions{
 		Name: BuildDockerName(dockerName, container),
 		Config: &docker.Config{
-			Env:          opts.Envs,
+			Env:          makeEnvList(opts.Envs),
 			ExposedPorts: exposedPorts,
 			Hostname:     containerHostname,
 			Image:        container.Image,
@@ -546,6 +605,8 @@ func (dm *DockerManager) runContainer(
 		dm.recorder.Eventf(ref, "created", "Created with docker id %v", dockerContainer.ID)
 	}
 
+	binds := makeMountBindings(opts.Mounts)
+
 	// The reason we create and mount the log file in here (not in kubelet) is because
 	// the file's location depends on the ID of the container, and we need to create and
 	// mount the file before actually starting the container.
@@ -560,13 +621,13 @@ func (dm *DockerManager) runContainer(
 		} else {
 			fs.Close() // Close immediately; we're just doing a `touch` here
 			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
-			opts.Binds = append(opts.Binds, b)
+			binds = append(binds, b)
 		}
 	}
 
 	hc := &docker.HostConfig{
 		PortBindings: portBindings,
-		Binds:        opts.Binds,
+		Binds:        binds,
 		NetworkMode:  netMode,
 		IpcMode:      ipcMode,
 	}
@@ -601,40 +662,6 @@ func setEntrypointAndCommand(container *api.Container, opts *docker.CreateContai
 	if len(container.Args) != 0 {
 		opts.Config.Cmd = container.Args
 	}
-}
-
-func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, map[docker.Port][]docker.PortBinding) {
-	exposedPorts := map[docker.Port]struct{}{}
-	portBindings := map[docker.Port][]docker.PortBinding{}
-	for _, port := range container.Ports {
-		exteriorPort := port.HostPort
-		if exteriorPort == 0 {
-			// No need to do port binding when HostPort is not specified
-			continue
-		}
-		interiorPort := port.ContainerPort
-		// Some of this port stuff is under-documented voodoo.
-		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api
-		var protocol string
-		switch strings.ToUpper(string(port.Protocol)) {
-		case "UDP":
-			protocol = "/udp"
-		case "TCP":
-			protocol = "/tcp"
-		default:
-			glog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
-			protocol = "/tcp"
-		}
-		dockerPort := docker.Port(strconv.Itoa(interiorPort) + protocol)
-		exposedPorts[dockerPort] = struct{}{}
-		portBindings[dockerPort] = []docker.PortBinding{
-			{
-				HostPort: strconv.Itoa(exteriorPort),
-				HostIP:   port.HostIP,
-			},
-		}
-	}
-	return exposedPorts, portBindings
 }
 
 // A helper function to get the KubeletContainerName and hash from a docker
