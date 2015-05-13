@@ -229,6 +229,9 @@ func setDefaults(c *Config) {
 	}
 	if c.PublicServicePorts.Size == 0 {
 		// TODO: Currently no way to specify no PublicServicePorts (do we need to allow this?)
+		// We should probably allow this for clouds that don't require PublicServicePorts to do load-balancing (GCE)
+		// but then that breaks the strict nestedness of visibility.
+		// Review post-v1
 		c.PublicServicePorts = util.PortRange{Base: 30000, Size: 2767}
 		glog.Infof("Service port range unspecified. Defaulting to %v.", c.PublicServicePorts)
 	}
