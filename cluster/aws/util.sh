@@ -22,6 +22,17 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
+case "${KUBE_OS_DISTRIBUTION}" in
+  ubuntu|coreos)
+    echo "Starting cluster using os distro: ${KUBE_OS_DISTRIBUTION}" >&2
+    source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
+    ;;
+  *)
+    echo "Cannot start cluster using os distro: ${KUBE_OS_DISTRIBUTION}" >&2
+    exit 2
+    ;;
+esac
+
 # This removes the final character in bash (somehow)
 AWS_REGION=${ZONE%?}
 
@@ -366,7 +377,13 @@ function wait-for-instance-running {
 }
 
 function kube-up {
+  get-tokens
+
+  detect-image
+  detect-minion-image
+
   find-release-tars
+
   upload-server-tars
 
   ensure-temp-dir
@@ -378,8 +395,6 @@ function kube-up {
   if [[ ! -f "$AWS_SSH_KEY" ]]; then
     ssh-keygen -f "$AWS_SSH_KEY" -N ''
   fi
-
-  detect-image
 
   $AWS_CMD import-key-pair --key-name kubernetes --public-key-material "file://$AWS_SSH_KEY.pub" > $LOG 2>&1 || true
 
@@ -439,7 +454,6 @@ function kube-up {
 	  SEC_GROUP_ID=$($AWS_CMD create-security-group --group-name kubernetes-sec-group --description kubernetes-sec-group --vpc-id $VPC_ID | json_val '["GroupId"]')
 	  $AWS_CMD authorize-security-group-ingress --group-id $SEC_GROUP_ID --protocol -1 --port all --cidr 0.0.0.0/0 > $LOG
   fi
-
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
     echo "#! /bin/bash"
@@ -466,6 +480,8 @@ function kube-up {
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
     echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
     echo "readonly MASTER_IP_RANGE='${MASTER_IP_RANGE:-}'"
+    echo "readonly KUBELET_TOKEN='${KUBELET_TOKEN}'"
+    echo "readonly KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
@@ -546,16 +562,7 @@ function kube-up {
   MINION_IDS=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "Starting Minion (${MINION_NAMES[$i]})"
-    (
-      # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
-      echo "#! /bin/bash"
-      echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
-      echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
-      echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
-      grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
-      grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
-      grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"
-    ) > "${KUBE_TEMP}/minion-start-${i}.sh"
+    generate-minion-user-data $i > "${KUBE_TEMP}/minion-user-data-${i}"
 
     local public_ip_option
     if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
@@ -565,7 +572,7 @@ function kube-up {
     fi
 
     minion_id=$($AWS_CMD run-instances \
-      --image-id $AWS_IMAGE \
+      --image-id $KUBE_MINION_IMAGE \
       --iam-instance-profile Name=$IAM_PROFILE_MINION \
       --instance-type $MINION_SIZE \
       --subnet-id $SUBNET_ID \
@@ -573,7 +580,7 @@ function kube-up {
       --key-name kubernetes \
       --security-group-ids $SEC_GROUP_ID \
       ${public_ip_option} \
-      --user-data file://${KUBE_TEMP}/minion-start-${i}.sh | json_val '["Instances"][0]["InstanceId"]')
+      --user-data "file://${KUBE_TEMP}/minion-user-data-${i}" | json_val '["Instances"][0]["InstanceId"]')
 
     add-tag $minion_id Name ${MINION_NAMES[$i]}
     add-tag $minion_id Role $MINION_TAG
@@ -669,31 +676,19 @@ function kube-up {
         local minion_name=${MINION_NAMES[$i]}
         local minion_ip=${KUBE_MINION_IP_ADDRESSES[$i]}
         echo -n Attempt "$(($attempt+1))" to check Docker on node "${minion_name} @ ${minion_ip}" ...
-        local output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@$minion_ip sudo docker ps -a 2>/dev/null)
-        if [[ -z "${output}" ]]; then
+        local output=`check-minion ${minion_name} ${minion_ip}`
+        echo $output
+        if [[ "${output}" != "working" ]]; then
           if (( attempt > 9 )); then
             echo
-            echo -e "${color_red}Docker failed to install on node ${minion_name}. Your cluster is unlikely" >&2
-            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-            echo -e "cluster. (sorry!)${color_norm}" >&2
+            echo -e "Your cluster is unlikely to work correctly." >&2
+            echo "Please run ./cluster/kube-down.sh and re-create the" >&2
+            echo -e "cluster. (sorry!)" >&2
             exit 1
           fi
-        # TODO: Reintroduce this (where does this container come from?)
-#        elif [[ "${output}" != *"kubernetes/pause"* ]]; then
-#          if (( attempt > 9 )); then
-#            echo
-#            echo -e "${color_red}Failed to observe kubernetes/pause on node ${minion_name}. Your cluster is unlikely" >&2
-#            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-#            echo -e "cluster. (sorry!)${color_norm}" >&2
-#            exit 1
-#          fi
         else
-          echo -e " ${color_green}[working]${color_norm}"
           break
         fi
-        echo -e " ${color_yellow}[not working yet]${color_norm}"
-        # Start Docker, in case it failed to start.
-        ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@$minion_ip sudo service docker start > $LOG 2>&1
         attempt=$(($attempt+1))
         sleep 30
       done
@@ -892,4 +887,9 @@ function prepare-e2e() {
   # (AWS runs detect-project, I don't think we need to anything)
   # Note: we can't print anything here, or else the test tools will break with the extra output
   return
+}
+
+function get-tokens() {
+  KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 }

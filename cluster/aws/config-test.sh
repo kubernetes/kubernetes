@@ -73,3 +73,10 @@ ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,Security
 # Optional: Enable/disable public IP assignment for minions.
 # Important Note: disable only if you have setup a NAT instance for internet access and configured appropriate routes!
 ENABLE_MINION_PUBLIC_IP=${KUBE_ENABLE_MINION_PUBLIC_IP:-true}
+
+# OS options for minions
+KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-ubuntu}"
+KUBE_MINION_IMAGE="${KUBE_MINION_IMAGE:-}"
+COREOS_CHANNEL="${COREOS_CHANNEL:-alpha}"
+CONTAINER_RUNTIME="${KUBE_CONTAINER_RUNTIME:-docker}"
+RKT_VERSION="${KUBE_RKT_VERSION:-0.5.5}"
