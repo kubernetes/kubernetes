@@ -47,11 +47,15 @@ def file_passes(filename, extension, ref, regexs):
     # trim our file to the same number of lines as the reference file
     data = data[:len(ref)]
 
-    # Replace all occurances of the regex "2015" with "2014"
+    p = regexs["year"]
+    for d in data:
+        if p.search(d):
+            return False
+
+    # Replace all occurances of the regex "2015|2014" with "YEAR"
     p = regexs["date"]
     for i, d in enumerate(data):
-
-        (data[i], found) = p.subn( '2014', d)
+        (data[i], found) = p.subn('YEAR', d)
         if found != 0:
             break
 
@@ -81,6 +85,8 @@ def main():
     ref = ref_file.read().splitlines()
 
     regexs = {}
+    # Search for "YEAR" which exists in the boilerplate, but shouldn't in the real thing
+    regexs["year"] = re.compile( 'YEAR' )
     # dates can be 2014 or 2015, company holder names can be anything
     regexs["date"] = re.compile( '(2014|2015)' )
     # strip // +build \n\n build constraints
