@@ -29,6 +29,8 @@ func addConversionFuncs() {
 	err := newer.Scheme.AddConversionFuncs(
 		convert_v1beta3_Container_To_api_Container,
 		convert_api_Container_To_v1beta3_Container,
+		convert_v1beta3_ServiceSpec_To_api_ServiceSpec,
+		convert_api_ServiceSpec_To_v1beta3_ServiceSpec,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -327,5 +329,103 @@ func convert_api_Container_To_v1beta3_Container(in *newer.Container, out *Contai
 	if out.SecurityContext != nil && out.SecurityContext.Capabilities != nil {
 		out.Capabilities = *out.SecurityContext.Capabilities
 	}
+	return nil
+}
+
+func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *newer.ServiceSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ServiceSpec))(in)
+	}
+	if in.Ports != nil {
+		out.Ports = make([]newer.ServicePort, len(in.Ports))
+		for i := range in.Ports {
+			if err := convert_v1beta3_ServicePort_To_api_ServicePort(&in.Ports[i], &out.Ports[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ports = nil
+	}
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	out.PortalIP = in.PortalIP
+
+	visibilityIn := in.Visibility
+	if visibilityIn == "" {
+		if in.CreateExternalLoadBalancer {
+			visibilityIn = VisibilityTypeLoadBalancer
+		} else {
+			visibilityIn = VisibilityTypeCluster
+		}
+	}
+	if err := s.Convert(&visibilityIn, &out.Visibility, 0); err != nil {
+		return err
+	}
+	out.CreateExternalLoadBalancer = visibilityIn == VisibilityTypeLoadBalancer
+
+	if in.PublicIPs != nil {
+		out.PublicIPs = make([]string, len(in.PublicIPs))
+		for i := range in.PublicIPs {
+			out.PublicIPs[i] = in.PublicIPs[i]
+		}
+	} else {
+		out.PublicIPs = nil
+	}
+	out.SessionAffinity = newer.AffinityType(in.SessionAffinity)
+	return nil
+}
+
+func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *newer.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*newer.ServiceSpec))(in)
+	}
+	if in.Ports != nil {
+		out.Ports = make([]ServicePort, len(in.Ports))
+		for i := range in.Ports {
+			if err := convert_api_ServicePort_To_v1beta3_ServicePort(&in.Ports[i], &out.Ports[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ports = nil
+	}
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	out.PortalIP = in.PortalIP
+
+	visibilityIn := in.Visibility
+	if visibilityIn == "" {
+		if in.CreateExternalLoadBalancer {
+			visibilityIn = newer.VisibilityTypeLoadBalancer
+		} else {
+			visibilityIn = newer.VisibilityTypeCluster
+		}
+	}
+	if err := s.Convert(&visibilityIn, &out.Visibility, 0); err != nil {
+		return err
+	}
+	out.CreateExternalLoadBalancer = visibilityIn == newer.VisibilityTypeLoadBalancer
+
+	if in.PublicIPs != nil {
+		out.PublicIPs = make([]string, len(in.PublicIPs))
+		for i := range in.PublicIPs {
+			out.PublicIPs[i] = in.PublicIPs[i]
+		}
+	} else {
+		out.PublicIPs = nil
+	}
+	out.SessionAffinity = AffinityType(in.SessionAffinity)
 	return nil
 }
