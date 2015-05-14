@@ -52,45 +52,15 @@ type REST struct {
 
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, portals ipallocator.Interface,
-	publicServicePorts util.PortRange, clusterName string) *REST {
-
-	// TODO: Before we can replicate masters, this has to be synced (e.g. lives in etcd)
-	pa := newPortAllocator(&publicServicePorts)
-	if pa == nil {
-		glog.Fatalf("Failed to create a port allocator. Is port-range '%v' valid?", publicServicePorts)
-	}
-
-	reloadServiceStateFromStorage(pa, registry)
+	publicServicePorts *portAllocator, clusterName string) *REST {
 
 	return &REST{
 		registry:    registry,
 		machines:    machines,
 		endpoints:   endpoints,
 		portals:     portals,
-		portMgr:     pa,
+		portMgr:     publicServicePorts,
 		clusterName: clusterName,
-	}
-}
-
-// Helper: mark all previously allocated IPs & ports in the allocator.
-func reloadServiceStateFromStorage(pa *portAllocator, registry Registry) {
-	services, err := registry.ListServices(api.NewContext())
-	if err != nil {
-		// This is really bad.
-		glog.Errorf("can't list services to init service REST: %v", err)
-		return
-	}
-	for i := range services.Items {
-		service := &services.Items[i]
-		for j := range service.Spec.Ports {
-			servicePort := &service.Spec.Ports[j]
-			if servicePort.PublicPort != 0 {
-				if err := pa.Allocate(servicePort.PublicPort); err != nil {
-					// This is really bad.
-					glog.Errorf("service %q ServicePort %s could not be allocated: %v", service.Name, servicePort.PublicPort, err)
-				}
-			}
-		}
 	}
 }
 

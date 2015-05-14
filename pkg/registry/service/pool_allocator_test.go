@@ -19,6 +19,10 @@ package service
 import (
 	math_rand "math/rand"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 )
 
 type stringSliceIterator struct {
@@ -62,85 +66,159 @@ func (d *testPoolDriver) IterateNext(last string) string {
 	return ""
 }
 
-func TestPoolAllocatorAllocate(t *testing.T) {
-	var pa PoolAllocator
-
-	driver := &testPoolDriver{items: []string{"1", "2", "3"}}
-	pa.Init(driver)
-
-	if err := pa.Allocate("0"); err != nil {
+func testPoolAllocatorAllocate(t *testing.T, pa PoolAllocator) {
+	if err := pa.Allocate("z"); err != nil {
 		// TODO: Maybe it should?
 		t.Errorf("PoolAllocator does not know what items are valid for pool")
 	}
 
-	if err := pa.Allocate("1"); err != nil {
+	if err := pa.Allocate("a"); err != nil {
 		t.Errorf("expected success, got %s", err)
 	}
 
-	if pa.Allocate("1") == nil {
+	if pa.Allocate("a") == nil {
 		t.Errorf("expected failure")
 	}
 }
 
-func TestPoolAllocatorAllocateNext(t *testing.T) {
-	var pa PoolAllocator
+func testPoolAllocatorAllocateNext(t *testing.T, pa PoolAllocator) {
+	v1, err := pa.AllocateNext()
+	if err != nil {
+		t.Errorf("expected 'a', got error: %v", err)
+	}
+	if v1 != "a" {
+		t.Errorf("expected 'a', got %s", v1)
+	}
 
+	v2, err := pa.AllocateNext()
+	if err != nil {
+		t.Errorf("expected 'b', got error: %v", err)
+	}
+	if v2 != "b" {
+		t.Errorf("expected 'b', got %s", v2)
+	}
+
+	v3, err := pa.AllocateNext()
+	if err != nil {
+		t.Errorf("expected 'c', got error: %v", err)
+	}
+	if v3 != "c" {
+		t.Errorf("expected 'c', got %s", v3)
+	}
+
+	v4, err := pa.AllocateNext()
+	if err != nil {
+		t.Errorf("expected no error - (though allocator is full)")
+	}
+	if v4 != "" {
+		t.Errorf("Expected '' - allocator is full")
+	}
+}
+
+func testPoolAllocatorRelease(t *testing.T, pa PoolAllocator) {
+	ok, err := pa.Release("a")
+	if err != nil {
+		t.Errorf("expected !ok, got error: %v", err)
+	}
+	if ok {
+		t.Errorf("Expected !ok")
+	}
+
+	pa.AllocateNext()
+	v2, _ := pa.AllocateNext()
+	pa.AllocateNext()
+
+	ok, err = pa.Release(v2)
+	if err != nil {
+		t.Errorf("expected ok, got error: %v", err)
+	}
+	if !ok {
+		t.Error("Expected release to succeed")
+	}
+
+	v2_again, err := pa.AllocateNext()
+	if err != nil {
+		t.Errorf("expected %s, got error: %v", v2, err)
+	}
+	if v2_again != v2 {
+		t.Errorf("Expected %s, got %s", v2, v2_again)
+	}
+
+	v4, err := pa.AllocateNext()
+	if err != nil {
+		t.Errorf("expected no error - though allocator is full")
+	}
+	if v4 != "" {
+		t.Errorf("Expected '' - allocator is full")
+	}
+}
+
+func Test_MemoryPoolAllocator_Allocate(t *testing.T) {
 	driver := &testPoolDriver{items: []string{"a", "b", "c"}}
+	pa := &MemoryPoolAllocator{}
+	pa.Init(driver)
+
+	testPoolAllocatorAllocate(t, pa)
+}
+
+func Test_MemoryPoolAllocator_AllocateNext(t *testing.T) {
+	driver := &testPoolDriver{items: []string{"a", "b", "c"}}
+	pa := &MemoryPoolAllocator{}
 	pa.Init(driver)
 
 	// Turn off random allocation attempts, so we just allocate in sequence
 	pa.randomAttempts = 0
 
-	v1 := pa.AllocateNext()
-	if v1 != "a" {
-		t.Errorf("expected 'a', got %s", v1)
-	}
-
-	v2 := pa.AllocateNext()
-	if v2 != "b" {
-		t.Errorf("expected 'b', got %s", v2)
-	}
-
-	v3 := pa.AllocateNext()
-	if v3 != "c" {
-		t.Errorf("expected 'c', got %s", v3)
-	}
-
-	v4 := pa.AllocateNext()
-	if v4 != "" {
-		t.Errorf("Expected '' - allocator is full")
-	}
+	testPoolAllocatorAllocateNext(t, pa)
 }
 
-func TestPoolAllocatorRelease(t *testing.T) {
-	var pa PoolAllocator
-
+func Test_MemoryPoolAllocator_Release(t *testing.T) {
 	driver := &testPoolDriver{items: []string{"a", "b", "c"}}
+	pa := &MemoryPoolAllocator{}
 	pa.Init(driver)
 
+	// Turn off random allocation attempts, so we just allocate in sequence
 	pa.randomAttempts = 0
 
-	ok := pa.Release("a")
-	if ok {
-		t.Errorf("Expected an error")
-	}
+	testPoolAllocatorRelease(t, pa)
+}
 
-	pa.AllocateNext()
-	v2 := pa.AllocateNext()
-	pa.AllocateNext()
+func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
+	fakeEtcdClient := tools.NewFakeEtcdClient(t)
+	fakeEtcdClient.TestIndex = true
+	helper := tools.NewEtcdHelper(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
+	return fakeEtcdClient, helper
+}
 
-	ok = pa.Release(v2)
-	if !ok {
-		t.Error("Expected release to succeed")
-	}
+func Test_EtcdPoolAllocator_Allocate(t *testing.T) {
+	driver := &testPoolDriver{items: []string{"a", "b", "c"}}
+	pa := &EtcdPoolAllocator{}
+	_, etcd := newHelper(t)
+	pa.Init(driver, &etcd, "/base/")
 
-	v2_again := pa.AllocateNext()
-	if v2_again != v2 {
-		t.Errorf("Expected %s, got %s", v2, v2_again)
-	}
+	testPoolAllocatorAllocate(t, pa)
+}
 
-	v4 := pa.AllocateNext()
-	if v4 != "" {
-		t.Errorf("Expected '' - allocator is full")
-	}
+func Test_EtcdPoolAllocator_AllocateNext(t *testing.T) {
+	driver := &testPoolDriver{items: []string{"a", "b", "c"}}
+	pa := &EtcdPoolAllocator{}
+	_, etcd := newHelper(t)
+	pa.Init(driver, &etcd, "/base/")
+
+	// Turn off random allocation attempts, so we just allocate in sequence
+	pa.randomAttempts = 0
+
+	testPoolAllocatorAllocateNext(t, pa)
+}
+
+func Test_EtcdPoolAllocator_Release(t *testing.T) {
+	driver := &testPoolDriver{items: []string{"a", "b", "c"}}
+	pa := &EtcdPoolAllocator{}
+	_, etcd := newHelper(t)
+	pa.Init(driver, &etcd, "/base/")
+
+	// Turn off random allocation attempts, so we just allocate in sequence
+	pa.randomAttempts = 0
+
+	testPoolAllocatorRelease(t, pa)
 }

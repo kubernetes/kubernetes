@@ -23,11 +23,15 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // The smallest size of port range we accept.
 const minPortPoolSize = 8
+
+// The base key in etc
+const baseKey = "/pools/serviceports/"
 
 type portAllocator struct {
 	portRange util.PortRange
@@ -35,7 +39,7 @@ type portAllocator struct {
 }
 
 // newPortAllocator creates and initializes a new portAllocator object.
-func newPortAllocator(portRange *util.PortRange) *portAllocator {
+func NewPortAllocator(portRange *util.PortRange, etcd *tools.EtcdHelper) *portAllocator {
 	rangeSize := portRange.Size
 	if rangeSize < minPortPoolSize {
 		glog.Errorf("PortAllocator requires at least %d ports", minPortPoolSize)
@@ -45,8 +49,16 @@ func newPortAllocator(portRange *util.PortRange) *portAllocator {
 	a := &portAllocator{
 		portRange: *portRange,
 	}
-	a.pool.Init(&portPoolDriver{portRange: *portRange})
 
+	if etcd == nil {
+		pa := &MemoryPoolAllocator{}
+		pa.Init(&portPoolDriver{portRange: *portRange})
+		a.pool = pa
+	} else {
+		pa := &EtcdPoolAllocator{}
+		pa.Init(&portPoolDriver{portRange: *portRange}, etcd, baseKey)
+		a.pool = pa
+	}
 	return a
 }
 
@@ -61,7 +73,10 @@ func (a *portAllocator) Allocate(port int) error {
 
 // Allocate allocates and returns a port.
 func (a *portAllocator) AllocateNext() (int, error) {
-	s := a.pool.AllocateNext()
+	s, err := a.pool.AllocateNext()
+	if err != nil {
+		return 0, err
+	}
 	if s == "" {
 		return 0, fmt.Errorf("can't find a free port in %s", a.portRange)
 	}
@@ -74,7 +89,11 @@ func (a *portAllocator) Release(port int) error {
 		return fmt.Errorf("Port %v does not fall within port-range %v", port, a.portRange)
 	}
 
-	if !a.pool.Release(portToString(port)) {
+	released, err := a.pool.Release(portToString(port))
+	if err != nil {
+		return err
+	}
+	if !released {
 		glog.Warning("Released port that was not assigned: ", port)
 	}
 	return nil

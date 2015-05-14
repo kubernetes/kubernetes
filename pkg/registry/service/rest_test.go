@@ -42,7 +42,8 @@ func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registryte
 	nodeRegistry := registrytest.NewMinionRegistry(machines, api.NodeResources{})
 	r := ipallocator.NewCIDRRange(makeIPNet(t))
 	portRange := util.PortRange{Base: 30000, Size: 1000}
-	storage := NewStorage(registry, nodeRegistry, endpointRegistry, r, portRange, "kubernetes")
+	portAllocator := NewPortAllocator(&portRange, nil)
+	storage := NewStorage(registry, nodeRegistry, endpointRegistry, r, portAllocator, "kubernetes")
 	return storage, registry
 }
 
@@ -64,7 +65,7 @@ func deepCloneService(svc *api.Service) *api.Service {
 
 func TestServiceRegistryCreate(t *testing.T) {
 	storage, registry := NewTestREST(t, nil)
-	storage.portMgr.pool.randomAttempts = 0
+	storage.portMgr.pool.(*MemoryPoolAllocator).randomAttempts = 0
 
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -500,7 +501,7 @@ func TestServiceRegistryList(t *testing.T) {
 
 func TestServiceRegistryIPAllocation(t *testing.T) {
 	rest, _ := NewTestREST(t, nil)
-	rest.portMgr.pool.randomAttempts = 0
+	rest.portMgr.pool.(*MemoryPoolAllocator).randomAttempts = 0
 
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -579,7 +580,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 
 func TestServiceRegistryIPReallocation(t *testing.T) {
 	rest, _ := NewTestREST(t, nil)
-	rest.portMgr.pool.randomAttempts = 0
+	rest.portMgr.pool.(*MemoryPoolAllocator).randomAttempts = 0
 
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -633,7 +634,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 
 func TestServiceRegistryIPUpdate(t *testing.T) {
 	rest, _ := NewTestREST(t, nil)
-	rest.portMgr.pool.randomAttempts = 0
+	rest.portMgr.pool.(*MemoryPoolAllocator).randomAttempts = 0
 
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
@@ -678,7 +679,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 
 func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	rest, _ := NewTestREST(t, nil)
-	rest.portMgr.pool.randomAttempts = 0
+	rest.portMgr.pool.(*MemoryPoolAllocator).randomAttempts = 0
 
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
@@ -718,8 +719,9 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	endpoints := &registrytest.EndpointRegistry{}
 	r := ipallocator.NewCIDRRange(makeIPNet(t))
 	portRange := util.PortRange{Base: 30000, Size: 1000}
-	rest1 := NewStorage(registry, nodeRegistry, endpoints, r, portRange, "kubernetes")
-	rest1.portMgr.pool.randomAttempts = 0
+	portAllocator := NewPortAllocator(&portRange, nil)
+	rest1 := NewStorage(registry, nodeRegistry, endpoints, r, portAllocator, "kubernetes")
+	rest1.portMgr.pool.(*MemoryPoolAllocator).randomAttempts = 0
 
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
@@ -752,8 +754,9 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	// This will reload from storage, finding the previous 2
 	nodeRegistry = registrytest.NewMinionRegistry(machines, api.NodeResources{})
 	r2 := ipallocator.NewCIDRRange(makeIPNet(t))
-	rest2 := NewStorage(registry, nodeRegistry, endpoints, r2, portRange, "kubernetes")
-	rest2.portMgr.pool.randomAttempts = 0
+	portAllocator2 := NewPortAllocator(&portRange, nil)
+	rest2 := NewStorage(registry, nodeRegistry, endpoints, r2, portAllocator2, "kubernetes")
+	rest2.portMgr.pool.(*MemoryPoolAllocator).randomAttempts = 0
 
 	svc = &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
@@ -813,7 +816,7 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	rest, registry := NewTestREST(t, nil)
-	rest.portMgr.pool.randomAttempts = 0
+	rest.portMgr.pool.(*MemoryPoolAllocator).randomAttempts = 0
 
 	test := resttest.New(t, rest, registry.SetError)
 	test.TestCreate(

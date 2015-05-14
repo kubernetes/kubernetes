@@ -21,19 +21,23 @@ import (
 	math_rand "math/rand"
 	"sync"
 
+	"os"
 	"time"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"strings"
 )
 
-// A PoolAllocator is a helper-class that supports a pool of resources that can be allocated
-type PoolAllocator struct {
-	driver PoolDriver
+// A PoolAllocator is a helper interface that supports a pool of resources that can be allocated
+type PoolAllocator interface {
+	// Allocate allocates a specific entry.
+	Allocate(s string) error
 
-	lock sync.Mutex // protects 'used' and 'random'
+	// AllocateNext allocates and returns a new entry.
+	AllocateNext() (string, error)
 
-	used           map[string]bool
-	randomAttempts int
-
-	random *math_rand.Rand
+	// Release de-allocates an entry.
+	Release(s string) (bool, error)
 }
 
 // A very simple string iterator
@@ -50,8 +54,36 @@ type PoolDriver interface {
 	Iterate() StringIterator
 }
 
-// Init initializes a new PoolAllocator driver.
-func (a *PoolAllocator) Init(driver PoolDriver) {
+// MemoryPoolAllocator is PoolAllocator that is backed by an in-memory collection,
+// can't be used if there are multiple processes allocating from the pool (cf EtcdPoolAllocator)
+type MemoryPoolAllocator struct {
+	driver PoolDriver
+
+	lock sync.Mutex // protects 'used' and 'random'
+
+	used           map[string]bool
+	randomAttempts int
+
+	random *math_rand.Rand
+}
+
+// EtcdPoolAllocator is PoolAllocator that is backed by etcd, so can be used by multiple processes
+type EtcdPoolAllocator struct {
+	driver PoolDriver
+
+	lock sync.Mutex // protects 'used' and 'random'
+
+	usedCached     map[string]bool
+	randomAttempts int
+
+	random *math_rand.Rand
+
+	etcd    *tools.EtcdHelper
+	baseKey string
+}
+
+// Init initializes a MemoryPoolAllocator.
+func (a *MemoryPoolAllocator) Init(driver PoolDriver) {
 	seed := time.Now().UTC().UnixNano()
 	a.random = math_rand.New(math_rand.NewSource(seed))
 
@@ -61,8 +93,26 @@ func (a *PoolAllocator) Init(driver PoolDriver) {
 	a.driver = driver
 }
 
-// Allocate allocates a specific entry.  This is useful when recovering saved state.
-func (a *PoolAllocator) Allocate(s string) error {
+// Init initializes a EtcdPoolAllocator.
+func (a *EtcdPoolAllocator) Init(driver PoolDriver, etcd *tools.EtcdHelper, baseKey string) {
+	seed := time.Now().UTC().UnixNano()
+	seed ^= int64(os.Getpid())
+	a.random = math_rand.New(math_rand.NewSource(seed))
+
+	a.randomAttempts = 1000
+	a.usedCached = make(map[string]bool)
+
+	a.driver = driver
+
+	a.etcd = etcd
+	if !strings.HasSuffix(baseKey, "/") {
+		baseKey += "/"
+	}
+	a.baseKey = baseKey
+}
+
+// Allocate allocates a specific entry.
+func (a *MemoryPoolAllocator) Allocate(s string) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -75,8 +125,55 @@ func (a *PoolAllocator) Allocate(s string) error {
 	return nil
 }
 
+// Try to lock the resource 's'..  Checks the cache first if useCache is true.
+// Always updates the cache when it learns information.
+func (a *EtcdPoolAllocator) tryLock(s string, useCache bool) (bool, error) {
+	if useCache {
+		a.lock.Lock()
+		if a.usedCached[s] {
+			return false, nil
+		}
+		a.lock.Unlock()
+	}
+
+	key := a.baseKey + s
+	value := "1"
+
+	_, err := a.etcd.Client.Create(key, value, 0)
+
+	created := true
+	if err != nil {
+		if tools.IsEtcdNodeExist(err) {
+			// We failed to obtain the lock
+			created = false
+		} else {
+			return false, fmt.Errorf("Error communicating with etcd: %v", err)
+		}
+	}
+
+	// Whether or not we locked it, it is locked
+	a.lock.Lock()
+	a.usedCached[s] = true
+	a.lock.Unlock()
+
+	return created, nil
+}
+
+// Allocate allocates a specific entry.
+func (a *EtcdPoolAllocator) Allocate(s string) error {
+	useCache := false
+	locked, err := a.tryLock(s, useCache)
+	if err != nil {
+		return err
+	}
+	if !locked {
+		return fmt.Errorf("Entry %s is already allocated", s)
+	}
+	return nil
+}
+
 // AllocateNext allocates and returns a new entry.
-func (a *PoolAllocator) AllocateNext() string {
+func (a *MemoryPoolAllocator) AllocateNext() (string, error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -87,7 +184,7 @@ func (a *PoolAllocator) AllocateNext() string {
 		inUse := a.used[s]
 		if !inUse {
 			a.used[s] = true
-			return s
+			return s, nil
 		}
 	}
 
@@ -101,27 +198,87 @@ func (a *PoolAllocator) AllocateNext() string {
 		inUse := a.used[s]
 		if !inUse {
 			a.used[s] = true
-			return s
+			return s, nil
 		}
 	}
-	return ""
+	return "", nil
+}
+
+// AllocateNext allocates and returns a new entry.
+func (a *EtcdPoolAllocator) AllocateNext() (string, error) {
+	// Try randomly first
+	for _, useCache := range []bool{true, false} {
+		for i := 0; i < a.randomAttempts; i++ {
+			s := a.driver.PickRandom(a.random)
+
+			locked, err := a.tryLock(s, useCache)
+			if err != nil {
+				return "", err
+			}
+			if locked {
+				return s, nil
+			}
+		}
+	}
+
+	// If that doesn't work, try a linear search
+	useCache := false
+	iterator := a.driver.Iterate()
+	for {
+		s, found := iterator.Next()
+		if !found {
+			break
+		}
+		locked, err := a.tryLock(s, useCache)
+		if err != nil {
+			return "", err
+		}
+		if locked {
+			return s, nil
+		}
+	}
+	return "", nil
 }
 
 // Release de-allocates an entry.
-func (a *PoolAllocator) Release(s string) bool {
+func (a *MemoryPoolAllocator) Release(s string) (bool, error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
 	inUse, found := a.used[s]
 	if !found {
-		return false
+		return false, nil
 	}
 	delete(a.used, s)
-	return inUse
+	return inUse, nil
+}
+
+// Release de-allocates an entry.
+func (a *EtcdPoolAllocator) Release(s string) (bool, error) {
+	key := a.baseKey + s
+
+	recursive := false
+	_, err := a.etcd.Client.Delete(key, recursive)
+
+	deleted := true
+	if err != nil {
+		if tools.IsEtcdNotFound(err) {
+			deleted = false
+		} else {
+			return false, fmt.Errorf("Error communicating with etcd: %v", err)
+		}
+	}
+
+	// Whether or not we deleted it, it is deleted
+	a.lock.Lock()
+	a.usedCached[s] = false
+	a.lock.Unlock()
+
+	return deleted, nil
 }
 
 // Count the number of items allocated.  Intended for tests, because an etcd implementation is likely to be slow.
-func (a *PoolAllocator) size() int {
+func (a *MemoryPoolAllocator) size() int {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -135,7 +292,7 @@ func (a *PoolAllocator) size() int {
 }
 
 // Checks if an entry is allocated.  Used by tests.
-func (a *PoolAllocator) isAllocated(s string) bool {
+func (a *MemoryPoolAllocator) isAllocated(s string) bool {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 

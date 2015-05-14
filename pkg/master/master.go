@@ -438,6 +438,11 @@ func (m *Master) init(c *Config) {
 	portalAllocator := etcdipallocator.NewEtcd(ipAllocator, c.EtcdHelper)
 	m.portalAllocator = portalAllocator
 
+	publicServicePorts := service.NewPortAllocator(&c.PublicServicePorts, &c.EtcdHelper)
+	if publicServicePorts == nil {
+		glog.Fatalf("Failed to create a port allocator. Is port-range '%v' valid?", c.PublicServicePorts)
+	}
+
 	controllerStorage := controlleretcd.NewREST(c.EtcdHelper)
 
 	// TODO: Factor out the core API registration
@@ -454,7 +459,7 @@ func (m *Master) init(c *Config) {
 		"podTemplates": podTemplateStorage,
 
 		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, portalAllocator, m.publicServicePorts, c.ClusterName),
+		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, portalAllocator, publicServicePorts, c.ClusterName),
 		"endpoints":              endpointsStorage,
 		"minions":                nodeStorage,
 		"minions/status":         nodeStatusStorage,

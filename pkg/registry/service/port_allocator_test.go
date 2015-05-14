@@ -53,21 +53,21 @@ func TestPortPoolIterator(t *testing.T) {
 }
 
 func TestPortAllocatorNew(t *testing.T) {
-	if newPortAllocator(&util.PortRange{Base: 0, Size: 0}) != nil {
+	if NewPortAllocator(&util.PortRange{Base: 0, Size: 0}, nil) != nil {
 		t.Errorf("expected nil for empty port range")
 	}
-	if newPortAllocator(&util.PortRange{Base: 100, Size: 1}) != nil {
+	if NewPortAllocator(&util.PortRange{Base: 100, Size: 1}, nil) != nil {
 		t.Errorf("expected nil for too-small port range")
 	}
 	pr, err := util.ParsePortRange("100-200")
 	if err != nil {
 		t.Error(err)
 	}
-	pa := newPortAllocator(pr)
+	pa := NewPortAllocator(pr, nil)
 	if pa == nil {
 		t.Errorf("expected non-nil")
 	}
-	if pa.pool.size() != 0 {
+	if pa.pool.(*MemoryPoolAllocator).size() != 0 {
 		t.Errorf("wrong size() for pa.pool")
 	}
 }
@@ -77,7 +77,7 @@ func TestPortAllocatorAllocate(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	pa := newPortAllocator(pr)
+	pa := NewPortAllocator(pr, nil)
 	if pa == nil {
 		t.Errorf("expected non-nil")
 	}
@@ -104,13 +104,13 @@ func TestPortAllocatorAllocateNext(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	pa := newPortAllocator(pr)
+	pa := NewPortAllocator(pr, nil)
 	if pa == nil {
 		t.Errorf("expected non-nil")
 	}
 
 	// Turn off random allocation attempts, so we just allocate in sequence
-	pa.pool.randomAttempts = 0
+	pa.pool.(*MemoryPoolAllocator).randomAttempts = 0
 
 	p1, err := pa.AllocateNext()
 	if err != nil {
@@ -155,13 +155,13 @@ func TestPortAllocatorRelease(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	pa := newPortAllocator(pr)
+	pa := NewPortAllocator(pr, nil)
 	if pa == nil {
 		t.Errorf("expected non-nil")
 	}
 
 	// Turn off random allocation attempts, so we just allocate in sequence
-	pa.pool.randomAttempts = 0
+	pa.pool.(*MemoryPoolAllocator).randomAttempts = 0
 
 	err = pa.Release(50)
 	if err == nil {
