@@ -40,3 +40,6 @@ Only etcd:
 Only flannel:
 
     $ ansible-playbook -i inventory flannel.yml
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/ansible/README.md?pixel)]()

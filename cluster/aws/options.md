@@ -49,3 +49,6 @@ Please note: Do not set this to "false" unless you...
 - ... already configured a route for "0.0.0.0/0" to this NAT instance
 - ... already configured a route for "YOUR_IP/32" to an AWS internet gateway (for the master instance to reach your
   client directly during setup)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/aws/options.md?pixel)]()

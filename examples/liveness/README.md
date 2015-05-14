@@ -74,3 +74,6 @@ You would also see the killing and creating events at the bottom of the *kubectl
   Thu, 14 May 2015 15:23:25 -0700       Thu, 14 May 2015 15:23:25 -0700 1       {kubelet kubernetes-minion-0uzf}        spec.containers{liveness}               started      Started with docker id b254a9810073f9ee9075bb38ac29a4b063647176ad9eabd9184078ca98a60062
   ...
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/liveness/README.md?pixel)]()

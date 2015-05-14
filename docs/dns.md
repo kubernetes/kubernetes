@@ -36,3 +36,6 @@ time.
 ## For more information
 
 See [the docs for the cluster addon](../cluster/addons/dns/README.md).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/dns.md?pixel)]()

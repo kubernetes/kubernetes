@@ -76,3 +76,6 @@ This demonstrates what would have been 20 separate entries (indicating schedulin
  * PR [#4206](https://github.com/GoogleCloudPlatform/kubernetes/issues/4206): Modify Event struct to allow compressing multiple recurring events in to a single event
  * PR [#4306](https://github.com/GoogleCloudPlatform/kubernetes/issues/4306): Compress recurring events in to a single event to optimize etcd storage
  * PR [#4444](https://github.com/GoogleCloudPlatform/kubernetes/pull/4444): Switch events history to use LRU cache instead of map
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/event_compression.md?pixel)]()

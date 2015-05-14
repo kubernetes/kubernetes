@@ -24,3 +24,6 @@ The following conventions for the glog levels to use.  [glog](http://godoc.org/g
     * Logging in particularly thorny parts of code where you may want to come back later and check it
 
 As per the comments, the practical default level is V(2).  Developers and QE environments may wish to run at V(3) or V(4). If you wish to change the log level, you can pass in `-v=X` where X is the desired maximum level to log.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/logging.md?pixel)]()

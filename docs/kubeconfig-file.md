@@ -149,3 +149,6 @@ $kubectl config set-context queen-anne-context --cluster=pig-cluster --user=blac
 $kubectl config set-context federal-context --cluster=horse-cluster --user=green-user --namespace=chisel-ns
 $kubectl config use-context federal-context
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubeconfig-file.md?pixel)]()

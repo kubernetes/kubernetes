@@ -195,3 +195,6 @@ for more details about the Kubernetes concepts and terminology.
 
 Having a problem? Check the [Kubernetes issues database](https://github.com/GoogleCloudPlatform/kubernetes/issues)
 for related issues.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/juju/bundles/README.md?pixel)]()

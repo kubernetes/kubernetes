@@ -27,3 +27,6 @@ Other details:
 * [Logging](logging.md)
 * Monitoring using [CAdvisor](https://github.com/google/cadvisor) and [Heapster](https://github.com/GoogleCloudPlatform/heapster)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/overview.md?pixel)]()

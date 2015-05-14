@@ -162,3 +162,6 @@ to services in the same namespace and read-write access to events in that namesp
 Finally, it may provide an interface to automate creation of new serviceAccounts.  In that case, the user may want
 to GET serviceAccounts to see what has been created.
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/service_accounts.md?pixel)]()

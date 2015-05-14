@@ -8,3 +8,6 @@ Serves NFS4 exports, defined on command line. At least one export must be define
 Usage::
 
     docker run -d --name nfs --privileged jsafrane/nfsexporter /path/to/share /path/to/share2 ...
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/nfs/exporter/README.md?pixel)]()

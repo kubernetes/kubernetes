@@ -206,3 +206,6 @@ This is the amount of time a container spends accessing disk, including actuator
   * Name: "storage-iops" (or `kubernetes.io/storage-iops`)
   * Units: operations per second
   * Compressible? yes
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/resources.md?pixel)]()

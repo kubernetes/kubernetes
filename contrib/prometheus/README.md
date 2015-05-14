@@ -69,3 +69,6 @@ at port 9090.
 - Possibly use postgre or mysql as a promdash database.
 - push gateway (https://github.com/prometheus/pushgateway) setup.
 - Setup high availability via NFS
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/prometheus/README.md?pixel)]()

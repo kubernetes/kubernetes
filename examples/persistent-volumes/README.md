@@ -110,3 +110,6 @@ Hopefully this simple guide is enough to get you started with PersistentVolumes.
 ```#google-containers``` on IRC and ask!
 
 Enjoy!
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/persistent-volumes/README.md?pixel)]()

@@ -98,3 +98,6 @@ to interact with the environment.
 - [Kubernetes issue tracker](https://github.com/GoogleCloudPlatform/kubernetes/issues)
 - [Kubernetes Documenation](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs)
 - [Kubernetes releases](https://github.com/GoogleCloudPlatform/kubernetes/releases)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/juju/charms/trusty/kubernetes/README.md?pixel)]()

@@ -15,3 +15,6 @@ See more:
 * [pillar](pillar/)
 * [reactor](reactor/)
 * [salt](salt/)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/saltbase/README.md?pixel)]()

@@ -103,3 +103,6 @@ There are 4 ways that a container manifest can be provided to the Kubelet:
 # HISTORY
 October 2014, Originally compiled by Scott Collier (scollier at redhat dot com) based
  on the kubernetes source material and internal work.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/man/kubelet.1.md?pixel)]()

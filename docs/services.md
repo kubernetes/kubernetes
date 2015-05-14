@@ -354,3 +354,6 @@ being aware of which `Pods` they are actually accessing.
 
 ![Services detailed diagram](services_detail.png)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/services.md?pixel)]()

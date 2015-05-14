@@ -44,3 +44,6 @@ There is a short window after a new master acquires the lease, during which data
 
 ## Open Questions:
 * Is there a desire to keep track of all nodes for a specific component type?
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/high-availability.md?pixel)]()

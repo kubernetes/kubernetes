@@ -45,3 +45,6 @@ spec:
               fieldPath: metadata.namespace
   restartPolicy: Never
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/downward_api.md?pixel)]()

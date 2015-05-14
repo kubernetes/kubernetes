@@ -43,3 +43,6 @@ This should print the service that has been created, and map an external IP addr
 ### Next: Configuration files
 Most people will eventually want to use declarative configuration files for creating/modifying their applications.  A [simplified introduction](simple-yaml.md)
 is given in a different document.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/simple-nginx.md?pixel)]()
