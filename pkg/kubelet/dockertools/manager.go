@@ -1293,7 +1293,8 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 	if containerInfo.State.Pid == 0 {
 		return "", fmt.Errorf("failed to get init PID for Docker pod infra container %q", string(id))
 	}
-	return id, util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
+	util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
+	return id, nil
 }
 
 // TODO(vmarmol): This will soon be made non-public when its only use is internal.

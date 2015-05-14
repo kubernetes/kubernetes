@@ -39,7 +39,8 @@ type containerManagerImpl struct {
 	dockerContainerName string
 
 	// The manager of the resource-only container Docker should be in.
-	manager fs.Manager
+	manager           fs.Manager
+	dockerOomScoreAdj int
 }
 
 var _ containerManager = &containerManagerImpl{}
@@ -55,6 +56,7 @@ func newContainerManager(dockerDaemonContainer string) (containerManager, error)
 				AllowAllDevices: true,
 			},
 		},
+		dockerOomScoreAdj: -900,
 	}, nil
 }
 
@@ -102,6 +104,11 @@ func (cm *containerManagerImpl) ensureDockerInContainer() error {
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to move PID %q (in %q) to %q", pid, cont, cm.dockerContainerName))
 			}
+		}
+
+		// Also apply oom_score_adj to processes
+		if err := util.ApplyOomScoreAdj(pid, cm.dockerOomScoreAdj); err != nil {
+			errs = append(errs, fmt.Errorf("failed to apply oom score %q to PID %q", cm.dockerOomScoreAdj, pid))
 		}
 	}
 
