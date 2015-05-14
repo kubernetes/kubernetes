@@ -38,7 +38,7 @@ type image struct {
 // sha512-91e98d7f1679a097c878203c9659f2a26ae394656b3147963324c61fa3832f15	coreos.com/etcd:v2.0.9
 //
 func (im *image) parseString(input string) error {
-	idName := strings.Split(input, "\t")
+	idName := strings.Split(strings.TrimSpace(input), "\t")
 	if len(idName) != 2 {
 		return fmt.Errorf("invalid image information from 'rkt images': %q", input)
 	}
