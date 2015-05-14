@@ -31,6 +31,7 @@ import (
 // an interface to allow mock testing.
 type Interface interface {
 	PodsNamespacer
+	PodTemplatesNamespacer
 	ReplicationControllersNamespacer
 	ServicesNamespacer
 	EndpointsNamespacer
@@ -65,6 +66,10 @@ func (c *Client) Endpoints(namespace string) EndpointsInterface {
 
 func (c *Client) Pods(namespace string) PodInterface {
 	return newPods(c, namespace)
+}
+
+func (c *Client) PodTemplates(namespace string) PodTemplateInterface {
+	return newPodTemplates(c, namespace)
 }
 
 func (c *Client) Services(namespace string) ServiceInterface {
