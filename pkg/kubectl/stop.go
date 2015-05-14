@@ -85,7 +85,9 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, gracePer
 	}
 	retry := &RetryParams{shortInterval, reaper.timeout}
 	waitForReplicas := &RetryParams{reaper.pollInterval, reaper.timeout}
-	err = resizer.Resize(namespace, name, 0, nil, retry, waitForReplicas)
+	if err = resizer.Resize(namespace, name, 0, nil, retry, waitForReplicas); err != nil {
+		return "", err
+	}
 	if err := rc.Delete(name); err != nil {
 		return "", err
 	}
