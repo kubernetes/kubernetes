@@ -1,0 +1,16 @@
+apiVersion: v1beta3
+kind: Pod
+metadata:
+  name: dns-frontend
+  labels:
+    name: dns-frontend
+spec:
+  containers:
+    - name: dns-frontend
+      image: ddysher/dns-frontend
+      command:
+        - python
+        - client.py
+        - http://dns-backend.development.kubernetes.local:8000
+      imagePullPolicy: Always
+  restartPolicy: Never
