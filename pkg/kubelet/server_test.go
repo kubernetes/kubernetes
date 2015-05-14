@@ -43,7 +43,6 @@ import (
 
 type fakeKubelet struct {
 	podByNameFunc                      func(namespace, name string) (*api.Pod, bool)
-	statusFunc                         func(name string) (api.PodStatus, error)
 	containerInfoFunc                  func(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	rawInfoFunc                        func(query *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error)
 	machineInfoFunc                    func() (*cadvisorApi.MachineInfo, error)
@@ -60,10 +59,6 @@ type fakeKubelet struct {
 
 func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
 	return fk.podByNameFunc(namespace, name)
-}
-
-func (fk *fakeKubelet) GetPodStatus(name string) (api.PodStatus, error) {
-	return fk.statusFunc(name)
 }
 
 func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
@@ -159,36 +154,6 @@ func getPodName(name, namespace string) string {
 		namespace = NamespaceDefault
 	}
 	return name + "_" + namespace
-}
-
-func TestPodStatus(t *testing.T) {
-	fw := newServerTest()
-	expected := api.PodStatus{
-		ContainerStatuses: []api.ContainerStatus{
-			{Name: "goodpod"},
-		},
-	}
-	fw.fakeKubelet.statusFunc = func(name string) (api.PodStatus, error) {
-		if name == "goodpod_default" {
-			return expected, nil
-		}
-		return api.PodStatus{}, fmt.Errorf("bad pod %s", name)
-	}
-	resp, err := http.Get(fw.testHTTPServer.URL + "/podInfo?podID=goodpod&podNamespace=default")
-	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
-	}
-	got, err := readResp(resp)
-	if err != nil {
-		t.Errorf("Error reading body: %v", err)
-	}
-	expectedBytes, err := json.Marshal(expected)
-	if err != nil {
-		t.Fatalf("Unexpected marshal error %v", err)
-	}
-	if got != string(expectedBytes) {
-		t.Errorf("Expected: '%v', got: '%v'", expected, got)
-	}
 }
 
 func TestContainerInfo(t *testing.T) {

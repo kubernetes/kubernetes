@@ -77,36 +77,6 @@ var (
 
 type fakeKubeletClient struct{}
 
-func (fakeKubeletClient) GetPodStatus(host, podNamespace, podName string) (api.PodStatusResult, error) {
-	glog.V(3).Infof("Trying to get container info for %v/%v/%v", host, podNamespace, podName)
-	// This is a horrible hack to get around the fact that we can't provide
-	// different port numbers per kubelet...
-	var c client.PodInfoGetter
-	switch host {
-	case "localhost":
-		c = &client.HTTPKubeletClient{
-			Client: http.DefaultClient,
-			Port:   10250,
-		}
-	case "127.0.0.1":
-		c = &client.HTTPKubeletClient{
-			Client: http.DefaultClient,
-			Port:   10251,
-		}
-	default:
-		glog.Fatalf("Can't get info for: '%v', '%v - %v'", host, podNamespace, podName)
-	}
-	r, err := c.GetPodStatus("127.0.0.1", podNamespace, podName)
-	if err != nil {
-		return r, err
-	}
-	r.Status.PodIP = "1.2.3.4"
-	for i := range r.Status.ContainerStatuses {
-		r.Status.ContainerStatuses[i].Ready = true
-	}
-	return r, nil
-}
-
 func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
 }
@@ -265,8 +235,7 @@ func makeTempDirOrDie(prefix string, baseDir string) string {
 
 // podsOnMinions returns true when all of the selected pods exist on a minion.
 func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
-	podInfo := fakeKubeletClient{}
-	// wait for minions to indicate they have info about the desired pods
+	// Wait until all pods are running on the node.
 	return func() (bool, error) {
 		pods, err := c.Pods(podNamespace).List(labelSelector, fields.Everything())
 		if err != nil {
@@ -274,14 +243,14 @@ func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.S
 			return false, nil
 		}
 		for i := range pods.Items {
-			host, id, namespace := pods.Items[i].Spec.Host, pods.Items[i].Name, pods.Items[i].Namespace
-			glog.Infof("Check whether pod %s.%s exists on node %q", id, namespace, host)
-			if len(host) == 0 {
-				glog.Infof("Pod %s.%s is not bound to a host yet", id, namespace)
+			pod := pods.Items[i]
+			podString := fmt.Sprintf("%q/%q", pod.Namespace, pod.Name)
+			glog.Infof("Check whether pod %q exists on node %q", podString, pod.Spec.Host)
+			if len(pod.Spec.Host) == 0 {
+				glog.Infof("Pod %q is not bound to a host yet", podString)
 				return false, nil
 			}
-			if _, err := podInfo.GetPodStatus(host, namespace, id); err != nil {
-				glog.Infof("GetPodStatus error: %v", err)
+			if pod.Status.Phase != api.PodRunning {
 				return false, nil
 			}
 		}
