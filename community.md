@@ -40,6 +40,9 @@ companies:
   - label: vmWare
     img: /img/desktop/community/company_sprites/vmware.png
     slug: vmware
+  - label: Intel
+    img: /img/desktop/community/company_sprites/intel_logo_k8s.jpg
+    slug: intel
 
 developers:
     label: View Contributors
