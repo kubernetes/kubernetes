@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mitchellh/goamz/aws"
-	"github.com/mitchellh/goamz/ec2"
+	"github.com/awslabs/aws-sdk-go/aws"
+	"github.com/awslabs/aws-sdk-go/service/ec2"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
@@ -96,8 +96,8 @@ func TestReadAWSCloudConfig(t *testing.T) {
 }
 
 func TestNewAWSCloud(t *testing.T) {
-	fakeAuthFunc := func() (auth aws.Auth, err error) {
-		return aws.Auth{"", "", ""}, nil
+	fakeAuthFunc := func() (creds aws.CredentialProvider, err error) {
+		return aws.DetectCreds("", "", "")
 	}
 
 	tests := []struct {
@@ -161,7 +161,7 @@ func TestNewAWSCloud(t *testing.T) {
 }
 
 type FakeEC2 struct {
-	instances []ec2.Instance
+	instances []*ec2.Instance
 }
 
 func contains(haystack []string, needle string) bool {
@@ -174,7 +174,7 @@ func contains(haystack []string, needle string) bool {
 }
 
 func (self *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error) {
-	matches := []ec2.Instance{}
+	matches := []*ec2.Instance{}
 	for _, instance := range self.instances {
 		if filter != nil && !filter.Matches(instance) {
 			continue
@@ -184,9 +184,8 @@ func (self *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) 
 		}
 		matches = append(matches, instance)
 	}
-	return &ec2.InstancesResp{"",
-		[]ec2.Reservation{
-			{"", "", "", nil, matches}}}, nil
+
+	return matches, nil
 }
 
 type FakeMetadata struct {
@@ -224,7 +223,7 @@ func (ec2 *FakeEC2) DeleteVolume(volumeID string) (resp *ec2.SimpleResp, err err
 	panic("Not implemented")
 }
 
-func mockInstancesResp(instances []ec2.Instance) (aws *AWSCloud) {
+func mockInstancesResp(instances []*ec2.Instance) (aws *AWSCloud) {
 	availabilityZone := "us-west-2d"
 	return &AWSCloud{
 		ec2: &FakeEC2{
@@ -238,25 +237,37 @@ func mockAvailabilityZone(region string, availabilityZone string) *AWSCloud {
 	return &AWSCloud{
 		ec2:              &FakeEC2{},
 		availabilityZone: availabilityZone,
-		region:           aws.Regions[region],
+		region:           region,
 	}
 
 }
 
 func TestList(t *testing.T) {
-	instances := make([]ec2.Instance, 4)
-	instances[0].Tags = []ec2.Tag{{"Name", "foo"}}
-	instances[0].PrivateDNSName = "instance1"
-	instances[0].State.Name = "running"
-	instances[1].Tags = []ec2.Tag{{"Name", "bar"}}
-	instances[1].PrivateDNSName = "instance2"
-	instances[1].State.Name = "running"
-	instances[2].Tags = []ec2.Tag{{"Name", "baz"}}
-	instances[2].PrivateDNSName = "instance3"
-	instances[2].State.Name = "running"
-	instances[3].Tags = []ec2.Tag{{"Name", "quux"}}
-	instances[3].PrivateDNSName = "instance4"
-	instances[3].State.Name = "running"
+	instances := make([]*ec2.Instance, 4)
+	instances[0].Tags = []ec2.Tag{{
+		Key:   aws.String("Name"),
+		Value: aws.String("foo"),
+	}}
+	instances[0].PrivateDNSName = aws.String("instance1")
+	instances[0].State.Name = aws.String("running")
+	instances[1].Tags = []ec2.Tag{{
+		Key:   aws.String("Name"),
+		Value: aws.String("bar"),
+	}}
+	instances[1].PrivateDNSName = aws.String("instance2")
+	instances[1].State.Name = aws.String("running")
+	instances[2].Tags = []ec2.Tag{{
+		Key:   aws.String("Name"),
+		Value: aws.String("baz"),
+	}}
+	instances[2].PrivateDNSName = aws.String("instance3")
+	instances[2].State.Name = aws.String("running")
+	instances[3].Tags = []ec2.Tag{{
+		Key:   aws.String("Name"),
+		Value: aws.String("quux"),
+	}}
+	instances[3].PrivateDNSName = aws.String("instance4")
+	instances[3].State.Name = aws.String("running")
 
 	aws := mockInstancesResp(instances)
 
@@ -292,16 +303,16 @@ func testHasNodeAddress(t *testing.T, addrs []api.NodeAddress, addressType api.N
 func TestNodeAddresses(t *testing.T) {
 	// Note these instances have the same name
 	// (we test that this produces an error)
-	instances := make([]ec2.Instance, 2)
-	instances[0].PrivateDNSName = "instance1"
-	instances[0].PrivateIpAddress = "192.168.0.1"
-	instances[0].PublicIpAddress = "1.2.3.4"
-	instances[0].State.Name = "running"
-	instances[1].PrivateDNSName = "instance1"
-	instances[1].PrivateIpAddress = "192.168.0.2"
-	instances[1].State.Name = "running"
+	instances := make([]*ec2.Instance, 2)
+	instances[0].PrivateDNSName = aws.String("instance1")
+	instances[0].PrivateIpAddress = aws.String("192.168.0.1")
+	instances[0].PublicIpAddress = aws.String("1.2.3.4")
+	instances[0].State.Name = aws.String("running")
+	instances[1].PrivateDNSName = aws.String("instance1")
+	instances[1].PrivateIpAddress = aws.String("192.168.0.2")
+	instances[1].State.Name = aws.String("running")
 
-	aws1 := mockInstancesResp([]ec2.Instance{})
+	aws1 := mockInstancesResp([]*ec2.Instance{})
 	_, err1 := aws1.NodeAddresses("instance")
 	if err1 == nil {
 		t.Errorf("Should error when no instance found")
@@ -345,16 +356,16 @@ func TestGetRegion(t *testing.T) {
 }
 
 func TestGetResources(t *testing.T) {
-	instances := make([]ec2.Instance, 3)
-	instances[0].PrivateDNSName = "m3.medium"
-	instances[0].InstanceType = "m3.medium"
-	instances[0].State.Name = "running"
-	instances[1].PrivateDNSName = "r3.8xlarge"
-	instances[1].InstanceType = "r3.8xlarge"
-	instances[1].State.Name = "running"
-	instances[2].PrivateDNSName = "unknown.type"
-	instances[2].InstanceType = "unknown.type"
-	instances[2].State.Name = "running"
+	instances := make([]*ec2.Instance, 3)
+	instances[0].PrivateDNSName = aws.String("m3.medium")
+	instances[0].InstanceType = aws.String("m3.medium")
+	instances[0].State.Name = aws.String("running")
+	instances[1].PrivateDNSName = aws.String("r3.8xlarge")
+	instances[1].InstanceType = aws.String("r3.8xlarge")
+	instances[1].State.Name = aws.String("running")
+	instances[2].PrivateDNSName = aws.String("unknown.type")
+	instances[2].InstanceType = aws.String("unknown.type")
+	instances[2].State.Name = aws.String("running")
 
 	aws1 := mockInstancesResp(instances)
 
