@@ -81,6 +81,9 @@ func (g *generator) generateConversionsBetween(inType, outType reflect.Type) err
 	}
 
 	if inType.Kind() != outType.Kind() {
+		if existingConversion {
+			return nil
+		}
 		return fmt.Errorf("cannot convert types of different kinds: %v %v", inType, outType)
 	}
 	// We should be able to generate conversions both sides.
@@ -172,9 +175,6 @@ func (g *generator) generateConversionsForStruct(inType, outType reflect.Type) e
 		outField, found := outType.FieldByName(inField.Name)
 		if !found {
 			return fmt.Errorf("couldn't find a corresponding field %v in %v", inField.Name, outType)
-		}
-		if inField.Type.Kind() != outField.Type.Kind() {
-			return fmt.Errorf("cannot convert types of different kinds: %v %v", inField, outField)
 		}
 		if isComplexType(inField.Type) {
 			if err := g.generateConversionsBetween(inField.Type, outField.Type); err != nil {
@@ -732,6 +732,11 @@ func (g *generator) existsDedicatedConversionFunction(inType, outType reflect.Ty
 		if conv.inType == inType && conv.outType == outType {
 			return false
 		}
+	}
+	if inType.Kind() != outType.Kind() {
+		// TODO(wojtek-t): Currently all conversions between types of different kinds are
+		// unnamed. Thus we return false here.
+		return false
 	}
 	return g.scheme.Converter().HasConversionFunc(inType, outType)
 }

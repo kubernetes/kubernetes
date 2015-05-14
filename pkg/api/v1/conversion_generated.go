@@ -1377,6 +1377,42 @@ func convert_api_ListMeta_To_v1_ListMeta(in *newer.ListMeta, out *ListMeta, s co
 	return nil
 }
 
+func convert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *newer.ListOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ListOptions))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LabelSelector, &out.LabelSelector, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.FieldSelector, &out.FieldSelector, 0); err != nil {
+		return err
+	}
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	return nil
+}
+
+func convert_api_ListOptions_To_v1_ListOptions(in *newer.ListOptions, out *ListOptions, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*newer.ListOptions))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LabelSelector, &out.LabelSelector, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.FieldSelector, &out.FieldSelector, 0); err != nil {
+		return err
+	}
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	return nil
+}
+
 func convert_v1_NFSVolumeSource_To_api_NFSVolumeSource(in *NFSVolumeSource, out *newer.NFSVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NFSVolumeSource))(in)
@@ -4269,6 +4305,7 @@ func init() {
 		convert_api_LimitRangeSpec_To_v1_LimitRangeSpec,
 		convert_api_LimitRange_To_v1_LimitRange,
 		convert_api_ListMeta_To_v1_ListMeta,
+		convert_api_ListOptions_To_v1_ListOptions,
 		convert_api_List_To_v1_List,
 		convert_api_NFSVolumeSource_To_v1_NFSVolumeSource,
 		convert_api_NamespaceList_To_v1_NamespaceList,
@@ -4377,6 +4414,7 @@ func init() {
 		convert_v1_LimitRangeSpec_To_api_LimitRangeSpec,
 		convert_v1_LimitRange_To_api_LimitRange,
 		convert_v1_ListMeta_To_api_ListMeta,
+		convert_v1_ListOptions_To_api_ListOptions,
 		convert_v1_List_To_api_List,
 		convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
 		convert_v1_NamespaceList_To_api_NamespaceList,
