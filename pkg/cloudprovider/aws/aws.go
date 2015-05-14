@@ -31,6 +31,7 @@ import (
 
 	"code.google.com/p/gcfg"
 	"github.com/awslabs/aws-sdk-go/aws"
+	"github.com/awslabs/aws-sdk-go/aws/credentials"
 	"github.com/awslabs/aws-sdk-go/service/ec2"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -46,16 +47,16 @@ type EC2 interface {
 	Instances(instanceIds []string, filter *ec2InstanceFilter) (instances []*ec2.Instance, err error)
 
 	// Attach a volume to an instance
-	AttachVolume(volumeID string, instanceId string, mountDevice string) (resp *ec2.AttachVolumeResp, err error)
+	AttachVolume(volumeID, instanceId, mountDevice string) (resp *ec2.VolumeAttachment, err error)
 	// Detach a volume from whatever instance it is attached to
 	// TODO: We should specify the InstanceID and the Device, for safety
-	DetachVolume(volumeID string) (resp *ec2.SimpleResp, err error)
+	DetachVolume(volumeID, instanceId, mountDevice string) (resp *ec2.VolumeAttachment, err error)
 	// Lists volumes
-	Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error)
+	Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.DescribeVolumesOutput, err error)
 	// Create an EBS volume
-	CreateVolume(request *ec2.CreateVolume) (resp *ec2.CreateVolumeResp, err error)
+	CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error)
 	// Delete an EBS volume
-	DeleteVolume(volumeID string) (resp *ec2.SimpleResp, err error)
+	DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput, err error)
 }
 
 // Abstraction over the AWS metadata service
@@ -123,6 +124,14 @@ type awsSdkEC2 struct {
 	ec2 *ec2.EC2
 }
 
+func stringPointerArray(orig []string) []*string {
+	n := make([]*string, len(orig))
+	for i, s := range orig {
+		n[i] = &s
+	}
+	return n
+}
+
 // Implementation of EC2.Instances
 func (self *awsSdkEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (resp []*ec2.Instance, err error) {
 	var filters []*ec2.Filter
@@ -142,7 +151,7 @@ func (self *awsSdkEC2) Instances(instanceIds []string, filter *ec2InstanceFilter
 
 	for {
 		res, err := self.ec2.DescribeInstances(&ec2.DescribeInstancesInput{
-			InstanceIDs: instanceIds,
+			InstanceIDs: stringPointerArray(instanceIds),
 			Filters:     filters,
 			NextToken:   &nextToken,
 		})
@@ -175,7 +184,7 @@ var metadataClient = http.Client{
 // Implements AWSMetadata.GetMetaData
 func (self *awsSdkMetadata) GetMetaData(key string) ([]byte, error) {
 	// TODO Get an implementation of this merged into aws-sdk-go
-	url := "http://169.254.169.254/latest/meta-data" + path
+	url := "http://169.254.169.254/latest/meta-data/" + key
 
 	res, err := metadataClient.Get(url)
 	if err != nil {
@@ -196,26 +205,41 @@ func (self *awsSdkMetadata) GetMetaData(key string) ([]byte, error) {
 	return []byte(body), nil
 }
 
-type AuthFunc func() (creds aws.CredentialsProvider, err error)
+type AuthFunc func() (creds *credentials.Credentials)
 
-func (s *awsSdkEC2) AttachVolume(volumeID string, instanceId string, device string) (resp *ec2.AttachVolumeResp, err error) {
-	return s.ec2.AttachVolume(volumeID, instanceId, device)
+func (s *awsSdkEC2) AttachVolume(volumeID, instanceId, device string) (resp *ec2.VolumeAttachment, err error) {
+
+	request := ec2.AttachVolumeInput{
+		Device:     &device,
+		InstanceID: &instanceId,
+		VolumeID:   &volumeID,
+	}
+	return s.ec2.AttachVolume(&request)
 }
 
-func (s *awsSdkEC2) DetachVolume(volumeID string) (resp *ec2.SimpleResp, err error) {
-	return s.ec2.DetachVolume(volumeID)
+func (s *awsSdkEC2) DetachVolume(volumeID, instanceId, device string) (resp *ec2.VolumeAttachment, err error) {
+	request := ec2.DetachVolumeInput{
+		Device:     &device,
+		InstanceID: &instanceId,
+		VolumeID:   &volumeID,
+	}
+	return s.ec2.DetachVolume(&request)
 }
 
-func (s *awsSdkEC2) Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error) {
-	return s.ec2.Volumes(volumeIDs, filter)
+func (s *awsSdkEC2) Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.DescribeVolumesOutput, err error) {
+	request := ec2.DescribeVolumesInput{
+		VolumeIDs: stringPointerArray(volumeIDs),
+	}
+	return s.ec2.DescribeVolumes(&request)
 }
 
-func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolume) (resp *ec2.CreateVolumeResp, err error) {
+func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error) {
 	return s.ec2.CreateVolume(request)
 }
 
-func (s *awsSdkEC2) DeleteVolume(volumeID string) (resp *ec2.SimpleResp, err error) {
-	return s.ec2.DeleteVolume(volumeID)
+func (s *awsSdkEC2) DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput, err error) {
+	request := ec2.DeleteVolumeInput{VolumeID: &volumeID}
+	return s.ec2.DeleteVolume(&request)
 }
 
 func init() {
@@ -225,8 +249,8 @@ func init() {
 	})
 }
 
-func getAuth() (creds aws.CredentialsProvider) {
-	return aws.DetectCreds("", "", "")
+func getAuth() (creds *credentials.Credentials) {
+	return credentials.NewStaticCredentials("", "", "")
 }
 
 // readAWSCloudConfig reads an instance of AWSCloudConfig from config reader.
@@ -339,11 +363,11 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 
 	addresses := []api.NodeAddress{}
 
-	if *instance.PrivateIpAddress != "" {
-		ipAddress := *instance.PrivateIpAddress
+	if *instance.PrivateIPAddress != "" {
+		ipAddress := *instance.PrivateIPAddress
 		ip := net.ParseIP(ipAddress)
 		if ip == nil {
-			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", *instance.InstanceId, ipAddress)
+			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", *instance.InstanceID, ipAddress)
 		}
 		addresses = append(addresses, api.NodeAddress{Type: api.NodeInternalIP, Address: ip.String()})
 
@@ -352,11 +376,11 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	}
 
 	// TODO: Other IP addresses (multiple ips)?
-	if *instance.PublicIpAddress != "" {
-		ipAddress := *instance.PublicIpAddress
+	if *instance.PublicIPAddress != "" {
+		ipAddress := *instance.PublicIPAddress
 		ip := net.ParseIP(ipAddress)
 		if ip == nil {
-			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", *instance.InstanceId, ipAddress)
+			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", *instance.InstanceID, ipAddress)
 		}
 		addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalIP, Address: ip.String()})
 	}
@@ -370,7 +394,7 @@ func (aws *AWSCloud) ExternalID(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return inst.InstanceId, nil
+	return *inst.InstanceID, nil
 }
 
 // Return the instances matching the relevant private dns name.
@@ -411,7 +435,8 @@ func (aws *AWSCloud) getInstancesByDnsName(name string) (*ec2.Instance, error) {
 // Check if the instance is alive (running or pending)
 // We typically ignore instances that are not alive
 func isAlive(instance *ec2.Instance) bool {
-	switch *instance.State.Name {
+	state := *instance.State
+	switch *state.Name {
 	case "shutting-down", "terminated", "stopping", "stopped":
 		return false
 	case "pending", "running":
@@ -693,23 +718,17 @@ func (self *awsInstance) getInstanceType() *awsInstanceType {
 
 // Gets the full information about this instance from the EC2 API
 func (self *awsInstance) getInfo() (*ec2.Instance, error) {
-	resp, err := self.ec2.Instances([]string{self.awsID}, nil)
+	instances, err := self.ec2.Instances([]string{self.awsID}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error querying ec2 for instance info: %v", err)
 	}
-	if len(resp.Reservations) == 0 {
-		return nil, fmt.Errorf("no reservations found for instance: %s", self.awsID)
-	}
-	if len(resp.Reservations) > 1 {
-		return nil, fmt.Errorf("multiple reservations found for instance: %s", self.awsID)
-	}
-	if len(resp.Reservations[0].Instances) == 0 {
+	if len(instances) == 0 {
 		return nil, fmt.Errorf("no instances found for instance: %s", self.awsID)
 	}
-	if len(resp.Reservations[0].Instances) > 1 {
+	if len(instances) > 1 {
 		return nil, fmt.Errorf("multiple instances found for instance: %s", self.awsID)
 	}
-	return &resp.Reservations[0].Instances[0], nil
+	return instances[0], nil
 }
 
 // Assigns an unused mount device for the specified volume.
@@ -733,8 +752,8 @@ func (self *awsInstance) assignMountDevice(volumeID string) (mountDevice string,
 			return "", false, err
 		}
 		deviceMappings := map[string]string{}
-		for _, blockDevice := range info.BlockDevices {
-			deviceMappings[blockDevice.DeviceName] = blockDevice.VolumeId
+		for _, blockDevice := range info.BlockDeviceMappings {
+			deviceMappings[*blockDevice.DeviceName] = *blockDevice.EBS.VolumeID
 		}
 		self.deviceMappings = deviceMappings
 	}
@@ -840,7 +859,7 @@ func (self *awsDisk) getInfo() (*ec2.Volume, error) {
 	if len(resp.Volumes) > 1 {
 		return nil, fmt.Errorf("multiple volumes found for volume: %s", self.awsID)
 	}
-	return &resp.Volumes[0], nil
+	return resp.Volumes[0], nil
 }
 
 func (self *awsDisk) waitForAttachmentStatus(status string) error {
@@ -861,7 +880,7 @@ func (self *awsDisk) waitForAttachmentStatus(status string) error {
 			if attachmentStatus != "" {
 				glog.Warning("Found multiple attachments: ", info)
 			}
-			attachmentStatus = attachment.Status
+			attachmentStatus = *attachment.State
 		}
 		if attachmentStatus == "" {
 			attachmentStatus = "detached"
@@ -931,7 +950,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 			return "", fmt.Errorf("Error finding instance: %v", err)
 		}
 
-		awsInstance = newAWSInstance(aws.ec2, instance.InstanceId)
+		awsInstance = newAWSInstance(aws.ec2, *instance.InstanceID)
 	}
 
 	if readOnly {
@@ -985,7 +1004,7 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 	}
 
 	// TODO: We should specify the InstanceID and the Device, for safety
-	response, err := aws.ec2.DetachVolume(disk.awsID)
+	response, err := aws.ec2.DetachVolume(disk.awsID, instanceName, diskName)
 	if err != nil {
 		return fmt.Errorf("error detaching EBS volume: %v", err)
 	}
@@ -1002,18 +1021,19 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 
 // Implements Volumes.CreateVolume
 func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
-	request := &ec2.CreateVolume{}
-	request.AvailZone = aws.availabilityZone
-	request.Size = (int64(volumeOptions.CapacityMB) + 1023) / 1024
+	request := &ec2.CreateVolumeInput{}
+	request.AvailabilityZone = &aws.availabilityZone
+	volSize := (int64(volumeOptions.CapacityMB) + 1023) / 1024
+	request.Size = &volSize
 	response, err := aws.ec2.CreateVolume(request)
 	if err != nil {
 		return "", err
 	}
 
-	az := response.AvailZone
-	awsID := response.VolumeId
+	az := response.AvailabilityZone
+	awsID := response.VolumeID
 
-	volumeName := "aws://" + az + "/" + awsID
+	volumeName := "aws://" + *az + "/" + *awsID
 
 	return volumeName, nil
 }
