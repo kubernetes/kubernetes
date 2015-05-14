@@ -293,7 +293,8 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			return
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "CREATE"))
+		userInfo, _ := api.UserFrom(ctx)
+		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "CREATE", userInfo))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -356,15 +357,16 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		}
 
 		obj := r.New()
+		ctx := scope.ContextFunc(req)
+		ctx = api.WithNamespace(ctx, namespace)
+
 		// PATCH requires same permission as UPDATE
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE"))
+		userInfo, _ := api.UserFrom(ctx)
+		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE", userInfo))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
-
-		ctx := scope.ContextFunc(req)
-		ctx = api.WithNamespace(ctx, namespace)
 
 		versionedObj, err := converter.ConvertToVersion(obj, scope.APIVersion)
 		if err != nil {
@@ -457,7 +459,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE"))
+		userInfo, _ := api.UserFrom(ctx)
+		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE", userInfo))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -518,7 +521,8 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			}
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, scope.Resource, "DELETE"))
+		userInfo, _ := api.UserFrom(ctx)
+		err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, scope.Resource, "DELETE", userInfo))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return

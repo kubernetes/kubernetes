@@ -30,7 +30,7 @@ import (
 func TestIgnoresNonCreate(t *testing.T) {
 	pod := &api.Pod{}
 	for _, op := range []string{"UPDATE", "DELETE", "CUSTOM"} {
-		attrs := admission.NewAttributesRecord(pod, "Pod", "myns", string(api.ResourcePods), op)
+		attrs := admission.NewAttributesRecord(pod, "Pod", "myns", string(api.ResourcePods), op, nil)
 		err := NewServiceAccount(nil).Admit(attrs)
 		if err != nil {
 			t.Errorf("Expected %s operation allowed, got err: %v", op, err)
@@ -40,7 +40,7 @@ func TestIgnoresNonCreate(t *testing.T) {
 
 func TestIgnoresNonPodResource(t *testing.T) {
 	pod := &api.Pod{}
-	attrs := admission.NewAttributesRecord(pod, "Pod", "myns", "CustomResource", "CREATE")
+	attrs := admission.NewAttributesRecord(pod, "Pod", "myns", "CustomResource", "CREATE", nil)
 	err := NewServiceAccount(nil).Admit(attrs)
 	if err != nil {
 		t.Errorf("Expected non-pod resource allowed, got err: %v", err)
@@ -48,7 +48,7 @@ func TestIgnoresNonPodResource(t *testing.T) {
 }
 
 func TestIgnoresNilObject(t *testing.T) {
-	attrs := admission.NewAttributesRecord(nil, "Pod", "myns", string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(nil, "Pod", "myns", string(api.ResourcePods), "CREATE", nil)
 	err := NewServiceAccount(nil).Admit(attrs)
 	if err != nil {
 		t.Errorf("Expected nil object allowed allowed, got err: %v", err)
@@ -57,7 +57,7 @@ func TestIgnoresNilObject(t *testing.T) {
 
 func TestIgnoresNonPodObject(t *testing.T) {
 	obj := &api.Namespace{}
-	attrs := admission.NewAttributesRecord(obj, "Pod", "myns", string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(obj, "Pod", "myns", string(api.ResourcePods), "CREATE", nil)
 	err := NewServiceAccount(nil).Admit(attrs)
 	if err != nil {
 		t.Errorf("Expected non pod object allowed, got err: %v", err)
@@ -77,7 +77,7 @@ func TestIgnoresMirrorPod(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, "Pod", "myns", string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(pod, "Pod", "myns", string(api.ResourcePods), "CREATE", nil)
 	err := NewServiceAccount(nil).Admit(attrs)
 	if err != nil {
 		t.Errorf("Expected mirror pod without service account or secrets allowed, got err: %v", err)
@@ -95,7 +95,7 @@ func TestRejectsMirrorPodWithServiceAccount(t *testing.T) {
 			ServiceAccount: "default",
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, "Pod", "myns", string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(pod, "Pod", "myns", string(api.ResourcePods), "CREATE", nil)
 	err := NewServiceAccount(nil).Admit(attrs)
 	if err == nil {
 		t.Errorf("Expected a mirror pod to be prevented from referencing a service account")
@@ -115,7 +115,7 @@ func TestRejectsMirrorPodWithSecretVolumes(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, "Pod", "myns", string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(pod, "Pod", "myns", string(api.ResourcePods), "CREATE", nil)
 	err := NewServiceAccount(nil).Admit(attrs)
 	if err == nil {
 		t.Errorf("Expected a mirror pod to be prevented from referencing a secret volume")
@@ -137,7 +137,7 @@ func TestAssignsDefaultServiceAccountAndToleratesMissingAPIToken(t *testing.T) {
 	})
 
 	pod := &api.Pod{}
-	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE", nil)
 	err := admit.Admit(attrs)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -161,7 +161,7 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 	admit := NewServiceAccount(client)
 
 	pod := &api.Pod{}
-	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE", nil)
 	err := admit.Admit(attrs)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -180,7 +180,7 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 	admit := NewServiceAccount(client)
 
 	pod := &api.Pod{}
-	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE", nil)
 	err := admit.Admit(attrs)
 	if err == nil {
 		t.Errorf("Expected error for missing service account, got none")
@@ -242,7 +242,7 @@ func TestAutomountsAPIToken(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE", nil)
 	err := admit.Admit(attrs)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -320,7 +320,7 @@ func TestRespectsExistingMount(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE", nil)
 	err := admit.Admit(attrs)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -363,7 +363,7 @@ func TestAllowsReferencedSecretVolumes(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE", nil)
 	err := admit.Admit(attrs)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -391,7 +391,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 			},
 		},
 	}
-	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE")
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE", nil)
 	err := admit.Admit(attrs)
 	if err == nil {
 		t.Errorf("Expected rejection for using a secret the service account does not reference")
