@@ -157,7 +157,7 @@ type PersistentVolumeClaim struct {
 	TypeMeta `json:",inline"`
 
 	// Spec defines the volume requested by a pod author
-	Spec PersistentVolumeClaimSpec `json:"spec,omitempty" description: "the desired characteristics of a volume"`
+	Spec PersistentVolumeClaimSpec `json:"spec,omitempty" description:"the desired characteristics of a volume"`
 
 	// Status represents the current information about a claim
 	Status PersistentVolumeClaimStatus `json:"status,omitempty" description:"the current status of a persistent volume claim; read-only"`
@@ -165,7 +165,7 @@ type PersistentVolumeClaim struct {
 
 type PersistentVolumeClaimList struct {
 	TypeMeta `json:",inline"`
-	Items    []PersistentVolumeClaim `json:"items,omitempty" description: "a list of persistent volume claims"`
+	Items    []PersistentVolumeClaim `json:"items,omitempty" description:"a list of persistent volume claims"`
 }
 
 // PersistentVolumeClaimSpec describes the common attributes of storage devices

@@ -702,7 +702,7 @@ type ContainerState struct {
 
 type ContainerStatus struct {
 	// Each container in a pod must have a unique name.
-	Name string `name of the container; must be a DNS_LABEL and unique within the pod; cannot be updated"`
+	Name string `json:"name"`
 	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
 	// defined for container?
 	State                ContainerState `json:"state,omitempty"`
