@@ -24,6 +24,26 @@ is_push=$@
 readonly KNOWN_TOKENS_FILE="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
 readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 
+function ensure-basic-networking() {
+  # Deal with GCE networking bring-up race. (We rely on DNS for a lot,
+  # and it's just not worth doing a whole lot of startup work if this
+  # isn't ready yet.)
+  until getent hosts metadata.google.internal &>/dev/null; do
+    echo 'Waiting for functional DNS (trying to resolve metadata.google.internal)...'
+    sleep 3
+  done
+  until getent hosts $(hostname -f) &>/dev/null; do
+    echo 'Waiting for functional DNS (trying to resolve my own FQDN)...'
+    sleep 3
+  done
+  until getent hosts $(hostname -i) &>/dev/null; do
+    echo 'Waiting for functional DNS (trying to resolve my own IP)...'
+    sleep 3
+  done
+
+  echo "Networking functional on $(hostname) ($(hostname -i))"
+}
+
 function ensure-install-dir() {
   INSTALL_DIR="/var/cache/kubernetes-install"
   mkdir -p ${INSTALL_DIR}
@@ -58,11 +78,11 @@ for k,v in yaml.load(sys.stdin).iteritems():
   print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
 ''' < "${kube_env_yaml}")
 
-  # Infer master status from presence in node pool
-  if [[ $(hostname) = ${NODE_INSTANCE_PREFIX}* ]]; then
-    KUBERNETES_MASTER="false"
-  else
+  # Infer master status from hostname
+  if [[ $(hostname) == "${INSTANCE_PREFIX}-master" ]]; then
     KUBERNETES_MASTER="true"
+  else
+    KUBERNETES_MASTER="false"
   fi
 }
 
@@ -466,6 +486,7 @@ function run-salt() {
 if [[ -z "${is_push}" ]]; then
   echo "== kube-up node config starting =="
   set-broken-motd
+  ensure-basic-networking
   ensure-install-dir
   set-kube-env
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
@@ -483,6 +504,7 @@ if [[ -z "${is_push}" ]]; then
   echo "== kube-up node config done =="
 else
   echo "== kube-push node config starting =="
+  ensure-basic-networking
   ensure-install-dir
   set-kube-env
   create-salt-pillar
