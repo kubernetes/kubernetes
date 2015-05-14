@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package conversion_test
+package api_test
 
 import (
 	"io/ioutil"
@@ -30,11 +30,11 @@ import (
 func BenchmarkPodConversion(b *testing.B) {
 	data, err := ioutil.ReadFile("pod_example.json")
 	if err != nil {
-		b.Fatalf("unexpected error while reading file: %v", err)
+		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var pod api.Pod
 	if err := api.Scheme.DecodeInto(data, &pod); err != nil {
-		b.Fatalf("unexpected error decoding pod: %v", err)
+		b.Fatalf("Unexpected error decoding pod: %v", err)
 	}
 
 	scheme := api.Scheme.Raw()
@@ -51,18 +51,18 @@ func BenchmarkPodConversion(b *testing.B) {
 		result = obj.(*api.Pod)
 	}
 	if !api.Semantic.DeepDerivative(pod, *result) {
-		b.Fatalf("Incorrect conversion: expected %v, got %v", pod, result)
+		b.Fatalf("Incorrect conversion: expected %v, got %v", pod, *result)
 	}
 }
 
 func BenchmarkNodeConversion(b *testing.B) {
 	data, err := ioutil.ReadFile("node_example.json")
 	if err != nil {
-		b.Fatalf("unexpected error while reading file: %v", err)
+		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var node api.Node
 	if err := api.Scheme.DecodeInto(data, &node); err != nil {
-		b.Fatalf("unexpected error decoding node: %v", err)
+		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 
 	scheme := api.Scheme.Raw()
@@ -79,18 +79,18 @@ func BenchmarkNodeConversion(b *testing.B) {
 		result = obj.(*api.Node)
 	}
 	if !api.Semantic.DeepDerivative(node, *result) {
-		b.Fatalf("Incorrect conversion: expected %v, got %v", node, result)
+		b.Fatalf("Incorrect conversion: expected %v, got %v", node, *result)
 	}
 }
 
 func BenchmarkReplicationControllerConversion(b *testing.B) {
 	data, err := ioutil.ReadFile("replication_controller_example.json")
 	if err != nil {
-		b.Fatalf("unexpected error while reading file: %v", err)
+		b.Fatalf("Unexpected error while reading file: %v", err)
 	}
 	var replicationController api.ReplicationController
 	if err := api.Scheme.DecodeInto(data, &replicationController); err != nil {
-		b.Fatalf("unexpected error decoding node: %v", err)
+		b.Fatalf("Unexpected error decoding node: %v", err)
 	}
 
 	scheme := api.Scheme.Raw()
@@ -107,6 +107,6 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 		result = obj.(*api.ReplicationController)
 	}
 	if !api.Semantic.DeepDerivative(replicationController, *result) {
-		b.Fatalf("Incorrect conversion: expected %v, got %v", replicationController, result)
+		b.Fatalf("Incorrect conversion: expected %v, got %v", replicationController, *result)
 	}
 }
