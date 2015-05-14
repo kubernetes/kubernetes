@@ -193,6 +193,10 @@
 			"Rev": "939230d2086a4f1870e04c52e0a376c25bae0ec4"
 		},
 		{
+			"ImportPath": "github.com/gogo/protobuf/proto",
+			"Rev": "ab6cea4a44ef42b748cd88d2d372047b75806e0c"
+		},
+		{
 			"ImportPath": "github.com/golang/glog",
 			"Rev": "44145f04b68cf362d9c4df2182967c2275eaefed"
 		},
@@ -333,6 +337,22 @@
 			"Rev": "fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a"
 		},
 		{
+			"ImportPath": "github.com/mesos/mesos-go/detector",
+			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+		},
+		{
+			"ImportPath": "github.com/mesos/mesos-go/mesosproto",
+			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+		},
+		{
+			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
+			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+		},
+		{
+			"ImportPath": "github.com/mesos/mesos-go/upid",
+			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+		},
+		{
 			"ImportPath": "github.com/miekg/dns",
 			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
 		},
@@ -393,6 +413,10 @@
 			"Rev": "77efab57b2f74dd3f9051c79752b2e8995c8b789"
 		},
 		{
+			"ImportPath": "github.com/samuel/go-zookeeper/zk",
+			"Rev": "d0e0d8e11f318e000a8cc434616d69e329edc374"
+		},
+		{
 			"ImportPath": "github.com/shurcooL/sanitized_anchor_name",
 			"Rev": "9a8b7d4e8f347bfa230879db9d7d4e4d9e19f962"
 		},
@@ -423,6 +447,10 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
+			"Rev": "e4ec8152c15fc46bd5056ce65997a07c7d415325"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/suite",
 			"Rev": "e4ec8152c15fc46bd5056ce65997a07c7d415325"
 		},
 		{
