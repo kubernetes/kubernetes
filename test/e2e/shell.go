@@ -33,27 +33,29 @@ var (
 )
 
 var _ = Describe("Shell", func() {
-
 	defer GinkgoRecover()
-	// Slurp up all the tests in hack/e2e-suite
-	bashE2ERoot := filepath.Join(root, "hack/e2e-suite")
-	files, err := ioutil.ReadDir(bashE2ERoot)
-	if err != nil {
-		Fail(fmt.Sprintf("Error reading test suites from %v %v", bashE2ERoot, err.Error()))
-	}
 
-	for _, file := range files {
-		fileName := file.Name() // Make a copy
-		It(fmt.Sprintf("tests that %v passes", fileName), func() {
-			// A number of scripts only work on gce
-			if !providerIs("gce", "gke") {
-				By(fmt.Sprintf("Skipping Shell test %s, which is only supported for provider gce and gke (not %s)",
-					fileName, testContext.Provider))
-				return
-			}
-			runCmdTest(filepath.Join(bashE2ERoot, fileName))
-		})
-	}
+	It("should run all the tests in hack/e2e-suite", func() {
+		// Slurp up all the tests in hack/e2e-suite
+		bashE2ERoot := filepath.Join(root, "hack/e2e-suite")
+		files, err := ioutil.ReadDir(bashE2ERoot)
+		if err != nil {
+			Fail(fmt.Sprintf("Error reading test suites from %v %v", bashE2ERoot, err.Error()))
+		}
+
+		for _, file := range files {
+			fileName := file.Name() // Make a copy
+			It(fmt.Sprintf("tests that %v passes", fileName), func() {
+				// A number of scripts only work on gce
+				if !providerIs("gce", "gke") {
+					By(fmt.Sprintf("Skipping Shell test %s, which is only supported for provider gce and gke (not %s)",
+						fileName, testContext.Provider))
+					return
+				}
+				runCmdTest(filepath.Join(bashE2ERoot, fileName))
+			})
+		}
+	})
 })
 
 func absOrDie(path string) string {
