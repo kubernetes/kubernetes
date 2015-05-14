@@ -239,6 +239,11 @@
 			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
 		{
+			"ImportPath": "github.com/go-sql-driver/mysql",
+			"Comment": "v1.2-119-g527bcd5",
+			"Rev": "527bcd55aab2e53314f1a150922560174b493034"
+		},
+		{
 			"ImportPath": "github.com/godbus/dbus",
 			"Comment": "0-7-g939230d",
 			"Rev": "939230d2086a4f1870e04c52e0a376c25bae0ec4"

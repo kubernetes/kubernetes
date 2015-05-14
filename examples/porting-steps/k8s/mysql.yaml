@@ -1,0 +1,42 @@
+---
+  kind: "ReplicationController"
+  apiVersion: "v1"
+  metadata:
+    name: "mysql"
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          role: "mysql"
+      spec:
+        volumes:
+        - name: "mysql-vol"
+          gcePersistentDisk:
+            pdName: "mysql-disk"
+            fsType: "ext4"
+        containers:
+        - name: "mysql"
+          image: "mysql:latest"
+          env:
+          - name: MYSQL_ROOT_PASSWORD
+            value: mysecretpassword
+          ports:
+          - name: "mysql"
+            containerPort: 3306
+            protocol: "TCP"
+          volumeMounts:
+          - name: "mysql-vol"
+            mountPath: "/var/lib/mysql"
+---
+  kind: "Service"
+  apiVersion: "v1"
+  metadata:
+    name: "mysql"
+  spec:
+    ports:
+    - protocol: "TCP"
+      port: 3306
+      targetPort: "mysql"
+    selector:
+      role: "mysql"

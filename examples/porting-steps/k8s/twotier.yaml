@@ -1,0 +1,36 @@
+---
+  kind: "ReplicationController"
+  apiVersion: "v1"
+  metadata:
+    name: "twotier"
+  spec:
+    replicas: 2
+    template:
+      metadata:
+        labels:
+          role: "front"
+      spec:
+        containers:
+        - name: "twotier"
+          env:
+          - name: DB_PW
+            value: mysecretpassword
+          image: "gcr.io/google-samples/steps-twotier:k8s"
+          ports:
+          - name: "http-server"
+            hostPort: 80
+            containerPort: 8080
+            protocol: "TCP"
+---
+  kind: "Service"
+  apiVersion: "v1"
+  metadata:
+    name: "twotier"
+  spec:
+    ports:
+    - protocol: "TCP"
+      port: 80
+      targetPort: "http-server"
+    selector:
+      role: "front"
+    type: "LoadBalancer"

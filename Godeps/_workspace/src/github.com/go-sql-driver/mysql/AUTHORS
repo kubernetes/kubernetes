@@ -1,0 +1,44 @@
+# This is the official list of Go-MySQL-Driver authors for copyright purposes.
+
+# If you are submitting a patch, please add your name or the name of the
+# organization which holds the copyright to this list in alphabetical order.
+
+# Names should be added to this file as
+#	Name <email address>
+# The email address is not required for organizations.
+# Please keep the list sorted.
+
+
+# Individual Persons
+
+Aaron Hopkins <go-sql-driver at die.net>
+Arne Hormann <arnehormann at gmail.com>
+Carlos Nieto <jose.carlos at menteslibres.net>
+Chris Moos <chris at tech9computers.com>
+DisposaBoy <disposaboy at dby.me>
+Frederick Mayle <frederickmayle at gmail.com>
+Gustavo Kristic <gkristic at gmail.com>
+Hanno Braun <mail at hannobraun.com>
+Henri Yandell <flamefew at gmail.com>
+INADA Naoki <songofacandy at gmail.com>
+James Harr <james.harr at gmail.com>
+Jian Zhen <zhenjl at gmail.com>
+Joshua Prunier <joshua.prunier at gmail.com>
+Julien Schmidt <go-sql-driver at julienschmidt.com>
+Kamil Dziedzic <kamil at klecza.pl>
+Leonardo YongUk Kim <dalinaum at gmail.com>
+Lucas Liu <extrafliu at gmail.com>
+Luke Scott <luke at webconnex.com>
+Michael Woolnough <michael.woolnough at gmail.com>
+Nicola Peduzzi <thenikso at gmail.com>
+Runrioter Wung <runrioter at gmail.com>
+Soroush Pour <me at soroushjp.com>
+Stan Putrya <root.vagner at gmail.com>
+Xiaobing Jiang <s7v7nislands at gmail.com>
+Xiuming Chen <cc at cxm.cc>
+
+# Organizations
+
+Barracuda Networks, Inc.
+Google Inc.
+Stripe Inc.
