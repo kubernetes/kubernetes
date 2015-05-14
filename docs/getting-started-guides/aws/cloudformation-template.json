@@ -1,37 +1,37 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Kubernetes 0.16.1 on EC2 powered by CoreOS 668.2.0 (alpha)",
+  "Description": "Kubernetes 0.17.0 on EC2 powered by CoreOS 681.0.0 (alpha)",
   "Mappings": {
       "RegionMap": {
           "eu-central-1" : {
-              "AMI" : "ami-5a330c47"
+              "AMI" : "ami-4c4f7151"
           },
           "ap-northeast-1" : {
-              "AMI" : "ami-905c9f90"
+              "AMI" : "ami-3a35fd3a"
           },
           "us-gov-west-1" : {
-              "AMI" : "ami-d1debff2"
+              "AMI" : "ami-57117174"
           },
           "sa-east-1" : {
-              "AMI" : "ami-d365e1ce"
+              "AMI" : "ami-fbcc4ae6"
           },
           "ap-southeast-2" : {
-              "AMI" : "ami-7db5c947"
+              "AMI" : "ami-593c4263"
           },
           "ap-southeast-1" : {
-              "AMI" : "ami-06c8f454"
+              "AMI" : "ami-3a083668"
           },
           "us-east-1" : {
-              "AMI" : "ami-2cd3dc44"
+              "AMI" : "ami-40322028"
           },
           "us-west-2" : {
-              "AMI" : "ami-69447259"
+              "AMI" : "ami-23b58613"
           },
           "us-west-1" : {
-              "AMI" : "ami-d524c891"
+              "AMI" : "ami-15618f51"
           },
           "eu-west-1" : {
-              "AMI" : "ami-c5b7d8b2"
+              "AMI" : "ami-8d1164fa"
           }
       }
   },
@@ -243,7 +243,7 @@
           "        Requires=network-online.target\n",
           "        After=network-online.target\n\n",
           "        [Service]\n",
-          "        ExecStart=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.16.1/bin/linux/amd64/kubectl\n",
+          "        ExecStart=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.17.0/bin/linux/amd64/kubectl\n",
           "        ExecStart=/usr/bin/chmod +x /opt/bin/kubectl\n",
           "        Type=oneshot\n",
           "        RemainAfterExit=true\n",
@@ -256,7 +256,7 @@
           "        Requires=etcd2-waiter.service\n",
           "        After=etcd2-waiter.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.16.1/bin/linux/amd64/kube-apiserver\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.17.0/bin/linux/amd64/kube-apiserver\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver\n",
           "        ExecStart=/opt/bin/kube-apiserver \\\n",
           "        --insecure-bind-address=0.0.0.0 \\\n",
@@ -273,7 +273,7 @@
           "        Requires=kube-apiserver.service\n",
           "        After=kube-apiserver.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.16.1/bin/linux/amd64/kube-controller-manager\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.17.0/bin/linux/amd64/kube-controller-manager\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-controller-manager\n",
           "        ExecStart=/opt/bin/kube-controller-manager \\\n",
           "        --master=127.0.0.1:8080\n",
@@ -288,7 +288,7 @@
           "        Requires=kube-apiserver.service\n",
           "        After=kube-apiserver.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.16.1/bin/linux/amd64/kube-scheduler\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.17.0/bin/linux/amd64/kube-scheduler\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-scheduler\n",
           "        ExecStart=/opt/bin/kube-scheduler \\\n",
           "        --master=127.0.0.1:8080\n",
@@ -367,7 +367,7 @@
           "        Requires=network-online.target\n",
           "        After=network-online.target\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.16.1/bin/linux/amd64/kubelet\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.17.0/bin/linux/amd64/kubelet\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet\n",
           "        ExecStart=/opt/bin/kubelet \\\n",
           "        --api-servers=", {"Fn::GetAtt" :["KubernetesMasterInstance" , "PrivateIp"]}, ":8080 \\\n",
@@ -383,7 +383,7 @@
           "        Requires=network-online.target\n",
           "        After=network-online.target\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.16.1/bin/linux/amd64/kube-proxy\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.17.0/bin/linux/amd64/kube-proxy\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy\n",
           "        ExecStart=/opt/bin/kube-proxy \\\n",
           "        --master=http://", {"Fn::GetAtt" :["KubernetesMasterInstance" , "PrivateIp"]}, ":8080\n",
