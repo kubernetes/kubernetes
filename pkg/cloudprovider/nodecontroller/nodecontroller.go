@@ -88,7 +88,6 @@ type NodeController struct {
 	// check node status posted from kubelet. This value should be lower than nodeMonitorGracePeriod.
 	// TODO: Change node status monitor to watch based.
 	nodeMonitorPeriod time.Duration
-	clusterName       string
 	clusterCIDR       *net.IPNet
 	allocateNodeCIDRs bool
 	// Method for easy mocking in unittest.
@@ -109,7 +108,6 @@ func NewNodeController(
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
-	clusterName string,
 	clusterCIDR *net.IPNet,
 	allocateNodeCIDRs bool) *NodeController {
 	eventBroadcaster := record.NewBroadcaster()
@@ -139,7 +137,6 @@ func NewNodeController(
 		nodeStartupGracePeriod:  nodeStartupGracePeriod,
 		lookupIP:                net.LookupIP,
 		now:                     util.Now,
-		clusterName:             clusterName,
 		clusterCIDR:             clusterCIDR,
 		allocateNodeCIDRs:       allocateNodeCIDRs,
 	}

@@ -8,9 +8,6 @@
 {% if pillar['node_instance_prefix'] is defined -%}
   {% set minion_regexp = "--minion_regexp='" + pillar['node_instance_prefix'] + ".*'" -%}
 {% endif -%}
-{% if pillar['instance_prefix'] is defined -%}
-  {% set cluster_name = "--cluster_name=" + pillar['instance_prefix'] -%}
-{% endif -%}
 {% if pillar['cluster_cidr'] is defined and pillar['cluster_cidr'] != "" -%}
   {% set cluster_cidr = "--cluster-cidr=" + pillar['cluster_cidr'] -%}
 {% endif -%}
@@ -57,7 +54,7 @@
 {% endif -%}
 {% endif -%}
 
-{% set params = "--master=127.0.0.1:8080" + " " + machines + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + minion_regexp + " " + cloud_provider  + " " + sync_nodes + " " + cloud_config + service_account_key + pillar['log_level'] -%}
+{% set params = "--master=127.0.0.1:8080" + " " + machines + " " + " " + cluster_cidr + " " + allocate_node_cidrs + " " + minion_regexp + " " + cloud_provider  + " " + sync_nodes + " " + cloud_config + service_account_key + pillar['log_level'] -%}
 
 {
 "apiVersion": "v1beta3",
