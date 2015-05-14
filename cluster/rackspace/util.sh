@@ -207,7 +207,7 @@ rax-boot-minions() {
         -e "s|ENABLE_NODE_MONITORING|${ENABLE_NODE_MONITORING:-false}|" \
         -e "s|ENABLE_NODE_LOGGING|${ENABLE_NODE_LOGGING:-false}|" \
         -e "s|INDEX|$((i + 1))|g" \
-        -e "s|KUBE_BEARER_TOKEN|${KUBE_BEARER_TOKEN}|" \
+        -e "s|KUBELET_TOKEN|${KUBELET_TOKEN}|" \
         -e "s|KUBE_NETWORK|${KUBE_NETWORK}|" \
         -e "s|KUBE_PROXY_TOKEN|${KUBE_PROXY_TOKEN}|" \
         -e "s|LOGGING_DESTINATION|${LOGGING_DESTINATION:-}|" \
