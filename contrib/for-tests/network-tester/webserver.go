@@ -37,13 +37,12 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -203,12 +202,25 @@ func main() {
 // Find all sibling pods in the service and post to their /write handler.
 func contactOthers(state *State) {
 	defer state.doneContactingPeers()
-	masterRO := url.URL{
-		Scheme: "http",
-		Host:   os.Getenv("KUBERNETES_RO_SERVICE_HOST") + ":" + os.Getenv("KUBERNETES_RO_SERVICE_PORT"),
-		Path:   "/api/" + latest.Version,
+	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+	if err != nil {
+		log.Fatalf("Unable to read service account token: %v", err)
 	}
-	client := &client.Client{client.NewRESTClient(&masterRO, latest.Version, latest.Codec, false, 5, 10)}
+	cc := client.Config{
+		Host:        "https://" + net.JoinHostPort(os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")),
+		Version:     "v1beta3",
+		BearerToken: string(token),
+		Insecure:    true, // TOOD: package certs along with the token
+	}
+	client, err := client.New(&cc)
+	if err != nil {
+		log.Fatalf("Unable to create client:\nconfig: %#v\nerror: %v\n", err)
+	}
+	if v, err := client.ServerVersion(); err != nil {
+		log.Fatalf("Unable to get server version: %v\n", err)
+	} else {
+		log.Printf("Server version: %#v\n", v)
+	}
 
 	// Do this repeatedly, in case there's some propagation delay with getting
 	// newly started pods into the endpoints list.
