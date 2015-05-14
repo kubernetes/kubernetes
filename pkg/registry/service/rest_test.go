@@ -716,8 +716,9 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	nodeRegistry := registrytest.NewMinionRegistry(machines, api.NodeResources{})
 	endpoints := &registrytest.EndpointRegistry{}
+	r := ipallocator.NewCIDRRange(makeIPNet(t))
 	portRange := util.PortRange{Base: 30000, Size: 1000}
-	rest1 := NewStorage(registry, nodeRegistry, endpoints, makeIPNet(t), portRange, "kubernetes")
+	rest1 := NewStorage(registry, nodeRegistry, endpoints, r, portRange, "kubernetes")
 	rest1.portMgr.pool.randomAttempts = 0
 
 	svc := &api.Service{
@@ -750,7 +751,8 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 
 	// This will reload from storage, finding the previous 2
 	nodeRegistry = registrytest.NewMinionRegistry(machines, api.NodeResources{})
-	rest2 := NewStorage(registry, nodeRegistry, endpoints, makeIPNet(t), portRange, "kubernetes")
+	r2 := ipallocator.NewCIDRRange(makeIPNet(t))
+	rest2 := NewStorage(registry, nodeRegistry, endpoints, r2, portRange, "kubernetes")
 	rest2.portMgr.pool.randomAttempts = 0
 
 	svc = &api.Service{
@@ -767,7 +769,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	}
 	created_svc, _ := rest2.Create(ctx, svc)
 	created_service := created_svc.(*api.Service)
-	if created_service.Spec.PortalIP != "1.2.3.3" {
+	if !makeIPNet(t).Contains(net.ParseIP(created_service.Spec.PortalIP)) {
 		t.Errorf("Unexpected PortalIP: %s", created_service.Spec.PortalIP)
 	}
 }

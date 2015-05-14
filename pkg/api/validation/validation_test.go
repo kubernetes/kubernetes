@@ -1711,7 +1711,7 @@ func TestValidateService(t *testing.T) {
 			tweakSvc: func(s *api.Service) {
 				s.Spec.CreateExternalLoadBalancer = true
 				s.Spec.Visibility = "loadbalancer"
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP", PublicPort: 12345})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", PublicPort: 12345})
 			},
 			numErrs: 0,
 		},
@@ -1720,7 +1720,7 @@ func TestValidateService(t *testing.T) {
 			tweakSvc: func(s *api.Service) {
 				s.Spec.CreateExternalLoadBalancer = true
 				s.Spec.Visibility = "loadbalancer"
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP"})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
 		},
@@ -1728,7 +1728,7 @@ func TestValidateService(t *testing.T) {
 			name: "valid public service with PublicPort",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Visibility = "public"
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP", PublicPort: 12345})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", PublicPort: 12345})
 			},
 			numErrs: 0,
 		},
@@ -1736,7 +1736,7 @@ func TestValidateService(t *testing.T) {
 			name: "valid public service without PublicPort",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Visibility = "public"
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP"})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
 		},
@@ -1744,7 +1744,7 @@ func TestValidateService(t *testing.T) {
 			name: "valid cluster service without PublicPort",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Visibility = "cluster"
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP"})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
 		},
@@ -1752,7 +1752,7 @@ func TestValidateService(t *testing.T) {
 			name: "invalid cluster service with PublicPort",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Visibility = "cluster"
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP", PublicPort: 12345})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", PublicPort: 12345})
 			},
 			numErrs: 1,
 		},
