@@ -108,23 +108,36 @@ cleanup_dockerized_kubelet()
 
 cleanup()
 {
-    echo "Cleaning up..."
-    [[ -n "${APISERVER_PID-}" ]] && sudo kill $(ps --ppid=${APISERVER_PID} --pid=${APISERVER_PID} | cut -d' ' -f1)
-    [[ -n "${CTLRMGR_PID-}" ]] && sudo kill $(ps --ppid=${CTLRMGR_PID} --pid=${CTLRMGR_PID} | cut -d' ' -f1)
-    
-    if [[ -n "$DOCKERIZE_KUBELET" ]]; then
-      cleanup_dockerized_kubelet
-    else 
-      [[ -n "${KUBELET_PID-}" ]] && sudo kill $(ps --ppid=${KUBELET_PID} --pid=${KUBELET_PID} | cut -d' ' -f1)
-    fi
+  echo "Cleaning up..."
+  # Check if the API server is still running
+  [[ -n "${APISERVER_PID-}" ]] && APISERVER_PIDS=$(ps -eh --ppid=${APISERVER_PID} --pid=${APISERVER_PID} |awk '{print $1}'|xargs)
+  [[ -n "${APISERVER_PIDS-}" ]] && sudo kill ${APISERVER_PIDS}
 
-    [[ -n "${PROXY_PID-}" ]] && sudo kill $(ps --ppid=${PROXY_PID} --pid=${PROXY_PID} | cut -d' ' -f1)
-    [[ -n "${SCHEDULER_PID-}" ]] && sudo kill $(ps --ppid=${SCHEDULER_PID} --pid=${SCHEDULER_PID} | cut -d' ' -f1)
+  # Check if the controller-manager is still running
+  [[ -n "${CTLRMGR_PID-}" ]] && CTLRMGR_PIDS=$(ps -eh --ppid=${CTLRMGR_PID} --pid=${CTLRMGR_PID} |awk '{print $1}'|xargs)
+  [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill ${CTLRMGR_PIDS}
 
-    [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
-    [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
+  if [[ -n "$DOCKERIZE_KUBELET" ]]; then
+    cleanup_dockerized_kubelet
+  else
+    # Check if the kubelet is still running
+    [[ -n "${KUBELET_PID-}" ]] && KUBELET_PIDS=$(ps -eh --ppid=${KUBELET_PID} --pid=${KUBELET_PID} |awk '{print $1}'|xargs)
+    [[ -n "${KUBELET_PIDS-}" ]] && sudo kill ${KUBELET_PIDS}
+  fi
 
-    exit 0
+  # Check if the proxy is still running
+  [[ -n "${PROXY_PID-}" ]] && PROXY_PIDS=$(ps -eh --ppid=${PROXY_PID} --pid=${PROXY_PID} |awk '{print $1}'|xargs)
+  [[ -n "${PROXY_PIDS-}" ]] && sudo kill ${PROXY_PIDS}
+
+  # Check if the scheduler is still running
+  [[ -n "${SCHEDULER_PID-}" ]] && SCHEDULER_PIDS=$(ps -eh --ppid=${SCHEDULER_PID} --pid=${SCHEDULER_PID} |awk '{print $1}'|xargs)
+  [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill ${SCHEDULER_PIDS}
+
+  # Check if the etcd is still running
+  [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
+  [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
+
+  exit 0
 }
 
 trap cleanup EXIT
