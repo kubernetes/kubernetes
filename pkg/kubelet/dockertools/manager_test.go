@@ -414,11 +414,12 @@ func TestKillContainerInPodWithError(t *testing.T) {
 
 type fakeExecProber struct {
 	result probe.Result
+	output string
 	err    error
 }
 
-func (p fakeExecProber) Probe(_ uexec.Cmd) (probe.Result, error) {
-	return p.result, p.err
+func (p fakeExecProber) Probe(_ uexec.Cmd) (probe.Result, string, error) {
+	return p.result, p.output, p.err
 }
 
 func replaceProber(dm *DockerManager, result probe.Result, err error) {
@@ -530,14 +531,14 @@ func TestProbeContainer(t *testing.T) {
 			testContainer: api.Container{
 				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
 			},
-			expectedResult:    probe.Success,
+			expectedResult:    probe.Failure,
 			expectedReadiness: false,
 		},
 		{
 			testContainer: api.Container{
 				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
 			},
-			expectedResult:    probe.Success,
+			expectedResult:    probe.Unknown,
 			expectedReadiness: false,
 		},
 		{
@@ -595,7 +596,7 @@ func TestProbeContainer(t *testing.T) {
 				LivenessProbe:  &api.Probe{InitialDelaySeconds: 100},
 				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
 			},
-			expectedResult:    probe.Success,
+			expectedResult:    probe.Failure,
 			expectedReadiness: false,
 		},
 		{
@@ -603,7 +604,7 @@ func TestProbeContainer(t *testing.T) {
 				LivenessProbe:  &api.Probe{InitialDelaySeconds: 100},
 				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
 			},
-			expectedResult:    probe.Success,
+			expectedResult:    probe.Unknown,
 			expectedReadiness: false,
 		},
 		{
@@ -668,7 +669,7 @@ func TestProbeContainer(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		if test.expectError {
 			replaceProber(manager, test.expectedResult, errors.New("error"))
 		} else {
@@ -676,16 +677,16 @@ func TestProbeContainer(t *testing.T) {
 		}
 		result, err := manager.prober.Probe(&api.Pod{}, api.PodStatus{}, test.testContainer, dc.ID, dc.Created)
 		if test.expectError && err == nil {
-			t.Error("Expected error but did no error was returned.")
+			t.Error("[%d] Expected error but did no error was returned.", i)
 		}
 		if !test.expectError && err != nil {
-			t.Errorf("Expected error but got: %v", err)
+			t.Errorf("[%d] Expected error but got: %v", i, err)
 		}
 		if test.expectedResult != result {
-			t.Errorf("Expected result was %v but probeContainer() returned %v", test.expectedResult, result)
+			t.Errorf("[%d] Expected result was %v but probeContainer() returned %v", i, test.expectedResult, result)
 		}
 		if test.expectedReadiness != manager.readinessManager.GetReadiness(dc.ID) {
-			t.Errorf("Expected readiness was %v but probeContainer() set %v", test.expectedReadiness, manager.readinessManager.GetReadiness(dc.ID))
+			t.Errorf("[%d] Expected readiness was %v but probeContainer() set %v", i, test.expectedReadiness, manager.readinessManager.GetReadiness(dc.ID))
 		}
 	}
 }

@@ -35,11 +35,11 @@ type KubeletClient interface {
 
 // KubeletHealthchecker is an interface for healthchecking kubelets
 type KubeletHealthChecker interface {
-	HealthCheck(host string) (probe.Result, error)
+	HealthCheck(host string) (result probe.Result, output string, err error)
 }
 
 type ConnectionInfoGetter interface {
-	GetConnectionInfo(host string) (scheme string, port uint, transport http.RoundTripper, error error)
+	GetConnectionInfo(host string) (scheme string, port uint, transport http.RoundTripper, err error)
 }
 
 // HTTPKubeletClient is the default implementation of KubeletHealthchecker, accesses the kubelet over HTTP.
@@ -103,7 +103,7 @@ func (c *HTTPKubeletClient) url(host, path, query string) string {
 	}).String()
 }
 
-func (c *HTTPKubeletClient) HealthCheck(host string) (probe.Result, error) {
+func (c *HTTPKubeletClient) HealthCheck(host string) (probe.Result, string, error) {
 	return httprobe.DoHTTPProbe(c.url(host, "/healthz", ""), c.Client)
 }
 
@@ -112,8 +112,8 @@ func (c *HTTPKubeletClient) HealthCheck(host string) (probe.Result, error) {
 // no kubelets.
 type FakeKubeletClient struct{}
 
-func (c FakeKubeletClient) HealthCheck(host string) (probe.Result, error) {
-	return probe.Unknown, errors.New("Not Implemented")
+func (c FakeKubeletClient) HealthCheck(host string) (probe.Result, string, error) {
+	return probe.Unknown, "", errors.New("Not Implemented")
 }
 
 func (c FakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {

@@ -31,12 +31,12 @@ func New() TCPProber {
 }
 
 type TCPProber interface {
-	Probe(host string, port int, timeout time.Duration) (probe.Result, error)
+	Probe(host string, port int, timeout time.Duration) (probe.Result, string, error)
 }
 
 type tcpProber struct{}
 
-func (pr tcpProber) Probe(host string, port int, timeout time.Duration) (probe.Result, error) {
+func (pr tcpProber) Probe(host string, port int, timeout time.Duration) (probe.Result, string, error) {
 	return DoTCPProbe(net.JoinHostPort(host, strconv.Itoa(port)), timeout)
 }
 
@@ -44,14 +44,15 @@ func (pr tcpProber) Probe(host string, port int, timeout time.Duration) (probe.R
 // If the socket can be opened, it returns Success
 // If the socket fails to open, it returns Failure.
 // This is exported because some other packages may want to do direct TCP probes.
-func DoTCPProbe(addr string, timeout time.Duration) (probe.Result, error) {
+func DoTCPProbe(addr string, timeout time.Duration) (probe.Result, string, error) {
 	conn, err := net.DialTimeout("tcp", addr, timeout)
 	if err != nil {
-		return probe.Failure, nil
+		// Convert errors to failures to handle timeouts.
+		return probe.Failure, err.Error(), nil
 	}
 	err = conn.Close()
 	if err != nil {
-		glog.Errorf("unexpected error closing health check socket: %v (%#v)", err, err)
+		glog.Errorf("Unexpected error closing TCP probe socket: %v (%#v)", err, err)
 	}
-	return probe.Success, nil
+	return probe.Success, "", nil
 }
