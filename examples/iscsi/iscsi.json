@@ -1,9 +1,8 @@
 {
     "apiVersion": "v1beta3",
-    "id": "iscsipd",
     "kind": "Pod",
     "metadata": {
-        "name": "iscsi"
+        "name": "iscsipd"
     },
     "spec": {
         "containers": [

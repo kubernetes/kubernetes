@@ -158,10 +158,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"claim-02": &api.PersistentVolumeClaim{},
 			"claim-03": &api.PersistentVolumeClaim{},
 		},
-		"../examples/iscsi/v1beta1": {
-			"iscsi": &api.Pod{},
-		},
-		"../examples/iscsi/v1beta3": {
+		"../examples/iscsi": {
 			"iscsi": &api.Pod{},
 		},
 		"../examples/glusterfs/v1beta3": {
