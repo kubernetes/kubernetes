@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package predicates
 
 import (
 	"fmt"
@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 type NodeInfo interface {
@@ -154,14 +155,14 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 	return true, nil
 }
 
-func NewResourceFitPredicate(info NodeInfo) FitPredicate {
+func NewResourceFitPredicate(info NodeInfo) algorithm.FitPredicate {
 	fit := &ResourceFit{
 		info: info,
 	}
 	return fit.PodFitsResources
 }
 
-func NewSelectorMatchPredicate(info NodeInfo) FitPredicate {
+func NewSelectorMatchPredicate(info NodeInfo) algorithm.FitPredicate {
 	selector := &NodeSelector{
 		info: info,
 	}
@@ -201,7 +202,7 @@ type NodeLabelChecker struct {
 	presence bool
 }
 
-func NewNodeLabelPredicate(info NodeInfo, labels []string, presence bool) FitPredicate {
+func NewNodeLabelPredicate(info NodeInfo, labels []string, presence bool) algorithm.FitPredicate {
 	labelChecker := &NodeLabelChecker{
 		info:     info,
 		labels:   labels,
@@ -239,13 +240,13 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *api.Pod, existingPods []*
 }
 
 type ServiceAffinity struct {
-	podLister     PodLister
-	serviceLister ServiceLister
+	podLister     algorithm.PodLister
+	serviceLister algorithm.ServiceLister
 	nodeInfo      NodeInfo
 	labels        []string
 }
 
-func NewServiceAffinityPredicate(podLister PodLister, serviceLister ServiceLister, nodeInfo NodeInfo, labels []string) FitPredicate {
+func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, nodeInfo NodeInfo, labels []string) algorithm.FitPredicate {
 	affinity := &ServiceAffinity{
 		podLister:     podLister,
 		serviceLister: serviceLister,
@@ -361,7 +362,7 @@ func getUsedPorts(pods ...*api.Pod) map[int]bool {
 
 // MapPodsToMachines obtains a list of pods and pivots that list into a map where the keys are host names
 // and the values are the list of pods running on that host.
-func MapPodsToMachines(lister PodLister) (map[string][]*api.Pod, error) {
+func MapPodsToMachines(lister algorithm.PodLister) (map[string][]*api.Pod, error) {
 	machineToPods := map[string][]*api.Pod{}
 	// TODO: perform more targeted query...
 	pods, err := lister.List(labels.Everything())

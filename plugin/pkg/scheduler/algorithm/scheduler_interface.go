@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package algorithm
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -22,6 +22,6 @@ import (
 
 // Scheduler is an interface implemented by things that know how to schedule pods
 // onto machines.
-type Scheduler interface {
+type ScheduleAlgorithm interface {
 	Schedule(*api.Pod, MinionLister) (selectedMachine string, err error)
 }

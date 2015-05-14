@@ -48,7 +48,6 @@ import (
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilErrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -56,6 +55,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
@@ -1354,7 +1354,7 @@ func (kl *Kubelet) checkCapacityExceeded(pods []*api.Pod) (fitting []*api.Pod, n
 	sort.Sort(podsByCreationTime(pods))
 
 	capacity := CapacityFromMachineInfo(info)
-	return scheduler.CheckPodsExceedingCapacity(pods, capacity)
+	return predicates.CheckPodsExceedingCapacity(pods, capacity)
 }
 
 // handleOutOfDisk detects if pods can't fit due to lack of disk space.
@@ -1403,7 +1403,7 @@ func (kl *Kubelet) checkNodeSelectorMatching(pods []*api.Pod) (fitting []*api.Po
 		return pods, nil
 	}
 	for _, pod := range pods {
-		if !scheduler.PodMatchesNodeLabels(pod, node) {
+		if !predicates.PodMatchesNodeLabels(pod, node) {
 			notFitting = append(notFitting, pod)
 			continue
 		}

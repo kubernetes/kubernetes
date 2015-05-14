@@ -28,9 +28,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/validation"
 
@@ -182,7 +182,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	algo := algorithm.NewGenericScheduler(predicateFuncs, priorityConfigs, f.PodLister, r)
+	algo := scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, f.PodLister, r)
 
 	podBackoff := podBackoff{
 		perPodBackoff: map[string]*backoffEntry{},
