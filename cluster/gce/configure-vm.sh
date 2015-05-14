@@ -362,7 +362,7 @@ EOF
   kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
   if [ ! -e "${kube_proxy_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-proxy
-    if [[ ! -z "${CA_CERT}" ]]; then
+    if [[ ! -z "${CA_CERT:-}" ]]; then
       (umask 077;
         cat > "${kube_proxy_kubeconfig_file}" <<EOF
 apiVersion: v1
