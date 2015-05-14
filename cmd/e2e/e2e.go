@@ -45,7 +45,6 @@ func init() {
 
 	flag.StringVar(&context.KubeConfig, clientcmd.RecommendedConfigPathFlag, "", "Path to kubeconfig containing embeded authinfo.")
 	flag.StringVar(&context.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
-	flag.StringVar(&context.AuthConfig, "auth-config", "", "Path to the auth info file.")
 	flag.StringVar(&context.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	flag.StringVar(&context.Host, "host", "", "The host, or apiserver, to connect to")
 	flag.StringVar(&context.RepoRoot, "repo-root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")

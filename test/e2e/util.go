@@ -34,7 +34,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -58,7 +57,6 @@ const (
 type TestContextType struct {
 	KubeConfig  string
 	KubeContext string
-	AuthConfig  string
 	CertDir     string
 	Host        string
 	RepoRoot    string
@@ -183,26 +181,8 @@ func loadConfig() (*client.Config, error) {
 			c.CurrentContext = testContext.KubeContext
 		}
 		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
-	case testContext.AuthConfig != "":
-		fmt.Printf(">>> testContext.AuthConfig: %s\n", testContext.AuthConfig)
-		config := &client.Config{
-			Host: testContext.Host,
-		}
-		info, err := clientauth.LoadFromFile(testContext.AuthConfig)
-		if err != nil {
-			return nil, fmt.Errorf("error loading AuthConfig: %v", err.Error())
-		}
-		// If the certificate directory is provided, set the cert paths to be there.
-		if testContext.CertDir != "" {
-			Logf("Expecting certs in %v.", testContext.CertDir)
-			info.CAFile = filepath.Join(testContext.CertDir, "ca.crt")
-			info.CertFile = filepath.Join(testContext.CertDir, "kubecfg.crt")
-			info.KeyFile = filepath.Join(testContext.CertDir, "kubecfg.key")
-		}
-		mergedConfig, err := info.MergeWithConfig(*config)
-		return &mergedConfig, err
 	default:
-		return nil, fmt.Errorf("either KubeConfig or AuthConfig must be specified to load client config")
+		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
 	}
 }
 
