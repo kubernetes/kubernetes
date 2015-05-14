@@ -22,7 +22,8 @@ import (
 	"io/ioutil"
 	"os"
 	"syscall"
-	"time"
+
+	"github.com/GoogleCloudPlatform/kubernetes/test/e2e"
 )
 
 var (
@@ -156,25 +157,11 @@ func readFileContentInLoop(path string) error {
 	if path == "" {
 		return nil
 	}
-	var (
-		contentBytes []byte
-		err          error
-	)
-	start := time.Now()
-	for time.Now().Sub(start) < (500 * time.Second) {
+	var content []byte
+	//Expected content "mount-tester new file\n", length (22), retry during 240 second
+	content, _ = e2e.TestFileContent(path, 22, 240)
 
-		contentBytes, err = ioutil.ReadFile(path)
-		if len(string(contentBytes)) != 0 {
-			break
-		}
-		if err != nil {
-			fmt.Printf("error reading file content for %q: %v\n", path, err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-	}
-
-	fmt.Printf("content of file %q: %v\n", path, string(contentBytes))
+	fmt.Printf("content of file %q: %v\n", path, string(content))
 
 	return nil
 }

@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	"golang.org/x/crypto/ssh"
 
@@ -939,4 +940,31 @@ func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResou
 	}
 
 	return len(badMetrics), nil
+}
+
+func TestFileContent(filePath string, bytesExpected int, retryDuration int) ([]byte, error) {
+	var (
+		contentBytes []byte
+		err          error
+	)
+
+	expectNoError(wait.Poll(time.Second*2, time.Second*time.Duration(retryDuration), func() (bool, error) {
+		contentBytes, err = ioutil.ReadFile(filePath)
+		if err == nil {
+			if len(contentBytes) == bytesExpected {
+				return true, nil
+			} else {
+				Logf("Unexpected length of file: found %d, expected %d", len(contentBytes), bytesExpected)
+			}
+
+		} else {
+			Logf("Error read file %s: %v", filePath, err)
+		}
+		return false, nil
+	}))
+	if err != nil {
+		return nil, err
+	}
+	return contentBytes, nil
+
 }
