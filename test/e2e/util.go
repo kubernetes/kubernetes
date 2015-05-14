@@ -534,6 +534,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int, podSta
 			}
 		}
 	}(stop, name, ns, label)
+	defer close(stop)
 
 	By(fmt.Sprintf("Making sure all %d replicas of rc %s in namespace %s exist", replicas, name, ns))
 	failCount := 5

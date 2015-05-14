@@ -81,13 +81,14 @@ var _ = Describe("Density", func() {
 			Failf("Couldn't delete ns %s", err)
 		}
 
+		expectNoError(writePerfData(c, uuid, "after"))
+
 		// Verify latency metrics
 		// TODO: Update threshold to 1s once we reach this goal
 		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
 		highLatencyRequests, err := HighLatencyRequests(c, 10*time.Second, util.NewStringSet("events"))
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
-		expectNoError(writePerfData(c, uuid, "after"))
 	})
 
 	// Tests with "Skipped" substring in their name will be skipped when running
