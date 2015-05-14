@@ -350,6 +350,36 @@ func (v DecoratedVisitor) Visit(fn VisitorFunc) error {
 	})
 }
 
+// ContinueOnErrorVisitor visits each item and, if an error occurs on
+// any individual item, returns an aggregate error after all items
+// are visited.
+type ContinueOnErrorVisitor struct {
+	Visitor
+}
+
+// Visit returns nil if no error occurs during traversal, a regular
+// error if one occurs, or if multiple errors occur, an aggregate
+// error.  If the provided visitor fails on any individual item it
+// will not prevent the remaining items from being visited. An error
+// returned by the visitor directly may still result in some items
+// not being visited.
+func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
+	errs := []error{}
+	err := v.Visitor.Visit(func(info *Info) error {
+		if err := fn(info); err != nil {
+			errs = append(errs, err)
+		}
+		return nil
+	})
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) == 1 {
+		return errs[0]
+	}
+	return errors.NewAggregate(errs)
+}
+
 // FlattenListVisitor flattens any objects that runtime.ExtractList recognizes as a list
 // - has an "Items" public field that is a slice of runtime.Objects or objects satisfying
 // that interface - into multiple Infos. An error on any sub item (for instance, if a List
