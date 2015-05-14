@@ -138,7 +138,8 @@ func NewMainKubelet(
 	cgroupRoot string,
 	containerRuntime string,
 	mounter mount.Interface,
-	dockerDaemonContainer string) (*Kubelet, error) {
+	dockerDaemonContainer string,
+	configureCBR0 bool) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -244,6 +245,7 @@ func NewMainKubelet(
 		oomWatcher:                     oomWatcher,
 		cgroupRoot:                     cgroupRoot,
 		mounter:                        mounter,
+		configureCBR0:                  configureCBR0,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -456,6 +458,10 @@ type Kubelet struct {
 
 	// Manager of non-Runtime containers.
 	containerManager containerManager
+
+	// Whether or not kubelet should take responsibility for keeping cbr0 in
+	// the correct state.
+	configureCBR0 bool
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1588,6 +1594,23 @@ func (kl *Kubelet) updateRuntimeUp() {
 	}
 }
 
+func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
+	if podCIDR == "" {
+		glog.V(5).Info("PodCIDR not set. Will not configure cbr0.")
+		return nil
+	}
+	_, cidr, err := net.ParseCIDR(podCIDR)
+	if err != nil {
+		return err
+	}
+	// Set cbr0 interface address to first address in IPNet
+	cidr.IP.To4()[3] += 1
+	if err := ensureCbr0(cidr); err != nil {
+		return err
+	}
+	return nil
+}
+
 // updateNodeStatus updates node status to master with retries.
 func (kl *Kubelet) updateNodeStatus() error {
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
@@ -1622,7 +1645,8 @@ func (kl *Kubelet) recordNodeUnschedulableEvent() {
 // Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
 var oldNodeUnschedulable bool
 
-// tryUpdateNodeStatus tries to update node status to master.
+// tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
+// is set, this function will also confirm that cbr0 is configured correctly.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
 	node, err := kl.kubeClient.Nodes().Get(kl.hostname)
 	if err != nil {
@@ -1630,6 +1654,14 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	}
 	if node == nil {
 		return fmt.Errorf("no node instance returned for %q", kl.hostname)
+	}
+
+	networkConfigured := true
+	if kl.configureCBR0 {
+		if err := kl.reconcileCBR0(node.Spec.PodCIDR); err != nil {
+			networkConfigured = false
+			glog.Errorf("Error configuring cbr0: %v", err)
+		}
 	}
 
 	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
@@ -1673,18 +1705,25 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 
 	currentTime := util.Now()
 	var newCondition api.NodeCondition
-	if containerRuntimeUp {
+	if containerRuntimeUp && networkConfigured {
 		newCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
-			Reason:            fmt.Sprintf("kubelet is posting ready status"),
+			Reason:            "kubelet is posting ready status",
 			LastHeartbeatTime: currentTime,
 		}
 	} else {
+		var reasons []string
+		if !containerRuntimeUp {
+			reasons = append(reasons, "container runtime is down")
+		}
+		if !networkConfigured {
+			reasons = append(reasons, "network not configured correctly")
+		}
 		newCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionFalse,
-			Reason:            fmt.Sprintf("container runtime is down"),
+			Reason:            strings.Join(reasons, ","),
 			LastHeartbeatTime: currentTime,
 		}
 	}

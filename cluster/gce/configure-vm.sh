@@ -64,14 +64,6 @@ for k,v in yaml.load(sys.stdin).iteritems():
   else
     KUBERNETES_MASTER="true"
   fi
-
-  if [[ "${KUBERNETES_MASTER}" != "true" ]] && [[ -z "${MINION_IP_RANGE:-}" ]]; then
-    # This block of code should go away once the master can allocate CIDRs
-    until MINION_IP_RANGE=$(curl-metadata node-ip-range); do
-      echo 'Waiting for metadata MINION_IP_RANGE...'
-      sleep 3
-    done
-  fi
 }
 
 function remove-docker-artifacts() {
@@ -411,7 +403,7 @@ function salt-node-role() {
 grains:
   roles:
     - kubernetes-pool
-  cbr-cidr: '$(echo "$MINION_IP_RANGE" | sed -e "s/'/''/g")'
+  cbr-cidr: 10.123.45.0/30
   cloud: gce
 EOF
 }
