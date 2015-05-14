@@ -366,6 +366,10 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 				}
 				servicePort.PublicPort = publicPort
 			}
+			// Detect duplicate public ports; this should have been caught by validation, so we panic
+			if contains(newPublicPorts, publicPort) {
+				panic("duplicate public port")
+			}
 			newPublicPorts = append(newPublicPorts, publicPort)
 		}
 	} else {
