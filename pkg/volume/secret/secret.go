@@ -19,6 +19,7 @@ package secret
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -92,7 +93,16 @@ var wrappedVolumeSpec = &volume.Spec{
 }
 
 func (sv *secretVolume) SetUpAt(dir string) error {
-	if volumeutil.IsReady(sv.getMetaDir()) {
+	isMnt, err := sv.mounter.IsMountPoint(dir)
+	// Getting an os.IsNotExist err from is a contingency; the directory
+	// may not exist yet, in which case, setup should run.
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	// If the plugin readiness file is present for this volume and
+	// the setup dir is a mountpoint, this volume is already ready.
+	if volumeutil.IsReady(sv.getMetaDir()) && isMnt {
 		return nil
 	}
 
