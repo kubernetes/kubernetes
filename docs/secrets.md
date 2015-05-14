@@ -32,9 +32,11 @@ The values are arbitrary data, encoded using base64.
 This is an example of a pod that uses a secret, in json format:
 ```json
 {
-  "apiVersion": "v1beta3",
-  "name": "mypod",
   "kind": "Pod",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "mypod"
+  },
   "spec": {
     "manifest": {
       "containers": [{
