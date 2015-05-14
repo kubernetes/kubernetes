@@ -206,7 +206,10 @@ func TestTCPProxy(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
@@ -230,7 +233,10 @@ func TestUDPProxy(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
@@ -259,7 +265,10 @@ func TestMultiPortProxy(t *testing.T) {
 		}},
 	}})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfoP, err := p.addServiceOnPort(serviceP, "TCP", 0, time.Second)
@@ -283,7 +292,10 @@ func TestMultiPortOnUpdate(t *testing.T) {
 	serviceQ := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "q"}
 	serviceX := ServicePortName{types.NamespacedName{"testnamespace", "echo"}, "x"}
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	p.OnUpdate([]api.Service{{
@@ -343,7 +355,10 @@ func TestTCPProxyStop(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
@@ -378,7 +393,10 @@ func TestUDPProxyStop(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
@@ -413,7 +431,10 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
@@ -447,7 +468,10 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
@@ -481,7 +505,10 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
@@ -530,7 +557,10 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
@@ -579,7 +609,10 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
@@ -624,7 +657,10 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
@@ -666,7 +702,10 @@ func TestProxyUpdatePublicIPs(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
@@ -715,7 +754,10 @@ func TestProxyUpdatePortal(t *testing.T) {
 		},
 	})
 
-	p := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	p, err := createProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)

@@ -76,14 +76,14 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 func (s *ProxyServer) Run(_ []string) error {
 	// TODO(vmarmol): Use container config for this.
 	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
-		glog.Info(err)
+		glog.V(2).Info(err)
 	}
 
 	// Run in its own container.
 	if err := util.RunInResourceContainer(s.ResourceContainer); err != nil {
 		glog.Warningf("Failed to start in resource-only container %q: %v", s.ResourceContainer, err)
 	} else {
-		glog.Infof("Running in resource-only container %q", s.ResourceContainer)
+		glog.V(2).Infof("Running in resource-only container %q", s.ResourceContainer)
 	}
 
 	serviceConfig := config.NewServiceConfig()
@@ -94,9 +94,9 @@ func (s *ProxyServer) Run(_ []string) error {
 		protocol = iptables.ProtocolIpv6
 	}
 	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol))
-	if proxier == nil {
-		glog.Fatalf("failed to create proxier, aborting")
+	proxier, err := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol))
+	if err != nil {
+		glog.Fatalf("Unable to create proxer: %v", err)
 	}
 
 	// Wire proxier to handle changes to services
