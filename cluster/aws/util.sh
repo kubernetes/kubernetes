@@ -354,7 +354,7 @@ function ensure-iam-profiles {
 function wait-for-instance-running {
   instance_id=$1
   while true; do
-    instance_state=$($AWS_CMD describe-instances --instance-ids $instance_id | expect_instance_states running)
+    instance_state=$($AWS_CMD describe-instances --instance-ids ${instance_id} | expect_instance_states running)
     if [[ "$instance_state" == "" ]]; then
       break
     else
@@ -364,6 +364,46 @@ function wait-for-instance-running {
     fi
   done
 }
+
+# Allocates new Elastic IP from Amazon
+# Output: allocated IP address
+function allocate-elastic-ip {
+  $AWS_CMD allocate-address --domain vpc --output text | cut -f3
+}
+
+function assign-ip-to-instance {
+  local ip_address=$1
+  local instance_id=$2
+  local fallback_ip=$3
+
+  local elastic_ip_allocation_id=$($AWS_CMD describe-addresses --public-ips $ip_address --output text | cut -f2)
+  local association_result=$($AWS_CMD associate-address --instance-id ${master_instance_id} --allocation-id ${elastic_ip_allocation_id} > /dev/null && echo "success" || echo "failure")
+
+  if [[ $association_result = "success" ]]; then
+    echo "${ip_address}"
+  else
+    echo "${fallback_ip}"
+  fi
+}
+
+# If MASTER_RESERVED_IP looks like IP address, will try to assign it to master instance
+# If MASTER_RESERVED_IP is "auto", will allocate new elastic ip and assign that
+# If none of the above or something fails, will output originally assigne IP
+# Output: assigned IP address
+function assign-elastic-ip {
+  local assigned_public_ip=$1
+  local master_instance_id=$2
+
+  # Check that MASTER_RESERVED_IP looks like an IPv4 address
+  if [[ "${MASTER_RESERVED_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    assign-ip-to-instance "${MASTER_RESERVED_IP}" "${master_instance_id}" "${assigned_public_ip}"
+  elif [[ "${MASTER_RESERVED_IP}" = "auto" ]]; then
+    assign-ip-to-instance $(allocate-elastic-ip) "${master_instance_id}" "${assigned_public_ip}"
+  else
+    echo "${assigned_public_ip}"
+  fi
+}
+
 
 function kube-up {
   find-release-tars
@@ -505,7 +545,7 @@ function kube-up {
       fi
     else
       KUBE_MASTER=${MASTER_NAME}
-      KUBE_MASTER_IP=${ip}
+      KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
       echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
 
       # We are not able to add a route to the instance until that instance is in "running" state.
