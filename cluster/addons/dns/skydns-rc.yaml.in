@@ -56,7 +56,7 @@ spec:
             command:
             - /bin/sh
             - -c
-            - nslookup kubernetes.default.{{ pillar['dns_domain'] }} localhost >/dev/null"
+            - nslookup kubernetes.default.{{ pillar['dns_domain'] }} localhost >/dev/null
           initialDelaySeconds: 30
           timeoutSeconds: 5
       dnsPolicy: Default  # Don't use cluster DNS.
