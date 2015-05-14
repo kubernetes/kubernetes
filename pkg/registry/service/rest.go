@@ -421,11 +421,11 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 
 func shouldAssignPublicPorts(service *api.Service) bool {
 	switch service.Spec.Visibility {
-	case api.VisibilityTypeLoadBalancer:
+	case api.ServiceVisibilityLoadBalancer:
 		return true
-	case api.VisibilityTypePublic:
+	case api.ServiceVisibilityNodePort:
 		return true
-	case api.VisibilityTypeCluster:
+	case api.ServiceVisibilityCluster:
 		return false
 	default:
 		glog.Errorf("Unknown visibility value: %v", service.Spec.Visibility)

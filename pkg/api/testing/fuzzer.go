@@ -186,8 +186,8 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			types := []api.AffinityType{api.AffinityTypeClientIP, api.AffinityTypeNone}
 			*p = types[c.Rand.Intn(len(types))]
 		},
-		func(p *api.VisibilityType, c fuzz.Continue) {
-			types := []api.VisibilityType{api.VisibilityTypeCluster, api.VisibilityTypePublic, api.VisibilityTypeLoadBalancer}
+		func(p *api.ServiceVisibility, c fuzz.Continue) {
+			types := []api.ServiceVisibility{api.ServiceVisibilityCluster, api.ServiceVisibilityNodePort, api.ServiceVisibilityLoadBalancer}
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *api.Container, c fuzz.Continue) {
@@ -268,7 +268,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				}
 			}
 			// CreateExternalLoadBalancer must be consistent with Visibility
-			ss.CreateExternalLoadBalancer = ss.Visibility == api.VisibilityTypeLoadBalancer
+			ss.CreateExternalLoadBalancer = ss.Visibility == api.ServiceVisibilityLoadBalancer
 		},
 		func(n *api.Node, c fuzz.Continue) {
 			c.FuzzNoCustom(n)

@@ -980,19 +980,21 @@ const (
 )
 
 // Session Visibility Type string
-type VisibilityType string
+type ServiceVisibility string
 
-// TODO: API constants are name with Caps. Cluster, Public, LoadBalancer.
-// TODO: Choose good names once we agree on overall direction and semantics.
 const (
-	// VisibilityTypeCluster means a service will only be accessible inside the k8s cluster.
-	VisibilityTypeCluster VisibilityType = "cluster"
+	// ServiceVisibilityCluster means a service will only be accessible inside the
+	// cluster, via the portal IP.
+	ServiceVisibilityCluster ServiceVisibility = "Cluster"
 
-	// VisibilityTypePublic means a service will be exposed on the nodes, in addition to 'cluster' visibility.
-	VisibilityTypePublic VisibilityType = "public"
+	// ServiceVisibilityNodePort means a service will be exposed on one port of
+	// every node, in addition to 'Cluster' visibility.
+	ServiceVisibilityNodePort ServiceVisibility = "NodePort"
 
-	// VisibilityTypeLoadBalancer means a service will be exposed via a load balancer, in addition to 'public' visibility.
-	VisibilityTypeLoadBalancer VisibilityType = "loadbalancer"
+	// ServiceVisibilityLoadBalancer means a service will be exposed via an
+	// external load balancer (if the cloud provider supports it), in addition
+	// to 'NodePort' visibility.
+	ServiceVisibilityLoadBalancer ServiceVisibility = "LoadBalancer"
 )
 
 // ServiceStatus represents the current status of a service
@@ -1018,8 +1020,8 @@ type ServiceSpec struct {
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty"`
 
-	// Visibility determines how the service will be exposed.  Valid options: cluster, public, loadbalancer
-	Visibility VisibilityType `json:"visibility,omitempty" description:"control whether the service can be reached from outside the kubernetes cluster"`
+	// Visibility determines how the service will be exposed.  Valid options: Cluster, NodePort, LoadBalancer
+	Visibility ServiceVisibility `json:"visibility,omitempty"`
 
 	// PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.

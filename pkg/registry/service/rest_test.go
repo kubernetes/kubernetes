@@ -72,7 +72,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -114,7 +114,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
 				SessionAffinity: api.AffinityTypeNone,
-				Visibility:      api.VisibilityTypeCluster,
+				Visibility:      api.ServiceVisibilityCluster,
 				Ports: []api.ServicePort{{
 					Port:     6502,
 					Protocol: api.ProtocolTCP,
@@ -126,7 +126,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
 				SessionAffinity: api.AffinityTypeNone,
-				Visibility:      api.VisibilityTypeCluster,
+				Visibility:      api.ServiceVisibilityCluster,
 				Ports: []api.ServicePort{{
 					Protocol: api.ProtocolTCP,
 				}},
@@ -169,7 +169,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz2"},
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -213,7 +213,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
 				SessionAffinity: api.AffinityTypeNone,
-				Visibility:      api.VisibilityTypeCluster,
+				Visibility:      api.ServiceVisibilityCluster,
 				Ports: []api.ServicePort{{
 					Port:     6502,
 					Protocol: api.ProtocolTCP,
@@ -225,7 +225,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"ThisSelectorFailsValidation": "ok"},
 				SessionAffinity: api.AffinityTypeNone,
-				Visibility:      api.VisibilityTypeCluster,
+				Visibility:      api.ServiceVisibilityCluster,
 				Ports: []api.ServicePort{{
 					Port:     6502,
 					Protocol: api.ProtocolTCP,
@@ -253,7 +253,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 			Selector:                   map[string]string{"bar": "baz"},
 			SessionAffinity:            api.AffinityTypeNone,
 			CreateExternalLoadBalancer: true,
-			Visibility:                 api.VisibilityTypeLoadBalancer,
+			Visibility:                 api.ServiceVisibilityLoadBalancer,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -281,7 +281,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -304,7 +304,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 			Selector:                   map[string]string{"bar": "baz"},
 			SessionAffinity:            api.AffinityTypeNone,
 			CreateExternalLoadBalancer: true,
-			Visibility:                 api.VisibilityTypeLoadBalancer,
+			Visibility:                 api.ServiceVisibilityLoadBalancer,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -329,7 +329,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 			Selector:                   map[string]string{"bar": "baz"},
 			SessionAffinity:            api.AffinityTypeNone,
 			CreateExternalLoadBalancer: false,
-			Visibility:                 api.VisibilityTypeCluster,
+			Visibility:                 api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -343,7 +343,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	// Modify load balancer to be external.
 	svc2 := deepCloneService(svc1)
 	svc2.Spec.CreateExternalLoadBalancer = true
-	svc2.Spec.Visibility = api.VisibilityTypeLoadBalancer
+	svc2.Spec.Visibility = api.ServiceVisibilityLoadBalancer
 	if _, _, err := storage.Update(ctx, svc2); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -367,7 +367,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 			Selector:                   map[string]string{"bar": "baz"},
 			SessionAffinity:            api.AffinityTypeNone,
 			CreateExternalLoadBalancer: true,
-			Visibility:                 api.VisibilityTypeLoadBalancer,
+			Visibility:                 api.ServiceVisibilityLoadBalancer,
 			Ports: []api.ServicePort{{
 				Name:     "p",
 				Port:     6502,
@@ -508,7 +508,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -530,7 +530,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -560,7 +560,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 			Selector:        map[string]string{"bar": "baz"},
 			PortalIP:        testIP,
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -587,7 +587,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -614,7 +614,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -641,7 +641,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -687,7 +687,7 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 			Selector:                   map[string]string{"bar": "baz"},
 			SessionAffinity:            api.AffinityTypeNone,
 			CreateExternalLoadBalancer: true,
-			Visibility:                 api.VisibilityTypeLoadBalancer,
+			Visibility:                 api.ServiceVisibilityLoadBalancer,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -728,7 +728,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -742,7 +742,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -763,7 +763,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.AffinityTypeNone,
-			Visibility:      api.VisibilityTypeCluster,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,

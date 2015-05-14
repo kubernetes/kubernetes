@@ -75,11 +75,11 @@ func addDefaultingFuncs() {
 			}
 			if obj.Visibility == "" {
 				if obj.CreateExternalLoadBalancer {
-					obj.Visibility = VisibilityTypeLoadBalancer
+					obj.Visibility = ServiceVisibilityLoadBalancer
 				} else {
-					obj.Visibility = VisibilityTypeCluster
+					obj.Visibility = ServiceVisibilityCluster
 				}
-			} else if obj.Visibility == VisibilityTypeLoadBalancer {
+			} else if obj.Visibility == ServiceVisibilityLoadBalancer {
 				obj.CreateExternalLoadBalancer = true
 			}
 			for i := range obj.Ports {

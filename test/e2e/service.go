@@ -347,11 +347,11 @@ var _ = Describe("Services", func() {
 		}
 	})
 
-	It("should be able to create a functioning public service", func() {
-		serviceName := "publicservice-test"
+	It("should be able to create a functioning NodePort service", func() {
+		serviceName := "nodeportservice-test"
 		ns := namespace0
 		labels := map[string]string{
-			"testid": "publicservice-test",
+			"testid": "nodeportservice-test",
 		}
 		service := &api.Service{
 			ObjectMeta: api.ObjectMeta{
@@ -367,7 +367,7 @@ var _ = Describe("Services", func() {
 			},
 		}
 
-		By("creating service " + serviceName + " with visibility=public in namespace " + ns)
+		By("creating service " + serviceName + " with visibility=NodePort in namespace " + ns)
 		result, err := c.Services(ns).Create(service)
 		Expect(err).NotTo(HaveOccurred())
 		defer func(ns, serviceName string) { // clean up when we're done
@@ -377,12 +377,12 @@ var _ = Describe("Services", func() {
 		}(ns, serviceName)
 
 		if len(result.Spec.Ports) != 1 {
-			Failf("got unexpected number (%d) of Ports for public service: %v", len(result.Spec.Ports), result)
+			Failf("got unexpected number (%d) of Ports for NodePort service: %v", len(result.Spec.Ports), result)
 		}
 
 		publicPort := result.Spec.Ports[0].PublicPort
 		if publicPort == 0 {
-			Failf("got unexpected publicPort (%d) on Ports[0] for public service: %v", publicPort, result)
+			Failf("got unexpected publicPort (%d) on Ports[0] for NodePort service: %v", publicPort, result)
 		}
 
 		publicIps, err := getMinionPublicIps(c)

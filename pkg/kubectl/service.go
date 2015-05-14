@@ -106,7 +106,7 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 		service.Spec.CreateExternalLoadBalancer = true
 	}
 	if len(params["visibility"]) != 0 {
-		service.Spec.Visibility = api.VisibilityType(params["visibility"])
+		service.Spec.Visibility = api.ServiceVisibility(params["visibility"])
 	}
 	if len(params["public-ip"]) != 0 {
 		service.Spec.PublicIPs = []string{params["public-ip"]}

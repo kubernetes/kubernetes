@@ -986,9 +986,9 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 }
 
 var supportedSessionAffinityType = util.NewStringSet(string(api.AffinityTypeClientIP), string(api.AffinityTypeNone))
-var supportedVisibilityType = util.NewStringSet(string(api.VisibilityTypeCluster),
-	string(api.VisibilityTypePublic),
-	string(api.VisibilityTypeLoadBalancer))
+var supportedServiceVisibility = util.NewStringSet(string(api.ServiceVisibilityCluster),
+	string(api.ServiceVisibilityNodePort),
+	string(api.ServiceVisibilityLoadBalancer))
 
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
@@ -1015,7 +1015,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 
 	if service.Spec.Visibility == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.visibility"))
-	} else if !supportedVisibilityType.Has(string(service.Spec.Visibility)) {
+	} else if !supportedServiceVisibility.Has(string(service.Spec.Visibility)) {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.visibility", service.Spec.Visibility))
 	}
 
@@ -1039,16 +1039,16 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot create an external load balancer with non-TCP ports"))
 			}
 		}
-		if service.Spec.Visibility != api.VisibilityTypeLoadBalancer {
+		if service.Spec.Visibility != api.ServiceVisibilityLoadBalancer {
 			allErrs = append(allErrs, errs.NewFieldInvalid("spec.visibility", service.Spec.Visibility, "visibility must be loadbalancer when createExternalLoadBalancer is true"))
 		}
 	} else {
-		if service.Spec.Visibility == api.VisibilityTypeLoadBalancer {
+		if service.Spec.Visibility == api.ServiceVisibilityLoadBalancer {
 			allErrs = append(allErrs, errs.NewFieldInvalid("spec.visibility", service.Spec.Visibility, "visibility cannot be loadbalancer when createExternalLoadBalancer is false"))
 		}
 	}
 
-	if service.Spec.Visibility == api.VisibilityTypeCluster {
+	if service.Spec.Visibility == api.ServiceVisibilityCluster {
 		for i := range service.Spec.Ports {
 			if service.Spec.Ports[i].PublicPort != 0 {
 				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot specify a public port with cluster-visibility services"))

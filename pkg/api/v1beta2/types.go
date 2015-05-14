@@ -810,17 +810,21 @@ const (
 )
 
 // Session Visibility Type string
-type VisibilityType string
+type ServiceVisibility string
 
 const (
-	// VisibilityTypeCluster means a service will only be accessible inside the k8s cluster.
-	VisibilityTypeCluster VisibilityType = "cluster"
+	// ServiceVisibilityCluster means a service will only be accessible inside the
+	// cluster, via the portal IP.
+	ServiceVisibilityCluster ServiceVisibility = "Cluster"
 
-	// VisibilityTypePublic means a service will be exposed on the nodes, in addition to 'cluster' visibility.
-	VisibilityTypePublic VisibilityType = "public"
+	// ServiceVisibilityNodePort means a service will be exposed on one port of
+	// every node, in addition to 'Cluster' visibility.
+	ServiceVisibilityNodePort ServiceVisibility = "NodePort"
 
-	// VisibilityTypeLoadBalancer means a service will be exposed via a load balancer, in addition to 'public' visibility.
-	VisibilityTypeLoadBalancer VisibilityType = "loadbalancer"
+	// ServiceVisibilityLoadBalancer means a service will be exposed via an
+	// external load balancer (if the cloud provider supports it), in addition
+	// to 'NodePort' visibility.
+	ServiceVisibilityLoadBalancer ServiceVisibility = "LoadBalancer"
 )
 
 const (
@@ -863,8 +867,8 @@ type Service struct {
 	// An external load balancer should be set up via the cloud-provider
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`
 
-	// Visibility determines how the service will be exposed.  Valid options: cluster, public, loadbalancer
-	Visibility VisibilityType `json:"visibility,omitempty" description:"control whether the service can be reached from outside the kubernetes cluster"`
+	// Visibility determines how the service will be exposed.  Valid options: Cluster, NodePort, LoadBalancer
+	Visibility ServiceVisibility `json:"visibility,omitempty" description:"visibility level of this service; must be Cluster, NodePort, or LoadBalancer; defaults to Cluster"`
 
 	// PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.

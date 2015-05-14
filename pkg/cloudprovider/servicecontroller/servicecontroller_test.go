@@ -28,7 +28,7 @@ import (
 
 const region = "us-central"
 
-func newService(name string, uid types.UID, visibility api.VisibilityType) *api.Service {
+func newService(name string, uid types.UID, visibility api.ServiceVisibility) *api.Service {
 	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: "namespace", UID: uid}, Spec: api.ServiceSpec{Visibility: visibility}}
 }
 
@@ -204,15 +204,15 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			// Services do not have external load balancers: no calls should be made.
 			services: []*api.Service{
-				newService("s0", "111", api.VisibilityTypeCluster),
-				newService("s1", "222", api.VisibilityTypePublic),
+				newService("s0", "111", api.ServiceVisibilityCluster),
+				newService("s1", "222", api.ServiceVisibilityNodePort),
 			},
 			expectedUpdateCalls: nil,
 		},
 		{
 			// Services does have an external load balancer: one call should be made.
 			services: []*api.Service{
-				newService("s0", "333", api.VisibilityTypeLoadBalancer),
+				newService("s0", "333", api.ServiceVisibilityLoadBalancer),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
 				{Name: "a333", Region: region, Hosts: []string{"node0", "node1", "node73"}},
@@ -221,9 +221,9 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			// Three services have an external load balancer: three calls.
 			services: []*api.Service{
-				newService("s0", "444", api.VisibilityTypeLoadBalancer),
-				newService("s1", "555", api.VisibilityTypeLoadBalancer),
-				newService("s2", "666", api.VisibilityTypeLoadBalancer),
+				newService("s0", "444", api.ServiceVisibilityLoadBalancer),
+				newService("s1", "555", api.ServiceVisibilityLoadBalancer),
+				newService("s2", "666", api.ServiceVisibilityLoadBalancer),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
 				{Name: "a444", Region: region, Hosts: []string{"node0", "node1", "node73"}},
@@ -234,10 +234,10 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			// Two services have an external load balancer and two don't: two calls.
 			services: []*api.Service{
-				newService("s0", "777", api.VisibilityTypePublic),
-				newService("s1", "888", api.VisibilityTypeLoadBalancer),
-				newService("s3", "999", api.VisibilityTypeLoadBalancer),
-				newService("s4", "123", api.VisibilityTypeCluster),
+				newService("s0", "777", api.ServiceVisibilityNodePort),
+				newService("s1", "888", api.ServiceVisibilityLoadBalancer),
+				newService("s3", "999", api.ServiceVisibilityLoadBalancer),
+				newService("s4", "123", api.ServiceVisibilityCluster),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
 				{Name: "a888", Region: region, Hosts: []string{"node0", "node1", "node73"}},
