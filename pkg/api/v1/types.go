@@ -282,7 +282,7 @@ type PersistentVolumeStatus struct {
 
 type PersistentVolumeList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds"`
 	Items    []PersistentVolume `json:"items,omitempty" description:"list of persistent volumes"`
 }
 
@@ -292,7 +292,7 @@ type PersistentVolumeClaim struct {
 	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
 
 	// Spec defines the volume requested by a pod author
-	Spec PersistentVolumeClaimSpec `json:"spec,omitempty" description: "the desired characteristics of a volume"`
+	Spec PersistentVolumeClaimSpec `json:"spec,omitempty" description:"the desired characteristics of a volume"`
 
 	// Status represents the current information about a claim
 	Status PersistentVolumeClaimStatus `json:"status,omitempty" description:"the current status of a persistent volume claim; read-only"`
@@ -300,8 +300,8 @@ type PersistentVolumeClaim struct {
 
 type PersistentVolumeClaimList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds`
-	Items    []PersistentVolumeClaim `json:"items,omitempty" description: "a list of persistent volume claims"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds"`
+	Items    []PersistentVolumeClaim `json:"items,omitempty" description:"a list of persistent volume claims"`
 }
 
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
@@ -873,7 +873,7 @@ type Pod struct {
 // PodList is a list of Pods.
 type PodList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds"`
 
 	Items []Pod `json:"items" description:"list of pods"`
 }
