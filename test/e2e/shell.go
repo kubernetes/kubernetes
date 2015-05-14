@@ -20,23 +20,16 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 
 	. "github.com/onsi/ginkgo"
 )
 
-var (
-	root = absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), "..")))
-)
-
 var _ = Describe("Shell", func() {
+	bashE2ERoot := filepath.Join(testContext.RepoRoot, "hack/e2e-suite")
 
-	defer GinkgoRecover()
 	// Slurp up all the tests in hack/e2e-suite
-	bashE2ERoot := filepath.Join(root, "hack/e2e-suite")
 	files, err := ioutil.ReadDir(bashE2ERoot)
 	if err != nil {
 		Fail(fmt.Sprintf("Error reading test suites from %v %v", bashE2ERoot, err.Error()))
