@@ -225,6 +225,9 @@ func setDefaults(c *Config) {
 		if err != nil {
 			glog.Fatalf("Unable to parse CIDR: %v", err)
 		}
+		if size := ipallocator.RangeSize(portalNet); size < 8 {
+			glog.Fatalf("The portal net range must be at least %d IP addresses", 8)
+		}
 		c.PortalNet = portalNet
 	}
 	if c.PublicServicePorts.Size == 0 {
@@ -311,6 +314,7 @@ func New(c *Config) *Master {
 		portalNet:             c.PortalNet,
 		publicServicePorts:    c.PublicServicePorts,
 		rootWebService:        new(restful.WebService),
+		enableCoreControllers: c.EnableCoreControllers,
 		enableLogsSupport:     c.EnableLogsSupport,
 		enableUISupport:       c.EnableUISupport,
 		enableSwaggerSupport:  c.EnableSwaggerSupport,
