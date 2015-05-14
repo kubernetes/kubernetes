@@ -423,7 +423,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 	// Start the service account and service account token controllers
 	tokenController := serviceaccount.NewTokensController(rootClient, serviceaccount.DefaultTokenControllerOptions(serviceaccount.JWTTokenGenerator(serviceAccountKey)))
 	tokenController.Run()
-	serviceAccountController := serviceaccount.NewServiceAccountsController(rootClient, serviceaccount.DefaultServiceAccountControllerOptions())
+	serviceAccountController := serviceaccount.NewServiceAccountsController(rootClient, serviceaccount.DefaultServiceAccountsControllerOptions())
 	serviceAccountController.Run()
 	// Start the admission plugin reflectors
 	serviceAccountAdmission.Run()

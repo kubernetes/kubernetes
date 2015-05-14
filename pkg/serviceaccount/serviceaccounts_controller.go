@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
@@ -41,24 +42,38 @@ func nameIndexFunc(obj interface{}) (string, error) {
 	return meta.Name(), nil
 }
 
-type ServiceAccountControllerOptions struct {
-	Name                 string
+// ServiceAccountsControllerOptions contains options for running a ServiceAccountsController
+type ServiceAccountsControllerOptions struct {
+	// Names is the set of service account names to ensure exist in every namespace
+	Names util.StringSet
+
+	// ServiceAccountResync is the interval between full resyncs of ServiceAccounts.
+	// If non-zero, all service accounts will be re-listed this often.
+	// Otherwise, re-list will be delayed as long as possible (until the watch is closed or times out).
 	ServiceAccountResync time.Duration
-	NamespaceResync      time.Duration
+
+	// NamespaceResync is the interval between full resyncs of Namespaces.
+	// If non-zero, all namespaces will be re-listed this often.
+	// Otherwise, re-list will be delayed as long as possible (until the watch is closed or times out).
+	NamespaceResync time.Duration
 }
 
-func DefaultServiceAccountControllerOptions() ServiceAccountControllerOptions {
-	return ServiceAccountControllerOptions{Name: "default"}
+func DefaultServiceAccountsControllerOptions() ServiceAccountsControllerOptions {
+	return ServiceAccountsControllerOptions{Names: util.NewStringSet("default")}
 }
 
 // NewServiceAccountsController returns a new *ServiceAccountsController.
-func NewServiceAccountsController(cl *client.Client, options ServiceAccountControllerOptions) *ServiceAccountsController {
+func NewServiceAccountsController(cl client.Interface, options ServiceAccountsControllerOptions) *ServiceAccountsController {
 	e := &ServiceAccountsController{
 		client: cl,
-		name:   options.Name,
+		names:  options.Names,
 	}
 
-	accountSelector := fields.SelectorFromSet(map[string]string{client.ObjectNameField: options.Name})
+	accountSelector := fields.Everything()
+	if len(options.Names) == 1 {
+		// If we're maintaining a single account, we can scope the accounts we watch to just that name
+		accountSelector = fields.SelectorFromSet(map[string]string{client.ObjectNameField: options.Names.List()[0]})
+	}
 	e.serviceAccounts, e.serviceAccountController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
@@ -101,8 +116,8 @@ func NewServiceAccountsController(cl *client.Client, options ServiceAccountContr
 type ServiceAccountsController struct {
 	stopChan chan struct{}
 
-	client *client.Client
-	name   string
+	client client.Interface
+	names  util.StringSet
 
 	serviceAccounts cache.Indexer
 	namespaces      cache.Indexer
@@ -137,27 +152,34 @@ func (e *ServiceAccountsController) serviceAccountDeleted(obj interface{}) {
 		// corresponding secrets will be cleaned up during the Secret re-list
 		return
 	}
-	e.createDefaultServiceAccountIfNeeded(serviceAccount.Namespace)
+	// If the deleted service account is one we're maintaining, recreate it
+	if e.names.Has(serviceAccount.Name) {
+		e.createServiceAccountIfNeeded(serviceAccount.Name, serviceAccount.Namespace)
+	}
 }
 
 // namespaceAdded reacts to a Namespace creation by creating a default ServiceAccount object
 func (e *ServiceAccountsController) namespaceAdded(obj interface{}) {
 	namespace := obj.(*api.Namespace)
-	e.createDefaultServiceAccountIfNeeded(namespace.Name)
+	for _, name := range e.names.List() {
+		e.createServiceAccountIfNeeded(name, namespace.Name)
+	}
 }
 
 // namespaceUpdated reacts to a Namespace update (or re-list) by creating a default ServiceAccount in the namespace if needed
 func (e *ServiceAccountsController) namespaceUpdated(oldObj interface{}, newObj interface{}) {
 	newNamespace := newObj.(*api.Namespace)
-	e.createDefaultServiceAccountIfNeeded(newNamespace.Name)
+	for _, name := range e.names.List() {
+		e.createServiceAccountIfNeeded(name, newNamespace.Name)
+	}
 }
 
-// createDefaultServiceAccountIfNeeded creates a default ServiceAccount in the given namespace if:
-// * it default ServiceAccount does not already exist
+// createServiceAccountIfNeeded creates a ServiceAccount with the given name in the given namespace if:
+// * the named ServiceAccount does not already exist
 // * the specified namespace exists
 // * the specified namespace is in the ACTIVE phase
-func (e *ServiceAccountsController) createDefaultServiceAccountIfNeeded(namespace string) {
-	serviceAccount, err := e.getDefaultServiceAccount(namespace)
+func (e *ServiceAccountsController) createServiceAccountIfNeeded(name, namespace string) {
+	serviceAccount, err := e.getServiceAccount(name, namespace)
 	if err != nil {
 		glog.Error(err)
 		return
@@ -181,22 +203,21 @@ func (e *ServiceAccountsController) createDefaultServiceAccountIfNeeded(namespac
 		return
 	}
 
-	e.createDefaultServiceAccount(namespace)
+	e.createServiceAccount(name, namespace)
 }
 
 // createDefaultServiceAccount creates a default ServiceAccount in the specified namespace
-func (e *ServiceAccountsController) createDefaultServiceAccount(namespace string) {
+func (e *ServiceAccountsController) createServiceAccount(name, namespace string) {
 	serviceAccount := &api.ServiceAccount{}
-	serviceAccount.Name = e.name
+	serviceAccount.Name = name
 	serviceAccount.Namespace = namespace
 	if _, err := e.client.ServiceAccounts(namespace).Create(serviceAccount); err != nil {
 		glog.Error(err)
 	}
 }
 
-// getDefaultServiceAccount returns the default ServiceAccount for the given namespace
-func (e *ServiceAccountsController) getDefaultServiceAccount(namespace string) (*api.ServiceAccount, error) {
-
+// getDefaultServiceAccount returns the ServiceAccount with the given name for the given namespace
+func (e *ServiceAccountsController) getServiceAccount(name, namespace string) (*api.ServiceAccount, error) {
 	key := &api.ServiceAccount{ObjectMeta: api.ObjectMeta{Namespace: namespace}}
 	accounts, err := e.serviceAccounts.Index("namespace", key)
 	if err != nil {
@@ -205,7 +226,7 @@ func (e *ServiceAccountsController) getDefaultServiceAccount(namespace string) (
 
 	for _, obj := range accounts {
 		serviceAccount := obj.(*api.ServiceAccount)
-		if e.name == serviceAccount.Name {
+		if name == serviceAccount.Name {
 			return serviceAccount, nil
 		}
 	}

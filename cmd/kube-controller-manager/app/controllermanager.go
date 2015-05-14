@@ -263,7 +263,7 @@ func (s *CMServer) Run(_ []string) error {
 
 	serviceaccount.NewServiceAccountsController(
 		kubeClient,
-		serviceaccount.DefaultServiceAccountControllerOptions(),
+		serviceaccount.DefaultServiceAccountsControllerOptions(),
 	).Run()
 
 	select {}
