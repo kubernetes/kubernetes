@@ -28,7 +28,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -60,130 +59,7 @@ var _ = Describe("Services", func() {
 			}
 		}
 	})
-
-	It("should provide DNS for the cluster", func() {
-		if providerIs("vagrant") {
-			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
-			return
-		}
-
-		ns := namespaces[0]
-		podClient := c.Pods(ns)
-		//TODO: Wait for skyDNS
-
-		// All the names we need to be able to resolve.
-		namesToResolve := []string{
-			// "kubernetes-ro" is not directly visible because we're not in the the default namespace
-			// TODO consider creating a service in our namespace and query it's DNS name too.
-			"kubernetes-ro.default",
-			"kubernetes-ro.default.cluster.local",
-			"google.com",
-		}
-
-		probeCmd := "for i in `seq 1 600`; do "
-		for _, name := range namesToResolve {
-			// Resolve by TCP and UDP DNS.
-			probeCmd += fmt.Sprintf(`test -n "$(dig +notcp +noall +answer +search %s)" && echo OK > /results/udp@%s;`, name, name)
-			probeCmd += fmt.Sprintf(`test -n "$(dig +tcp +noall +answer +search %s)" && echo OK > /results/tcp@%s;`, name, name)
-		}
-		probeCmd += "sleep 1; done"
-
-		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
-		pod := &api.Pod{
-			TypeMeta: api.TypeMeta{
-				Kind:       "Pod",
-				APIVersion: latest.Version,
-			},
-			ObjectMeta: api.ObjectMeta{
-				Name: "dns-test-" + string(util.NewUUID()),
-			},
-			Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{
-						Name: "results",
-						VolumeSource: api.VolumeSource{
-							EmptyDir: &api.EmptyDirVolumeSource{},
-						},
-					},
-				},
-				Containers: []api.Container{
-					{
-						Name:  "webserver",
-						Image: "gcr.io/google_containers/test-webserver",
-						VolumeMounts: []api.VolumeMount{
-							{
-								Name:      "results",
-								MountPath: "/results",
-							},
-						},
-					},
-					{
-						Name:    "querier",
-						Image:   "gcr.io/google_containers/dnsutils",
-						Command: []string{"sh", "-c", probeCmd},
-						VolumeMounts: []api.VolumeMount{
-							{
-								Name:      "results",
-								MountPath: "/results",
-							},
-						},
-					},
-				},
-			},
-		}
-
-		By("submitting the pod to kubernetes")
-		defer func() {
-			By("deleting pod " + pod.Name)
-			defer GinkgoRecover()
-			podClient.Delete(pod.Name, nil)
-		}()
-		if _, err := podClient.Create(pod); err != nil {
-			Failf("Failed to create pod %s: %v", pod.Name, err)
-		}
-		expectNoError(waitForPodRunningInNamespace(c, pod.Name, ns))
-
-		By("retrieving the pod")
-		pod, err := podClient.Get(pod.Name)
-		if err != nil {
-			Failf("Failed to get pod %s: %v", pod.Name, err)
-		}
-
-		// Try to find results for each expected name.
-		By("looking for the results for each expected name")
-		var failed []string
-
-		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
-			failed = []string{}
-			for _, name := range namesToResolve {
-				for _, proto := range []string{"udp", "tcp"} {
-					testCase := fmt.Sprintf("%s@%s", proto, name)
-					_, err := c.Get().
-						Prefix("proxy").
-						Resource("pods").
-						Namespace(ns).
-						Name(pod.Name).
-						Suffix("results", testCase).
-						Do().Raw()
-					if err != nil {
-						failed = append(failed, testCase)
-					}
-				}
-			}
-			if len(failed) == 0 {
-				return true, nil
-			}
-			Logf("Lookups using %s failed for: %v\n", pod.Name, failed)
-			return false, nil
-		}))
-		Expect(len(failed)).To(Equal(0))
-
-		// TODO: probe from the host, too.
-
-		Logf("DNS probes using %s succeeded\n", pod.Name)
-	})
-
+	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
 	It("should provide RW and RO services", func() {
 		svc := api.ServiceList{}
 		err := c.Get().
