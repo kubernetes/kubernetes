@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -27,7 +26,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // TODO: this basic interface is duplicated in N places.  consolidate?
@@ -40,13 +38,6 @@ type Server struct {
 	Port        int
 	Path        string
 	EnableHTTPS bool
-}
-
-// validator is responsible for validating the cluster and serving
-type validator struct {
-	// a list of servers to health check
-	servers func() map[string]Server
-	rt      http.RoundTripper
 }
 
 type ServerStatus struct {
@@ -95,40 +86,4 @@ func (server *Server) DoServerCheck(rt http.RoundTripper) (probe.Result, string,
 			fmt.Errorf("unhealthy http status code: %d (%s)", resp.StatusCode, resp.Status)
 	}
 	return probe.Success, string(data), nil
-}
-
-func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	verb := "get"
-	apiResource := ""
-	var httpCode int
-	reqStart := time.Now()
-	defer monitor(&verb, &apiResource, util.GetClient(r), &httpCode, reqStart)
-
-	reply := []ServerStatus{}
-	for name, server := range v.servers() {
-		transport := v.rt
-		status, msg, err := server.DoServerCheck(transport)
-		var errorMsg string
-		if err != nil {
-			errorMsg = err.Error()
-		} else {
-			errorMsg = "nil"
-		}
-		reply = append(reply, ServerStatus{name, status.String(), status, msg, errorMsg})
-	}
-	data, err := json.MarshalIndent(reply, "", "  ")
-	if err != nil {
-		httpCode = http.StatusInternalServerError
-		w.WriteHeader(httpCode)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	httpCode = http.StatusOK
-	w.WriteHeader(httpCode)
-	w.Write(data)
-}
-
-// NewValidator creates a validator for a set of servers.
-func NewValidator(servers func() map[string]Server) http.Handler {
-	return &validator{servers: servers, rt: http.DefaultTransport}
 }

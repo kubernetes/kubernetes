@@ -41,8 +41,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/componentstatus"
 	controlleretcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller/etcd"
@@ -497,7 +495,7 @@ func (m *Master) init(c *Config) {
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,
 		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
 
-		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c, false) }),
+		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
 	}
 
 	apiVersions := []string{}
@@ -539,8 +537,6 @@ func (m *Master) init(c *Config) {
 		m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
 	}
 
-	// TODO: This is now deprecated. Should be removed once client dependencies are gone.
-	apiserver.InstallValidator(m.muxHelper, func() map[string]apiserver.Server { return m.getServersToValidate(c, true) })
 	if c.EnableLogsSupport {
 		apiserver.InstallLogsSupport(m.muxHelper)
 	}
@@ -673,7 +669,7 @@ func (m *Master) InstallSwaggerAPI() {
 	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
 }
 
-func (m *Master) getServersToValidate(c *Config, includeNodes bool) map[string]apiserver.Server {
+func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 	serversToValidate := map[string]apiserver.Server{
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
 		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
@@ -699,15 +695,6 @@ func (m *Master) getServersToValidate(c *Config, includeNodes bool) map[string]a
 			port = 4001
 		}
 		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/v2/keys/"}
-	}
-	if includeNodes && m.nodeRegistry != nil {
-		nodes, err := m.nodeRegistry.ListMinions(api.NewDefaultContext(), labels.Everything(), fields.Everything())
-		if err != nil {
-			glog.Errorf("Failed to list minions: %v", err)
-		}
-		for ix, node := range nodes.Items {
-			serversToValidate[fmt.Sprintf("node-%d", ix)] = apiserver.Server{Addr: node.Name, Port: ports.KubeletPort, Path: "/healthz", EnableHTTPS: true}
-		}
 	}
 	return serversToValidate
 }
