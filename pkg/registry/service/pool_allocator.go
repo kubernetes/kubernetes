@@ -125,15 +125,18 @@ func (a *MemoryPoolAllocator) Allocate(s string) error {
 	return nil
 }
 
-// Try to lock the resource 's'..  Checks the cache first if useCache is true.
+// Try to lock the resource identified by s.
+// Checks to see if we have a cached allocation first if useCache is true.
 // Always updates the cache when it learns information.
 func (a *EtcdPoolAllocator) tryLock(s string, useCache bool) (bool, error) {
 	if useCache {
 		a.lock.Lock()
-		if a.usedCached[s] {
+		usedCached := a.usedCached[s]
+		a.lock.Unlock()
+
+		if usedCached {
 			return false, nil
 		}
-		a.lock.Unlock()
 	}
 
 	key := a.baseKey + s
@@ -209,7 +212,10 @@ func (a *EtcdPoolAllocator) AllocateNext() (string, error) {
 	// Try randomly first
 	for _, useCache := range []bool{true, false} {
 		for i := 0; i < a.randomAttempts; i++ {
+			// random is not documented to be thread-safe
+			a.lock.Lock()
 			s := a.driver.PickRandom(a.random)
+			a.lock.Unlock()
 
 			locked, err := a.tryLock(s, useCache)
 			if err != nil {
