@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1579,7 +1579,7 @@ func www_app_assets_css_app_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37053, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37053, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3072,7 +3072,6 @@ app.controller('ListPodsCtrl', [
     $scope.serverView = false;
 
     $scope.headers = [
-      {name: '', field: 'thumb'},
       {name: 'Pod', field: 'pod'},
       {name: 'IP', field: 'ip'},
       {name: 'Status', field: 'status'},
@@ -3092,7 +3091,6 @@ app.controller('ListPodsCtrl', [
       status: 'grey'
     };
     $scope.sortable = ['pod', 'ip', 'status'];
-    $scope.thumbs = 'thumb';
     $scope.count = 10;
 
     $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
@@ -3137,18 +3135,19 @@ app.controller('ListPodsCtrl', [
                 });
           }
 
-          Object.keys(pod.labels)
-              .forEach(function(key) {
-                if (key == 'name') {
-                  _labels += ', ' + pod.labels[key];
-                }
-                if (key == 'uses') {
-                  _uses += ', ' + pod.labels[key];
-                }
-              });
+          if (pod.labels) {
+            Object.keys(pod.labels)
+                .forEach(function(key) {
+                  if (key == 'name') {
+                    _labels += ', ' + pod.labels[key];
+                  }
+                  if (key == 'uses') {
+                    _uses += ', ' + pod.labels[key];
+                  }
+                });
+            }
 
           $scope.content.push({
-            thumb: '"assets/img/kubernetes.svg"',
             pod: pod.id,
             ip: pod.currentState.podIP,
             containers: _fixComma(_containers),
@@ -4183,7 +4182,7 @@ func www_app_assets_js_app_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 79552, mode: os.FileMode(420), modTime: time.Unix(1431651247, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 79499, mode: os.FileMode(420), modTime: time.Unix(1431900597, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4225,7 +4224,7 @@ func www_app_assets_js_base_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477058, mode: os.FileMode(420), modTime: time.Unix(1431651247, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477058, mode: os.FileMode(420), modTime: time.Unix(1431900597, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4367,7 +4366,7 @@ func www_app_components_readme_md() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/README.md", size: 5196, mode: os.FileMode(420), modTime: time.Unix(1431651250, 0)}
+	info := bindata_file_info{name: "www/app/components/README.md", size: 5196, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4385,7 +4384,7 @@ func www_app_components_dashboard_readme_md() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/README.md", size: 41, mode: os.FileMode(420), modTime: time.Unix(1431651250, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/README.md", size: 41, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4402,7 +4401,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_18px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4423,7 +4422,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_24px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4440,7 +4439,7 @@ func www_app_components_dashboard_img_icons_ic_close_18px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4457,7 +4456,7 @@ func www_app_components_dashboard_img_icons_ic_close_24px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4534,7 +4533,7 @@ func www_app_components_dashboard_manifest_json() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1725, mode: os.FileMode(420), modTime: time.Unix(1431651250, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1725, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4551,7 +4550,7 @@ func www_app_components_dashboard_pages_footer_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4588,7 +4587,7 @@ func www_app_components_dashboard_pages_header_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 873, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 873, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4612,7 +4611,7 @@ func www_app_components_dashboard_pages_home_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4629,7 +4628,24 @@ func www_app_components_dashboard_protractor_smoke_spec_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/protractor/smoke.spec.js", size: 2616, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/protractor/smoke.spec.js", size: 2616, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _www_app_components_dashboard_test_controllers_header_spec_js = []byte(`"use strict";describe("header controller",function(){beforeEach(module("kubernetesApp.components.dashboard")),beforeEach(inject(function(e,t,o){this.rootScope=e,this.scope=e.$new(),this.location=t,spyOn(this.location,"path"),this.controller=o,this.ctrl=this.controller("HeaderCtrl",{$scope:this.scope}),this.scope.$apply()})),describe("subPages",function(){it("is defined",function(){expect(this.scope.subPages).not.toBeUndefined()}),it("is an array",function(){expect(Array.isArray(this.scope.subPages)).toBeTruthy()}),it("is not empty",function(){expect(this.scope.subPages.length).toBeGreaterThan(0)}),describe("each subPage",function(){it("has a category",function(){this.scope.subPages.forEach(function(e){expect(e.category).toBeTruthy()})}),it("has a name",function(){this.scope.subPages.forEach(function(e){expect(e.name).toBeTruthy()})}),it("has a value",function(){this.scope.subPages.forEach(function(e){expect(e.value).toBeTruthy()})})})}),describe("Pages",function(){it("does not change location on first detected change",function(){expect(this.location.path).not.toHaveBeenCalled()}),it("changes location on second detected change",function(){var e=this;this.scope.$apply(function(){e.scope.Pages="test_Pages"}),expect(this.location.path).toHaveBeenCalledWith("test_Pages")})})});`)
+
+func www_app_components_dashboard_test_controllers_header_spec_js_bytes() ([]byte, error) {
+	return _www_app_components_dashboard_test_controllers_header_spec_js, nil
+}
+
+func www_app_components_dashboard_test_controllers_header_spec_js() (*asset, error) {
+	bytes, err := www_app_components_dashboard_test_controllers_header_spec_js_bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindata_file_info{name: "www/app/components/dashboard/test/controllers/header.spec.js", size: 1293, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4680,7 +4696,7 @@ func www_app_components_dashboard_views_groups_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4704,7 +4720,7 @@ func www_app_components_dashboard_views_listevents_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4728,7 +4744,7 @@ func www_app_components_dashboard_views_listminions_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 327, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 327, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4752,7 +4768,7 @@ func www_app_components_dashboard_views_listpods_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 324, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 324, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4828,7 +4844,7 @@ func www_app_components_dashboard_views_listpodscards_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4862,7 +4878,7 @@ func www_app_components_dashboard_views_listpodsvisualizer_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4886,7 +4902,7 @@ func www_app_components_dashboard_views_listreplicationcontrollers_html() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 342, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 342, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4910,7 +4926,7 @@ func www_app_components_dashboard_views_listservices_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 328, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 328, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4936,7 +4952,7 @@ func www_app_components_dashboard_views_partials_cadvisor_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 443, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 443, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4973,7 +4989,7 @@ func www_app_components_dashboard_views_partials_groupbox_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5032,7 +5048,7 @@ func www_app_components_dashboard_views_partials_groupitem_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2109, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2109, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5082,7 +5098,7 @@ func www_app_components_dashboard_views_partials_podtilesbyname_html() (*asset, 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5132,7 +5148,7 @@ func www_app_components_dashboard_views_partials_podtilesbyserver_html() (*asset
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5246,7 +5262,7 @@ func www_app_components_dashboard_views_pod_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 2740, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 2740, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5345,7 +5361,7 @@ func www_app_components_dashboard_views_replication_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 2187, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 2187, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5459,7 +5475,7 @@ func www_app_components_dashboard_views_service_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 2485, mode: os.FileMode(420), modTime: time.Unix(1431651251, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 2485, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5536,7 +5552,7 @@ func www_app_index_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/index.html", size: 2290, mode: os.FileMode(420), modTime: time.Unix(1431650377, 0)}
+	info := bindata_file_info{name: "www/app/index.html", size: 2290, mode: os.FileMode(420), modTime: time.Unix(1431887938, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5546,11992 +5562,11992 @@ var _www_app_shared_assets_sampledata1_json = []byte(`{
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Node:kubernetes-minion-63vc.c.shared-kraken.internal", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Node:kubernetes-minion-63vc.c.shared-kraken.internal",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Node:kubernetes-minion-63vc.c.shared-kraken.internal", 
-      "target": "Pod:elasticsearch-logging-controller-fplln", 
+      },
+      "source": "Node:kubernetes-minion-63vc.c.shared-kraken.internal",
+      "target": "Pod:elasticsearch-logging-controller-fplln",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:elasticsearch-logging-controller-fplln", 
-      "target": "Container:k8s_elasticsearch-logging.2a73470d_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_4f7ab6f1", 
+      },
+      "source": "Pod:elasticsearch-logging-controller-fplln",
+      "target": "Container:k8s_elasticsearch-logging.2a73470d_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_4f7ab6f1",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_elasticsearch-logging.2a73470d_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_4f7ab6f1", 
-      "target": "Process:c59ed482c768/9167", 
+      },
+      "source": "Container:k8s_elasticsearch-logging.2a73470d_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_4f7ab6f1",
+      "target": "Process:c59ed482c768/9167",
       "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_elasticsearch-logging.2a73470d_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_4f7ab6f1", 
-      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/2046fa81d27b", 
-      "type": "createdFrom"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Pod:elasticsearch-logging-controller-fplln", 
-      "target": "Container:k8s_POD.fadf157b_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_560fbb19", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_POD.fadf157b_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_560fbb19", 
-      "target": "Process:3cbca1d60090/8980", 
-      "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_POD.fadf157b_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_560fbb19", 
-      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "source": "Container:k8s_elasticsearch-logging.2a73470d_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_4f7ab6f1",
+      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/2046fa81d27b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Node:kubernetes-minion-63vc.c.shared-kraken.internal", 
-      "target": "Pod:frontend-controller-szwk1", 
+      },
+      "source": "Pod:elasticsearch-logging-controller-fplln",
+      "target": "Container:k8s_POD.fadf157b_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_560fbb19",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:frontend-controller-szwk1", 
-      "target": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
+      },
+      "source": "Container:k8s_POD.fadf157b_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_560fbb19",
+      "target": "Process:3cbca1d60090/8980",
       "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
-      "target": "Process:bbe285c5f2e6/9180", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
-      "target": "Process:bbe285c5f2e6/9234", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
-      "target": "Process:bbe285c5f2e6/9334", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
-      "target": "Process:bbe285c5f2e6/9342", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
-      "target": "Process:bbe285c5f2e6/9343", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
-      "target": "Process:bbe285c5f2e6/9344", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
-      "target": "Process:bbe285c5f2e6/9345", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
-      "target": "Process:bbe285c5f2e6/9346", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
-      "target": "Process:bbe285c5f2e6/31634", 
-      "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
-      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/5630952871a3", 
+      },
+      "source": "Container:k8s_POD.fadf157b_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_560fbb19",
+      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:frontend-controller-szwk1", 
-      "target": "Container:k8s_POD.8550e9ae_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_291e36d2", 
+      },
+      "source": "Node:kubernetes-minion-63vc.c.shared-kraken.internal",
+      "target": "Pod:frontend-controller-szwk1",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_POD.8550e9ae_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_291e36d2", 
-      "target": "Process:73d5a7fedfbc/8946", 
+      },
+      "source": "Pod:frontend-controller-szwk1",
+      "target": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
+      "target": "Process:bbe285c5f2e6/9180",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
+      "target": "Process:bbe285c5f2e6/9234",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
+      "target": "Process:bbe285c5f2e6/9334",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
+      "target": "Process:bbe285c5f2e6/9342",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
+      "target": "Process:bbe285c5f2e6/9343",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
+      "target": "Process:bbe285c5f2e6/9344",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
+      "target": "Process:bbe285c5f2e6/9345",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
+      "target": "Process:bbe285c5f2e6/9346",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
+      "target": "Process:bbe285c5f2e6/31634",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_POD.8550e9ae_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_291e36d2", 
-      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
+      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/5630952871a3",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Node:kubernetes-minion-63vc.c.shared-kraken.internal", 
-      "target": "Pod:kibana-logging-controller-0133o", 
+      },
+      "source": "Pod:frontend-controller-szwk1",
+      "target": "Container:k8s_POD.8550e9ae_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_291e36d2",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:kibana-logging-controller-0133o", 
-      "target": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15", 
+      },
+      "source": "Container:k8s_POD.8550e9ae_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_291e36d2",
+      "target": "Process:73d5a7fedfbc/8946",
       "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15", 
-      "target": "Process:c61833fc16d7/9169", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15", 
-      "target": "Process:c61833fc16d7/9213", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15", 
-      "target": "Process:c61833fc16d7/9214", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15", 
-      "target": "Process:c61833fc16d7/9215", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15", 
-      "target": "Process:c61833fc16d7/9216", 
-      "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15", 
-      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/478301224e74", 
+      },
+      "source": "Container:k8s_POD.8550e9ae_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_291e36d2",
+      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:kibana-logging-controller-0133o", 
-      "target": "Container:k8s_POD.8f57ed6e_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_7d7407e5", 
+      },
+      "source": "Node:kubernetes-minion-63vc.c.shared-kraken.internal",
+      "target": "Pod:kibana-logging-controller-0133o",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_POD.8f57ed6e_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_7d7407e5", 
-      "target": "Process:9692de5790bd/8983", 
+      },
+      "source": "Pod:kibana-logging-controller-0133o",
+      "target": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15",
+      "target": "Process:c61833fc16d7/9169",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15",
+      "target": "Process:c61833fc16d7/9213",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15",
+      "target": "Process:c61833fc16d7/9214",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15",
+      "target": "Process:c61833fc16d7/9215",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15",
+      "target": "Process:c61833fc16d7/9216",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_POD.8f57ed6e_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_7d7407e5", 
-      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "source": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15",
+      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/478301224e74",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Node:kubernetes-minion-a411.c.shared-kraken.internal", 
+      },
+      "source": "Pod:kibana-logging-controller-0133o",
+      "target": "Container:k8s_POD.8f57ed6e_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_7d7407e5",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Node:kubernetes-minion-a411.c.shared-kraken.internal", 
-      "target": "Pod:redis-master", 
+      },
+      "source": "Container:k8s_POD.8f57ed6e_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_7d7407e5",
+      "target": "Process:9692de5790bd/8983",
       "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Pod:redis-master", 
-      "target": "Container:k8s_master.89d7f81b_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_3aac79cb", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_master.89d7f81b_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_3aac79cb", 
-      "target": "Process:7f19195ef679/22432", 
-      "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_master.89d7f81b_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_3aac79cb", 
-      "target": "Image:kubernetes-minion-a411.c.shared-kraken.internal/c059fe93c46a", 
+      },
+      "source": "Container:k8s_POD.8f57ed6e_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_7d7407e5",
+      "target": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:redis-master", 
-      "target": "Container:k8s_POD.f7adea30_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_f3a01881", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Node:kubernetes-minion-a411.c.shared-kraken.internal",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_POD.f7adea30_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_f3a01881", 
-      "target": "Process:11626b569335/22336", 
+      },
+      "source": "Node:kubernetes-minion-a411.c.shared-kraken.internal",
+      "target": "Pod:redis-master",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Pod:redis-master",
+      "target": "Container:k8s_master.89d7f81b_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_3aac79cb",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_master.89d7f81b_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_3aac79cb",
+      "target": "Process:7f19195ef679/22432",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_POD.f7adea30_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_f3a01881", 
-      "target": "Image:kubernetes-minion-a411.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "source": "Container:k8s_master.89d7f81b_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_3aac79cb",
+      "target": "Image:kubernetes-minion-a411.c.shared-kraken.internal/c059fe93c46a",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Node:kubernetes-minion-a411.c.shared-kraken.internal", 
-      "target": "Pod:redis-slave-controller-vi7hv", 
+      },
+      "source": "Pod:redis-master",
+      "target": "Container:k8s_POD.f7adea30_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_f3a01881",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:redis-slave-controller-vi7hv", 
-      "target": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728", 
+      },
+      "source": "Container:k8s_POD.f7adea30_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_f3a01881",
+      "target": "Process:11626b569335/22336",
       "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728", 
-      "target": "Process:a9028e8bd1ab/22454", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728", 
-      "target": "Process:a9028e8bd1ab/22471", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728", 
-      "target": "Process:a9028e8bd1ab/22477", 
-      "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728", 
-      "target": "Image:kubernetes-minion-a411.c.shared-kraken.internal/81b1b696a77a", 
+      },
+      "source": "Container:k8s_POD.f7adea30_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_f3a01881",
+      "target": "Image:kubernetes-minion-a411.c.shared-kraken.internal/6c4579af347b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:redis-slave-controller-vi7hv", 
-      "target": "Container:k8s_POD.e886ea28_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_36f906e2", 
+      },
+      "source": "Node:kubernetes-minion-a411.c.shared-kraken.internal",
+      "target": "Pod:redis-slave-controller-vi7hv",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_POD.e886ea28_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_36f906e2", 
-      "target": "Process:f82d27e2dfcf/22308", 
+      },
+      "source": "Pod:redis-slave-controller-vi7hv",
+      "target": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728",
+      "target": "Process:a9028e8bd1ab/22454",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728",
+      "target": "Process:a9028e8bd1ab/22471",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728",
+      "target": "Process:a9028e8bd1ab/22477",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_POD.e886ea28_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_36f906e2", 
-      "target": "Image:kubernetes-minion-a411.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728",
+      "target": "Image:kubernetes-minion-a411.c.shared-kraken.internal/81b1b696a77a",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Node:kubernetes-minion-e3zy.c.shared-kraken.internal", 
+      },
+      "source": "Pod:redis-slave-controller-vi7hv",
+      "target": "Container:k8s_POD.e886ea28_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_36f906e2",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Node:kubernetes-minion-e3zy.c.shared-kraken.internal", 
-      "target": "Pod:frontend-controller-b182t", 
+      },
+      "source": "Container:k8s_POD.e886ea28_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_36f906e2",
+      "target": "Process:f82d27e2dfcf/22308",
       "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Pod:frontend-controller-b182t", 
-      "target": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
-      "target": "Process:e868855420dd/15857", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
-      "target": "Process:e868855420dd/25256", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
-      "target": "Process:e868855420dd/25297", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
-      "target": "Process:e868855420dd/25366", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
-      "target": "Process:e868855420dd/25368", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
-      "target": "Process:e868855420dd/25369", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
-      "target": "Process:e868855420dd/25370", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
-      "target": "Process:e868855420dd/25371", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
-      "target": "Process:e868855420dd/25372", 
-      "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
-      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/5630952871a3", 
+      },
+      "source": "Container:k8s_POD.e886ea28_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_36f906e2",
+      "target": "Image:kubernetes-minion-a411.c.shared-kraken.internal/6c4579af347b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:frontend-controller-b182t", 
-      "target": "Container:k8s_POD.8550e9ae_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_b9fb60e3", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Node:kubernetes-minion-e3zy.c.shared-kraken.internal",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_POD.8550e9ae_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_b9fb60e3", 
-      "target": "Process:c1b91efcd342/25115", 
+      },
+      "source": "Node:kubernetes-minion-e3zy.c.shared-kraken.internal",
+      "target": "Pod:frontend-controller-b182t",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Pod:frontend-controller-b182t",
+      "target": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
+      "target": "Process:e868855420dd/15857",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
+      "target": "Process:e868855420dd/25256",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
+      "target": "Process:e868855420dd/25297",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
+      "target": "Process:e868855420dd/25366",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
+      "target": "Process:e868855420dd/25368",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
+      "target": "Process:e868855420dd/25369",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
+      "target": "Process:e868855420dd/25370",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
+      "target": "Process:e868855420dd/25371",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
+      "target": "Process:e868855420dd/25372",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_POD.8550e9ae_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_b9fb60e3", 
-      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
+      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/5630952871a3",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Node:kubernetes-minion-e3zy.c.shared-kraken.internal", 
-      "target": "Pod:monitoring-influx-grafana-controller-gziey", 
+      },
+      "source": "Pod:frontend-controller-b182t",
+      "target": "Container:k8s_POD.8550e9ae_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_b9fb60e3",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:monitoring-influx-grafana-controller-gziey", 
-      "target": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152", 
+      },
+      "source": "Container:k8s_POD.8550e9ae_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_b9fb60e3",
+      "target": "Process:c1b91efcd342/25115",
       "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152", 
-      "target": "Process:f436d2afe7bf/25304", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152", 
-      "target": "Process:f436d2afe7bf/25322", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152", 
-      "target": "Process:f436d2afe7bf/25323", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152", 
-      "target": "Process:f436d2afe7bf/25324", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152", 
-      "target": "Process:f436d2afe7bf/25325", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152", 
-      "target": "Process:f436d2afe7bf/25326", 
-      "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152", 
-      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/3df24075659b", 
+      },
+      "source": "Container:k8s_POD.8550e9ae_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_b9fb60e3",
+      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:monitoring-influx-grafana-controller-gziey", 
-      "target": "Container:k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112", 
+      },
+      "source": "Node:kubernetes-minion-e3zy.c.shared-kraken.internal",
+      "target": "Pod:monitoring-influx-grafana-controller-gziey",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112", 
-      "target": "Process:005426f19bca/25258", 
+      },
+      "source": "Pod:monitoring-influx-grafana-controller-gziey",
+      "target": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112", 
-      "target": "Process:005426f19bca/25272", 
+      },
+      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152",
+      "target": "Process:f436d2afe7bf/25304",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152",
+      "target": "Process:f436d2afe7bf/25322",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152",
+      "target": "Process:f436d2afe7bf/25323",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152",
+      "target": "Process:f436d2afe7bf/25324",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152",
+      "target": "Process:f436d2afe7bf/25325",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152",
+      "target": "Process:f436d2afe7bf/25326",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112", 
-      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/fdd2bd0d0470", 
+      },
+      "source": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152",
+      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/3df24075659b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:monitoring-influx-grafana-controller-gziey", 
-      "target": "Container:k8s_POD.14142f41_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_fde1c5ed", 
+      },
+      "source": "Pod:monitoring-influx-grafana-controller-gziey",
+      "target": "Container:k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_POD.14142f41_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_fde1c5ed", 
-      "target": "Process:bd6afd430dba/25172", 
+      },
+      "source": "Container:k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112",
+      "target": "Process:005426f19bca/25258",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112",
+      "target": "Process:005426f19bca/25272",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_POD.14142f41_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_fde1c5ed", 
-      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "source": "Container:k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112",
+      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/fdd2bd0d0470",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Node:kubernetes-minion-e3zy.c.shared-kraken.internal", 
-      "target": "Pod:skydns-ls6k1", 
+      },
+      "source": "Pod:monitoring-influx-grafana-controller-gziey",
+      "target": "Container:k8s_POD.14142f41_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_fde1c5ed",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:skydns-ls6k1", 
-      "target": "Container:k8s_skydns.8c4210b3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_b83c0e62", 
+      },
+      "source": "Container:k8s_POD.14142f41_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_fde1c5ed",
+      "target": "Process:bd6afd430dba/25172",
       "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_skydns.8c4210b3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_b83c0e62", 
-      "target": "Process:1c6f3946b06a/25390", 
-      "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_skydns.8c4210b3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_b83c0e62", 
-      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/93f9564eaa33", 
+      },
+      "source": "Container:k8s_POD.14142f41_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_fde1c5ed",
+      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:skydns-ls6k1", 
-      "target": "Container:k8s_kube2sky.53fede80_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_6a42ba56", 
+      },
+      "source": "Node:kubernetes-minion-e3zy.c.shared-kraken.internal",
+      "target": "Pod:skydns-ls6k1",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_kube2sky.53fede80_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_6a42ba56", 
-      "target": "Process:8f17a7d63d27/25373", 
+      },
+      "source": "Pod:skydns-ls6k1",
+      "target": "Container:k8s_skydns.8c4210b3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_b83c0e62",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_skydns.8c4210b3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_b83c0e62",
+      "target": "Process:1c6f3946b06a/25390",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_kube2sky.53fede80_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_6a42ba56", 
-      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/3ea44ca9f1bd", 
+      },
+      "source": "Container:k8s_skydns.8c4210b3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_b83c0e62",
+      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/93f9564eaa33",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:skydns-ls6k1", 
-      "target": "Container:k8s_etcd.dc42e1f3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_5f874ba1", 
+      },
+      "source": "Pod:skydns-ls6k1",
+      "target": "Container:k8s_kube2sky.53fede80_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_6a42ba56",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_etcd.dc42e1f3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_5f874ba1", 
-      "target": "Process:14bb8d474c88/25341", 
+      },
+      "source": "Container:k8s_kube2sky.53fede80_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_6a42ba56",
+      "target": "Process:8f17a7d63d27/25373",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_etcd.dc42e1f3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_5f874ba1", 
-      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/c5f34efc4446", 
+      },
+      "source": "Container:k8s_kube2sky.53fede80_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_6a42ba56",
+      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/3ea44ca9f1bd",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:skydns-ls6k1", 
-      "target": "Container:k8s_POD.d3cdea5d_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_c4a76070", 
+      },
+      "source": "Pod:skydns-ls6k1",
+      "target": "Container:k8s_etcd.dc42e1f3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_5f874ba1",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_POD.d3cdea5d_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_c4a76070", 
-      "target": "Process:df65efb615d5/25074", 
+      },
+      "source": "Container:k8s_etcd.dc42e1f3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_5f874ba1",
+      "target": "Process:14bb8d474c88/25341",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_POD.d3cdea5d_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_c4a76070", 
-      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "source": "Container:k8s_etcd.dc42e1f3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_5f874ba1",
+      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/c5f34efc4446",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Node:kubernetes-minion-tf8u.c.shared-kraken.internal", 
+      },
+      "source": "Pod:skydns-ls6k1",
+      "target": "Container:k8s_POD.d3cdea5d_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_c4a76070",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Node:kubernetes-minion-tf8u.c.shared-kraken.internal", 
-      "target": "Pod:frontend-controller-vjzjp", 
+      },
+      "source": "Container:k8s_POD.d3cdea5d_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_c4a76070",
+      "target": "Process:df65efb615d5/25074",
       "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Pod:frontend-controller-vjzjp", 
-      "target": "Container:k8s_POD.8550e9ae_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_684ff4ae", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_POD.8550e9ae_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_684ff4ae", 
-      "target": "Process:c00924f5248b/4083", 
-      "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_POD.8550e9ae_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_684ff4ae", 
-      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "source": "Container:k8s_POD.d3cdea5d_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_c4a76070",
+      "target": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:frontend-controller-vjzjp", 
-      "target": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Node:kubernetes-minion-tf8u.c.shared-kraken.internal",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
-      "target": "Process:9a066b06d5d0/4255", 
+      },
+      "source": "Node:kubernetes-minion-tf8u.c.shared-kraken.internal",
+      "target": "Pod:frontend-controller-vjzjp",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
-      "target": "Process:9a066b06d5d0/4293", 
+      },
+      "source": "Pod:frontend-controller-vjzjp",
+      "target": "Container:k8s_POD.8550e9ae_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_684ff4ae",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
-      "target": "Process:9a066b06d5d0/4330", 
+      },
+      "source": "Container:k8s_POD.8550e9ae_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_684ff4ae",
+      "target": "Process:c00924f5248b/4083",
       "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
-      "target": "Process:9a066b06d5d0/4332", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
-      "target": "Process:9a066b06d5d0/4333", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
-      "target": "Process:9a066b06d5d0/4334", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
-      "target": "Process:9a066b06d5d0/4335", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
-      "target": "Process:9a066b06d5d0/4336", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
-      "target": "Process:9a066b06d5d0/22522", 
-      "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
-      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/5630952871a3", 
+      },
+      "source": "Container:k8s_POD.8550e9ae_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_684ff4ae",
+      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Node:kubernetes-minion-tf8u.c.shared-kraken.internal", 
-      "target": "Pod:monitoring-heapster-controller-oh43e", 
+      },
+      "source": "Pod:frontend-controller-vjzjp",
+      "target": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:monitoring-heapster-controller-oh43e", 
-      "target": "Container:k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3", 
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
+      "target": "Process:9a066b06d5d0/4255",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3", 
-      "target": "Process:3a528bad8247/4246", 
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
+      "target": "Process:9a066b06d5d0/4293",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3", 
-      "target": "Process:3a528bad8247/4276", 
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
+      "target": "Process:9a066b06d5d0/4330",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
+      "target": "Process:9a066b06d5d0/4332",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
+      "target": "Process:9a066b06d5d0/4333",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
+      "target": "Process:9a066b06d5d0/4334",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
+      "target": "Process:9a066b06d5d0/4335",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
+      "target": "Process:9a066b06d5d0/4336",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
+      "target": "Process:9a066b06d5d0/22522",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3", 
-      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6d053b2331f9", 
+      },
+      "source": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
+      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/5630952871a3",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:monitoring-heapster-controller-oh43e", 
-      "target": "Container:k8s_POD.8149c85a_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_ff9d7b54", 
+      },
+      "source": "Node:kubernetes-minion-tf8u.c.shared-kraken.internal",
+      "target": "Pod:monitoring-heapster-controller-oh43e",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_POD.8149c85a_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_ff9d7b54", 
-      "target": "Process:ae0effbebe7e/4082", 
+      },
+      "source": "Pod:monitoring-heapster-controller-oh43e",
+      "target": "Container:k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3",
+      "target": "Process:3a528bad8247/4246",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3",
+      "target": "Process:3a528bad8247/4276",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_POD.8149c85a_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_ff9d7b54", 
-      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "source": "Container:k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3",
+      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6d053b2331f9",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Node:kubernetes-minion-tf8u.c.shared-kraken.internal", 
-      "target": "Pod:redis-slave-controller-dnyxx", 
+      },
+      "source": "Pod:monitoring-heapster-controller-oh43e",
+      "target": "Container:k8s_POD.8149c85a_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_ff9d7b54",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:redis-slave-controller-dnyxx", 
-      "target": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068", 
+      },
+      "source": "Container:k8s_POD.8149c85a_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_ff9d7b54",
+      "target": "Process:ae0effbebe7e/4082",
       "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068", 
-      "target": "Process:0219b8fac88d/4286", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068", 
-      "target": "Process:0219b8fac88d/4308", 
-      "type": "contains"
-    }, 
-    {
-      "annotations": {
-        "label": "contains"
-      }, 
-      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068", 
-      "target": "Process:0219b8fac88d/4309", 
-      "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068", 
-      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/81b1b696a77a", 
+      },
+      "source": "Container:k8s_POD.8149c85a_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_ff9d7b54",
+      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Pod:redis-slave-controller-dnyxx", 
-      "target": "Container:k8s_POD.e886ea28_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_19052fd1", 
+      },
+      "source": "Node:kubernetes-minion-tf8u.c.shared-kraken.internal",
+      "target": "Pod:redis-slave-controller-dnyxx",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Container:k8s_POD.e886ea28_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_19052fd1", 
-      "target": "Process:4cec5365e5cc/4179", 
+      },
+      "source": "Pod:redis-slave-controller-dnyxx",
+      "target": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068",
+      "target": "Process:0219b8fac88d/4286",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068",
+      "target": "Process:0219b8fac88d/4308",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068",
+      "target": "Process:0219b8fac88d/4309",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "createdFrom"
-      }, 
-      "source": "Container:k8s_POD.e886ea28_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_19052fd1", 
-      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "source": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068",
+      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/81b1b696a77a",
       "type": "createdFrom"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Service:elasticsearch-logging", 
+      },
+      "source": "Pod:redis-slave-controller-dnyxx",
+      "target": "Container:k8s_POD.e886ea28_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_19052fd1",
       "type": "contains"
-    }, 
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Container:k8s_POD.e886ea28_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_19052fd1",
+      "target": "Process:4cec5365e5cc/4179",
+      "type": "contains"
+    },
+    {
+      "annotations": {
+        "label": "createdFrom"
+      },
+      "source": "Container:k8s_POD.e886ea28_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_19052fd1",
+      "target": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b",
+      "type": "createdFrom"
+    },
+    {
+      "annotations": {
+        "label": "contains"
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Service:elasticsearch-logging",
+      "type": "contains"
+    },
     {
       "annotations": {
         "label": "loadBalances"
-      }, 
-      "source": "Service:elasticsearch-logging", 
-      "target": "Pod:elasticsearch-logging-controller-fplln", 
+      },
+      "source": "Service:elasticsearch-logging",
+      "target": "Pod:elasticsearch-logging-controller-fplln",
       "type": "loadBalances"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Service:kibana-logging", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Service:kibana-logging",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "loadBalances"
-      }, 
-      "source": "Service:kibana-logging", 
-      "target": "Pod:kibana-logging-controller-0133o", 
+      },
+      "source": "Service:kibana-logging",
+      "target": "Pod:kibana-logging-controller-0133o",
       "type": "loadBalances"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Service:kubernetes", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Service:kubernetes",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Service:kubernetes-ro", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Service:kubernetes-ro",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Service:monitoring-grafana", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Service:monitoring-grafana",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Service:monitoring-heapster", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Service:monitoring-heapster",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Service:monitoring-influxdb", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Service:monitoring-influxdb",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Service:redis-master", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Service:redis-master",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "loadBalances"
-      }, 
-      "source": "Service:redis-master", 
-      "target": "Pod:redis-master", 
+      },
+      "source": "Service:redis-master",
+      "target": "Pod:redis-master",
       "type": "loadBalances"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Service:redisslave", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Service:redisslave",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "loadBalances"
-      }, 
-      "source": "Service:redisslave", 
-      "target": "Pod:redis-slave-controller-dnyxx", 
+      },
+      "source": "Service:redisslave",
+      "target": "Pod:redis-slave-controller-dnyxx",
       "type": "loadBalances"
-    }, 
+    },
     {
       "annotations": {
         "label": "loadBalances"
-      }, 
-      "source": "Service:redisslave", 
-      "target": "Pod:redis-slave-controller-vi7hv", 
+      },
+      "source": "Service:redisslave",
+      "target": "Pod:redis-slave-controller-vi7hv",
       "type": "loadBalances"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "Service:skydns", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "Service:skydns",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "loadBalances"
-      }, 
-      "source": "Service:skydns", 
-      "target": "Pod:skydns-ls6k1", 
+      },
+      "source": "Service:skydns",
+      "target": "Pod:skydns-ls6k1",
       "type": "loadBalances"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "ReplicationController:elasticsearch-logging-controller", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "ReplicationController:elasticsearch-logging-controller",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitors"
-      }, 
-      "source": "ReplicationController:elasticsearch-logging-controller", 
-      "target": "Pod:elasticsearch-logging-controller-fplln", 
+      },
+      "source": "ReplicationController:elasticsearch-logging-controller",
+      "target": "Pod:elasticsearch-logging-controller-fplln",
       "type": "monitors"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "ReplicationController:frontend-controller", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "ReplicationController:frontend-controller",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitors"
-      }, 
-      "source": "ReplicationController:frontend-controller", 
-      "target": "Pod:frontend-controller-b182t", 
+      },
+      "source": "ReplicationController:frontend-controller",
+      "target": "Pod:frontend-controller-b182t",
       "type": "monitors"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitors"
-      }, 
-      "source": "ReplicationController:frontend-controller", 
-      "target": "Pod:frontend-controller-szwk1", 
+      },
+      "source": "ReplicationController:frontend-controller",
+      "target": "Pod:frontend-controller-szwk1",
       "type": "monitors"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitors"
-      }, 
-      "source": "ReplicationController:frontend-controller", 
-      "target": "Pod:frontend-controller-vjzjp", 
+      },
+      "source": "ReplicationController:frontend-controller",
+      "target": "Pod:frontend-controller-vjzjp",
       "type": "monitors"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "ReplicationController:kibana-logging-controller", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "ReplicationController:kibana-logging-controller",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitors"
-      }, 
-      "source": "ReplicationController:kibana-logging-controller", 
-      "target": "Pod:kibana-logging-controller-0133o", 
+      },
+      "source": "ReplicationController:kibana-logging-controller",
+      "target": "Pod:kibana-logging-controller-0133o",
       "type": "monitors"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "ReplicationController:monitoring-heapster-controller", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "ReplicationController:monitoring-heapster-controller",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitors"
-      }, 
-      "source": "ReplicationController:monitoring-heapster-controller", 
-      "target": "Pod:monitoring-heapster-controller-oh43e", 
+      },
+      "source": "ReplicationController:monitoring-heapster-controller",
+      "target": "Pod:monitoring-heapster-controller-oh43e",
       "type": "monitors"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "ReplicationController:monitoring-influx-grafana-controller", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "ReplicationController:monitoring-influx-grafana-controller",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitors"
-      }, 
-      "source": "ReplicationController:monitoring-influx-grafana-controller", 
-      "target": "Pod:monitoring-influx-grafana-controller-gziey", 
+      },
+      "source": "ReplicationController:monitoring-influx-grafana-controller",
+      "target": "Pod:monitoring-influx-grafana-controller-gziey",
       "type": "monitors"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "ReplicationController:redis-slave-controller", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "ReplicationController:redis-slave-controller",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitors"
-      }, 
-      "source": "ReplicationController:redis-slave-controller", 
-      "target": "Pod:redis-slave-controller-dnyxx", 
+      },
+      "source": "ReplicationController:redis-slave-controller",
+      "target": "Pod:redis-slave-controller-dnyxx",
       "type": "monitors"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitors"
-      }, 
-      "source": "ReplicationController:redis-slave-controller", 
-      "target": "Pod:redis-slave-controller-vi7hv", 
+      },
+      "source": "ReplicationController:redis-slave-controller",
+      "target": "Pod:redis-slave-controller-vi7hv",
       "type": "monitors"
-    }, 
+    },
     {
       "annotations": {
         "label": "contains"
-      }, 
-      "source": "Cluster:shared-kraken", 
-      "target": "ReplicationController:skydns", 
+      },
+      "source": "Cluster:shared-kraken",
+      "target": "ReplicationController:skydns",
       "type": "contains"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitors"
-      }, 
-      "source": "ReplicationController:skydns", 
-      "target": "Pod:skydns-ls6k1", 
+      },
+      "source": "ReplicationController:skydns",
+      "target": "Pod:skydns-ls6k1",
       "type": "monitors"
     }
-  ], 
+  ],
   "resources": [
     {
       "annotations": {
         "label": "shared-kraken"
-      }, 
-      "id": "Cluster:shared-kraken", 
-      "timestamp": "2015-03-17T00:01:32.796352", 
+      },
+      "id": "Cluster:shared-kraken",
+      "timestamp": "2015-03-17T00:01:32.796352",
       "type": "Cluster"
-    }, 
+    },
     {
       "annotations": {
         "label": "kubernetes-minion-63vc"
-      }, 
-      "id": "Node:kubernetes-minion-63vc.c.shared-kraken.internal", 
+      },
+      "id": "Node:kubernetes-minion-63vc.c.shared-kraken.internal",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:46Z", 
-        "hostIP": "130.211.175.232", 
-        "id": "kubernetes-minion-63vc.c.shared-kraken.internal", 
-        "resourceVersion": 1231193, 
+        "creationTimestamp": "2015-02-19T00:11:46Z",
+        "hostIP": "130.211.175.232",
+        "id": "kubernetes-minion-63vc.c.shared-kraken.internal",
+        "resourceVersion": 1231193,
         "resources": {
           "capacity": {
-            "cpu": "1", 
+            "cpu": "1",
             "memory": 4026531840
           }
-        }, 
-        "selfLink": "/api/v1beta1/nodes/kubernetes-minion-63vc.c.shared-kraken.internal", 
+        },
+        "selfLink": "/api/v1beta1/nodes/kubernetes-minion-63vc.c.shared-kraken.internal",
         "status": {
           "conditions": [
             {
-              "kind": "Ready", 
-              "lastProbeTime": "2015-03-17T00:01:23Z", 
-              "lastTransitionTime": "2015-02-25T17:19:02Z", 
-              "reason": "Node health check succeeded: kubelet /healthz endpoint returns ok", 
+              "kind": "Ready",
+              "lastProbeTime": "2015-03-17T00:01:23Z",
+              "lastTransitionTime": "2015-02-25T17:19:02Z",
+              "reason": "Node health check succeeded: kubelet /healthz endpoint returns ok",
               "status": "Full"
             }
           ]
-        }, 
+        },
         "uid": "e432bc08-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:32.796352", 
+      },
+      "timestamp": "2015-03-17T00:01:32.796352",
       "type": "Node"
-    }, 
+    },
     {
       "annotations": {
         "label": "elasticsearch-logging-controller-fplln"
-      }, 
-      "id": "Pod:elasticsearch-logging-controller-fplln", 
+      },
+      "id": "Pod:elasticsearch-logging-controller-fplln",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:57Z", 
+        "creationTimestamp": "2015-02-19T00:11:57Z",
         "currentState": {
           "Condition": [
             {
-              "kind": "Ready", 
+              "kind": "Ready",
               "status": "Full"
             }
-          ], 
-          "host": "kubernetes-minion-63vc.c.shared-kraken.internal", 
-          "hostIP": "130.211.175.232", 
+          ],
+          "host": "kubernetes-minion-63vc.c.shared-kraken.internal",
+          "hostIP": "130.211.175.232",
           "info": {
             "POD": {
-              "containerID": "docker://3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529", 
-              "image": "kubernetes/pause:latest", 
-              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-              "podIP": "10.244.0.3", 
-              "ready": false, 
-              "restartCount": 5, 
+              "containerID": "docker://3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529",
+              "image": "kubernetes/pause:latest",
+              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+              "podIP": "10.244.0.3",
+              "ready": false,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:19:11Z"
                 }
               }
-            }, 
+            },
             "elasticsearch-logging": {
-              "containerID": "docker://c59ed482c768928f8b44203096ba3e628994ba82a135dd4f89970d8fba54c38f", 
-              "image": "dockerfile/elasticsearch", 
-              "imageID": "docker://2046fa81d27b371de4ae5b6106f0a18b27f4fae94c38f68954c4685e7ae94459", 
-              "ready": true, 
-              "restartCount": 5, 
+              "containerID": "docker://c59ed482c768928f8b44203096ba3e628994ba82a135dd4f89970d8fba54c38f",
+              "image": "dockerfile/elasticsearch",
+              "imageID": "docker://2046fa81d27b371de4ae5b6106f0a18b27f4fae94c38f68954c4685e7ae94459",
+              "ready": true,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:19:12Z"
                 }
               }
             }
-          }, 
+          },
           "manifest": {
-            "containers": null, 
-            "id": "", 
-            "restartPolicy": {}, 
-            "version": "", 
+            "containers": null,
+            "id": "",
+            "restartPolicy": {},
+            "version": "",
             "volumes": null
-          }, 
-          "podIP": "10.244.0.3", 
+          },
+          "podIP": "10.244.0.3",
           "status": "Running"
-        }, 
+        },
         "desiredState": {
           "manifest": {
             "containers": [
               {
-                "capabilities": {}, 
-                "image": "dockerfile/elasticsearch", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "name": "elasticsearch-logging", 
+                "capabilities": {},
+                "image": "dockerfile/elasticsearch",
+                "imagePullPolicy": "PullIfNotPresent",
+                "name": "elasticsearch-logging",
                 "ports": [
                   {
-                    "containerPort": 9200, 
-                    "name": "es-port", 
+                    "containerPort": 9200,
+                    "name": "es-port",
                     "protocol": "TCP"
-                  }, 
+                  },
                   {
-                    "containerPort": 9300, 
-                    "name": "es-transport-port", 
+                    "containerPort": 9300,
+                    "name": "es-transport-port",
                     "protocol": "TCP"
                   }
-                ], 
-                "resources": {}, 
-                "terminationMessagePath": "/dev/termination-log", 
+                ],
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
                 "volumeMounts": [
                   {
-                    "mountPath": "/data", 
-                    "name": "es-persistent-storage", 
+                    "mountPath": "/data",
+                    "name": "es-persistent-storage",
                     "path": "/data"
                   }
                 ]
               }
-            ], 
-            "dnsPolicy": "ClusterFirst", 
-            "id": "", 
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "id": "",
             "restartPolicy": {
               "always": {}
-            }, 
-            "version": "v1beta2", 
+            },
+            "version": "v1beta2",
             "volumes": [
               {
-                "name": "es-persistent-storage", 
+                "name": "es-persistent-storage",
                 "source": {
-                  "emptyDir": {}, 
-                  "gitRepo": null, 
-                  "hostDir": null, 
-                  "persistentDisk": null, 
+                  "emptyDir": {},
+                  "gitRepo": null,
+                  "hostDir": null,
+                  "persistentDisk": null,
                   "secret": null
                 }
               }
             ]
           }
-        }, 
-        "generateName": "elasticsearch-logging-controller-", 
-        "id": "elasticsearch-logging-controller-fplln", 
+        },
+        "generateName": "elasticsearch-logging-controller-",
+        "id": "elasticsearch-logging-controller-fplln",
         "labels": {
           "name": "elasticsearch-logging"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 30, 
-        "selfLink": "/api/v1beta1/pods/elasticsearch-logging-controller-fplln?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 30,
+        "selfLink": "/api/v1beta1/pods/elasticsearch-logging-controller-fplln?namespace=default",
         "uid": "eaec34d7-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:32.824353", 
+      },
+      "timestamp": "2015-03-17T00:01:32.824353",
       "type": "Pod"
-    }, 
+    },
     {
       "annotations": {
         "label": "c59ed482c768"
-      }, 
-      "id": "Container:k8s_elasticsearch-logging.2a73470d_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_4f7ab6f1", 
+      },
+      "id": "Container:k8s_elasticsearch-logging.2a73470d_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_4f7ab6f1",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
             "/elasticsearch/bin/elasticsearch"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "ES_PKG_NAME=elasticsearch-1.4.3", 
-            "HOME=/root", 
-            "JAVA_HOME=/usr/lib/jvm/java-8-oracle", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "ES_PKG_NAME=elasticsearch-1.4.3",
+            "HOME=/root",
+            "JAVA_HOME=/usr/lib/jvm/java-8-oracle",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
-            "9200/tcp": {}, 
+            "9200/tcp": {},
             "9300/tcp": {}
-          }, 
-          "Hostname": "elasticsearch-logging-controller-fplln", 
-          "Image": "dockerfile/elasticsearch", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "elasticsearch-logging-controller-fplln",
+          "Image": "dockerfile/elasticsearch",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Created": "2015-02-25T17:19:11.789746097Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:19:11.789746097Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
-            "/var/lib/kubelet/pods/eaec34d7-b7cb-11e4-9018-42010af0f3f2/volumes/kubernetes.io~empty-dir/es-persistent-storage:/data", 
+            "/var/lib/kubelet/pods/eaec34d7-b7cb-11e4-9018-42010af0f3f2/volumes/kubernetes.io~empty-dir/es-persistent-storage:/data",
             "/var/lib/kubelet/pods/eaec34d7-b7cb-11e4-9018-42010af0f3f2/containers/elasticsearch-logging/c59ed482c768928f8b44203096ba3e628994ba82a135dd4f89970d8fba54c38f:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "container:3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529", 
-          "PortBindings": null, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "container:3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529",
+          "PortBindings": null,
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529/hosts", 
-        "Id": "c59ed482c768928f8b44203096ba3e628994ba82a135dd4f89970d8fba54c38f", 
-        "Image": "2046fa81d27b371de4ae5b6106f0a18b27f4fae94c38f68954c4685e7ae94459", 
-        "MountLabel": "", 
-        "Name": "/k8s_elasticsearch-logging.2a73470d_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_4f7ab6f1", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529/hosts",
+        "Id": "c59ed482c768928f8b44203096ba3e628994ba82a135dd4f89970d8fba54c38f",
+        "Image": "2046fa81d27b371de4ae5b6106f0a18b27f4fae94c38f68954c4685e7ae94459",
+        "MountLabel": "",
+        "Name": "/k8s_elasticsearch-logging.2a73470d_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_4f7ab6f1",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/elasticsearch/bin/elasticsearch", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529/resolv.conf", 
+        },
+        "Path": "/elasticsearch/bin/elasticsearch",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 9167, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 9167,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:19:12.151547994Z"
-        }, 
+        },
         "Volumes": {
-          "/data": "/var/lib/kubelet/pods/eaec34d7-b7cb-11e4-9018-42010af0f3f2/volumes/kubernetes.io~empty-dir/es-persistent-storage", 
+          "/data": "/var/lib/kubelet/pods/eaec34d7-b7cb-11e4-9018-42010af0f3f2/volumes/kubernetes.io~empty-dir/es-persistent-storage",
           "/dev/termination-log": "/var/lib/kubelet/pods/eaec34d7-b7cb-11e4-9018-42010af0f3f2/containers/elasticsearch-logging/c59ed482c768928f8b44203096ba3e628994ba82a135dd4f89970d8fba54c38f"
-        }, 
+        },
         "VolumesRW": {
-          "/data": true, 
+          "/data": true,
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:32.848895", 
+      },
+      "timestamp": "2015-03-17T00:01:32.848895",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "9167"
-      }, 
-      "id": "Process:c59ed482c768/9167", 
+      },
+      "id": "Process:c59ed482c768/9167",
       "properties": {
-        "%CPU": "11.5", 
-        "%MEM": "10.9", 
-        "COMMAND": "/usr/lib/jvm/java-8-oracle/bin/java -Xms256m -Xmx1g -Xss256k -Djava.awt.headless=true -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly -XX:+HeapDumpOnOutOfMemoryError -XX:+DisableExplicitGC -Dfile.encoding=UTF-8 -Delasticsearch -Des.foreground=yes -Des.path.home=/elasticsearch -cp :/elasticsearch/lib/elasticsearch-1.4.3.jar:/elasticsearch/lib/*:/elasticsearch/lib/sigar/* org.elasticsearch.bootstrap.Elasticsearch", 
-        "PID": "9167", 
-        "RSS": "414960", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "3196:26", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "11.5",
+        "%MEM": "10.9",
+        "COMMAND": "/usr/lib/jvm/java-8-oracle/bin/java -Xms256m -Xmx1g -Xss256k -Djava.awt.headless=true -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly -XX:+HeapDumpOnOutOfMemoryError -XX:+DisableExplicitGC -Dfile.encoding=UTF-8 -Delasticsearch -Des.foreground=yes -Des.path.home=/elasticsearch -cp :/elasticsearch/lib/elasticsearch-1.4.3.jar:/elasticsearch/lib/*:/elasticsearch/lib/sigar/* org.elasticsearch.bootstrap.Elasticsearch",
+        "PID": "9167",
+        "RSS": "414960",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "3196:26",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "3704120"
-      }, 
-      "timestamp": "2015-03-17T00:04:08.838467", 
+      },
+      "timestamp": "2015-03-17T00:04:08.838467",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "2046fa81d27b"
-      }, 
-      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/2046fa81d27b", 
+      },
+      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/2046fa81d27b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
             "/elasticsearch/bin/elasticsearch"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "HOME=/root", 
-            "JAVA_HOME=/usr/lib/jvm/java-8-oracle", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "HOME=/root",
+            "JAVA_HOME=/usr/lib/jvm/java-8-oracle",
             "ES_PKG_NAME=elasticsearch-1.4.3"
-          ], 
+          ],
           "ExposedPorts": {
-            "9200/tcp": {}, 
+            "9200/tcp": {},
             "9300/tcp": {}
-          }, 
-          "Hostname": "f4f502dce15c", 
-          "Image": "4b7ce22f2d965bd8d7639c70194bf3829a4aee1055ae2285e6e75d4deec6840e", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "f4f502dce15c",
+          "Image": "4b7ce22f2d965bd8d7639c70194bf3829a4aee1055ae2285e6e75d4deec6840e",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Container": "b80011fc668117d858aaad1a5b5e8152ca828bdc7f4fb28f6b82ec767dffce9d", 
+        },
+        "Container": "b80011fc668117d858aaad1a5b5e8152ca828bdc7f4fb28f6b82ec767dffce9d",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) EXPOSE 9300/tcp"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "HOME=/root", 
-            "JAVA_HOME=/usr/lib/jvm/java-8-oracle", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "HOME=/root",
+            "JAVA_HOME=/usr/lib/jvm/java-8-oracle",
             "ES_PKG_NAME=elasticsearch-1.4.3"
-          ], 
+          ],
           "ExposedPorts": {
-            "9200/tcp": {}, 
+            "9200/tcp": {},
             "9300/tcp": {}
-          }, 
-          "Hostname": "f4f502dce15c", 
-          "Image": "4b7ce22f2d965bd8d7639c70194bf3829a4aee1055ae2285e6e75d4deec6840e", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "f4f502dce15c",
+          "Image": "4b7ce22f2d965bd8d7639c70194bf3829a4aee1055ae2285e6e75d4deec6840e",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Created": "2015-02-17T09:21:08.987830049Z", 
-        "DockerVersion": "1.5.0", 
-        "Id": "2046fa81d27b371de4ae5b6106f0a18b27f4fae94c38f68954c4685e7ae94459", 
-        "Os": "linux", 
-        "Parent": "4b7ce22f2d965bd8d7639c70194bf3829a4aee1055ae2285e6e75d4deec6840e", 
-        "Size": 0, 
+        },
+        "Created": "2015-02-17T09:21:08.987830049Z",
+        "DockerVersion": "1.5.0",
+        "Id": "2046fa81d27b371de4ae5b6106f0a18b27f4fae94c38f68954c4685e7ae94459",
+        "Os": "linux",
+        "Parent": "4b7ce22f2d965bd8d7639c70194bf3829a4aee1055ae2285e6e75d4deec6840e",
+        "Size": 0,
         "VirtualSize": 784979176
-      }, 
-      "timestamp": "2015-03-17T00:01:32.960236", 
+      },
+      "timestamp": "2015-03-17T00:01:32.960236",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "3cbca1d60090"
-      }, 
-      "id": "Container:k8s_POD.fadf157b_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_560fbb19", 
+      },
+      "id": "Container:k8s_POD.fadf157b_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_560fbb19",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "elasticsearch-logging-controller-fplln", 
-          "Image": "kubernetes/pause:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "elasticsearch-logging-controller-fplln",
+          "Image": "kubernetes/pause:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:19:09.993691333Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:19:09.993691333Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
-          "Binds": null, 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          "Binds": null,
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "", 
-          "PortBindings": null, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "",
+          "PortBindings": null,
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "/var/lib/docker/containers/3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529/hostname", 
-        "HostsPath": "/var/lib/docker/containers/3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529/hosts", 
-        "Id": "3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529", 
-        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "MountLabel": "", 
-        "Name": "/k8s_POD.fadf157b_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_560fbb19", 
+        },
+        "HostnamePath": "/var/lib/docker/containers/3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529/hostname",
+        "HostsPath": "/var/lib/docker/containers/3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529/hosts",
+        "Id": "3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529",
+        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "MountLabel": "",
+        "Name": "/k8s_POD.fadf157b_elasticsearch-logging-controller-fplln.default.api_eaec34d7-b7cb-11e4-9018-42010af0f3f2_560fbb19",
         "NetworkSettings": {
-          "Bridge": "cbr0", 
-          "Gateway": "10.244.0.1", 
-          "IPAddress": "10.244.0.3", 
-          "IPPrefixLen": 24, 
-          "MacAddress": "02:42:0a:f4:00:03", 
-          "PortMapping": null, 
+          "Bridge": "cbr0",
+          "Gateway": "10.244.0.1",
+          "IPAddress": "10.244.0.3",
+          "IPPrefixLen": 24,
+          "MacAddress": "02:42:0a:f4:00:03",
+          "PortMapping": null,
           "Ports": {}
-        }, 
-        "Path": "/pause", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529/resolv.conf", 
+        },
+        "Path": "/pause",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/3cbca1d600908d26041b5e2d410cc98dc11209a002719ee19cb14c35129de529/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 8980, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 8980,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:19:11.337452124Z"
-        }, 
-        "Volumes": {}, 
+        },
+        "Volumes": {},
         "VolumesRW": {}
-      }, 
-      "timestamp": "2015-03-17T00:01:32.873132", 
+      },
+      "timestamp": "2015-03-17T00:01:32.873132",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "8980"
-      }, 
-      "id": "Process:3cbca1d60090/8980", 
+      },
+      "id": "Process:3cbca1d60090/8980",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/pause", 
-        "PID": "8980", 
-        "RSS": "428", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "0:03", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/pause",
+        "PID": "8980",
+        "RSS": "428",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "0:03",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "265340"
-      }, 
-      "timestamp": "2015-03-17T00:01:32.974952", 
+      },
+      "timestamp": "2015-03-17T00:01:32.974952",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6c4579af347b"
-      }, 
-      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd", 
+        },
+        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/pause]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-07-19T07:02:32.267701596Z", 
-        "DockerVersion": "1.0.0", 
-        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "Os": "linux", 
-        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-        "Size": 0, 
+        },
+        "Created": "2014-07-19T07:02:32.267701596Z",
+        "DockerVersion": "1.0.0",
+        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "Os": "linux",
+        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+        "Size": 0,
         "VirtualSize": 239840
-      }, 
-      "timestamp": "2015-03-17T00:01:32.979442", 
+      },
+      "timestamp": "2015-03-17T00:01:32.979442",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "frontend-controller-szwk1"
-      }, 
-      "id": "Pod:frontend-controller-szwk1", 
+      },
+      "id": "Pod:frontend-controller-szwk1",
       "properties": {
-        "creationTimestamp": "2015-02-19T01:39:01Z", 
+        "creationTimestamp": "2015-02-19T01:39:01Z",
         "currentState": {
           "Condition": [
             {
-              "kind": "Ready", 
+              "kind": "Ready",
               "status": "Full"
             }
-          ], 
-          "host": "kubernetes-minion-63vc.c.shared-kraken.internal", 
-          "hostIP": "130.211.175.232", 
+          ],
+          "host": "kubernetes-minion-63vc.c.shared-kraken.internal",
+          "hostIP": "130.211.175.232",
           "info": {
             "POD": {
-              "containerID": "docker://73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9", 
-              "image": "kubernetes/pause:latest", 
-              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-              "podIP": "10.244.0.2", 
-              "ready": false, 
-              "restartCount": 5, 
+              "containerID": "docker://73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9",
+              "image": "kubernetes/pause:latest",
+              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+              "podIP": "10.244.0.2",
+              "ready": false,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:19:11Z"
                 }
               }
-            }, 
+            },
             "php-redis": {
-              "containerID": "docker://bbe285c5f2e698c19d86bf07fa180fb23a20dc1e0fcec41486a6773eb541fc44", 
-              "image": "kubernetes/example-guestbook-php-redis", 
-              "imageID": "docker://5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f", 
-              "ready": true, 
-              "restartCount": 5, 
+              "containerID": "docker://bbe285c5f2e698c19d86bf07fa180fb23a20dc1e0fcec41486a6773eb541fc44",
+              "image": "kubernetes/example-guestbook-php-redis",
+              "imageID": "docker://5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f",
+              "ready": true,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:19:12Z"
                 }
               }
             }
-          }, 
+          },
           "manifest": {
-            "containers": null, 
-            "id": "", 
-            "restartPolicy": {}, 
-            "version": "", 
+            "containers": null,
+            "id": "",
+            "restartPolicy": {},
+            "version": "",
             "volumes": null
-          }, 
-          "podIP": "10.244.0.2", 
+          },
+          "podIP": "10.244.0.2",
           "status": "Running"
-        }, 
+        },
         "desiredState": {
           "manifest": {
             "containers": [
               {
-                "capabilities": {}, 
-                "cpu": 100, 
-                "image": "kubernetes/example-guestbook-php-redis", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "memory": 50000000, 
-                "name": "php-redis", 
+                "capabilities": {},
+                "cpu": 100,
+                "image": "kubernetes/example-guestbook-php-redis",
+                "imagePullPolicy": "PullIfNotPresent",
+                "memory": 50000000,
+                "name": "php-redis",
                 "ports": [
                   {
-                    "containerPort": 80, 
-                    "hostPort": 8000, 
+                    "containerPort": 80,
+                    "hostPort": 8000,
                     "protocol": "TCP"
                   }
-                ], 
+                ],
                 "resources": {
                   "limits": {
-                    "cpu": "0.1", 
+                    "cpu": "0.1",
                     "memory": 50000000
                   }
-                }, 
+                },
                 "terminationMessagePath": "/dev/termination-log"
               }
-            ], 
-            "dnsPolicy": "ClusterFirst", 
-            "id": "", 
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "id": "",
             "restartPolicy": {
               "always": {}
-            }, 
-            "version": "v1beta2", 
+            },
+            "version": "v1beta2",
             "volumes": null
           }
-        }, 
-        "generateName": "frontend-controller-", 
-        "id": "frontend-controller-szwk1", 
+        },
+        "generateName": "frontend-controller-",
+        "id": "frontend-controller-szwk1",
         "labels": {
-          "name": "frontend", 
+          "name": "frontend",
           "uses": "redisslave,redis-master"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 2220, 
-        "selfLink": "/api/v1beta1/pods/frontend-controller-szwk1?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 2220,
+        "selfLink": "/api/v1beta1/pods/frontend-controller-szwk1?namespace=default",
         "uid": "14a335e3-b7d8-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:32.824353", 
+      },
+      "timestamp": "2015-03-17T00:01:32.824353",
       "type": "Pod"
-    }, 
+    },
     {
       "annotations": {
         "label": "bbe285c5f2e6"
-      }, 
-      "id": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
+      },
+      "id": "Container:k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
       "properties": {
-        "AppArmorProfile": "", 
+        "AppArmorProfile": "",
         "Args": [
-          "-c", 
+          "-c",
           "/run.sh"
-        ], 
+        ],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "/run.sh"
-          ], 
-          "CpuShares": 102, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 102,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "frontend-controller-szwk1", 
-          "Image": "kubernetes/example-guestbook-php-redis", 
-          "MacAddress": "", 
-          "Memory": 50000000, 
-          "MemorySwap": -1, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "frontend-controller-szwk1",
+          "Image": "kubernetes/example-guestbook-php-redis",
+          "MacAddress": "",
+          "Memory": 50000000,
+          "MemorySwap": -1,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:19:11.81978513Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:19:11.81978513Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/14a335e3-b7d8-11e4-9018-42010af0f3f2/containers/php-redis/bbe285c5f2e698c19d86bf07fa180fb23a20dc1e0fcec41486a6773eb541fc44:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "container:73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "container:73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9",
           "PortBindings": {
             "80/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "8000"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9/hosts", 
-        "Id": "bbe285c5f2e698c19d86bf07fa180fb23a20dc1e0fcec41486a6773eb541fc44", 
-        "Image": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f", 
-        "MountLabel": "", 
-        "Name": "/k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9/hosts",
+        "Id": "bbe285c5f2e698c19d86bf07fa180fb23a20dc1e0fcec41486a6773eb541fc44",
+        "Image": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f",
+        "MountLabel": "",
+        "Name": "/k8s_php-redis.f1bf04fb_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_bf021c78",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/bin/sh", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9/resolv.conf", 
+        },
+        "Path": "/bin/sh",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 9180, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 9180,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:19:12.570235819Z"
-        }, 
+        },
         "Volumes": {
           "/dev/termination-log": "/var/lib/kubelet/pods/14a335e3-b7d8-11e4-9018-42010af0f3f2/containers/php-redis/bbe285c5f2e698c19d86bf07fa180fb23a20dc1e0fcec41486a6773eb541fc44"
-        }, 
+        },
         "VolumesRW": {
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:32.991762", 
+      },
+      "timestamp": "2015-03-17T00:01:32.991762",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "9180"
-      }, 
-      "id": "Process:bbe285c5f2e6/9180", 
+      },
+      "id": "Process:bbe285c5f2e6/9180",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/bin/sh -c /run.sh", 
-        "PID": "9180", 
-        "RSS": "80", 
-        "START": "Feb25", 
-        "STAT": "Ss", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/bin/sh -c /run.sh",
+        "PID": "9180",
+        "RSS": "80",
+        "START": "Feb25",
+        "STAT": "Ss",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "4412"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.099217", 
+      },
+      "timestamp": "2015-03-17T00:01:33.099217",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "9234"
-      }, 
-      "id": "Process:bbe285c5f2e6/9234", 
+      },
+      "id": "Process:bbe285c5f2e6/9234",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.2", 
-        "COMMAND": "/usr/bin/python /usr/bin/supervisord -n", 
-        "PID": "9234", 
-        "RSS": "10904", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "4:18", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.2",
+        "COMMAND": "/usr/bin/python /usr/bin/supervisord -n",
+        "PID": "9234",
+        "RSS": "10904",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "4:18",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "53152"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.099217", 
+      },
+      "timestamp": "2015-03-17T00:01:33.099217",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "9334"
-      }, 
-      "id": "Process:bbe285c5f2e6/9334", 
+      },
+      "id": "Process:bbe285c5f2e6/9334",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.3", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "9334", 
-        "RSS": "11908", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:55", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.3",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "9334",
+        "RSS": "11908",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:55",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "259972"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.099217", 
+      },
+      "timestamp": "2015-03-17T00:01:33.099217",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "9342"
-      }, 
-      "id": "Process:bbe285c5f2e6/9342", 
+      },
+      "id": "Process:bbe285c5f2e6/9342",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "9342", 
-        "RSS": "6620", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "9342",
+        "RSS": "6620",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260036"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.099217", 
+      },
+      "timestamp": "2015-03-17T00:01:33.099217",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "9343"
-      }, 
-      "id": "Process:bbe285c5f2e6/9343", 
+      },
+      "id": "Process:bbe285c5f2e6/9343",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.2", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "9343", 
-        "RSS": "8532", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.2",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "9343",
+        "RSS": "8532",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260112"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.099217", 
+      },
+      "timestamp": "2015-03-17T00:01:33.099217",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "9344"
-      }, 
-      "id": "Process:bbe285c5f2e6/9344", 
+      },
+      "id": "Process:bbe285c5f2e6/9344",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "9344", 
-        "RSS": "6624", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "9344",
+        "RSS": "6624",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260052"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.099217", 
+      },
+      "timestamp": "2015-03-17T00:01:33.099217",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "9345"
-      }, 
-      "id": "Process:bbe285c5f2e6/9345", 
+      },
+      "id": "Process:bbe285c5f2e6/9345",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "9345", 
-        "RSS": "6748", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "9345",
+        "RSS": "6748",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260012"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.099217", 
+      },
+      "timestamp": "2015-03-17T00:01:33.099217",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "9346"
-      }, 
-      "id": "Process:bbe285c5f2e6/9346", 
+      },
+      "id": "Process:bbe285c5f2e6/9346",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "9346", 
-        "RSS": "6856", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "9346",
+        "RSS": "6856",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260012"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.099217", 
+      },
+      "timestamp": "2015-03-17T00:01:33.099217",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "31634"
-      }, 
-      "id": "Process:bbe285c5f2e6/31634", 
+      },
+      "id": "Process:bbe285c5f2e6/31634",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "31634", 
-        "RSS": "6856", 
-        "START": "Mar01", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "31634",
+        "RSS": "6856",
+        "START": "Mar01",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260020"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.099217", 
+      },
+      "timestamp": "2015-03-17T00:01:33.099217",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "5630952871a3"
-      }, 
-      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/5630952871a3", 
+      },
+      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/5630952871a3",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "/run.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "9909d49b9b51", 
-          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "9909d49b9b51",
+          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "63db4df258d14794d7072e009c12443c790c09fb9c25119ec1d06a6197ab85aa", 
+        },
+        "Container": "63db4df258d14794d7072e009c12443c790c09fb9c25119ec1d06a6197ab85aa",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) CMD [/bin/sh -c /run.sh]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "9909d49b9b51", 
-          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "9909d49b9b51",
+          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-12-09T19:16:28.984874361Z", 
-        "DockerVersion": "1.3.0", 
-        "Id": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f", 
-        "Os": "linux", 
-        "Parent": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429", 
-        "Size": 0, 
+        },
+        "Created": "2014-12-09T19:16:28.984874361Z",
+        "DockerVersion": "1.3.0",
+        "Id": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f",
+        "Os": "linux",
+        "Parent": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429",
+        "Size": 0,
         "VirtualSize": 382800212
-      }, 
-      "timestamp": "2015-03-17T00:01:33.135158", 
+      },
+      "timestamp": "2015-03-17T00:01:33.135158",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "73d5a7fedfbc"
-      }, 
-      "id": "Container:k8s_POD.8550e9ae_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_291e36d2", 
+      },
+      "id": "Container:k8s_POD.8550e9ae_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_291e36d2",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "frontend-controller-szwk1", 
-          "Image": "kubernetes/pause:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "frontend-controller-szwk1",
+          "Image": "kubernetes/pause:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:19:09.951312223Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:19:09.951312223Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
-          "Binds": null, 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          "Binds": null,
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "",
           "PortBindings": {
             "80/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "8000"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "/var/lib/docker/containers/73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9/hostname", 
-        "HostsPath": "/var/lib/docker/containers/73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9/hosts", 
-        "Id": "73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9", 
-        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "MountLabel": "", 
-        "Name": "/k8s_POD.8550e9ae_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_291e36d2", 
+        },
+        "HostnamePath": "/var/lib/docker/containers/73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9/hostname",
+        "HostsPath": "/var/lib/docker/containers/73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9/hosts",
+        "Id": "73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9",
+        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "MountLabel": "",
+        "Name": "/k8s_POD.8550e9ae_frontend-controller-szwk1.default.api_14a335e3-b7d8-11e4-9018-42010af0f3f2_291e36d2",
         "NetworkSettings": {
-          "Bridge": "cbr0", 
-          "Gateway": "10.244.0.1", 
-          "IPAddress": "10.244.0.2", 
-          "IPPrefixLen": 24, 
-          "MacAddress": "02:42:0a:f4:00:02", 
-          "PortMapping": null, 
+          "Bridge": "cbr0",
+          "Gateway": "10.244.0.1",
+          "IPAddress": "10.244.0.2",
+          "IPPrefixLen": 24,
+          "MacAddress": "02:42:0a:f4:00:02",
+          "PortMapping": null,
           "Ports": {
             "80/tcp": [
               {
-                "HostIp": "0.0.0.0", 
+                "HostIp": "0.0.0.0",
                 "HostPort": "8000"
               }
             ]
           }
-        }, 
-        "Path": "/pause", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9/resolv.conf", 
+        },
+        "Path": "/pause",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/73d5a7fedfbc50e87b1d349dc203d5ae84369216ef24b3658c87b113ad02aae9/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 8946, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 8946,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:19:11.08815428Z"
-        }, 
-        "Volumes": {}, 
+        },
+        "Volumes": {},
         "VolumesRW": {}
-      }, 
-      "timestamp": "2015-03-17T00:01:33.057129", 
+      },
+      "timestamp": "2015-03-17T00:01:33.057129",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "8946"
-      }, 
-      "id": "Process:73d5a7fedfbc/8946", 
+      },
+      "id": "Process:73d5a7fedfbc/8946",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/pause", 
-        "PID": "8946", 
-        "RSS": "468", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "0:04", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/pause",
+        "PID": "8946",
+        "RSS": "468",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "0:04",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "265340"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.177745", 
+      },
+      "timestamp": "2015-03-17T00:01:33.177745",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6c4579af347b"
-      }, 
-      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd", 
+        },
+        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/pause]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-07-19T07:02:32.267701596Z", 
-        "DockerVersion": "1.0.0", 
-        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "Os": "linux", 
-        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-        "Size": 0, 
+        },
+        "Created": "2014-07-19T07:02:32.267701596Z",
+        "DockerVersion": "1.0.0",
+        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "Os": "linux",
+        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+        "Size": 0,
         "VirtualSize": 239840
-      }, 
-      "timestamp": "2015-03-17T00:01:32.979442", 
+      },
+      "timestamp": "2015-03-17T00:01:32.979442",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "kibana-logging-controller-0133o"
-      }, 
-      "id": "Pod:kibana-logging-controller-0133o", 
+      },
+      "id": "Pod:kibana-logging-controller-0133o",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:57Z", 
+        "creationTimestamp": "2015-02-19T00:11:57Z",
         "currentState": {
           "Condition": [
             {
-              "kind": "Ready", 
+              "kind": "Ready",
               "status": "Full"
             }
-          ], 
-          "host": "kubernetes-minion-63vc.c.shared-kraken.internal", 
-          "hostIP": "130.211.175.232", 
+          ],
+          "host": "kubernetes-minion-63vc.c.shared-kraken.internal",
+          "hostIP": "130.211.175.232",
           "info": {
             "POD": {
-              "containerID": "docker://9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a", 
-              "image": "kubernetes/pause:latest", 
-              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-              "podIP": "10.244.0.4", 
-              "ready": false, 
-              "restartCount": 5, 
+              "containerID": "docker://9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a",
+              "image": "kubernetes/pause:latest",
+              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+              "podIP": "10.244.0.4",
+              "ready": false,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:19:11Z"
                 }
               }
-            }, 
+            },
             "kibana-logging": {
-              "containerID": "docker://c61833fc16d77f9d0de783328b62d0840e2b91611bf378f8f864d1d67b54ced2", 
-              "image": "kubernetes/kibana:1.0", 
-              "imageID": "docker://478301224e74a6476c2c58513b024182fa92e6d8f65559ae0c11f340d0602529", 
-              "ready": true, 
-              "restartCount": 5, 
+              "containerID": "docker://c61833fc16d77f9d0de783328b62d0840e2b91611bf378f8f864d1d67b54ced2",
+              "image": "kubernetes/kibana:1.0",
+              "imageID": "docker://478301224e74a6476c2c58513b024182fa92e6d8f65559ae0c11f340d0602529",
+              "ready": true,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:19:12Z"
                 }
               }
             }
-          }, 
+          },
           "manifest": {
-            "containers": null, 
-            "id": "", 
-            "restartPolicy": {}, 
-            "version": "", 
+            "containers": null,
+            "id": "",
+            "restartPolicy": {},
+            "version": "",
             "volumes": null
-          }, 
-          "podIP": "10.244.0.4", 
+          },
+          "podIP": "10.244.0.4",
           "status": "Running"
-        }, 
+        },
         "desiredState": {
           "manifest": {
             "containers": [
               {
-                "capabilities": {}, 
-                "image": "kubernetes/kibana:1.0", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "name": "kibana-logging", 
+                "capabilities": {},
+                "image": "kubernetes/kibana:1.0",
+                "imagePullPolicy": "PullIfNotPresent",
+                "name": "kibana-logging",
                 "ports": [
                   {
-                    "containerPort": 80, 
-                    "name": "kibana-port", 
+                    "containerPort": 80,
+                    "name": "kibana-port",
                     "protocol": "TCP"
                   }
-                ], 
-                "resources": {}, 
+                ],
+                "resources": {},
                 "terminationMessagePath": "/dev/termination-log"
               }
-            ], 
-            "dnsPolicy": "ClusterFirst", 
-            "id": "", 
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "id": "",
             "restartPolicy": {
               "always": {}
-            }, 
-            "version": "v1beta2", 
+            },
+            "version": "v1beta2",
             "volumes": null
           }
-        }, 
-        "generateName": "kibana-logging-controller-", 
-        "id": "kibana-logging-controller-0133o", 
+        },
+        "generateName": "kibana-logging-controller-",
+        "id": "kibana-logging-controller-0133o",
         "labels": {
           "name": "kibana-logging"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 33, 
-        "selfLink": "/api/v1beta1/pods/kibana-logging-controller-0133o?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 33,
+        "selfLink": "/api/v1beta1/pods/kibana-logging-controller-0133o?namespace=default",
         "uid": "eaecd332-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:32.824353", 
+      },
+      "timestamp": "2015-03-17T00:01:32.824353",
       "type": "Pod"
-    }, 
+    },
     {
       "annotations": {
         "label": "c61833fc16d7"
-      }, 
-      "id": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15", 
+      },
+      "id": "Container:k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
             "/usr/local/bin/run_kibana_nginx.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "DEBIAN_FRONTEND=noninteractive", 
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "DEBIAN_FRONTEND=noninteractive",
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "kibana-logging-controller-0133o", 
-          "Image": "kubernetes/kibana:1.0", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "kibana-logging-controller-0133o",
+          "Image": "kubernetes/kibana:1.0",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:19:11.810783288Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:19:11.810783288Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/eaecd332-b7cb-11e4-9018-42010af0f3f2/containers/kibana-logging/c61833fc16d77f9d0de783328b62d0840e2b91611bf378f8f864d1d67b54ced2:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "container:9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a", 
-          "PortBindings": null, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "container:9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a",
+          "PortBindings": null,
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a/hosts", 
-        "Id": "c61833fc16d77f9d0de783328b62d0840e2b91611bf378f8f864d1d67b54ced2", 
-        "Image": "478301224e74a6476c2c58513b024182fa92e6d8f65559ae0c11f340d0602529", 
-        "MountLabel": "", 
-        "Name": "/k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a/hosts",
+        "Id": "c61833fc16d77f9d0de783328b62d0840e2b91611bf378f8f864d1d67b54ced2",
+        "Image": "478301224e74a6476c2c58513b024182fa92e6d8f65559ae0c11f340d0602529",
+        "MountLabel": "",
+        "Name": "/k8s_kibana-logging.724cfcc6_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_2a67cb15",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/usr/local/bin/run_kibana_nginx.sh", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a/resolv.conf", 
+        },
+        "Path": "/usr/local/bin/run_kibana_nginx.sh",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 9169, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 9169,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:19:12.123301077Z"
-        }, 
+        },
         "Volumes": {
           "/dev/termination-log": "/var/lib/kubelet/pods/eaecd332-b7cb-11e4-9018-42010af0f3f2/containers/kibana-logging/c61833fc16d77f9d0de783328b62d0840e2b91611bf378f8f864d1d67b54ced2"
-        }, 
+        },
         "VolumesRW": {
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:33.195655", 
+      },
+      "timestamp": "2015-03-17T00:01:33.195655",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "9169"
-      }, 
-      "id": "Process:c61833fc16d7/9169", 
+      },
+      "id": "Process:c61833fc16d7/9169",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "nginx: master process nginx -c /etc/nginx/nginx.conf", 
-        "PID": "9169", 
-        "RSS": "1612", 
-        "START": "Feb25", 
-        "STAT": "Ss", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "nginx: master process nginx -c /etc/nginx/nginx.conf",
+        "PID": "9169",
+        "RSS": "1612",
+        "START": "Feb25",
+        "STAT": "Ss",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "90232"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.254822", 
+      },
+      "timestamp": "2015-03-17T00:01:33.254822",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "9213"
-      }, 
-      "id": "Process:c61833fc16d7/9213", 
+      },
+      "id": "Process:c61833fc16d7/9213",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "nginx: worker process", 
-        "PID": "9213", 
-        "RSS": "1548", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "1:16", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "nginx: worker process",
+        "PID": "9213",
+        "RSS": "1548",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "1:16",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "90516"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.254822", 
+      },
+      "timestamp": "2015-03-17T00:01:33.254822",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "9214"
-      }, 
-      "id": "Process:c61833fc16d7/9214", 
+      },
+      "id": "Process:c61833fc16d7/9214",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "nginx: worker process", 
-        "PID": "9214", 
-        "RSS": "1556", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "nginx: worker process",
+        "PID": "9214",
+        "RSS": "1556",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "90516"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.254822", 
+      },
+      "timestamp": "2015-03-17T00:01:33.254822",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "9215"
-      }, 
-      "id": "Process:c61833fc16d7/9215", 
+      },
+      "id": "Process:c61833fc16d7/9215",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "nginx: worker process", 
-        "PID": "9215", 
-        "RSS": "1548", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "1:20", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "nginx: worker process",
+        "PID": "9215",
+        "RSS": "1548",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "1:20",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "90516"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.254822", 
+      },
+      "timestamp": "2015-03-17T00:01:33.254822",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "9216"
-      }, 
-      "id": "Process:c61833fc16d7/9216", 
+      },
+      "id": "Process:c61833fc16d7/9216",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "nginx: worker process", 
-        "PID": "9216", 
-        "RSS": "1576", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "1:15", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "nginx: worker process",
+        "PID": "9216",
+        "RSS": "1576",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "1:15",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "90516"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.254822", 
+      },
+      "timestamp": "2015-03-17T00:01:33.254822",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "478301224e74"
-      }, 
-      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/478301224e74", 
+      },
+      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/478301224e74",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "Satnam Singh \"satnam@google.com\"", 
-        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "Satnam Singh \"satnam@google.com\"",
+        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
             "/usr/local/bin/run_kibana_nginx.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "DEBIAN_FRONTEND=noninteractive"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "8c41fcbc2d07", 
-          "Image": "27ca45b13403ed55c47666c566020f11e7b8fa8fda3cd916427400700328957a", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "8c41fcbc2d07",
+          "Image": "27ca45b13403ed55c47666c566020f11e7b8fa8fda3cd916427400700328957a",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "b1dfe71f6acc50f87db4038b788c34f327ca923c62d18e0d799d9f2562cf7660", 
+        },
+        "Container": "b1dfe71f6acc50f87db4038b788c34f327ca923c62d18e0d799d9f2562cf7660",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) CMD [/usr/local/bin/run_kibana_nginx.sh]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "DEBIAN_FRONTEND=noninteractive"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "8c41fcbc2d07", 
-          "Image": "27ca45b13403ed55c47666c566020f11e7b8fa8fda3cd916427400700328957a", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "8c41fcbc2d07",
+          "Image": "27ca45b13403ed55c47666c566020f11e7b8fa8fda3cd916427400700328957a",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-01-15T05:29:21.408402905Z", 
-        "DockerVersion": "1.3.1", 
-        "Id": "478301224e74a6476c2c58513b024182fa92e6d8f65559ae0c11f340d0602529", 
-        "Os": "linux", 
-        "Parent": "27ca45b13403ed55c47666c566020f11e7b8fa8fda3cd916427400700328957a", 
-        "Size": 0, 
+        },
+        "Created": "2015-01-15T05:29:21.408402905Z",
+        "DockerVersion": "1.3.1",
+        "Id": "478301224e74a6476c2c58513b024182fa92e6d8f65559ae0c11f340d0602529",
+        "Os": "linux",
+        "Parent": "27ca45b13403ed55c47666c566020f11e7b8fa8fda3cd916427400700328957a",
+        "Size": 0,
         "VirtualSize": 240188943
-      }, 
-      "timestamp": "2015-03-17T00:01:33.261199", 
+      },
+      "timestamp": "2015-03-17T00:01:33.261199",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "9692de5790bd"
-      }, 
-      "id": "Container:k8s_POD.8f57ed6e_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_7d7407e5", 
+      },
+      "id": "Container:k8s_POD.8f57ed6e_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_7d7407e5",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "kibana-logging-controller-0133o", 
-          "Image": "kubernetes/pause:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "kibana-logging-controller-0133o",
+          "Image": "kubernetes/pause:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:19:10.014567451Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:19:10.014567451Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
-          "Binds": null, 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          "Binds": null,
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "", 
-          "PortBindings": null, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "",
+          "PortBindings": null,
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "/var/lib/docker/containers/9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a/hostname", 
-        "HostsPath": "/var/lib/docker/containers/9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a/hosts", 
-        "Id": "9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a", 
-        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "MountLabel": "", 
-        "Name": "/k8s_POD.8f57ed6e_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_7d7407e5", 
+        },
+        "HostnamePath": "/var/lib/docker/containers/9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a/hostname",
+        "HostsPath": "/var/lib/docker/containers/9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a/hosts",
+        "Id": "9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a",
+        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "MountLabel": "",
+        "Name": "/k8s_POD.8f57ed6e_kibana-logging-controller-0133o.default.api_eaecd332-b7cb-11e4-9018-42010af0f3f2_7d7407e5",
         "NetworkSettings": {
-          "Bridge": "cbr0", 
-          "Gateway": "10.244.0.1", 
-          "IPAddress": "10.244.0.4", 
-          "IPPrefixLen": 24, 
-          "MacAddress": "02:42:0a:f4:00:04", 
-          "PortMapping": null, 
+          "Bridge": "cbr0",
+          "Gateway": "10.244.0.1",
+          "IPAddress": "10.244.0.4",
+          "IPPrefixLen": 24,
+          "MacAddress": "02:42:0a:f4:00:04",
+          "PortMapping": null,
           "Ports": {}
-        }, 
-        "Path": "/pause", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a/resolv.conf", 
+        },
+        "Path": "/pause",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/9692de5790bd29e77045bd28898f71aaeb17c4a43cc0643b44fa13e9b518f80a/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 8983, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 8983,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:19:11.337460471Z"
-        }, 
-        "Volumes": {}, 
+        },
+        "Volumes": {},
         "VolumesRW": {}
-      }, 
-      "timestamp": "2015-03-17T00:01:33.221048", 
+      },
+      "timestamp": "2015-03-17T00:01:33.221048",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "8983"
-      }, 
-      "id": "Process:9692de5790bd/8983", 
+      },
+      "id": "Process:9692de5790bd/8983",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/pause", 
-        "PID": "8983", 
-        "RSS": "472", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "0:03", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/pause",
+        "PID": "8983",
+        "RSS": "472",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "0:03",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "265340"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.275542", 
+      },
+      "timestamp": "2015-03-17T00:01:33.275542",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6c4579af347b"
-      }, 
-      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "id": "Image:kubernetes-minion-63vc.c.shared-kraken.internal/6c4579af347b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd", 
+        },
+        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/pause]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-07-19T07:02:32.267701596Z", 
-        "DockerVersion": "1.0.0", 
-        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "Os": "linux", 
-        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-        "Size": 0, 
+        },
+        "Created": "2014-07-19T07:02:32.267701596Z",
+        "DockerVersion": "1.0.0",
+        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "Os": "linux",
+        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+        "Size": 0,
         "VirtualSize": 239840
-      }, 
-      "timestamp": "2015-03-17T00:01:32.979442", 
+      },
+      "timestamp": "2015-03-17T00:01:32.979442",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "kubernetes-minion-a411"
-      }, 
-      "id": "Node:kubernetes-minion-a411.c.shared-kraken.internal", 
+      },
+      "id": "Node:kubernetes-minion-a411.c.shared-kraken.internal",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:46Z", 
-        "hostIP": "23.251.159.135", 
-        "id": "kubernetes-minion-a411.c.shared-kraken.internal", 
-        "resourceVersion": 1231194, 
+        "creationTimestamp": "2015-02-19T00:11:46Z",
+        "hostIP": "23.251.159.135",
+        "id": "kubernetes-minion-a411.c.shared-kraken.internal",
+        "resourceVersion": 1231194,
         "resources": {
           "capacity": {
-            "cpu": "1", 
+            "cpu": "1",
             "memory": 4026531840
           }
-        }, 
-        "selfLink": "/api/v1beta1/nodes/kubernetes-minion-a411.c.shared-kraken.internal", 
+        },
+        "selfLink": "/api/v1beta1/nodes/kubernetes-minion-a411.c.shared-kraken.internal",
         "status": {
           "conditions": [
             {
-              "kind": "Ready", 
-              "lastProbeTime": "2015-03-17T00:01:23Z", 
-              "lastTransitionTime": "2015-03-01T11:57:20Z", 
-              "reason": "Node health check succeeded: kubelet /healthz endpoint returns ok", 
+              "kind": "Ready",
+              "lastProbeTime": "2015-03-17T00:01:23Z",
+              "lastTransitionTime": "2015-03-01T11:57:20Z",
+              "reason": "Node health check succeeded: kubelet /healthz endpoint returns ok",
               "status": "Full"
             }
           ]
-        }, 
+        },
         "uid": "e433f082-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:32.796352", 
+      },
+      "timestamp": "2015-03-17T00:01:32.796352",
       "type": "Node"
-    }, 
+    },
     {
       "annotations": {
         "label": "redis-master"
-      }, 
-      "id": "Pod:redis-master", 
+      },
+      "id": "Pod:redis-master",
       "properties": {
-        "creationTimestamp": "2015-02-19T01:36:00Z", 
+        "creationTimestamp": "2015-02-19T01:36:00Z",
         "currentState": {
           "Condition": [
             {
-              "kind": "Ready", 
+              "kind": "Ready",
               "status": "Full"
             }
-          ], 
-          "host": "kubernetes-minion-a411.c.shared-kraken.internal", 
-          "hostIP": "23.251.159.135", 
+          ],
+          "host": "kubernetes-minion-a411.c.shared-kraken.internal",
+          "hostIP": "23.251.159.135",
           "info": {
             "POD": {
-              "containerID": "docker://11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f", 
-              "image": "kubernetes/pause:latest", 
-              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-              "podIP": "10.244.1.5", 
-              "ready": false, 
-              "restartCount": 3, 
+              "containerID": "docker://11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f",
+              "image": "kubernetes/pause:latest",
+              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+              "podIP": "10.244.1.5",
+              "ready": false,
+              "restartCount": 3,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:23:15Z"
                 }
               }
-            }, 
+            },
             "master": {
-              "containerID": "docker://7f19195ef67925756e1fde565a09e8c9280644fe452ba5aea58811a267e6fa52", 
-              "image": "dockerfile/redis", 
-              "imageID": "docker://c059fe93c46a2fb873656b65eeed5153208bbbaecc420f53fe2131262cce0549", 
-              "ready": true, 
-              "restartCount": 3, 
+              "containerID": "docker://7f19195ef67925756e1fde565a09e8c9280644fe452ba5aea58811a267e6fa52",
+              "image": "dockerfile/redis",
+              "imageID": "docker://c059fe93c46a2fb873656b65eeed5153208bbbaecc420f53fe2131262cce0549",
+              "ready": true,
+              "restartCount": 3,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:23:16Z"
                 }
               }
             }
-          }, 
+          },
           "manifest": {
-            "containers": null, 
-            "id": "", 
-            "restartPolicy": {}, 
-            "version": "", 
+            "containers": null,
+            "id": "",
+            "restartPolicy": {},
+            "version": "",
             "volumes": null
-          }, 
-          "podIP": "10.244.1.5", 
+          },
+          "podIP": "10.244.1.5",
           "status": "Running"
-        }, 
+        },
         "desiredState": {
           "manifest": {
             "containers": [
               {
-                "capabilities": {}, 
-                "cpu": 100, 
-                "image": "dockerfile/redis", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "name": "master", 
+                "capabilities": {},
+                "cpu": 100,
+                "image": "dockerfile/redis",
+                "imagePullPolicy": "PullIfNotPresent",
+                "name": "master",
                 "ports": [
                   {
-                    "containerPort": 6379, 
-                    "hostPort": 6379, 
+                    "containerPort": 6379,
+                    "hostPort": 6379,
                     "protocol": "TCP"
                   }
-                ], 
+                ],
                 "resources": {
                   "limits": {
                     "cpu": "0.1"
                   }
-                }, 
+                },
                 "terminationMessagePath": "/dev/termination-log"
               }
-            ], 
-            "dnsPolicy": "ClusterFirst", 
-            "id": "", 
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "id": "",
             "restartPolicy": {
               "always": {}
-            }, 
-            "version": "v1beta2", 
+            },
+            "version": "v1beta2",
             "volumes": null
           }
-        }, 
-        "id": "redis-master", 
+        },
+        "id": "redis-master",
         "labels": {
           "name": "redis-master"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 2115, 
-        "selfLink": "/api/v1beta1/pods/redis-master?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 2115,
+        "selfLink": "/api/v1beta1/pods/redis-master?namespace=default",
         "uid": "a8a4a5a1-b7d7-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.318503", 
+      },
+      "timestamp": "2015-03-17T00:01:33.318503",
       "type": "Pod"
-    }, 
+    },
     {
       "annotations": {
         "label": "7f19195ef679"
-      }, 
-      "id": "Container:k8s_master.89d7f81b_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_3aac79cb", 
+      },
+      "id": "Container:k8s_master.89d7f81b_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_3aac79cb",
       "properties": {
-        "AppArmorProfile": "", 
+        "AppArmorProfile": "",
         "Args": [
           "/etc/redis/redis.conf"
-        ], 
+        ],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "redis-server", 
+            "redis-server",
             "/etc/redis/redis.conf"
-          ], 
-          "CpuShares": 102, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 102,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/root", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/root",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "redis-master", 
-          "Image": "dockerfile/redis", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "redis-master",
+          "Image": "dockerfile/redis",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Created": "2015-02-25T17:23:15.585254538Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:23:15.585254538Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/a8a4a5a1-b7d7-11e4-9018-42010af0f3f2/containers/master/7f19195ef67925756e1fde565a09e8c9280644fe452ba5aea58811a267e6fa52:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "container:11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "container:11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f",
           "PortBindings": {
             "6379/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "6379"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f/hosts", 
-        "Id": "7f19195ef67925756e1fde565a09e8c9280644fe452ba5aea58811a267e6fa52", 
-        "Image": "c059fe93c46a2fb873656b65eeed5153208bbbaecc420f53fe2131262cce0549", 
-        "MountLabel": "", 
-        "Name": "/k8s_master.89d7f81b_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_3aac79cb", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f/hosts",
+        "Id": "7f19195ef67925756e1fde565a09e8c9280644fe452ba5aea58811a267e6fa52",
+        "Image": "c059fe93c46a2fb873656b65eeed5153208bbbaecc420f53fe2131262cce0549",
+        "MountLabel": "",
+        "Name": "/k8s_master.89d7f81b_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_3aac79cb",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "redis-server", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f/resolv.conf", 
+        },
+        "Path": "redis-server",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 22432, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 22432,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:23:16.007410579Z"
-        }, 
+        },
         "Volumes": {
-          "/data": "/var/lib/docker/vfs/dir/c47d0d1aa0dde82719421ab24d6b9fde3bc4f3fb743e71b54a13086610b7a2c3", 
+          "/data": "/var/lib/docker/vfs/dir/c47d0d1aa0dde82719421ab24d6b9fde3bc4f3fb743e71b54a13086610b7a2c3",
           "/dev/termination-log": "/var/lib/kubelet/pods/a8a4a5a1-b7d7-11e4-9018-42010af0f3f2/containers/master/7f19195ef67925756e1fde565a09e8c9280644fe452ba5aea58811a267e6fa52"
-        }, 
+        },
         "VolumesRW": {
-          "/data": true, 
+          "/data": true,
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:33.335560", 
+      },
+      "timestamp": "2015-03-17T00:01:33.335560",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "22432"
-      }, 
-      "id": "Process:7f19195ef679/22432", 
+      },
+      "id": "Process:7f19195ef679/22432",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "redis-server *:6379", 
-        "PID": "22432", 
-        "RSS": "4584", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "21:11", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "redis-server *:6379",
+        "PID": "22432",
+        "RSS": "4584",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "21:11",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "35200"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.419996", 
+      },
+      "timestamp": "2015-03-17T00:01:33.419996",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "c059fe93c46a"
-      }, 
-      "id": "Image:kubernetes-minion-a411.c.shared-kraken.internal/c059fe93c46a", 
+      },
+      "id": "Image:kubernetes-minion-a411.c.shared-kraken.internal/c059fe93c46a",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "redis-server", 
+            "redis-server",
             "/etc/redis/redis.conf"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "HOME=/root"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "f4f502dce15c", 
-          "Image": "24d723856c60dc8457504360c4499ea0231f9f8e8a02182c64c0c284e00e4e28", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "f4f502dce15c",
+          "Image": "24d723856c60dc8457504360c4499ea0231f9f8e8a02182c64c0c284e00e4e28",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Container": "2a14238ce1dc83aa8f164371a7f0525509095f48e81857a3038c52f4dade7af6", 
+        },
+        "Container": "2a14238ce1dc83aa8f164371a7f0525509095f48e81857a3038c52f4dade7af6",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) EXPOSE map[6379/tcp:{}]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "HOME=/root"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "f4f502dce15c", 
-          "Image": "24d723856c60dc8457504360c4499ea0231f9f8e8a02182c64c0c284e00e4e28", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "f4f502dce15c",
+          "Image": "24d723856c60dc8457504360c4499ea0231f9f8e8a02182c64c0c284e00e4e28",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Created": "2015-01-28T20:22:11.091883429Z", 
-        "DockerVersion": "1.3.3", 
-        "Id": "c059fe93c46a2fb873656b65eeed5153208bbbaecc420f53fe2131262cce0549", 
-        "Os": "linux", 
-        "Parent": "24d723856c60dc8457504360c4499ea0231f9f8e8a02182c64c0c284e00e4e28", 
-        "Size": 0, 
+        },
+        "Created": "2015-01-28T20:22:11.091883429Z",
+        "DockerVersion": "1.3.3",
+        "Id": "c059fe93c46a2fb873656b65eeed5153208bbbaecc420f53fe2131262cce0549",
+        "Os": "linux",
+        "Parent": "24d723856c60dc8457504360c4499ea0231f9f8e8a02182c64c0c284e00e4e28",
+        "Size": 0,
         "VirtualSize": 419116580
-      }, 
-      "timestamp": "2015-03-17T00:01:33.426872", 
+      },
+      "timestamp": "2015-03-17T00:01:33.426872",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "11626b569335"
-      }, 
-      "id": "Container:k8s_POD.f7adea30_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_f3a01881", 
+      },
+      "id": "Container:k8s_POD.f7adea30_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_f3a01881",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "redis-master", 
-          "Image": "kubernetes/pause:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "redis-master",
+          "Image": "kubernetes/pause:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:23:14.098886205Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:23:14.098886205Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
-          "Binds": null, 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          "Binds": null,
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "",
           "PortBindings": {
             "6379/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "6379"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "/var/lib/docker/containers/11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f/hostname", 
-        "HostsPath": "/var/lib/docker/containers/11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f/hosts", 
-        "Id": "11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f", 
-        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "MountLabel": "", 
-        "Name": "/k8s_POD.f7adea30_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_f3a01881", 
+        },
+        "HostnamePath": "/var/lib/docker/containers/11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f/hostname",
+        "HostsPath": "/var/lib/docker/containers/11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f/hosts",
+        "Id": "11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f",
+        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "MountLabel": "",
+        "Name": "/k8s_POD.f7adea30_redis-master.default.api_a8a4a5a1-b7d7-11e4-9018-42010af0f3f2_f3a01881",
         "NetworkSettings": {
-          "Bridge": "cbr0", 
-          "Gateway": "10.244.1.1", 
-          "IPAddress": "10.244.1.5", 
-          "IPPrefixLen": 24, 
-          "MacAddress": "02:42:0a:f4:01:05", 
-          "PortMapping": null, 
+          "Bridge": "cbr0",
+          "Gateway": "10.244.1.1",
+          "IPAddress": "10.244.1.5",
+          "IPPrefixLen": 24,
+          "MacAddress": "02:42:0a:f4:01:05",
+          "PortMapping": null,
           "Ports": {
             "6379/tcp": [
               {
-                "HostIp": "0.0.0.0", 
+                "HostIp": "0.0.0.0",
                 "HostPort": "6379"
               }
             ]
           }
-        }, 
-        "Path": "/pause", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f/resolv.conf", 
+        },
+        "Path": "/pause",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/11626b56933559ace1bec122f76ef5bde9a40db56c0a7ddfba8a8bc0ef53069f/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 22336, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 22336,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:23:15.407745574Z"
-        }, 
-        "Volumes": {}, 
+        },
+        "Volumes": {},
         "VolumesRW": {}
-      }, 
-      "timestamp": "2015-03-17T00:01:33.348500", 
+      },
+      "timestamp": "2015-03-17T00:01:33.348500",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "22336"
-      }, 
-      "id": "Process:11626b569335/22336", 
+      },
+      "id": "Process:11626b569335/22336",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/pause", 
-        "PID": "22336", 
-        "RSS": "484", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "0:03", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/pause",
+        "PID": "22336",
+        "RSS": "484",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "0:03",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "265340"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.440997", 
+      },
+      "timestamp": "2015-03-17T00:01:33.440997",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6c4579af347b"
-      }, 
-      "id": "Image:kubernetes-minion-a411.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "id": "Image:kubernetes-minion-a411.c.shared-kraken.internal/6c4579af347b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd", 
+        },
+        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/pause]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-07-19T07:02:32.267701596Z", 
-        "DockerVersion": "1.0.0", 
-        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "Os": "linux", 
-        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-        "Size": 0, 
+        },
+        "Created": "2014-07-19T07:02:32.267701596Z",
+        "DockerVersion": "1.0.0",
+        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "Os": "linux",
+        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+        "Size": 0,
         "VirtualSize": 239840
-      }, 
-      "timestamp": "2015-03-17T00:01:33.446163", 
+      },
+      "timestamp": "2015-03-17T00:01:33.446163",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "redis-slave-controller-vi7hv"
-      }, 
-      "id": "Pod:redis-slave-controller-vi7hv", 
+      },
+      "id": "Pod:redis-slave-controller-vi7hv",
       "properties": {
-        "creationTimestamp": "2015-02-19T01:37:34Z", 
+        "creationTimestamp": "2015-02-19T01:37:34Z",
         "currentState": {
           "Condition": [
             {
-              "kind": "Ready", 
+              "kind": "Ready",
               "status": "Full"
             }
-          ], 
-          "host": "kubernetes-minion-a411.c.shared-kraken.internal", 
-          "hostIP": "23.251.159.135", 
+          ],
+          "host": "kubernetes-minion-a411.c.shared-kraken.internal",
+          "hostIP": "23.251.159.135",
           "info": {
             "POD": {
-              "containerID": "docker://f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861", 
-              "image": "kubernetes/pause:latest", 
-              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-              "podIP": "10.244.1.4", 
-              "ready": false, 
-              "restartCount": 3, 
+              "containerID": "docker://f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861",
+              "image": "kubernetes/pause:latest",
+              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+              "podIP": "10.244.1.4",
+              "ready": false,
+              "restartCount": 3,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:23:15Z"
                 }
               }
-            }, 
+            },
             "slave": {
-              "containerID": "docker://a9028e8bd1abcecb2f1ec8bec20067e04aef882dcae0a196472dcd39f96c61b8", 
-              "image": "brendanburns/redis-slave", 
-              "imageID": "docker://81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c", 
-              "ready": true, 
-              "restartCount": 3, 
+              "containerID": "docker://a9028e8bd1abcecb2f1ec8bec20067e04aef882dcae0a196472dcd39f96c61b8",
+              "image": "brendanburns/redis-slave",
+              "imageID": "docker://81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c",
+              "ready": true,
+              "restartCount": 3,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:23:16Z"
                 }
               }
             }
-          }, 
+          },
           "manifest": {
-            "containers": null, 
-            "id": "", 
-            "restartPolicy": {}, 
-            "version": "", 
+            "containers": null,
+            "id": "",
+            "restartPolicy": {},
+            "version": "",
             "volumes": null
-          }, 
-          "podIP": "10.244.1.4", 
+          },
+          "podIP": "10.244.1.4",
           "status": "Running"
-        }, 
+        },
         "desiredState": {
           "manifest": {
             "containers": [
               {
-                "capabilities": {}, 
-                "cpu": 200, 
-                "image": "brendanburns/redis-slave", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "name": "slave", 
+                "capabilities": {},
+                "cpu": 200,
+                "image": "brendanburns/redis-slave",
+                "imagePullPolicy": "PullIfNotPresent",
+                "name": "slave",
                 "ports": [
                   {
-                    "containerPort": 6379, 
-                    "hostPort": 6380, 
+                    "containerPort": 6379,
+                    "hostPort": 6380,
                     "protocol": "TCP"
                   }
-                ], 
+                ],
                 "resources": {
                   "limits": {
                     "cpu": "0.2"
                   }
-                }, 
+                },
                 "terminationMessagePath": "/dev/termination-log"
               }
-            ], 
-            "dnsPolicy": "ClusterFirst", 
-            "id": "", 
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "id": "",
             "restartPolicy": {
               "always": {}
-            }, 
-            "version": "v1beta2", 
+            },
+            "version": "v1beta2",
             "volumes": null
           }
-        }, 
-        "generateName": "redis-slave-controller-", 
-        "id": "redis-slave-controller-vi7hv", 
+        },
+        "generateName": "redis-slave-controller-",
+        "id": "redis-slave-controller-vi7hv",
         "labels": {
-          "name": "redisslave", 
+          "name": "redisslave",
           "uses": "redis-master"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 2165, 
-        "selfLink": "/api/v1beta1/pods/redis-slave-controller-vi7hv?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 2165,
+        "selfLink": "/api/v1beta1/pods/redis-slave-controller-vi7hv?namespace=default",
         "uid": "e104deb3-b7d7-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.318503", 
+      },
+      "timestamp": "2015-03-17T00:01:33.318503",
       "type": "Pod"
-    }, 
+    },
     {
       "annotations": {
         "label": "a9028e8bd1ab"
-      }, 
-      "id": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728", 
+      },
+      "id": "Container:k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728",
       "properties": {
-        "AppArmorProfile": "", 
+        "AppArmorProfile": "",
         "Args": [
-          "-c", 
+          "-c",
           "/run.sh"
-        ], 
+        ],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "/run.sh"
-          ], 
-          "CpuShares": 204, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 204,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/root", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/root",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "redis-slave-controller-vi7hv", 
-          "Image": "brendanburns/redis-slave", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "redis-slave-controller-vi7hv",
+          "Image": "brendanburns/redis-slave",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Created": "2015-02-25T17:23:15.607621051Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:23:15.607621051Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/e104deb3-b7d7-11e4-9018-42010af0f3f2/containers/slave/a9028e8bd1abcecb2f1ec8bec20067e04aef882dcae0a196472dcd39f96c61b8:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "container:f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "container:f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861",
           "PortBindings": {
             "6379/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "6380"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861/hosts", 
-        "Id": "a9028e8bd1abcecb2f1ec8bec20067e04aef882dcae0a196472dcd39f96c61b8", 
-        "Image": "81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c", 
-        "MountLabel": "", 
-        "Name": "/k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861/hosts",
+        "Id": "a9028e8bd1abcecb2f1ec8bec20067e04aef882dcae0a196472dcd39f96c61b8",
+        "Image": "81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c",
+        "MountLabel": "",
+        "Name": "/k8s_slave.e3c7fad7_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_c5bbb728",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/bin/sh", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861/resolv.conf", 
+        },
+        "Path": "/bin/sh",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 22454, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 22454,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:23:16.159511796Z"
-        }, 
+        },
         "Volumes": {
-          "/data": "/var/lib/docker/vfs/dir/7a0e1bbae9019640fbd0d48784c7a89915919e6cfb6b11d1fb7b9255393d2ba8", 
+          "/data": "/var/lib/docker/vfs/dir/7a0e1bbae9019640fbd0d48784c7a89915919e6cfb6b11d1fb7b9255393d2ba8",
           "/dev/termination-log": "/var/lib/kubelet/pods/e104deb3-b7d7-11e4-9018-42010af0f3f2/containers/slave/a9028e8bd1abcecb2f1ec8bec20067e04aef882dcae0a196472dcd39f96c61b8"
-        }, 
+        },
         "VolumesRW": {
-          "/data": true, 
+          "/data": true,
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:33.456522", 
+      },
+      "timestamp": "2015-03-17T00:01:33.456522",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "22454"
-      }, 
-      "id": "Process:a9028e8bd1ab/22454", 
+      },
+      "id": "Process:a9028e8bd1ab/22454",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/bin/sh -c /run.sh", 
-        "PID": "22454", 
-        "RSS": "776", 
-        "START": "Feb25", 
-        "STAT": "Ss", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/bin/sh -c /run.sh",
+        "PID": "22454",
+        "RSS": "776",
+        "START": "Feb25",
+        "STAT": "Ss",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "4452"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.507677", 
+      },
+      "timestamp": "2015-03-17T00:01:33.507677",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "22471"
-      }, 
-      "id": "Process:a9028e8bd1ab/22471", 
+      },
+      "id": "Process:a9028e8bd1ab/22471",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/bin/bash /run.sh", 
-        "PID": "22471", 
-        "RSS": "2852", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/bin/bash /run.sh",
+        "PID": "22471",
+        "RSS": "2852",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "17996"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.507677", 
+      },
+      "timestamp": "2015-03-17T00:01:33.507677",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "22477"
-      }, 
-      "id": "Process:a9028e8bd1ab/22477", 
+      },
+      "id": "Process:a9028e8bd1ab/22477",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "redis-server *:6379", 
-        "PID": "22477", 
-        "RSS": "3860", 
-        "START": "Feb25", 
-        "STAT": "Sl", 
-        "TIME": "25:35", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "redis-server *:6379",
+        "PID": "22477",
+        "RSS": "3860",
+        "START": "Feb25",
+        "STAT": "Sl",
+        "TIME": "25:35",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "35180"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.507677", 
+      },
+      "timestamp": "2015-03-17T00:01:33.507677",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "81b1b696a77a"
-      }, 
-      "id": "Image:kubernetes-minion-a411.c.shared-kraken.internal/81b1b696a77a", 
+      },
+      "id": "Image:kubernetes-minion-a411.c.shared-kraken.internal/81b1b696a77a",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "/run.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "HOME=/root"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "f22711318734", 
-          "Image": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "f22711318734",
+          "Image": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Container": "9c0df3e46915e0be5819bbdab972ff9807a479beee8e9c79d4e392e12894750d", 
+        },
+        "Container": "9c0df3e46915e0be5819bbdab972ff9807a479beee8e9c79d4e392e12894750d",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) CMD [/bin/sh -c /run.sh]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "HOME=/root"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "f22711318734", 
-          "Image": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "f22711318734",
+          "Image": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Created": "2014-11-16T03:37:21.890022087Z", 
-        "DockerVersion": "1.3.0", 
-        "Id": "81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c", 
-        "Os": "linux", 
-        "Parent": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546", 
-        "Size": 0, 
+        },
+        "Created": "2014-11-16T03:37:21.890022087Z",
+        "DockerVersion": "1.3.0",
+        "Id": "81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c",
+        "Os": "linux",
+        "Parent": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546",
+        "Size": 0,
         "VirtualSize": 434171778
-      }, 
-      "timestamp": "2015-03-17T00:01:33.515295", 
+      },
+      "timestamp": "2015-03-17T00:01:33.515295",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "f82d27e2dfcf"
-      }, 
-      "id": "Container:k8s_POD.e886ea28_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_36f906e2", 
+      },
+      "id": "Container:k8s_POD.e886ea28_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_36f906e2",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "redis-slave-controller-vi7hv", 
-          "Image": "kubernetes/pause:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "redis-slave-controller-vi7hv",
+          "Image": "kubernetes/pause:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:23:14.08662704Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:23:14.08662704Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
-          "Binds": null, 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          "Binds": null,
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "",
           "PortBindings": {
             "6379/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "6380"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "/var/lib/docker/containers/f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861/hostname", 
-        "HostsPath": "/var/lib/docker/containers/f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861/hosts", 
-        "Id": "f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861", 
-        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "MountLabel": "", 
-        "Name": "/k8s_POD.e886ea28_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_36f906e2", 
+        },
+        "HostnamePath": "/var/lib/docker/containers/f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861/hostname",
+        "HostsPath": "/var/lib/docker/containers/f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861/hosts",
+        "Id": "f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861",
+        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "MountLabel": "",
+        "Name": "/k8s_POD.e886ea28_redis-slave-controller-vi7hv.default.api_e104deb3-b7d7-11e4-9018-42010af0f3f2_36f906e2",
         "NetworkSettings": {
-          "Bridge": "cbr0", 
-          "Gateway": "10.244.1.1", 
-          "IPAddress": "10.244.1.4", 
-          "IPPrefixLen": 24, 
-          "MacAddress": "02:42:0a:f4:01:04", 
-          "PortMapping": null, 
+          "Bridge": "cbr0",
+          "Gateway": "10.244.1.1",
+          "IPAddress": "10.244.1.4",
+          "IPPrefixLen": 24,
+          "MacAddress": "02:42:0a:f4:01:04",
+          "PortMapping": null,
           "Ports": {
             "6379/tcp": [
               {
-                "HostIp": "0.0.0.0", 
+                "HostIp": "0.0.0.0",
                 "HostPort": "6380"
               }
             ]
           }
-        }, 
-        "Path": "/pause", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861/resolv.conf", 
+        },
+        "Path": "/pause",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/f82d27e2dfcf2c0453f67d26cee831c66611c9877512dc997d0a04eb0440f861/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 22308, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 22308,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:23:15.402677279Z"
-        }, 
-        "Volumes": {}, 
+        },
+        "Volumes": {},
         "VolumesRW": {}
-      }, 
-      "timestamp": "2015-03-17T00:01:33.477380", 
+      },
+      "timestamp": "2015-03-17T00:01:33.477380",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "22308"
-      }, 
-      "id": "Process:f82d27e2dfcf/22308", 
+      },
+      "id": "Process:f82d27e2dfcf/22308",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/pause", 
-        "PID": "22308", 
-        "RSS": "484", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "0:03", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/pause",
+        "PID": "22308",
+        "RSS": "484",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "0:03",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "265340"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.528016", 
+      },
+      "timestamp": "2015-03-17T00:01:33.528016",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6c4579af347b"
-      }, 
-      "id": "Image:kubernetes-minion-a411.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "id": "Image:kubernetes-minion-a411.c.shared-kraken.internal/6c4579af347b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd", 
+        },
+        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/pause]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-07-19T07:02:32.267701596Z", 
-        "DockerVersion": "1.0.0", 
-        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "Os": "linux", 
-        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-        "Size": 0, 
+        },
+        "Created": "2014-07-19T07:02:32.267701596Z",
+        "DockerVersion": "1.0.0",
+        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "Os": "linux",
+        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+        "Size": 0,
         "VirtualSize": 239840
-      }, 
-      "timestamp": "2015-03-17T00:01:33.446163", 
+      },
+      "timestamp": "2015-03-17T00:01:33.446163",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "kubernetes-minion-e3zy"
-      }, 
-      "id": "Node:kubernetes-minion-e3zy.c.shared-kraken.internal", 
+      },
+      "id": "Node:kubernetes-minion-e3zy.c.shared-kraken.internal",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:46Z", 
-        "hostIP": "104.154.65.114", 
-        "id": "kubernetes-minion-e3zy.c.shared-kraken.internal", 
-        "resourceVersion": 1231195, 
+        "creationTimestamp": "2015-02-19T00:11:46Z",
+        "hostIP": "104.154.65.114",
+        "id": "kubernetes-minion-e3zy.c.shared-kraken.internal",
+        "resourceVersion": 1231195,
         "resources": {
           "capacity": {
-            "cpu": "1", 
+            "cpu": "1",
             "memory": 4026531840
           }
-        }, 
-        "selfLink": "/api/v1beta1/nodes/kubernetes-minion-e3zy.c.shared-kraken.internal", 
+        },
+        "selfLink": "/api/v1beta1/nodes/kubernetes-minion-e3zy.c.shared-kraken.internal",
         "status": {
           "conditions": [
             {
-              "kind": "Ready", 
-              "lastProbeTime": "2015-03-17T00:01:23Z", 
-              "lastTransitionTime": "2015-02-25T19:54:47Z", 
-              "reason": "Node health check succeeded: kubelet /healthz endpoint returns ok", 
+              "kind": "Ready",
+              "lastProbeTime": "2015-03-17T00:01:23Z",
+              "lastTransitionTime": "2015-02-25T19:54:47Z",
+              "reason": "Node health check succeeded: kubelet /healthz endpoint returns ok",
               "status": "Full"
             }
           ]
-        }, 
+        },
         "uid": "e4350128-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:32.796352", 
+      },
+      "timestamp": "2015-03-17T00:01:32.796352",
       "type": "Node"
-    }, 
+    },
     {
       "annotations": {
         "label": "frontend-controller-b182t"
-      }, 
-      "id": "Pod:frontend-controller-b182t", 
+      },
+      "id": "Pod:frontend-controller-b182t",
       "properties": {
-        "creationTimestamp": "2015-02-19T01:39:01Z", 
+        "creationTimestamp": "2015-02-19T01:39:01Z",
         "currentState": {
           "Condition": [
             {
-              "kind": "Ready", 
+              "kind": "Ready",
               "status": "Full"
             }
-          ], 
-          "host": "kubernetes-minion-e3zy.c.shared-kraken.internal", 
-          "hostIP": "104.154.65.114", 
+          ],
+          "host": "kubernetes-minion-e3zy.c.shared-kraken.internal",
+          "hostIP": "104.154.65.114",
           "info": {
             "POD": {
-              "containerID": "docker://c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753", 
-              "image": "kubernetes/pause:latest", 
-              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-              "podIP": "10.244.2.5", 
-              "ready": false, 
-              "restartCount": 5, 
+              "containerID": "docker://c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753",
+              "image": "kubernetes/pause:latest",
+              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+              "podIP": "10.244.2.5",
+              "ready": false,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T20:38:59Z"
                 }
               }
-            }, 
+            },
             "php-redis": {
-              "containerID": "docker://e868855420ddf0111491e53ef9cbc5ff92f7e6a7ae2e8caf4f443b17f4da27a7", 
-              "image": "kubernetes/example-guestbook-php-redis", 
-              "imageID": "docker://5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f", 
-              "ready": true, 
-              "restartCount": 5, 
+              "containerID": "docker://e868855420ddf0111491e53ef9cbc5ff92f7e6a7ae2e8caf4f443b17f4da27a7",
+              "image": "kubernetes/example-guestbook-php-redis",
+              "imageID": "docker://5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f",
+              "ready": true,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T20:39:01Z"
                 }
               }
             }
-          }, 
+          },
           "manifest": {
-            "containers": null, 
-            "id": "", 
-            "restartPolicy": {}, 
-            "version": "", 
+            "containers": null,
+            "id": "",
+            "restartPolicy": {},
+            "version": "",
             "volumes": null
-          }, 
-          "podIP": "10.244.2.5", 
+          },
+          "podIP": "10.244.2.5",
           "status": "Running"
-        }, 
+        },
         "desiredState": {
           "manifest": {
             "containers": [
               {
-                "capabilities": {}, 
-                "cpu": 100, 
-                "image": "kubernetes/example-guestbook-php-redis", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "memory": 50000000, 
-                "name": "php-redis", 
+                "capabilities": {},
+                "cpu": 100,
+                "image": "kubernetes/example-guestbook-php-redis",
+                "imagePullPolicy": "PullIfNotPresent",
+                "memory": 50000000,
+                "name": "php-redis",
                 "ports": [
                   {
-                    "containerPort": 80, 
-                    "hostPort": 8000, 
+                    "containerPort": 80,
+                    "hostPort": 8000,
                     "protocol": "TCP"
                   }
-                ], 
+                ],
                 "resources": {
                   "limits": {
-                    "cpu": "0.1", 
+                    "cpu": "0.1",
                     "memory": 50000000
                   }
-                }, 
+                },
                 "terminationMessagePath": "/dev/termination-log"
               }
-            ], 
-            "dnsPolicy": "ClusterFirst", 
-            "id": "", 
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "id": "",
             "restartPolicy": {
               "always": {}
-            }, 
-            "version": "v1beta2", 
+            },
+            "version": "v1beta2",
             "volumes": null
           }
-        }, 
-        "generateName": "frontend-controller-", 
-        "id": "frontend-controller-b182t", 
+        },
+        "generateName": "frontend-controller-",
+        "id": "frontend-controller-b182t",
         "labels": {
-          "name": "frontend", 
+          "name": "frontend",
           "uses": "redisslave,redis-master"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 2221, 
-        "selfLink": "/api/v1beta1/pods/frontend-controller-b182t?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 2221,
+        "selfLink": "/api/v1beta1/pods/frontend-controller-b182t?namespace=default",
         "uid": "14a3a978-b7d8-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.559330", 
+      },
+      "timestamp": "2015-03-17T00:01:33.559330",
       "type": "Pod"
-    }, 
+    },
     {
       "annotations": {
         "label": "e868855420dd"
-      }, 
-      "id": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
+      },
+      "id": "Container:k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
       "properties": {
-        "AppArmorProfile": "", 
+        "AppArmorProfile": "",
         "Args": [
-          "-c", 
+          "-c",
           "/run.sh"
-        ], 
+        ],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "/run.sh"
-          ], 
-          "CpuShares": 102, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 102,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "frontend-controller-b182t", 
-          "Image": "kubernetes/example-guestbook-php-redis", 
-          "MacAddress": "", 
-          "Memory": 50000000, 
-          "MemorySwap": -1, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "frontend-controller-b182t",
+          "Image": "kubernetes/example-guestbook-php-redis",
+          "MacAddress": "",
+          "Memory": 50000000,
+          "MemorySwap": -1,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T20:39:00.430009522Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T20:39:00.430009522Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/14a3a978-b7d8-11e4-9018-42010af0f3f2/containers/php-redis/e868855420ddf0111491e53ef9cbc5ff92f7e6a7ae2e8caf4f443b17f4da27a7:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "container:c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "container:c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753",
           "PortBindings": {
             "80/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "8000"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753/hosts", 
-        "Id": "e868855420ddf0111491e53ef9cbc5ff92f7e6a7ae2e8caf4f443b17f4da27a7", 
-        "Image": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f", 
-        "MountLabel": "", 
-        "Name": "/k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753/hosts",
+        "Id": "e868855420ddf0111491e53ef9cbc5ff92f7e6a7ae2e8caf4f443b17f4da27a7",
+        "Image": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f",
+        "MountLabel": "",
+        "Name": "/k8s_php-redis.f1bf04fb_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_558495b7",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/bin/sh", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753/resolv.conf", 
+        },
+        "Path": "/bin/sh",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 25256, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 25256,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T20:39:01.035418104Z"
-        }, 
+        },
         "Volumes": {
           "/dev/termination-log": "/var/lib/kubelet/pods/14a3a978-b7d8-11e4-9018-42010af0f3f2/containers/php-redis/e868855420ddf0111491e53ef9cbc5ff92f7e6a7ae2e8caf4f443b17f4da27a7"
-        }, 
+        },
         "VolumesRW": {
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:33.622107", 
+      },
+      "timestamp": "2015-03-17T00:01:33.622107",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "15857"
-      }, 
-      "id": "Process:e868855420dd/15857", 
+      },
+      "id": "Process:e868855420dd/15857",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "15857", 
-        "RSS": "5980", 
-        "START": "Feb28", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "15857",
+        "RSS": "5980",
+        "START": "Feb28",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260012"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.820413", 
+      },
+      "timestamp": "2015-03-17T00:01:33.820413",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25256"
-      }, 
-      "id": "Process:e868855420dd/25256", 
+      },
+      "id": "Process:e868855420dd/25256",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/bin/sh -c /run.sh", 
-        "PID": "25256", 
-        "RSS": "80", 
-        "START": "Feb25", 
-        "STAT": "Ss", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/bin/sh -c /run.sh",
+        "PID": "25256",
+        "RSS": "80",
+        "START": "Feb25",
+        "STAT": "Ss",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "4412"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.820413", 
+      },
+      "timestamp": "2015-03-17T00:01:33.820413",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25297"
-      }, 
-      "id": "Process:e868855420dd/25297", 
+      },
+      "id": "Process:e868855420dd/25297",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.2", 
-        "COMMAND": "/usr/bin/python /usr/bin/supervisord -n", 
-        "PID": "25297", 
-        "RSS": "10676", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "4:11", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.2",
+        "COMMAND": "/usr/bin/python /usr/bin/supervisord -n",
+        "PID": "25297",
+        "RSS": "10676",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "4:11",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "53152"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.820413", 
+      },
+      "timestamp": "2015-03-17T00:01:33.820413",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25366"
-      }, 
-      "id": "Process:e868855420dd/25366", 
+      },
+      "id": "Process:e868855420dd/25366",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.2", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "25366", 
-        "RSS": "11332", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:54", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.2",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "25366",
+        "RSS": "11332",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:54",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "259972"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.820413", 
+      },
+      "timestamp": "2015-03-17T00:01:33.820413",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25368"
-      }, 
-      "id": "Process:e868855420dd/25368", 
+      },
+      "id": "Process:e868855420dd/25368",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "25368", 
-        "RSS": "5980", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "25368",
+        "RSS": "5980",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260052"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.820413", 
+      },
+      "timestamp": "2015-03-17T00:01:33.820413",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25369"
-      }, 
-      "id": "Process:e868855420dd/25369", 
+      },
+      "id": "Process:e868855420dd/25369",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "25369", 
-        "RSS": "7392", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "25369",
+        "RSS": "7392",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260112"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.820413", 
+      },
+      "timestamp": "2015-03-17T00:01:33.820413",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25370"
-      }, 
-      "id": "Process:e868855420dd/25370", 
+      },
+      "id": "Process:e868855420dd/25370",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "25370", 
-        "RSS": "5980", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "25370",
+        "RSS": "5980",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260052"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.820413", 
+      },
+      "timestamp": "2015-03-17T00:01:33.820413",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25371"
-      }, 
-      "id": "Process:e868855420dd/25371", 
+      },
+      "id": "Process:e868855420dd/25371",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "25371", 
-        "RSS": "5980", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "25371",
+        "RSS": "5980",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260020"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.820413", 
+      },
+      "timestamp": "2015-03-17T00:01:33.820413",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25372"
-      }, 
-      "id": "Process:e868855420dd/25372", 
+      },
+      "id": "Process:e868855420dd/25372",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "25372", 
-        "RSS": "5980", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "25372",
+        "RSS": "5980",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260012"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.820413", 
+      },
+      "timestamp": "2015-03-17T00:01:33.820413",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "5630952871a3"
-      }, 
-      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/5630952871a3", 
+      },
+      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/5630952871a3",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "/run.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "9909d49b9b51", 
-          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "9909d49b9b51",
+          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "63db4df258d14794d7072e009c12443c790c09fb9c25119ec1d06a6197ab85aa", 
+        },
+        "Container": "63db4df258d14794d7072e009c12443c790c09fb9c25119ec1d06a6197ab85aa",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) CMD [/bin/sh -c /run.sh]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "9909d49b9b51", 
-          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "9909d49b9b51",
+          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-12-09T19:16:28.984874361Z", 
-        "DockerVersion": "1.3.0", 
-        "Id": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f", 
-        "Os": "linux", 
-        "Parent": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429", 
-        "Size": 0, 
+        },
+        "Created": "2014-12-09T19:16:28.984874361Z",
+        "DockerVersion": "1.3.0",
+        "Id": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f",
+        "Os": "linux",
+        "Parent": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429",
+        "Size": 0,
         "VirtualSize": 382800212
-      }, 
-      "timestamp": "2015-03-17T00:01:33.840468", 
+      },
+      "timestamp": "2015-03-17T00:01:33.840468",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "c1b91efcd342"
-      }, 
-      "id": "Container:k8s_POD.8550e9ae_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_b9fb60e3", 
+      },
+      "id": "Container:k8s_POD.8550e9ae_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_b9fb60e3",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "frontend-controller-b182t", 
-          "Image": "kubernetes/pause:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "frontend-controller-b182t",
+          "Image": "kubernetes/pause:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T20:38:59.335299221Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T20:38:59.335299221Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
-          "Binds": null, 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          "Binds": null,
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "",
           "PortBindings": {
             "80/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "8000"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "/var/lib/docker/containers/c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753/hostname", 
-        "HostsPath": "/var/lib/docker/containers/c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753/hosts", 
-        "Id": "c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753", 
-        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "MountLabel": "", 
-        "Name": "/k8s_POD.8550e9ae_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_b9fb60e3", 
+        },
+        "HostnamePath": "/var/lib/docker/containers/c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753/hostname",
+        "HostsPath": "/var/lib/docker/containers/c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753/hosts",
+        "Id": "c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753",
+        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "MountLabel": "",
+        "Name": "/k8s_POD.8550e9ae_frontend-controller-b182t.default.api_14a3a978-b7d8-11e4-9018-42010af0f3f2_b9fb60e3",
         "NetworkSettings": {
-          "Bridge": "cbr0", 
-          "Gateway": "10.244.2.1", 
-          "IPAddress": "10.244.2.5", 
-          "IPPrefixLen": 24, 
-          "MacAddress": "02:42:0a:f4:02:05", 
-          "PortMapping": null, 
+          "Bridge": "cbr0",
+          "Gateway": "10.244.2.1",
+          "IPAddress": "10.244.2.5",
+          "IPPrefixLen": 24,
+          "MacAddress": "02:42:0a:f4:02:05",
+          "PortMapping": null,
           "Ports": {
             "80/tcp": [
               {
-                "HostIp": "0.0.0.0", 
+                "HostIp": "0.0.0.0",
                 "HostPort": "8000"
               }
             ]
           }
-        }, 
-        "Path": "/pause", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753/resolv.conf", 
+        },
+        "Path": "/pause",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/c1b91efcd342d88001c1abe8b9ef129db91eb0c9841e7344d942fdfcd76d1753/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 25115, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 25115,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T20:38:59.643646773Z"
-        }, 
-        "Volumes": {}, 
+        },
+        "Volumes": {},
         "VolumesRW": {}
-      }, 
-      "timestamp": "2015-03-17T00:01:33.637005", 
+      },
+      "timestamp": "2015-03-17T00:01:33.637005",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "25115"
-      }, 
-      "id": "Process:c1b91efcd342/25115", 
+      },
+      "id": "Process:c1b91efcd342/25115",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/pause", 
-        "PID": "25115", 
-        "RSS": "420", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "0:05", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/pause",
+        "PID": "25115",
+        "RSS": "420",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "0:05",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "265340"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.863269", 
+      },
+      "timestamp": "2015-03-17T00:01:33.863269",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6c4579af347b"
-      }, 
-      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd", 
+        },
+        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/pause]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-07-19T07:02:32.267701596Z", 
-        "DockerVersion": "1.0.0", 
-        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "Os": "linux", 
-        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-        "Size": 0, 
+        },
+        "Created": "2014-07-19T07:02:32.267701596Z",
+        "DockerVersion": "1.0.0",
+        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "Os": "linux",
+        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+        "Size": 0,
         "VirtualSize": 239840
-      }, 
-      "timestamp": "2015-03-17T00:01:33.870098", 
+      },
+      "timestamp": "2015-03-17T00:01:33.870098",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitoring-influx-grafana-controller-gziey"
-      }, 
-      "id": "Pod:monitoring-influx-grafana-controller-gziey", 
+      },
+      "id": "Pod:monitoring-influx-grafana-controller-gziey",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:57Z", 
+        "creationTimestamp": "2015-02-19T00:11:57Z",
         "currentState": {
           "Condition": [
             {
-              "kind": "Ready", 
+              "kind": "Ready",
               "status": "Full"
             }
-          ], 
-          "host": "kubernetes-minion-e3zy.c.shared-kraken.internal", 
-          "hostIP": "104.154.65.114", 
+          ],
+          "host": "kubernetes-minion-e3zy.c.shared-kraken.internal",
+          "hostIP": "104.154.65.114",
           "info": {
             "POD": {
-              "containerID": "docker://bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2", 
-              "image": "kubernetes/pause:latest", 
-              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-              "podIP": "10.244.2.4", 
-              "ready": false, 
-              "restartCount": 5, 
+              "containerID": "docker://bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2",
+              "image": "kubernetes/pause:latest",
+              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+              "podIP": "10.244.2.4",
+              "ready": false,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T20:38:59Z"
                 }
               }
-            }, 
+            },
             "grafana": {
-              "containerID": "docker://f436d2afe7bf99a3891699d302501d619975f922cf9207235257090745ed7c4c", 
-              "image": "kubernetes/heapster_grafana:v0.3", 
-              "imageID": "docker://3df24075659b8bcc57085c2bac5043ffd651b034567a4ccb06a354a2ab0f51b3", 
-              "ready": true, 
-              "restartCount": 5, 
+              "containerID": "docker://f436d2afe7bf99a3891699d302501d619975f922cf9207235257090745ed7c4c",
+              "image": "kubernetes/heapster_grafana:v0.3",
+              "imageID": "docker://3df24075659b8bcc57085c2bac5043ffd651b034567a4ccb06a354a2ab0f51b3",
+              "ready": true,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T20:39:01Z"
                 }
               }
-            }, 
+            },
             "influxdb": {
-              "containerID": "docker://005426f19bcaff7e67e0a66063e78b1e307c30a13236619e485f8dbebedd3ea6", 
-              "image": "kubernetes/heapster_influxdb:v0.3", 
-              "imageID": "docker://fdd2bd0d0470aa206c02a9f48a90efcf4835f15829dfc0d6cee6c55850c9a834", 
-              "ready": true, 
-              "restartCount": 5, 
+              "containerID": "docker://005426f19bcaff7e67e0a66063e78b1e307c30a13236619e485f8dbebedd3ea6",
+              "image": "kubernetes/heapster_influxdb:v0.3",
+              "imageID": "docker://fdd2bd0d0470aa206c02a9f48a90efcf4835f15829dfc0d6cee6c55850c9a834",
+              "ready": true,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T20:39:00Z"
                 }
               }
             }
-          }, 
+          },
           "manifest": {
-            "containers": null, 
-            "id": "", 
-            "restartPolicy": {}, 
-            "version": "", 
+            "containers": null,
+            "id": "",
+            "restartPolicy": {},
+            "version": "",
             "volumes": null
-          }, 
-          "podIP": "10.244.2.4", 
+          },
+          "podIP": "10.244.2.4",
           "status": "Running"
-        }, 
+        },
         "desiredState": {
           "manifest": {
             "containers": [
               {
-                "capabilities": {}, 
-                "image": "kubernetes/heapster_influxdb:v0.3", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "name": "influxdb", 
+                "capabilities": {},
+                "image": "kubernetes/heapster_influxdb:v0.3",
+                "imagePullPolicy": "PullIfNotPresent",
+                "name": "influxdb",
                 "ports": [
                   {
-                    "containerPort": 8083, 
-                    "hostPort": 8083, 
+                    "containerPort": 8083,
+                    "hostPort": 8083,
                     "protocol": "TCP"
-                  }, 
+                  },
                   {
-                    "containerPort": 8086, 
-                    "hostPort": 8086, 
+                    "containerPort": 8086,
+                    "hostPort": 8086,
                     "protocol": "TCP"
                   }
-                ], 
-                "resources": {}, 
+                ],
+                "resources": {},
                 "terminationMessagePath": "/dev/termination-log"
-              }, 
+              },
               {
-                "capabilities": {}, 
+                "capabilities": {},
                 "env": [
                   {
-                    "key": "HTTP_USER", 
-                    "name": "HTTP_USER", 
+                    "key": "HTTP_USER",
+                    "name": "HTTP_USER",
                     "value": "admin"
-                  }, 
+                  },
                   {
-                    "key": "HTTP_PASS", 
-                    "name": "HTTP_PASS", 
+                    "key": "HTTP_PASS",
+                    "name": "HTTP_PASS",
                     "value": "**None**"
                   }
-                ], 
-                "image": "kubernetes/heapster_grafana:v0.3", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "name": "grafana", 
+                ],
+                "image": "kubernetes/heapster_grafana:v0.3",
+                "imagePullPolicy": "PullIfNotPresent",
+                "name": "grafana",
                 "ports": [
                   {
-                    "containerPort": 80, 
-                    "hostPort": 80, 
+                    "containerPort": 80,
+                    "hostPort": 80,
                     "protocol": "TCP"
                   }
-                ], 
-                "resources": {}, 
+                ],
+                "resources": {},
                 "terminationMessagePath": "/dev/termination-log"
               }
-            ], 
-            "dnsPolicy": "ClusterFirst", 
-            "id": "", 
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "id": "",
             "restartPolicy": {
               "always": {}
-            }, 
-            "version": "v1beta2", 
+            },
+            "version": "v1beta2",
             "volumes": null
           }
-        }, 
-        "generateName": "monitoring-influx-grafana-controller-", 
-        "id": "monitoring-influx-grafana-controller-gziey", 
+        },
+        "generateName": "monitoring-influx-grafana-controller-",
+        "id": "monitoring-influx-grafana-controller-gziey",
         "labels": {
           "name": "influxGrafana"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 31, 
-        "selfLink": "/api/v1beta1/pods/monitoring-influx-grafana-controller-gziey?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 31,
+        "selfLink": "/api/v1beta1/pods/monitoring-influx-grafana-controller-gziey?namespace=default",
         "uid": "eaec8788-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.559330", 
+      },
+      "timestamp": "2015-03-17T00:01:33.559330",
       "type": "Pod"
-    }, 
+    },
     {
       "annotations": {
         "label": "f436d2afe7bf"
-      }, 
-      "id": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152", 
+      },
+      "id": "Container:k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
             "/run.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "GRAFANA_DB_NAME=grafana", 
-            "GRAFANA_VERSION=1.9.1", 
-            "HOME=/", 
-            "HTTP_PASS=**None**", 
-            "HTTP_USER=admin", 
-            "INFLUXDB_HOST=localhost", 
-            "INFLUXDB_NAME=k8s", 
-            "INFLUXDB_PASS=root", 
-            "INFLUXDB_PORT=8086", 
-            "INFLUXDB_PROTO=http", 
-            "INFLUXDB_USER=root", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "GRAFANA_DB_NAME=grafana",
+            "GRAFANA_VERSION=1.9.1",
+            "HOME=/",
+            "HTTP_PASS=**None**",
+            "HTTP_USER=admin",
+            "INFLUXDB_HOST=localhost",
+            "INFLUXDB_NAME=k8s",
+            "INFLUXDB_PASS=root",
+            "INFLUXDB_PORT=8086",
+            "INFLUXDB_PROTO=http",
+            "INFLUXDB_USER=root",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "monitoring-influx-grafana-controller-gziey", 
-          "Image": "kubernetes/heapster_grafana:v0.3", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "monitoring-influx-grafana-controller-gziey",
+          "Image": "kubernetes/heapster_grafana:v0.3",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T20:39:01.114457707Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T20:39:01.114457707Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/eaec8788-b7cb-11e4-9018-42010af0f3f2/containers/grafana/f436d2afe7bf99a3891699d302501d619975f922cf9207235257090745ed7c4c:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "container:bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "container:bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2",
           "PortBindings": {
             "80/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "80"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/hosts", 
-        "Id": "f436d2afe7bf99a3891699d302501d619975f922cf9207235257090745ed7c4c", 
-        "Image": "3df24075659b8bcc57085c2bac5043ffd651b034567a4ccb06a354a2ab0f51b3", 
-        "MountLabel": "", 
-        "Name": "/k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/hosts",
+        "Id": "f436d2afe7bf99a3891699d302501d619975f922cf9207235257090745ed7c4c",
+        "Image": "3df24075659b8bcc57085c2bac5043ffd651b034567a4ccb06a354a2ab0f51b3",
+        "MountLabel": "",
+        "Name": "/k8s_grafana.51c4196c_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_362b0152",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/run.sh", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/resolv.conf", 
+        },
+        "Path": "/run.sh",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 25304, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 25304,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T20:39:01.358730453Z"
-        }, 
+        },
         "Volumes": {
           "/dev/termination-log": "/var/lib/kubelet/pods/eaec8788-b7cb-11e4-9018-42010af0f3f2/containers/grafana/f436d2afe7bf99a3891699d302501d619975f922cf9207235257090745ed7c4c"
-        }, 
+        },
         "VolumesRW": {
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:33.898453", 
+      },
+      "timestamp": "2015-03-17T00:01:33.898453",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "25304"
-      }, 
-      "id": "Process:f436d2afe7bf/25304", 
+      },
+      "id": "Process:f436d2afe7bf/25304",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/bin/bash /run.sh", 
-        "PID": "25304", 
-        "RSS": "396", 
-        "START": "Feb25", 
-        "STAT": "Ss", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/bin/bash /run.sh",
+        "PID": "25304",
+        "RSS": "396",
+        "START": "Feb25",
+        "STAT": "Ss",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "17996"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.966187", 
+      },
+      "timestamp": "2015-03-17T00:01:33.966187",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25322"
-      }, 
-      "id": "Process:f436d2afe7bf/25322", 
+      },
+      "id": "Process:f436d2afe7bf/25322",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "nginx: master process /usr/sbin/nginx", 
-        "PID": "25322", 
-        "RSS": "1644", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "nginx: master process /usr/sbin/nginx",
+        "PID": "25322",
+        "RSS": "1644",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "85880"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.966187", 
+      },
+      "timestamp": "2015-03-17T00:01:33.966187",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25323"
-      }, 
-      "id": "Process:f436d2afe7bf/25323", 
+      },
+      "id": "Process:f436d2afe7bf/25323",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "nginx: worker process", 
-        "PID": "25323", 
-        "RSS": "1584", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "1:04", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "nginx: worker process",
+        "PID": "25323",
+        "RSS": "1584",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "1:04",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "86160"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.966187", 
+      },
+      "timestamp": "2015-03-17T00:01:33.966187",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25324"
-      }, 
-      "id": "Process:f436d2afe7bf/25324", 
+      },
+      "id": "Process:f436d2afe7bf/25324",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "nginx: worker process", 
-        "PID": "25324", 
-        "RSS": "1364", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:58", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "nginx: worker process",
+        "PID": "25324",
+        "RSS": "1364",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:58",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "86160"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.966187", 
+      },
+      "timestamp": "2015-03-17T00:01:33.966187",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25325"
-      }, 
-      "id": "Process:f436d2afe7bf/25325", 
+      },
+      "id": "Process:f436d2afe7bf/25325",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "nginx: worker process", 
-        "PID": "25325", 
-        "RSS": "1364", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:06", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "nginx: worker process",
+        "PID": "25325",
+        "RSS": "1364",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:06",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "86160"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.966187", 
+      },
+      "timestamp": "2015-03-17T00:01:33.966187",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25326"
-      }, 
-      "id": "Process:f436d2afe7bf/25326", 
+      },
+      "id": "Process:f436d2afe7bf/25326",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "nginx: worker process", 
-        "PID": "25326", 
-        "RSS": "1616", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "1:04", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "nginx: worker process",
+        "PID": "25326",
+        "RSS": "1616",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "1:04",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "86160"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.966187", 
+      },
+      "timestamp": "2015-03-17T00:01:33.966187",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "3df24075659b"
-      }, 
-      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/3df24075659b", 
+      },
+      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/3df24075659b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "Vishnu Kannan <vishnuk@google.com>", 
-        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "Vishnu Kannan <vishnuk@google.com>",
+        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
             "/run.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "HOME=/", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "GRAFANA_VERSION=1.9.1", 
-            "HTTP_USER=admin", 
-            "HTTP_PASS=**Random**", 
-            "INFLUXDB_PROTO=http", 
-            "INFLUXDB_HOST=localhost", 
-            "INFLUXDB_PORT=8086", 
-            "INFLUXDB_NAME=k8s", 
-            "INFLUXDB_USER=root", 
-            "INFLUXDB_PASS=root", 
+            "HOME=/",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "GRAFANA_VERSION=1.9.1",
+            "HTTP_USER=admin",
+            "HTTP_PASS=**Random**",
+            "INFLUXDB_PROTO=http",
+            "INFLUXDB_HOST=localhost",
+            "INFLUXDB_PORT=8086",
+            "INFLUXDB_NAME=k8s",
+            "INFLUXDB_USER=root",
+            "INFLUXDB_PASS=root",
             "GRAFANA_DB_NAME=grafana"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "dd40882ba0ea", 
-          "Image": "1921bce36b2ac44718f4f0d22fb38f033d2310c74369ac9f0922f09320656e20", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "dd40882ba0ea",
+          "Image": "1921bce36b2ac44718f4f0d22fb38f033d2310c74369ac9f0922f09320656e20",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "61eeb65c25115170d65c28b8445e7c9408a96dc65ce1887a76132071e598e231", 
+        },
+        "Container": "61eeb65c25115170d65c28b8445e7c9408a96dc65ce1887a76132071e598e231",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) CMD [/run.sh]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "HOME=/", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "GRAFANA_VERSION=1.9.1", 
-            "HTTP_USER=admin", 
-            "HTTP_PASS=**Random**", 
-            "INFLUXDB_PROTO=http", 
-            "INFLUXDB_HOST=localhost", 
-            "INFLUXDB_PORT=8086", 
-            "INFLUXDB_NAME=k8s", 
-            "INFLUXDB_USER=root", 
-            "INFLUXDB_PASS=root", 
+            "HOME=/",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "GRAFANA_VERSION=1.9.1",
+            "HTTP_USER=admin",
+            "HTTP_PASS=**Random**",
+            "INFLUXDB_PROTO=http",
+            "INFLUXDB_HOST=localhost",
+            "INFLUXDB_PORT=8086",
+            "INFLUXDB_NAME=k8s",
+            "INFLUXDB_USER=root",
+            "INFLUXDB_PASS=root",
             "GRAFANA_DB_NAME=grafana"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "dd40882ba0ea", 
-          "Image": "1921bce36b2ac44718f4f0d22fb38f033d2310c74369ac9f0922f09320656e20", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "dd40882ba0ea",
+          "Image": "1921bce36b2ac44718f4f0d22fb38f033d2310c74369ac9f0922f09320656e20",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-01-22T23:27:25.643625803Z", 
-        "DockerVersion": "1.4.1", 
-        "Id": "3df24075659b8bcc57085c2bac5043ffd651b034567a4ccb06a354a2ab0f51b3", 
-        "Os": "linux", 
-        "Parent": "1921bce36b2ac44718f4f0d22fb38f033d2310c74369ac9f0922f09320656e20", 
-        "Size": 0, 
+        },
+        "Created": "2015-01-22T23:27:25.643625803Z",
+        "DockerVersion": "1.4.1",
+        "Id": "3df24075659b8bcc57085c2bac5043ffd651b034567a4ccb06a354a2ab0f51b3",
+        "Os": "linux",
+        "Parent": "1921bce36b2ac44718f4f0d22fb38f033d2310c74369ac9f0922f09320656e20",
+        "Size": 0,
         "VirtualSize": 249655365
-      }, 
-      "timestamp": "2015-03-17T00:01:33.977770", 
+      },
+      "timestamp": "2015-03-17T00:01:33.977770",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "005426f19bca"
-      }, 
-      "id": "Container:k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112", 
+      },
+      "id": "Container:k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
             "/run.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "INFLUXDB_VERSION=0.8.8", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "PRE_CREATE_DB=k8s;grafana", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "INFLUXDB_VERSION=0.8.8",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "PRE_CREATE_DB=k8s;grafana",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
-            "8083/tcp": {}, 
-            "8084/tcp": {}, 
-            "8086/tcp": {}, 
-            "8090/tcp": {}, 
+            "8083/tcp": {},
+            "8084/tcp": {},
+            "8086/tcp": {},
+            "8090/tcp": {},
             "8099/tcp": {}
-          }, 
-          "Hostname": "monitoring-influx-grafana-controller-gziey", 
-          "Image": "kubernetes/heapster_influxdb:v0.3", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "monitoring-influx-grafana-controller-gziey",
+          "Image": "kubernetes/heapster_influxdb:v0.3",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T20:39:00.446336779Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T20:39:00.446336779Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/eaec8788-b7cb-11e4-9018-42010af0f3f2/containers/influxdb/005426f19bcaff7e67e0a66063e78b1e307c30a13236619e485f8dbebedd3ea6:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "container:bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "container:bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2",
           "PortBindings": {
             "8083/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "8083"
               }
-            ], 
+            ],
             "8086/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "8086"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/hosts", 
-        "Id": "005426f19bcaff7e67e0a66063e78b1e307c30a13236619e485f8dbebedd3ea6", 
-        "Image": "fdd2bd0d0470aa206c02a9f48a90efcf4835f15829dfc0d6cee6c55850c9a834", 
-        "MountLabel": "", 
-        "Name": "/k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/hosts",
+        "Id": "005426f19bcaff7e67e0a66063e78b1e307c30a13236619e485f8dbebedd3ea6",
+        "Image": "fdd2bd0d0470aa206c02a9f48a90efcf4835f15829dfc0d6cee6c55850c9a834",
+        "MountLabel": "",
+        "Name": "/k8s_influxdb.d451f8b_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_be0a9112",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/run.sh", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/resolv.conf", 
+        },
+        "Path": "/run.sh",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 25258, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 25258,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T20:39:00.793085761Z"
-        }, 
+        },
         "Volumes": {
-          "/data": "/var/lib/docker/vfs/dir/e23637974f8e067772cd93fc7f64ac895602052e4f814675dee286223979869a", 
+          "/data": "/var/lib/docker/vfs/dir/e23637974f8e067772cd93fc7f64ac895602052e4f814675dee286223979869a",
           "/dev/termination-log": "/var/lib/kubelet/pods/eaec8788-b7cb-11e4-9018-42010af0f3f2/containers/influxdb/005426f19bcaff7e67e0a66063e78b1e307c30a13236619e485f8dbebedd3ea6"
-        }, 
+        },
         "VolumesRW": {
-          "/data": true, 
+          "/data": true,
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:33.903087", 
+      },
+      "timestamp": "2015-03-17T00:01:33.903087",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "25258"
-      }, 
-      "id": "Process:005426f19bca/25258", 
+      },
+      "id": "Process:005426f19bca/25258",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/bin/bash /run.sh", 
-        "PID": "25258", 
-        "RSS": "672", 
-        "START": "Feb25", 
-        "STAT": "Ss", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/bin/bash /run.sh",
+        "PID": "25258",
+        "RSS": "672",
+        "START": "Feb25",
+        "STAT": "Ss",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "18016"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.997069", 
+      },
+      "timestamp": "2015-03-17T00:01:33.997069",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "25272"
-      }, 
-      "id": "Process:005426f19bca/25272", 
+      },
+      "id": "Process:005426f19bca/25272",
       "properties": {
-        "%CPU": "0.7", 
-        "%MEM": "2.4", 
-        "COMMAND": "/usr/bin/influxdb -config=/config/config.toml", 
-        "PID": "25272", 
-        "RSS": "92496", 
-        "START": "Feb25", 
-        "STAT": "Sl", 
-        "TIME": "196:28", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.7",
+        "%MEM": "2.4",
+        "COMMAND": "/usr/bin/influxdb -config=/config/config.toml",
+        "PID": "25272",
+        "RSS": "92496",
+        "START": "Feb25",
+        "STAT": "Sl",
+        "TIME": "196:28",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "2315004"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.997069", 
+      },
+      "timestamp": "2015-03-17T00:01:33.997069",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "fdd2bd0d0470"
-      }, 
-      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/fdd2bd0d0470", 
+      },
+      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/fdd2bd0d0470",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
             "/run.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "INFLUXDB_VERSION=0.8.8", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "INFLUXDB_VERSION=0.8.8",
             "PRE_CREATE_DB=k8s;grafana"
-          ], 
+          ],
           "ExposedPorts": {
-            "8083/tcp": {}, 
-            "8084/tcp": {}, 
-            "8086/tcp": {}, 
-            "8090/tcp": {}, 
+            "8083/tcp": {},
+            "8084/tcp": {},
+            "8086/tcp": {},
+            "8090/tcp": {},
             "8099/tcp": {}
-          }, 
-          "Hostname": "93847cf6a341", 
-          "Image": "01ca504ee3d1de53f259146c27bb2c3f9a4531127e46eb156c615f9596769bdb", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "93847cf6a341",
+          "Image": "01ca504ee3d1de53f259146c27bb2c3f9a4531127e46eb156c615f9596769bdb",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": ""
-        }, 
-        "Container": "6852c8aea0dd1195b0478ed433b5711c674191afc85d3c15c3a07c357bd7b329", 
+        },
+        "Container": "6852c8aea0dd1195b0478ed433b5711c674191afc85d3c15c3a07c357bd7b329",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) CMD [/run.sh]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "INFLUXDB_VERSION=0.8.8", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "INFLUXDB_VERSION=0.8.8",
             "PRE_CREATE_DB=k8s;grafana"
-          ], 
+          ],
           "ExposedPorts": {
-            "8083/tcp": {}, 
-            "8084/tcp": {}, 
-            "8086/tcp": {}, 
-            "8090/tcp": {}, 
+            "8083/tcp": {},
+            "8084/tcp": {},
+            "8086/tcp": {},
+            "8090/tcp": {},
             "8099/tcp": {}
-          }, 
-          "Hostname": "93847cf6a341", 
-          "Image": "01ca504ee3d1de53f259146c27bb2c3f9a4531127e46eb156c615f9596769bdb", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "93847cf6a341",
+          "Image": "01ca504ee3d1de53f259146c27bb2c3f9a4531127e46eb156c615f9596769bdb",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": ""
-        }, 
-        "Created": "2015-01-19T18:54:18.48135834Z", 
-        "DockerVersion": "1.4.1", 
-        "Id": "fdd2bd0d0470aa206c02a9f48a90efcf4835f15829dfc0d6cee6c55850c9a834", 
-        "Os": "linux", 
-        "Parent": "01ca504ee3d1de53f259146c27bb2c3f9a4531127e46eb156c615f9596769bdb", 
-        "Size": 0, 
+        },
+        "Created": "2015-01-19T18:54:18.48135834Z",
+        "DockerVersion": "1.4.1",
+        "Id": "fdd2bd0d0470aa206c02a9f48a90efcf4835f15829dfc0d6cee6c55850c9a834",
+        "Os": "linux",
+        "Parent": "01ca504ee3d1de53f259146c27bb2c3f9a4531127e46eb156c615f9596769bdb",
+        "Size": 0,
         "VirtualSize": 274660127
-      }, 
-      "timestamp": "2015-03-17T00:01:34.004199", 
+      },
+      "timestamp": "2015-03-17T00:01:34.004199",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "bd6afd430dba"
-      }, 
-      "id": "Container:k8s_POD.14142f41_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_fde1c5ed", 
+      },
+      "id": "Container:k8s_POD.14142f41_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_fde1c5ed",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
-            "80/tcp": {}, 
-            "8083/tcp": {}, 
+            "80/tcp": {},
+            "8083/tcp": {},
             "8086/tcp": {}
-          }, 
-          "Hostname": "monitoring-influx-grafana-controller-gziey", 
-          "Image": "kubernetes/pause:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "monitoring-influx-grafana-controller-gziey",
+          "Image": "kubernetes/pause:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T20:38:59.045627366Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T20:38:59.045627366Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
-          "Binds": null, 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          "Binds": null,
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "",
           "PortBindings": {
             "80/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "80"
               }
-            ], 
+            ],
             "8083/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "8083"
               }
-            ], 
+            ],
             "8086/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "8086"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/hostname", 
-        "HostsPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/hosts", 
-        "Id": "bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2", 
-        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "MountLabel": "", 
-        "Name": "/k8s_POD.14142f41_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_fde1c5ed", 
+        },
+        "HostnamePath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/hostname",
+        "HostsPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/hosts",
+        "Id": "bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2",
+        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "MountLabel": "",
+        "Name": "/k8s_POD.14142f41_monitoring-influx-grafana-controller-gziey.default.api_eaec8788-b7cb-11e4-9018-42010af0f3f2_fde1c5ed",
         "NetworkSettings": {
-          "Bridge": "cbr0", 
-          "Gateway": "10.244.2.1", 
-          "IPAddress": "10.244.2.4", 
-          "IPPrefixLen": 24, 
-          "MacAddress": "02:42:0a:f4:02:04", 
-          "PortMapping": null, 
+          "Bridge": "cbr0",
+          "Gateway": "10.244.2.1",
+          "IPAddress": "10.244.2.4",
+          "IPPrefixLen": 24,
+          "MacAddress": "02:42:0a:f4:02:04",
+          "PortMapping": null,
           "Ports": {
             "80/tcp": [
               {
-                "HostIp": "0.0.0.0", 
+                "HostIp": "0.0.0.0",
                 "HostPort": "80"
               }
-            ], 
+            ],
             "8083/tcp": [
               {
-                "HostIp": "0.0.0.0", 
+                "HostIp": "0.0.0.0",
                 "HostPort": "8083"
               }
-            ], 
+            ],
             "8086/tcp": [
               {
-                "HostIp": "0.0.0.0", 
+                "HostIp": "0.0.0.0",
                 "HostPort": "8086"
               }
             ]
           }
-        }, 
-        "Path": "/pause", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/resolv.conf", 
+        },
+        "Path": "/pause",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/bd6afd430dbab0c4bc242d19e51c1fb9965ae2091a2fde31409f8ae6bf1501a2/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 25172, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 25172,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T20:38:59.731947599Z"
-        }, 
-        "Volumes": {}, 
+        },
+        "Volumes": {},
         "VolumesRW": {}
-      }, 
-      "timestamp": "2015-03-17T00:01:33.933984", 
+      },
+      "timestamp": "2015-03-17T00:01:33.933984",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "25172"
-      }, 
-      "id": "Process:bd6afd430dba/25172", 
+      },
+      "id": "Process:bd6afd430dba/25172",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/pause", 
-        "PID": "25172", 
-        "RSS": "420", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "0:04", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/pause",
+        "PID": "25172",
+        "RSS": "420",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "0:04",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "265340"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.023829", 
+      },
+      "timestamp": "2015-03-17T00:01:34.023829",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6c4579af347b"
-      }, 
-      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd", 
+        },
+        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/pause]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-07-19T07:02:32.267701596Z", 
-        "DockerVersion": "1.0.0", 
-        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "Os": "linux", 
-        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-        "Size": 0, 
+        },
+        "Created": "2014-07-19T07:02:32.267701596Z",
+        "DockerVersion": "1.0.0",
+        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "Os": "linux",
+        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+        "Size": 0,
         "VirtualSize": 239840
-      }, 
-      "timestamp": "2015-03-17T00:01:33.870098", 
+      },
+      "timestamp": "2015-03-17T00:01:33.870098",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "skydns-ls6k1"
-      }, 
-      "id": "Pod:skydns-ls6k1", 
+      },
+      "id": "Pod:skydns-ls6k1",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:57Z", 
+        "creationTimestamp": "2015-02-19T00:11:57Z",
         "currentState": {
           "Condition": [
             {
-              "kind": "Ready", 
+              "kind": "Ready",
               "status": "Full"
             }
-          ], 
-          "host": "kubernetes-minion-e3zy.c.shared-kraken.internal", 
-          "hostIP": "104.154.65.114", 
+          ],
+          "host": "kubernetes-minion-e3zy.c.shared-kraken.internal",
+          "hostIP": "104.154.65.114",
           "info": {
             "POD": {
-              "containerID": "docker://df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4", 
-              "image": "kubernetes/pause:latest", 
-              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-              "podIP": "10.244.2.6", 
-              "ready": false, 
-              "restartCount": 5, 
+              "containerID": "docker://df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4",
+              "image": "kubernetes/pause:latest",
+              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+              "podIP": "10.244.2.6",
+              "ready": false,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T20:38:59Z"
                 }
               }
-            }, 
+            },
             "etcd": {
-              "containerID": "docker://14bb8d474c88ffbe9390663dca30402032c63b77513dd14396ca82ed3b11797d", 
-              "image": "quay.io/coreos/etcd:latest", 
-              "imageID": "docker://c5f34efc44466ec7abb9a68af20d2f876ea691095747e7e5a62e890cdedadcdc", 
-              "ready": true, 
-              "restartCount": 5, 
+              "containerID": "docker://14bb8d474c88ffbe9390663dca30402032c63b77513dd14396ca82ed3b11797d",
+              "image": "quay.io/coreos/etcd:latest",
+              "imageID": "docker://c5f34efc44466ec7abb9a68af20d2f876ea691095747e7e5a62e890cdedadcdc",
+              "ready": true,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T20:39:02Z"
                 }
               }
-            }, 
+            },
             "kube2sky": {
-              "containerID": "docker://8f17a7d63d27f05d2efee9b46ddbad37a59d7228f2da6e1e893f02481dd94996", 
-              "image": "kubernetes/kube2sky:1.0", 
-              "imageID": "docker://3ea44ca9f1bd295f38fb1922e39d26e59294453ac0c5da9ae3c12cea5834c4ad", 
-              "ready": true, 
-              "restartCount": 5, 
+              "containerID": "docker://8f17a7d63d27f05d2efee9b46ddbad37a59d7228f2da6e1e893f02481dd94996",
+              "image": "kubernetes/kube2sky:1.0",
+              "imageID": "docker://3ea44ca9f1bd295f38fb1922e39d26e59294453ac0c5da9ae3c12cea5834c4ad",
+              "ready": true,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T20:39:02Z"
                 }
               }
-            }, 
+            },
             "skydns": {
-              "containerID": "docker://1c6f3946b06a20df8f6e5bd68206984fa9d8f093dddf3e747e012c87dede621d", 
-              "image": "kubernetes/skydns:2014-12-23-001", 
-              "imageID": "docker://93f9564eaa3307440f3486b109c2fd39172d59a4b49ee4470d0b6141b4113388", 
-              "ready": true, 
-              "restartCount": 5, 
+              "containerID": "docker://1c6f3946b06a20df8f6e5bd68206984fa9d8f093dddf3e747e012c87dede621d",
+              "image": "kubernetes/skydns:2014-12-23-001",
+              "imageID": "docker://93f9564eaa3307440f3486b109c2fd39172d59a4b49ee4470d0b6141b4113388",
+              "ready": true,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T20:39:02Z"
                 }
               }
             }
-          }, 
+          },
           "manifest": {
-            "containers": null, 
-            "id": "", 
-            "restartPolicy": {}, 
-            "version": "", 
+            "containers": null,
+            "id": "",
+            "restartPolicy": {},
+            "version": "",
             "volumes": null
-          }, 
-          "podIP": "10.244.2.6", 
+          },
+          "podIP": "10.244.2.6",
           "status": "Running"
-        }, 
+        },
         "desiredState": {
           "manifest": {
             "containers": [
               {
-                "capabilities": {}, 
+                "capabilities": {},
                 "command": [
-                  "/etcd", 
-                  "-bind-addr=127.0.0.1", 
+                  "/etcd",
+                  "-bind-addr=127.0.0.1",
                   "-peer-bind-addr=127.0.0.1"
-                ], 
-                "image": "quay.io/coreos/etcd:latest", 
-                "imagePullPolicy": "PullAlways", 
-                "name": "etcd", 
-                "resources": {}, 
+                ],
+                "image": "quay.io/coreos/etcd:latest",
+                "imagePullPolicy": "PullAlways",
+                "name": "etcd",
+                "resources": {},
                 "terminationMessagePath": "/dev/termination-log"
-              }, 
+              },
               {
-                "capabilities": {}, 
+                "capabilities": {},
                 "command": [
                   "-domain=kubernetes.local"
-                ], 
-                "image": "kubernetes/kube2sky:1.0", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "name": "kube2sky", 
-                "resources": {}, 
+                ],
+                "image": "kubernetes/kube2sky:1.0",
+                "imagePullPolicy": "PullIfNotPresent",
+                "name": "kube2sky",
+                "resources": {},
                 "terminationMessagePath": "/dev/termination-log"
-              }, 
+              },
               {
-                "capabilities": {}, 
+                "capabilities": {},
                 "command": [
-                  "-machines=http://localhost:4001", 
-                  "-addr=0.0.0.0:53", 
+                  "-machines=http://localhost:4001",
+                  "-addr=0.0.0.0:53",
                   "-domain=kubernetes.local."
-                ], 
-                "image": "kubernetes/skydns:2014-12-23-001", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "name": "skydns", 
+                ],
+                "image": "kubernetes/skydns:2014-12-23-001",
+                "imagePullPolicy": "PullIfNotPresent",
+                "name": "skydns",
                 "ports": [
                   {
-                    "containerPort": 53, 
-                    "name": "dns", 
+                    "containerPort": 53,
+                    "name": "dns",
                     "protocol": "UDP"
                   }
-                ], 
-                "resources": {}, 
+                ],
+                "resources": {},
                 "terminationMessagePath": "/dev/termination-log"
               }
-            ], 
-            "dnsPolicy": "Default", 
-            "id": "", 
+            ],
+            "dnsPolicy": "Default",
+            "id": "",
             "restartPolicy": {
               "always": {}
-            }, 
-            "version": "v1beta2", 
+            },
+            "version": "v1beta2",
             "volumes": null
           }
-        }, 
-        "generateName": "skydns-", 
-        "id": "skydns-ls6k1", 
+        },
+        "generateName": "skydns-",
+        "id": "skydns-ls6k1",
         "labels": {
           "k8s-app": "skydns"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 34, 
-        "selfLink": "/api/v1beta1/pods/skydns-ls6k1?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 34,
+        "selfLink": "/api/v1beta1/pods/skydns-ls6k1?namespace=default",
         "uid": "eaecec5a-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:33.559330", 
+      },
+      "timestamp": "2015-03-17T00:01:33.559330",
       "type": "Pod"
-    }, 
+    },
     {
       "annotations": {
         "label": "1c6f3946b06a"
-      }, 
-      "id": "Container:k8s_skydns.8c4210b3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_b83c0e62", 
+      },
+      "id": "Container:k8s_skydns.8c4210b3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_b83c0e62",
       "properties": {
-        "AppArmorProfile": "", 
+        "AppArmorProfile": "",
         "Args": [
-          "-machines=http://localhost:4001", 
-          "-addr=0.0.0.0:53", 
+          "-machines=http://localhost:4001",
+          "-addr=0.0.0.0:53",
           "-domain=kubernetes.local."
-        ], 
+        ],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "-machines=http://localhost:4001", 
-            "-addr=0.0.0.0:53", 
+            "-machines=http://localhost:4001",
+            "-addr=0.0.0.0:53",
             "-domain=kubernetes.local."
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/skydns"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "skydns-ls6k1", 
-          "Image": "kubernetes/skydns:2014-12-23-001", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "skydns-ls6k1",
+          "Image": "kubernetes/skydns:2014-12-23-001",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T20:39:02.472036043Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T20:39:02.472036043Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/eaecec5a-b7cb-11e4-9018-42010af0f3f2/containers/skydns/1c6f3946b06a20df8f6e5bd68206984fa9d8f093dddf3e747e012c87dede621d:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
-          "Dns": null, 
-          "DnsSearch": null, 
-          "ExtraHosts": null, 
-          "IpcMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4", 
-          "PortBindings": null, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
+          "Dns": null,
+          "DnsSearch": null,
+          "ExtraHosts": null,
+          "IpcMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4",
+          "PortBindings": null,
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/hosts", 
-        "Id": "1c6f3946b06a20df8f6e5bd68206984fa9d8f093dddf3e747e012c87dede621d", 
-        "Image": "93f9564eaa3307440f3486b109c2fd39172d59a4b49ee4470d0b6141b4113388", 
-        "MountLabel": "", 
-        "Name": "/k8s_skydns.8c4210b3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_b83c0e62", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/hosts",
+        "Id": "1c6f3946b06a20df8f6e5bd68206984fa9d8f093dddf3e747e012c87dede621d",
+        "Image": "93f9564eaa3307440f3486b109c2fd39172d59a4b49ee4470d0b6141b4113388",
+        "MountLabel": "",
+        "Name": "/k8s_skydns.8c4210b3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_b83c0e62",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/skydns", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/resolv.conf", 
+        },
+        "Path": "/skydns",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 25390, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 25390,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T20:39:02.691537021Z"
-        }, 
+        },
         "Volumes": {
           "/dev/termination-log": "/var/lib/kubelet/pods/eaecec5a-b7cb-11e4-9018-42010af0f3f2/containers/skydns/1c6f3946b06a20df8f6e5bd68206984fa9d8f093dddf3e747e012c87dede621d"
-        }, 
+        },
         "VolumesRW": {
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:34.039341", 
+      },
+      "timestamp": "2015-03-17T00:01:34.039341",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "25390"
-      }, 
-      "id": "Process:1c6f3946b06a/25390", 
+      },
+      "id": "Process:1c6f3946b06a/25390",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "/skydns -machines=http://localhost:4001 -addr=0.0.0.0:53 -domain=kubernetes.local.", 
-        "PID": "25390", 
-        "RSS": "4088", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "5:57", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "/skydns -machines=http://localhost:4001 -addr=0.0.0.0:53 -domain=kubernetes.local.",
+        "PID": "25390",
+        "RSS": "4088",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "5:57",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "13908"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.230185", 
+      },
+      "timestamp": "2015-03-17T00:01:34.230185",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "93f9564eaa33"
-      }, 
-      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/93f9564eaa33", 
+      },
+      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/93f9564eaa33",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "Tim Hockin <thockin@google.com>", 
-        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "Tim Hockin <thockin@google.com>",
+        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/skydns"
-          ], 
+          ],
           "Env": [
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "88f18f678e5d", 
-          "Image": "881bfaf6568d614f274f68a4b088037819f56604f9e3711b6e3e5bc71250ec05", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "88f18f678e5d",
+          "Image": "881bfaf6568d614f274f68a4b088037819f56604f9e3711b6e3e5bc71250ec05",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "9a789310ecdffbe544a118aba3d6d8043abff9a4d3f5e589931625f6492a72f6", 
+        },
+        "Container": "9a789310ecdffbe544a118aba3d6d8043abff9a4d3f5e589931625f6492a72f6",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/skydns]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/skydns"
-          ], 
+          ],
           "Env": [
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "88f18f678e5d", 
-          "Image": "881bfaf6568d614f274f68a4b088037819f56604f9e3711b6e3e5bc71250ec05", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "88f18f678e5d",
+          "Image": "881bfaf6568d614f274f68a4b088037819f56604f9e3711b6e3e5bc71250ec05",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-12-23T22:39:32.213674267Z", 
-        "DockerVersion": "1.4.1", 
-        "Id": "93f9564eaa3307440f3486b109c2fd39172d59a4b49ee4470d0b6141b4113388", 
-        "Os": "linux", 
-        "Parent": "881bfaf6568d614f274f68a4b088037819f56604f9e3711b6e3e5bc71250ec05", 
-        "Size": 0, 
+        },
+        "Created": "2014-12-23T22:39:32.213674267Z",
+        "DockerVersion": "1.4.1",
+        "Id": "93f9564eaa3307440f3486b109c2fd39172d59a4b49ee4470d0b6141b4113388",
+        "Os": "linux",
+        "Parent": "881bfaf6568d614f274f68a4b088037819f56604f9e3711b6e3e5bc71250ec05",
+        "Size": 0,
         "VirtualSize": 8971347
-      }, 
-      "timestamp": "2015-03-17T00:01:34.258096", 
+      },
+      "timestamp": "2015-03-17T00:01:34.258096",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "8f17a7d63d27"
-      }, 
-      "id": "Container:k8s_kube2sky.53fede80_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_6a42ba56", 
+      },
+      "id": "Container:k8s_kube2sky.53fede80_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_6a42ba56",
       "properties": {
-        "AppArmorProfile": "", 
+        "AppArmorProfile": "",
         "Args": [
           "-domain=kubernetes.local"
-        ], 
+        ],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
             "-domain=kubernetes.local"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/kube2sky"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "skydns-ls6k1", 
-          "Image": "kubernetes/kube2sky:1.0", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "skydns-ls6k1",
+          "Image": "kubernetes/kube2sky:1.0",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T20:39:02.153334595Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T20:39:02.153334595Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/eaecec5a-b7cb-11e4-9018-42010af0f3f2/containers/kube2sky/8f17a7d63d27f05d2efee9b46ddbad37a59d7228f2da6e1e893f02481dd94996:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
-          "Dns": null, 
-          "DnsSearch": null, 
-          "ExtraHosts": null, 
-          "IpcMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4", 
-          "PortBindings": null, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
+          "Dns": null,
+          "DnsSearch": null,
+          "ExtraHosts": null,
+          "IpcMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4",
+          "PortBindings": null,
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/hosts", 
-        "Id": "8f17a7d63d27f05d2efee9b46ddbad37a59d7228f2da6e1e893f02481dd94996", 
-        "Image": "3ea44ca9f1bd295f38fb1922e39d26e59294453ac0c5da9ae3c12cea5834c4ad", 
-        "MountLabel": "", 
-        "Name": "/k8s_kube2sky.53fede80_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_6a42ba56", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/hosts",
+        "Id": "8f17a7d63d27f05d2efee9b46ddbad37a59d7228f2da6e1e893f02481dd94996",
+        "Image": "3ea44ca9f1bd295f38fb1922e39d26e59294453ac0c5da9ae3c12cea5834c4ad",
+        "MountLabel": "",
+        "Name": "/k8s_kube2sky.53fede80_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_6a42ba56",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/kube2sky", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/resolv.conf", 
+        },
+        "Path": "/kube2sky",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 25373, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 25373,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T20:39:02.392075903Z"
-        }, 
+        },
         "Volumes": {
           "/dev/termination-log": "/var/lib/kubelet/pods/eaecec5a-b7cb-11e4-9018-42010af0f3f2/containers/kube2sky/8f17a7d63d27f05d2efee9b46ddbad37a59d7228f2da6e1e893f02481dd94996"
-        }, 
+        },
         "VolumesRW": {
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:34.044275", 
+      },
+      "timestamp": "2015-03-17T00:01:34.044275",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "25373"
-      }, 
-      "id": "Process:8f17a7d63d27/25373", 
+      },
+      "id": "Process:8f17a7d63d27/25373",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "/kube2sky -domain=kubernetes.local", 
-        "PID": "25373", 
-        "RSS": "6032", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "1:06", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "/kube2sky -domain=kubernetes.local",
+        "PID": "25373",
+        "RSS": "6032",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "1:06",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "13332"
-      }, 
-      "timestamp": "2015-03-17T00:02:49.511383", 
+      },
+      "timestamp": "2015-03-17T00:02:49.511383",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "3ea44ca9f1bd"
-      }, 
-      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/3ea44ca9f1bd", 
+      },
+      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/3ea44ca9f1bd",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "Tim Hockin <thockin@google.com>", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "Tim Hockin <thockin@google.com>",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/kube2sky"
-          ], 
+          ],
           "Env": [
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "665a61a9491d", 
-          "Image": "a8cca3d55334f03efffc702ed3db2ffce9ec74e79d9401b399a0dab6212cdbd7", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "665a61a9491d",
+          "Image": "a8cca3d55334f03efffc702ed3db2ffce9ec74e79d9401b399a0dab6212cdbd7",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "40e72afa696914d791ffa4ab5b3c0ff1e19f45e8400de0b0186d17a5c4818847", 
+        },
+        "Container": "40e72afa696914d791ffa4ab5b3c0ff1e19f45e8400de0b0186d17a5c4818847",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/kube2sky]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/kube2sky"
-          ], 
+          ],
           "Env": [
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "665a61a9491d", 
-          "Image": "a8cca3d55334f03efffc702ed3db2ffce9ec74e79d9401b399a0dab6212cdbd7", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "665a61a9491d",
+          "Image": "a8cca3d55334f03efffc702ed3db2ffce9ec74e79d9401b399a0dab6212cdbd7",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-11-17T04:21:36.013464763Z", 
-        "DockerVersion": "1.3.1", 
-        "Id": "3ea44ca9f1bd295f38fb1922e39d26e59294453ac0c5da9ae3c12cea5834c4ad", 
-        "Os": "linux", 
-        "Parent": "a8cca3d55334f03efffc702ed3db2ffce9ec74e79d9401b399a0dab6212cdbd7", 
-        "Size": 0, 
+        },
+        "Created": "2014-11-17T04:21:36.013464763Z",
+        "DockerVersion": "1.3.1",
+        "Id": "3ea44ca9f1bd295f38fb1922e39d26e59294453ac0c5da9ae3c12cea5834c4ad",
+        "Os": "linux",
+        "Parent": "a8cca3d55334f03efffc702ed3db2ffce9ec74e79d9401b399a0dab6212cdbd7",
+        "Size": 0,
         "VirtualSize": 7724289
-      }, 
-      "timestamp": "2015-03-17T00:01:34.330662", 
+      },
+      "timestamp": "2015-03-17T00:01:34.330662",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "14bb8d474c88"
-      }, 
-      "id": "Container:k8s_etcd.dc42e1f3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_5f874ba1", 
+      },
+      "id": "Container:k8s_etcd.dc42e1f3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_5f874ba1",
       "properties": {
-        "AppArmorProfile": "", 
+        "AppArmorProfile": "",
         "Args": [
-          "/etcd", 
-          "-bind-addr=127.0.0.1", 
+          "/etcd",
+          "-bind-addr=127.0.0.1",
           "-peer-bind-addr=127.0.0.1"
-        ], 
+        ],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/etcd", 
-            "-bind-addr=127.0.0.1", 
+            "/etcd",
+            "-bind-addr=127.0.0.1",
             "-peer-bind-addr=127.0.0.1"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/etcd"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
-            "2379/tcp": {}, 
-            "2380/tcp": {}, 
-            "4001/tcp": {}, 
+            "2379/tcp": {},
+            "2380/tcp": {},
+            "4001/tcp": {},
             "7001/tcp": {}
-          }, 
-          "Hostname": "skydns-ls6k1", 
-          "Image": "quay.io/coreos/etcd:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "skydns-ls6k1",
+          "Image": "quay.io/coreos/etcd:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T20:39:02.035986492Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T20:39:02.035986492Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/eaecec5a-b7cb-11e4-9018-42010af0f3f2/containers/etcd/14bb8d474c88ffbe9390663dca30402032c63b77513dd14396ca82ed3b11797d:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
-          "Dns": null, 
-          "DnsSearch": null, 
-          "ExtraHosts": null, 
-          "IpcMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4", 
-          "PortBindings": null, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
+          "Dns": null,
+          "DnsSearch": null,
+          "ExtraHosts": null,
+          "IpcMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4",
+          "PortBindings": null,
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/hosts", 
-        "Id": "14bb8d474c88ffbe9390663dca30402032c63b77513dd14396ca82ed3b11797d", 
-        "Image": "c5f34efc44466ec7abb9a68af20d2f876ea691095747e7e5a62e890cdedadcdc", 
-        "MountLabel": "", 
-        "Name": "/k8s_etcd.dc42e1f3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_5f874ba1", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/hosts",
+        "Id": "14bb8d474c88ffbe9390663dca30402032c63b77513dd14396ca82ed3b11797d",
+        "Image": "c5f34efc44466ec7abb9a68af20d2f876ea691095747e7e5a62e890cdedadcdc",
+        "MountLabel": "",
+        "Name": "/k8s_etcd.dc42e1f3_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_5f874ba1",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/etcd", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/resolv.conf", 
+        },
+        "Path": "/etcd",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 25341, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 25341,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T20:39:02.092518697Z"
-        }, 
+        },
         "Volumes": {
           "/dev/termination-log": "/var/lib/kubelet/pods/eaecec5a-b7cb-11e4-9018-42010af0f3f2/containers/etcd/14bb8d474c88ffbe9390663dca30402032c63b77513dd14396ca82ed3b11797d"
-        }, 
+        },
         "VolumesRW": {
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:34.048694", 
+      },
+      "timestamp": "2015-03-17T00:01:34.048694",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "25341"
-      }, 
-      "id": "Process:14bb8d474c88/25341", 
+      },
+      "id": "Process:14bb8d474c88/25341",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.3", 
-        "COMMAND": "/etcd /etcd -bind-addr=127.0.0.1 -peer-bind-addr=127.0.0.1", 
-        "PID": "25341", 
-        "RSS": "13200", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "20:20", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.3",
+        "COMMAND": "/etcd /etcd -bind-addr=127.0.0.1 -peer-bind-addr=127.0.0.1",
+        "PID": "25341",
+        "RSS": "13200",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "20:20",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "25788"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.351085", 
+      },
+      "timestamp": "2015-03-17T00:01:34.351085",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "c5f34efc4446"
-      }, 
-      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/c5f34efc4446", 
+      },
+      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/c5f34efc4446",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/etcd"
-          ], 
+          ],
           "Env": [
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
+          ],
           "ExposedPorts": {
-            "2379/tcp": {}, 
-            "2380/tcp": {}, 
-            "4001/tcp": {}, 
+            "2379/tcp": {},
+            "2380/tcp": {},
+            "4001/tcp": {},
             "7001/tcp": {}
-          }, 
-          "Hostname": "70f56fc06e1f", 
-          "Image": "78d63abf03b980919deaac3454a80496559da893948f427868492fa8a0d717ab", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "70f56fc06e1f",
+          "Image": "78d63abf03b980919deaac3454a80496559da893948f427868492fa8a0d717ab",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "84dab35d199788f0f9144cc684917a0a17cf3764bdaae768ff5e59a1f0773c79", 
+        },
+        "Container": "84dab35d199788f0f9144cc684917a0a17cf3764bdaae768ff5e59a1f0773c79",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/etcd]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/etcd"
-          ], 
+          ],
           "Env": [
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
+          ],
           "ExposedPorts": {
-            "2379/tcp": {}, 
-            "2380/tcp": {}, 
-            "4001/tcp": {}, 
+            "2379/tcp": {},
+            "2380/tcp": {},
+            "4001/tcp": {},
             "7001/tcp": {}
-          }, 
-          "Hostname": "70f56fc06e1f", 
-          "Image": "78d63abf03b980919deaac3454a80496559da893948f427868492fa8a0d717ab", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "70f56fc06e1f",
+          "Image": "78d63abf03b980919deaac3454a80496559da893948f427868492fa8a0d717ab",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-11-19T19:59:17.860180047Z", 
-        "DockerVersion": "1.2.0", 
-        "Id": "c5f34efc44466ec7abb9a68af20d2f876ea691095747e7e5a62e890cdedadcdc", 
-        "Os": "linux", 
-        "Parent": "78d63abf03b980919deaac3454a80496559da893948f427868492fa8a0d717ab", 
-        "Size": 0, 
+        },
+        "Created": "2014-11-19T19:59:17.860180047Z",
+        "DockerVersion": "1.2.0",
+        "Id": "c5f34efc44466ec7abb9a68af20d2f876ea691095747e7e5a62e890cdedadcdc",
+        "Os": "linux",
+        "Parent": "78d63abf03b980919deaac3454a80496559da893948f427868492fa8a0d717ab",
+        "Size": 0,
         "VirtualSize": 20152592
-      }, 
-      "timestamp": "2015-03-17T00:01:34.356938", 
+      },
+      "timestamp": "2015-03-17T00:01:34.356938",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "df65efb615d5"
-      }, 
-      "id": "Container:k8s_POD.d3cdea5d_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_c4a76070", 
+      },
+      "id": "Container:k8s_POD.d3cdea5d_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_c4a76070",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "skydns-ls6k1", 
-          "Image": "kubernetes/pause:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "skydns-ls6k1",
+          "Image": "kubernetes/pause:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T20:38:59.274459381Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T20:38:59.274459381Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
-          "Binds": null, 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
-          "Dns": null, 
-          "DnsSearch": null, 
-          "ExtraHosts": null, 
-          "IpcMode": "", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "", 
-          "PortBindings": null, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          "Binds": null,
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
+          "Dns": null,
+          "DnsSearch": null,
+          "ExtraHosts": null,
+          "IpcMode": "",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "",
+          "PortBindings": null,
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/hostname", 
-        "HostsPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/hosts", 
-        "Id": "df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4", 
-        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "MountLabel": "", 
-        "Name": "/k8s_POD.d3cdea5d_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_c4a76070", 
+        },
+        "HostnamePath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/hostname",
+        "HostsPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/hosts",
+        "Id": "df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4",
+        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "MountLabel": "",
+        "Name": "/k8s_POD.d3cdea5d_skydns-ls6k1.default.api_eaecec5a-b7cb-11e4-9018-42010af0f3f2_c4a76070",
         "NetworkSettings": {
-          "Bridge": "cbr0", 
-          "Gateway": "10.244.2.1", 
-          "IPAddress": "10.244.2.6", 
-          "IPPrefixLen": 24, 
-          "MacAddress": "02:42:0a:f4:02:06", 
-          "PortMapping": null, 
+          "Bridge": "cbr0",
+          "Gateway": "10.244.2.1",
+          "IPAddress": "10.244.2.6",
+          "IPPrefixLen": 24,
+          "MacAddress": "02:42:0a:f4:02:06",
+          "PortMapping": null,
           "Ports": {}
-        }, 
-        "Path": "/pause", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/resolv.conf", 
+        },
+        "Path": "/pause",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/df65efb615d52acbf1d3103fa07e221489cd581f3c7c8c05bb6bbf951befe1e4/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 25074, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 25074,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T20:38:59.546355673Z"
-        }, 
-        "Volumes": {}, 
+        },
+        "Volumes": {},
         "VolumesRW": {}
-      }, 
-      "timestamp": "2015-03-17T00:01:34.151958", 
+      },
+      "timestamp": "2015-03-17T00:01:34.151958",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "25074"
-      }, 
-      "id": "Process:df65efb615d5/25074", 
+      },
+      "id": "Process:df65efb615d5/25074",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/pause", 
-        "PID": "25074", 
-        "RSS": "420", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "0:04", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/pause",
+        "PID": "25074",
+        "RSS": "420",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "0:04",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "265340"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.373261", 
+      },
+      "timestamp": "2015-03-17T00:01:34.373261",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6c4579af347b"
-      }, 
-      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "id": "Image:kubernetes-minion-e3zy.c.shared-kraken.internal/6c4579af347b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd", 
+        },
+        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/pause]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-07-19T07:02:32.267701596Z", 
-        "DockerVersion": "1.0.0", 
-        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "Os": "linux", 
-        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-        "Size": 0, 
+        },
+        "Created": "2014-07-19T07:02:32.267701596Z",
+        "DockerVersion": "1.0.0",
+        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "Os": "linux",
+        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+        "Size": 0,
         "VirtualSize": 239840
-      }, 
-      "timestamp": "2015-03-17T00:01:33.870098", 
+      },
+      "timestamp": "2015-03-17T00:01:33.870098",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "kubernetes-minion-tf8u"
-      }, 
-      "id": "Node:kubernetes-minion-tf8u.c.shared-kraken.internal", 
+      },
+      "id": "Node:kubernetes-minion-tf8u.c.shared-kraken.internal",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:46Z", 
-        "hostIP": "146.148.77.250", 
-        "id": "kubernetes-minion-tf8u.c.shared-kraken.internal", 
-        "resourceVersion": 1231196, 
+        "creationTimestamp": "2015-02-19T00:11:46Z",
+        "hostIP": "146.148.77.250",
+        "id": "kubernetes-minion-tf8u.c.shared-kraken.internal",
+        "resourceVersion": 1231196,
         "resources": {
           "capacity": {
-            "cpu": "1", 
+            "cpu": "1",
             "memory": 4026531840
           }
-        }, 
-        "selfLink": "/api/v1beta1/nodes/kubernetes-minion-tf8u.c.shared-kraken.internal", 
+        },
+        "selfLink": "/api/v1beta1/nodes/kubernetes-minion-tf8u.c.shared-kraken.internal",
         "status": {
           "conditions": [
             {
-              "kind": "Ready", 
-              "lastProbeTime": "2015-03-17T00:01:23Z", 
-              "lastTransitionTime": "2015-02-24T22:37:30Z", 
-              "reason": "Node health check succeeded: kubelet /healthz endpoint returns ok", 
+              "kind": "Ready",
+              "lastProbeTime": "2015-03-17T00:01:23Z",
+              "lastTransitionTime": "2015-02-24T22:37:30Z",
+              "reason": "Node health check succeeded: kubelet /healthz endpoint returns ok",
               "status": "Full"
             }
           ]
-        }, 
+        },
         "uid": "e435dbd9-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:32.796352", 
+      },
+      "timestamp": "2015-03-17T00:01:32.796352",
       "type": "Node"
-    }, 
+    },
     {
       "annotations": {
         "label": "frontend-controller-vjzjp"
-      }, 
-      "id": "Pod:frontend-controller-vjzjp", 
+      },
+      "id": "Pod:frontend-controller-vjzjp",
       "properties": {
-        "creationTimestamp": "2015-02-19T01:39:01Z", 
+        "creationTimestamp": "2015-02-19T01:39:01Z",
         "currentState": {
           "Condition": [
             {
-              "kind": "Ready", 
+              "kind": "Ready",
               "status": "Full"
             }
-          ], 
-          "host": "kubernetes-minion-tf8u.c.shared-kraken.internal", 
-          "hostIP": "146.148.77.250", 
+          ],
+          "host": "kubernetes-minion-tf8u.c.shared-kraken.internal",
+          "hostIP": "146.148.77.250",
           "info": {
             "POD": {
-              "containerID": "docker://c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50", 
-              "image": "kubernetes/pause:latest", 
-              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-              "podIP": "10.244.3.4", 
-              "ready": false, 
-              "restartCount": 5, 
+              "containerID": "docker://c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50",
+              "image": "kubernetes/pause:latest",
+              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+              "podIP": "10.244.3.4",
+              "ready": false,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:21:25Z"
                 }
               }
-            }, 
+            },
             "php-redis": {
-              "containerID": "docker://9a066b06d5d08b27ac613f1564acac31ee3409796a114904dfc40ba92359ac11", 
-              "image": "kubernetes/example-guestbook-php-redis", 
-              "imageID": "docker://5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f", 
-              "ready": true, 
-              "restartCount": 5, 
+              "containerID": "docker://9a066b06d5d08b27ac613f1564acac31ee3409796a114904dfc40ba92359ac11",
+              "image": "kubernetes/example-guestbook-php-redis",
+              "imageID": "docker://5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f",
+              "ready": true,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:21:26Z"
                 }
               }
             }
-          }, 
+          },
           "manifest": {
-            "containers": null, 
-            "id": "", 
-            "restartPolicy": {}, 
-            "version": "", 
+            "containers": null,
+            "id": "",
+            "restartPolicy": {},
+            "version": "",
             "volumes": null
-          }, 
-          "podIP": "10.244.3.4", 
+          },
+          "podIP": "10.244.3.4",
           "status": "Running"
-        }, 
+        },
         "desiredState": {
           "manifest": {
             "containers": [
               {
-                "capabilities": {}, 
-                "cpu": 100, 
-                "image": "kubernetes/example-guestbook-php-redis", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "memory": 50000000, 
-                "name": "php-redis", 
+                "capabilities": {},
+                "cpu": 100,
+                "image": "kubernetes/example-guestbook-php-redis",
+                "imagePullPolicy": "PullIfNotPresent",
+                "memory": 50000000,
+                "name": "php-redis",
                 "ports": [
                   {
-                    "containerPort": 80, 
-                    "hostPort": 8000, 
+                    "containerPort": 80,
+                    "hostPort": 8000,
                     "protocol": "TCP"
                   }
-                ], 
+                ],
                 "resources": {
                   "limits": {
-                    "cpu": "0.1", 
+                    "cpu": "0.1",
                     "memory": 50000000
                   }
-                }, 
+                },
                 "terminationMessagePath": "/dev/termination-log"
               }
-            ], 
-            "dnsPolicy": "ClusterFirst", 
-            "id": "", 
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "id": "",
             "restartPolicy": {
               "always": {}
-            }, 
-            "version": "v1beta2", 
+            },
+            "version": "v1beta2",
             "volumes": null
           }
-        }, 
-        "generateName": "frontend-controller-", 
-        "id": "frontend-controller-vjzjp", 
+        },
+        "generateName": "frontend-controller-",
+        "id": "frontend-controller-vjzjp",
         "labels": {
-          "name": "frontend", 
+          "name": "frontend",
           "uses": "redisslave,redis-master"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 2222, 
-        "selfLink": "/api/v1beta1/pods/frontend-controller-vjzjp?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 2222,
+        "selfLink": "/api/v1beta1/pods/frontend-controller-vjzjp?namespace=default",
         "uid": "14a3cb0c-b7d8-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.408110", 
+      },
+      "timestamp": "2015-03-17T00:01:34.408110",
       "type": "Pod"
-    }, 
+    },
     {
       "annotations": {
         "label": "c00924f5248b"
-      }, 
-      "id": "Container:k8s_POD.8550e9ae_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_684ff4ae", 
+      },
+      "id": "Container:k8s_POD.8550e9ae_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_684ff4ae",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "frontend-controller-vjzjp", 
-          "Image": "kubernetes/pause:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "frontend-controller-vjzjp",
+          "Image": "kubernetes/pause:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:21:25.108160677Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:21:25.108160677Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
-          "Binds": null, 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          "Binds": null,
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "",
           "PortBindings": {
             "80/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "8000"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "/var/lib/docker/containers/c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50/hostname", 
-        "HostsPath": "/var/lib/docker/containers/c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50/hosts", 
-        "Id": "c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50", 
-        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "MountLabel": "", 
-        "Name": "/k8s_POD.8550e9ae_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_684ff4ae", 
+        },
+        "HostnamePath": "/var/lib/docker/containers/c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50/hostname",
+        "HostsPath": "/var/lib/docker/containers/c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50/hosts",
+        "Id": "c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50",
+        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "MountLabel": "",
+        "Name": "/k8s_POD.8550e9ae_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_684ff4ae",
         "NetworkSettings": {
-          "Bridge": "cbr0", 
-          "Gateway": "10.244.3.1", 
-          "IPAddress": "10.244.3.4", 
-          "IPPrefixLen": 24, 
-          "MacAddress": "02:42:0a:f4:03:04", 
-          "PortMapping": null, 
+          "Bridge": "cbr0",
+          "Gateway": "10.244.3.1",
+          "IPAddress": "10.244.3.4",
+          "IPPrefixLen": 24,
+          "MacAddress": "02:42:0a:f4:03:04",
+          "PortMapping": null,
           "Ports": {
             "80/tcp": [
               {
-                "HostIp": "0.0.0.0", 
+                "HostIp": "0.0.0.0",
                 "HostPort": "8000"
               }
             ]
           }
-        }, 
-        "Path": "/pause", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50/resolv.conf", 
+        },
+        "Path": "/pause",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 4083, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 4083,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:21:25.545202435Z"
-        }, 
-        "Volumes": {}, 
+        },
+        "Volumes": {},
         "VolumesRW": {}
-      }, 
-      "timestamp": "2015-03-17T00:01:34.445394", 
+      },
+      "timestamp": "2015-03-17T00:01:34.445394",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "4083"
-      }, 
-      "id": "Process:c00924f5248b/4083", 
+      },
+      "id": "Process:c00924f5248b/4083",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/pause", 
-        "PID": "4083", 
-        "RSS": "432", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "0:04", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/pause",
+        "PID": "4083",
+        "RSS": "432",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "0:04",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "265340"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.544166", 
+      },
+      "timestamp": "2015-03-17T00:01:34.544166",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6c4579af347b"
-      }, 
-      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd", 
+        },
+        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/pause]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-07-19T07:02:32.267701596Z", 
-        "DockerVersion": "1.0.0", 
-        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "Os": "linux", 
-        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-        "Size": 0, 
+        },
+        "Created": "2014-07-19T07:02:32.267701596Z",
+        "DockerVersion": "1.0.0",
+        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "Os": "linux",
+        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+        "Size": 0,
         "VirtualSize": 239840
-      }, 
-      "timestamp": "2015-03-17T00:01:34.549147", 
+      },
+      "timestamp": "2015-03-17T00:01:34.549147",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "9a066b06d5d0"
-      }, 
-      "id": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
+      },
+      "id": "Container:k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
       "properties": {
-        "AppArmorProfile": "", 
+        "AppArmorProfile": "",
         "Args": [
-          "-c", 
+          "-c",
           "/run.sh"
-        ], 
+        ],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "/run.sh"
-          ], 
-          "CpuShares": 102, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 102,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "frontend-controller-vjzjp", 
-          "Image": "kubernetes/example-guestbook-php-redis", 
-          "MacAddress": "", 
-          "Memory": 50000000, 
-          "MemorySwap": -1, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "frontend-controller-vjzjp",
+          "Image": "kubernetes/example-guestbook-php-redis",
+          "MacAddress": "",
+          "Memory": 50000000,
+          "MemorySwap": -1,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:21:25.9813196Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:21:25.9813196Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/14a3cb0c-b7d8-11e4-9018-42010af0f3f2/containers/php-redis/9a066b06d5d08b27ac613f1564acac31ee3409796a114904dfc40ba92359ac11:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "container:c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "container:c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50",
           "PortBindings": {
             "80/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "8000"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50/hosts", 
-        "Id": "9a066b06d5d08b27ac613f1564acac31ee3409796a114904dfc40ba92359ac11", 
-        "Image": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f", 
-        "MountLabel": "", 
-        "Name": "/k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50/hosts",
+        "Id": "9a066b06d5d08b27ac613f1564acac31ee3409796a114904dfc40ba92359ac11",
+        "Image": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f",
+        "MountLabel": "",
+        "Name": "/k8s_php-redis.f1bf04fb_frontend-controller-vjzjp.default.api_14a3cb0c-b7d8-11e4-9018-42010af0f3f2_9d0ec49d",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/bin/sh", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50/resolv.conf", 
+        },
+        "Path": "/bin/sh",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/c00924f5248b023070de8f68d0400183d3f87a858d64622b0c7bddd764a7dc50/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 4255, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 4255,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:21:26.715823674Z"
-        }, 
+        },
         "Volumes": {
           "/dev/termination-log": "/var/lib/kubelet/pods/14a3cb0c-b7d8-11e4-9018-42010af0f3f2/containers/php-redis/9a066b06d5d08b27ac613f1564acac31ee3409796a114904dfc40ba92359ac11"
-        }, 
+        },
         "VolumesRW": {
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:34.454177", 
+      },
+      "timestamp": "2015-03-17T00:01:34.454177",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "4255"
-      }, 
-      "id": "Process:9a066b06d5d0/4255", 
+      },
+      "id": "Process:9a066b06d5d0/4255",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/bin/sh -c /run.sh", 
-        "PID": "4255", 
-        "RSS": "512", 
-        "START": "Feb25", 
-        "STAT": "Ss", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/bin/sh -c /run.sh",
+        "PID": "4255",
+        "RSS": "512",
+        "START": "Feb25",
+        "STAT": "Ss",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "4412"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.564517", 
+      },
+      "timestamp": "2015-03-17T00:01:34.564517",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "4293"
-      }, 
-      "id": "Process:9a066b06d5d0/4293", 
+      },
+      "id": "Process:9a066b06d5d0/4293",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.3", 
-        "COMMAND": "/usr/bin/python /usr/bin/supervisord -n", 
-        "PID": "4293", 
-        "RSS": "11672", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "4:24", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.3",
+        "COMMAND": "/usr/bin/python /usr/bin/supervisord -n",
+        "PID": "4293",
+        "RSS": "11672",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "4:24",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "53152"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.564517", 
+      },
+      "timestamp": "2015-03-17T00:01:34.564517",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "4330"
-      }, 
-      "id": "Process:9a066b06d5d0/4330", 
+      },
+      "id": "Process:9a066b06d5d0/4330",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.3", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "4330", 
-        "RSS": "12732", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:55", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.3",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "4330",
+        "RSS": "12732",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:55",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "259972"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.564517", 
+      },
+      "timestamp": "2015-03-17T00:01:34.564517",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "4332"
-      }, 
-      "id": "Process:9a066b06d5d0/4332", 
+      },
+      "id": "Process:9a066b06d5d0/4332",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "4332", 
-        "RSS": "7456", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "4332",
+        "RSS": "7456",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260036"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.564517", 
+      },
+      "timestamp": "2015-03-17T00:01:34.564517",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "4333"
-      }, 
-      "id": "Process:9a066b06d5d0/4333", 
+      },
+      "id": "Process:9a066b06d5d0/4333",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "4333", 
-        "RSS": "7456", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "4333",
+        "RSS": "7456",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260020"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.564517", 
+      },
+      "timestamp": "2015-03-17T00:01:34.564517",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "4334"
-      }, 
-      "id": "Process:9a066b06d5d0/4334", 
+      },
+      "id": "Process:9a066b06d5d0/4334",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "4334", 
-        "RSS": "7456", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "4334",
+        "RSS": "7456",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260012"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.564517", 
+      },
+      "timestamp": "2015-03-17T00:01:34.564517",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "4335"
-      }, 
-      "id": "Process:9a066b06d5d0/4335", 
+      },
+      "id": "Process:9a066b06d5d0/4335",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "4335", 
-        "RSS": "7456", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "4335",
+        "RSS": "7456",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260052"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.564517", 
+      },
+      "timestamp": "2015-03-17T00:01:34.564517",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "4336"
-      }, 
-      "id": "Process:9a066b06d5d0/4336", 
+      },
+      "id": "Process:9a066b06d5d0/4336",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.2", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "4336", 
-        "RSS": "8652", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.2",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "4336",
+        "RSS": "8652",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260112"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.564517", 
+      },
+      "timestamp": "2015-03-17T00:01:34.564517",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "22522"
-      }, 
-      "id": "Process:9a066b06d5d0/22522", 
+      },
+      "id": "Process:9a066b06d5d0/22522",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.1", 
-        "COMMAND": "apache2 -D FOREGROUND", 
-        "PID": "22522", 
-        "RSS": "7456", 
-        "START": "Feb28", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "www-data", 
+        "%CPU": "0.0",
+        "%MEM": "0.1",
+        "COMMAND": "apache2 -D FOREGROUND",
+        "PID": "22522",
+        "RSS": "7456",
+        "START": "Feb28",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "www-data",
         "VSZ": "260012"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.564517", 
+      },
+      "timestamp": "2015-03-17T00:01:34.564517",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "5630952871a3"
-      }, 
-      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/5630952871a3", 
+      },
+      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/5630952871a3",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "/run.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "9909d49b9b51", 
-          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "9909d49b9b51",
+          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "63db4df258d14794d7072e009c12443c790c09fb9c25119ec1d06a6197ab85aa", 
+        },
+        "Container": "63db4df258d14794d7072e009c12443c790c09fb9c25119ec1d06a6197ab85aa",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) CMD [/bin/sh -c /run.sh]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
+          ],
           "ExposedPorts": {
             "80/tcp": {}
-          }, 
-          "Hostname": "9909d49b9b51", 
-          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "9909d49b9b51",
+          "Image": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-12-09T19:16:28.984874361Z", 
-        "DockerVersion": "1.3.0", 
-        "Id": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f", 
-        "Os": "linux", 
-        "Parent": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429", 
-        "Size": 0, 
+        },
+        "Created": "2014-12-09T19:16:28.984874361Z",
+        "DockerVersion": "1.3.0",
+        "Id": "5630952871a38cddffda9ec611f5978ab0933628fcd54cd7d7677ce6b17de33f",
+        "Os": "linux",
+        "Parent": "230bb094e7576b66d198094b7e19d3e119b2d2404b097b143123cbc4917e6429",
+        "Size": 0,
         "VirtualSize": 382800212
-      }, 
-      "timestamp": "2015-03-17T00:01:34.580210", 
+      },
+      "timestamp": "2015-03-17T00:01:34.580210",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitoring-heapster-controller-oh43e"
-      }, 
-      "id": "Pod:monitoring-heapster-controller-oh43e", 
+      },
+      "id": "Pod:monitoring-heapster-controller-oh43e",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:57Z", 
+        "creationTimestamp": "2015-02-19T00:11:57Z",
         "currentState": {
           "Condition": [
             {
-              "kind": "Ready", 
+              "kind": "Ready",
               "status": "Full"
             }
-          ], 
-          "host": "kubernetes-minion-tf8u.c.shared-kraken.internal", 
-          "hostIP": "146.148.77.250", 
+          ],
+          "host": "kubernetes-minion-tf8u.c.shared-kraken.internal",
+          "hostIP": "146.148.77.250",
           "info": {
             "POD": {
-              "containerID": "docker://ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3", 
-              "image": "kubernetes/pause:latest", 
-              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-              "podIP": "10.244.3.5", 
-              "ready": false, 
-              "restartCount": 4, 
+              "containerID": "docker://ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3",
+              "image": "kubernetes/pause:latest",
+              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+              "podIP": "10.244.3.5",
+              "ready": false,
+              "restartCount": 4,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:21:25Z"
                 }
               }
-            }, 
+            },
             "heapster": {
-              "containerID": "docker://3a528bad82474c454aaa21a2442e2a1652685c7f6a22dee0eec801a22e83dcb2", 
-              "image": "vish/heapster:canary", 
-              "imageID": "docker://6d053b2331f94bc79d816dbaef5ff46873f56e51deea255ddbde7120cada43cc", 
-              "ready": true, 
-              "restartCount": 5, 
+              "containerID": "docker://3a528bad82474c454aaa21a2442e2a1652685c7f6a22dee0eec801a22e83dcb2",
+              "image": "vish/heapster:canary",
+              "imageID": "docker://6d053b2331f94bc79d816dbaef5ff46873f56e51deea255ddbde7120cada43cc",
+              "ready": true,
+              "restartCount": 5,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:21:26Z"
                 }
               }
             }
-          }, 
+          },
           "manifest": {
-            "containers": null, 
-            "id": "", 
-            "restartPolicy": {}, 
-            "version": "", 
+            "containers": null,
+            "id": "",
+            "restartPolicy": {},
+            "version": "",
             "volumes": null
-          }, 
-          "podIP": "10.244.3.5", 
+          },
+          "podIP": "10.244.3.5",
           "status": "Running"
-        }, 
+        },
         "desiredState": {
           "manifest": {
             "containers": [
               {
-                "capabilities": {}, 
+                "capabilities": {},
                 "env": [
                   {
-                    "key": "INFLUXDB_HOST", 
-                    "name": "INFLUXDB_HOST", 
+                    "key": "INFLUXDB_HOST",
+                    "name": "INFLUXDB_HOST",
                     "value": "monitoring-influxdb"
                   }
-                ], 
-                "image": "vish/heapster:canary", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "name": "heapster", 
-                "resources": {}, 
+                ],
+                "image": "vish/heapster:canary",
+                "imagePullPolicy": "PullIfNotPresent",
+                "name": "heapster",
+                "resources": {},
                 "terminationMessagePath": "/dev/termination-log"
               }
-            ], 
-            "dnsPolicy": "ClusterFirst", 
-            "id": "", 
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "id": "",
             "restartPolicy": {
               "always": {}
-            }, 
-            "version": "v1beta2", 
+            },
+            "version": "v1beta2",
             "volumes": null
           }
-        }, 
-        "generateName": "monitoring-heapster-controller-", 
-        "id": "monitoring-heapster-controller-oh43e", 
+        },
+        "generateName": "monitoring-heapster-controller-",
+        "id": "monitoring-heapster-controller-oh43e",
         "labels": {
-          "name": "heapster", 
+          "name": "heapster",
           "uses": "monitoring-influxdb"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 32, 
-        "selfLink": "/api/v1beta1/pods/monitoring-heapster-controller-oh43e?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 32,
+        "selfLink": "/api/v1beta1/pods/monitoring-heapster-controller-oh43e?namespace=default",
         "uid": "eaecb958-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.408110", 
+      },
+      "timestamp": "2015-03-17T00:01:34.408110",
       "type": "Pod"
-    }, 
+    },
     {
       "annotations": {
         "label": "3a528bad8247"
-      }, 
-      "id": "Container:k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3", 
+      },
+      "id": "Container:k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
             "/run.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "INFLUXDB_HOST=monitoring-influxdb", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "INFLUXDB_HOST=monitoring-influxdb",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "monitoring-heapster-controller-oh43e", 
-          "Image": "vish/heapster:canary", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "monitoring-heapster-controller-oh43e",
+          "Image": "vish/heapster:canary",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:21:26.012057593Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:21:26.012057593Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/eaecb958-b7cb-11e4-9018-42010af0f3f2/containers/heapster/3a528bad82474c454aaa21a2442e2a1652685c7f6a22dee0eec801a22e83dcb2:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "container:ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3", 
-          "PortBindings": null, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "container:ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3",
+          "PortBindings": null,
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3/hosts", 
-        "Id": "3a528bad82474c454aaa21a2442e2a1652685c7f6a22dee0eec801a22e83dcb2", 
-        "Image": "6d053b2331f94bc79d816dbaef5ff46873f56e51deea255ddbde7120cada43cc", 
-        "MountLabel": "", 
-        "Name": "/k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3/hosts",
+        "Id": "3a528bad82474c454aaa21a2442e2a1652685c7f6a22dee0eec801a22e83dcb2",
+        "Image": "6d053b2331f94bc79d816dbaef5ff46873f56e51deea255ddbde7120cada43cc",
+        "MountLabel": "",
+        "Name": "/k8s_heapster.2144eb98_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_3d5f21b3",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/run.sh", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3/resolv.conf", 
+        },
+        "Path": "/run.sh",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 4246, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 4246,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:21:26.41931187Z"
-        }, 
+        },
         "Volumes": {
           "/dev/termination-log": "/var/lib/kubelet/pods/eaecb958-b7cb-11e4-9018-42010af0f3f2/containers/heapster/3a528bad82474c454aaa21a2442e2a1652685c7f6a22dee0eec801a22e83dcb2"
-        }, 
+        },
         "VolumesRW": {
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:34.596550", 
+      },
+      "timestamp": "2015-03-17T00:01:34.596550",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "4246"
-      }, 
-      "id": "Process:3a528bad8247/4246", 
+      },
+      "id": "Process:3a528bad8247/4246",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/bin/bash /run.sh", 
-        "PID": "4246", 
-        "RSS": "604", 
-        "START": "Feb25", 
-        "STAT": "Ss", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/bin/bash /run.sh",
+        "PID": "4246",
+        "RSS": "604",
+        "START": "Feb25",
+        "STAT": "Ss",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "18004"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.653889", 
+      },
+      "timestamp": "2015-03-17T00:01:34.653889",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "4276"
-      }, 
-      "id": "Process:3a528bad8247/4276", 
+      },
+      "id": "Process:3a528bad8247/4276",
       "properties": {
-        "%CPU": "0.2", 
-        "%MEM": "0.3", 
-        "COMMAND": "/usr/bin/heapster --kubernetes_master 10.0.0.1:80 --sink influxdb --sink_influxdb_host 10.0.50.127:80", 
-        "PID": "4276", 
-        "RSS": "12600", 
-        "START": "Feb25", 
-        "STAT": "Sl", 
-        "TIME": "59:02", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.2",
+        "%MEM": "0.3",
+        "COMMAND": "/usr/bin/heapster --kubernetes_master 10.0.0.1:80 --sink influxdb --sink_influxdb_host 10.0.50.127:80",
+        "PID": "4276",
+        "RSS": "12600",
+        "START": "Feb25",
+        "STAT": "Sl",
+        "TIME": "59:02",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "637408"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.653889", 
+      },
+      "timestamp": "2015-03-17T00:01:34.653889",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6d053b2331f9"
-      }, 
-      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6d053b2331f9", 
+      },
+      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6d053b2331f9",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "vishnuk@google.com", 
-        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "vishnuk@google.com",
+        "Checksum": "tarsum.dev+sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
             "/run.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "f22711318734", 
-          "Image": "7fc80d85e45f67f5822b469aeb2b90c8bf14be9c4fe86ad0e376269d0adfe8ee", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "f22711318734",
+          "Image": "7fc80d85e45f67f5822b469aeb2b90c8bf14be9c4fe86ad0e376269d0adfe8ee",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "211f0b53df0f8036138b0ce1d8f101ad32a25c185e82d1c6c9bdfb2fc28b3565", 
+        },
+        "Container": "211f0b53df0f8036138b0ce1d8f101ad32a25c185e82d1c6c9bdfb2fc28b3565",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) CMD [/run.sh]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "f22711318734", 
-          "Image": "7fc80d85e45f67f5822b469aeb2b90c8bf14be9c4fe86ad0e376269d0adfe8ee", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "f22711318734",
+          "Image": "7fc80d85e45f67f5822b469aeb2b90c8bf14be9c4fe86ad0e376269d0adfe8ee",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-18T23:42:04.849887009Z", 
-        "DockerVersion": "1.4.1", 
-        "Id": "6d053b2331f94bc79d816dbaef5ff46873f56e51deea255ddbde7120cada43cc", 
-        "Os": "linux", 
-        "Parent": "7fc80d85e45f67f5822b469aeb2b90c8bf14be9c4fe86ad0e376269d0adfe8ee", 
-        "Size": 0, 
+        },
+        "Created": "2015-02-18T23:42:04.849887009Z",
+        "DockerVersion": "1.4.1",
+        "Id": "6d053b2331f94bc79d816dbaef5ff46873f56e51deea255ddbde7120cada43cc",
+        "Os": "linux",
+        "Parent": "7fc80d85e45f67f5822b469aeb2b90c8bf14be9c4fe86ad0e376269d0adfe8ee",
+        "Size": 0,
         "VirtualSize": 211046824
-      }, 
-      "timestamp": "2015-03-17T00:01:34.660083", 
+      },
+      "timestamp": "2015-03-17T00:01:34.660083",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "ae0effbebe7e"
-      }, 
-      "id": "Container:k8s_POD.8149c85a_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_ff9d7b54", 
+      },
+      "id": "Container:k8s_POD.8149c85a_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_ff9d7b54",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "monitoring-heapster-controller-oh43e", 
-          "Image": "kubernetes/pause:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "monitoring-heapster-controller-oh43e",
+          "Image": "kubernetes/pause:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:21:25.229652938Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:21:25.229652938Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
-          "Binds": null, 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          "Binds": null,
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "", 
-          "PortBindings": null, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "",
+          "PortBindings": null,
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "/var/lib/docker/containers/ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3/hostname", 
-        "HostsPath": "/var/lib/docker/containers/ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3/hosts", 
-        "Id": "ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3", 
-        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "MountLabel": "", 
-        "Name": "/k8s_POD.8149c85a_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_ff9d7b54", 
+        },
+        "HostnamePath": "/var/lib/docker/containers/ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3/hostname",
+        "HostsPath": "/var/lib/docker/containers/ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3/hosts",
+        "Id": "ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3",
+        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "MountLabel": "",
+        "Name": "/k8s_POD.8149c85a_monitoring-heapster-controller-oh43e.default.api_eaecb958-b7cb-11e4-9018-42010af0f3f2_ff9d7b54",
         "NetworkSettings": {
-          "Bridge": "cbr0", 
-          "Gateway": "10.244.3.1", 
-          "IPAddress": "10.244.3.5", 
-          "IPPrefixLen": 24, 
-          "MacAddress": "02:42:0a:f4:03:05", 
-          "PortMapping": null, 
+          "Bridge": "cbr0",
+          "Gateway": "10.244.3.1",
+          "IPAddress": "10.244.3.5",
+          "IPPrefixLen": 24,
+          "MacAddress": "02:42:0a:f4:03:05",
+          "PortMapping": null,
           "Ports": {}
-        }, 
-        "Path": "/pause", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3/resolv.conf", 
+        },
+        "Path": "/pause",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/ae0effbebe7e4e3fc73a31d22224eadbad54a56c22e75f0abaf9c121bb18a4b3/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 4082, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 4082,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:21:25.58370912Z"
-        }, 
-        "Volumes": {}, 
+        },
+        "Volumes": {},
         "VolumesRW": {}
-      }, 
-      "timestamp": "2015-03-17T00:01:34.613034", 
+      },
+      "timestamp": "2015-03-17T00:01:34.613034",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "4082"
-      }, 
-      "id": "Process:ae0effbebe7e/4082", 
+      },
+      "id": "Process:ae0effbebe7e/4082",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/pause", 
-        "PID": "4082", 
-        "RSS": "432", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "0:04", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/pause",
+        "PID": "4082",
+        "RSS": "432",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "0:04",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "265340"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.680611", 
+      },
+      "timestamp": "2015-03-17T00:01:34.680611",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6c4579af347b"
-      }, 
-      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd", 
+        },
+        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/pause]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-07-19T07:02:32.267701596Z", 
-        "DockerVersion": "1.0.0", 
-        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "Os": "linux", 
-        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-        "Size": 0, 
+        },
+        "Created": "2014-07-19T07:02:32.267701596Z",
+        "DockerVersion": "1.0.0",
+        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "Os": "linux",
+        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+        "Size": 0,
         "VirtualSize": 239840
-      }, 
-      "timestamp": "2015-03-17T00:01:34.549147", 
+      },
+      "timestamp": "2015-03-17T00:01:34.549147",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "redis-slave-controller-dnyxx"
-      }, 
-      "id": "Pod:redis-slave-controller-dnyxx", 
+      },
+      "id": "Pod:redis-slave-controller-dnyxx",
       "properties": {
-        "creationTimestamp": "2015-02-19T01:37:34Z", 
+        "creationTimestamp": "2015-02-19T01:37:34Z",
         "currentState": {
           "Condition": [
             {
-              "kind": "Ready", 
+              "kind": "Ready",
               "status": "Full"
             }
-          ], 
-          "host": "kubernetes-minion-tf8u.c.shared-kraken.internal", 
-          "hostIP": "146.148.77.250", 
+          ],
+          "host": "kubernetes-minion-tf8u.c.shared-kraken.internal",
+          "hostIP": "146.148.77.250",
           "info": {
             "POD": {
-              "containerID": "docker://4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9", 
-              "image": "kubernetes/pause:latest", 
-              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-              "podIP": "10.244.3.6", 
-              "ready": false, 
-              "restartCount": 4, 
+              "containerID": "docker://4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9",
+              "image": "kubernetes/pause:latest",
+              "imageID": "docker://6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+              "podIP": "10.244.3.6",
+              "ready": false,
+              "restartCount": 4,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:21:25Z"
                 }
               }
-            }, 
+            },
             "slave": {
-              "containerID": "docker://0219b8fac88d8f3f5c5d42d0823a915975cd0cdd0a55ea6b8ce5c7b6b0fbda08", 
-              "image": "brendanburns/redis-slave", 
-              "imageID": "docker://81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c", 
-              "ready": true, 
-              "restartCount": 3, 
+              "containerID": "docker://0219b8fac88d8f3f5c5d42d0823a915975cd0cdd0a55ea6b8ce5c7b6b0fbda08",
+              "image": "brendanburns/redis-slave",
+              "imageID": "docker://81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c",
+              "ready": true,
+              "restartCount": 3,
               "state": {
                 "running": {
                   "startedAt": "2015-02-25T17:21:26Z"
                 }
               }
             }
-          }, 
+          },
           "manifest": {
-            "containers": null, 
-            "id": "", 
-            "restartPolicy": {}, 
-            "version": "", 
+            "containers": null,
+            "id": "",
+            "restartPolicy": {},
+            "version": "",
             "volumes": null
-          }, 
-          "podIP": "10.244.3.6", 
+          },
+          "podIP": "10.244.3.6",
           "status": "Running"
-        }, 
+        },
         "desiredState": {
           "manifest": {
             "containers": [
               {
-                "capabilities": {}, 
-                "cpu": 200, 
-                "image": "brendanburns/redis-slave", 
-                "imagePullPolicy": "PullIfNotPresent", 
-                "name": "slave", 
+                "capabilities": {},
+                "cpu": 200,
+                "image": "brendanburns/redis-slave",
+                "imagePullPolicy": "PullIfNotPresent",
+                "name": "slave",
                 "ports": [
                   {
-                    "containerPort": 6379, 
-                    "hostPort": 6380, 
+                    "containerPort": 6379,
+                    "hostPort": 6380,
                     "protocol": "TCP"
                   }
-                ], 
+                ],
                 "resources": {
                   "limits": {
                     "cpu": "0.2"
                   }
-                }, 
+                },
                 "terminationMessagePath": "/dev/termination-log"
               }
-            ], 
-            "dnsPolicy": "ClusterFirst", 
-            "id": "", 
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "id": "",
             "restartPolicy": {
               "always": {}
-            }, 
-            "version": "v1beta2", 
+            },
+            "version": "v1beta2",
             "volumes": null
           }
-        }, 
-        "generateName": "redis-slave-controller-", 
-        "id": "redis-slave-controller-dnyxx", 
+        },
+        "generateName": "redis-slave-controller-",
+        "id": "redis-slave-controller-dnyxx",
         "labels": {
-          "name": "redisslave", 
+          "name": "redisslave",
           "uses": "redis-master"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 2164, 
-        "selfLink": "/api/v1beta1/pods/redis-slave-controller-dnyxx?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 2164,
+        "selfLink": "/api/v1beta1/pods/redis-slave-controller-dnyxx?namespace=default",
         "uid": "e104806a-b7d7-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.408110", 
+      },
+      "timestamp": "2015-03-17T00:01:34.408110",
       "type": "Pod"
-    }, 
+    },
     {
       "annotations": {
         "label": "0219b8fac88d"
-      }, 
-      "id": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068", 
+      },
+      "id": "Container:k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068",
       "properties": {
-        "AppArmorProfile": "", 
+        "AppArmorProfile": "",
         "Args": [
-          "-c", 
+          "-c",
           "/run.sh"
-        ], 
+        ],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "/run.sh"
-          ], 
-          "CpuShares": 204, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 204,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/root", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/root",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "redis-slave-controller-dnyxx", 
-          "Image": "brendanburns/redis-slave", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "redis-slave-controller-dnyxx",
+          "Image": "brendanburns/redis-slave",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Created": "2015-02-25T17:21:26.517282879Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:21:26.517282879Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
           "Binds": [
             "/var/lib/kubelet/pods/e104806a-b7d7-11e4-9018-42010af0f3f2/containers/slave/0219b8fac88d8f3f5c5d42d0823a915975cd0cdd0a55ea6b8ce5c7b6b0fbda08:/dev/termination-log"
-          ], 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "container:4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "container:4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "container:4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "container:4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9",
           "PortBindings": {
             "6379/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "6380"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "", 
-        "HostsPath": "/var/lib/docker/containers/4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9/hosts", 
-        "Id": "0219b8fac88d8f3f5c5d42d0823a915975cd0cdd0a55ea6b8ce5c7b6b0fbda08", 
-        "Image": "81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c", 
-        "MountLabel": "", 
-        "Name": "/k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068", 
+        },
+        "HostnamePath": "",
+        "HostsPath": "/var/lib/docker/containers/4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9/hosts",
+        "Id": "0219b8fac88d8f3f5c5d42d0823a915975cd0cdd0a55ea6b8ce5c7b6b0fbda08",
+        "Image": "81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c",
+        "MountLabel": "",
+        "Name": "/k8s_slave.e3c7fad7_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_fea6e068",
         "NetworkSettings": {
-          "Bridge": "", 
-          "Gateway": "", 
-          "IPAddress": "", 
-          "IPPrefixLen": 0, 
-          "MacAddress": "", 
-          "PortMapping": null, 
+          "Bridge": "",
+          "Gateway": "",
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "MacAddress": "",
+          "PortMapping": null,
           "Ports": null
-        }, 
-        "Path": "/bin/sh", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9/resolv.conf", 
+        },
+        "Path": "/bin/sh",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 4286, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 4286,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:21:26.884370926Z"
-        }, 
+        },
         "Volumes": {
-          "/data": "/var/lib/docker/vfs/dir/bdd95a3bf51ef4f8db587f882b46885177cc6a9969fa80a6cbfd9295356db7b0", 
+          "/data": "/var/lib/docker/vfs/dir/bdd95a3bf51ef4f8db587f882b46885177cc6a9969fa80a6cbfd9295356db7b0",
           "/dev/termination-log": "/var/lib/kubelet/pods/e104806a-b7d7-11e4-9018-42010af0f3f2/containers/slave/0219b8fac88d8f3f5c5d42d0823a915975cd0cdd0a55ea6b8ce5c7b6b0fbda08"
-        }, 
+        },
         "VolumesRW": {
-          "/data": true, 
+          "/data": true,
           "/dev/termination-log": true
         }
-      }, 
-      "timestamp": "2015-03-17T00:01:34.697142", 
+      },
+      "timestamp": "2015-03-17T00:01:34.697142",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "4286"
-      }, 
-      "id": "Process:0219b8fac88d/4286", 
+      },
+      "id": "Process:0219b8fac88d/4286",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/bin/sh -c /run.sh", 
-        "PID": "4286", 
-        "RSS": "84", 
-        "START": "Feb25", 
-        "STAT": "Ss", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/bin/sh -c /run.sh",
+        "PID": "4286",
+        "RSS": "84",
+        "START": "Feb25",
+        "STAT": "Ss",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "4452"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.756307", 
+      },
+      "timestamp": "2015-03-17T00:01:34.756307",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "4308"
-      }, 
-      "id": "Process:0219b8fac88d/4308", 
+      },
+      "id": "Process:0219b8fac88d/4308",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/bin/bash /run.sh", 
-        "PID": "4308", 
-        "RSS": "600", 
-        "START": "Feb25", 
-        "STAT": "S", 
-        "TIME": "0:00", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/bin/bash /run.sh",
+        "PID": "4308",
+        "RSS": "600",
+        "START": "Feb25",
+        "STAT": "S",
+        "TIME": "0:00",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "17996"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.756307", 
+      },
+      "timestamp": "2015-03-17T00:01:34.756307",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "4309"
-      }, 
-      "id": "Process:0219b8fac88d/4309", 
+      },
+      "id": "Process:0219b8fac88d/4309",
       "properties": {
-        "%CPU": "0.1", 
-        "%MEM": "0.0", 
-        "COMMAND": "redis-server *:6379", 
-        "PID": "4309", 
-        "RSS": "2376", 
-        "START": "Feb25", 
-        "STAT": "Sl", 
-        "TIME": "28:38", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.1",
+        "%MEM": "0.0",
+        "COMMAND": "redis-server *:6379",
+        "PID": "4309",
+        "RSS": "2376",
+        "START": "Feb25",
+        "STAT": "Sl",
+        "TIME": "28:38",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "35180"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.756307", 
+      },
+      "timestamp": "2015-03-17T00:01:34.756307",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "81b1b696a77a"
-      }, 
-      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/81b1b696a77a", 
+      },
+      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/81b1b696a77a",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "/run.sh"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "HOME=/root"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "f22711318734", 
-          "Image": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "f22711318734",
+          "Image": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Container": "9c0df3e46915e0be5819bbdab972ff9807a479beee8e9c79d4e392e12894750d", 
+        },
+        "Container": "9c0df3e46915e0be5819bbdab972ff9807a479beee8e9c79d4e392e12894750d",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) CMD [/bin/sh -c /run.sh]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
-          "Entrypoint": null, 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
+          "Entrypoint": null,
           "Env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "HOME=/root"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "f22711318734", 
-          "Image": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
+          },
+          "Hostname": "f22711318734",
+          "Image": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
           "Volumes": {
             "/data": {}
-          }, 
+          },
           "WorkingDir": "/data"
-        }, 
-        "Created": "2014-11-16T03:37:21.890022087Z", 
-        "DockerVersion": "1.3.0", 
-        "Id": "81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c", 
-        "Os": "linux", 
-        "Parent": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546", 
-        "Size": 0, 
+        },
+        "Created": "2014-11-16T03:37:21.890022087Z",
+        "DockerVersion": "1.3.0",
+        "Id": "81b1b696a77a9b5ca5e8954b0428208daa67853c118bb8d15cae073028a0ee3c",
+        "Os": "linux",
+        "Parent": "cdc9281d0adf6da47bb43c6d91ff1de9a4e5d890228bbe520e343e7b360ab546",
+        "Size": 0,
         "VirtualSize": 434171778
-      }, 
-      "timestamp": "2015-03-17T00:01:34.763462", 
+      },
+      "timestamp": "2015-03-17T00:01:34.763462",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "4cec5365e5cc"
-      }, 
-      "id": "Container:k8s_POD.e886ea28_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_19052fd1", 
+      },
+      "id": "Container:k8s_POD.e886ea28_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_19052fd1",
       "properties": {
-        "AppArmorProfile": "", 
-        "Args": [], 
+        "AppArmorProfile": "",
+        "Args": [],
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200", 
-            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp", 
-            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205", 
-            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200", 
-            "HOME=/", 
-            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601", 
-            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp", 
-            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28", 
-            "KIBANA_LOGGING_SERVICE_PORT=5601", 
-            "KUBERNETES_PORT=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443", 
-            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2", 
-            "KUBERNETES_PORT_443_TCP_PORT=443", 
-            "KUBERNETES_PORT_443_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80", 
-            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1", 
-            "KUBERNETES_RO_PORT_80_TCP_PORT=80", 
-            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp", 
-            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1", 
-            "KUBERNETES_RO_SERVICE_PORT=80", 
-            "KUBERNETES_SERVICE_HOST=10.0.0.2", 
-            "KUBERNETES_SERVICE_PORT=443", 
-            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80", 
-            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147", 
-            "MONITORING_GRAFANA_SERVICE_PORT=80", 
-            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80", 
-            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65", 
-            "MONITORING_HEAPSTER_SERVICE_PORT=80", 
-            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80", 
-            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp", 
-            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127", 
-            "MONITORING_INFLUXDB_SERVICE_PORT=80", 
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 
-            "REDISSLAVE_PORT=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379", 
-            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161", 
-            "REDISSLAVE_PORT_6379_TCP_PORT=6379", 
-            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp", 
-            "REDISSLAVE_SERVICE_HOST=10.0.78.161", 
-            "REDISSLAVE_SERVICE_PORT=6379", 
-            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379", 
-            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112", 
-            "REDIS_MASTER_PORT_6379_TCP_PORT=6379", 
-            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp", 
-            "REDIS_MASTER_SERVICE_HOST=10.0.254.112", 
-            "REDIS_MASTER_SERVICE_PORT=6379", 
-            "SKYDNS_PORT=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53", 
-            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10", 
-            "SKYDNS_PORT_53_UDP_PORT=53", 
-            "SKYDNS_PORT_53_UDP_PROTO=udp", 
-            "SKYDNS_SERVICE_HOST=10.0.0.10", 
+            "ELASTICSEARCH_LOGGING_PORT=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP=tcp://10.0.126.205:9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_ADDR=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PORT=9200",
+            "ELASTICSEARCH_LOGGING_PORT_9200_TCP_PROTO=tcp",
+            "ELASTICSEARCH_LOGGING_SERVICE_HOST=10.0.126.205",
+            "ELASTICSEARCH_LOGGING_SERVICE_PORT=9200",
+            "HOME=/",
+            "KIBANA_LOGGING_PORT=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP=tcp://10.0.51.28:5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_ADDR=10.0.51.28",
+            "KIBANA_LOGGING_PORT_5601_TCP_PORT=5601",
+            "KIBANA_LOGGING_PORT_5601_TCP_PROTO=tcp",
+            "KIBANA_LOGGING_SERVICE_HOST=10.0.51.28",
+            "KIBANA_LOGGING_SERVICE_PORT=5601",
+            "KUBERNETES_PORT=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP=tcp://10.0.0.2:443",
+            "KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2",
+            "KUBERNETES_PORT_443_TCP_PORT=443",
+            "KUBERNETES_PORT_443_TCP_PROTO=tcp",
+            "KUBERNETES_RO_PORT=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP=tcp://10.0.0.1:80",
+            "KUBERNETES_RO_PORT_80_TCP_ADDR=10.0.0.1",
+            "KUBERNETES_RO_PORT_80_TCP_PORT=80",
+            "KUBERNETES_RO_PORT_80_TCP_PROTO=tcp",
+            "KUBERNETES_RO_SERVICE_HOST=10.0.0.1",
+            "KUBERNETES_RO_SERVICE_PORT=80",
+            "KUBERNETES_SERVICE_HOST=10.0.0.2",
+            "KUBERNETES_SERVICE_PORT=443",
+            "MONITORING_GRAFANA_PORT=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP=tcp://10.0.48.147:80",
+            "MONITORING_GRAFANA_PORT_80_TCP_ADDR=10.0.48.147",
+            "MONITORING_GRAFANA_PORT_80_TCP_PORT=80",
+            "MONITORING_GRAFANA_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_GRAFANA_SERVICE_HOST=10.0.48.147",
+            "MONITORING_GRAFANA_SERVICE_PORT=80",
+            "MONITORING_HEAPSTER_PORT=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP=tcp://10.0.85.65:80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_ADDR=10.0.85.65",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PORT=80",
+            "MONITORING_HEAPSTER_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_HEAPSTER_SERVICE_HOST=10.0.85.65",
+            "MONITORING_HEAPSTER_SERVICE_PORT=80",
+            "MONITORING_INFLUXDB_PORT=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP=tcp://10.0.50.127:80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_ADDR=10.0.50.127",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PORT=80",
+            "MONITORING_INFLUXDB_PORT_80_TCP_PROTO=tcp",
+            "MONITORING_INFLUXDB_SERVICE_HOST=10.0.50.127",
+            "MONITORING_INFLUXDB_SERVICE_PORT=80",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDISSLAVE_PORT=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP=tcp://10.0.78.161:6379",
+            "REDISSLAVE_PORT_6379_TCP_ADDR=10.0.78.161",
+            "REDISSLAVE_PORT_6379_TCP_PORT=6379",
+            "REDISSLAVE_PORT_6379_TCP_PROTO=tcp",
+            "REDISSLAVE_SERVICE_HOST=10.0.78.161",
+            "REDISSLAVE_SERVICE_PORT=6379",
+            "REDIS_MASTER_PORT=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP=tcp://10.0.254.112:6379",
+            "REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.254.112",
+            "REDIS_MASTER_PORT_6379_TCP_PORT=6379",
+            "REDIS_MASTER_PORT_6379_TCP_PROTO=tcp",
+            "REDIS_MASTER_SERVICE_HOST=10.0.254.112",
+            "REDIS_MASTER_SERVICE_PORT=6379",
+            "SKYDNS_PORT=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP=udp://10.0.0.10:53",
+            "SKYDNS_PORT_53_UDP_ADDR=10.0.0.10",
+            "SKYDNS_PORT_53_UDP_PORT=53",
+            "SKYDNS_PORT_53_UDP_PROTO=udp",
+            "SKYDNS_SERVICE_HOST=10.0.0.10",
             "SKYDNS_SERVICE_PORT=53"
-          ], 
+          ],
           "ExposedPorts": {
             "6379/tcp": {}
-          }, 
-          "Hostname": "redis-slave-controller-dnyxx", 
-          "Image": "kubernetes/pause:latest", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": null, 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          },
+          "Hostname": "redis-slave-controller-dnyxx",
+          "Image": "kubernetes/pause:latest",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": null,
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2015-02-25T17:21:25.365963476Z", 
-        "Driver": "aufs", 
-        "ExecDriver": "native-0.2", 
+        },
+        "Created": "2015-02-25T17:21:25.365963476Z",
+        "Driver": "aufs",
+        "ExecDriver": "native-0.2",
         "HostConfig": {
-          "Binds": null, 
-          "CapAdd": null, 
-          "CapDrop": null, 
-          "ContainerIDFile": "", 
-          "Devices": null, 
+          "Binds": null,
+          "CapAdd": null,
+          "CapDrop": null,
+          "ContainerIDFile": "",
+          "Devices": null,
           "Dns": [
-            "10.0.0.10", 
-            "169.254.169.254", 
+            "10.0.0.10",
+            "169.254.169.254",
             "10.240.0.1"
-          ], 
+          ],
           "DnsSearch": [
-            "default.kubernetes.local", 
-            "kubernetes.local", 
-            "c.shared-kraken.internal.", 
-            "519348962119.google.internal.", 
+            "default.kubernetes.local",
+            "kubernetes.local",
+            "c.shared-kraken.internal.",
+            "519348962119.google.internal.",
             "google.internal."
-          ], 
-          "ExtraHosts": null, 
-          "IpcMode": "", 
-          "Links": null, 
-          "LxcConf": null, 
-          "NetworkMode": "", 
+          ],
+          "ExtraHosts": null,
+          "IpcMode": "",
+          "Links": null,
+          "LxcConf": null,
+          "NetworkMode": "",
           "PortBindings": {
             "6379/tcp": [
               {
-                "HostIp": "", 
+                "HostIp": "",
                 "HostPort": "6380"
               }
             ]
-          }, 
-          "Privileged": false, 
-          "PublishAllPorts": false, 
+          },
+          "Privileged": false,
+          "PublishAllPorts": false,
           "RestartPolicy": {
-            "MaximumRetryCount": 0, 
+            "MaximumRetryCount": 0,
             "Name": ""
-          }, 
-          "SecurityOpt": null, 
+          },
+          "SecurityOpt": null,
           "VolumesFrom": null
-        }, 
-        "HostnamePath": "/var/lib/docker/containers/4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9/hostname", 
-        "HostsPath": "/var/lib/docker/containers/4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9/hosts", 
-        "Id": "4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9", 
-        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "MountLabel": "", 
-        "Name": "/k8s_POD.e886ea28_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_19052fd1", 
+        },
+        "HostnamePath": "/var/lib/docker/containers/4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9/hostname",
+        "HostsPath": "/var/lib/docker/containers/4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9/hosts",
+        "Id": "4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9",
+        "Image": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "MountLabel": "",
+        "Name": "/k8s_POD.e886ea28_redis-slave-controller-dnyxx.default.api_e104806a-b7d7-11e4-9018-42010af0f3f2_19052fd1",
         "NetworkSettings": {
-          "Bridge": "cbr0", 
-          "Gateway": "10.244.3.1", 
-          "IPAddress": "10.244.3.6", 
-          "IPPrefixLen": 24, 
-          "MacAddress": "02:42:0a:f4:03:06", 
-          "PortMapping": null, 
+          "Bridge": "cbr0",
+          "Gateway": "10.244.3.1",
+          "IPAddress": "10.244.3.6",
+          "IPPrefixLen": 24,
+          "MacAddress": "02:42:0a:f4:03:06",
+          "PortMapping": null,
           "Ports": {
             "6379/tcp": [
               {
-                "HostIp": "0.0.0.0", 
+                "HostIp": "0.0.0.0",
                 "HostPort": "6380"
               }
             ]
           }
-        }, 
-        "Path": "/pause", 
-        "ProcessLabel": "", 
-        "ResolvConfPath": "/var/lib/docker/containers/4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9/resolv.conf", 
+        },
+        "Path": "/pause",
+        "ProcessLabel": "",
+        "ResolvConfPath": "/var/lib/docker/containers/4cec5365e5ccfb78ed20d90cd55ac6fb2b7a807a7bf4d23d0496b7c5304e0fa9/resolv.conf",
         "State": {
-          "Error": "", 
-          "ExitCode": 0, 
-          "FinishedAt": "0001-01-01T00:00:00Z", 
-          "OOMKilled": false, 
-          "Paused": false, 
-          "Pid": 4179, 
-          "Restarting": false, 
-          "Running": true, 
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 4179,
+          "Restarting": false,
+          "Running": true,
           "StartedAt": "2015-02-25T17:21:25.690399743Z"
-        }, 
-        "Volumes": {}, 
+        },
+        "Volumes": {},
         "VolumesRW": {}
-      }, 
-      "timestamp": "2015-03-17T00:01:34.723437", 
+      },
+      "timestamp": "2015-03-17T00:01:34.723437",
       "type": "Container"
-    }, 
+    },
     {
       "annotations": {
         "label": "4179"
-      }, 
-      "id": "Process:4cec5365e5cc/4179", 
+      },
+      "id": "Process:4cec5365e5cc/4179",
       "properties": {
-        "%CPU": "0.0", 
-        "%MEM": "0.0", 
-        "COMMAND": "/pause", 
-        "PID": "4179", 
-        "RSS": "432", 
-        "START": "Feb25", 
-        "STAT": "Ssl", 
-        "TIME": "0:04", 
-        "TTY": "?", 
-        "USER": "root", 
+        "%CPU": "0.0",
+        "%MEM": "0.0",
+        "COMMAND": "/pause",
+        "PID": "4179",
+        "RSS": "432",
+        "START": "Feb25",
+        "STAT": "Ssl",
+        "TIME": "0:04",
+        "TTY": "?",
+        "USER": "root",
         "VSZ": "265340"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.778011", 
+      },
+      "timestamp": "2015-03-17T00:01:34.778011",
       "type": "Process"
-    }, 
+    },
     {
       "annotations": {
         "label": "6c4579af347b"
-      }, 
-      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b", 
+      },
+      "id": "Image:kubernetes-minion-tf8u.c.shared-kraken.internal/6c4579af347b",
       "properties": {
-        "Architecture": "amd64", 
-        "Author": "", 
-        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3", 
-        "Comment": "", 
+        "Architecture": "amd64",
+        "Author": "",
+        "Checksum": "tarsum.dev+sha256:1b755912c77197c6a43539f2a708ef89d5849b8ce02642cb702e47afaa8195c3",
+        "Comment": "",
         "Config": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
-          "Cmd": null, 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "Cmd": null,
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd", 
+        },
+        "Container": "c2bc28b48b5c5543f3589c02eb9e7fa898a733cd850cb4cc350d9353f6ae9bcd",
         "ContainerConfig": {
-          "AttachStderr": false, 
-          "AttachStdin": false, 
-          "AttachStdout": false, 
+          "AttachStderr": false,
+          "AttachStdin": false,
+          "AttachStdout": false,
           "Cmd": [
-            "/bin/sh", 
-            "-c", 
+            "/bin/sh",
+            "-c",
             "#(nop) ENTRYPOINT [/pause]"
-          ], 
-          "CpuShares": 0, 
-          "Cpuset": "", 
-          "Domainname": "", 
+          ],
+          "CpuShares": 0,
+          "Cpuset": "",
+          "Domainname": "",
           "Entrypoint": [
             "/pause"
-          ], 
+          ],
           "Env": [
-            "HOME=/", 
+            "HOME=/",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          ], 
-          "ExposedPorts": null, 
-          "Hostname": "e931342f8fec", 
-          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-          "MacAddress": "", 
-          "Memory": 0, 
-          "MemorySwap": 0, 
-          "NetworkDisabled": false, 
-          "OnBuild": [], 
-          "OpenStdin": false, 
-          "PortSpecs": null, 
-          "StdinOnce": false, 
-          "Tty": false, 
-          "User": "", 
-          "Volumes": null, 
+          ],
+          "ExposedPorts": null,
+          "Hostname": "e931342f8fec",
+          "Image": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+          "MacAddress": "",
+          "Memory": 0,
+          "MemorySwap": 0,
+          "NetworkDisabled": false,
+          "OnBuild": [],
+          "OpenStdin": false,
+          "PortSpecs": null,
+          "StdinOnce": false,
+          "Tty": false,
+          "User": "",
+          "Volumes": null,
           "WorkingDir": ""
-        }, 
-        "Created": "2014-07-19T07:02:32.267701596Z", 
-        "DockerVersion": "1.0.0", 
-        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27", 
-        "Os": "linux", 
-        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475", 
-        "Size": 0, 
+        },
+        "Created": "2014-07-19T07:02:32.267701596Z",
+        "DockerVersion": "1.0.0",
+        "Id": "6c4579af347b649857e915521132f15a06186d73faa62145e3eeeb6be0e97c27",
+        "Os": "linux",
+        "Parent": "e244e638e26e77a8b08da462b1cb92811ed6d3d2874286368afcef7717ed9475",
+        "Size": 0,
         "VirtualSize": 239840
-      }, 
-      "timestamp": "2015-03-17T00:01:34.549147", 
+      },
+      "timestamp": "2015-03-17T00:01:34.549147",
       "type": "Image"
-    }, 
+    },
     {
       "annotations": {
         "label": "elasticsearch-logging"
-      }, 
-      "id": "Service:elasticsearch-logging", 
+      },
+      "id": "Service:elasticsearch-logging",
       "properties": {
-        "containerPort": "es-port", 
-        "createExternalLoadBalancer": true, 
-        "creationTimestamp": "2015-02-19T00:11:53Z", 
-        "id": "elasticsearch-logging", 
+        "containerPort": "es-port",
+        "createExternalLoadBalancer": true,
+        "creationTimestamp": "2015-02-19T00:11:53Z",
+        "id": "elasticsearch-logging",
         "labels": {
           "name": "elasticsearch-logging"
-        }, 
-        "namespace": "default", 
-        "port": 9200, 
-        "portalIP": "10.0.126.205", 
-        "protocol": "TCP", 
+        },
+        "namespace": "default",
+        "port": 9200,
+        "portalIP": "10.0.126.205",
+        "protocol": "TCP",
         "publicIPs": [
           "146.148.56.136"
-        ], 
-        "resourceVersion": 68, 
+        ],
+        "resourceVersion": 68,
         "selector": {
           "name": "elasticsearch-logging"
-        }, 
-        "selfLink": "/api/v1beta1/services/elasticsearch-logging?namespace=default", 
-        "sessionAffinity": "None", 
+        },
+        "selfLink": "/api/v1beta1/services/elasticsearch-logging?namespace=default",
+        "sessionAffinity": "None",
         "uid": "e8804c83-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.786569", 
+      },
+      "timestamp": "2015-03-17T00:01:34.786569",
       "type": "Service"
-    }, 
+    },
     {
       "annotations": {
         "label": "kibana-logging"
-      }, 
-      "id": "Service:kibana-logging", 
+      },
+      "id": "Service:kibana-logging",
       "properties": {
-        "containerPort": "kibana-port", 
-        "createExternalLoadBalancer": true, 
-        "creationTimestamp": "2015-02-19T00:11:53Z", 
-        "id": "kibana-logging", 
+        "containerPort": "kibana-port",
+        "createExternalLoadBalancer": true,
+        "creationTimestamp": "2015-02-19T00:11:53Z",
+        "id": "kibana-logging",
         "labels": {
           "name": "kibana-logging"
-        }, 
-        "namespace": "default", 
-        "port": 5601, 
-        "portalIP": "10.0.51.28", 
-        "protocol": "TCP", 
+        },
+        "namespace": "default",
+        "port": 5601,
+        "portalIP": "10.0.51.28",
+        "protocol": "TCP",
         "publicIPs": [
           "130.211.172.131"
-        ], 
-        "resourceVersion": 69, 
+        ],
+        "resourceVersion": 69,
         "selector": {
           "name": "kibana-logging"
-        }, 
-        "selfLink": "/api/v1beta1/services/kibana-logging?namespace=default", 
-        "sessionAffinity": "None", 
+        },
+        "selfLink": "/api/v1beta1/services/kibana-logging?namespace=default",
+        "sessionAffinity": "None",
         "uid": "e87b2184-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.786569", 
+      },
+      "timestamp": "2015-03-17T00:01:34.786569",
       "type": "Service"
-    }, 
+    },
     {
       "annotations": {
         "label": "kubernetes"
-      }, 
-      "id": "Service:kubernetes", 
+      },
+      "id": "Service:kubernetes",
       "properties": {
-        "containerPort": 0, 
-        "creationTimestamp": "2015-02-19T00:11:42Z", 
-        "id": "kubernetes", 
+        "containerPort": 0,
+        "creationTimestamp": "2015-02-19T00:11:42Z",
+        "id": "kubernetes",
         "labels": {
-          "component": "apiserver", 
+          "component": "apiserver",
           "provider": "kubernetes"
-        }, 
-        "namespace": "default", 
-        "port": 443, 
-        "portalIP": "10.0.0.2", 
-        "protocol": "TCP", 
-        "resourceVersion": 4, 
-        "selector": null, 
-        "selfLink": "/api/v1beta1/services/kubernetes?namespace=default", 
-        "sessionAffinity": "None", 
+        },
+        "namespace": "default",
+        "port": 443,
+        "portalIP": "10.0.0.2",
+        "protocol": "TCP",
+        "resourceVersion": 4,
+        "selector": null,
+        "selfLink": "/api/v1beta1/services/kubernetes?namespace=default",
+        "sessionAffinity": "None",
         "uid": "e221251b-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.786569", 
+      },
+      "timestamp": "2015-03-17T00:01:34.786569",
       "type": "Service"
-    }, 
+    },
     {
       "annotations": {
         "label": "kubernetes-ro"
-      }, 
-      "id": "Service:kubernetes-ro", 
+      },
+      "id": "Service:kubernetes-ro",
       "properties": {
-        "containerPort": 0, 
-        "creationTimestamp": "2015-02-19T00:11:42Z", 
-        "id": "kubernetes-ro", 
+        "containerPort": 0,
+        "creationTimestamp": "2015-02-19T00:11:42Z",
+        "id": "kubernetes-ro",
         "labels": {
-          "component": "apiserver", 
+          "component": "apiserver",
           "provider": "kubernetes"
-        }, 
-        "namespace": "default", 
-        "port": 80, 
-        "portalIP": "10.0.0.1", 
-        "protocol": "TCP", 
-        "resourceVersion": 5, 
-        "selector": null, 
-        "selfLink": "/api/v1beta1/services/kubernetes-ro?namespace=default", 
-        "sessionAffinity": "None", 
+        },
+        "namespace": "default",
+        "port": 80,
+        "portalIP": "10.0.0.1",
+        "protocol": "TCP",
+        "resourceVersion": 5,
+        "selector": null,
+        "selfLink": "/api/v1beta1/services/kubernetes-ro?namespace=default",
+        "sessionAffinity": "None",
         "uid": "e223bbf7-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.786569", 
+      },
+      "timestamp": "2015-03-17T00:01:34.786569",
       "type": "Service"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitoring-grafana"
-      }, 
-      "id": "Service:monitoring-grafana", 
+      },
+      "id": "Service:monitoring-grafana",
       "properties": {
-        "containerPort": 80, 
-        "creationTimestamp": "2015-02-19T00:11:53Z", 
-        "id": "monitoring-grafana", 
-        "namespace": "default", 
-        "port": 80, 
-        "portalIP": "10.0.48.147", 
-        "protocol": "TCP", 
-        "resourceVersion": 22, 
+        "containerPort": 80,
+        "creationTimestamp": "2015-02-19T00:11:53Z",
+        "id": "monitoring-grafana",
+        "namespace": "default",
+        "port": 80,
+        "portalIP": "10.0.48.147",
+        "protocol": "TCP",
+        "resourceVersion": 22,
         "selector": {
           "name": "influxGrafana"
-        }, 
-        "selfLink": "/api/v1beta1/services/monitoring-grafana?namespace=default", 
-        "sessionAffinity": "None", 
+        },
+        "selfLink": "/api/v1beta1/services/monitoring-grafana?namespace=default",
+        "sessionAffinity": "None",
         "uid": "e885ee4b-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.786569", 
+      },
+      "timestamp": "2015-03-17T00:01:34.786569",
       "type": "Service"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitoring-heapster"
-      }, 
-      "id": "Service:monitoring-heapster", 
+      },
+      "id": "Service:monitoring-heapster",
       "properties": {
-        "containerPort": 8082, 
-        "creationTimestamp": "2015-02-19T00:11:53Z", 
-        "id": "monitoring-heapster", 
-        "namespace": "default", 
-        "port": 80, 
-        "portalIP": "10.0.85.65", 
-        "protocol": "TCP", 
-        "resourceVersion": 19, 
+        "containerPort": 8082,
+        "creationTimestamp": "2015-02-19T00:11:53Z",
+        "id": "monitoring-heapster",
+        "namespace": "default",
+        "port": 80,
+        "portalIP": "10.0.85.65",
+        "protocol": "TCP",
+        "resourceVersion": 19,
         "selector": {
           "name": "heapster"
-        }, 
-        "selfLink": "/api/v1beta1/services/monitoring-heapster?namespace=default", 
-        "sessionAffinity": "None", 
+        },
+        "selfLink": "/api/v1beta1/services/monitoring-heapster?namespace=default",
+        "sessionAffinity": "None",
         "uid": "e883d705-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.786569", 
+      },
+      "timestamp": "2015-03-17T00:01:34.786569",
       "type": "Service"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitoring-influxdb"
-      }, 
-      "id": "Service:monitoring-influxdb", 
+      },
+      "id": "Service:monitoring-influxdb",
       "properties": {
-        "containerPort": 8086, 
-        "creationTimestamp": "2015-02-19T00:11:53Z", 
-        "id": "monitoring-influxdb", 
-        "namespace": "default", 
-        "port": 80, 
-        "portalIP": "10.0.50.127", 
-        "protocol": "TCP", 
-        "resourceVersion": 21, 
+        "containerPort": 8086,
+        "creationTimestamp": "2015-02-19T00:11:53Z",
+        "id": "monitoring-influxdb",
+        "namespace": "default",
+        "port": 80,
+        "portalIP": "10.0.50.127",
+        "protocol": "TCP",
+        "resourceVersion": 21,
         "selector": {
           "name": "influxGrafana"
-        }, 
-        "selfLink": "/api/v1beta1/services/monitoring-influxdb?namespace=default", 
-        "sessionAffinity": "None", 
+        },
+        "selfLink": "/api/v1beta1/services/monitoring-influxdb?namespace=default",
+        "sessionAffinity": "None",
         "uid": "e885ceda-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.786569", 
+      },
+      "timestamp": "2015-03-17T00:01:34.786569",
       "type": "Service"
-    }, 
+    },
     {
       "annotations": {
         "label": "redis-master"
-      }, 
-      "id": "Service:redis-master", 
+      },
+      "id": "Service:redis-master",
       "properties": {
-        "containerPort": 6379, 
-        "creationTimestamp": "2015-02-19T01:36:53Z", 
-        "id": "redis-master", 
+        "containerPort": 6379,
+        "creationTimestamp": "2015-02-19T01:36:53Z",
+        "id": "redis-master",
         "labels": {
           "name": "redis-master"
-        }, 
-        "namespace": "default", 
-        "port": 6379, 
-        "portalIP": "10.0.254.112", 
-        "protocol": "TCP", 
-        "resourceVersion": 2145, 
+        },
+        "namespace": "default",
+        "port": 6379,
+        "portalIP": "10.0.254.112",
+        "protocol": "TCP",
+        "resourceVersion": 2145,
         "selector": {
           "name": "redis-master"
-        }, 
-        "selfLink": "/api/v1beta1/services/redis-master?namespace=default", 
-        "sessionAffinity": "None", 
+        },
+        "selfLink": "/api/v1beta1/services/redis-master?namespace=default",
+        "sessionAffinity": "None",
         "uid": "c81f5fae-b7d7-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.786569", 
+      },
+      "timestamp": "2015-03-17T00:01:34.786569",
       "type": "Service"
-    }, 
+    },
     {
       "annotations": {
         "label": "redisslave"
-      }, 
-      "id": "Service:redisslave", 
+      },
+      "id": "Service:redisslave",
       "properties": {
-        "containerPort": 6379, 
-        "creationTimestamp": "2015-02-19T01:38:46Z", 
-        "id": "redisslave", 
+        "containerPort": 6379,
+        "creationTimestamp": "2015-02-19T01:38:46Z",
+        "id": "redisslave",
         "labels": {
           "name": "redisslave"
-        }, 
-        "namespace": "default", 
-        "port": 6379, 
-        "portalIP": "10.0.78.161", 
-        "protocol": "TCP", 
-        "resourceVersion": 2209, 
+        },
+        "namespace": "default",
+        "port": 6379,
+        "portalIP": "10.0.78.161",
+        "protocol": "TCP",
+        "resourceVersion": 2209,
         "selector": {
           "name": "redisslave"
-        }, 
-        "selfLink": "/api/v1beta1/services/redisslave?namespace=default", 
-        "sessionAffinity": "None", 
+        },
+        "selfLink": "/api/v1beta1/services/redisslave?namespace=default",
+        "sessionAffinity": "None",
         "uid": "0bac519a-b7d8-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.786569", 
+      },
+      "timestamp": "2015-03-17T00:01:34.786569",
       "type": "Service"
-    }, 
+    },
     {
       "annotations": {
         "label": "skydns"
-      }, 
-      "id": "Service:skydns", 
+      },
+      "id": "Service:skydns",
       "properties": {
-        "containerPort": 53, 
-        "creationTimestamp": "2015-02-19T00:11:53Z", 
-        "id": "skydns", 
+        "containerPort": 53,
+        "creationTimestamp": "2015-02-19T00:11:53Z",
+        "id": "skydns",
         "labels": {
           "k8s-app": "skydns"
-        }, 
-        "namespace": "default", 
-        "port": 53, 
-        "portalIP": "10.0.0.10", 
-        "protocol": "UDP", 
-        "resourceVersion": 20, 
+        },
+        "namespace": "default",
+        "port": 53,
+        "portalIP": "10.0.0.10",
+        "protocol": "UDP",
+        "resourceVersion": 20,
         "selector": {
           "k8s-app": "skydns"
-        }, 
-        "selfLink": "/api/v1beta1/services/skydns?namespace=default", 
-        "sessionAffinity": "None", 
+        },
+        "selfLink": "/api/v1beta1/services/skydns?namespace=default",
+        "sessionAffinity": "None",
         "uid": "e885b8f7-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:34.786569", 
+      },
+      "timestamp": "2015-03-17T00:01:34.786569",
       "type": "Service"
-    }, 
+    },
     {
       "annotations": {
         "label": "elasticsearch-logging-controller"
-      }, 
-      "id": "ReplicationController:elasticsearch-logging-controller", 
+      },
+      "id": "ReplicationController:elasticsearch-logging-controller",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:53Z", 
+        "creationTimestamp": "2015-02-19T00:11:53Z",
         "currentState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
-                "containers": null, 
-                "id": "", 
-                "restartPolicy": {}, 
-                "version": "", 
+                "containers": null,
+                "id": "",
+                "restartPolicy": {},
+                "version": "",
                 "volumes": null
               }
             }
-          }, 
+          },
           "replicas": 1
-        }, 
+        },
         "desiredState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
                 "containers": [
                   {
-                    "capabilities": {}, 
-                    "image": "dockerfile/elasticsearch", 
-                    "imagePullPolicy": "PullIfNotPresent", 
-                    "name": "elasticsearch-logging", 
+                    "capabilities": {},
+                    "image": "dockerfile/elasticsearch",
+                    "imagePullPolicy": "PullIfNotPresent",
+                    "name": "elasticsearch-logging",
                     "ports": [
                       {
-                        "containerPort": 9200, 
-                        "name": "es-port", 
+                        "containerPort": 9200,
+                        "name": "es-port",
                         "protocol": "TCP"
-                      }, 
+                      },
                       {
-                        "containerPort": 9300, 
-                        "name": "es-transport-port", 
+                        "containerPort": 9300,
+                        "name": "es-transport-port",
                         "protocol": "TCP"
                       }
-                    ], 
-                    "resources": {}, 
-                    "terminationMessagePath": "/dev/termination-log", 
+                    ],
+                    "resources": {},
+                    "terminationMessagePath": "/dev/termination-log",
                     "volumeMounts": [
                       {
-                        "mountPath": "/data", 
-                        "name": "es-persistent-storage", 
+                        "mountPath": "/data",
+                        "name": "es-persistent-storage",
                         "path": "/data"
                       }
                     ]
                   }
-                ], 
-                "dnsPolicy": "ClusterFirst", 
-                "id": "", 
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "id": "",
                 "restartPolicy": {
                   "always": {}
-                }, 
-                "version": "v1beta2", 
+                },
+                "version": "v1beta2",
                 "volumes": [
                   {
-                    "name": "es-persistent-storage", 
+                    "name": "es-persistent-storage",
                     "source": {
-                      "emptyDir": {}, 
-                      "gitRepo": null, 
-                      "hostDir": null, 
-                      "persistentDisk": null, 
+                      "emptyDir": {},
+                      "gitRepo": null,
+                      "hostDir": null,
+                      "persistentDisk": null,
                       "secret": null
                     }
                   }
                 ]
               }
-            }, 
+            },
             "labels": {
               "name": "elasticsearch-logging"
             }
-          }, 
+          },
           "replicaSelector": {
             "name": "elasticsearch-logging"
-          }, 
+          },
           "replicas": 1
-        }, 
-        "id": "elasticsearch-logging-controller", 
+        },
+        "id": "elasticsearch-logging-controller",
         "labels": {
           "name": "elasticsearch-logging"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 23, 
-        "selfLink": "/api/v1beta1/replicationControllers/elasticsearch-logging-controller?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 23,
+        "selfLink": "/api/v1beta1/replicationControllers/elasticsearch-logging-controller?namespace=default",
         "uid": "e88b3b49-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:35.083763", 
+      },
+      "timestamp": "2015-03-17T00:01:35.083763",
       "type": "ReplicationController"
-    }, 
+    },
     {
       "annotations": {
         "label": "frontend-controller"
-      }, 
-      "id": "ReplicationController:frontend-controller", 
+      },
+      "id": "ReplicationController:frontend-controller",
       "properties": {
-        "creationTimestamp": "2015-02-19T01:39:01Z", 
+        "creationTimestamp": "2015-02-19T01:39:01Z",
         "currentState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
-                "containers": null, 
-                "id": "", 
-                "restartPolicy": {}, 
-                "version": "", 
+                "containers": null,
+                "id": "",
+                "restartPolicy": {},
+                "version": "",
                 "volumes": null
               }
             }
-          }, 
+          },
           "replicas": 3
-        }, 
+        },
         "desiredState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
                 "containers": [
                   {
-                    "capabilities": {}, 
-                    "cpu": 100, 
-                    "image": "kubernetes/example-guestbook-php-redis", 
-                    "imagePullPolicy": "PullIfNotPresent", 
-                    "memory": 50000000, 
-                    "name": "php-redis", 
+                    "capabilities": {},
+                    "cpu": 100,
+                    "image": "kubernetes/example-guestbook-php-redis",
+                    "imagePullPolicy": "PullIfNotPresent",
+                    "memory": 50000000,
+                    "name": "php-redis",
                     "ports": [
                       {
-                        "containerPort": 80, 
-                        "hostPort": 8000, 
+                        "containerPort": 80,
+                        "hostPort": 8000,
                         "protocol": "TCP"
                       }
-                    ], 
+                    ],
                     "resources": {
                       "limits": {
-                        "cpu": "0.1", 
+                        "cpu": "0.1",
                         "memory": 50000000
                       }
-                    }, 
+                    },
                     "terminationMessagePath": "/dev/termination-log"
                   }
-                ], 
-                "dnsPolicy": "ClusterFirst", 
-                "id": "", 
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "id": "",
                 "restartPolicy": {
                   "always": {}
-                }, 
-                "version": "v1beta2", 
+                },
+                "version": "v1beta2",
                 "volumes": null
               }
-            }, 
+            },
             "labels": {
-              "name": "frontend", 
+              "name": "frontend",
               "uses": "redisslave,redis-master"
             }
-          }, 
+          },
           "replicaSelector": {
             "name": "frontend"
-          }, 
+          },
           "replicas": 3
-        }, 
-        "id": "frontend-controller", 
+        },
+        "id": "frontend-controller",
         "labels": {
           "name": "frontend"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 2219, 
-        "selfLink": "/api/v1beta1/replicationControllers/frontend-controller?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 2219,
+        "selfLink": "/api/v1beta1/replicationControllers/frontend-controller?namespace=default",
         "uid": "149cf3ac-b7d8-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:35.083763", 
+      },
+      "timestamp": "2015-03-17T00:01:35.083763",
       "type": "ReplicationController"
-    }, 
+    },
     {
       "annotations": {
         "label": "kibana-logging-controller"
-      }, 
-      "id": "ReplicationController:kibana-logging-controller", 
+      },
+      "id": "ReplicationController:kibana-logging-controller",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:53Z", 
+        "creationTimestamp": "2015-02-19T00:11:53Z",
         "currentState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
-                "containers": null, 
-                "id": "", 
-                "restartPolicy": {}, 
-                "version": "", 
+                "containers": null,
+                "id": "",
+                "restartPolicy": {},
+                "version": "",
                 "volumes": null
               }
             }
-          }, 
+          },
           "replicas": 1
-        }, 
+        },
         "desiredState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
                 "containers": [
                   {
-                    "capabilities": {}, 
-                    "image": "kubernetes/kibana:1.0", 
-                    "imagePullPolicy": "PullIfNotPresent", 
-                    "name": "kibana-logging", 
+                    "capabilities": {},
+                    "image": "kubernetes/kibana:1.0",
+                    "imagePullPolicy": "PullIfNotPresent",
+                    "name": "kibana-logging",
                     "ports": [
                       {
-                        "containerPort": 80, 
-                        "name": "kibana-port", 
+                        "containerPort": 80,
+                        "name": "kibana-port",
                         "protocol": "TCP"
                       }
-                    ], 
-                    "resources": {}, 
+                    ],
+                    "resources": {},
                     "terminationMessagePath": "/dev/termination-log"
                   }
-                ], 
-                "dnsPolicy": "ClusterFirst", 
-                "id": "", 
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "id": "",
                 "restartPolicy": {
                   "always": {}
-                }, 
-                "version": "v1beta2", 
+                },
+                "version": "v1beta2",
                 "volumes": null
               }
-            }, 
+            },
             "labels": {
               "name": "kibana-logging"
             }
-          }, 
+          },
           "replicaSelector": {
             "name": "kibana-logging"
-          }, 
+          },
           "replicas": 1
-        }, 
-        "id": "kibana-logging-controller", 
+        },
+        "id": "kibana-logging-controller",
         "labels": {
           "name": "kibana-logging"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 18, 
-        "selfLink": "/api/v1beta1/replicationControllers/kibana-logging-controller?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 18,
+        "selfLink": "/api/v1beta1/replicationControllers/kibana-logging-controller?namespace=default",
         "uid": "e883e7aa-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:35.083763", 
+      },
+      "timestamp": "2015-03-17T00:01:35.083763",
       "type": "ReplicationController"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitoring-heapster-controller"
-      }, 
-      "id": "ReplicationController:monitoring-heapster-controller", 
+      },
+      "id": "ReplicationController:monitoring-heapster-controller",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:53Z", 
+        "creationTimestamp": "2015-02-19T00:11:53Z",
         "currentState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
-                "containers": null, 
-                "id": "", 
-                "restartPolicy": {}, 
-                "version": "", 
+                "containers": null,
+                "id": "",
+                "restartPolicy": {},
+                "version": "",
                 "volumes": null
               }
             }
-          }, 
+          },
           "replicas": 1
-        }, 
+        },
         "desiredState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
                 "containers": [
                   {
-                    "capabilities": {}, 
+                    "capabilities": {},
                     "env": [
                       {
-                        "key": "INFLUXDB_HOST", 
-                        "name": "INFLUXDB_HOST", 
+                        "key": "INFLUXDB_HOST",
+                        "name": "INFLUXDB_HOST",
                         "value": "monitoring-influxdb"
                       }
-                    ], 
-                    "image": "vish/heapster:canary", 
-                    "imagePullPolicy": "PullIfNotPresent", 
-                    "name": "heapster", 
-                    "resources": {}, 
+                    ],
+                    "image": "vish/heapster:canary",
+                    "imagePullPolicy": "PullIfNotPresent",
+                    "name": "heapster",
+                    "resources": {},
                     "terminationMessagePath": "/dev/termination-log"
                   }
-                ], 
-                "dnsPolicy": "ClusterFirst", 
-                "id": "", 
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "id": "",
                 "restartPolicy": {
                   "always": {}
-                }, 
-                "version": "v1beta2", 
+                },
+                "version": "v1beta2",
                 "volumes": null
               }
-            }, 
+            },
             "labels": {
-              "name": "heapster", 
+              "name": "heapster",
               "uses": "monitoring-influxdb"
             }
-          }, 
+          },
           "replicaSelector": {
             "name": "heapster"
-          }, 
+          },
           "replicas": 1
-        }, 
-        "id": "monitoring-heapster-controller", 
+        },
+        "id": "monitoring-heapster-controller",
         "labels": {
           "name": "heapster"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 17, 
-        "selfLink": "/api/v1beta1/replicationControllers/monitoring-heapster-controller?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 17,
+        "selfLink": "/api/v1beta1/replicationControllers/monitoring-heapster-controller?namespace=default",
         "uid": "e8830cb0-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:35.083763", 
+      },
+      "timestamp": "2015-03-17T00:01:35.083763",
       "type": "ReplicationController"
-    }, 
+    },
     {
       "annotations": {
         "label": "monitoring-influx-grafana-controller"
-      }, 
-      "id": "ReplicationController:monitoring-influx-grafana-controller", 
+      },
+      "id": "ReplicationController:monitoring-influx-grafana-controller",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:53Z", 
+        "creationTimestamp": "2015-02-19T00:11:53Z",
         "currentState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
-                "containers": null, 
-                "id": "", 
-                "restartPolicy": {}, 
-                "version": "", 
+                "containers": null,
+                "id": "",
+                "restartPolicy": {},
+                "version": "",
                 "volumes": null
               }
             }
-          }, 
+          },
           "replicas": 1
-        }, 
+        },
         "desiredState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
                 "containers": [
                   {
-                    "capabilities": {}, 
-                    "image": "kubernetes/heapster_influxdb:v0.3", 
-                    "imagePullPolicy": "PullIfNotPresent", 
-                    "name": "influxdb", 
+                    "capabilities": {},
+                    "image": "kubernetes/heapster_influxdb:v0.3",
+                    "imagePullPolicy": "PullIfNotPresent",
+                    "name": "influxdb",
                     "ports": [
                       {
-                        "containerPort": 8083, 
-                        "hostPort": 8083, 
+                        "containerPort": 8083,
+                        "hostPort": 8083,
                         "protocol": "TCP"
-                      }, 
+                      },
                       {
-                        "containerPort": 8086, 
-                        "hostPort": 8086, 
+                        "containerPort": 8086,
+                        "hostPort": 8086,
                         "protocol": "TCP"
                       }
-                    ], 
-                    "resources": {}, 
+                    ],
+                    "resources": {},
                     "terminationMessagePath": "/dev/termination-log"
-                  }, 
+                  },
                   {
-                    "capabilities": {}, 
+                    "capabilities": {},
                     "env": [
                       {
-                        "key": "HTTP_USER", 
-                        "name": "HTTP_USER", 
+                        "key": "HTTP_USER",
+                        "name": "HTTP_USER",
                         "value": "admin"
-                      }, 
+                      },
                       {
-                        "key": "HTTP_PASS", 
-                        "name": "HTTP_PASS", 
+                        "key": "HTTP_PASS",
+                        "name": "HTTP_PASS",
                         "value": "**None**"
                       }
-                    ], 
-                    "image": "kubernetes/heapster_grafana:v0.3", 
-                    "imagePullPolicy": "PullIfNotPresent", 
-                    "name": "grafana", 
+                    ],
+                    "image": "kubernetes/heapster_grafana:v0.3",
+                    "imagePullPolicy": "PullIfNotPresent",
+                    "name": "grafana",
                     "ports": [
                       {
-                        "containerPort": 80, 
-                        "hostPort": 80, 
+                        "containerPort": 80,
+                        "hostPort": 80,
                         "protocol": "TCP"
                       }
-                    ], 
-                    "resources": {}, 
+                    ],
+                    "resources": {},
                     "terminationMessagePath": "/dev/termination-log"
                   }
-                ], 
-                "dnsPolicy": "ClusterFirst", 
-                "id": "", 
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "id": "",
                 "restartPolicy": {
                   "always": {}
-                }, 
-                "version": "v1beta2", 
+                },
+                "version": "v1beta2",
                 "volumes": null
               }
-            }, 
+            },
             "labels": {
               "name": "influxGrafana"
             }
-          }, 
+          },
           "replicaSelector": {
             "name": "influxGrafana"
-          }, 
+          },
           "replicas": 1
-        }, 
-        "id": "monitoring-influx-grafana-controller", 
+        },
+        "id": "monitoring-influx-grafana-controller",
         "labels": {
           "name": "influxGrafana"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 24, 
-        "selfLink": "/api/v1beta1/replicationControllers/monitoring-influx-grafana-controller?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 24,
+        "selfLink": "/api/v1beta1/replicationControllers/monitoring-influx-grafana-controller?namespace=default",
         "uid": "e88bcebd-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:35.083763", 
+      },
+      "timestamp": "2015-03-17T00:01:35.083763",
       "type": "ReplicationController"
-    }, 
+    },
     {
       "annotations": {
         "label": "redis-slave-controller"
-      }, 
-      "id": "ReplicationController:redis-slave-controller", 
+      },
+      "id": "ReplicationController:redis-slave-controller",
       "properties": {
-        "creationTimestamp": "2015-02-19T01:37:34Z", 
+        "creationTimestamp": "2015-02-19T01:37:34Z",
         "currentState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
-                "containers": null, 
-                "id": "", 
-                "restartPolicy": {}, 
-                "version": "", 
+                "containers": null,
+                "id": "",
+                "restartPolicy": {},
+                "version": "",
                 "volumes": null
               }
             }
-          }, 
+          },
           "replicas": 2
-        }, 
+        },
         "desiredState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
                 "containers": [
                   {
-                    "capabilities": {}, 
-                    "cpu": 200, 
-                    "image": "brendanburns/redis-slave", 
-                    "imagePullPolicy": "PullIfNotPresent", 
-                    "name": "slave", 
+                    "capabilities": {},
+                    "cpu": 200,
+                    "image": "brendanburns/redis-slave",
+                    "imagePullPolicy": "PullIfNotPresent",
+                    "name": "slave",
                     "ports": [
                       {
-                        "containerPort": 6379, 
-                        "hostPort": 6380, 
+                        "containerPort": 6379,
+                        "hostPort": 6380,
                         "protocol": "TCP"
                       }
-                    ], 
+                    ],
                     "resources": {
                       "limits": {
                         "cpu": "0.2"
                       }
-                    }, 
+                    },
                     "terminationMessagePath": "/dev/termination-log"
                   }
-                ], 
-                "dnsPolicy": "ClusterFirst", 
-                "id": "", 
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "id": "",
                 "restartPolicy": {
                   "always": {}
-                }, 
-                "version": "v1beta2", 
+                },
+                "version": "v1beta2",
                 "volumes": null
               }
-            }, 
+            },
             "labels": {
-              "name": "redisslave", 
+              "name": "redisslave",
               "uses": "redis-master"
             }
-          }, 
+          },
           "replicaSelector": {
             "name": "redisslave"
-          }, 
+          },
           "replicas": 2
-        }, 
-        "id": "redis-slave-controller", 
+        },
+        "id": "redis-slave-controller",
         "labels": {
           "name": "redisslave"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 2163, 
-        "selfLink": "/api/v1beta1/replicationControllers/redis-slave-controller?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 2163,
+        "selfLink": "/api/v1beta1/replicationControllers/redis-slave-controller?namespace=default",
         "uid": "e0fe9d98-b7d7-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:35.083763", 
+      },
+      "timestamp": "2015-03-17T00:01:35.083763",
       "type": "ReplicationController"
-    }, 
+    },
     {
       "annotations": {
         "label": "skydns"
-      }, 
-      "id": "ReplicationController:skydns", 
+      },
+      "id": "ReplicationController:skydns",
       "properties": {
-        "creationTimestamp": "2015-02-19T00:11:53Z", 
+        "creationTimestamp": "2015-02-19T00:11:53Z",
         "currentState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
-                "containers": null, 
-                "id": "", 
-                "restartPolicy": {}, 
-                "version": "", 
+                "containers": null,
+                "id": "",
+                "restartPolicy": {},
+                "version": "",
                 "volumes": null
               }
             }
-          }, 
+          },
           "replicas": 1
-        }, 
+        },
         "desiredState": {
           "podTemplate": {
             "desiredState": {
               "manifest": {
                 "containers": [
                   {
-                    "capabilities": {}, 
+                    "capabilities": {},
                     "command": [
-                      "/etcd", 
-                      "-bind-addr=127.0.0.1", 
+                      "/etcd",
+                      "-bind-addr=127.0.0.1",
                       "-peer-bind-addr=127.0.0.1"
-                    ], 
-                    "image": "quay.io/coreos/etcd:latest", 
-                    "imagePullPolicy": "PullAlways", 
-                    "name": "etcd", 
-                    "resources": {}, 
+                    ],
+                    "image": "quay.io/coreos/etcd:latest",
+                    "imagePullPolicy": "PullAlways",
+                    "name": "etcd",
+                    "resources": {},
                     "terminationMessagePath": "/dev/termination-log"
-                  }, 
+                  },
                   {
-                    "capabilities": {}, 
+                    "capabilities": {},
                     "command": [
                       "-domain=kubernetes.local"
-                    ], 
-                    "image": "kubernetes/kube2sky:1.0", 
-                    "imagePullPolicy": "PullIfNotPresent", 
-                    "name": "kube2sky", 
-                    "resources": {}, 
+                    ],
+                    "image": "kubernetes/kube2sky:1.0",
+                    "imagePullPolicy": "PullIfNotPresent",
+                    "name": "kube2sky",
+                    "resources": {},
                     "terminationMessagePath": "/dev/termination-log"
-                  }, 
+                  },
                   {
-                    "capabilities": {}, 
+                    "capabilities": {},
                     "command": [
-                      "-machines=http://localhost:4001", 
-                      "-addr=0.0.0.0:53", 
+                      "-machines=http://localhost:4001",
+                      "-addr=0.0.0.0:53",
                       "-domain=kubernetes.local."
-                    ], 
-                    "image": "kubernetes/skydns:2014-12-23-001", 
-                    "imagePullPolicy": "PullIfNotPresent", 
-                    "name": "skydns", 
+                    ],
+                    "image": "kubernetes/skydns:2014-12-23-001",
+                    "imagePullPolicy": "PullIfNotPresent",
+                    "name": "skydns",
                     "ports": [
                       {
-                        "containerPort": 53, 
-                        "name": "dns", 
+                        "containerPort": 53,
+                        "name": "dns",
                         "protocol": "UDP"
                       }
-                    ], 
-                    "resources": {}, 
+                    ],
+                    "resources": {},
                     "terminationMessagePath": "/dev/termination-log"
                   }
-                ], 
-                "dnsPolicy": "Default", 
-                "id": "", 
+                ],
+                "dnsPolicy": "Default",
+                "id": "",
                 "restartPolicy": {
                   "always": {}
-                }, 
-                "version": "v1beta2", 
+                },
+                "version": "v1beta2",
                 "volumes": null
               }
-            }, 
+            },
             "labels": {
               "k8s-app": "skydns"
             }
-          }, 
+          },
           "replicaSelector": {
             "k8s-app": "skydns"
-          }, 
+          },
           "replicas": 1
-        }, 
-        "id": "skydns", 
+        },
+        "id": "skydns",
         "labels": {
           "k8s-app": "skydns"
-        }, 
-        "namespace": "default", 
-        "resourceVersion": 25, 
-        "selfLink": "/api/v1beta1/replicationControllers/skydns?namespace=default", 
+        },
+        "namespace": "default",
+        "resourceVersion": 25,
+        "selfLink": "/api/v1beta1/replicationControllers/skydns?namespace=default",
         "uid": "e88d6fb4-b7cb-11e4-9018-42010af0f3f2"
-      }, 
-      "timestamp": "2015-03-17T00:01:35.083763", 
+      },
+      "timestamp": "2015-03-17T00:01:35.083763",
       "type": "ReplicationController"
     }
-  ], 
-  "success": true, 
+  ],
+  "success": true,
   "timestamp": "2015-03-17T00:04:18.106157"
 }`)
 
@@ -17545,7 +17561,7 @@ func www_app_shared_assets_sampledata1_json() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/shared/assets/sampleData1.json", size: 427639, mode: os.FileMode(420), modTime: time.Unix(1431651250, 0)}
+	info := bindata_file_info{name: "www/app/shared/assets/sampleData1.json", size: 427639, mode: os.FileMode(420), modTime: time.Unix(1431900600, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -17732,7 +17748,7 @@ func www_app_views_partials_md_table_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 2920, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 2920, mode: os.FileMode(420), modTime: time.Unix(1431888276, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -20705,108 +20721,108 @@ performAction: function anonymous(yytext,yyleng,yylineno,yy,yystate,$$,_$) {
 
 var $0 = $$.length - 1;
 switch (yystate) {
-case 1: return $$[$0-1]; 
+case 1: return $$[$0-1];
 break;
-case 2: this.$ = new yy.ProgramNode([], $$[$0]); 
+case 2: this.$ = new yy.ProgramNode([], $$[$0]);
 break;
-case 3: this.$ = new yy.ProgramNode($$[$0-2], $$[$0]); 
+case 3: this.$ = new yy.ProgramNode($$[$0-2], $$[$0]);
 break;
-case 4: this.$ = new yy.ProgramNode($$[$0-1], []); 
+case 4: this.$ = new yy.ProgramNode($$[$0-1], []);
 break;
-case 5: this.$ = new yy.ProgramNode($$[$0]); 
+case 5: this.$ = new yy.ProgramNode($$[$0]);
 break;
-case 6: this.$ = new yy.ProgramNode([], []); 
+case 6: this.$ = new yy.ProgramNode([], []);
 break;
-case 7: this.$ = new yy.ProgramNode([]); 
+case 7: this.$ = new yy.ProgramNode([]);
 break;
-case 8: this.$ = [$$[$0]]; 
+case 8: this.$ = [$$[$0]];
 break;
-case 9: $$[$0-1].push($$[$0]); this.$ = $$[$0-1]; 
+case 9: $$[$0-1].push($$[$0]); this.$ = $$[$0-1];
 break;
-case 10: this.$ = new yy.BlockNode($$[$0-2], $$[$0-1].inverse, $$[$0-1], $$[$0]); 
+case 10: this.$ = new yy.BlockNode($$[$0-2], $$[$0-1].inverse, $$[$0-1], $$[$0]);
 break;
-case 11: this.$ = new yy.BlockNode($$[$0-2], $$[$0-1], $$[$0-1].inverse, $$[$0]); 
+case 11: this.$ = new yy.BlockNode($$[$0-2], $$[$0-1], $$[$0-1].inverse, $$[$0]);
 break;
-case 12: this.$ = $$[$0]; 
+case 12: this.$ = $$[$0];
 break;
-case 13: this.$ = $$[$0]; 
+case 13: this.$ = $$[$0];
 break;
-case 14: this.$ = new yy.ContentNode($$[$0]); 
+case 14: this.$ = new yy.ContentNode($$[$0]);
 break;
-case 15: this.$ = new yy.CommentNode($$[$0]); 
+case 15: this.$ = new yy.CommentNode($$[$0]);
 break;
-case 16: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1]); 
+case 16: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1]);
 break;
-case 17: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1]); 
+case 17: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1]);
 break;
-case 18: this.$ = $$[$0-1]; 
+case 18: this.$ = $$[$0-1];
 break;
 case 19:
     // Parsing out the '&' escape token at this level saves ~500 bytes after min due to the removal of one parser node.
     this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1], $$[$0-2][2] === '&');
-  
+
 break;
-case 20: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1], true); 
+case 20: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1], true);
 break;
-case 21: this.$ = new yy.PartialNode($$[$0-1]); 
+case 21: this.$ = new yy.PartialNode($$[$0-1]);
 break;
-case 22: this.$ = new yy.PartialNode($$[$0-2], $$[$0-1]); 
+case 22: this.$ = new yy.PartialNode($$[$0-2], $$[$0-1]);
 break;
-case 23: 
+case 23:
 break;
-case 24: this.$ = [[$$[$0-2]].concat($$[$0-1]), $$[$0]]; 
+case 24: this.$ = [[$$[$0-2]].concat($$[$0-1]), $$[$0]];
 break;
-case 25: this.$ = [[$$[$0-1]].concat($$[$0]), null]; 
+case 25: this.$ = [[$$[$0-1]].concat($$[$0]), null];
 break;
-case 26: this.$ = [[$$[$0-1]], $$[$0]]; 
+case 26: this.$ = [[$$[$0-1]], $$[$0]];
 break;
-case 27: this.$ = [[$$[$0]], null]; 
+case 27: this.$ = [[$$[$0]], null];
 break;
-case 28: this.$ = [[$$[$0]], null]; 
+case 28: this.$ = [[$$[$0]], null];
 break;
-case 29: $$[$0-1].push($$[$0]); this.$ = $$[$0-1]; 
+case 29: $$[$0-1].push($$[$0]); this.$ = $$[$0-1];
 break;
-case 30: this.$ = [$$[$0]]; 
+case 30: this.$ = [$$[$0]];
 break;
-case 31: this.$ = $$[$0]; 
+case 31: this.$ = $$[$0];
 break;
-case 32: this.$ = new yy.StringNode($$[$0]); 
+case 32: this.$ = new yy.StringNode($$[$0]);
 break;
-case 33: this.$ = new yy.IntegerNode($$[$0]); 
+case 33: this.$ = new yy.IntegerNode($$[$0]);
 break;
-case 34: this.$ = new yy.BooleanNode($$[$0]); 
+case 34: this.$ = new yy.BooleanNode($$[$0]);
 break;
-case 35: this.$ = $$[$0]; 
+case 35: this.$ = $$[$0];
 break;
-case 36: this.$ = new yy.HashNode($$[$0]); 
+case 36: this.$ = new yy.HashNode($$[$0]);
 break;
-case 37: $$[$0-1].push($$[$0]); this.$ = $$[$0-1]; 
+case 37: $$[$0-1].push($$[$0]); this.$ = $$[$0-1];
 break;
-case 38: this.$ = [$$[$0]]; 
+case 38: this.$ = [$$[$0]];
 break;
-case 39: this.$ = [$$[$0-2], $$[$0]]; 
+case 39: this.$ = [$$[$0-2], $$[$0]];
 break;
-case 40: this.$ = [$$[$0-2], new yy.StringNode($$[$0])]; 
+case 40: this.$ = [$$[$0-2], new yy.StringNode($$[$0])];
 break;
-case 41: this.$ = [$$[$0-2], new yy.IntegerNode($$[$0])]; 
+case 41: this.$ = [$$[$0-2], new yy.IntegerNode($$[$0])];
 break;
-case 42: this.$ = [$$[$0-2], new yy.BooleanNode($$[$0])]; 
+case 42: this.$ = [$$[$0-2], new yy.BooleanNode($$[$0])];
 break;
-case 43: this.$ = [$$[$0-2], $$[$0]]; 
+case 43: this.$ = [$$[$0-2], $$[$0]];
 break;
-case 44: this.$ = new yy.PartialNameNode($$[$0]); 
+case 44: this.$ = new yy.PartialNameNode($$[$0]);
 break;
-case 45: this.$ = new yy.PartialNameNode(new yy.StringNode($$[$0])); 
+case 45: this.$ = new yy.PartialNameNode(new yy.StringNode($$[$0]));
 break;
-case 46: this.$ = new yy.PartialNameNode(new yy.IntegerNode($$[$0])); 
+case 46: this.$ = new yy.PartialNameNode(new yy.IntegerNode($$[$0]));
 break;
-case 47: this.$ = new yy.DataNode($$[$0]); 
+case 47: this.$ = new yy.DataNode($$[$0]);
 break;
-case 48: this.$ = new yy.IdNode($$[$0]); 
+case 48: this.$ = new yy.IdNode($$[$0]);
 break;
-case 49: $$[$0-2].push({part: $$[$0], separator: $$[$0-1]}); this.$ = $$[$0-2]; 
+case 49: $$[$0-2].push({part: $$[$0], separator: $$[$0-1]}); this.$ = $$[$0-2];
 break;
-case 50: this.$ = [{part: $$[$0]}]; 
+case 50: this.$ = [{part: $$[$0]}];
 break;
 }
 },
@@ -21092,77 +21108,77 @@ lexer.performAction = function anonymous(yy,yy_,$avoiding_name_collisions,YY_STA
 
 var YYSTATE=YY_START
 switch($avoiding_name_collisions) {
-case 0: yy_.yytext = "\\"; return 14; 
+case 0: yy_.yytext = "\\"; return 14;
 break;
 case 1:
                                    if(yy_.yytext.slice(-1) !== "\\") this.begin("mu");
                                    if(yy_.yytext.slice(-1) === "\\") yy_.yytext = yy_.yytext.substr(0,yy_.yyleng-1), this.begin("emu");
                                    if(yy_.yytext) return 14;
-                                 
+
 break;
-case 2: return 14; 
+case 2: return 14;
 break;
 case 3:
                                    if(yy_.yytext.slice(-1) !== "\\") this.popState();
                                    if(yy_.yytext.slice(-1) === "\\") yy_.yytext = yy_.yytext.substr(0,yy_.yyleng-1);
                                    return 14;
-                                 
+
 break;
-case 4: yy_.yytext = yy_.yytext.substr(0, yy_.yyleng-4); this.popState(); return 15; 
+case 4: yy_.yytext = yy_.yytext.substr(0, yy_.yyleng-4); this.popState(); return 15;
 break;
-case 5: return 25; 
+case 5: return 25;
 break;
-case 6: return 16; 
+case 6: return 16;
 break;
-case 7: return 20; 
+case 7: return 20;
 break;
-case 8: return 19; 
+case 8: return 19;
 break;
-case 9: return 19; 
+case 9: return 19;
 break;
-case 10: return 23; 
+case 10: return 23;
 break;
-case 11: return 22; 
+case 11: return 22;
 break;
-case 12: this.popState(); this.begin('com'); 
+case 12: this.popState(); this.begin('com');
 break;
-case 13: yy_.yytext = yy_.yytext.substr(3,yy_.yyleng-5); this.popState(); return 15; 
+case 13: yy_.yytext = yy_.yytext.substr(3,yy_.yyleng-5); this.popState(); return 15;
 break;
-case 14: return 22; 
+case 14: return 22;
 break;
-case 15: return 37; 
+case 15: return 37;
 break;
-case 16: return 36; 
+case 16: return 36;
 break;
-case 17: return 36; 
+case 17: return 36;
 break;
-case 18: return 40; 
+case 18: return 40;
 break;
-case 19: /*ignore whitespace*/ 
+case 19: /*ignore whitespace*/
 break;
-case 20: this.popState(); return 24; 
+case 20: this.popState(); return 24;
 break;
-case 21: this.popState(); return 18; 
+case 21: this.popState(); return 18;
 break;
-case 22: yy_.yytext = yy_.yytext.substr(1,yy_.yyleng-2).replace(/\\"/g,'"'); return 31; 
+case 22: yy_.yytext = yy_.yytext.substr(1,yy_.yyleng-2).replace(/\\"/g,'"'); return 31;
 break;
-case 23: yy_.yytext = yy_.yytext.substr(1,yy_.yyleng-2).replace(/\\'/g,"'"); return 31; 
+case 23: yy_.yytext = yy_.yytext.substr(1,yy_.yyleng-2).replace(/\\'/g,"'"); return 31;
 break;
-case 24: return 38; 
+case 24: return 38;
 break;
-case 25: return 33; 
+case 25: return 33;
 break;
-case 26: return 33; 
+case 26: return 33;
 break;
-case 27: return 32; 
+case 27: return 32;
 break;
-case 28: return 36; 
+case 28: return 36;
 break;
-case 29: yy_.yytext = yy_.yytext.substr(1, yy_.yyleng-2); return 36; 
+case 29: yy_.yytext = yy_.yytext.substr(1, yy_.yyleng-2); return 36;
 break;
-case 30: return 'INVALID'; 
+case 30: return 'INVALID';
 break;
-case 31: return 5; 
+case 31: return 5;
 break;
 }
 };
@@ -22885,7 +22901,7 @@ func third_party_swagger_ui_lib_jquery_1_8_0_min_js() (*asset, error) {
 var _third_party_swagger_ui_lib_jquery_ba_bbq_min_js = []byte(`/*
  * jQuery BBQ: Back Button & Query Library - v1.2.1 - 2/17/2010
  * http://benalman.com/projects/jquery-bbq-plugin/
- * 
+ *
  * Copyright (c) 2010 "Cowboy" Ben Alman
  * Dual licensed under the MIT and GPL licenses.
  * http://benalman.com/about/license/
@@ -22894,7 +22910,7 @@ var _third_party_swagger_ui_lib_jquery_ba_bbq_min_js = []byte(`/*
 /*
  * jQuery hashchange event - v1.2 - 2/11/2010
  * http://benalman.com/projects/jquery-hashchange-plugin/
- * 
+ *
  * Copyright (c) 2010 "Cowboy" Ben Alman
  * Dual licensed under the MIT and GPL licenses.
  * http://benalman.com/about/license/
@@ -24276,7 +24292,7 @@ Content.prototype = {
 
 // ` + "`" + `Content` + "`" + ` objects have the following attributes:
 Object.defineProperties(Content.prototype,{
-  
+
 // - **type**. Typically accessed as ` + "`" + `content.type` + "`" + `, reflects the ` + "`" + `content-type` + "`" + `
 //   header associated with the request or response. If not passed as an options
 //   to the constructor or set explicitly, it will infer the type the ` + "`" + `data` + "`" + `
@@ -24390,7 +24406,7 @@ Content.processors = {};
 // - **stringify**. The function used to convert a Javascript data type into a
 //   raw content entity.
 Content.registerProcessor = function(types,processor) {
-  
+
 // You can pass an array of types that will trigger this processor, or just one.
 // We determine the array via duck-typing here.
   if (types.forEach) {
@@ -24480,33 +24496,33 @@ require._core = {
 require.resolve = (function () {
     return function (x, cwd) {
         if (!cwd) cwd = '/';
-        
+
         if (require._core[x]) return x;
         var path = require.modules.path();
         var y = cwd || '.';
-        
+
         if (x.match(/^(?:\.\.?\/|\/)/)) {
             var m = loadAsFileSync(path.resolve(y, x))
                 || loadAsDirectorySync(path.resolve(y, x));
             if (m) return m;
         }
-        
+
         var n = loadNodeModulesSync(x, y);
         if (n) return n;
-        
+
         throw new Error("Cannot find module '" + x + "'");
-        
+
         function loadAsFileSync (x) {
             if (require.modules[x]) {
                 return x;
             }
-            
+
             for (var i = 0; i < require.extensions.length; i++) {
                 var ext = require.extensions[i];
                 if (require.modules[x + ext]) return x + ext;
             }
         }
-        
+
         function loadAsDirectorySync (x) {
             x = x.replace(/\/+$/, '');
             var pkgfile = x + '/package.json';
@@ -24526,10 +24542,10 @@ require.resolve = (function () {
                     if (m) return m;
                 }
             }
-            
+
             return loadAsFileSync(x + '/index');
         }
-        
+
         function loadNodeModulesSync (x, start) {
             var dirs = nodeModulesPathsSync(start);
             for (var i = 0; i < dirs.length; i++) {
@@ -24539,23 +24555,23 @@ require.resolve = (function () {
                 var n = loadAsDirectorySync(dir + '/' + x);
                 if (n) return n;
             }
-            
+
             var m = loadAsFileSync(x);
             if (m) return m;
         }
-        
+
         function nodeModulesPathsSync (start) {
             var parts;
             if (start === '/') parts = [ '' ];
             else parts = path.normalize(start).split('/');
-            
+
             var dirs = [];
             for (var i = parts.length - 1; i >= 0; i--) {
                 if (parts[i] === 'node_modules') continue;
                 var dir = parts.slice(0, i + 1).join('/') + '/node_modules';
                 dirs.push(dir);
             }
-            
+
             return dirs;
         }
     };
@@ -24571,13 +24587,13 @@ require.alias = function (from, to) {
         res = require.resolve(from, '/');
     }
     var basedir = path.dirname(res);
-    
+
     var keys = (Object.keys || function (obj) {
         var res = [];
         for (var key in obj) res.push(key)
         return res;
     })(require.modules);
-    
+
     for (var i = 0; i < keys.length; i++) {
         var key = keys[i];
         if (key.slice(0, basedir.length + 1) === basedir + '/') {
@@ -24595,7 +24611,7 @@ require.define = function (filename, fn) {
         ? ''
         : require.modules.path().dirname(filename)
     ;
-    
+
     var require_ = function (file) {
         return require(file, dirname)
     };
@@ -24605,7 +24621,7 @@ require.define = function (filename, fn) {
     require_.modules = require.modules;
     require_.define = require.define;
     var module_ = { exports : {} };
-    
+
     require.modules[filename] = function () {
         require.modules[filename]._cached = module_.exports;
         fn.call(
@@ -24628,7 +24644,7 @@ if (!process.nextTick) process.nextTick = (function () {
     var canPost = typeof window !== 'undefined'
         && window.postMessage && window.addEventListener
     ;
-    
+
     if (canPost) {
         window.addEventListener('message', function (ev) {
             if (ev.source === window && ev.data === 'browserify-tick') {
@@ -24640,7 +24656,7 @@ if (!process.nextTick) process.nextTick = (function () {
             }
         }, true);
     }
-    
+
     return function (fn) {
         if (canPost) {
             queue.push(fn);
@@ -24750,7 +24766,7 @@ path = normalizeArray(filter(path.split('/'), function(p) {
   if (path && trailingSlash) {
     path += '/';
   }
-  
+
   return (isAbsolute ? '/' : '') + path;
 };
 
@@ -24801,7 +24817,7 @@ require.define("/shred.js", function (require, module, exports, __dirname, __fil
     // Shred is an HTTP client library intended to simplify the use of Node's
 // built-in HTTP library. In particular, we wanted to make it easier to interact
 // with HTTP-based APIs.
-// 
+//
 // See the [examples](./examples.html) for more details.
 
 // Ax is a nice logging library we wrote. You can use any logger, providing it
@@ -24823,7 +24839,7 @@ var Shred = function(options) {
 };
 
 // Most of the real work is done in the request and reponse classes.
- 
+
 Shred.Request = require("./shred/request");
 Shred.Response = require("./shred/response");
 
@@ -24894,7 +24910,7 @@ var format = function(level,message) {
 
 var noOp = function(message) { return this; }
 var makeLogger = function(level,fn) {
-  return function(message) { 
+  return function(message) {
     this.stream.write(this.format(level, message)+"\n");
     return this;
   }
@@ -25006,7 +25022,7 @@ require.define("/node_modules/cookiejar/cookiejar.js", function (require, module
       return this;
     }
     else {
-        return new CookieAccessInfo(domain,path,secure,script)    
+        return new CookieAccessInfo(domain,path,secure,script)
     }
 }
 
@@ -25065,7 +25081,7 @@ Cookie.prototype.parse = function parse(str) {
       , value=pair[2];
       this.name = key;
       this.value = value;
-    
+
       for(var i=1;i<parts.length;i++) {
         pair=parts[i].match(/([^=]+)(?:=((?:.|\n)*))?/)
         , key=pair[1].trim().toLowerCase()
@@ -25094,7 +25110,7 @@ Cookie.prototype.parse = function parse(str) {
           break
         }
       }
-    
+
       return this;
   }
     return new Cookie().parse(str)
@@ -25135,7 +25151,7 @@ Cookie.prototype.collidesWith = function collidesWith(access_info) {
 exports.CookieJar=CookieJar=function CookieJar() {
   if(this instanceof CookieJar) {
       var cookies = {} //name: [Cookie]
-    
+
       this.setCookie = function setCookie(cookie) {
         cookie = Cookie(cookie);
         //Delete the cookie if the set is past the current time
@@ -25199,7 +25215,7 @@ exports.CookieJar=CookieJar=function CookieJar() {
             matches.toValueString=function() {return matches.map(function(c){return c.toValueString();}).join(';');}
         return matches;
       }
-    
+
       return this;
   }
     return new CookieJar()
@@ -25577,7 +25593,7 @@ var processOptions = function(request,options) {
       request.setHeader("cookie", cookieString);
     }
   }
-  
+
   // The content entity can be set either using the ` + "`" + `body` + "`" + ` or ` + "`" + `content` + "`" + ` attributes.
   if (options.body||options.content) {
     request.content = options.body||options.content;
@@ -26195,14 +26211,14 @@ try {
 // ` + "`" + `Request` + "`" + ` object handles this, getting the raw response object and passing it
 // in here, along with the request. The callback allows us to stream the response
 // and then use the callback to let the request know when it's ready.
-var Response = function(raw, request, callback) { 
+var Response = function(raw, request, callback) {
   var response = this;
   this._raw = raw;
 
   // The ` + "`" + `._setHeaders` + "`" + ` method is "private"; you can't otherwise set headers on
   // the response.
   this._setHeaders.call(this,raw.headers);
-  
+
   // store any cookies
   if (request.cookieJar && this.getHeader('set-cookie')) {
     var cookieStrings = this.getHeader('set-cookie');
@@ -26265,7 +26281,7 @@ var Response = function(raw, request, callback) {
     }
 
     var setBodyAndFinish = function (body) {
-      response._body = new Content({ 
+      response._body = new Content({
         body: body,
         type: response.getHeader("Content-Type")
       });
@@ -26285,7 +26301,7 @@ var Response = function(raw, request, callback) {
     else{
        if (response.request.encoding){
             body = Iconv.fromEncoding(body,response.request.encoding);
-        }        
+        }
       setBodyAndFinish(body);
     }
   });
@@ -26318,8 +26334,8 @@ Response.prototype = {
 
 // ` + "`" + `Response` + "`" + ` object properties, all of which are read-only:
 Object.defineProperties(Response.prototype, {
-  
-// - **status**. The HTTP status code for the response. 
+
+// - **status**. The HTTP status code for the response.
   status: {
     get: function() { return this._raw.statusCode; },
     enumerable: true
@@ -26377,7 +26393,7 @@ module.exports = Response;
 });
 
 require.define("/shred/content.js", function (require, module, exports, __dirname, __filename) {
-    
+
 // The purpose of the ` + "`" + `Content` + "`" + ` object is to abstract away the data conversions
 // to and from raw content entities as strings. For example, you want to be able
 // to pass in a Javascript object and have it be automatically converted into a
@@ -26407,7 +26423,7 @@ Content.prototype = {
 
 // ` + "`" + `Content` + "`" + ` objects have the following attributes:
 Object.defineProperties(Content.prototype,{
-  
+
 // - **type**. Typically accessed as ` + "`" + `content.type` + "`" + `, reflects the ` + "`" + `content-type` + "`" + `
 //   header associated with the request or response. If not passed as an options
 //   to the constructor or set explicitly, it will infer the type the ` + "`" + `data` + "`" + `
@@ -26521,7 +26537,7 @@ Content.processors = {};
 // - **stringify**. The function used to convert a Javascript data type into a
 //   raw content entity.
 Content.registerProcessor = function(types,processor) {
-  
+
 // You can pass an array of types that will trigger this processor, or just one.
 // We determine the array via duck-typing here.
   if (types.forEach) {
@@ -26576,7 +26592,7 @@ require.define("/shred/mixins/headers.js", function (require, module, exports, _
 // overload the index operator in Javascript, using a hash to represent the
 // headers means it's possible to have two conflicting values for a single
 // header.
-// 
+//
 // The solution to this is to provide explicit methods to set or get headers.
 // This also has the benefit of allowing us to introduce additional variations,
 // including snake case, which we automatically convert to what Matthew King has
@@ -26590,7 +26606,7 @@ require.define("/shred/mixins/headers.js", function (require, module, exports, _
 var corsetCase = function(string) {
   return string;//.toLowerCase()
       //.replace("_","-")
-      // .replace(/(^|-)(\w)/g, 
+      // .replace(/(^|-)(\w)/g,
           // function(s) { return s.toUpperCase(); });
 };
 
@@ -26614,7 +26630,7 @@ var getHeader = function(object,name) {
 };
 
 // The "real" ` + "`" + `getHeader` + "`" + ` function: get one or more headers, or all of them
-// if you don't ask for any specifics. 
+// if you don't ask for any specifics.
 var getHeaders = function(object,names) {
   var keys = (names && names.length>0) ? names : Object.keys($H(object));
   var hash = keys.reduce(function(hash,key) {
@@ -26642,7 +26658,7 @@ var setHeaders = function(object,hash) {
 // Here's where we actually bind the functionality to an object. These mixins work by
 // exposing mixin functions. Each function mixes in a specific batch of features.
 module.exports = {
-  
+
   // Add getters.
   getters: function(constructor) {
     constructor.prototype.getHeader = function(name) { return getHeader(this,name); };
@@ -26682,10 +26698,10 @@ var iconv = module.exports = {
     fromEncoding: function(buf, encoding) {
         return iconv.getCodec(encoding).fromEncoding(buf);
     },
-    
+
     defaultCharUnicode: '�',
     defaultCharSingleByte: '?',
-    
+
     // Get correct codec for given encoding.
     getCodec: function(encoding) {
         var enc = encoding || "utf8";
@@ -26704,7 +26720,7 @@ var iconv = module.exports = {
                 // Options for other encoding.
                 codecOptions = codec;
                 enc = codec.type;
-            } 
+            }
             else if (type === "Function")
                 // Codec itself.
                 return codec(codecOptions);
@@ -26712,7 +26728,7 @@ var iconv = module.exports = {
                 throw new Error("Encoding not recognized: '" + encoding + "' (searched as: '"+enc+"')");
         }
     },
-    
+
     // Define basic encodings
     encodings: {
         internal: function(options) {
@@ -26730,20 +26746,20 @@ var iconv = module.exports = {
         binary: "internal",
         ascii: "internal",
         base64: "internal",
-        
+
         // Codepage single-byte encodings.
         singlebyte: function(options) {
             // Prepare chars if needed
             if (!options.chars || (options.chars.length !== 128 && options.chars.length !== 256))
                 throw new Error("Encoding '"+options.type+"' has incorrect 'chars' (must be of len 128 or 256)");
-            
+
             if (options.chars.length === 128)
                 options.chars = asciiString + options.chars;
-            
+
             if (!options.charsBuf) {
                 options.charsBuf = new Buffer(options.chars, 'ucs2');
             }
-            
+
             if (!options.revCharsBuf) {
                 options.revCharsBuf = new Buffer(65536);
                 var defChar = iconv.defaultCharSingleByte.charCodeAt(0);
@@ -26752,21 +26768,21 @@ var iconv = module.exports = {
                 for (var i = 0; i < options.chars.length; i++)
                     options.revCharsBuf[options.chars.charCodeAt(i)] = i;
             }
-            
+
             return {
                 toEncoding: function(str) {
                     str = ensureString(str);
-                    
+
                     var buf = new Buffer(str.length);
                     var revCharsBuf = options.revCharsBuf;
                     for (var i = 0; i < str.length; i++)
                         buf[i] = revCharsBuf[str.charCodeAt(i)];
-                    
+
                     return buf;
                 },
                 fromEncoding: function(buf) {
                     buf = ensureBuffer(buf);
-                    
+
                     // Strings are immutable in JS -> we use ucs2 buffer to speed up computations.
                     var charsBuf = options.charsBuf;
                     var newBuf = new Buffer(buf.length*2);
@@ -26793,7 +26809,7 @@ var iconv = module.exports = {
                     revCharsTable[table[key]] = parseInt(key);
                 }
             }
-            
+
             return {
                 toEncoding: function(str) {
                     str = ensureString(str);
@@ -26803,7 +26819,7 @@ var iconv = module.exports = {
                         if (str.charCodeAt(i) >> 7)
                             bufLen++;
 
-                    var newBuf = new Buffer(bufLen), gbkcode, unicode, 
+                    var newBuf = new Buffer(bufLen), gbkcode, unicode,
                         defaultChar = revCharsTable[iconv.defaultCharUnicode.charCodeAt(0)];
 
                     for (var i = 0, j = 0; i < strLen; i++) {
@@ -26828,7 +26844,7 @@ var iconv = module.exports = {
                     }
                     var newBuf = new Buffer(strLen*2), unicode, gbkcode,
                         defaultChar = iconv.defaultCharUnicode.charCodeAt(0);
-                    
+
                     for (var i = 0, j = 0; i < bufLen; i++, j+=2) {
                         gbkcode = buf[i];
                         if (gbkcode & 0x80) {
@@ -26895,7 +26911,7 @@ http.request = function (params, cb) {
     if (!params) params = {};
     if (!params.host) params.host = window.location.host.split(':')[0];
     if (!params.port) params.port = window.location.port;
-    
+
     var req = new Request(new xhrHttp, params);
     if (cb) req.on('response', cb);
     return req;
@@ -27010,15 +27026,15 @@ var Request = module.exports = function (xhr, params) {
     var self = this;
     self.xhr = xhr;
     self.body = '';
-    
+
     var uri = params.host + ':' + params.port + (params.path || '/');
-    
+
     xhr.open(
         params.method || 'GET',
         (params.scheme || 'http') + '://' + uri,
         true
     );
-    
+
     if (params.headers) {
         Object.keys(params.headers).forEach(function (key) {
             if (!isSafeHeader(key)) return;
@@ -27031,12 +27047,12 @@ var Request = module.exports = function (xhr, params) {
             else xhr.setRequestHeader(key, value)
         });
     }
-    
+
     var res = new Response(xhr);
     res.on('ready', function () {
         self.emit('response', res);
     });
-    
+
     xhr.onreadystatechange = function () {
         res.handle(xhr);
     };
@@ -27089,11 +27105,11 @@ function parseHeaders (xhr) {
     for (var i = 0; i < lines.length; i++) {
         var line = lines[i];
         if (line === '') continue;
-        
+
         var m = line.match(/^([^:]+):\s*(.*)/);
         if (m) {
             var key = m[1].toLowerCase(), value = m[2];
-            
+
             if (headers[key] !== undefined) {
                 if ((Array.isArray && Array.isArray(headers[key]))
                 || headers[key] instanceof Array) {
@@ -27137,7 +27153,7 @@ Response.prototype.handle = function () {
         catch (err) {
             capable.status2 = false;
         }
-        
+
         if (capable.status2) {
             this.emit('ready');
         }
@@ -27151,7 +27167,7 @@ Response.prototype.handle = function () {
             }
         }
         catch (err) {}
-        
+
         try {
             this.write();
         }
@@ -27165,7 +27181,7 @@ Response.prototype.handle = function () {
             this.emit('ready');
         }
         this.write();
-        
+
         if (xhr.error) {
             this.emit('error', xhr.responseText);
         }
@@ -27247,7 +27263,7 @@ var ArrayModel = function(definition) {
   this.name = "arrayModel";
   this.definition = definition || {};
   this.properties = [];
-  
+
   var requiredFields = definition.enum || [];
   var innerType = definition.items;
   if(innerType) {
@@ -28654,7 +28670,7 @@ Property.prototype.toString = function() {
   }
 
 
-  var options = ''; 
+  var options = '';
   var isArray = this.schema.type === 'array';
   var type;
 
@@ -28716,11 +28732,11 @@ Property.prototype.toString = function() {
     }
 
     options += optionHtml('Enum', enumString);
-  }     
+  }
 
   if (options.length > 0)
     str = '<span class="propWrap">' + str + '<table class="optionsWrapper"><tr><th colspan="2">' + this.name + '</th></tr>' + options + '</table></span>';
-  
+
   return str;
 };
 
@@ -29080,11 +29096,11 @@ SwaggerResource.prototype.addOperations = function (resource_path, ops, consumes
           o.summary,
           o.notes,
           type,
-          responseMessages, 
-          this, 
-          consumes, 
-          produces, 
-          o.authorizations, 
+          responseMessages,
+          this,
+          consumes,
+          produces,
+          o.authorizations,
           o.deprecated);
 
       this.operations[op.nickname] = op;
@@ -29566,15 +29582,15 @@ SwaggerOperation.prototype.urlify = function (args) {
     param = params[i];
     if(param.paramType === 'query') {
       if (queryParams !== '')
-        queryParams += '&';    
+        queryParams += '&';
       if (Array.isArray(param)) {
-        var output = '';   
-        for(j = 0; j < param.length; j++) {    
-          if(j > 0)    
-            output += ',';   
-          output += encodeURIComponent(param[j]);    
-        }    
-        queryParams += encodeURIComponent(param.name) + '=' + output;    
+        var output = '';
+        for(j = 0; j < param.length; j++) {
+          if(j > 0)
+            output += ',';
+          output += encodeURIComponent(param[j]);
+        }
+        queryParams += encodeURIComponent(param.name) + '=' + output;
       }
       else {
         if (typeof args[param.name] !== 'undefined') {
@@ -29640,7 +29656,7 @@ SwaggerOperation.prototype.asCurl = function (args) {
   var results = [];
   var i;
 
-  var headers = SwaggerRequest.prototype.setHeaders(args, {}, this);    
+  var headers = SwaggerRequest.prototype.setHeaders(args, {}, this);
   for(i = 0; i < this.parameters.length; i++) {
     var param = this.parameters[i];
     if(param.paramType && param.paramType === 'header' && args[param.name]) {
@@ -30288,12 +30304,12 @@ function handleLogin() {
     for (var key in authSchemes) {
       if (authSchemes.hasOwnProperty(key)) {
         var flow = authSchemes[key].flow;
-        
+
         if(authSchemes[key].type === 'oauth2' && flow && (flow === 'implicit' || flow === 'accessCode')) {
           var dets = authSchemes[key];
           url = dets.authorizationUrl + '?response_type=' + (flow === 'implicit' ? 'token' : 'code');
           window.swaggerUi.tokenName = dets.tokenName || 'access_token';
-          window.swaggerUi.tokenUrl = (flow === 'accessCode' ? dets.tokenUrl : null);          
+          window.swaggerUi.tokenUrl = (flow === 'accessCode' ? dets.tokenUrl : null);
         }
         else if(authSchemes[key].grantTypes) {
           // 1.2 support
@@ -30320,7 +30336,7 @@ function handleLogin() {
 
     for(k =0; k < o.length; k++) {
       var scope = $(o[k]).attr('scope');
-      
+
       if (scopes.indexOf(scope) === -1)
         scopes.push(scope);
     }
@@ -30392,11 +30408,11 @@ function processOAuthCode(data) {
     url : window.swaggerUi.tokenUrl,
     type: "POST",
     data: params,
-    success:function(data, textStatus, jqXHR) 
+    success:function(data, textStatus, jqXHR)
     {
       onOAuthComplete(data);
     },
-    error: function(jqXHR, textStatus, errorThrown) 
+    error: function(jqXHR, textStatus, errorThrown)
     {
       onOAuthComplete("");
     }
@@ -30450,7 +30466,7 @@ function onOAuthComplete(token) {
               // all scopes are satisfied
               $(o).find('.api-ic').addClass('ic-info');
               $(o).find('.api-ic').removeClass('ic-warning');
-              $(o).find('.api-ic').removeClass('ic-error');          
+              $(o).find('.api-ic').removeClass('ic-error');
             }
           }
         });
@@ -31459,16 +31475,16 @@ var _third_party_swagger_ui_lib_swagger_js = []byte(`// swagger.js
       var param = params[i];
       if(param.paramType === 'query') {
         if (queryParams !== '')
-          queryParams += '&';    
+          queryParams += '&';
         if (Array.isArray(param)) {
-          var j;   
-          var output = '';   
-          for(j = 0; j < param.length; j++) {    
-            if(j > 0)    
-              output += ',';   
-            output += encodeURIComponent(param[j]);    
-          }    
-          queryParams += encodeURIComponent(param.name) + '=' + output;    
+          var j;
+          var output = '';
+          for(j = 0; j < param.length; j++) {
+            if(j > 0)
+              output += ',';
+            output += encodeURIComponent(param[j]);
+          }
+          queryParams += encodeURIComponent(param.name) + '=' + output;
         }
         else {
           if (args[param.name]) {
@@ -32384,7 +32400,7 @@ var Docs = {
 			$('.resource ul.endpoints').slideDown();
 			return;
 		}
-		
+
 		$('li#resource_' + resource).addClass('active');
 
 		var elem = $('li#resource_' + resource + ' ul.endpoints');
@@ -32408,7 +32424,7 @@ var Docs = {
 	expandOperationsForResource: function(resource) {
 		// Make sure the resource container is open..
 		Docs.expandEndpointListForResource(resource);
-		
+
 		if (resource == '') {
 			$('.resource ul.endpoints li.operation div.content').slideDown();
 			return;
@@ -34597,6 +34613,7 @@ var _bindata = map[string]func() (*asset, error){
 	"www/app/components/dashboard/pages/header.html":                     www_app_components_dashboard_pages_header_html,
 	"www/app/components/dashboard/pages/home.html":                       www_app_components_dashboard_pages_home_html,
 	"www/app/components/dashboard/protractor/smoke.spec.js":              www_app_components_dashboard_protractor_smoke_spec_js,
+	"www/app/components/dashboard/test/controllers/header.spec.js":       www_app_components_dashboard_test_controllers_header_spec_js,
 	"www/app/components/dashboard/views/groups.html":                     www_app_components_dashboard_views_groups_html,
 	"www/app/components/dashboard/views/listEvents.html":                 www_app_components_dashboard_views_listevents_html,
 	"www/app/components/dashboard/views/listMinions.html":                www_app_components_dashboard_views_listminions_html,
@@ -34804,6 +34821,11 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 					}},
 					"protractor": {nil, map[string]*_bintree_t{
 						"smoke.spec.js": {www_app_components_dashboard_protractor_smoke_spec_js, map[string]*_bintree_t{}},
+					}},
+					"test": {nil, map[string]*_bintree_t{
+						"controllers": {nil, map[string]*_bintree_t{
+							"header.spec.js": {www_app_components_dashboard_test_controllers_header_spec_js, map[string]*_bintree_t{}},
+						}},
 					}},
 					"views": {nil, map[string]*_bintree_t{
 						"groups.html":                     {www_app_components_dashboard_views_groups_html, map[string]*_bintree_t{}},
