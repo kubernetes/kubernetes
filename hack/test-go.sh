@@ -53,9 +53,9 @@ KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # Comma separated list of API Versions that should be tested.
 KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1beta1,v1beta3"}
-# Prefixes for etcd paths (standard and customized)
-ETCD_STANDARD_PREFIX="registry"
-ETCD_CUSTOM_PREFIX="kubernetes.io/registry"
+# Run tests with the standard (registry) and a custom etcd prefix
+# (kubernetes.io/registry).
+KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry,kubernetes.io/registry"}
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -204,17 +204,31 @@ reportCoverageToCoveralls() {
   fi
 }
 
-# Convert the CSV to an array of API versions to test
+# Convert the CSVs to arrays.
 IFS=',' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
-ETCD_PREFIX=${ETCD_STANDARD_PREFIX}
-LAST_API_VERSION=""
-for apiVersion in "${apiVersions[@]}"; do
-  echo "Running tests for APIVersion: $apiVersion"
-  LAST_API_VERSION=$apiVersion
-  KUBE_API_VERSION="${apiVersion}" ETCD_PREFIX=${ETCD_STANDARD_PREFIX} runTests "$@"
+IFS=',' read -a etcdPrefixes <<< "${KUBE_TEST_ETCD_PREFIXES}"
+apiVersionsCount=${#apiVersions[@]}
+etcdPrefixesCount=${#etcdPrefixes[@]}
+for (( i=0, j=0; ; )); do
+  apiVersion=${apiVersions[i]}
+  etcdPrefix=${etcdPrefixes[j]}
+  echo "Running tests for APIVersion: $apiVersion with etcdPrefix: $etcdPrefix"
+  KUBE_API_VERSION="${apiVersion}" ETCD_PREFIX=${etcdPrefix} runTests "$@"
+  i=${i}+1
+  j=${j}+1
+  if [[ i -eq ${apiVersionsCount} ]] && [[ j -eq ${etcdPrefixesCount} ]]; then
+    # All api versions and etcd prefixes tested.
+    break
+  fi
+  if [[ i -eq ${apiVersionsCount} ]]; then
+    # Use the last api version for remaining etcd prefixes.
+    i=${i}-1
+  fi
+   if [[ j -eq ${etcdPrefixesCount} ]]; then
+     # Use the last etcd prefix for remaining api versions.
+    j=${j}-1
+  fi
 done
-echo "Using custom etcd path prefix: ${ETCD_CUSTOM_PREFIX}"
-KUBE_API_VERSION="${LAST_API_VERSION}" ETCD_PREFIX=${ETCD_CUSTOM_PREFIX} runTests "$@"
 
 # We might run the tests for multiple versions, but we want to report only
 # one of them to coveralls. Here we report coverage from the last run.
