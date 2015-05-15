@@ -811,6 +811,9 @@ type PodSpec struct {
 	// a termination signal and the time when the processes are forcibly halted with a kill signal.
 	// Set this value longer than the expected cleanup time for your process.
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
+	// Optional duration in seconds relative to the StartTime that the pod may be active on a node
+	// before the system actively tries to terminate the pod; value must be positive integer
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 	// Required: Set DNS policy.
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
@@ -840,6 +843,10 @@ type PodStatus struct {
 
 	HostIP string `json:"hostIP,omitempty"`
 	PodIP  string `json:"podIP,omitempty"`
+
+	// Date and time at which the object was acknowledged by the Kubelet.
+	// This is before the Kubelet pulled the container image(s) for the pod.
+	StartTime *util.Time `json:"startTime,omitempty"`
 
 	// The list has one entry per container in the manifest. Each entry is
 	// currently the output of `docker inspect`. This output format is *not*
@@ -1692,6 +1699,7 @@ type ContainerManifest struct {
 	Containers                    []Container   `json:"containers"`
 	RestartPolicy                 RestartPolicy `json:"restartPolicy,omitempty"`
 	TerminationGracePeriodSeconds *int64        `json:"terminationGracePeriodSeconds,omitempty"`
+	ActiveDeadlineSeconds         *int64        `json:"activeDeadlineSeconds,omitempty"`
 	// Required: Set DNS policy.
 	DNSPolicy   DNSPolicy `json:"dnsPolicy"`
 	HostNetwork bool      `json:"hostNetwork,omitempty"`

@@ -710,6 +710,10 @@ func init() {
 				out.TerminationGracePeriodSeconds = new(int64)
 				*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
 			}
+			if in.ActiveDeadlineSeconds != nil {
+				out.ActiveDeadlineSeconds = new(int64)
+				*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
+			}
 			out.DNSPolicy = DNSPolicy(in.DNSPolicy)
 			out.Version = "v1beta2"
 			out.HostNetwork = in.HostNetwork
@@ -728,6 +732,10 @@ func init() {
 			if in.TerminationGracePeriodSeconds != nil {
 				out.TerminationGracePeriodSeconds = new(int64)
 				*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
+			}
+			if in.ActiveDeadlineSeconds != nil {
+				out.ActiveDeadlineSeconds = new(int64)
+				*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
 			}
 			out.DNSPolicy = newer.DNSPolicy(in.DNSPolicy)
 			out.HostNetwork = in.HostNetwork

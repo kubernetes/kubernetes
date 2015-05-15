@@ -4501,3 +4501,183 @@ func TestMakePortMappings(t *testing.T) {
 		}
 	}
 }
+
+func TestFilterOutPodsPastActiveDeadline(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	pods := newTestPods(5)
+
+	exceededActiveDeadlineSeconds := int64(30)
+	notYetActiveDeadlineSeconds := int64(120)
+	now := util.Now()
+	startTime := util.NewTime(now.Time.Add(-1 * time.Minute))
+	pods[0].Status.StartTime = &startTime
+	pods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
+	pods[1].Status.StartTime = &startTime
+	pods[1].Spec.ActiveDeadlineSeconds = &notYetActiveDeadlineSeconds
+	expected := []*api.Pod{pods[1], pods[2], pods[3], pods[4]}
+	kubelet.podManager.SetPods(pods)
+	actual := kubelet.filterOutPodsPastActiveDeadline(pods)
+	if !reflect.DeepEqual(expected, actual) {
+		expectedNames := ""
+		for _, pod := range expected {
+			expectedNames = expectedNames + pod.Name + " "
+		}
+		actualNames := ""
+		for _, pod := range actual {
+			actualNames = actualNames + pod.Name + " "
+		}
+		t.Errorf("expected %#v, got %#v", expectedNames, actualNames)
+	}
+}
+
+func TestSyncPodsDeletesPodsThatRunTooLong(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kubelet := testKubelet.kubelet
+	fakeDocker := testKubelet.fakeDocker
+
+	now := util.Now()
+	startTime := util.NewTime(now.Time.Add(-1 * time.Minute))
+	exceededActiveDeadlineSeconds := int64(30)
+
+	pods := []*api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "12345678",
+				Name:      "bar",
+				Namespace: "new",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "foo"},
+				},
+				ActiveDeadlineSeconds: &exceededActiveDeadlineSeconds,
+			},
+			Status: api.PodStatus{
+				StartTime: &startTime,
+			},
+		},
+	}
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s_foo_bar_new_12345678_1111"},
+			ID:    "1234",
+		},
+		{
+			// pod infra container
+			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_bar_new_12345678_2222"},
+			ID:    "9876",
+		},
+	}
+	fakeDocker.ContainerMap = map[string]*docker.Container{
+		"1234": {
+			ID:         "1234",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
+		},
+		"9876": {
+			ID:         "9876",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
+		},
+		"9999": {
+			ID:         "9999",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
+		},
+	}
+
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	verifyCalls(t, fakeDocker, []string{"list", "inspect_container", "stop", "inspect_container", "stop", "list"})
+
+	// A map iteration is used to delete containers, so must not depend on
+	// order here.
+	expectedToStop := map[string]bool{
+		"1234": true,
+		"9876": true,
+	}
+	if len(fakeDocker.Stopped) != 2 ||
+		!expectedToStop[fakeDocker.Stopped[0]] ||
+		!expectedToStop[fakeDocker.Stopped[1]] {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
+	}
+}
+
+func TestSyncPodsDoesNotDeletePodsThatRunTooLong(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kubelet := testKubelet.kubelet
+	fakeDocker := testKubelet.fakeDocker
+
+	now := util.Now()
+	startTime := util.NewTime(now.Time.Add(-1 * time.Minute))
+	exceededActiveDeadlineSeconds := int64(300)
+
+	pods := []*api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "12345678",
+				Name:      "bar",
+				Namespace: "new",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "foo"},
+				},
+				ActiveDeadlineSeconds: &exceededActiveDeadlineSeconds,
+			},
+			Status: api.PodStatus{
+				StartTime: &startTime,
+			},
+		},
+	}
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s_foo_bar_new_12345678_1111"},
+			ID:    "1234",
+		},
+		{
+			// pod infra container
+			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_bar_new_12345678_2222"},
+			ID:    "9876",
+		},
+	}
+	fakeDocker.ContainerMap = map[string]*docker.Container{
+		"1234": {
+			ID:         "1234",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
+		},
+		"9876": {
+			ID:         "9876",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
+		},
+		"9999": {
+			ID:         "9999",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
+		},
+	}
+
+	kubelet.podManager.SetPods(pods)
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	verifyCalls(t, fakeDocker, []string{
+		"list", "list", "list",
+		// Get pod status.
+		"inspect_container", "inspect_container",
+		// Check the pod infra container.
+		"inspect_container",
+		// Get pod status.
+		"list", "inspect_container", "inspect_container", "list"})
+}
