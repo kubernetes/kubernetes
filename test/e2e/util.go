@@ -212,9 +212,9 @@ func expectNoError(err error, explain ...interface{}) {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
 }
 
-func cleanup(filePath string, selectors ...string) {
-	By("using stop to clean up resources")
-	runKubectl("stop", "-f", filePath)
+func cleanup(filePath, namespace string, selectors ...string) {
+	By(fmt.Sprintf("using stop to clean up resources in namespace %v", namespace))
+	runKubectl("stop", "-f", filePath, fmt.Sprintf("--namespace=%v", namespace))
 
 	for _, selector := range selectors {
 		resources := runKubectl("get", "pods,rc,se", "-l", selector, "--no-headers")
