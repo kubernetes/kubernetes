@@ -96,16 +96,18 @@ var _ = Describe("Density", func() {
 	type Density struct {
 		skip          bool
 		podsPerMinion int
+		/* Controls how often the apiserver is polled for pods */
+		interval int
 	}
 
 	densityTests := []Density{
 		// This test should always run, even if larger densities are skipped.
-		{podsPerMinion: 3, skip: false},
-		{podsPerMinion: 30, skip: false},
+		{podsPerMinion: 3, skip: false, interval: 10},
+		{podsPerMinion: 30, skip: false, interval: 10},
 		// More than 30 pods per node is outside our v1.0 goals.
 		// We might want to enable those tests in the future.
-		{podsPerMinion: 50, skip: true},
-		{podsPerMinion: 100, skip: true},
+		{podsPerMinion: 50, skip: true, interval: 10},
+		{podsPerMinion: 100, skip: true, interval: 1},
 	}
 
 	for _, testArg := range densityTests {
@@ -123,6 +125,15 @@ var _ = Describe("Density", func() {
 			fileHndl, err := os.Create(fmt.Sprintf("%s/pod_states.csv", uuid))
 			expectNoError(err)
 			defer fileHndl.Close()
+
+			config := RCConfig{Client: c,
+				Image:         "gcr.io/google_containers/pause:go",
+				Name:          RCName,
+				Namespace:     ns,
+				PollInterval:  itArg.interval,
+				PodStatusFile: fileHndl,
+				Replicas:      totalPods,
+			}
 
 			// Create a listener for events.
 			events := make([](*api.Event), 0)
@@ -148,7 +159,7 @@ var _ = Describe("Density", func() {
 
 			// Start the replication controller.
 			startTime := time.Now()
-			expectNoError(RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", totalPods, fileHndl))
+			expectNoError(RunRC(config))
 			e2eStartupTime := time.Now().Sub(startTime)
 			Logf("E2E startup time for %d pods: %v", totalPods, e2eStartupTime)
 

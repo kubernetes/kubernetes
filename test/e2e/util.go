@@ -75,6 +75,16 @@ type ContainerFailures struct {
 	restarts int
 }
 
+type RCConfig struct {
+	Client        *client.Client
+	Image         string
+	Name          string
+	Namespace     string
+	PollInterval  int
+	PodStatusFile *os.File
+	Replicas      int
+}
+
 func Logf(format string, a ...interface{}) {
 	fmt.Fprintf(GinkgoWriter, "INFO: "+format+"\n", a...)
 }
@@ -475,8 +485,14 @@ func Diff(oldPods []api.Pod, curPods []api.Pod) PodDiff {
 // It will waits for all pods it spawns to become "Running".
 // It's the caller's responsibility to clean up externally (i.e. use the
 // namespace lifecycle for handling cleanup).
-func RunRC(c *client.Client, name string, ns, image string, replicas int, podStatusFile *os.File) error {
+func RunRC(config RCConfig) error {
 	var last int
+	c := config.Client
+	name := config.Name
+	ns := config.Namespace
+	image := config.Image
+	replicas := config.Replicas
+	interval := config.PollInterval
 
 	maxContainerFailures := int(math.Max(1.0, float64(replicas)*.01))
 	current := 0
@@ -518,7 +534,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int, podSta
 
 	// Create a routine to query for the list of pods
 	stop := make(chan struct{})
-	go func(stop <-chan struct{}, n string, ns string, l labels.Selector) {
+	go func(stop <-chan struct{}, n string, ns string, l labels.Selector, i int) {
 		for {
 			select {
 			case <-stop:
@@ -530,16 +546,19 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int, podSta
 				} else {
 					podLists.Push(p.Items)
 				}
-				time.Sleep(1 * time.Second)
+				time.Sleep(time.Duration(i) * time.Second)
 			}
 		}
-	}(stop, name, ns, label)
+	}(stop, name, ns, label, interval)
 	defer close(stop)
 
 	By(fmt.Sprintf("Making sure all %d replicas of rc %s in namespace %s exist", replicas, name, ns))
-	failCount := 5
+	failCount := int(25 / interval)
 	for same < failCount && current < replicas {
-		time.Sleep(2 * time.Second)
+		time.Sleep(time.Duration(interval*2) * time.Second)
+
+		// Greedily read all existing entries in the queue until
+		// all pods are found submitted or the queue is empty
 		for podLists.Len() > 0 && current < replicas {
 			item := podLists.Pop()
 			pods := item.value.([]api.Pod)
@@ -568,13 +587,16 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int, podSta
 	By(fmt.Sprintf("Waiting for all %d replicas to be running with a max container failures of %d", replicas, maxContainerFailures))
 	same = 0
 	last = 0
-	failCount = 10
+	failCount = int(100 / interval)
 	current = 0
 	var oldPods []api.Pod
 	podLists.Reset()
 	foundAllPods := false
 	for same < failCount && current < replicas {
-		time.Sleep(2 * time.Second)
+		time.Sleep(time.Duration(interval*2) * time.Second)
+
+		// Greedily read all existing entries in the queue until
+		// either all pods are running or the queue is empty
 		for podLists.Len() > 0 && current < replicas {
 			item := podLists.Pop()
 			current = 0
@@ -603,8 +625,8 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int, podSta
 				}
 			}
 			Logf("Pod States: %d running, %d pending, %d waiting, %d inactive, %d unknown ", current, pending, waiting, inactive, unknown)
-			if podStatusFile != nil {
-				fmt.Fprintf(podStatusFile, "%s, %d, running, %d, pending, %d, waiting, %d, inactive, %d, unknown\n", item.createTime, current, pending, waiting, inactive, unknown)
+			if config.PodStatusFile != nil {
+				fmt.Fprintf(config.PodStatusFile, "%s, %d, running, %d, pending, %d, waiting, %d, inactive, %d, unknown\n", item.createTime, current, pending, waiting, inactive, unknown)
 			}
 
 			if foundAllPods && len(currentPods) != len(oldPods) {
@@ -652,7 +674,6 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int, podSta
 			}
 		}
 	}
-	close(stop)
 	if current != replicas {
 		return fmt.Errorf("Only %d pods started out of %d", current, replicas)
 	}
