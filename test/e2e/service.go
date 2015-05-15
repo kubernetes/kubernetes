@@ -349,7 +349,7 @@ var _ = Describe("Services", func() {
 
 	It("should be able to create a functioning NodePort service", func() {
 		serviceName := "nodeportservice-test"
-		ns := namespace0
+		ns := namespaces[0]
 		labels := map[string]string{
 			"testid": "nodeportservice-test",
 		}
