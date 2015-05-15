@@ -656,6 +656,12 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 		glog.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
 	}
 
+	err = kl.cadvisor.Start()
+	if err != nil {
+		kl.recorder.Eventf(kl.nodeRef, "kubeletSetupFailed", "Failed to start CAdvisor %v", err)
+		glog.Errorf("Failed to start CAdvisor, system may not be properly monitored: %v", err)
+	}
+
 	err = kl.containerManager.Start()
 	if err != nil {
 		kl.recorder.Eventf(kl.nodeRef, "kubeletSetupFailed", "Failed to start ContainerManager %v", err)

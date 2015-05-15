@@ -37,6 +37,10 @@ func New(port uint) (Interface, error) {
 
 var unsupportedErr = errors.New("cAdvisor is unsupported in this build")
 
+func (cu *cadvisorUnsupported) Start() error {
+	return unsupportedErr
+}
+
 func (cu *cadvisorUnsupported) DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error) {
 	return cadvisorApi.ContainerInfo{}, unsupportedErr
 }

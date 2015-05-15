@@ -28,6 +28,10 @@ type Fake struct {
 
 var _ Interface = new(Fake)
 
+func (c *Fake) Start() error {
+	return nil
+}
+
 func (c *Fake) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	return new(cadvisorApi.ContainerInfo), nil
 }

@@ -24,6 +24,7 @@ import (
 
 // Interface is an abstract interface for testability.  It abstracts the interface to cAdvisor.
 type Interface interface {
+	Start() error
 	DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error)
 	ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	SubcontainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error)

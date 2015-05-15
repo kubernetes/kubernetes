@@ -57,10 +57,6 @@ func New(port uint) (Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = m.Start()
-	if err != nil {
-		return nil, err
-	}
 
 	cadvisorClient := &cadvisorClient{
 		Manager: m,
@@ -73,8 +69,11 @@ func New(port uint) (Interface, error) {
 			return nil, err
 		}
 	}
-
 	return cadvisorClient, nil
+}
+
+func (cc *cadvisorClient) Start() error {
+	return cc.Manager.Start()
 }
 
 func (cc *cadvisorClient) exportHTTP(port uint) error {
