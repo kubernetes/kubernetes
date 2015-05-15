@@ -19,6 +19,7 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os/exec"
 	"path/filepath"
 
@@ -26,18 +27,35 @@ import (
 )
 
 var _ = Describe("Shell", func() {
-	defer GinkgoRecover()
+	bashE2ERoot := filepath.Join(testContext.RepoRoot, "hack/e2e-suite")
 
-	It(fmt.Sprintf("tests that services.sh passes"), func() {
-		// The services script only works on gce/gke
-		if !providerIs("gce", "gke") {
-			By(fmt.Sprintf("Skipping Shell test services.sh, which is only supported for provider gce and gke (not %s)",
-				testContext.Provider))
-			return
-		}
-		runCmdTest(filepath.Join(testContext.RepoRoot, "hack/e2e-suite/services.sh"))
-	})
+	// Slurp up all the tests in hack/e2e-suite
+	files, err := ioutil.ReadDir(bashE2ERoot)
+	if err != nil {
+		Fail(fmt.Sprintf("Error reading test suites from %v %v", bashE2ERoot, err.Error()))
+	}
+
+	for _, file := range files {
+		fileName := file.Name() // Make a copy
+		It(fmt.Sprintf("tests that %v passes", fileName), func() {
+			// A number of scripts only work on gce
+			if !providerIs("gce", "gke") {
+				By(fmt.Sprintf("Skipping Shell test %s, which is only supported for provider gce and gke (not %s)",
+					fileName, testContext.Provider))
+				return
+			}
+			runCmdTest(filepath.Join(bashE2ERoot, fileName))
+		})
+	}
 })
+
+func absOrDie(path string) string {
+	out, err := filepath.Abs(path)
+	if err != nil {
+		panic(err)
+	}
+	return out
+}
 
 // Runs the given cmd test.
 func runCmdTest(path string) {
