@@ -16,6 +16,61 @@ var app = angular.module('kubernetesApp', [
   'angular.filter'
 ].concat(componentNamespaces));
 
+app.factory('menu', [
+  '$location',
+  '$rootScope',
+  'sections',
+  function($location, $rootScope, sections) {
+
+    var self;
+
+    $rootScope.$on('$locationChangeSuccess', onLocationChange);
+
+    return self = {
+
+      sections: sections,
+
+      setSections: function(_sections) { this.sections = _sections; },
+      selectSection: function(section) { self.openedSection = section; },
+      toggleSelectSection: function(section) {
+        self.openedSection = (self.openedSection === section ? null : section);
+      },
+      isSectionSelected: function(section) { return self.openedSection === section; },
+      selectPage: function(section, page) {
+        page && page.url && $location.path(page.url);
+        self.currentSection = section;
+        self.currentPage = page;
+      },
+      isPageSelected: function(page) { return self.currentPage === page; }
+    };
+
+    function onLocationChange() {
+      var path = $location.path();
+
+      var matchPage = function(section, page) {
+        if (path === page.url) {
+          self.selectSection(section);
+          self.selectPage(section, page);
+        }
+      };
+
+      sections.forEach(function(section) {
+        if (section.children) {
+          section.children.forEach(function(childSection) {
+            if (childSection.pages) {
+              childSection.pages.forEach(function(page) { matchPage(childSection, page); });
+            }
+          });
+        } else if (section.pages) {
+          section.pages.forEach(function(page) { matchPage(section, page); });
+        } else if (section.type === 'link') {
+          matchPage(section, section);
+        }
+      });
+    }
+  }
+]);
+
 angular.module('kubernetesApp.config', []);
 angular.module('kubernetesApp.services', ['kubernetesApp.config']);
 
@@ -45,6 +100,8 @@ app.config([
         });
       }
     ]);
+
+app.value("sections", [{"name":"Dashboard","url":"/dashboard","type":"link","templateUrl":"/components/dashboard/pages/home.html"},{"name":"Dashboard","type":"heading","children":[{"name":"Dashboard","type":"toggle","url":"/dashboard","templateUrl":"/components/dashboard/pages/home.html","pages":[{"name":"Pods","url":"/dashboard/pods","templateUrl":"/components/dashboard/views/listPods.html","type":"link"},{"name":"Pod Visualizer","url":"/dashboard/visualpods","templateUrl":"/components/dashboard/views/listPodsVisualizer.html","type":"link"},{"name":"Services","url":"/dashboard/services","templateUrl":"/components/dashboard/views/listServices.html","type":"link"},{"name":"Replication Controllers","url":"/dashboard/replicationcontrollers","templateUrl":"/components/dashboard/views/listReplicationControllers.html","type":"link"},{"name":"Events","url":"/dashboard/events","templateUrl":"/components/dashboard/views/listEvents.html","type":"link"},{"name":"Nodes","url":"/dashboard/minions","templateUrl":"/components/dashboard/views/listMinions.html","type":"link"},{"name":"Replication Controller","url":"/dashboard/replicationcontrollers/:replicationControllerId","templateUrl":"/components/dashboard/views/replication.html","type":"link"},{"name":"Service","url":"/dashboard/services/:serviceId","templateUrl":"/components/dashboard/views/service.html","type":"link"},{"name":"Explore","url":"/dashboard/groups/:grouping*?/selector/:selector*?","templateUrl":"/components/dashboard/views/groups.html","type":"link"},{"name":"Pod","url":"/dashboard/pods/:podId","templateUrl":"/components/dashboard/views/pod.html","type":"link"}]}]},{"name":"Graph","url":"/graph","type":"link","templateUrl":"/components/graph/pages/home.html"},{"name":"Graph","url":"/graph/inspect","type":"link","templateUrl":"/components/graph/pages/inspect.html","css":"/components/graph/css/show-details-table.css"},{"name":"Graph","type":"heading","children":[{"name":"Graph","type":"toggle","url":"/graph","templateUrl":"/components/graph/pages/home.html","pages":[{"name":"Test","url":"/graph/test","type":"link","templateUrl":"/components/graph/pages/home.html"}]}]}]);
 
 app.directive('includeReplace',
               function() {
@@ -137,7 +194,7 @@ app.service('SidebarService', [
 
 
 app.value("tabs", [{"component":"dashboard","title":"Dashboard"}]);
-app.constant("manifestRoutes", [{"description":"Dashboard visualization.","url":"/dashboard/","templateUrl":"components/dashboard/pages/home.html"},{"description":"Pods","url":"/dashboard/pods","templateUrl":"components/dashboard/views/listPods.html"},{"description":"Pod Visualizer","url":"/dashboard/visualpods","templateUrl":"components/dashboard/views/listPodsVisualizer.html"},{"description":"Services","url":"/dashboard/services","templateUrl":"components/dashboard/views/listServices.html"},{"description":"Replication Controllers","url":"/dashboard/replicationcontrollers","templateUrl":"components/dashboard/views/listReplicationControllers.html"},{"description":"Events","url":"/dashboard/events","templateUrl":"components/dashboard/views/listEvents.html"},{"description":"Minions","url":"/dashboard/minions","templateUrl":"components/dashboard/views/listMinions.html"},{"description":"Replication Controller","url":"/dashboard/replicationcontrollers/:replicationControllerId","templateUrl":"components/dashboard/views/replication.html"},{"description":"Service","url":"/dashboard/services/:serviceId","templateUrl":"components/dashboard/views/service.html"},{"description":"Explore","url":"/dashboard/groups/:grouping*?/selector/:selector*?","templateUrl":"components/dashboard/views/groups.html"},{"description":"Pod","url":"/dashboard/pods/:podId","templateUrl":"components/dashboard/views/pod.html"}]);
+app.constant("manifestRoutes", [{"description":"Dashboard visualization.","url":"/dashboard/","templateUrl":"components/dashboard/pages/home.html"},{"description":"Pods","url":"/dashboard/pods","templateUrl":"components/dashboard/views/listPods.html"},{"description":"Pod Visualizer","url":"/dashboard/visualpods","templateUrl":"components/dashboard/views/listPodsVisualizer.html"},{"description":"Services","url":"/dashboard/services","templateUrl":"components/dashboard/views/listServices.html"},{"description":"Replication Controllers","url":"/dashboard/replicationcontrollers","templateUrl":"components/dashboard/views/listReplicationControllers.html"},{"description":"Events","url":"/dashboard/events","templateUrl":"components/dashboard/views/listEvents.html"},{"description":"Nodes","url":"/dashboard/minions","templateUrl":"components/dashboard/views/listMinions.html"},{"description":"Replication Controller","url":"/dashboard/replicationcontrollers/:replicationControllerId","templateUrl":"components/dashboard/views/replication.html"},{"description":"Service","url":"/dashboard/services/:serviceId","templateUrl":"components/dashboard/views/service.html"},{"description":"Explore","url":"/dashboard/groups/:grouping*?/selector/:selector*?","templateUrl":"components/dashboard/views/groups.html"},{"description":"Pod","url":"/dashboard/pods/:podId","templateUrl":"components/dashboard/views/pod.html"}]);
 
 angular.module("kubernetesApp.config", [])
 
@@ -165,6 +222,122 @@ angular.module("kubernetesApp.config", [])
  * Module: constants.js
  * Define constants to inject across the application
  =========================================================*/
+/**=========================================================
+ * Module: home-page.js
+ * Page Controller
+ =========================================================*/
+
+app.controller('PageCtrl', [
+  '$scope',
+  '$timeout',
+  '$mdSidenav',
+  'menu',
+  '$rootScope',
+  function($scope, $timeout, $mdSidenav, menu, $rootScope) {
+  $scope.menu = menu;
+
+  $scope.path = path;
+  $scope.goHome = goHome;
+  $scope.openMenu = openMenu;
+  $rootScope.openMenu = openMenu;
+  $scope.closeMenu = closeMenu;
+  $scope.isSectionSelected = isSectionSelected;
+
+  $rootScope.$on('$locationChangeSuccess', openPage);
+
+  // Methods used by menuLink and menuToggle directives
+  this.isOpen = isOpen;
+  this.isSelected = isSelected;
+  this.toggleOpen = toggleOpen;
+  this.shouldLockOpen = shouldLockOpen;
+  $scope.toggleKubernetesUiMenu = toggleKubernetesUiMenu;
+
+  var mainContentArea = document.querySelector("[role='main']");
+  var kubernetesUiMenu = document.querySelector("[role='kubernetes-ui-menu']");
+
+  // *********************
+  // Internal methods
+  // *********************
+
+  var _t = false;
+
+  $scope.showKubernetesUiMenu = false;
+
+  function shouldLockOpen() {
+    return _t;
+  }
+
+  function toggleKubernetesUiMenu() {
+    $scope.showKubernetesUiMenu = !$scope.showKubernetesUiMenu;
+  }
+
+  function closeMenu() {
+    $timeout(function() {
+      $mdSidenav('left').close();
+    });
+  }
+
+  function openMenu() {
+    $timeout(function() {
+      _t = !$mdSidenav('left').isOpen();
+      $mdSidenav('left').toggle();
+    });
+  }
+
+  function path() {
+    return $location.path();
+  }
+
+  function goHome($event) {
+    menu.selectPage(null, null);
+    $location.path( '/' );
+  }
+
+  function openPage() {
+    $scope.closeMenu();
+    mainContentArea.focus();
+  }
+
+  function isSelected(page) {
+    return menu.isPageSelected(page);
+  }
+
+  function isSectionSelected(section) {
+    var selected = false;
+    var openedSection = menu.openedSection;
+    if(openedSection === section){
+      selected = true;
+    }
+    else if(section.children) {
+      section.children.forEach(function(childSection) {
+        if(childSection === openedSection){
+          selected = true;
+        }
+      });
+    }
+    return selected;
+  }
+
+  function isOpen(section) {
+    return menu.isSectionSelected(section);
+  }
+
+  function toggleOpen(section) {
+    menu.toggleSelectSection(section);
+  }
+
+  }
+]).filter('humanizeDoc', function() {
+  return function(doc) {
+    if (!doc) return;
+    if (doc.type === 'directive') {
+      return doc.name.replace(/([A-Z])/g, function($1) {
+        return '-'+$1.toLowerCase();
+      });
+    }
+    return doc.label || doc.name;
+  }; });
+
 /**=========================================================
  * Module: main.js
  * Main Application Controller
@@ -2111,8 +2284,10 @@ app.controller('ServiceCtrl', [
                  '$scope',
                  '$filter',
                  '$location',
+                 'menu',
                  '$rootScope',
-                 function($scope, $filter, $location, $rootScope) {
+                 function($scope, $filter, $location, menu, $rootScope) {
+                  $scope.menu = menu;
                    $scope.$watch('page', function(newValue, oldValue) {
                      if (typeof newValue !== 'undefined') {
                        $location.path(newValue);
@@ -2127,7 +2302,7 @@ app.controller('ServiceCtrl', [
                        id: 'groupsView'
                      },
                      {category: 'dashboard', name: 'Pods', value: '/dashboard/pods', id: 'podsView'},
-                     {category: 'dashboard', name: 'Minions', value: '/dashboard/minions', id: 'minionsView'},
+                     {category: 'dashboard', name: 'Nodes', value: '/dashboard/minions', id: 'minionsView'},
                      {
                        category: 'dashboard',
                        name: 'Replication Controllers',

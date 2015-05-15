@@ -125,4 +125,4 @@ Content available under the [CC-By 3.0
 license](http://creativecommons.org/licenses/by/3.0/)
 
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/www/app/components/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/www/master/components/README.md?pixel)]()

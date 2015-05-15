@@ -15,8 +15,10 @@
                  '$scope',
                  '$filter',
                  '$location',
+                 'menu',
                  '$rootScope',
-                 function($scope, $filter, $location, $rootScope) {
+                 function($scope, $filter, $location, menu, $rootScope) {
+                  $scope.menu = menu;
                    $scope.$watch('page', function(newValue, oldValue) {
                      if (typeof newValue !== 'undefined') {
                        $location.path(newValue);
@@ -31,7 +33,7 @@
                        id: 'groupsView'
                      },
                      {category: 'dashboard', name: 'Pods', value: '/dashboard/pods', id: 'podsView'},
-                     {category: 'dashboard', name: 'Minions', value: '/dashboard/minions', id: 'minionsView'},
+                     {category: 'dashboard', name: 'Nodes', value: '/dashboard/minions', id: 'minionsView'},
                      {
                        category: 'dashboard',
                        name: 'Replication Controllers',

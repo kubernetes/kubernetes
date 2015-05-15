@@ -1,5 +1,5 @@
 {
-  "description": "The basic kubernetes ui dashboard... ",
+  "description": "The basic Kubernetes UI dashboard... ",
   "routes": [
     {
       "description": "Dashboard visualization.",
@@ -32,7 +32,7 @@
       "templateUrl": "components/dashboard/views/listEvents.html"
     },
     {
-      "description": "Minions",
+      "description": "Nodes",
       "url": "/minions",
       "templateUrl": "components/dashboard/views/listMinions.html"
     },
