@@ -170,6 +170,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"glusterfs-pod":       &api.Pod{},
 			"glusterfs-endpoints": &api.Endpoints{},
 		},
+		"../examples/liveness": {
+			"exec-liveness": &api.Pod{},
+			"http-liveness": &api.Pod{},
+		},
 		"../examples": {
 			"pod":         &api.Pod{},
 			"replication": &api.ReplicationController{},
