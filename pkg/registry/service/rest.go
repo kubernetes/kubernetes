@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
@@ -46,13 +47,13 @@ type REST struct {
 	machines    minion.Registry
 	endpoints   endpoint.Registry
 	portals     ipallocator.Interface
-	portMgr     *portAllocator
+	portMgr     *portallocator.PortAllocator
 	clusterName string
 }
 
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, portals ipallocator.Interface,
-	publicServicePorts *portAllocator, clusterName string) *REST {
+	publicServicePorts *portallocator.PortAllocator, clusterName string) *REST {
 
 	return &REST{
 		registry:    registry,
@@ -64,19 +65,19 @@ func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.
 	}
 }
 
-// Encapsulates the semantics of a port allocation 'transaction'
-// it is better to leak ports than to double-allocate them
-// so we allocate immediately, but defer release
-// on commit we best-effort release the deferred releases
-// on rollback we best-effort release any allocations we did
+// Encapsulates the semantics of a port allocation 'transaction':
+// It is better to leak ports than to double-allocate them,
+// so we allocate immediately, but defer release.
+// On commit we best-effort release the deferred releases.
+// On rollback we best-effort release any allocations we did.
 type portAllocationOperation struct {
-	pa              *portAllocator
+	pa              *portallocator.PortAllocator
 	allocated       []int
 	releaseDeferred []int
 	ShouldRollback  bool
 }
 
-func (op *portAllocationOperation) Init(pa *portAllocator) {
+func (op *portAllocationOperation) Init(pa *portallocator.PortAllocator) {
 	op.pa = pa
 	op.allocated = []int{}
 	op.releaseDeferred = []int{}
@@ -115,16 +116,18 @@ func (op *portAllocationOperation) Commit() []error {
 	return errors
 }
 
-func (op *portAllocationOperation) Allocate(port int) error {
-	err := op.pa.Allocate(port)
+func (op *portAllocationOperation) Allocate(port int, owner *api.Service) error {
+	name := owner.Namespace + "/" + owner.Name
+	err := op.pa.Allocate(port, name)
 	if err == nil {
 		op.allocated = append(op.allocated, port)
 	}
 	return err
 }
 
-func (op *portAllocationOperation) AllocateNext() (int, error) {
-	port, err := op.pa.AllocateNext()
+func (op *portAllocationOperation) AllocateNext(owner *api.Service) (int, error) {
+	name := owner.Namespace + "/" + owner.Name
+	port, err := op.pa.AllocateNext(name)
 	if err == nil {
 		op.allocated = append(op.allocated, port)
 	}
@@ -190,12 +193,12 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		if servicePort.NodePort != 0 {
-			err := nodePortOp.Allocate(servicePort.NodePort)
+			err := nodePortOp.Allocate(servicePort.NodePort, service)
 			if err != nil {
 				return nil, err
 			}
 		} else if assignNodePorts {
-			nodePort, err := nodePortOp.AllocateNext()
+			nodePort, err := nodePortOp.AllocateNext(service)
 			if err != nil {
 				return nil, err
 			}
@@ -324,13 +327,13 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 			nodePort := servicePort.NodePort
 			if nodePort != 0 {
 				if !contains(oldNodePorts, nodePort) {
-					err := nodePortOp.Allocate(nodePort)
+					err := nodePortOp.Allocate(nodePort, service)
 					if err != nil {
 						return nil, false, err
 					}
 				}
 			} else {
-				nodePort, err = nodePortOp.AllocateNext()
+				nodePort, err = nodePortOp.AllocateNext(service)
 				if err != nil {
 					return nil, false, err
 				}

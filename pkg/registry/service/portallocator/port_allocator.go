@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service
+package portallocator
 
 import (
 	"fmt"
@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pool"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -33,29 +34,29 @@ const minPortPoolSize = 8
 // The base key in etc
 const baseKey = "/pools/serviceports/"
 
-type portAllocator struct {
+type PortAllocator struct {
 	portRange util.PortRange
-	pool      PoolAllocator
+	pool      pool.PoolAllocator
 }
 
 // newPortAllocator creates and initializes a new portAllocator object.
-func NewPortAllocator(portRange *util.PortRange, etcd *tools.EtcdHelper) *portAllocator {
+func NewPortAllocator(portRange *util.PortRange, etcd *tools.EtcdHelper) *PortAllocator {
 	rangeSize := portRange.Size
 	if rangeSize < minPortPoolSize {
 		glog.Errorf("PortAllocator requires at least %d ports", minPortPoolSize)
 		return nil
 	}
 
-	a := &portAllocator{
+	a := &PortAllocator{
 		portRange: *portRange,
 	}
 
 	if etcd == nil {
-		pa := &MemoryPoolAllocator{}
+		pa := &pool.MemoryPoolAllocator{}
 		pa.Init(&portPoolDriver{portRange: *portRange})
 		a.pool = pa
 	} else {
-		pa := &EtcdPoolAllocator{}
+		pa := &pool.EtcdPoolAllocator{}
 		pa.Init(&portPoolDriver{portRange: *portRange}, etcd, baseKey)
 		a.pool = pa
 	}
@@ -63,17 +64,24 @@ func NewPortAllocator(portRange *util.PortRange, etcd *tools.EtcdHelper) *portAl
 }
 
 // Allocate portAllocator a specific port.  This is useful when recovering saved state.
-func (a *portAllocator) Allocate(port int) error {
+func (a *PortAllocator) Allocate(port int, owner string) error {
 	if !a.portRange.Contains(port) {
 		return fmt.Errorf("Port %v does not fall within port-range %v", port, a.portRange)
 	}
 
-	return a.pool.Allocate(portToString(port))
+	locked, err := a.pool.Allocate(portToString(port), owner)
+	if err != nil {
+		return err
+	}
+	if !locked {
+		return fmt.Errorf("Port %d is already allocated", port)
+	}
+	return nil
 }
 
 // Allocate allocates and returns a port.
-func (a *portAllocator) AllocateNext() (int, error) {
-	s, err := a.pool.AllocateNext()
+func (a *PortAllocator) AllocateNext(owner string) (int, error) {
+	s, err := a.pool.AllocateNext(owner)
 	if err != nil {
 		return 0, err
 	}
@@ -84,7 +92,7 @@ func (a *portAllocator) AllocateNext() (int, error) {
 }
 
 // Release de-allocates a port.
-func (a *portAllocator) Release(port int) error {
+func (a *PortAllocator) Release(port int) error {
 	if !a.portRange.Contains(port) {
 		return fmt.Errorf("Port %v does not fall within port-range %v", port, a.portRange)
 	}
@@ -99,6 +107,11 @@ func (a *portAllocator) Release(port int) error {
 	return nil
 }
 
+// For tests
+func (a *PortAllocator) DisableRandomAllocation() {
+	a.pool.DisableRandomAllocation()
+}
+
 // Implements PoolDriver over the ports in a PortRange
 type portPoolDriver struct {
 	portRange util.PortRange
@@ -110,7 +123,7 @@ func (d *portPoolDriver) PickRandom(random *math_rand.Rand) string {
 	return portToString(port)
 }
 
-func (d *portPoolDriver) Iterate() StringIterator {
+func (d *portPoolDriver) Iterate() pool.StringIterator {
 	return &portPoolIterator{portRange: d.portRange}
 }
 

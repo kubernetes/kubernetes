@@ -384,9 +384,9 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected number (%d) of Ports for NodePort service: %v", len(result.Spec.Ports), result)
 		}
 
-		publicPort := result.Spec.Ports[0].PublicPort
-		if publicPort == 0 {
-			Failf("got unexpected publicPort (%d) on Ports[0] for NodePort service: %v", publicPort, result)
+		nodePort := result.Spec.Ports[0].NodePort
+		if nodePort == 0 {
+			Failf("got unexpected nodePort (%d) on Ports[0] for NodePort service: %v", nodePort, result)
 		}
 
 		publicIps, err := getMinionPublicIps(c)
@@ -430,7 +430,7 @@ var _ = Describe("Services", func() {
 		By("hitting the pod through the service's external IPs")
 		var resp *http.Response
 		for t := time.Now(); time.Since(t) < podStartTimeout; time.Sleep(5 * time.Second) {
-			resp, err = http.Get(fmt.Sprintf("http://%s:%d", ip, publicPort))
+			resp, err = http.Get(fmt.Sprintf("http://%s:%d", ip, nodePort))
 			if err == nil {
 				break
 			}

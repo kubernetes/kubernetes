@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service
+package portallocator
 
 import (
 	"strconv"
@@ -67,9 +67,9 @@ func TestPortAllocatorNew(t *testing.T) {
 	if pa == nil {
 		t.Errorf("expected non-nil")
 	}
-	if pa.pool.(*MemoryPoolAllocator).size() != 0 {
-		t.Errorf("wrong size() for pa.pool")
-	}
+	//	if pa.pool.(*pool.MemoryPoolAllocator).size() != 0 {
+	//		t.Errorf("wrong size() for pa.pool")
+	//	}
 }
 
 func TestPortAllocatorAllocate(t *testing.T) {
@@ -82,19 +82,19 @@ func TestPortAllocatorAllocate(t *testing.T) {
 		t.Errorf("expected non-nil")
 	}
 
-	if err := pa.Allocate(99); err == nil {
+	if err := pa.Allocate(99, "owner1"); err == nil {
 		t.Errorf("expected failure")
 	}
 
-	if err := pa.Allocate(-1); err == nil {
+	if err := pa.Allocate(-1, "owner1"); err == nil {
 		t.Errorf("expected failure")
 	}
 
-	if err := pa.Allocate(100); err != nil {
+	if err := pa.Allocate(100, "owner1"); err != nil {
 		t.Errorf("expected success, got %s", err)
 	}
 
-	if pa.Allocate(100) == nil {
+	if pa.Allocate(100, "owner1") == nil {
 		t.Errorf("expected failure")
 	}
 }
@@ -110,9 +110,9 @@ func TestPortAllocatorAllocateNext(t *testing.T) {
 	}
 
 	// Turn off random allocation attempts, so we just allocate in sequence
-	pa.pool.(*MemoryPoolAllocator).randomAttempts = 0
+	pa.DisableRandomAllocation()
 
-	p1, err := pa.AllocateNext()
+	p1, err := pa.AllocateNext("owner1")
 	if err != nil {
 		t.Error(err)
 	}
@@ -120,7 +120,7 @@ func TestPortAllocatorAllocateNext(t *testing.T) {
 		t.Errorf("expected 100, got %d", p1)
 	}
 
-	p2, err := pa.AllocateNext()
+	p2, err := pa.AllocateNext("owner1")
 	if err != nil {
 		t.Error(err)
 	}
@@ -130,13 +130,13 @@ func TestPortAllocatorAllocateNext(t *testing.T) {
 
 	// Burn a bunch of ports.
 	for i := 3; i <= 100; i++ {
-		_, err = pa.AllocateNext()
+		_, err = pa.AllocateNext("owner1")
 		if err != nil {
 			t.Error(err)
 		}
 	}
 
-	p101, err := pa.AllocateNext()
+	p101, err := pa.AllocateNext("owner1")
 	if err != nil {
 		t.Error(err)
 	}
@@ -144,7 +144,7 @@ func TestPortAllocatorAllocateNext(t *testing.T) {
 		t.Errorf("expected 200, got %s", p101)
 	}
 
-	_, err = pa.AllocateNext()
+	_, err = pa.AllocateNext("owner1")
 	if err == nil {
 		t.Errorf("Expected nil - allocator is full")
 	}
@@ -161,22 +161,22 @@ func TestPortAllocatorRelease(t *testing.T) {
 	}
 
 	// Turn off random allocation attempts, so we just allocate in sequence
-	pa.pool.(*MemoryPoolAllocator).randomAttempts = 0
+	pa.DisableRandomAllocation()
 
 	err = pa.Release(50)
 	if err == nil {
 		t.Errorf("Expected an error")
 	}
 
-	p1, err := pa.AllocateNext()
+	p1, err := pa.AllocateNext("owner1")
 	if err != nil {
 		t.Error(err)
 	}
-	p2, err := pa.AllocateNext()
+	p2, err := pa.AllocateNext("owner1")
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = pa.AllocateNext()
+	_, err = pa.AllocateNext("owner1")
 	if err != nil {
 		t.Error(err)
 	}
@@ -186,22 +186,22 @@ func TestPortAllocatorRelease(t *testing.T) {
 		t.Error(err)
 	}
 
-	p4, err := pa.AllocateNext()
+	p4, err := pa.AllocateNext("owner1")
 	if p4 != p2 {
 		t.Errorf("Expected %d, got %d", p2, p4)
 	}
 
 	// Burn a bunch of addresses.
 	for i := 4; i <= 101; i++ {
-		pa.AllocateNext()
+		pa.AllocateNext("owner1")
 	}
-	_, err = pa.AllocateNext()
+	_, err = pa.AllocateNext("owner1")
 	if err == nil {
 		t.Errorf("Expected an error")
 	}
 	pa.Release(p1)
 
-	p1_again, err := pa.AllocateNext()
+	p1_again, err := pa.AllocateNext("owner1")
 	if p1_again != p1 {
 		t.Errorf("Expected %d, got %d", p1, p1_again)
 	}

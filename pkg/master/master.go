@@ -65,6 +65,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
 	etcdipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
 	serviceaccountetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
@@ -142,8 +143,8 @@ type Config struct {
 	// The name of the cluster.
 	ClusterName string
 
-	// The range of ports to be assigned to public services
-	PublicServicePorts util.PortRange
+	// The range of ports to be assigned to services with visibility=NodePort or greater
+	NodePorts util.PortRange
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -172,7 +173,7 @@ type Master struct {
 	v1beta3               bool
 	v1                    bool
 	requestContextMapper  api.RequestContextMapper
-	publicServicePorts    util.PortRange
+	nodePorts             util.PortRange
 
 	// External host is the name that should be used in external (public internet) URLs for this master
 	externalHost string
@@ -197,6 +198,8 @@ type Master struct {
 	serviceRegistry   service.Registry
 	endpointRegistry  endpoint.Registry
 	portalAllocator   service.IPRegistry
+
+	nodePortAllocator *portallocator.PortAllocator
 
 	// "Outputs"
 	Handler         http.Handler
@@ -230,13 +233,13 @@ func setDefaults(c *Config) {
 		}
 		c.PortalNet = portalNet
 	}
-	if c.PublicServicePorts.Size == 0 {
+	if c.NodePorts.Size == 0 {
 		// TODO: Currently no way to specify no PublicServicePorts (do we need to allow this?)
 		// We should probably allow this for clouds that don't require PublicServicePorts to do load-balancing (GCE)
 		// but then that breaks the strict nestedness of visibility.
 		// Review post-v1
-		c.PublicServicePorts = util.PortRange{Base: 30000, Size: 2767}
-		glog.Infof("Service port range unspecified. Defaulting to %v.", c.PublicServicePorts)
+		c.NodePorts = util.PortRange{Base: 30000, Size: 2767}
+		glog.Infof("Node port range unspecified. Defaulting to %v.", c.NodePorts)
 	}
 	if c.MasterCount == 0 {
 		// Clearly, there will be at least one master.
@@ -312,7 +315,7 @@ func New(c *Config) *Master {
 
 	m := &Master{
 		portalNet:             c.PortalNet,
-		publicServicePorts:    c.PublicServicePorts,
+		nodePorts:             c.NodePorts,
 		rootWebService:        new(restful.WebService),
 		enableCoreControllers: c.EnableCoreControllers,
 		enableLogsSupport:     c.EnableLogsSupport,
@@ -442,10 +445,11 @@ func (m *Master) init(c *Config) {
 	portalAllocator := etcdipallocator.NewEtcd(ipAllocator, c.EtcdHelper)
 	m.portalAllocator = portalAllocator
 
-	publicServicePorts := service.NewPortAllocator(&c.PublicServicePorts, &c.EtcdHelper)
-	if publicServicePorts == nil {
-		glog.Fatalf("Failed to create a port allocator. Is port-range '%v' valid?", c.PublicServicePorts)
+	nodePortAllocator := portallocator.NewPortAllocator(&c.NodePorts, &c.EtcdHelper)
+	if nodePortAllocator == nil {
+		glog.Fatalf("Failed to create a port allocator. Is port-range '%v' valid?", c.NodePorts)
 	}
+	m.nodePortAllocator = nodePortAllocator
 
 	controllerStorage := controlleretcd.NewREST(c.EtcdHelper)
 
@@ -463,7 +467,7 @@ func (m *Master) init(c *Config) {
 		"podTemplates": podTemplateStorage,
 
 		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, portalAllocator, publicServicePorts, c.ClusterName),
+		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, portalAllocator, nodePortAllocator, c.ClusterName),
 		"endpoints":              endpointsStorage,
 		"minions":                nodeStorage,
 		"minions/status":         nodeStatusStorage,
