@@ -104,3 +104,13 @@ func (c *ManagerMock) GetProcessList(name string, options v2.RequestOptions) ([]
 	args := c.Called()
 	return args.Get(0).([]v2.ProcessInfo), args.Error(1)
 }
+
+func (c *ManagerMock) DockerInfo() (DockerStatus, error) {
+	args := c.Called()
+	return args.Get(0).(DockerStatus), args.Error(1)
+}
+
+func (c *ManagerMock) DockerImages() ([]DockerImage, error) {
+	args := c.Called()
+	return args.Get(0).([]DockerImage), args.Error(1)
+}

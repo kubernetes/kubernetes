@@ -340,3 +340,27 @@ func (self *dockerContainerHandler) StopWatchingSubcontainers() error {
 func (self *dockerContainerHandler) Exists() bool {
 	return containerLibcontainer.Exists(*dockerRootDir, *dockerRunDir, self.id)
 }
+
+func DockerInfo() (map[string]string, error) {
+	client, err := docker.NewClient(*ArgDockerEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("unable to communicate with docker daemon: %v", err)
+	}
+	info, err := client.Info()
+	if err != nil {
+		return nil, err
+	}
+	return info.Map(), nil
+}
+
+func DockerImages() ([]docker.APIImages, error) {
+	client, err := docker.NewClient(*ArgDockerEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("unable to communicate with docker daemon: %v", err)
+	}
+	images, err := client.ListImages(docker.ListImagesOptions{All: false})
+	if err != nil {
+		return nil, err
+	}
+	return images, nil
+}

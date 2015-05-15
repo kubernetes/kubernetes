@@ -427,8 +427,8 @@ function drawFileSystemUsage(machineInfo, stats) {
 }
 
 function drawProcesses(processInfo) {
-	var titles = ["User", "PID", "PPID", "Start Time", "CPU %", "RSS", "Virtual Size", "Status", "Running Time", "Command"];
-	var titleTypes = ['string', 'number', 'number', 'string', 'string', 'string', 'string', 'string', 'string', 'string'];
+	var titles = ["User", "PID", "PPID", "Start Time", "CPU %", "MEM %", "RSS", "Virtual Size", "Status", "Running Time", "Command"];
+	var titleTypes = ['string', 'number', 'number', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string'];
 	var data = []
 	for (var i = 1; i < processInfo.length; i++) {
 		var elements = [];
@@ -437,6 +437,7 @@ function drawProcesses(processInfo) {
 		elements.push(processInfo[i].parent_pid);
 		elements.push(processInfo[i].start_time);
 		elements.push(processInfo[i].percent_cpu);
+		elements.push(processInfo[i].percent_mem);
 		elements.push(processInfo[i].rss);
 		elements.push(processInfo[i].virtual_size);
 		elements.push(processInfo[i].status);
