@@ -17,8 +17,6 @@ limitations under the License.
 package service
 
 import (
-	"bytes"
-	"encoding/gob"
 	"net"
 	"strings"
 	"testing"
@@ -27,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
@@ -54,13 +53,11 @@ func makeIPNet(t *testing.T) *net.IPNet {
 }
 
 func deepCloneService(svc *api.Service) *api.Service {
-	buff := new(bytes.Buffer)
-	enc := gob.NewEncoder(buff)
-	dec := gob.NewDecoder(buff)
-	enc.Encode(svc)
-	result := new(api.Service)
-	dec.Decode(result)
-	return result
+	value, err := conversion.DeepCopy(svc)
+	if err != nil {
+		panic("couldn't copy service")
+	}
+	return value.(*api.Service)
 }
 
 func TestServiceRegistryCreate(t *testing.T) {
