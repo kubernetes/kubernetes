@@ -72,7 +72,7 @@ var _ = Describe("kubectl", func() {
 		)
 
 		It("should create and stop a replication controller", func() {
-			defer cleanup(nautilusPath, updateDemoSelector)
+			defer cleanup(nautilusPath, ns, updateDemoSelector)
 
 			By("creating a replication controller")
 			runKubectl("create", "-f", nautilusPath, fmt.Sprintf("--namespace=%v", ns))
@@ -80,7 +80,7 @@ var _ = Describe("kubectl", func() {
 		})
 
 		It("should scale a replication controller", func() {
-			defer cleanup(nautilusPath, updateDemoSelector)
+			defer cleanup(nautilusPath, ns, updateDemoSelector)
 
 			By("creating a replication controller")
 			runKubectl("create", "-f", nautilusPath, fmt.Sprintf("--namespace=%v", ns))
@@ -95,7 +95,7 @@ var _ = Describe("kubectl", func() {
 
 		It("should do a rolling update of a replication controller", func() {
 			// Cleanup all resources in case we fail somewhere in the middle
-			defer cleanup(updateDemoRoot, updateDemoSelector)
+			defer cleanup(updateDemoRoot, ns, updateDemoSelector)
 
 			By("creating the initial replication controller")
 			runKubectl("create", "-f", nautilusPath, fmt.Sprintf("--namespace=%v", ns))
@@ -115,7 +115,7 @@ var _ = Describe("kubectl", func() {
 				return
 			}
 
-			defer cleanup(guestbookPath, frontendSelector, redisMasterSelector, redisSlaveSelector)
+			defer cleanup(guestbookPath, ns, frontendSelector, redisMasterSelector, redisSlaveSelector)
 
 			By("creating all guestbook components")
 			runKubectl("create", "-f", guestbookPath, fmt.Sprintf("--namespace=%v", ns))
