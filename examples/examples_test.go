@@ -74,6 +74,11 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = validation.ValidatePodTemplate(t)
+	case *api.Endpoints:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = validation.ValidateEndpoints(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -161,8 +166,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/iscsi": {
 			"iscsi": &api.Pod{},
 		},
-		"../examples/glusterfs/v1beta3": {
-			"glusterfs": &api.Pod{},
+		"../examples/glusterfs": {
+			"glusterfs-pod":       &api.Pod{},
+			"glusterfs-endpoints": &api.Endpoints{},
 		},
 		"../examples": {
 			"pod":         &api.Pod{},

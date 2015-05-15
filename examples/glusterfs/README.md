@@ -2,15 +2,45 @@
 
 [Glusterfs](http://www.gluster.org) is an open source scale-out filesystem. These examples provide information about how to allow containers use Glusterfs volumes.
 
-The example assumes that the Glusterfs client package is installed on all nodes.
+The example assumes that you have already set up a Glusterfs server cluster and the Glusterfs client package is installed on all Kubernetes nodes.
 
 ### Prerequisites
 
-Install Glusterfs client package on the Kubernetes hosts.
+Set up Glusterfs server cluster; install Glusterfs client package on the Kubernetes nodes. ([Guide](https://www.howtoforge.com/high-availability-storage-with-glusterfs-3.2.x-on-debian-wheezy-automatic-file-replication-mirror-across-two-storage-servers))
+
+### Create endpoints
+Here is a snippet of glusterfs-endpoints.json,
+```
+      "addresses": [
+        {
+          "IP": "10.240.106.152"
+        }
+      ],
+      "ports": [
+        {
+          "port": 1,
+          "protocol": "TCP"
+        }
+      ]
+
+```
+The "IP" field should be filled with the address of a node in the Glusterfs server cluster. In this example, it is fine to give any valid value (from 1 to 65535) to the "port" field. 
+
+Create the endpoints,
+```shell
+$ kubectl create -f examples/glusterfs/glusterfs-endpoints.json
+```
+
+You can verify that the endpoints are successfully created by running
+```shell
+$ kubect get endpoints
+NAME                ENDPOINTS
+glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
+```
 
 ### Create a POD
 
-The following *volume* spec illustrates a sample configuration.
+The following *volume* spec in glusterfs-pod.json illustrates a sample configuration.
 
 ```js
 {
@@ -29,19 +59,24 @@ The parameters are explained as the followings.
 - **path** is the Glusterfs volume name. 
 - **readOnly** is the boolean that sets the mountpoint readOnly or readWrite. 
 
-Detailed POD and Gluster cluster endpoints examples can be found at [v1beta3/](v1beta3/) and [endpoints/](endpoints/)
-
+Create a pod that has a container using Glusterfs volume,
 ```shell
-# create gluster cluster endpoints
-$ kubectl create -f examples/glusterfs/endpoints/glusterfs-endpoints.json
-# create a container using gluster volume
-$ kubectl create -f examples/glusterfs/v1beta3/glusterfs.json
+$ kubectl create -f examples/glusterfs/glusterfs-pod.json
 ```
-Once that's up you can list the pods and endpoint in the cluster, to verify that the master is running:
+You can verify that the pod is running:
 
 ```shell
-$ kubectl get endpoints
 $ kubectl get pods
+POD         IP            CONTAINER(S)   IMAGE(S)              HOST                                  LABELS    STATUS    CREATED          MESSAGE
+glusterfs   10.244.2.13                                        kubernetes-minion-151f/23.236.54.97   <none>    Running   About a minute   
+                          glusterfs      kubernetes/pause                                                      Running   About a minute   
+
 ```
 
-If you ssh to that machine, you can run `docker ps` to see the actual pod and `mount` to see if the Glusterfs volume is mounted.
+You may ssh to the host and run 'mount' to see if the Glusterfs volume is mounted,
+```shell
+$ mount | grep kube_vol
+10.240.106.152:kube_vol on /var/lib/kubelet/pods/f164a571-fa68-11e4-ad5c-42010af019b7/volumes/kubernetes.io~glusterfs/glusterfsvol type fuse.glusterfs (rw,relatime,user_id=0,group_id=0,default_permissions,allow_other,max_read=131072)
+```
+
+You may also run `docker ps` on the host to see the actual container.
