@@ -1050,6 +1050,11 @@ type ServiceSpec struct {
 	// The Name of an existing load-balancer, as used here, can be found in the Name field of LoadBalancerStatus.
 	LoadBalancer string `json:"loadBalancer,omitempty"`
 
+	// PublicIPs are deprecated and silently ignored.
+	// Old behaviour: PublicIPs are used by external load balancers, or can be set by
+	// users to handle external traffic that arrives at a node.
+	PublicIPs []string `json:"publicIPs,omitempty"`
+
 	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty"`
 }

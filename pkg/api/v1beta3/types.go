@@ -985,7 +985,33 @@ const (
 )
 
 // ServiceStatus represents the current status of a service
-type ServiceStatus struct{}
+type ServiceStatus struct{
+	// LoadBalancer contains the current status of the load-balancer,
+	// if one is present.
+	LoadBalancer LoadBalancerStatus `json:"loadBalancer,omitempty" description:"status of load-balancer"`
+}
+
+// LoadBalancerStatus represents the status of a load-balancer
+type LoadBalancerStatus struct {
+	// Name is an identifier for the load-balancer, which can be used
+	// when specifying LoadBalancer during Service create/update
+	Name string `json:"name"`
+
+	// Endpoints is a list containing endpoints for the load-balancer;
+	// traffic intended for the service should be sent to these endpoints.
+	Endpoints []LoadBalancerEndpointStatus `json:"endpoints,omitempty" description:"load-balancer endpoints"`
+}
+
+// EndpointStatus represents the status of a load-balancer endpoint
+type LoadBalancerEndpointStatus struct {
+	// IP is set for load-balancer endpoints that are IP based
+	// (typically GCE or OpenStack load-balancers.)
+	IP string `json:"ip,omitempty" description:"IP address of endpoint"`
+
+	// Hostname is set for load-balancer endpoints that are DNS based
+	// (typically AWS load-balancers.
+	Hostname string `json:"hostname,omitempty" description:"hostname of endpoint"`
+}
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
@@ -1008,9 +1034,13 @@ type ServiceSpec struct {
 	// Visibility determines how the service will be exposed.  Valid options: Cluster, NodePort, LoadBalancer
 	Visibility ServiceVisibility `json:"visibility,omitempty" description:"visibility level of this service; must be Cluster, NodePort, or LoadBalancer; defaults to Cluster"`
 
-	// PublicIPs are used by external load balancers, or can be set by
+	// LoadBalancer can be specified by a user to request a particular load-balancer.
+	// The Name of an existing load-balancer, as used here, can be found in the Name field of LoadBalancerStatus.
+	LoadBalancer string `json:"loadBalancer,omitempty" description:"load balancer to use, defaults to automatically created"`
+
+	// Deprecated. PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
-	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs (e.g. load balancers) that should be proxied to this service"`
+	PublicIPs []string `json:"publicIPs,omitempty" description:"deprecated. externally visible IPs (e.g. load balancers) that should be proxied to this service"`
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`

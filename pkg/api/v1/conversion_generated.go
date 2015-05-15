@@ -1413,6 +1413,60 @@ func convert_api_ListOptions_To_v1_ListOptions(in *newer.ListOptions, out *ListO
 	return nil
 }
 
+func convert_v1_LoadBalancerEndpointStatus_To_api_LoadBalancerEndpointStatus(in *LoadBalancerEndpointStatus, out *newer.LoadBalancerEndpointStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LoadBalancerEndpointStatus))(in)
+	}
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func convert_api_LoadBalancerEndpointStatus_To_v1_LoadBalancerEndpointStatus(in *newer.LoadBalancerEndpointStatus, out *LoadBalancerEndpointStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*newer.LoadBalancerEndpointStatus))(in)
+	}
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus(in *LoadBalancerStatus, out *newer.LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LoadBalancerStatus))(in)
+	}
+	out.Name = in.Name
+	if in.Endpoints != nil {
+		out.Endpoints = make([]newer.LoadBalancerEndpointStatus, len(in.Endpoints))
+		for i := range in.Endpoints {
+			if err := convert_v1_LoadBalancerEndpointStatus_To_api_LoadBalancerEndpointStatus(&in.Endpoints[i], &out.Endpoints[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Endpoints = nil
+	}
+	return nil
+}
+
+func convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(in *newer.LoadBalancerStatus, out *LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*newer.LoadBalancerStatus))(in)
+	}
+	out.Name = in.Name
+	if in.Endpoints != nil {
+		out.Endpoints = make([]LoadBalancerEndpointStatus, len(in.Endpoints))
+		for i := range in.Endpoints {
+			if err := convert_api_LoadBalancerEndpointStatus_To_v1_LoadBalancerEndpointStatus(&in.Endpoints[i], &out.Endpoints[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Endpoints = nil
+	}
+	return nil
+}
+
 func convert_v1_NFSVolumeSource_To_api_NFSVolumeSource(in *NFSVolumeSource, out *newer.NFSVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NFSVolumeSource))(in)
@@ -3823,6 +3877,7 @@ func convert_v1_ServicePort_To_api_ServicePort(in *ServicePort, out *newer.Servi
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
+	out.PublicPort = in.PublicPort
 	return nil
 }
 
@@ -3836,6 +3891,7 @@ func convert_api_ServicePort_To_v1_ServicePort(in *newer.ServicePort, out *Servi
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
+	out.PublicPort = in.PublicPort
 	return nil
 }
 
@@ -3862,7 +3918,8 @@ func convert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *newer.Servi
 		out.Selector = nil
 	}
 	out.PortalIP = in.PortalIP
-	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
+	out.Visibility = newer.ServiceVisibility(in.Visibility)
+	out.LoadBalancer = in.LoadBalancer
 	if in.PublicIPs != nil {
 		out.PublicIPs = make([]string, len(in.PublicIPs))
 		for i := range in.PublicIPs {
@@ -3898,7 +3955,8 @@ func convert_api_ServiceSpec_To_v1_ServiceSpec(in *newer.ServiceSpec, out *Servi
 		out.Selector = nil
 	}
 	out.PortalIP = in.PortalIP
-	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
+	out.Visibility = ServiceVisibility(in.Visibility)
+	out.LoadBalancer = in.LoadBalancer
 	if in.PublicIPs != nil {
 		out.PublicIPs = make([]string, len(in.PublicIPs))
 		for i := range in.PublicIPs {
@@ -3915,12 +3973,18 @@ func convert_v1_ServiceStatus_To_api_ServiceStatus(in *ServiceStatus, out *newer
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceStatus))(in)
 	}
+	if err := convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func convert_api_ServiceStatus_To_v1_ServiceStatus(in *newer.ServiceStatus, out *ServiceStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*newer.ServiceStatus))(in)
+	}
+	if err := convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -4333,6 +4397,8 @@ func init() {
 		convert_api_ListMeta_To_v1_ListMeta,
 		convert_api_ListOptions_To_v1_ListOptions,
 		convert_api_List_To_v1_List,
+		convert_api_LoadBalancerEndpointStatus_To_v1_LoadBalancerEndpointStatus,
+		convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
 		convert_api_NFSVolumeSource_To_v1_NFSVolumeSource,
 		convert_api_NamespaceList_To_v1_NamespaceList,
 		convert_api_NamespaceSpec_To_v1_NamespaceSpec,
@@ -4442,6 +4508,8 @@ func init() {
 		convert_v1_ListMeta_To_api_ListMeta,
 		convert_v1_ListOptions_To_api_ListOptions,
 		convert_v1_List_To_api_List,
+		convert_v1_LoadBalancerEndpointStatus_To_api_LoadBalancerEndpointStatus,
+		convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus,
 		convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
 		convert_v1_NamespaceList_To_api_NamespaceList,
 		convert_v1_NamespaceSpec_To_api_NamespaceSpec,

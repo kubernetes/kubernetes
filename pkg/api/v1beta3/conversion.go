@@ -368,6 +368,8 @@ func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *newer.
 		return err
 	}
 
+	out.LoadBalancer = in.LoadBalancer
+
 	if in.PublicIPs != nil {
 		out.PublicIPs = make([]string, len(in.PublicIPs))
 		for i := range in.PublicIPs {
@@ -408,6 +410,7 @@ func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *newer.ServiceSpec, out *
 		return err
 	}
 	out.CreateExternalLoadBalancer = in.Visibility == newer.ServiceVisibilityLoadBalancer
+	out.LoadBalancer = in.LoadBalancer
 
 	if in.PublicIPs != nil {
 		out.PublicIPs = make([]string, len(in.PublicIPs))

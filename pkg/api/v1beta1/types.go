@@ -862,9 +862,13 @@ type Service struct {
 	// Visibility determines how the service will be exposed.  Valid options: Cluster, NodePort, LoadBalancer
 	Visibility ServiceVisibility `json:"visibility,omitempty" description:"visibility level of this service; must be Cluster, NodePort, or LoadBalancer; defaults to Cluster"`
 
-	// PublicIPs are used by external load balancers, or can be set by
+	// LoadBalancer can be specified by a user to request a particular load-balancer.
+	// The Name of an existing load-balancer, as used here, can be found in the Name field of LoadBalancerStatus.
+	LoadBalancer string `json:"loadBalancer,omitempty" description:"load balancer to use, defaults to automatically created"`
+
+	// Deprecated. PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
-	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs (e.g. load balancers) that should be proxied to this service"`
+	PublicIPs []string `json:"publicIPs,omitempty" description:"deprecated. externally visible IPs (e.g. load balancers) that should be proxied to this service"`
 
 	// PortalIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can

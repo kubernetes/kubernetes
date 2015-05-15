@@ -785,6 +785,7 @@ func addConversionFuncs() {
 				return err
 			}
 			out.CreateExternalLoadBalancer = in.Spec.Visibility == newer.ServiceVisibilityLoadBalancer
+			out.LoadBalancer = in.Spec.LoadBalancer
 
 			return nil
 		},
@@ -840,6 +841,8 @@ func addConversionFuncs() {
 			if err := s.Convert(&visibilityIn, &out.Spec.Visibility, 0); err != nil {
 				return err
 			}
+
+			out.Spec.LoadBalancer = in.LoadBalancer
 
 			return nil
 		},
