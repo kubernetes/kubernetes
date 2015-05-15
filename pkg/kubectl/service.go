@@ -32,6 +32,7 @@ func (ServiceGenerator) ParamNames() []GeneratorParam {
 		{"name", true},
 		{"selector", true},
 		{"port", true},
+		{"labels", false},
 		{"public-ip", false},
 		{"create-external-load-balancer", false},
 		{"protocol", false},
