@@ -50,11 +50,13 @@ current-context: service-account-context
 EOF
   local -r kubeconfig_base64=$(echo "${kubeconfig}" | base64 -w0)
   read -r -d '' secretyaml <<EOF
-apiVersion: v1beta1
-kind: Secret 
-id: token-${safe_username}
+apiVersion: v1beta3
 data:
   kubeconfig: ${kubeconfig_base64}
+kind: Secret
+metadata:
+  name: token-${safe_username}
+type: Opaque
 EOF
   create-resource-from-string "${secretyaml}" 100 10 "Secret-for-token-for-user-${username}" &
 # TODO: label the secrets with special label so kubectl does not show these?
