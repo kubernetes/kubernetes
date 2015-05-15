@@ -293,11 +293,13 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			return
 		}
 
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "CREATE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Create) {
+			userInfo, _ := api.UserFrom(ctx)
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, admission.Create, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
@@ -361,11 +363,13 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		ctx = api.WithNamespace(ctx, namespace)
 
 		// PATCH requires same permission as UPDATE
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Update) {
+			userInfo, _ := api.UserFrom(ctx)
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, admission.Update, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		versionedObj, err := converter.ConvertToVersion(obj, scope.APIVersion)
@@ -459,11 +463,13 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Update) {
+			userInfo, _ := api.UserFrom(ctx)
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, admission.Update, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		wasCreated := false
@@ -521,11 +527,13 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			}
 		}
 
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, scope.Resource, "DELETE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Delete) {
+			userInfo, _ := api.UserFrom(ctx)
+			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, scope.Resource, admission.Delete, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {

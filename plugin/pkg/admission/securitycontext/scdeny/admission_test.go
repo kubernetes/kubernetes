@@ -63,3 +63,19 @@ func TestAdmission(t *testing.T) {
 		}
 	}
 }
+
+func TestHandles(t *testing.T) {
+	handler := NewSecurityContextDeny(nil)
+	tests := map[admission.Operation]bool{
+		admission.Update:  true,
+		admission.Create:  true,
+		admission.Delete:  false,
+		admission.Connect: false,
+	}
+	for op, expected := range tests {
+		result := handler.Handles(op)
+		if result != expected {
+			t.Errorf("Unexpected result for operation %s: %v\n", op, result)
+		}
+	}
+}

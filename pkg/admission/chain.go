@@ -36,13 +36,31 @@ func NewFromPlugins(client client.Interface, pluginNames []string, configFilePat
 	return chainAdmissionHandler(plugins)
 }
 
+// NewChainHandler creates a new chain handler from an array of handlers. Used for testing.
+func NewChainHandler(handlers ...Interface) Interface {
+	return chainAdmissionHandler(handlers)
+}
+
 // Admit performs an admission control check using a chain of handlers, and returns immediately on first error
 func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 	for _, handler := range admissionHandler {
+		if !handler.Handles(a.GetOperation()) {
+			continue
+		}
 		err := handler.Admit(a)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// Handles will return true if any of the handlers handles the given operation
+func (admissionHandler chainAdmissionHandler) Handles(operation Operation) bool {
+	for _, handler := range admissionHandler {
+		if handler.Handles(operation) {
+			return true
+		}
+	}
+	return false
 }

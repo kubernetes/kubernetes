@@ -53,6 +53,8 @@ func init() {
 var _ = admission.Interface(&serviceAccount{})
 
 type serviceAccount struct {
+	*admission.Handler
+
 	// LimitSecretReferences rejects pods that reference secrets their service accounts do not reference
 	LimitSecretReferences bool
 	// MountServiceAccountToken creates Volume and VolumeMounts for the first referenced ServiceAccountToken for the pod's service account
@@ -102,6 +104,7 @@ func NewServiceAccount(cl client.Interface) *serviceAccount {
 	)
 
 	return &serviceAccount{
+		Handler: admission.NewHandler(admission.Create),
 		// TODO: enable this once we've swept secret usage to account for adding secret references to service accounts
 		LimitSecretReferences: false,
 		// Auto mount service account API token secrets
@@ -130,10 +133,6 @@ func (s *serviceAccount) Stop() {
 }
 
 func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
-	// We only care about Pod CREATE operations
-	if a.GetOperation() != "CREATE" {
-		return nil
-	}
 	if a.GetResource() != string(api.ResourcePods) {
 		return nil
 	}
