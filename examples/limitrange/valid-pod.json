@@ -1,20 +1,22 @@
 {
-  "id": "valid-pod",
+  "apiVersion":"v1beta3",
   "kind": "Pod",
-  "apiVersion":"v1beta2",
-  "labels": {
-    "name": "valid-pod"
-  },
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "valid-pod",
-      "containers": [{
-        "name": "kubernetes-serve-hostname",
-        "image": "gcr.io/google_containers/serve_hostname",
-        "cpu": 1000,
-        "memory": 5242880
-      }]
+  "metadata": {
+    "name": "valid-pod",
+    "labels": {
+      "name": "valid-pod"
     }
+  },
+  "spec": {
+    "containers": [{
+      "name": "kubernetes-serve-hostname",
+      "image": "gcr.io/google_containers/serve_hostname",
+      "resources": {
+        "limits": {
+          "cpu": "1",
+          "memory": "6Mi"
+        }
+      }
+    }]
   }
 }
