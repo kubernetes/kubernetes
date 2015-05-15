@@ -203,6 +203,17 @@ func rawValue(value string) *json.RawMessage {
 	return &msg
 }
 
+// rawValue converts the request, limit to *json.RawMessage
+func rawRequestLimit(request, limit string) *json.RawMessage {
+	if request == "" {
+		return rawValue(fmt.Sprintf(`{"limit":%q}`, limit))
+	}
+	if limit == "" {
+		return rawValue(fmt.Sprintf(`{"request":%q}`, request))
+	}
+	return rawValue(fmt.Sprintf(`{"request":%q,"limit":%q}`, request, limit))
+}
+
 // setIsolators overrides the isolators of the pod manifest if necessary.
 // TODO need an apply config in security context for rkt
 func setIsolators(app *appctypes.App, c *api.Container) error {
@@ -277,7 +288,7 @@ func setIsolators(app *appctypes.App, c *api.Container) error {
 		// https://github.com/appc/spec/issues/268
 		isolator := appctypes.Isolator{
 			Name:     acName,
-			ValueRaw: rawValue(fmt.Sprintf(`{"request":%q,"limit":%q}`, res.request, res.limit)),
+			ValueRaw: rawRequestLimit(res.request, res.limit),
 		}
 		app.Isolators = append(app.Isolators, isolator)
 	}
@@ -1077,6 +1088,15 @@ func (r *runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.Rea
 	return command.Run()
 }
 
+// isUUID returns true if the input is a valid rkt UUID,
+// e.g. "2372bc17-47cb-43fb-8d78-20b31729feda".
+func isUUID(input string) bool {
+	if _, err := appctypes.NewUUID(input); err != nil {
+		return false
+	}
+	return true
+}
+
 // getPodInfos returns a map of [pod-uuid]:*podInfo
 func (r *runtime) getPodInfos() (map[string]*podInfo, error) {
 	result := make(map[string]*podInfo)
@@ -1100,12 +1120,13 @@ func (r *runtime) getPodInfos() (map[string]*podInfo, error) {
 	// With '--no-legend', the first line is eliminated.
 	for _, line := range output {
 		tuples := splitLineByTab(line)
-		if len(tuples) < 3 { // At least it should have 3 entries.
-			glog.Warningf("rkt: Unrecognized line: %q", line)
+		if len(tuples) < 1 {
+			continue
+		}
+		if !isUUID(tuples[0]) {
 			continue
 		}
 		id := tuples[0]
-
 		status, err := r.runCommand("status", id)
 		if err != nil {
 			glog.Errorf("rkt: Cannot get status for pod (uuid=%q): %v", id, err)
