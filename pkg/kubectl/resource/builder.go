@@ -614,6 +614,9 @@ func (b *Builder) Do() *Result {
 		helpers = append(helpers, RetrieveLazy)
 	}
 	r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
+	if b.continueOnError {
+		r.visitor = ContinueOnErrorVisitor{r.visitor}
+	}
 	return r
 }
 

@@ -18,6 +18,7 @@ package resource
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -603,6 +604,36 @@ func TestMultipleObject(t *testing.T) {
 	}
 	if !api.Semantic.DeepDerivative(expected, obj) {
 		t.Errorf("unexpected visited objects: %#v", obj)
+	}
+}
+
+func TestContinueOnErrorVisitor(t *testing.T) {
+	r, _, _ := streamTestData()
+	req := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		ContinueOnError().
+		NamespaceParam("test").Stream(r, "STDIN").Flatten().
+		Do()
+	count := 0
+	testErr := fmt.Errorf("test error")
+	err := req.Visit(func(_ *Info) error {
+		count++
+		if count > 1 {
+			return testErr
+		}
+		return nil
+	})
+	if err == nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 3 {
+		t.Fatalf("did not visit all infos: %d", count)
+	}
+	agg, ok := err.(errors.Aggregate)
+	if !ok {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(agg.Errors()) != 2 || agg.Errors()[0] != testErr || agg.Errors()[1] != testErr {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

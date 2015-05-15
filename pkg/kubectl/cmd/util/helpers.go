@@ -46,62 +46,113 @@ type debugError interface {
 	DebugError() (msg string, args []interface{})
 }
 
+// CheckErr prints a user friendly error to STDERR and exits with a non-zero
+// exit code. Unrecognized errors will be printed with an "error: " prefix.
+//
+// This method is generic to the command in use and may be used by non-Kubectl
+// commands.
 func CheckErr(err error) {
-	if err != nil {
-		if debugErr, ok := err.(debugError); ok {
-			glog.V(4).Infof(debugErr.DebugError())
-		}
-		_, isStatus := err.(client.APIStatus)
-		switch {
-		case clientcmd.IsConfigurationInvalid(err):
-			fatal(MultilineError("Error in configuration: ", err))
-		case isStatus:
-			fatal(fmt.Sprintf("Error from server: %s", err.Error()))
-		case errors.IsUnexpectedObjectError(err):
-			fatal(fmt.Sprintf("Server returned an unexpected response: %s", err.Error()))
-		}
-		switch t := err.(type) {
-		case *url.Error:
-			glog.V(4).Infof("Connection error: %s %s: %v", t.Op, t.URL, t.Err)
-			switch {
-			case strings.Contains(t.Err.Error(), "connection refused"):
-				host := t.URL
-				if server, err := url.Parse(t.URL); err == nil {
-					host = server.Host
-				}
-				fatal(fmt.Sprintf("The connection to the server %s was refused - did you specify the right host or port?", host))
-			}
-			fatal(fmt.Sprintf("Unable to connect to the server: %v", t.Err))
-		}
-		fatal(fmt.Sprintf("Error: %s", err.Error()))
+	if err == nil {
+		return
 	}
+
+	// handle multiline errors
+	if clientcmd.IsConfigurationInvalid(err) {
+		fatal(MultilineError("Error in configuration: ", err))
+	}
+	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) > 0 {
+		fatal(MultipleErrors("", agg.Errors()))
+	}
+
+	msg, ok := StandardErrorMessage(err)
+	if !ok {
+		msg = fmt.Sprintf("error: %s\n", err.Error())
+	}
+	fatal(msg)
 }
 
+// StandardErrorMessage translates common errors into a human readable message, or returns
+// false if the error is not one of the recognized types. It may also log extended
+// information to glog.
+//
+// This method is generic to the command in use and may be used by non-Kubectl
+// commands.
+func StandardErrorMessage(err error) (string, bool) {
+	if debugErr, ok := err.(debugError); ok {
+		glog.V(4).Infof(debugErr.DebugError())
+	}
+	_, isStatus := err.(client.APIStatus)
+	switch {
+	case isStatus:
+		return fmt.Sprintf("Error from server: %s", err.Error()), true
+	case errors.IsUnexpectedObjectError(err):
+		return fmt.Sprintf("Server returned an unexpected response: %s", err.Error()), true
+	}
+	switch t := err.(type) {
+	case *url.Error:
+		glog.V(4).Infof("Connection error: %s %s: %v", t.Op, t.URL, t.Err)
+		switch {
+		case strings.Contains(t.Err.Error(), "connection refused"):
+			host := t.URL
+			if server, err := url.Parse(t.URL); err == nil {
+				host = server.Host
+			}
+			return fmt.Sprintf("The connection to the server %s was refused - did you specify the right host or port?", host), true
+		}
+		return fmt.Sprintf("Unable to connect to the server: %v", t.Err), true
+	}
+	return "", false
+}
+
+// MultilineError returns a string representing an error that splits sub errors into their own
+// lines. The returned string will end with a newline.
 func MultilineError(prefix string, err error) string {
 	if agg, ok := err.(utilerrors.Aggregate); ok {
-		errs := agg.Errors()
+		errs := utilerrors.Flatten(agg).Errors()
 		buf := &bytes.Buffer{}
 		switch len(errs) {
 		case 0:
-			return fmt.Sprintf("%s%v", prefix, err)
+			return fmt.Sprintf("%s%v\n", prefix, err)
 		case 1:
-			return fmt.Sprintf("%s%v", prefix, errs[0])
+			return fmt.Sprintf("%s%v\n", prefix, messageForError(errs[0]))
 		default:
 			fmt.Fprintln(buf, prefix)
 			for _, err := range errs {
-				fmt.Fprintf(buf, "* %v\n", err)
+				fmt.Fprintf(buf, "* %v\n", messageForError(err))
 			}
 			return buf.String()
 		}
 	}
-	return fmt.Sprintf("%s%s", prefix, err)
+	return fmt.Sprintf("%s%s\n", prefix, err)
 }
 
+// MultipleErrors returns a newline delimited string containing
+// the prefix and referenced errors in standard form.
+func MultipleErrors(prefix string, errs []error) string {
+	buf := &bytes.Buffer{}
+	for _, err := range errs {
+		fmt.Fprintf(buf, "%s%v\n", prefix, messageForError(err))
+	}
+	return buf.String()
+}
+
+// messageForError returns the string representing the error.
+func messageForError(err error) string {
+	msg, ok := StandardErrorMessage(err)
+	if !ok {
+		msg = err.Error()
+	}
+	return msg
+}
+
+// fatal prints the message and then exits. If V(2) or greater, glog.Fatal
+// is invoked for extended information. The provided msg should end in a
+// newline.
 func fatal(msg string) {
 	if glog.V(2) {
 		glog.FatalDepth(2, msg)
 	}
-	fmt.Fprintln(os.Stderr, msg)
+	fmt.Fprint(os.Stderr, msg)
 	os.Exit(1)
 }
 
