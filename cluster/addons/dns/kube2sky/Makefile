@@ -4,7 +4,7 @@
 
 .PHONY: all kube2sky container push clean
 
-TAG = 1.4
+TAG = 1.5
 PREFIX = gcr.io/google_containers
 
 all: container
