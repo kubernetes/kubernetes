@@ -298,39 +298,10 @@ func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) 
 	if !info.portalIP.Equal(net.ParseIP(service.Spec.PortalIP)) {
 		return false
 	}
-	if !loadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
+	if !info.loadBalancerStatus.Equal(&service.Status.LoadBalancer) {
 		return false
 	}
 	if info.sessionAffinityType != service.Spec.SessionAffinity {
-		return false
-	}
-	return true
-}
-
-func loadBalancerStatusEqual(lhs, rhs *api.LoadBalancerStatus) bool {
-	if lhs.Name != rhs.Name {
-		return false
-	}
-	return endpointsEqual(lhs.Endpoints, rhs.Endpoints)
-}
-
-func endpointsEqual(lhs, rhs []api.LoadBalancerEndpointStatus) bool {
-	if len(lhs) != len(rhs) {
-		return false
-	}
-	for i := range lhs {
-		if !endpointEqual(&lhs[i], &rhs[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-func endpointEqual(lhs, rhs *api.LoadBalancerEndpointStatus) bool {
-	if lhs.IP != rhs.IP {
-		return false
-	}
-	if lhs.Hostname != rhs.Hostname {
 		return false
 	}
 	return true

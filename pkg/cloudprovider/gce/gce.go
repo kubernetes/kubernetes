@@ -277,15 +277,18 @@ func (gce *GCECloud) waitForZoneOp(op *compute.Operation) error {
 }
 
 // GetTCPLoadBalancer is an implementation of TCPLoadBalancer.GetTCPLoadBalancer
-func (gce *GCECloud) GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error) {
-	fw, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
+func (gce *GCECloud) GetTCPLoadBalancer(name, region string) (status api.LoadBalancerStatus, exists bool, err error) {
+	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err == nil {
-		return fw.IPAddress, true, nil
+		status.Name = fwd.IPAddress
+		status.Endpoints = []api.LoadBalancerEndpointStatus { { IP: fwd.IPAddress  } }
+
+		return status, true, nil
 	}
 	if isHTTPErrorCode(err, http.StatusNotFound) {
-		return "", false, nil
+		return status, false, nil
 	}
-	return "", false, err
+	return status, false, err
 }
 
 func isHTTPErrorCode(err error, code int) bool {
@@ -309,17 +312,19 @@ func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // TODO(a-robinson): Don't just ignore specified IP addresses. Check if they're
 // owned by the project and available to be used, and use them if they are.
-func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error) {
+func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (api.LoadBalancerStatus, error) {
+	status := api.LoadBalancerStatus{}
+
 	err := gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
 	if err != nil {
 		if !isHTTPErrorCode(err, http.StatusConflict) {
-			return "", err
+			return status, err
 		}
 		glog.Infof("Creating forwarding rule pointing at target pool that already exists: %v", err)
 	}
 
 	if len(ports) == 0 {
-		return "", fmt.Errorf("no ports specified for GCE load balancer")
+		return status, fmt.Errorf("no ports specified for GCE load balancer")
 	}
 	minPort := 65536
 	maxPort := 0
@@ -339,19 +344,23 @@ func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.I
 	}
 	op, err := gce.service.ForwardingRules.Insert(gce.projectID, region, req).Do()
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-		return "", err
+		return status, err
 	}
 	if op != nil {
 		err = gce.waitForRegionOp(op, region)
 		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-			return "", err
+			return status, err
 		}
 	}
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err != nil {
-		return "", err
+		return status, err
 	}
-	return fwd.IPAddress, nil
+
+	status.Name = fwd.IPAddress
+	status.Endpoints = []api.LoadBalancerEndpointStatus { { IP: fwd.IPAddress  } }
+
+	return status, nil
 }
 
 // UpdateTCPLoadBalancer is an implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
