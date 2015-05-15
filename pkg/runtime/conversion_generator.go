@@ -265,7 +265,7 @@ func (g *conversionGenerator) WriteConversionFunctions(w io.Writer) error {
 
 func (g *conversionGenerator) writeRegisterHeader(b *buffer, indent int) {
 	b.addLine("func init() {\n", indent)
-	b.addLine("err := newer.Scheme.AddGeneratedConversionFuncs(\n", indent+1)
+	b.addLine("err := api.Scheme.AddGeneratedConversionFuncs(\n", indent+1)
 }
 
 func (g *conversionGenerator) writeRegisterFooter(b *buffer, indent int) {

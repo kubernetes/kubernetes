@@ -19,18 +19,18 @@ package v1
 import (
 	"fmt"
 
-	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 func addConversionFuncs() {
-	err := newer.Scheme.AddConversionFuncs()
+	err := api.Scheme.AddConversionFuncs()
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
 
 	// Add field conversion funcs.
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1", "Pod",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Pod",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -46,7 +46,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1", "Node",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Node",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name":
@@ -61,7 +61,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1", "ReplicationController",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "ReplicationController",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -75,7 +75,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1", "Event",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Event",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "involvedObject.kind",
@@ -96,7 +96,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1", "Namespace",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Namespace",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "status.phase":

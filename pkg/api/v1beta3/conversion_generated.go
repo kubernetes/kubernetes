@@ -19,13 +19,13 @@ package v1beta3
 import (
 	"reflect"
 
-	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
 // AUTO-GENERATED FUNCTIONS START HERE
-func convert_v1beta3_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in *AWSElasticBlockStoreVolumeSource, out *newer.AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
+func convert_v1beta3_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in *AWSElasticBlockStoreVolumeSource, out *api.AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*AWSElasticBlockStoreVolumeSource))(in)
 	}
@@ -36,9 +36,9 @@ func convert_v1beta3_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStor
 	return nil
 }
 
-func convert_api_AWSElasticBlockStoreVolumeSource_To_v1beta3_AWSElasticBlockStoreVolumeSource(in *newer.AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
+func convert_api_AWSElasticBlockStoreVolumeSource_To_v1beta3_AWSElasticBlockStoreVolumeSource(in *api.AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.AWSElasticBlockStoreVolumeSource))(in)
+		defaulting.(func(*api.AWSElasticBlockStoreVolumeSource))(in)
 	}
 	out.VolumeID = in.VolumeID
 	out.FSType = in.FSType
@@ -47,7 +47,7 @@ func convert_api_AWSElasticBlockStoreVolumeSource_To_v1beta3_AWSElasticBlockStor
 	return nil
 }
 
-func convert_v1beta3_Binding_To_api_Binding(in *Binding, out *newer.Binding, s conversion.Scope) error {
+func convert_v1beta3_Binding_To_api_Binding(in *Binding, out *api.Binding, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Binding))(in)
 	}
@@ -63,9 +63,9 @@ func convert_v1beta3_Binding_To_api_Binding(in *Binding, out *newer.Binding, s c
 	return nil
 }
 
-func convert_api_Binding_To_v1beta3_Binding(in *newer.Binding, out *Binding, s conversion.Scope) error {
+func convert_api_Binding_To_v1beta3_Binding(in *api.Binding, out *Binding, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Binding))(in)
+		defaulting.(func(*api.Binding))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -79,9 +79,9 @@ func convert_api_Binding_To_v1beta3_Binding(in *newer.Binding, out *Binding, s c
 	return nil
 }
 
-func convert_api_Capabilities_To_v1beta3_Capabilities(in *newer.Capabilities, out *Capabilities, s conversion.Scope) error {
+func convert_api_Capabilities_To_v1beta3_Capabilities(in *api.Capabilities, out *Capabilities, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Capabilities))(in)
+		defaulting.(func(*api.Capabilities))(in)
 	}
 	if in.Add != nil {
 		out.Add = make([]Capability, len(in.Add))
@@ -102,22 +102,22 @@ func convert_api_Capabilities_To_v1beta3_Capabilities(in *newer.Capabilities, ou
 	return nil
 }
 
-func convert_v1beta3_Capabilities_To_api_Capabilities(in *Capabilities, out *newer.Capabilities, s conversion.Scope) error {
+func convert_v1beta3_Capabilities_To_api_Capabilities(in *Capabilities, out *api.Capabilities, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Capabilities))(in)
 	}
 	if in.Add != nil {
-		out.Add = make([]newer.Capability, len(in.Add))
+		out.Add = make([]api.Capability, len(in.Add))
 		for i := range in.Add {
-			out.Add[i] = newer.Capability(in.Add[i])
+			out.Add[i] = api.Capability(in.Add[i])
 		}
 	} else {
 		out.Add = nil
 	}
 	if in.Drop != nil {
-		out.Drop = make([]newer.Capability, len(in.Drop))
+		out.Drop = make([]api.Capability, len(in.Drop))
 		for i := range in.Drop {
-			out.Drop[i] = newer.Capability(in.Drop[i])
+			out.Drop[i] = api.Capability(in.Drop[i])
 		}
 	} else {
 		out.Drop = nil
@@ -125,20 +125,20 @@ func convert_v1beta3_Capabilities_To_api_Capabilities(in *Capabilities, out *new
 	return nil
 }
 
-func convert_v1beta3_ComponentCondition_To_api_ComponentCondition(in *ComponentCondition, out *newer.ComponentCondition, s conversion.Scope) error {
+func convert_v1beta3_ComponentCondition_To_api_ComponentCondition(in *ComponentCondition, out *api.ComponentCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ComponentCondition))(in)
 	}
-	out.Type = newer.ComponentConditionType(in.Type)
-	out.Status = newer.ConditionStatus(in.Status)
+	out.Type = api.ComponentConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
 	out.Message = in.Message
 	out.Error = in.Error
 	return nil
 }
 
-func convert_api_ComponentCondition_To_v1beta3_ComponentCondition(in *newer.ComponentCondition, out *ComponentCondition, s conversion.Scope) error {
+func convert_api_ComponentCondition_To_v1beta3_ComponentCondition(in *api.ComponentCondition, out *ComponentCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ComponentCondition))(in)
+		defaulting.(func(*api.ComponentCondition))(in)
 	}
 	out.Type = ComponentConditionType(in.Type)
 	out.Status = ConditionStatus(in.Status)
@@ -147,7 +147,7 @@ func convert_api_ComponentCondition_To_v1beta3_ComponentCondition(in *newer.Comp
 	return nil
 }
 
-func convert_v1beta3_ComponentStatus_To_api_ComponentStatus(in *ComponentStatus, out *newer.ComponentStatus, s conversion.Scope) error {
+func convert_v1beta3_ComponentStatus_To_api_ComponentStatus(in *ComponentStatus, out *api.ComponentStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ComponentStatus))(in)
 	}
@@ -158,7 +158,7 @@ func convert_v1beta3_ComponentStatus_To_api_ComponentStatus(in *ComponentStatus,
 		return err
 	}
 	if in.Conditions != nil {
-		out.Conditions = make([]newer.ComponentCondition, len(in.Conditions))
+		out.Conditions = make([]api.ComponentCondition, len(in.Conditions))
 		for i := range in.Conditions {
 			if err := convert_v1beta3_ComponentCondition_To_api_ComponentCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
 				return err
@@ -170,9 +170,9 @@ func convert_v1beta3_ComponentStatus_To_api_ComponentStatus(in *ComponentStatus,
 	return nil
 }
 
-func convert_api_ComponentStatus_To_v1beta3_ComponentStatus(in *newer.ComponentStatus, out *ComponentStatus, s conversion.Scope) error {
+func convert_api_ComponentStatus_To_v1beta3_ComponentStatus(in *api.ComponentStatus, out *ComponentStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ComponentStatus))(in)
+		defaulting.(func(*api.ComponentStatus))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -193,7 +193,7 @@ func convert_api_ComponentStatus_To_v1beta3_ComponentStatus(in *newer.ComponentS
 	return nil
 }
 
-func convert_v1beta3_ComponentStatusList_To_api_ComponentStatusList(in *ComponentStatusList, out *newer.ComponentStatusList, s conversion.Scope) error {
+func convert_v1beta3_ComponentStatusList_To_api_ComponentStatusList(in *ComponentStatusList, out *api.ComponentStatusList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ComponentStatusList))(in)
 	}
@@ -204,7 +204,7 @@ func convert_v1beta3_ComponentStatusList_To_api_ComponentStatusList(in *Componen
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.ComponentStatus, len(in.Items))
+		out.Items = make([]api.ComponentStatus, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_ComponentStatus_To_api_ComponentStatus(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -216,9 +216,9 @@ func convert_v1beta3_ComponentStatusList_To_api_ComponentStatusList(in *Componen
 	return nil
 }
 
-func convert_api_ComponentStatusList_To_v1beta3_ComponentStatusList(in *newer.ComponentStatusList, out *ComponentStatusList, s conversion.Scope) error {
+func convert_api_ComponentStatusList_To_v1beta3_ComponentStatusList(in *api.ComponentStatusList, out *ComponentStatusList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ComponentStatusList))(in)
+		defaulting.(func(*api.ComponentStatusList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -239,21 +239,21 @@ func convert_api_ComponentStatusList_To_v1beta3_ComponentStatusList(in *newer.Co
 	return nil
 }
 
-func convert_v1beta3_ContainerPort_To_api_ContainerPort(in *ContainerPort, out *newer.ContainerPort, s conversion.Scope) error {
+func convert_v1beta3_ContainerPort_To_api_ContainerPort(in *ContainerPort, out *api.ContainerPort, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ContainerPort))(in)
 	}
 	out.Name = in.Name
 	out.HostPort = in.HostPort
 	out.ContainerPort = in.ContainerPort
-	out.Protocol = newer.Protocol(in.Protocol)
+	out.Protocol = api.Protocol(in.Protocol)
 	out.HostIP = in.HostIP
 	return nil
 }
 
-func convert_api_ContainerPort_To_v1beta3_ContainerPort(in *newer.ContainerPort, out *ContainerPort, s conversion.Scope) error {
+func convert_api_ContainerPort_To_v1beta3_ContainerPort(in *api.ContainerPort, out *ContainerPort, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ContainerPort))(in)
+		defaulting.(func(*api.ContainerPort))(in)
 	}
 	out.Name = in.Name
 	out.HostPort = in.HostPort
@@ -263,12 +263,12 @@ func convert_api_ContainerPort_To_v1beta3_ContainerPort(in *newer.ContainerPort,
 	return nil
 }
 
-func convert_v1beta3_ContainerState_To_api_ContainerState(in *ContainerState, out *newer.ContainerState, s conversion.Scope) error {
+func convert_v1beta3_ContainerState_To_api_ContainerState(in *ContainerState, out *api.ContainerState, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ContainerState))(in)
 	}
 	if in.Waiting != nil {
-		out.Waiting = new(newer.ContainerStateWaiting)
+		out.Waiting = new(api.ContainerStateWaiting)
 		if err := convert_v1beta3_ContainerStateWaiting_To_api_ContainerStateWaiting(in.Waiting, out.Waiting, s); err != nil {
 			return err
 		}
@@ -276,7 +276,7 @@ func convert_v1beta3_ContainerState_To_api_ContainerState(in *ContainerState, ou
 		out.Waiting = nil
 	}
 	if in.Running != nil {
-		out.Running = new(newer.ContainerStateRunning)
+		out.Running = new(api.ContainerStateRunning)
 		if err := convert_v1beta3_ContainerStateRunning_To_api_ContainerStateRunning(in.Running, out.Running, s); err != nil {
 			return err
 		}
@@ -284,7 +284,7 @@ func convert_v1beta3_ContainerState_To_api_ContainerState(in *ContainerState, ou
 		out.Running = nil
 	}
 	if in.Termination != nil {
-		out.Termination = new(newer.ContainerStateTerminated)
+		out.Termination = new(api.ContainerStateTerminated)
 		if err := convert_v1beta3_ContainerStateTerminated_To_api_ContainerStateTerminated(in.Termination, out.Termination, s); err != nil {
 			return err
 		}
@@ -294,9 +294,9 @@ func convert_v1beta3_ContainerState_To_api_ContainerState(in *ContainerState, ou
 	return nil
 }
 
-func convert_api_ContainerState_To_v1beta3_ContainerState(in *newer.ContainerState, out *ContainerState, s conversion.Scope) error {
+func convert_api_ContainerState_To_v1beta3_ContainerState(in *api.ContainerState, out *ContainerState, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ContainerState))(in)
+		defaulting.(func(*api.ContainerState))(in)
 	}
 	if in.Waiting != nil {
 		out.Waiting = new(ContainerStateWaiting)
@@ -325,7 +325,7 @@ func convert_api_ContainerState_To_v1beta3_ContainerState(in *newer.ContainerSta
 	return nil
 }
 
-func convert_v1beta3_ContainerStateRunning_To_api_ContainerStateRunning(in *ContainerStateRunning, out *newer.ContainerStateRunning, s conversion.Scope) error {
+func convert_v1beta3_ContainerStateRunning_To_api_ContainerStateRunning(in *ContainerStateRunning, out *api.ContainerStateRunning, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ContainerStateRunning))(in)
 	}
@@ -335,9 +335,9 @@ func convert_v1beta3_ContainerStateRunning_To_api_ContainerStateRunning(in *Cont
 	return nil
 }
 
-func convert_api_ContainerStateRunning_To_v1beta3_ContainerStateRunning(in *newer.ContainerStateRunning, out *ContainerStateRunning, s conversion.Scope) error {
+func convert_api_ContainerStateRunning_To_v1beta3_ContainerStateRunning(in *api.ContainerStateRunning, out *ContainerStateRunning, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ContainerStateRunning))(in)
+		defaulting.(func(*api.ContainerStateRunning))(in)
 	}
 	if err := s.Convert(&in.StartedAt, &out.StartedAt, 0); err != nil {
 		return err
@@ -345,7 +345,7 @@ func convert_api_ContainerStateRunning_To_v1beta3_ContainerStateRunning(in *newe
 	return nil
 }
 
-func convert_v1beta3_ContainerStateTerminated_To_api_ContainerStateTerminated(in *ContainerStateTerminated, out *newer.ContainerStateTerminated, s conversion.Scope) error {
+func convert_v1beta3_ContainerStateTerminated_To_api_ContainerStateTerminated(in *ContainerStateTerminated, out *api.ContainerStateTerminated, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ContainerStateTerminated))(in)
 	}
@@ -363,9 +363,9 @@ func convert_v1beta3_ContainerStateTerminated_To_api_ContainerStateTerminated(in
 	return nil
 }
 
-func convert_api_ContainerStateTerminated_To_v1beta3_ContainerStateTerminated(in *newer.ContainerStateTerminated, out *ContainerStateTerminated, s conversion.Scope) error {
+func convert_api_ContainerStateTerminated_To_v1beta3_ContainerStateTerminated(in *api.ContainerStateTerminated, out *ContainerStateTerminated, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ContainerStateTerminated))(in)
+		defaulting.(func(*api.ContainerStateTerminated))(in)
 	}
 	out.ExitCode = in.ExitCode
 	out.Signal = in.Signal
@@ -381,7 +381,7 @@ func convert_api_ContainerStateTerminated_To_v1beta3_ContainerStateTerminated(in
 	return nil
 }
 
-func convert_v1beta3_ContainerStateWaiting_To_api_ContainerStateWaiting(in *ContainerStateWaiting, out *newer.ContainerStateWaiting, s conversion.Scope) error {
+func convert_v1beta3_ContainerStateWaiting_To_api_ContainerStateWaiting(in *ContainerStateWaiting, out *api.ContainerStateWaiting, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ContainerStateWaiting))(in)
 	}
@@ -389,15 +389,15 @@ func convert_v1beta3_ContainerStateWaiting_To_api_ContainerStateWaiting(in *Cont
 	return nil
 }
 
-func convert_api_ContainerStateWaiting_To_v1beta3_ContainerStateWaiting(in *newer.ContainerStateWaiting, out *ContainerStateWaiting, s conversion.Scope) error {
+func convert_api_ContainerStateWaiting_To_v1beta3_ContainerStateWaiting(in *api.ContainerStateWaiting, out *ContainerStateWaiting, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ContainerStateWaiting))(in)
+		defaulting.(func(*api.ContainerStateWaiting))(in)
 	}
 	out.Reason = in.Reason
 	return nil
 }
 
-func convert_v1beta3_ContainerStatus_To_api_ContainerStatus(in *ContainerStatus, out *newer.ContainerStatus, s conversion.Scope) error {
+func convert_v1beta3_ContainerStatus_To_api_ContainerStatus(in *ContainerStatus, out *api.ContainerStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ContainerStatus))(in)
 	}
@@ -416,9 +416,9 @@ func convert_v1beta3_ContainerStatus_To_api_ContainerStatus(in *ContainerStatus,
 	return nil
 }
 
-func convert_api_ContainerStatus_To_v1beta3_ContainerStatus(in *newer.ContainerStatus, out *ContainerStatus, s conversion.Scope) error {
+func convert_api_ContainerStatus_To_v1beta3_ContainerStatus(in *api.ContainerStatus, out *ContainerStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ContainerStatus))(in)
+		defaulting.(func(*api.ContainerStatus))(in)
 	}
 	out.Name = in.Name
 	if err := convert_api_ContainerState_To_v1beta3_ContainerState(&in.State, &out.State, s); err != nil {
@@ -435,7 +435,7 @@ func convert_api_ContainerStatus_To_v1beta3_ContainerStatus(in *newer.ContainerS
 	return nil
 }
 
-func convert_v1beta3_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *newer.DeleteOptions, s conversion.Scope) error {
+func convert_v1beta3_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *api.DeleteOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*DeleteOptions))(in)
 	}
@@ -451,9 +451,9 @@ func convert_v1beta3_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *
 	return nil
 }
 
-func convert_api_DeleteOptions_To_v1beta3_DeleteOptions(in *newer.DeleteOptions, out *DeleteOptions, s conversion.Scope) error {
+func convert_api_DeleteOptions_To_v1beta3_DeleteOptions(in *api.DeleteOptions, out *DeleteOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.DeleteOptions))(in)
+		defaulting.(func(*api.DeleteOptions))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -467,29 +467,29 @@ func convert_api_DeleteOptions_To_v1beta3_DeleteOptions(in *newer.DeleteOptions,
 	return nil
 }
 
-func convert_v1beta3_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource(in *EmptyDirVolumeSource, out *newer.EmptyDirVolumeSource, s conversion.Scope) error {
+func convert_v1beta3_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource(in *EmptyDirVolumeSource, out *api.EmptyDirVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EmptyDirVolumeSource))(in)
 	}
-	out.Medium = newer.StorageMedium(in.Medium)
+	out.Medium = api.StorageMedium(in.Medium)
 	return nil
 }
 
-func convert_api_EmptyDirVolumeSource_To_v1beta3_EmptyDirVolumeSource(in *newer.EmptyDirVolumeSource, out *EmptyDirVolumeSource, s conversion.Scope) error {
+func convert_api_EmptyDirVolumeSource_To_v1beta3_EmptyDirVolumeSource(in *api.EmptyDirVolumeSource, out *EmptyDirVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.EmptyDirVolumeSource))(in)
+		defaulting.(func(*api.EmptyDirVolumeSource))(in)
 	}
 	out.Medium = StorageMedium(in.Medium)
 	return nil
 }
 
-func convert_v1beta3_EndpointAddress_To_api_EndpointAddress(in *EndpointAddress, out *newer.EndpointAddress, s conversion.Scope) error {
+func convert_v1beta3_EndpointAddress_To_api_EndpointAddress(in *EndpointAddress, out *api.EndpointAddress, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EndpointAddress))(in)
 	}
 	out.IP = in.IP
 	if in.TargetRef != nil {
-		out.TargetRef = new(newer.ObjectReference)
+		out.TargetRef = new(api.ObjectReference)
 		if err := convert_v1beta3_ObjectReference_To_api_ObjectReference(in.TargetRef, out.TargetRef, s); err != nil {
 			return err
 		}
@@ -499,9 +499,9 @@ func convert_v1beta3_EndpointAddress_To_api_EndpointAddress(in *EndpointAddress,
 	return nil
 }
 
-func convert_api_EndpointAddress_To_v1beta3_EndpointAddress(in *newer.EndpointAddress, out *EndpointAddress, s conversion.Scope) error {
+func convert_api_EndpointAddress_To_v1beta3_EndpointAddress(in *api.EndpointAddress, out *EndpointAddress, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.EndpointAddress))(in)
+		defaulting.(func(*api.EndpointAddress))(in)
 	}
 	out.IP = in.IP
 	if in.TargetRef != nil {
@@ -515,19 +515,19 @@ func convert_api_EndpointAddress_To_v1beta3_EndpointAddress(in *newer.EndpointAd
 	return nil
 }
 
-func convert_v1beta3_EndpointPort_To_api_EndpointPort(in *EndpointPort, out *newer.EndpointPort, s conversion.Scope) error {
+func convert_v1beta3_EndpointPort_To_api_EndpointPort(in *EndpointPort, out *api.EndpointPort, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EndpointPort))(in)
 	}
 	out.Name = in.Name
 	out.Port = in.Port
-	out.Protocol = newer.Protocol(in.Protocol)
+	out.Protocol = api.Protocol(in.Protocol)
 	return nil
 }
 
-func convert_api_EndpointPort_To_v1beta3_EndpointPort(in *newer.EndpointPort, out *EndpointPort, s conversion.Scope) error {
+func convert_api_EndpointPort_To_v1beta3_EndpointPort(in *api.EndpointPort, out *EndpointPort, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.EndpointPort))(in)
+		defaulting.(func(*api.EndpointPort))(in)
 	}
 	out.Name = in.Name
 	out.Port = in.Port
@@ -535,12 +535,12 @@ func convert_api_EndpointPort_To_v1beta3_EndpointPort(in *newer.EndpointPort, ou
 	return nil
 }
 
-func convert_v1beta3_EndpointSubset_To_api_EndpointSubset(in *EndpointSubset, out *newer.EndpointSubset, s conversion.Scope) error {
+func convert_v1beta3_EndpointSubset_To_api_EndpointSubset(in *EndpointSubset, out *api.EndpointSubset, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EndpointSubset))(in)
 	}
 	if in.Addresses != nil {
-		out.Addresses = make([]newer.EndpointAddress, len(in.Addresses))
+		out.Addresses = make([]api.EndpointAddress, len(in.Addresses))
 		for i := range in.Addresses {
 			if err := convert_v1beta3_EndpointAddress_To_api_EndpointAddress(&in.Addresses[i], &out.Addresses[i], s); err != nil {
 				return err
@@ -550,7 +550,7 @@ func convert_v1beta3_EndpointSubset_To_api_EndpointSubset(in *EndpointSubset, ou
 		out.Addresses = nil
 	}
 	if in.Ports != nil {
-		out.Ports = make([]newer.EndpointPort, len(in.Ports))
+		out.Ports = make([]api.EndpointPort, len(in.Ports))
 		for i := range in.Ports {
 			if err := convert_v1beta3_EndpointPort_To_api_EndpointPort(&in.Ports[i], &out.Ports[i], s); err != nil {
 				return err
@@ -562,9 +562,9 @@ func convert_v1beta3_EndpointSubset_To_api_EndpointSubset(in *EndpointSubset, ou
 	return nil
 }
 
-func convert_api_EndpointSubset_To_v1beta3_EndpointSubset(in *newer.EndpointSubset, out *EndpointSubset, s conversion.Scope) error {
+func convert_api_EndpointSubset_To_v1beta3_EndpointSubset(in *api.EndpointSubset, out *EndpointSubset, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.EndpointSubset))(in)
+		defaulting.(func(*api.EndpointSubset))(in)
 	}
 	if in.Addresses != nil {
 		out.Addresses = make([]EndpointAddress, len(in.Addresses))
@@ -589,7 +589,7 @@ func convert_api_EndpointSubset_To_v1beta3_EndpointSubset(in *newer.EndpointSubs
 	return nil
 }
 
-func convert_v1beta3_Endpoints_To_api_Endpoints(in *Endpoints, out *newer.Endpoints, s conversion.Scope) error {
+func convert_v1beta3_Endpoints_To_api_Endpoints(in *Endpoints, out *api.Endpoints, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Endpoints))(in)
 	}
@@ -600,7 +600,7 @@ func convert_v1beta3_Endpoints_To_api_Endpoints(in *Endpoints, out *newer.Endpoi
 		return err
 	}
 	if in.Subsets != nil {
-		out.Subsets = make([]newer.EndpointSubset, len(in.Subsets))
+		out.Subsets = make([]api.EndpointSubset, len(in.Subsets))
 		for i := range in.Subsets {
 			if err := convert_v1beta3_EndpointSubset_To_api_EndpointSubset(&in.Subsets[i], &out.Subsets[i], s); err != nil {
 				return err
@@ -612,9 +612,9 @@ func convert_v1beta3_Endpoints_To_api_Endpoints(in *Endpoints, out *newer.Endpoi
 	return nil
 }
 
-func convert_api_Endpoints_To_v1beta3_Endpoints(in *newer.Endpoints, out *Endpoints, s conversion.Scope) error {
+func convert_api_Endpoints_To_v1beta3_Endpoints(in *api.Endpoints, out *Endpoints, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Endpoints))(in)
+		defaulting.(func(*api.Endpoints))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -635,7 +635,7 @@ func convert_api_Endpoints_To_v1beta3_Endpoints(in *newer.Endpoints, out *Endpoi
 	return nil
 }
 
-func convert_v1beta3_EndpointsList_To_api_EndpointsList(in *EndpointsList, out *newer.EndpointsList, s conversion.Scope) error {
+func convert_v1beta3_EndpointsList_To_api_EndpointsList(in *EndpointsList, out *api.EndpointsList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EndpointsList))(in)
 	}
@@ -646,7 +646,7 @@ func convert_v1beta3_EndpointsList_To_api_EndpointsList(in *EndpointsList, out *
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.Endpoints, len(in.Items))
+		out.Items = make([]api.Endpoints, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_Endpoints_To_api_Endpoints(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -658,9 +658,9 @@ func convert_v1beta3_EndpointsList_To_api_EndpointsList(in *EndpointsList, out *
 	return nil
 }
 
-func convert_api_EndpointsList_To_v1beta3_EndpointsList(in *newer.EndpointsList, out *EndpointsList, s conversion.Scope) error {
+func convert_api_EndpointsList_To_v1beta3_EndpointsList(in *api.EndpointsList, out *EndpointsList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.EndpointsList))(in)
+		defaulting.(func(*api.EndpointsList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -681,14 +681,14 @@ func convert_api_EndpointsList_To_v1beta3_EndpointsList(in *newer.EndpointsList,
 	return nil
 }
 
-func convert_v1beta3_EnvVar_To_api_EnvVar(in *EnvVar, out *newer.EnvVar, s conversion.Scope) error {
+func convert_v1beta3_EnvVar_To_api_EnvVar(in *EnvVar, out *api.EnvVar, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EnvVar))(in)
 	}
 	out.Name = in.Name
 	out.Value = in.Value
 	if in.ValueFrom != nil {
-		out.ValueFrom = new(newer.EnvVarSource)
+		out.ValueFrom = new(api.EnvVarSource)
 		if err := convert_v1beta3_EnvVarSource_To_api_EnvVarSource(in.ValueFrom, out.ValueFrom, s); err != nil {
 			return err
 		}
@@ -698,9 +698,9 @@ func convert_v1beta3_EnvVar_To_api_EnvVar(in *EnvVar, out *newer.EnvVar, s conve
 	return nil
 }
 
-func convert_api_EnvVar_To_v1beta3_EnvVar(in *newer.EnvVar, out *EnvVar, s conversion.Scope) error {
+func convert_api_EnvVar_To_v1beta3_EnvVar(in *api.EnvVar, out *EnvVar, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.EnvVar))(in)
+		defaulting.(func(*api.EnvVar))(in)
 	}
 	out.Name = in.Name
 	out.Value = in.Value
@@ -715,12 +715,12 @@ func convert_api_EnvVar_To_v1beta3_EnvVar(in *newer.EnvVar, out *EnvVar, s conve
 	return nil
 }
 
-func convert_v1beta3_EnvVarSource_To_api_EnvVarSource(in *EnvVarSource, out *newer.EnvVarSource, s conversion.Scope) error {
+func convert_v1beta3_EnvVarSource_To_api_EnvVarSource(in *EnvVarSource, out *api.EnvVarSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EnvVarSource))(in)
 	}
 	if in.FieldRef != nil {
-		out.FieldRef = new(newer.ObjectFieldSelector)
+		out.FieldRef = new(api.ObjectFieldSelector)
 		if err := convert_v1beta3_ObjectFieldSelector_To_api_ObjectFieldSelector(in.FieldRef, out.FieldRef, s); err != nil {
 			return err
 		}
@@ -730,9 +730,9 @@ func convert_v1beta3_EnvVarSource_To_api_EnvVarSource(in *EnvVarSource, out *new
 	return nil
 }
 
-func convert_api_EnvVarSource_To_v1beta3_EnvVarSource(in *newer.EnvVarSource, out *EnvVarSource, s conversion.Scope) error {
+func convert_api_EnvVarSource_To_v1beta3_EnvVarSource(in *api.EnvVarSource, out *EnvVarSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.EnvVarSource))(in)
+		defaulting.(func(*api.EnvVarSource))(in)
 	}
 	if in.FieldRef != nil {
 		out.FieldRef = new(ObjectFieldSelector)
@@ -745,7 +745,7 @@ func convert_api_EnvVarSource_To_v1beta3_EnvVarSource(in *newer.EnvVarSource, ou
 	return nil
 }
 
-func convert_v1beta3_Event_To_api_Event(in *Event, out *newer.Event, s conversion.Scope) error {
+func convert_v1beta3_Event_To_api_Event(in *Event, out *api.Event, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Event))(in)
 	}
@@ -773,9 +773,9 @@ func convert_v1beta3_Event_To_api_Event(in *Event, out *newer.Event, s conversio
 	return nil
 }
 
-func convert_api_Event_To_v1beta3_Event(in *newer.Event, out *Event, s conversion.Scope) error {
+func convert_api_Event_To_v1beta3_Event(in *api.Event, out *Event, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Event))(in)
+		defaulting.(func(*api.Event))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -801,7 +801,7 @@ func convert_api_Event_To_v1beta3_Event(in *newer.Event, out *Event, s conversio
 	return nil
 }
 
-func convert_v1beta3_EventList_To_api_EventList(in *EventList, out *newer.EventList, s conversion.Scope) error {
+func convert_v1beta3_EventList_To_api_EventList(in *EventList, out *api.EventList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EventList))(in)
 	}
@@ -812,7 +812,7 @@ func convert_v1beta3_EventList_To_api_EventList(in *EventList, out *newer.EventL
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.Event, len(in.Items))
+		out.Items = make([]api.Event, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_Event_To_api_Event(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -824,9 +824,9 @@ func convert_v1beta3_EventList_To_api_EventList(in *EventList, out *newer.EventL
 	return nil
 }
 
-func convert_api_EventList_To_v1beta3_EventList(in *newer.EventList, out *EventList, s conversion.Scope) error {
+func convert_api_EventList_To_v1beta3_EventList(in *api.EventList, out *EventList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.EventList))(in)
+		defaulting.(func(*api.EventList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -847,7 +847,7 @@ func convert_api_EventList_To_v1beta3_EventList(in *newer.EventList, out *EventL
 	return nil
 }
 
-func convert_v1beta3_EventSource_To_api_EventSource(in *EventSource, out *newer.EventSource, s conversion.Scope) error {
+func convert_v1beta3_EventSource_To_api_EventSource(in *EventSource, out *api.EventSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EventSource))(in)
 	}
@@ -856,16 +856,16 @@ func convert_v1beta3_EventSource_To_api_EventSource(in *EventSource, out *newer.
 	return nil
 }
 
-func convert_api_EventSource_To_v1beta3_EventSource(in *newer.EventSource, out *EventSource, s conversion.Scope) error {
+func convert_api_EventSource_To_v1beta3_EventSource(in *api.EventSource, out *EventSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.EventSource))(in)
+		defaulting.(func(*api.EventSource))(in)
 	}
 	out.Component = in.Component
 	out.Host = in.Host
 	return nil
 }
 
-func convert_v1beta3_ExecAction_To_api_ExecAction(in *ExecAction, out *newer.ExecAction, s conversion.Scope) error {
+func convert_v1beta3_ExecAction_To_api_ExecAction(in *ExecAction, out *api.ExecAction, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ExecAction))(in)
 	}
@@ -880,9 +880,9 @@ func convert_v1beta3_ExecAction_To_api_ExecAction(in *ExecAction, out *newer.Exe
 	return nil
 }
 
-func convert_api_ExecAction_To_v1beta3_ExecAction(in *newer.ExecAction, out *ExecAction, s conversion.Scope) error {
+func convert_api_ExecAction_To_v1beta3_ExecAction(in *api.ExecAction, out *ExecAction, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ExecAction))(in)
+		defaulting.(func(*api.ExecAction))(in)
 	}
 	if in.Command != nil {
 		out.Command = make([]string, len(in.Command))
@@ -895,7 +895,7 @@ func convert_api_ExecAction_To_v1beta3_ExecAction(in *newer.ExecAction, out *Exe
 	return nil
 }
 
-func convert_v1beta3_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource(in *GCEPersistentDiskVolumeSource, out *newer.GCEPersistentDiskVolumeSource, s conversion.Scope) error {
+func convert_v1beta3_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource(in *GCEPersistentDiskVolumeSource, out *api.GCEPersistentDiskVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*GCEPersistentDiskVolumeSource))(in)
 	}
@@ -906,9 +906,9 @@ func convert_v1beta3_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolum
 	return nil
 }
 
-func convert_api_GCEPersistentDiskVolumeSource_To_v1beta3_GCEPersistentDiskVolumeSource(in *newer.GCEPersistentDiskVolumeSource, out *GCEPersistentDiskVolumeSource, s conversion.Scope) error {
+func convert_api_GCEPersistentDiskVolumeSource_To_v1beta3_GCEPersistentDiskVolumeSource(in *api.GCEPersistentDiskVolumeSource, out *GCEPersistentDiskVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.GCEPersistentDiskVolumeSource))(in)
+		defaulting.(func(*api.GCEPersistentDiskVolumeSource))(in)
 	}
 	out.PDName = in.PDName
 	out.FSType = in.FSType
@@ -917,7 +917,7 @@ func convert_api_GCEPersistentDiskVolumeSource_To_v1beta3_GCEPersistentDiskVolum
 	return nil
 }
 
-func convert_v1beta3_GitRepoVolumeSource_To_api_GitRepoVolumeSource(in *GitRepoVolumeSource, out *newer.GitRepoVolumeSource, s conversion.Scope) error {
+func convert_v1beta3_GitRepoVolumeSource_To_api_GitRepoVolumeSource(in *GitRepoVolumeSource, out *api.GitRepoVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*GitRepoVolumeSource))(in)
 	}
@@ -926,16 +926,16 @@ func convert_v1beta3_GitRepoVolumeSource_To_api_GitRepoVolumeSource(in *GitRepoV
 	return nil
 }
 
-func convert_api_GitRepoVolumeSource_To_v1beta3_GitRepoVolumeSource(in *newer.GitRepoVolumeSource, out *GitRepoVolumeSource, s conversion.Scope) error {
+func convert_api_GitRepoVolumeSource_To_v1beta3_GitRepoVolumeSource(in *api.GitRepoVolumeSource, out *GitRepoVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.GitRepoVolumeSource))(in)
+		defaulting.(func(*api.GitRepoVolumeSource))(in)
 	}
 	out.Repository = in.Repository
 	out.Revision = in.Revision
 	return nil
 }
 
-func convert_v1beta3_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource(in *GlusterfsVolumeSource, out *newer.GlusterfsVolumeSource, s conversion.Scope) error {
+func convert_v1beta3_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource(in *GlusterfsVolumeSource, out *api.GlusterfsVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*GlusterfsVolumeSource))(in)
 	}
@@ -945,9 +945,9 @@ func convert_v1beta3_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource(in *Glus
 	return nil
 }
 
-func convert_api_GlusterfsVolumeSource_To_v1beta3_GlusterfsVolumeSource(in *newer.GlusterfsVolumeSource, out *GlusterfsVolumeSource, s conversion.Scope) error {
+func convert_api_GlusterfsVolumeSource_To_v1beta3_GlusterfsVolumeSource(in *api.GlusterfsVolumeSource, out *GlusterfsVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.GlusterfsVolumeSource))(in)
+		defaulting.(func(*api.GlusterfsVolumeSource))(in)
 	}
 	out.EndpointsName = in.EndpointsName
 	out.Path = in.Path
@@ -955,7 +955,7 @@ func convert_api_GlusterfsVolumeSource_To_v1beta3_GlusterfsVolumeSource(in *newe
 	return nil
 }
 
-func convert_v1beta3_HTTPGetAction_To_api_HTTPGetAction(in *HTTPGetAction, out *newer.HTTPGetAction, s conversion.Scope) error {
+func convert_v1beta3_HTTPGetAction_To_api_HTTPGetAction(in *HTTPGetAction, out *api.HTTPGetAction, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HTTPGetAction))(in)
 	}
@@ -967,9 +967,9 @@ func convert_v1beta3_HTTPGetAction_To_api_HTTPGetAction(in *HTTPGetAction, out *
 	return nil
 }
 
-func convert_api_HTTPGetAction_To_v1beta3_HTTPGetAction(in *newer.HTTPGetAction, out *HTTPGetAction, s conversion.Scope) error {
+func convert_api_HTTPGetAction_To_v1beta3_HTTPGetAction(in *api.HTTPGetAction, out *HTTPGetAction, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.HTTPGetAction))(in)
+		defaulting.(func(*api.HTTPGetAction))(in)
 	}
 	out.Path = in.Path
 	if err := s.Convert(&in.Port, &out.Port, 0); err != nil {
@@ -979,12 +979,12 @@ func convert_api_HTTPGetAction_To_v1beta3_HTTPGetAction(in *newer.HTTPGetAction,
 	return nil
 }
 
-func convert_v1beta3_Handler_To_api_Handler(in *Handler, out *newer.Handler, s conversion.Scope) error {
+func convert_v1beta3_Handler_To_api_Handler(in *Handler, out *api.Handler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Handler))(in)
 	}
 	if in.Exec != nil {
-		out.Exec = new(newer.ExecAction)
+		out.Exec = new(api.ExecAction)
 		if err := convert_v1beta3_ExecAction_To_api_ExecAction(in.Exec, out.Exec, s); err != nil {
 			return err
 		}
@@ -992,7 +992,7 @@ func convert_v1beta3_Handler_To_api_Handler(in *Handler, out *newer.Handler, s c
 		out.Exec = nil
 	}
 	if in.HTTPGet != nil {
-		out.HTTPGet = new(newer.HTTPGetAction)
+		out.HTTPGet = new(api.HTTPGetAction)
 		if err := convert_v1beta3_HTTPGetAction_To_api_HTTPGetAction(in.HTTPGet, out.HTTPGet, s); err != nil {
 			return err
 		}
@@ -1000,7 +1000,7 @@ func convert_v1beta3_Handler_To_api_Handler(in *Handler, out *newer.Handler, s c
 		out.HTTPGet = nil
 	}
 	if in.TCPSocket != nil {
-		out.TCPSocket = new(newer.TCPSocketAction)
+		out.TCPSocket = new(api.TCPSocketAction)
 		if err := convert_v1beta3_TCPSocketAction_To_api_TCPSocketAction(in.TCPSocket, out.TCPSocket, s); err != nil {
 			return err
 		}
@@ -1010,9 +1010,9 @@ func convert_v1beta3_Handler_To_api_Handler(in *Handler, out *newer.Handler, s c
 	return nil
 }
 
-func convert_api_Handler_To_v1beta3_Handler(in *newer.Handler, out *Handler, s conversion.Scope) error {
+func convert_api_Handler_To_v1beta3_Handler(in *api.Handler, out *Handler, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Handler))(in)
+		defaulting.(func(*api.Handler))(in)
 	}
 	if in.Exec != nil {
 		out.Exec = new(ExecAction)
@@ -1041,7 +1041,7 @@ func convert_api_Handler_To_v1beta3_Handler(in *newer.Handler, out *Handler, s c
 	return nil
 }
 
-func convert_v1beta3_HostPathVolumeSource_To_api_HostPathVolumeSource(in *HostPathVolumeSource, out *newer.HostPathVolumeSource, s conversion.Scope) error {
+func convert_v1beta3_HostPathVolumeSource_To_api_HostPathVolumeSource(in *HostPathVolumeSource, out *api.HostPathVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*HostPathVolumeSource))(in)
 	}
@@ -1049,15 +1049,15 @@ func convert_v1beta3_HostPathVolumeSource_To_api_HostPathVolumeSource(in *HostPa
 	return nil
 }
 
-func convert_api_HostPathVolumeSource_To_v1beta3_HostPathVolumeSource(in *newer.HostPathVolumeSource, out *HostPathVolumeSource, s conversion.Scope) error {
+func convert_api_HostPathVolumeSource_To_v1beta3_HostPathVolumeSource(in *api.HostPathVolumeSource, out *HostPathVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.HostPathVolumeSource))(in)
+		defaulting.(func(*api.HostPathVolumeSource))(in)
 	}
 	out.Path = in.Path
 	return nil
 }
 
-func convert_v1beta3_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *ISCSIVolumeSource, out *newer.ISCSIVolumeSource, s conversion.Scope) error {
+func convert_v1beta3_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *ISCSIVolumeSource, out *api.ISCSIVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ISCSIVolumeSource))(in)
 	}
@@ -1069,9 +1069,9 @@ func convert_v1beta3_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *ISCSIVolumeS
 	return nil
 }
 
-func convert_api_ISCSIVolumeSource_To_v1beta3_ISCSIVolumeSource(in *newer.ISCSIVolumeSource, out *ISCSIVolumeSource, s conversion.Scope) error {
+func convert_api_ISCSIVolumeSource_To_v1beta3_ISCSIVolumeSource(in *api.ISCSIVolumeSource, out *ISCSIVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ISCSIVolumeSource))(in)
+		defaulting.(func(*api.ISCSIVolumeSource))(in)
 	}
 	out.TargetPortal = in.TargetPortal
 	out.IQN = in.IQN
@@ -1081,12 +1081,12 @@ func convert_api_ISCSIVolumeSource_To_v1beta3_ISCSIVolumeSource(in *newer.ISCSIV
 	return nil
 }
 
-func convert_v1beta3_Lifecycle_To_api_Lifecycle(in *Lifecycle, out *newer.Lifecycle, s conversion.Scope) error {
+func convert_v1beta3_Lifecycle_To_api_Lifecycle(in *Lifecycle, out *api.Lifecycle, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Lifecycle))(in)
 	}
 	if in.PostStart != nil {
-		out.PostStart = new(newer.Handler)
+		out.PostStart = new(api.Handler)
 		if err := convert_v1beta3_Handler_To_api_Handler(in.PostStart, out.PostStart, s); err != nil {
 			return err
 		}
@@ -1094,7 +1094,7 @@ func convert_v1beta3_Lifecycle_To_api_Lifecycle(in *Lifecycle, out *newer.Lifecy
 		out.PostStart = nil
 	}
 	if in.PreStop != nil {
-		out.PreStop = new(newer.Handler)
+		out.PreStop = new(api.Handler)
 		if err := convert_v1beta3_Handler_To_api_Handler(in.PreStop, out.PreStop, s); err != nil {
 			return err
 		}
@@ -1104,9 +1104,9 @@ func convert_v1beta3_Lifecycle_To_api_Lifecycle(in *Lifecycle, out *newer.Lifecy
 	return nil
 }
 
-func convert_api_Lifecycle_To_v1beta3_Lifecycle(in *newer.Lifecycle, out *Lifecycle, s conversion.Scope) error {
+func convert_api_Lifecycle_To_v1beta3_Lifecycle(in *api.Lifecycle, out *Lifecycle, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Lifecycle))(in)
+		defaulting.(func(*api.Lifecycle))(in)
 	}
 	if in.PostStart != nil {
 		out.PostStart = new(Handler)
@@ -1127,7 +1127,7 @@ func convert_api_Lifecycle_To_v1beta3_Lifecycle(in *newer.Lifecycle, out *Lifecy
 	return nil
 }
 
-func convert_v1beta3_LimitRange_To_api_LimitRange(in *LimitRange, out *newer.LimitRange, s conversion.Scope) error {
+func convert_v1beta3_LimitRange_To_api_LimitRange(in *LimitRange, out *api.LimitRange, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LimitRange))(in)
 	}
@@ -1143,9 +1143,9 @@ func convert_v1beta3_LimitRange_To_api_LimitRange(in *LimitRange, out *newer.Lim
 	return nil
 }
 
-func convert_api_LimitRange_To_v1beta3_LimitRange(in *newer.LimitRange, out *LimitRange, s conversion.Scope) error {
+func convert_api_LimitRange_To_v1beta3_LimitRange(in *api.LimitRange, out *LimitRange, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.LimitRange))(in)
+		defaulting.(func(*api.LimitRange))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1159,43 +1159,43 @@ func convert_api_LimitRange_To_v1beta3_LimitRange(in *newer.LimitRange, out *Lim
 	return nil
 }
 
-func convert_v1beta3_LimitRangeItem_To_api_LimitRangeItem(in *LimitRangeItem, out *newer.LimitRangeItem, s conversion.Scope) error {
+func convert_v1beta3_LimitRangeItem_To_api_LimitRangeItem(in *LimitRangeItem, out *api.LimitRangeItem, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LimitRangeItem))(in)
 	}
-	out.Type = newer.LimitType(in.Type)
+	out.Type = api.LimitType(in.Type)
 	if in.Max != nil {
-		out.Max = make(map[newer.ResourceName]resource.Quantity)
+		out.Max = make(map[api.ResourceName]resource.Quantity)
 		for key, val := range in.Max {
 			newVal := resource.Quantity{}
 			if err := s.Convert(&val, &newVal, 0); err != nil {
 				return err
 			}
-			out.Max[newer.ResourceName(key)] = newVal
+			out.Max[api.ResourceName(key)] = newVal
 		}
 	} else {
 		out.Max = nil
 	}
 	if in.Min != nil {
-		out.Min = make(map[newer.ResourceName]resource.Quantity)
+		out.Min = make(map[api.ResourceName]resource.Quantity)
 		for key, val := range in.Min {
 			newVal := resource.Quantity{}
 			if err := s.Convert(&val, &newVal, 0); err != nil {
 				return err
 			}
-			out.Min[newer.ResourceName(key)] = newVal
+			out.Min[api.ResourceName(key)] = newVal
 		}
 	} else {
 		out.Min = nil
 	}
 	if in.Default != nil {
-		out.Default = make(map[newer.ResourceName]resource.Quantity)
+		out.Default = make(map[api.ResourceName]resource.Quantity)
 		for key, val := range in.Default {
 			newVal := resource.Quantity{}
 			if err := s.Convert(&val, &newVal, 0); err != nil {
 				return err
 			}
-			out.Default[newer.ResourceName(key)] = newVal
+			out.Default[api.ResourceName(key)] = newVal
 		}
 	} else {
 		out.Default = nil
@@ -1203,9 +1203,9 @@ func convert_v1beta3_LimitRangeItem_To_api_LimitRangeItem(in *LimitRangeItem, ou
 	return nil
 }
 
-func convert_api_LimitRangeItem_To_v1beta3_LimitRangeItem(in *newer.LimitRangeItem, out *LimitRangeItem, s conversion.Scope) error {
+func convert_api_LimitRangeItem_To_v1beta3_LimitRangeItem(in *api.LimitRangeItem, out *LimitRangeItem, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.LimitRangeItem))(in)
+		defaulting.(func(*api.LimitRangeItem))(in)
 	}
 	out.Type = LimitType(in.Type)
 	if in.Max != nil {
@@ -1247,7 +1247,7 @@ func convert_api_LimitRangeItem_To_v1beta3_LimitRangeItem(in *newer.LimitRangeIt
 	return nil
 }
 
-func convert_v1beta3_LimitRangeList_To_api_LimitRangeList(in *LimitRangeList, out *newer.LimitRangeList, s conversion.Scope) error {
+func convert_v1beta3_LimitRangeList_To_api_LimitRangeList(in *LimitRangeList, out *api.LimitRangeList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LimitRangeList))(in)
 	}
@@ -1258,7 +1258,7 @@ func convert_v1beta3_LimitRangeList_To_api_LimitRangeList(in *LimitRangeList, ou
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.LimitRange, len(in.Items))
+		out.Items = make([]api.LimitRange, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_LimitRange_To_api_LimitRange(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -1270,9 +1270,9 @@ func convert_v1beta3_LimitRangeList_To_api_LimitRangeList(in *LimitRangeList, ou
 	return nil
 }
 
-func convert_api_LimitRangeList_To_v1beta3_LimitRangeList(in *newer.LimitRangeList, out *LimitRangeList, s conversion.Scope) error {
+func convert_api_LimitRangeList_To_v1beta3_LimitRangeList(in *api.LimitRangeList, out *LimitRangeList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.LimitRangeList))(in)
+		defaulting.(func(*api.LimitRangeList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1293,12 +1293,12 @@ func convert_api_LimitRangeList_To_v1beta3_LimitRangeList(in *newer.LimitRangeLi
 	return nil
 }
 
-func convert_v1beta3_LimitRangeSpec_To_api_LimitRangeSpec(in *LimitRangeSpec, out *newer.LimitRangeSpec, s conversion.Scope) error {
+func convert_v1beta3_LimitRangeSpec_To_api_LimitRangeSpec(in *LimitRangeSpec, out *api.LimitRangeSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LimitRangeSpec))(in)
 	}
 	if in.Limits != nil {
-		out.Limits = make([]newer.LimitRangeItem, len(in.Limits))
+		out.Limits = make([]api.LimitRangeItem, len(in.Limits))
 		for i := range in.Limits {
 			if err := convert_v1beta3_LimitRangeItem_To_api_LimitRangeItem(&in.Limits[i], &out.Limits[i], s); err != nil {
 				return err
@@ -1310,9 +1310,9 @@ func convert_v1beta3_LimitRangeSpec_To_api_LimitRangeSpec(in *LimitRangeSpec, ou
 	return nil
 }
 
-func convert_api_LimitRangeSpec_To_v1beta3_LimitRangeSpec(in *newer.LimitRangeSpec, out *LimitRangeSpec, s conversion.Scope) error {
+func convert_api_LimitRangeSpec_To_v1beta3_LimitRangeSpec(in *api.LimitRangeSpec, out *LimitRangeSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.LimitRangeSpec))(in)
+		defaulting.(func(*api.LimitRangeSpec))(in)
 	}
 	if in.Limits != nil {
 		out.Limits = make([]LimitRangeItem, len(in.Limits))
@@ -1327,7 +1327,7 @@ func convert_api_LimitRangeSpec_To_v1beta3_LimitRangeSpec(in *newer.LimitRangeSp
 	return nil
 }
 
-func convert_v1beta3_List_To_api_List(in *List, out *newer.List, s conversion.Scope) error {
+func convert_v1beta3_List_To_api_List(in *List, out *api.List, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*List))(in)
 	}
@@ -1343,9 +1343,9 @@ func convert_v1beta3_List_To_api_List(in *List, out *newer.List, s conversion.Sc
 	return nil
 }
 
-func convert_api_List_To_v1beta3_List(in *newer.List, out *List, s conversion.Scope) error {
+func convert_api_List_To_v1beta3_List(in *api.List, out *List, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.List))(in)
+		defaulting.(func(*api.List))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1359,7 +1359,7 @@ func convert_api_List_To_v1beta3_List(in *newer.List, out *List, s conversion.Sc
 	return nil
 }
 
-func convert_v1beta3_ListMeta_To_api_ListMeta(in *ListMeta, out *newer.ListMeta, s conversion.Scope) error {
+func convert_v1beta3_ListMeta_To_api_ListMeta(in *ListMeta, out *api.ListMeta, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ListMeta))(in)
 	}
@@ -1368,16 +1368,16 @@ func convert_v1beta3_ListMeta_To_api_ListMeta(in *ListMeta, out *newer.ListMeta,
 	return nil
 }
 
-func convert_api_ListMeta_To_v1beta3_ListMeta(in *newer.ListMeta, out *ListMeta, s conversion.Scope) error {
+func convert_api_ListMeta_To_v1beta3_ListMeta(in *api.ListMeta, out *ListMeta, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ListMeta))(in)
+		defaulting.(func(*api.ListMeta))(in)
 	}
 	out.SelfLink = in.SelfLink
 	out.ResourceVersion = in.ResourceVersion
 	return nil
 }
 
-func convert_v1beta3_ListOptions_To_api_ListOptions(in *ListOptions, out *newer.ListOptions, s conversion.Scope) error {
+func convert_v1beta3_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ListOptions))(in)
 	}
@@ -1395,9 +1395,9 @@ func convert_v1beta3_ListOptions_To_api_ListOptions(in *ListOptions, out *newer.
 	return nil
 }
 
-func convert_api_ListOptions_To_v1beta3_ListOptions(in *newer.ListOptions, out *ListOptions, s conversion.Scope) error {
+func convert_api_ListOptions_To_v1beta3_ListOptions(in *api.ListOptions, out *ListOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ListOptions))(in)
+		defaulting.(func(*api.ListOptions))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1413,7 +1413,7 @@ func convert_api_ListOptions_To_v1beta3_ListOptions(in *newer.ListOptions, out *
 	return nil
 }
 
-func convert_v1beta3_LocalObjectReference_To_api_LocalObjectReference(in *LocalObjectReference, out *newer.LocalObjectReference, s conversion.Scope) error {
+func convert_v1beta3_LocalObjectReference_To_api_LocalObjectReference(in *LocalObjectReference, out *api.LocalObjectReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LocalObjectReference))(in)
 	}
@@ -1421,15 +1421,15 @@ func convert_v1beta3_LocalObjectReference_To_api_LocalObjectReference(in *LocalO
 	return nil
 }
 
-func convert_api_LocalObjectReference_To_v1beta3_LocalObjectReference(in *newer.LocalObjectReference, out *LocalObjectReference, s conversion.Scope) error {
+func convert_api_LocalObjectReference_To_v1beta3_LocalObjectReference(in *api.LocalObjectReference, out *LocalObjectReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.LocalObjectReference))(in)
+		defaulting.(func(*api.LocalObjectReference))(in)
 	}
 	out.Name = in.Name
 	return nil
 }
 
-func convert_v1beta3_NFSVolumeSource_To_api_NFSVolumeSource(in *NFSVolumeSource, out *newer.NFSVolumeSource, s conversion.Scope) error {
+func convert_v1beta3_NFSVolumeSource_To_api_NFSVolumeSource(in *NFSVolumeSource, out *api.NFSVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NFSVolumeSource))(in)
 	}
@@ -1439,9 +1439,9 @@ func convert_v1beta3_NFSVolumeSource_To_api_NFSVolumeSource(in *NFSVolumeSource,
 	return nil
 }
 
-func convert_api_NFSVolumeSource_To_v1beta3_NFSVolumeSource(in *newer.NFSVolumeSource, out *NFSVolumeSource, s conversion.Scope) error {
+func convert_api_NFSVolumeSource_To_v1beta3_NFSVolumeSource(in *api.NFSVolumeSource, out *NFSVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.NFSVolumeSource))(in)
+		defaulting.(func(*api.NFSVolumeSource))(in)
 	}
 	out.Server = in.Server
 	out.Path = in.Path
@@ -1449,7 +1449,7 @@ func convert_api_NFSVolumeSource_To_v1beta3_NFSVolumeSource(in *newer.NFSVolumeS
 	return nil
 }
 
-func convert_v1beta3_Namespace_To_api_Namespace(in *Namespace, out *newer.Namespace, s conversion.Scope) error {
+func convert_v1beta3_Namespace_To_api_Namespace(in *Namespace, out *api.Namespace, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Namespace))(in)
 	}
@@ -1468,9 +1468,9 @@ func convert_v1beta3_Namespace_To_api_Namespace(in *Namespace, out *newer.Namesp
 	return nil
 }
 
-func convert_api_Namespace_To_v1beta3_Namespace(in *newer.Namespace, out *Namespace, s conversion.Scope) error {
+func convert_api_Namespace_To_v1beta3_Namespace(in *api.Namespace, out *Namespace, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Namespace))(in)
+		defaulting.(func(*api.Namespace))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1487,7 +1487,7 @@ func convert_api_Namespace_To_v1beta3_Namespace(in *newer.Namespace, out *Namesp
 	return nil
 }
 
-func convert_v1beta3_NamespaceList_To_api_NamespaceList(in *NamespaceList, out *newer.NamespaceList, s conversion.Scope) error {
+func convert_v1beta3_NamespaceList_To_api_NamespaceList(in *NamespaceList, out *api.NamespaceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NamespaceList))(in)
 	}
@@ -1498,7 +1498,7 @@ func convert_v1beta3_NamespaceList_To_api_NamespaceList(in *NamespaceList, out *
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.Namespace, len(in.Items))
+		out.Items = make([]api.Namespace, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_Namespace_To_api_Namespace(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -1510,9 +1510,9 @@ func convert_v1beta3_NamespaceList_To_api_NamespaceList(in *NamespaceList, out *
 	return nil
 }
 
-func convert_api_NamespaceList_To_v1beta3_NamespaceList(in *newer.NamespaceList, out *NamespaceList, s conversion.Scope) error {
+func convert_api_NamespaceList_To_v1beta3_NamespaceList(in *api.NamespaceList, out *NamespaceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.NamespaceList))(in)
+		defaulting.(func(*api.NamespaceList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1533,14 +1533,14 @@ func convert_api_NamespaceList_To_v1beta3_NamespaceList(in *newer.NamespaceList,
 	return nil
 }
 
-func convert_v1beta3_NamespaceSpec_To_api_NamespaceSpec(in *NamespaceSpec, out *newer.NamespaceSpec, s conversion.Scope) error {
+func convert_v1beta3_NamespaceSpec_To_api_NamespaceSpec(in *NamespaceSpec, out *api.NamespaceSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NamespaceSpec))(in)
 	}
 	if in.Finalizers != nil {
-		out.Finalizers = make([]newer.FinalizerName, len(in.Finalizers))
+		out.Finalizers = make([]api.FinalizerName, len(in.Finalizers))
 		for i := range in.Finalizers {
-			out.Finalizers[i] = newer.FinalizerName(in.Finalizers[i])
+			out.Finalizers[i] = api.FinalizerName(in.Finalizers[i])
 		}
 	} else {
 		out.Finalizers = nil
@@ -1548,9 +1548,9 @@ func convert_v1beta3_NamespaceSpec_To_api_NamespaceSpec(in *NamespaceSpec, out *
 	return nil
 }
 
-func convert_api_NamespaceSpec_To_v1beta3_NamespaceSpec(in *newer.NamespaceSpec, out *NamespaceSpec, s conversion.Scope) error {
+func convert_api_NamespaceSpec_To_v1beta3_NamespaceSpec(in *api.NamespaceSpec, out *NamespaceSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.NamespaceSpec))(in)
+		defaulting.(func(*api.NamespaceSpec))(in)
 	}
 	if in.Finalizers != nil {
 		out.Finalizers = make([]FinalizerName, len(in.Finalizers))
@@ -1563,23 +1563,23 @@ func convert_api_NamespaceSpec_To_v1beta3_NamespaceSpec(in *newer.NamespaceSpec,
 	return nil
 }
 
-func convert_v1beta3_NamespaceStatus_To_api_NamespaceStatus(in *NamespaceStatus, out *newer.NamespaceStatus, s conversion.Scope) error {
+func convert_v1beta3_NamespaceStatus_To_api_NamespaceStatus(in *NamespaceStatus, out *api.NamespaceStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NamespaceStatus))(in)
 	}
-	out.Phase = newer.NamespacePhase(in.Phase)
+	out.Phase = api.NamespacePhase(in.Phase)
 	return nil
 }
 
-func convert_api_NamespaceStatus_To_v1beta3_NamespaceStatus(in *newer.NamespaceStatus, out *NamespaceStatus, s conversion.Scope) error {
+func convert_api_NamespaceStatus_To_v1beta3_NamespaceStatus(in *api.NamespaceStatus, out *NamespaceStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.NamespaceStatus))(in)
+		defaulting.(func(*api.NamespaceStatus))(in)
 	}
 	out.Phase = NamespacePhase(in.Phase)
 	return nil
 }
 
-func convert_v1beta3_Node_To_api_Node(in *Node, out *newer.Node, s conversion.Scope) error {
+func convert_v1beta3_Node_To_api_Node(in *Node, out *api.Node, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Node))(in)
 	}
@@ -1598,9 +1598,9 @@ func convert_v1beta3_Node_To_api_Node(in *Node, out *newer.Node, s conversion.Sc
 	return nil
 }
 
-func convert_api_Node_To_v1beta3_Node(in *newer.Node, out *Node, s conversion.Scope) error {
+func convert_api_Node_To_v1beta3_Node(in *api.Node, out *Node, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Node))(in)
+		defaulting.(func(*api.Node))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1617,30 +1617,30 @@ func convert_api_Node_To_v1beta3_Node(in *newer.Node, out *Node, s conversion.Sc
 	return nil
 }
 
-func convert_v1beta3_NodeAddress_To_api_NodeAddress(in *NodeAddress, out *newer.NodeAddress, s conversion.Scope) error {
+func convert_v1beta3_NodeAddress_To_api_NodeAddress(in *NodeAddress, out *api.NodeAddress, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeAddress))(in)
 	}
-	out.Type = newer.NodeAddressType(in.Type)
+	out.Type = api.NodeAddressType(in.Type)
 	out.Address = in.Address
 	return nil
 }
 
-func convert_api_NodeAddress_To_v1beta3_NodeAddress(in *newer.NodeAddress, out *NodeAddress, s conversion.Scope) error {
+func convert_api_NodeAddress_To_v1beta3_NodeAddress(in *api.NodeAddress, out *NodeAddress, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.NodeAddress))(in)
+		defaulting.(func(*api.NodeAddress))(in)
 	}
 	out.Type = NodeAddressType(in.Type)
 	out.Address = in.Address
 	return nil
 }
 
-func convert_v1beta3_NodeCondition_To_api_NodeCondition(in *NodeCondition, out *newer.NodeCondition, s conversion.Scope) error {
+func convert_v1beta3_NodeCondition_To_api_NodeCondition(in *NodeCondition, out *api.NodeCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeCondition))(in)
 	}
-	out.Type = newer.NodeConditionType(in.Type)
-	out.Status = newer.ConditionStatus(in.Status)
+	out.Type = api.NodeConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
 	if err := s.Convert(&in.LastHeartbeatTime, &out.LastHeartbeatTime, 0); err != nil {
 		return err
 	}
@@ -1652,9 +1652,9 @@ func convert_v1beta3_NodeCondition_To_api_NodeCondition(in *NodeCondition, out *
 	return nil
 }
 
-func convert_api_NodeCondition_To_v1beta3_NodeCondition(in *newer.NodeCondition, out *NodeCondition, s conversion.Scope) error {
+func convert_api_NodeCondition_To_v1beta3_NodeCondition(in *api.NodeCondition, out *NodeCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.NodeCondition))(in)
+		defaulting.(func(*api.NodeCondition))(in)
 	}
 	out.Type = NodeConditionType(in.Type)
 	out.Status = ConditionStatus(in.Status)
@@ -1669,7 +1669,7 @@ func convert_api_NodeCondition_To_v1beta3_NodeCondition(in *newer.NodeCondition,
 	return nil
 }
 
-func convert_v1beta3_NodeList_To_api_NodeList(in *NodeList, out *newer.NodeList, s conversion.Scope) error {
+func convert_v1beta3_NodeList_To_api_NodeList(in *NodeList, out *api.NodeList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeList))(in)
 	}
@@ -1680,7 +1680,7 @@ func convert_v1beta3_NodeList_To_api_NodeList(in *NodeList, out *newer.NodeList,
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.Node, len(in.Items))
+		out.Items = make([]api.Node, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_Node_To_api_Node(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -1692,9 +1692,9 @@ func convert_v1beta3_NodeList_To_api_NodeList(in *NodeList, out *newer.NodeList,
 	return nil
 }
 
-func convert_api_NodeList_To_v1beta3_NodeList(in *newer.NodeList, out *NodeList, s conversion.Scope) error {
+func convert_api_NodeList_To_v1beta3_NodeList(in *api.NodeList, out *NodeList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.NodeList))(in)
+		defaulting.(func(*api.NodeList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -1715,7 +1715,7 @@ func convert_api_NodeList_To_v1beta3_NodeList(in *newer.NodeList, out *NodeList,
 	return nil
 }
 
-func convert_v1beta3_NodeSpec_To_api_NodeSpec(in *NodeSpec, out *newer.NodeSpec, s conversion.Scope) error {
+func convert_v1beta3_NodeSpec_To_api_NodeSpec(in *NodeSpec, out *api.NodeSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeSpec))(in)
 	}
@@ -1725,9 +1725,9 @@ func convert_v1beta3_NodeSpec_To_api_NodeSpec(in *NodeSpec, out *newer.NodeSpec,
 	return nil
 }
 
-func convert_api_NodeSpec_To_v1beta3_NodeSpec(in *newer.NodeSpec, out *NodeSpec, s conversion.Scope) error {
+func convert_api_NodeSpec_To_v1beta3_NodeSpec(in *api.NodeSpec, out *NodeSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.NodeSpec))(in)
+		defaulting.(func(*api.NodeSpec))(in)
 	}
 	out.PodCIDR = in.PodCIDR
 	out.ExternalID = in.ExternalID
@@ -1735,25 +1735,25 @@ func convert_api_NodeSpec_To_v1beta3_NodeSpec(in *newer.NodeSpec, out *NodeSpec,
 	return nil
 }
 
-func convert_v1beta3_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *newer.NodeStatus, s conversion.Scope) error {
+func convert_v1beta3_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeStatus))(in)
 	}
 	if in.Capacity != nil {
-		out.Capacity = make(map[newer.ResourceName]resource.Quantity)
+		out.Capacity = make(map[api.ResourceName]resource.Quantity)
 		for key, val := range in.Capacity {
 			newVal := resource.Quantity{}
 			if err := s.Convert(&val, &newVal, 0); err != nil {
 				return err
 			}
-			out.Capacity[newer.ResourceName(key)] = newVal
+			out.Capacity[api.ResourceName(key)] = newVal
 		}
 	} else {
 		out.Capacity = nil
 	}
-	out.Phase = newer.NodePhase(in.Phase)
+	out.Phase = api.NodePhase(in.Phase)
 	if in.Conditions != nil {
-		out.Conditions = make([]newer.NodeCondition, len(in.Conditions))
+		out.Conditions = make([]api.NodeCondition, len(in.Conditions))
 		for i := range in.Conditions {
 			if err := convert_v1beta3_NodeCondition_To_api_NodeCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
 				return err
@@ -1763,7 +1763,7 @@ func convert_v1beta3_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *newer.Nod
 		out.Conditions = nil
 	}
 	if in.Addresses != nil {
-		out.Addresses = make([]newer.NodeAddress, len(in.Addresses))
+		out.Addresses = make([]api.NodeAddress, len(in.Addresses))
 		for i := range in.Addresses {
 			if err := convert_v1beta3_NodeAddress_To_api_NodeAddress(&in.Addresses[i], &out.Addresses[i], s); err != nil {
 				return err
@@ -1778,9 +1778,9 @@ func convert_v1beta3_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *newer.Nod
 	return nil
 }
 
-func convert_api_NodeStatus_To_v1beta3_NodeStatus(in *newer.NodeStatus, out *NodeStatus, s conversion.Scope) error {
+func convert_api_NodeStatus_To_v1beta3_NodeStatus(in *api.NodeStatus, out *NodeStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.NodeStatus))(in)
+		defaulting.(func(*api.NodeStatus))(in)
 	}
 	if in.Capacity != nil {
 		out.Capacity = make(map[ResourceName]resource.Quantity)
@@ -1821,7 +1821,7 @@ func convert_api_NodeStatus_To_v1beta3_NodeStatus(in *newer.NodeStatus, out *Nod
 	return nil
 }
 
-func convert_v1beta3_NodeSystemInfo_To_api_NodeSystemInfo(in *NodeSystemInfo, out *newer.NodeSystemInfo, s conversion.Scope) error {
+func convert_v1beta3_NodeSystemInfo_To_api_NodeSystemInfo(in *NodeSystemInfo, out *api.NodeSystemInfo, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NodeSystemInfo))(in)
 	}
@@ -1836,9 +1836,9 @@ func convert_v1beta3_NodeSystemInfo_To_api_NodeSystemInfo(in *NodeSystemInfo, ou
 	return nil
 }
 
-func convert_api_NodeSystemInfo_To_v1beta3_NodeSystemInfo(in *newer.NodeSystemInfo, out *NodeSystemInfo, s conversion.Scope) error {
+func convert_api_NodeSystemInfo_To_v1beta3_NodeSystemInfo(in *api.NodeSystemInfo, out *NodeSystemInfo, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.NodeSystemInfo))(in)
+		defaulting.(func(*api.NodeSystemInfo))(in)
 	}
 	out.MachineID = in.MachineID
 	out.SystemUUID = in.SystemUUID
@@ -1851,7 +1851,7 @@ func convert_api_NodeSystemInfo_To_v1beta3_NodeSystemInfo(in *newer.NodeSystemIn
 	return nil
 }
 
-func convert_v1beta3_ObjectFieldSelector_To_api_ObjectFieldSelector(in *ObjectFieldSelector, out *newer.ObjectFieldSelector, s conversion.Scope) error {
+func convert_v1beta3_ObjectFieldSelector_To_api_ObjectFieldSelector(in *ObjectFieldSelector, out *api.ObjectFieldSelector, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ObjectFieldSelector))(in)
 	}
@@ -1860,16 +1860,16 @@ func convert_v1beta3_ObjectFieldSelector_To_api_ObjectFieldSelector(in *ObjectFi
 	return nil
 }
 
-func convert_api_ObjectFieldSelector_To_v1beta3_ObjectFieldSelector(in *newer.ObjectFieldSelector, out *ObjectFieldSelector, s conversion.Scope) error {
+func convert_api_ObjectFieldSelector_To_v1beta3_ObjectFieldSelector(in *api.ObjectFieldSelector, out *ObjectFieldSelector, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ObjectFieldSelector))(in)
+		defaulting.(func(*api.ObjectFieldSelector))(in)
 	}
 	out.APIVersion = in.APIVersion
 	out.FieldPath = in.FieldPath
 	return nil
 }
 
-func convert_v1beta3_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *newer.ObjectMeta, s conversion.Scope) error {
+func convert_v1beta3_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *api.ObjectMeta, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ObjectMeta))(in)
 	}
@@ -1908,9 +1908,9 @@ func convert_v1beta3_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *newer.Obj
 	return nil
 }
 
-func convert_api_ObjectMeta_To_v1beta3_ObjectMeta(in *newer.ObjectMeta, out *ObjectMeta, s conversion.Scope) error {
+func convert_api_ObjectMeta_To_v1beta3_ObjectMeta(in *api.ObjectMeta, out *ObjectMeta, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ObjectMeta))(in)
+		defaulting.(func(*api.ObjectMeta))(in)
 	}
 	out.Name = in.Name
 	out.GenerateName = in.GenerateName
@@ -1947,7 +1947,7 @@ func convert_api_ObjectMeta_To_v1beta3_ObjectMeta(in *newer.ObjectMeta, out *Obj
 	return nil
 }
 
-func convert_v1beta3_ObjectReference_To_api_ObjectReference(in *ObjectReference, out *newer.ObjectReference, s conversion.Scope) error {
+func convert_v1beta3_ObjectReference_To_api_ObjectReference(in *ObjectReference, out *api.ObjectReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ObjectReference))(in)
 	}
@@ -1961,9 +1961,9 @@ func convert_v1beta3_ObjectReference_To_api_ObjectReference(in *ObjectReference,
 	return nil
 }
 
-func convert_api_ObjectReference_To_v1beta3_ObjectReference(in *newer.ObjectReference, out *ObjectReference, s conversion.Scope) error {
+func convert_api_ObjectReference_To_v1beta3_ObjectReference(in *api.ObjectReference, out *ObjectReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ObjectReference))(in)
+		defaulting.(func(*api.ObjectReference))(in)
 	}
 	out.Kind = in.Kind
 	out.Namespace = in.Namespace
@@ -1975,7 +1975,7 @@ func convert_api_ObjectReference_To_v1beta3_ObjectReference(in *newer.ObjectRefe
 	return nil
 }
 
-func convert_v1beta3_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, out *newer.PersistentVolume, s conversion.Scope) error {
+func convert_v1beta3_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, out *api.PersistentVolume, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolume))(in)
 	}
@@ -1994,9 +1994,9 @@ func convert_v1beta3_PersistentVolume_To_api_PersistentVolume(in *PersistentVolu
 	return nil
 }
 
-func convert_api_PersistentVolume_To_v1beta3_PersistentVolume(in *newer.PersistentVolume, out *PersistentVolume, s conversion.Scope) error {
+func convert_api_PersistentVolume_To_v1beta3_PersistentVolume(in *api.PersistentVolume, out *PersistentVolume, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PersistentVolume))(in)
+		defaulting.(func(*api.PersistentVolume))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2013,7 +2013,7 @@ func convert_api_PersistentVolume_To_v1beta3_PersistentVolume(in *newer.Persiste
 	return nil
 }
 
-func convert_v1beta3_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *PersistentVolumeClaim, out *newer.PersistentVolumeClaim, s conversion.Scope) error {
+func convert_v1beta3_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *PersistentVolumeClaim, out *api.PersistentVolumeClaim, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeClaim))(in)
 	}
@@ -2032,9 +2032,9 @@ func convert_v1beta3_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *Pers
 	return nil
 }
 
-func convert_api_PersistentVolumeClaim_To_v1beta3_PersistentVolumeClaim(in *newer.PersistentVolumeClaim, out *PersistentVolumeClaim, s conversion.Scope) error {
+func convert_api_PersistentVolumeClaim_To_v1beta3_PersistentVolumeClaim(in *api.PersistentVolumeClaim, out *PersistentVolumeClaim, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PersistentVolumeClaim))(in)
+		defaulting.(func(*api.PersistentVolumeClaim))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2051,7 +2051,7 @@ func convert_api_PersistentVolumeClaim_To_v1beta3_PersistentVolumeClaim(in *newe
 	return nil
 }
 
-func convert_v1beta3_PersistentVolumeClaimList_To_api_PersistentVolumeClaimList(in *PersistentVolumeClaimList, out *newer.PersistentVolumeClaimList, s conversion.Scope) error {
+func convert_v1beta3_PersistentVolumeClaimList_To_api_PersistentVolumeClaimList(in *PersistentVolumeClaimList, out *api.PersistentVolumeClaimList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeClaimList))(in)
 	}
@@ -2062,7 +2062,7 @@ func convert_v1beta3_PersistentVolumeClaimList_To_api_PersistentVolumeClaimList(
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.PersistentVolumeClaim, len(in.Items))
+		out.Items = make([]api.PersistentVolumeClaim, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_PersistentVolumeClaim_To_api_PersistentVolumeClaim(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -2074,9 +2074,9 @@ func convert_v1beta3_PersistentVolumeClaimList_To_api_PersistentVolumeClaimList(
 	return nil
 }
 
-func convert_api_PersistentVolumeClaimList_To_v1beta3_PersistentVolumeClaimList(in *newer.PersistentVolumeClaimList, out *PersistentVolumeClaimList, s conversion.Scope) error {
+func convert_api_PersistentVolumeClaimList_To_v1beta3_PersistentVolumeClaimList(in *api.PersistentVolumeClaimList, out *PersistentVolumeClaimList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PersistentVolumeClaimList))(in)
+		defaulting.(func(*api.PersistentVolumeClaimList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2097,14 +2097,14 @@ func convert_api_PersistentVolumeClaimList_To_v1beta3_PersistentVolumeClaimList(
 	return nil
 }
 
-func convert_v1beta3_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(in *PersistentVolumeClaimSpec, out *newer.PersistentVolumeClaimSpec, s conversion.Scope) error {
+func convert_v1beta3_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(in *PersistentVolumeClaimSpec, out *api.PersistentVolumeClaimSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeClaimSpec))(in)
 	}
 	if in.AccessModes != nil {
-		out.AccessModes = make([]newer.PersistentVolumeAccessMode, len(in.AccessModes))
+		out.AccessModes = make([]api.PersistentVolumeAccessMode, len(in.AccessModes))
 		for i := range in.AccessModes {
-			out.AccessModes[i] = newer.PersistentVolumeAccessMode(in.AccessModes[i])
+			out.AccessModes[i] = api.PersistentVolumeAccessMode(in.AccessModes[i])
 		}
 	} else {
 		out.AccessModes = nil
@@ -2116,9 +2116,9 @@ func convert_v1beta3_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(
 	return nil
 }
 
-func convert_api_PersistentVolumeClaimSpec_To_v1beta3_PersistentVolumeClaimSpec(in *newer.PersistentVolumeClaimSpec, out *PersistentVolumeClaimSpec, s conversion.Scope) error {
+func convert_api_PersistentVolumeClaimSpec_To_v1beta3_PersistentVolumeClaimSpec(in *api.PersistentVolumeClaimSpec, out *PersistentVolumeClaimSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PersistentVolumeClaimSpec))(in)
+		defaulting.(func(*api.PersistentVolumeClaimSpec))(in)
 	}
 	if in.AccessModes != nil {
 		out.AccessModes = make([]PersistentVolumeAccessMode, len(in.AccessModes))
@@ -2135,27 +2135,27 @@ func convert_api_PersistentVolumeClaimSpec_To_v1beta3_PersistentVolumeClaimSpec(
 	return nil
 }
 
-func convert_v1beta3_PersistentVolumeClaimStatus_To_api_PersistentVolumeClaimStatus(in *PersistentVolumeClaimStatus, out *newer.PersistentVolumeClaimStatus, s conversion.Scope) error {
+func convert_v1beta3_PersistentVolumeClaimStatus_To_api_PersistentVolumeClaimStatus(in *PersistentVolumeClaimStatus, out *api.PersistentVolumeClaimStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeClaimStatus))(in)
 	}
-	out.Phase = newer.PersistentVolumeClaimPhase(in.Phase)
+	out.Phase = api.PersistentVolumeClaimPhase(in.Phase)
 	if in.AccessModes != nil {
-		out.AccessModes = make([]newer.PersistentVolumeAccessMode, len(in.AccessModes))
+		out.AccessModes = make([]api.PersistentVolumeAccessMode, len(in.AccessModes))
 		for i := range in.AccessModes {
-			out.AccessModes[i] = newer.PersistentVolumeAccessMode(in.AccessModes[i])
+			out.AccessModes[i] = api.PersistentVolumeAccessMode(in.AccessModes[i])
 		}
 	} else {
 		out.AccessModes = nil
 	}
 	if in.Capacity != nil {
-		out.Capacity = make(map[newer.ResourceName]resource.Quantity)
+		out.Capacity = make(map[api.ResourceName]resource.Quantity)
 		for key, val := range in.Capacity {
 			newVal := resource.Quantity{}
 			if err := s.Convert(&val, &newVal, 0); err != nil {
 				return err
 			}
-			out.Capacity[newer.ResourceName(key)] = newVal
+			out.Capacity[api.ResourceName(key)] = newVal
 		}
 	} else {
 		out.Capacity = nil
@@ -2163,9 +2163,9 @@ func convert_v1beta3_PersistentVolumeClaimStatus_To_api_PersistentVolumeClaimSta
 	return nil
 }
 
-func convert_api_PersistentVolumeClaimStatus_To_v1beta3_PersistentVolumeClaimStatus(in *newer.PersistentVolumeClaimStatus, out *PersistentVolumeClaimStatus, s conversion.Scope) error {
+func convert_api_PersistentVolumeClaimStatus_To_v1beta3_PersistentVolumeClaimStatus(in *api.PersistentVolumeClaimStatus, out *PersistentVolumeClaimStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PersistentVolumeClaimStatus))(in)
+		defaulting.(func(*api.PersistentVolumeClaimStatus))(in)
 	}
 	out.Phase = PersistentVolumeClaimPhase(in.Phase)
 	if in.AccessModes != nil {
@@ -2191,7 +2191,7 @@ func convert_api_PersistentVolumeClaimStatus_To_v1beta3_PersistentVolumeClaimSta
 	return nil
 }
 
-func convert_v1beta3_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeClaimVolumeSource(in *PersistentVolumeClaimVolumeSource, out *newer.PersistentVolumeClaimVolumeSource, s conversion.Scope) error {
+func convert_v1beta3_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeClaimVolumeSource(in *PersistentVolumeClaimVolumeSource, out *api.PersistentVolumeClaimVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeClaimVolumeSource))(in)
 	}
@@ -2200,16 +2200,16 @@ func convert_v1beta3_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeCl
 	return nil
 }
 
-func convert_api_PersistentVolumeClaimVolumeSource_To_v1beta3_PersistentVolumeClaimVolumeSource(in *newer.PersistentVolumeClaimVolumeSource, out *PersistentVolumeClaimVolumeSource, s conversion.Scope) error {
+func convert_api_PersistentVolumeClaimVolumeSource_To_v1beta3_PersistentVolumeClaimVolumeSource(in *api.PersistentVolumeClaimVolumeSource, out *PersistentVolumeClaimVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PersistentVolumeClaimVolumeSource))(in)
+		defaulting.(func(*api.PersistentVolumeClaimVolumeSource))(in)
 	}
 	out.ClaimName = in.ClaimName
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
-func convert_v1beta3_PersistentVolumeList_To_api_PersistentVolumeList(in *PersistentVolumeList, out *newer.PersistentVolumeList, s conversion.Scope) error {
+func convert_v1beta3_PersistentVolumeList_To_api_PersistentVolumeList(in *PersistentVolumeList, out *api.PersistentVolumeList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeList))(in)
 	}
@@ -2220,7 +2220,7 @@ func convert_v1beta3_PersistentVolumeList_To_api_PersistentVolumeList(in *Persis
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.PersistentVolume, len(in.Items))
+		out.Items = make([]api.PersistentVolume, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_PersistentVolume_To_api_PersistentVolume(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -2232,9 +2232,9 @@ func convert_v1beta3_PersistentVolumeList_To_api_PersistentVolumeList(in *Persis
 	return nil
 }
 
-func convert_api_PersistentVolumeList_To_v1beta3_PersistentVolumeList(in *newer.PersistentVolumeList, out *PersistentVolumeList, s conversion.Scope) error {
+func convert_api_PersistentVolumeList_To_v1beta3_PersistentVolumeList(in *api.PersistentVolumeList, out *PersistentVolumeList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PersistentVolumeList))(in)
+		defaulting.(func(*api.PersistentVolumeList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2255,12 +2255,12 @@ func convert_api_PersistentVolumeList_To_v1beta3_PersistentVolumeList(in *newer.
 	return nil
 }
 
-func convert_v1beta3_PersistentVolumeSource_To_api_PersistentVolumeSource(in *PersistentVolumeSource, out *newer.PersistentVolumeSource, s conversion.Scope) error {
+func convert_v1beta3_PersistentVolumeSource_To_api_PersistentVolumeSource(in *PersistentVolumeSource, out *api.PersistentVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeSource))(in)
 	}
 	if in.GCEPersistentDisk != nil {
-		out.GCEPersistentDisk = new(newer.GCEPersistentDiskVolumeSource)
+		out.GCEPersistentDisk = new(api.GCEPersistentDiskVolumeSource)
 		if err := convert_v1beta3_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource(in.GCEPersistentDisk, out.GCEPersistentDisk, s); err != nil {
 			return err
 		}
@@ -2268,7 +2268,7 @@ func convert_v1beta3_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Pe
 		out.GCEPersistentDisk = nil
 	}
 	if in.AWSElasticBlockStore != nil {
-		out.AWSElasticBlockStore = new(newer.AWSElasticBlockStoreVolumeSource)
+		out.AWSElasticBlockStore = new(api.AWSElasticBlockStoreVolumeSource)
 		if err := convert_v1beta3_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in.AWSElasticBlockStore, out.AWSElasticBlockStore, s); err != nil {
 			return err
 		}
@@ -2276,7 +2276,7 @@ func convert_v1beta3_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Pe
 		out.AWSElasticBlockStore = nil
 	}
 	if in.HostPath != nil {
-		out.HostPath = new(newer.HostPathVolumeSource)
+		out.HostPath = new(api.HostPathVolumeSource)
 		if err := convert_v1beta3_HostPathVolumeSource_To_api_HostPathVolumeSource(in.HostPath, out.HostPath, s); err != nil {
 			return err
 		}
@@ -2284,7 +2284,7 @@ func convert_v1beta3_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Pe
 		out.HostPath = nil
 	}
 	if in.Glusterfs != nil {
-		out.Glusterfs = new(newer.GlusterfsVolumeSource)
+		out.Glusterfs = new(api.GlusterfsVolumeSource)
 		if err := convert_v1beta3_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource(in.Glusterfs, out.Glusterfs, s); err != nil {
 			return err
 		}
@@ -2292,7 +2292,7 @@ func convert_v1beta3_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Pe
 		out.Glusterfs = nil
 	}
 	if in.NFS != nil {
-		out.NFS = new(newer.NFSVolumeSource)
+		out.NFS = new(api.NFSVolumeSource)
 		if err := convert_v1beta3_NFSVolumeSource_To_api_NFSVolumeSource(in.NFS, out.NFS, s); err != nil {
 			return err
 		}
@@ -2302,9 +2302,9 @@ func convert_v1beta3_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Pe
 	return nil
 }
 
-func convert_api_PersistentVolumeSource_To_v1beta3_PersistentVolumeSource(in *newer.PersistentVolumeSource, out *PersistentVolumeSource, s conversion.Scope) error {
+func convert_api_PersistentVolumeSource_To_v1beta3_PersistentVolumeSource(in *api.PersistentVolumeSource, out *PersistentVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PersistentVolumeSource))(in)
+		defaulting.(func(*api.PersistentVolumeSource))(in)
 	}
 	if in.GCEPersistentDisk != nil {
 		out.GCEPersistentDisk = new(GCEPersistentDiskVolumeSource)
@@ -2349,18 +2349,18 @@ func convert_api_PersistentVolumeSource_To_v1beta3_PersistentVolumeSource(in *ne
 	return nil
 }
 
-func convert_v1beta3_PersistentVolumeSpec_To_api_PersistentVolumeSpec(in *PersistentVolumeSpec, out *newer.PersistentVolumeSpec, s conversion.Scope) error {
+func convert_v1beta3_PersistentVolumeSpec_To_api_PersistentVolumeSpec(in *PersistentVolumeSpec, out *api.PersistentVolumeSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeSpec))(in)
 	}
 	if in.Capacity != nil {
-		out.Capacity = make(map[newer.ResourceName]resource.Quantity)
+		out.Capacity = make(map[api.ResourceName]resource.Quantity)
 		for key, val := range in.Capacity {
 			newVal := resource.Quantity{}
 			if err := s.Convert(&val, &newVal, 0); err != nil {
 				return err
 			}
-			out.Capacity[newer.ResourceName(key)] = newVal
+			out.Capacity[api.ResourceName(key)] = newVal
 		}
 	} else {
 		out.Capacity = nil
@@ -2369,15 +2369,15 @@ func convert_v1beta3_PersistentVolumeSpec_To_api_PersistentVolumeSpec(in *Persis
 		return err
 	}
 	if in.AccessModes != nil {
-		out.AccessModes = make([]newer.PersistentVolumeAccessMode, len(in.AccessModes))
+		out.AccessModes = make([]api.PersistentVolumeAccessMode, len(in.AccessModes))
 		for i := range in.AccessModes {
-			out.AccessModes[i] = newer.PersistentVolumeAccessMode(in.AccessModes[i])
+			out.AccessModes[i] = api.PersistentVolumeAccessMode(in.AccessModes[i])
 		}
 	} else {
 		out.AccessModes = nil
 	}
 	if in.ClaimRef != nil {
-		out.ClaimRef = new(newer.ObjectReference)
+		out.ClaimRef = new(api.ObjectReference)
 		if err := convert_v1beta3_ObjectReference_To_api_ObjectReference(in.ClaimRef, out.ClaimRef, s); err != nil {
 			return err
 		}
@@ -2387,9 +2387,9 @@ func convert_v1beta3_PersistentVolumeSpec_To_api_PersistentVolumeSpec(in *Persis
 	return nil
 }
 
-func convert_api_PersistentVolumeSpec_To_v1beta3_PersistentVolumeSpec(in *newer.PersistentVolumeSpec, out *PersistentVolumeSpec, s conversion.Scope) error {
+func convert_api_PersistentVolumeSpec_To_v1beta3_PersistentVolumeSpec(in *api.PersistentVolumeSpec, out *PersistentVolumeSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PersistentVolumeSpec))(in)
+		defaulting.(func(*api.PersistentVolumeSpec))(in)
 	}
 	if in.Capacity != nil {
 		out.Capacity = make(map[ResourceName]resource.Quantity)
@@ -2425,23 +2425,23 @@ func convert_api_PersistentVolumeSpec_To_v1beta3_PersistentVolumeSpec(in *newer.
 	return nil
 }
 
-func convert_v1beta3_PersistentVolumeStatus_To_api_PersistentVolumeStatus(in *PersistentVolumeStatus, out *newer.PersistentVolumeStatus, s conversion.Scope) error {
+func convert_v1beta3_PersistentVolumeStatus_To_api_PersistentVolumeStatus(in *PersistentVolumeStatus, out *api.PersistentVolumeStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PersistentVolumeStatus))(in)
 	}
-	out.Phase = newer.PersistentVolumePhase(in.Phase)
+	out.Phase = api.PersistentVolumePhase(in.Phase)
 	return nil
 }
 
-func convert_api_PersistentVolumeStatus_To_v1beta3_PersistentVolumeStatus(in *newer.PersistentVolumeStatus, out *PersistentVolumeStatus, s conversion.Scope) error {
+func convert_api_PersistentVolumeStatus_To_v1beta3_PersistentVolumeStatus(in *api.PersistentVolumeStatus, out *PersistentVolumeStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PersistentVolumeStatus))(in)
+		defaulting.(func(*api.PersistentVolumeStatus))(in)
 	}
 	out.Phase = PersistentVolumePhase(in.Phase)
 	return nil
 }
 
-func convert_v1beta3_Pod_To_api_Pod(in *Pod, out *newer.Pod, s conversion.Scope) error {
+func convert_v1beta3_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Pod))(in)
 	}
@@ -2460,9 +2460,9 @@ func convert_v1beta3_Pod_To_api_Pod(in *Pod, out *newer.Pod, s conversion.Scope)
 	return nil
 }
 
-func convert_api_Pod_To_v1beta3_Pod(in *newer.Pod, out *Pod, s conversion.Scope) error {
+func convert_api_Pod_To_v1beta3_Pod(in *api.Pod, out *Pod, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Pod))(in)
+		defaulting.(func(*api.Pod))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2479,25 +2479,25 @@ func convert_api_Pod_To_v1beta3_Pod(in *newer.Pod, out *Pod, s conversion.Scope)
 	return nil
 }
 
-func convert_v1beta3_PodCondition_To_api_PodCondition(in *PodCondition, out *newer.PodCondition, s conversion.Scope) error {
+func convert_v1beta3_PodCondition_To_api_PodCondition(in *PodCondition, out *api.PodCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodCondition))(in)
 	}
-	out.Type = newer.PodConditionType(in.Type)
-	out.Status = newer.ConditionStatus(in.Status)
+	out.Type = api.PodConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
 	return nil
 }
 
-func convert_api_PodCondition_To_v1beta3_PodCondition(in *newer.PodCondition, out *PodCondition, s conversion.Scope) error {
+func convert_api_PodCondition_To_v1beta3_PodCondition(in *api.PodCondition, out *PodCondition, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PodCondition))(in)
+		defaulting.(func(*api.PodCondition))(in)
 	}
 	out.Type = PodConditionType(in.Type)
 	out.Status = ConditionStatus(in.Status)
 	return nil
 }
 
-func convert_v1beta3_PodExecOptions_To_api_PodExecOptions(in *PodExecOptions, out *newer.PodExecOptions, s conversion.Scope) error {
+func convert_v1beta3_PodExecOptions_To_api_PodExecOptions(in *PodExecOptions, out *api.PodExecOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodExecOptions))(in)
 	}
@@ -2520,9 +2520,9 @@ func convert_v1beta3_PodExecOptions_To_api_PodExecOptions(in *PodExecOptions, ou
 	return nil
 }
 
-func convert_api_PodExecOptions_To_v1beta3_PodExecOptions(in *newer.PodExecOptions, out *PodExecOptions, s conversion.Scope) error {
+func convert_api_PodExecOptions_To_v1beta3_PodExecOptions(in *api.PodExecOptions, out *PodExecOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PodExecOptions))(in)
+		defaulting.(func(*api.PodExecOptions))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2543,7 +2543,7 @@ func convert_api_PodExecOptions_To_v1beta3_PodExecOptions(in *newer.PodExecOptio
 	return nil
 }
 
-func convert_v1beta3_PodList_To_api_PodList(in *PodList, out *newer.PodList, s conversion.Scope) error {
+func convert_v1beta3_PodList_To_api_PodList(in *PodList, out *api.PodList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodList))(in)
 	}
@@ -2554,7 +2554,7 @@ func convert_v1beta3_PodList_To_api_PodList(in *PodList, out *newer.PodList, s c
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.Pod, len(in.Items))
+		out.Items = make([]api.Pod, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_Pod_To_api_Pod(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -2566,9 +2566,9 @@ func convert_v1beta3_PodList_To_api_PodList(in *PodList, out *newer.PodList, s c
 	return nil
 }
 
-func convert_api_PodList_To_v1beta3_PodList(in *newer.PodList, out *PodList, s conversion.Scope) error {
+func convert_api_PodList_To_v1beta3_PodList(in *api.PodList, out *PodList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PodList))(in)
+		defaulting.(func(*api.PodList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2589,7 +2589,7 @@ func convert_api_PodList_To_v1beta3_PodList(in *newer.PodList, out *PodList, s c
 	return nil
 }
 
-func convert_v1beta3_PodLogOptions_To_api_PodLogOptions(in *PodLogOptions, out *newer.PodLogOptions, s conversion.Scope) error {
+func convert_v1beta3_PodLogOptions_To_api_PodLogOptions(in *PodLogOptions, out *api.PodLogOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodLogOptions))(in)
 	}
@@ -2602,9 +2602,9 @@ func convert_v1beta3_PodLogOptions_To_api_PodLogOptions(in *PodLogOptions, out *
 	return nil
 }
 
-func convert_api_PodLogOptions_To_v1beta3_PodLogOptions(in *newer.PodLogOptions, out *PodLogOptions, s conversion.Scope) error {
+func convert_api_PodLogOptions_To_v1beta3_PodLogOptions(in *api.PodLogOptions, out *PodLogOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PodLogOptions))(in)
+		defaulting.(func(*api.PodLogOptions))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2615,7 +2615,7 @@ func convert_api_PodLogOptions_To_v1beta3_PodLogOptions(in *newer.PodLogOptions,
 	return nil
 }
 
-func convert_v1beta3_PodProxyOptions_To_api_PodProxyOptions(in *PodProxyOptions, out *newer.PodProxyOptions, s conversion.Scope) error {
+func convert_v1beta3_PodProxyOptions_To_api_PodProxyOptions(in *PodProxyOptions, out *api.PodProxyOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodProxyOptions))(in)
 	}
@@ -2626,9 +2626,9 @@ func convert_v1beta3_PodProxyOptions_To_api_PodProxyOptions(in *PodProxyOptions,
 	return nil
 }
 
-func convert_api_PodProxyOptions_To_v1beta3_PodProxyOptions(in *newer.PodProxyOptions, out *PodProxyOptions, s conversion.Scope) error {
+func convert_api_PodProxyOptions_To_v1beta3_PodProxyOptions(in *api.PodProxyOptions, out *PodProxyOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PodProxyOptions))(in)
+		defaulting.(func(*api.PodProxyOptions))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2637,12 +2637,12 @@ func convert_api_PodProxyOptions_To_v1beta3_PodProxyOptions(in *newer.PodProxyOp
 	return nil
 }
 
-func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s conversion.Scope) error {
+func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodSpec))(in)
 	}
 	if in.Volumes != nil {
-		out.Volumes = make([]newer.Volume, len(in.Volumes))
+		out.Volumes = make([]api.Volume, len(in.Volumes))
 		for i := range in.Volumes {
 			if err := convert_v1beta3_Volume_To_api_Volume(&in.Volumes[i], &out.Volumes[i], s); err != nil {
 				return err
@@ -2652,7 +2652,7 @@ func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s c
 		out.Volumes = nil
 	}
 	if in.Containers != nil {
-		out.Containers = make([]newer.Container, len(in.Containers))
+		out.Containers = make([]api.Container, len(in.Containers))
 		for i := range in.Containers {
 			if err := convert_v1beta3_Container_To_api_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
 				return err
@@ -2661,7 +2661,7 @@ func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s c
 	} else {
 		out.Containers = nil
 	}
-	out.RestartPolicy = newer.RestartPolicy(in.RestartPolicy)
+	out.RestartPolicy = api.RestartPolicy(in.RestartPolicy)
 	if in.TerminationGracePeriodSeconds != nil {
 		out.TerminationGracePeriodSeconds = new(int64)
 		*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
@@ -2674,7 +2674,7 @@ func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s c
 	} else {
 		out.ActiveDeadlineSeconds = nil
 	}
-	out.DNSPolicy = newer.DNSPolicy(in.DNSPolicy)
+	out.DNSPolicy = api.DNSPolicy(in.DNSPolicy)
 	if in.NodeSelector != nil {
 		out.NodeSelector = make(map[string]string)
 		for key, val := range in.NodeSelector {
@@ -2687,7 +2687,7 @@ func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s c
 	out.Host = in.Host
 	out.HostNetwork = in.HostNetwork
 	if in.ImagePullSecrets != nil {
-		out.ImagePullSecrets = make([]newer.LocalObjectReference, len(in.ImagePullSecrets))
+		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
 			if err := convert_v1beta3_LocalObjectReference_To_api_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
 				return err
@@ -2699,9 +2699,9 @@ func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s c
 	return nil
 }
 
-func convert_api_PodSpec_To_v1beta3_PodSpec(in *newer.PodSpec, out *PodSpec, s conversion.Scope) error {
+func convert_api_PodSpec_To_v1beta3_PodSpec(in *api.PodSpec, out *PodSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PodSpec))(in)
+		defaulting.(func(*api.PodSpec))(in)
 	}
 	if in.Volumes != nil {
 		out.Volumes = make([]Volume, len(in.Volumes))
@@ -2761,13 +2761,13 @@ func convert_api_PodSpec_To_v1beta3_PodSpec(in *newer.PodSpec, out *PodSpec, s c
 	return nil
 }
 
-func convert_v1beta3_PodStatus_To_api_PodStatus(in *PodStatus, out *newer.PodStatus, s conversion.Scope) error {
+func convert_v1beta3_PodStatus_To_api_PodStatus(in *PodStatus, out *api.PodStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodStatus))(in)
 	}
-	out.Phase = newer.PodPhase(in.Phase)
+	out.Phase = api.PodPhase(in.Phase)
 	if in.Conditions != nil {
-		out.Conditions = make([]newer.PodCondition, len(in.Conditions))
+		out.Conditions = make([]api.PodCondition, len(in.Conditions))
 		for i := range in.Conditions {
 			if err := convert_v1beta3_PodCondition_To_api_PodCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
 				return err
@@ -2787,7 +2787,7 @@ func convert_v1beta3_PodStatus_To_api_PodStatus(in *PodStatus, out *newer.PodSta
 		out.StartTime = nil
 	}
 	if in.ContainerStatuses != nil {
-		out.ContainerStatuses = make([]newer.ContainerStatus, len(in.ContainerStatuses))
+		out.ContainerStatuses = make([]api.ContainerStatus, len(in.ContainerStatuses))
 		for i := range in.ContainerStatuses {
 			if err := convert_v1beta3_ContainerStatus_To_api_ContainerStatus(&in.ContainerStatuses[i], &out.ContainerStatuses[i], s); err != nil {
 				return err
@@ -2799,9 +2799,9 @@ func convert_v1beta3_PodStatus_To_api_PodStatus(in *PodStatus, out *newer.PodSta
 	return nil
 }
 
-func convert_api_PodStatus_To_v1beta3_PodStatus(in *newer.PodStatus, out *PodStatus, s conversion.Scope) error {
+func convert_api_PodStatus_To_v1beta3_PodStatus(in *api.PodStatus, out *PodStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PodStatus))(in)
+		defaulting.(func(*api.PodStatus))(in)
 	}
 	out.Phase = PodPhase(in.Phase)
 	if in.Conditions != nil {
@@ -2837,7 +2837,7 @@ func convert_api_PodStatus_To_v1beta3_PodStatus(in *newer.PodStatus, out *PodSta
 	return nil
 }
 
-func convert_v1beta3_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult, out *newer.PodStatusResult, s conversion.Scope) error {
+func convert_v1beta3_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult, out *api.PodStatusResult, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodStatusResult))(in)
 	}
@@ -2853,9 +2853,9 @@ func convert_v1beta3_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult,
 	return nil
 }
 
-func convert_api_PodStatusResult_To_v1beta3_PodStatusResult(in *newer.PodStatusResult, out *PodStatusResult, s conversion.Scope) error {
+func convert_api_PodStatusResult_To_v1beta3_PodStatusResult(in *api.PodStatusResult, out *PodStatusResult, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PodStatusResult))(in)
+		defaulting.(func(*api.PodStatusResult))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2869,7 +2869,7 @@ func convert_api_PodStatusResult_To_v1beta3_PodStatusResult(in *newer.PodStatusR
 	return nil
 }
 
-func convert_v1beta3_PodTemplate_To_api_PodTemplate(in *PodTemplate, out *newer.PodTemplate, s conversion.Scope) error {
+func convert_v1beta3_PodTemplate_To_api_PodTemplate(in *PodTemplate, out *api.PodTemplate, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodTemplate))(in)
 	}
@@ -2885,9 +2885,9 @@ func convert_v1beta3_PodTemplate_To_api_PodTemplate(in *PodTemplate, out *newer.
 	return nil
 }
 
-func convert_api_PodTemplate_To_v1beta3_PodTemplate(in *newer.PodTemplate, out *PodTemplate, s conversion.Scope) error {
+func convert_api_PodTemplate_To_v1beta3_PodTemplate(in *api.PodTemplate, out *PodTemplate, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PodTemplate))(in)
+		defaulting.(func(*api.PodTemplate))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2901,7 +2901,7 @@ func convert_api_PodTemplate_To_v1beta3_PodTemplate(in *newer.PodTemplate, out *
 	return nil
 }
 
-func convert_v1beta3_PodTemplateList_To_api_PodTemplateList(in *PodTemplateList, out *newer.PodTemplateList, s conversion.Scope) error {
+func convert_v1beta3_PodTemplateList_To_api_PodTemplateList(in *PodTemplateList, out *api.PodTemplateList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodTemplateList))(in)
 	}
@@ -2912,7 +2912,7 @@ func convert_v1beta3_PodTemplateList_To_api_PodTemplateList(in *PodTemplateList,
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.PodTemplate, len(in.Items))
+		out.Items = make([]api.PodTemplate, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_PodTemplate_To_api_PodTemplate(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -2924,9 +2924,9 @@ func convert_v1beta3_PodTemplateList_To_api_PodTemplateList(in *PodTemplateList,
 	return nil
 }
 
-func convert_api_PodTemplateList_To_v1beta3_PodTemplateList(in *newer.PodTemplateList, out *PodTemplateList, s conversion.Scope) error {
+func convert_api_PodTemplateList_To_v1beta3_PodTemplateList(in *api.PodTemplateList, out *PodTemplateList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PodTemplateList))(in)
+		defaulting.(func(*api.PodTemplateList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -2947,7 +2947,7 @@ func convert_api_PodTemplateList_To_v1beta3_PodTemplateList(in *newer.PodTemplat
 	return nil
 }
 
-func convert_v1beta3_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out *newer.PodTemplateSpec, s conversion.Scope) error {
+func convert_v1beta3_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out *api.PodTemplateSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*PodTemplateSpec))(in)
 	}
@@ -2960,9 +2960,9 @@ func convert_v1beta3_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec,
 	return nil
 }
 
-func convert_api_PodTemplateSpec_To_v1beta3_PodTemplateSpec(in *newer.PodTemplateSpec, out *PodTemplateSpec, s conversion.Scope) error {
+func convert_api_PodTemplateSpec_To_v1beta3_PodTemplateSpec(in *api.PodTemplateSpec, out *PodTemplateSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.PodTemplateSpec))(in)
+		defaulting.(func(*api.PodTemplateSpec))(in)
 	}
 	if err := convert_api_ObjectMeta_To_v1beta3_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
 		return err
@@ -2973,7 +2973,7 @@ func convert_api_PodTemplateSpec_To_v1beta3_PodTemplateSpec(in *newer.PodTemplat
 	return nil
 }
 
-func convert_v1beta3_Probe_To_api_Probe(in *Probe, out *newer.Probe, s conversion.Scope) error {
+func convert_v1beta3_Probe_To_api_Probe(in *Probe, out *api.Probe, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Probe))(in)
 	}
@@ -2985,9 +2985,9 @@ func convert_v1beta3_Probe_To_api_Probe(in *Probe, out *newer.Probe, s conversio
 	return nil
 }
 
-func convert_api_Probe_To_v1beta3_Probe(in *newer.Probe, out *Probe, s conversion.Scope) error {
+func convert_api_Probe_To_v1beta3_Probe(in *api.Probe, out *Probe, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Probe))(in)
+		defaulting.(func(*api.Probe))(in)
 	}
 	if err := convert_api_Handler_To_v1beta3_Handler(&in.Handler, &out.Handler, s); err != nil {
 		return err
@@ -2997,7 +2997,7 @@ func convert_api_Probe_To_v1beta3_Probe(in *newer.Probe, out *Probe, s conversio
 	return nil
 }
 
-func convert_v1beta3_RangeAllocation_To_api_RangeAllocation(in *RangeAllocation, out *newer.RangeAllocation, s conversion.Scope) error {
+func convert_v1beta3_RangeAllocation_To_api_RangeAllocation(in *RangeAllocation, out *api.RangeAllocation, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*RangeAllocation))(in)
 	}
@@ -3014,9 +3014,9 @@ func convert_v1beta3_RangeAllocation_To_api_RangeAllocation(in *RangeAllocation,
 	return nil
 }
 
-func convert_api_RangeAllocation_To_v1beta3_RangeAllocation(in *newer.RangeAllocation, out *RangeAllocation, s conversion.Scope) error {
+func convert_api_RangeAllocation_To_v1beta3_RangeAllocation(in *api.RangeAllocation, out *RangeAllocation, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.RangeAllocation))(in)
+		defaulting.(func(*api.RangeAllocation))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3031,7 +3031,7 @@ func convert_api_RangeAllocation_To_v1beta3_RangeAllocation(in *newer.RangeAlloc
 	return nil
 }
 
-func convert_v1beta3_ReplicationController_To_api_ReplicationController(in *ReplicationController, out *newer.ReplicationController, s conversion.Scope) error {
+func convert_v1beta3_ReplicationController_To_api_ReplicationController(in *ReplicationController, out *api.ReplicationController, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationController))(in)
 	}
@@ -3050,9 +3050,9 @@ func convert_v1beta3_ReplicationController_To_api_ReplicationController(in *Repl
 	return nil
 }
 
-func convert_api_ReplicationController_To_v1beta3_ReplicationController(in *newer.ReplicationController, out *ReplicationController, s conversion.Scope) error {
+func convert_api_ReplicationController_To_v1beta3_ReplicationController(in *api.ReplicationController, out *ReplicationController, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ReplicationController))(in)
+		defaulting.(func(*api.ReplicationController))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3069,7 +3069,7 @@ func convert_api_ReplicationController_To_v1beta3_ReplicationController(in *newe
 	return nil
 }
 
-func convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList(in *ReplicationControllerList, out *newer.ReplicationControllerList, s conversion.Scope) error {
+func convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList(in *ReplicationControllerList, out *api.ReplicationControllerList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerList))(in)
 	}
@@ -3080,7 +3080,7 @@ func convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList(
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.ReplicationController, len(in.Items))
+		out.Items = make([]api.ReplicationController, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_ReplicationController_To_api_ReplicationController(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3092,9 +3092,9 @@ func convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList(
 	return nil
 }
 
-func convert_api_ReplicationControllerList_To_v1beta3_ReplicationControllerList(in *newer.ReplicationControllerList, out *ReplicationControllerList, s conversion.Scope) error {
+func convert_api_ReplicationControllerList_To_v1beta3_ReplicationControllerList(in *api.ReplicationControllerList, out *ReplicationControllerList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ReplicationControllerList))(in)
+		defaulting.(func(*api.ReplicationControllerList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3115,7 +3115,7 @@ func convert_api_ReplicationControllerList_To_v1beta3_ReplicationControllerList(
 	return nil
 }
 
-func convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *ReplicationControllerSpec, out *newer.ReplicationControllerSpec, s conversion.Scope) error {
+func convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *ReplicationControllerSpec, out *api.ReplicationControllerSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerSpec))(in)
 	}
@@ -3129,7 +3129,7 @@ func convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec(
 		out.Selector = nil
 	}
 	if in.TemplateRef != nil {
-		out.TemplateRef = new(newer.ObjectReference)
+		out.TemplateRef = new(api.ObjectReference)
 		if err := convert_v1beta3_ObjectReference_To_api_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
 			return err
 		}
@@ -3137,7 +3137,7 @@ func convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec(
 		out.TemplateRef = nil
 	}
 	if in.Template != nil {
-		out.Template = new(newer.PodTemplateSpec)
+		out.Template = new(api.PodTemplateSpec)
 		if err := convert_v1beta3_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
 			return err
 		}
@@ -3147,9 +3147,9 @@ func convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec(
 	return nil
 }
 
-func convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec(in *newer.ReplicationControllerSpec, out *ReplicationControllerSpec, s conversion.Scope) error {
+func convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec(in *api.ReplicationControllerSpec, out *ReplicationControllerSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ReplicationControllerSpec))(in)
+		defaulting.(func(*api.ReplicationControllerSpec))(in)
 	}
 	out.Replicas = in.Replicas
 	if in.Selector != nil {
@@ -3179,7 +3179,7 @@ func convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec(
 	return nil
 }
 
-func convert_v1beta3_ReplicationControllerStatus_To_api_ReplicationControllerStatus(in *ReplicationControllerStatus, out *newer.ReplicationControllerStatus, s conversion.Scope) error {
+func convert_v1beta3_ReplicationControllerStatus_To_api_ReplicationControllerStatus(in *ReplicationControllerStatus, out *api.ReplicationControllerStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerStatus))(in)
 	}
@@ -3187,15 +3187,15 @@ func convert_v1beta3_ReplicationControllerStatus_To_api_ReplicationControllerSta
 	return nil
 }
 
-func convert_api_ReplicationControllerStatus_To_v1beta3_ReplicationControllerStatus(in *newer.ReplicationControllerStatus, out *ReplicationControllerStatus, s conversion.Scope) error {
+func convert_api_ReplicationControllerStatus_To_v1beta3_ReplicationControllerStatus(in *api.ReplicationControllerStatus, out *ReplicationControllerStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ReplicationControllerStatus))(in)
+		defaulting.(func(*api.ReplicationControllerStatus))(in)
 	}
 	out.Replicas = in.Replicas
 	return nil
 }
 
-func convert_v1beta3_ResourceQuota_To_api_ResourceQuota(in *ResourceQuota, out *newer.ResourceQuota, s conversion.Scope) error {
+func convert_v1beta3_ResourceQuota_To_api_ResourceQuota(in *ResourceQuota, out *api.ResourceQuota, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ResourceQuota))(in)
 	}
@@ -3214,9 +3214,9 @@ func convert_v1beta3_ResourceQuota_To_api_ResourceQuota(in *ResourceQuota, out *
 	return nil
 }
 
-func convert_api_ResourceQuota_To_v1beta3_ResourceQuota(in *newer.ResourceQuota, out *ResourceQuota, s conversion.Scope) error {
+func convert_api_ResourceQuota_To_v1beta3_ResourceQuota(in *api.ResourceQuota, out *ResourceQuota, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ResourceQuota))(in)
+		defaulting.(func(*api.ResourceQuota))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3233,7 +3233,7 @@ func convert_api_ResourceQuota_To_v1beta3_ResourceQuota(in *newer.ResourceQuota,
 	return nil
 }
 
-func convert_v1beta3_ResourceQuotaList_To_api_ResourceQuotaList(in *ResourceQuotaList, out *newer.ResourceQuotaList, s conversion.Scope) error {
+func convert_v1beta3_ResourceQuotaList_To_api_ResourceQuotaList(in *ResourceQuotaList, out *api.ResourceQuotaList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ResourceQuotaList))(in)
 	}
@@ -3244,7 +3244,7 @@ func convert_v1beta3_ResourceQuotaList_To_api_ResourceQuotaList(in *ResourceQuot
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.ResourceQuota, len(in.Items))
+		out.Items = make([]api.ResourceQuota, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_ResourceQuota_To_api_ResourceQuota(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3256,9 +3256,9 @@ func convert_v1beta3_ResourceQuotaList_To_api_ResourceQuotaList(in *ResourceQuot
 	return nil
 }
 
-func convert_api_ResourceQuotaList_To_v1beta3_ResourceQuotaList(in *newer.ResourceQuotaList, out *ResourceQuotaList, s conversion.Scope) error {
+func convert_api_ResourceQuotaList_To_v1beta3_ResourceQuotaList(in *api.ResourceQuotaList, out *ResourceQuotaList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ResourceQuotaList))(in)
+		defaulting.(func(*api.ResourceQuotaList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3279,18 +3279,18 @@ func convert_api_ResourceQuotaList_To_v1beta3_ResourceQuotaList(in *newer.Resour
 	return nil
 }
 
-func convert_v1beta3_ResourceQuotaSpec_To_api_ResourceQuotaSpec(in *ResourceQuotaSpec, out *newer.ResourceQuotaSpec, s conversion.Scope) error {
+func convert_v1beta3_ResourceQuotaSpec_To_api_ResourceQuotaSpec(in *ResourceQuotaSpec, out *api.ResourceQuotaSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ResourceQuotaSpec))(in)
 	}
 	if in.Hard != nil {
-		out.Hard = make(map[newer.ResourceName]resource.Quantity)
+		out.Hard = make(map[api.ResourceName]resource.Quantity)
 		for key, val := range in.Hard {
 			newVal := resource.Quantity{}
 			if err := s.Convert(&val, &newVal, 0); err != nil {
 				return err
 			}
-			out.Hard[newer.ResourceName(key)] = newVal
+			out.Hard[api.ResourceName(key)] = newVal
 		}
 	} else {
 		out.Hard = nil
@@ -3298,9 +3298,9 @@ func convert_v1beta3_ResourceQuotaSpec_To_api_ResourceQuotaSpec(in *ResourceQuot
 	return nil
 }
 
-func convert_api_ResourceQuotaSpec_To_v1beta3_ResourceQuotaSpec(in *newer.ResourceQuotaSpec, out *ResourceQuotaSpec, s conversion.Scope) error {
+func convert_api_ResourceQuotaSpec_To_v1beta3_ResourceQuotaSpec(in *api.ResourceQuotaSpec, out *ResourceQuotaSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ResourceQuotaSpec))(in)
+		defaulting.(func(*api.ResourceQuotaSpec))(in)
 	}
 	if in.Hard != nil {
 		out.Hard = make(map[ResourceName]resource.Quantity)
@@ -3317,30 +3317,30 @@ func convert_api_ResourceQuotaSpec_To_v1beta3_ResourceQuotaSpec(in *newer.Resour
 	return nil
 }
 
-func convert_v1beta3_ResourceQuotaStatus_To_api_ResourceQuotaStatus(in *ResourceQuotaStatus, out *newer.ResourceQuotaStatus, s conversion.Scope) error {
+func convert_v1beta3_ResourceQuotaStatus_To_api_ResourceQuotaStatus(in *ResourceQuotaStatus, out *api.ResourceQuotaStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ResourceQuotaStatus))(in)
 	}
 	if in.Hard != nil {
-		out.Hard = make(map[newer.ResourceName]resource.Quantity)
+		out.Hard = make(map[api.ResourceName]resource.Quantity)
 		for key, val := range in.Hard {
 			newVal := resource.Quantity{}
 			if err := s.Convert(&val, &newVal, 0); err != nil {
 				return err
 			}
-			out.Hard[newer.ResourceName(key)] = newVal
+			out.Hard[api.ResourceName(key)] = newVal
 		}
 	} else {
 		out.Hard = nil
 	}
 	if in.Used != nil {
-		out.Used = make(map[newer.ResourceName]resource.Quantity)
+		out.Used = make(map[api.ResourceName]resource.Quantity)
 		for key, val := range in.Used {
 			newVal := resource.Quantity{}
 			if err := s.Convert(&val, &newVal, 0); err != nil {
 				return err
 			}
-			out.Used[newer.ResourceName(key)] = newVal
+			out.Used[api.ResourceName(key)] = newVal
 		}
 	} else {
 		out.Used = nil
@@ -3348,9 +3348,9 @@ func convert_v1beta3_ResourceQuotaStatus_To_api_ResourceQuotaStatus(in *Resource
 	return nil
 }
 
-func convert_api_ResourceQuotaStatus_To_v1beta3_ResourceQuotaStatus(in *newer.ResourceQuotaStatus, out *ResourceQuotaStatus, s conversion.Scope) error {
+func convert_api_ResourceQuotaStatus_To_v1beta3_ResourceQuotaStatus(in *api.ResourceQuotaStatus, out *ResourceQuotaStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ResourceQuotaStatus))(in)
+		defaulting.(func(*api.ResourceQuotaStatus))(in)
 	}
 	if in.Hard != nil {
 		out.Hard = make(map[ResourceName]resource.Quantity)
@@ -3379,30 +3379,30 @@ func convert_api_ResourceQuotaStatus_To_v1beta3_ResourceQuotaStatus(in *newer.Re
 	return nil
 }
 
-func convert_v1beta3_ResourceRequirements_To_api_ResourceRequirements(in *ResourceRequirements, out *newer.ResourceRequirements, s conversion.Scope) error {
+func convert_v1beta3_ResourceRequirements_To_api_ResourceRequirements(in *ResourceRequirements, out *api.ResourceRequirements, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ResourceRequirements))(in)
 	}
 	if in.Limits != nil {
-		out.Limits = make(map[newer.ResourceName]resource.Quantity)
+		out.Limits = make(map[api.ResourceName]resource.Quantity)
 		for key, val := range in.Limits {
 			newVal := resource.Quantity{}
 			if err := s.Convert(&val, &newVal, 0); err != nil {
 				return err
 			}
-			out.Limits[newer.ResourceName(key)] = newVal
+			out.Limits[api.ResourceName(key)] = newVal
 		}
 	} else {
 		out.Limits = nil
 	}
 	if in.Requests != nil {
-		out.Requests = make(map[newer.ResourceName]resource.Quantity)
+		out.Requests = make(map[api.ResourceName]resource.Quantity)
 		for key, val := range in.Requests {
 			newVal := resource.Quantity{}
 			if err := s.Convert(&val, &newVal, 0); err != nil {
 				return err
 			}
-			out.Requests[newer.ResourceName(key)] = newVal
+			out.Requests[api.ResourceName(key)] = newVal
 		}
 	} else {
 		out.Requests = nil
@@ -3410,9 +3410,9 @@ func convert_v1beta3_ResourceRequirements_To_api_ResourceRequirements(in *Resour
 	return nil
 }
 
-func convert_api_ResourceRequirements_To_v1beta3_ResourceRequirements(in *newer.ResourceRequirements, out *ResourceRequirements, s conversion.Scope) error {
+func convert_api_ResourceRequirements_To_v1beta3_ResourceRequirements(in *api.ResourceRequirements, out *ResourceRequirements, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ResourceRequirements))(in)
+		defaulting.(func(*api.ResourceRequirements))(in)
 	}
 	if in.Limits != nil {
 		out.Limits = make(map[ResourceName]resource.Quantity)
@@ -3441,9 +3441,9 @@ func convert_api_ResourceRequirements_To_v1beta3_ResourceRequirements(in *newer.
 	return nil
 }
 
-func convert_api_SELinuxOptions_To_v1beta3_SELinuxOptions(in *newer.SELinuxOptions, out *SELinuxOptions, s conversion.Scope) error {
+func convert_api_SELinuxOptions_To_v1beta3_SELinuxOptions(in *api.SELinuxOptions, out *SELinuxOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.SELinuxOptions))(in)
+		defaulting.(func(*api.SELinuxOptions))(in)
 	}
 	out.User = in.User
 	out.Role = in.Role
@@ -3452,7 +3452,7 @@ func convert_api_SELinuxOptions_To_v1beta3_SELinuxOptions(in *newer.SELinuxOptio
 	return nil
 }
 
-func convert_v1beta3_SELinuxOptions_To_api_SELinuxOptions(in *SELinuxOptions, out *newer.SELinuxOptions, s conversion.Scope) error {
+func convert_v1beta3_SELinuxOptions_To_api_SELinuxOptions(in *SELinuxOptions, out *api.SELinuxOptions, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*SELinuxOptions))(in)
 	}
@@ -3463,7 +3463,7 @@ func convert_v1beta3_SELinuxOptions_To_api_SELinuxOptions(in *SELinuxOptions, ou
 	return nil
 }
 
-func convert_v1beta3_Secret_To_api_Secret(in *Secret, out *newer.Secret, s conversion.Scope) error {
+func convert_v1beta3_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Secret))(in)
 	}
@@ -3485,13 +3485,13 @@ func convert_v1beta3_Secret_To_api_Secret(in *Secret, out *newer.Secret, s conve
 	} else {
 		out.Data = nil
 	}
-	out.Type = newer.SecretType(in.Type)
+	out.Type = api.SecretType(in.Type)
 	return nil
 }
 
-func convert_api_Secret_To_v1beta3_Secret(in *newer.Secret, out *Secret, s conversion.Scope) error {
+func convert_api_Secret_To_v1beta3_Secret(in *api.Secret, out *Secret, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Secret))(in)
+		defaulting.(func(*api.Secret))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3515,7 +3515,7 @@ func convert_api_Secret_To_v1beta3_Secret(in *newer.Secret, out *Secret, s conve
 	return nil
 }
 
-func convert_v1beta3_SecretList_To_api_SecretList(in *SecretList, out *newer.SecretList, s conversion.Scope) error {
+func convert_v1beta3_SecretList_To_api_SecretList(in *SecretList, out *api.SecretList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*SecretList))(in)
 	}
@@ -3526,7 +3526,7 @@ func convert_v1beta3_SecretList_To_api_SecretList(in *SecretList, out *newer.Sec
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.Secret, len(in.Items))
+		out.Items = make([]api.Secret, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_Secret_To_api_Secret(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3538,9 +3538,9 @@ func convert_v1beta3_SecretList_To_api_SecretList(in *SecretList, out *newer.Sec
 	return nil
 }
 
-func convert_api_SecretList_To_v1beta3_SecretList(in *newer.SecretList, out *SecretList, s conversion.Scope) error {
+func convert_api_SecretList_To_v1beta3_SecretList(in *api.SecretList, out *SecretList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.SecretList))(in)
+		defaulting.(func(*api.SecretList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3561,7 +3561,7 @@ func convert_api_SecretList_To_v1beta3_SecretList(in *newer.SecretList, out *Sec
 	return nil
 }
 
-func convert_v1beta3_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolumeSource, out *newer.SecretVolumeSource, s conversion.Scope) error {
+func convert_v1beta3_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolumeSource, out *api.SecretVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*SecretVolumeSource))(in)
 	}
@@ -3569,17 +3569,17 @@ func convert_v1beta3_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolu
 	return nil
 }
 
-func convert_api_SecretVolumeSource_To_v1beta3_SecretVolumeSource(in *newer.SecretVolumeSource, out *SecretVolumeSource, s conversion.Scope) error {
+func convert_api_SecretVolumeSource_To_v1beta3_SecretVolumeSource(in *api.SecretVolumeSource, out *SecretVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.SecretVolumeSource))(in)
+		defaulting.(func(*api.SecretVolumeSource))(in)
 	}
 	out.SecretName = in.SecretName
 	return nil
 }
 
-func convert_api_SecurityContext_To_v1beta3_SecurityContext(in *newer.SecurityContext, out *SecurityContext, s conversion.Scope) error {
+func convert_api_SecurityContext_To_v1beta3_SecurityContext(in *api.SecurityContext, out *SecurityContext, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.SecurityContext))(in)
+		defaulting.(func(*api.SecurityContext))(in)
 	}
 	if in.Capabilities != nil {
 		out.Capabilities = new(Capabilities)
@@ -3612,12 +3612,12 @@ func convert_api_SecurityContext_To_v1beta3_SecurityContext(in *newer.SecurityCo
 	return nil
 }
 
-func convert_v1beta3_SecurityContext_To_api_SecurityContext(in *SecurityContext, out *newer.SecurityContext, s conversion.Scope) error {
+func convert_v1beta3_SecurityContext_To_api_SecurityContext(in *SecurityContext, out *api.SecurityContext, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*SecurityContext))(in)
 	}
 	if in.Capabilities != nil {
-		out.Capabilities = new(newer.Capabilities)
+		out.Capabilities = new(api.Capabilities)
 		if err := convert_v1beta3_Capabilities_To_api_Capabilities(in.Capabilities, out.Capabilities, s); err != nil {
 			return err
 		}
@@ -3631,7 +3631,7 @@ func convert_v1beta3_SecurityContext_To_api_SecurityContext(in *SecurityContext,
 		out.Privileged = nil
 	}
 	if in.SELinuxOptions != nil {
-		out.SELinuxOptions = new(newer.SELinuxOptions)
+		out.SELinuxOptions = new(api.SELinuxOptions)
 		if err := convert_v1beta3_SELinuxOptions_To_api_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
 			return err
 		}
@@ -3647,7 +3647,7 @@ func convert_v1beta3_SecurityContext_To_api_SecurityContext(in *SecurityContext,
 	return nil
 }
 
-func convert_v1beta3_SerializedReference_To_api_SerializedReference(in *SerializedReference, out *newer.SerializedReference, s conversion.Scope) error {
+func convert_v1beta3_SerializedReference_To_api_SerializedReference(in *SerializedReference, out *api.SerializedReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*SerializedReference))(in)
 	}
@@ -3660,9 +3660,9 @@ func convert_v1beta3_SerializedReference_To_api_SerializedReference(in *Serializ
 	return nil
 }
 
-func convert_api_SerializedReference_To_v1beta3_SerializedReference(in *newer.SerializedReference, out *SerializedReference, s conversion.Scope) error {
+func convert_api_SerializedReference_To_v1beta3_SerializedReference(in *api.SerializedReference, out *SerializedReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.SerializedReference))(in)
+		defaulting.(func(*api.SerializedReference))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3673,7 +3673,7 @@ func convert_api_SerializedReference_To_v1beta3_SerializedReference(in *newer.Se
 	return nil
 }
 
-func convert_v1beta3_Service_To_api_Service(in *Service, out *newer.Service, s conversion.Scope) error {
+func convert_v1beta3_Service_To_api_Service(in *Service, out *api.Service, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Service))(in)
 	}
@@ -3692,9 +3692,9 @@ func convert_v1beta3_Service_To_api_Service(in *Service, out *newer.Service, s c
 	return nil
 }
 
-func convert_api_Service_To_v1beta3_Service(in *newer.Service, out *Service, s conversion.Scope) error {
+func convert_api_Service_To_v1beta3_Service(in *api.Service, out *Service, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Service))(in)
+		defaulting.(func(*api.Service))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3711,7 +3711,7 @@ func convert_api_Service_To_v1beta3_Service(in *newer.Service, out *Service, s c
 	return nil
 }
 
-func convert_v1beta3_ServiceAccount_To_api_ServiceAccount(in *ServiceAccount, out *newer.ServiceAccount, s conversion.Scope) error {
+func convert_v1beta3_ServiceAccount_To_api_ServiceAccount(in *ServiceAccount, out *api.ServiceAccount, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceAccount))(in)
 	}
@@ -3722,7 +3722,7 @@ func convert_v1beta3_ServiceAccount_To_api_ServiceAccount(in *ServiceAccount, ou
 		return err
 	}
 	if in.Secrets != nil {
-		out.Secrets = make([]newer.ObjectReference, len(in.Secrets))
+		out.Secrets = make([]api.ObjectReference, len(in.Secrets))
 		for i := range in.Secrets {
 			if err := convert_v1beta3_ObjectReference_To_api_ObjectReference(&in.Secrets[i], &out.Secrets[i], s); err != nil {
 				return err
@@ -3734,9 +3734,9 @@ func convert_v1beta3_ServiceAccount_To_api_ServiceAccount(in *ServiceAccount, ou
 	return nil
 }
 
-func convert_api_ServiceAccount_To_v1beta3_ServiceAccount(in *newer.ServiceAccount, out *ServiceAccount, s conversion.Scope) error {
+func convert_api_ServiceAccount_To_v1beta3_ServiceAccount(in *api.ServiceAccount, out *ServiceAccount, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ServiceAccount))(in)
+		defaulting.(func(*api.ServiceAccount))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3757,7 +3757,7 @@ func convert_api_ServiceAccount_To_v1beta3_ServiceAccount(in *newer.ServiceAccou
 	return nil
 }
 
-func convert_v1beta3_ServiceAccountList_To_api_ServiceAccountList(in *ServiceAccountList, out *newer.ServiceAccountList, s conversion.Scope) error {
+func convert_v1beta3_ServiceAccountList_To_api_ServiceAccountList(in *ServiceAccountList, out *api.ServiceAccountList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceAccountList))(in)
 	}
@@ -3768,7 +3768,7 @@ func convert_v1beta3_ServiceAccountList_To_api_ServiceAccountList(in *ServiceAcc
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.ServiceAccount, len(in.Items))
+		out.Items = make([]api.ServiceAccount, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_ServiceAccount_To_api_ServiceAccount(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3780,9 +3780,9 @@ func convert_v1beta3_ServiceAccountList_To_api_ServiceAccountList(in *ServiceAcc
 	return nil
 }
 
-func convert_api_ServiceAccountList_To_v1beta3_ServiceAccountList(in *newer.ServiceAccountList, out *ServiceAccountList, s conversion.Scope) error {
+func convert_api_ServiceAccountList_To_v1beta3_ServiceAccountList(in *api.ServiceAccountList, out *ServiceAccountList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ServiceAccountList))(in)
+		defaulting.(func(*api.ServiceAccountList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3803,7 +3803,7 @@ func convert_api_ServiceAccountList_To_v1beta3_ServiceAccountList(in *newer.Serv
 	return nil
 }
 
-func convert_v1beta3_ServiceList_To_api_ServiceList(in *ServiceList, out *newer.ServiceList, s conversion.Scope) error {
+func convert_v1beta3_ServiceList_To_api_ServiceList(in *ServiceList, out *api.ServiceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceList))(in)
 	}
@@ -3814,7 +3814,7 @@ func convert_v1beta3_ServiceList_To_api_ServiceList(in *ServiceList, out *newer.
 		return err
 	}
 	if in.Items != nil {
-		out.Items = make([]newer.Service, len(in.Items))
+		out.Items = make([]api.Service, len(in.Items))
 		for i := range in.Items {
 			if err := convert_v1beta3_Service_To_api_Service(&in.Items[i], &out.Items[i], s); err != nil {
 				return err
@@ -3826,9 +3826,9 @@ func convert_v1beta3_ServiceList_To_api_ServiceList(in *ServiceList, out *newer.
 	return nil
 }
 
-func convert_api_ServiceList_To_v1beta3_ServiceList(in *newer.ServiceList, out *ServiceList, s conversion.Scope) error {
+func convert_api_ServiceList_To_v1beta3_ServiceList(in *api.ServiceList, out *ServiceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ServiceList))(in)
+		defaulting.(func(*api.ServiceList))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -3849,12 +3849,12 @@ func convert_api_ServiceList_To_v1beta3_ServiceList(in *newer.ServiceList, out *
 	return nil
 }
 
-func convert_v1beta3_ServicePort_To_api_ServicePort(in *ServicePort, out *newer.ServicePort, s conversion.Scope) error {
+func convert_v1beta3_ServicePort_To_api_ServicePort(in *ServicePort, out *api.ServicePort, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServicePort))(in)
 	}
 	out.Name = in.Name
-	out.Protocol = newer.Protocol(in.Protocol)
+	out.Protocol = api.Protocol(in.Protocol)
 	out.Port = in.Port
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
@@ -3862,9 +3862,9 @@ func convert_v1beta3_ServicePort_To_api_ServicePort(in *ServicePort, out *newer.
 	return nil
 }
 
-func convert_api_ServicePort_To_v1beta3_ServicePort(in *newer.ServicePort, out *ServicePort, s conversion.Scope) error {
+func convert_api_ServicePort_To_v1beta3_ServicePort(in *api.ServicePort, out *ServicePort, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ServicePort))(in)
+		defaulting.(func(*api.ServicePort))(in)
 	}
 	out.Name = in.Name
 	out.Protocol = Protocol(in.Protocol)
@@ -3875,12 +3875,12 @@ func convert_api_ServicePort_To_v1beta3_ServicePort(in *newer.ServicePort, out *
 	return nil
 }
 
-func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *newer.ServiceSpec, s conversion.Scope) error {
+func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceSpec))(in)
 	}
 	if in.Ports != nil {
-		out.Ports = make([]newer.ServicePort, len(in.Ports))
+		out.Ports = make([]api.ServicePort, len(in.Ports))
 		for i := range in.Ports {
 			if err := convert_v1beta3_ServicePort_To_api_ServicePort(&in.Ports[i], &out.Ports[i], s); err != nil {
 				return err
@@ -3907,13 +3907,13 @@ func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *newer.
 	} else {
 		out.PublicIPs = nil
 	}
-	out.SessionAffinity = newer.ServiceAffinity(in.SessionAffinity)
+	out.SessionAffinity = api.ServiceAffinity(in.SessionAffinity)
 	return nil
 }
 
-func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *newer.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
+func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ServiceSpec))(in)
+		defaulting.(func(*api.ServiceSpec))(in)
 	}
 	if in.Ports != nil {
 		out.Ports = make([]ServicePort, len(in.Ports))
@@ -3947,21 +3947,21 @@ func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *newer.ServiceSpec, out *
 	return nil
 }
 
-func convert_v1beta3_ServiceStatus_To_api_ServiceStatus(in *ServiceStatus, out *newer.ServiceStatus, s conversion.Scope) error {
+func convert_v1beta3_ServiceStatus_To_api_ServiceStatus(in *ServiceStatus, out *api.ServiceStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceStatus))(in)
 	}
 	return nil
 }
 
-func convert_api_ServiceStatus_To_v1beta3_ServiceStatus(in *newer.ServiceStatus, out *ServiceStatus, s conversion.Scope) error {
+func convert_api_ServiceStatus_To_v1beta3_ServiceStatus(in *api.ServiceStatus, out *ServiceStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ServiceStatus))(in)
+		defaulting.(func(*api.ServiceStatus))(in)
 	}
 	return nil
 }
 
-func convert_v1beta3_Status_To_api_Status(in *Status, out *newer.Status, s conversion.Scope) error {
+func convert_v1beta3_Status_To_api_Status(in *Status, out *api.Status, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Status))(in)
 	}
@@ -3973,9 +3973,9 @@ func convert_v1beta3_Status_To_api_Status(in *Status, out *newer.Status, s conve
 	}
 	out.Status = in.Status
 	out.Message = in.Message
-	out.Reason = newer.StatusReason(in.Reason)
+	out.Reason = api.StatusReason(in.Reason)
 	if in.Details != nil {
-		out.Details = new(newer.StatusDetails)
+		out.Details = new(api.StatusDetails)
 		if err := convert_v1beta3_StatusDetails_To_api_StatusDetails(in.Details, out.Details, s); err != nil {
 			return err
 		}
@@ -3986,9 +3986,9 @@ func convert_v1beta3_Status_To_api_Status(in *Status, out *newer.Status, s conve
 	return nil
 }
 
-func convert_api_Status_To_v1beta3_Status(in *newer.Status, out *Status, s conversion.Scope) error {
+func convert_api_Status_To_v1beta3_Status(in *api.Status, out *Status, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Status))(in)
+		defaulting.(func(*api.Status))(in)
 	}
 	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -4011,19 +4011,19 @@ func convert_api_Status_To_v1beta3_Status(in *newer.Status, out *Status, s conve
 	return nil
 }
 
-func convert_v1beta3_StatusCause_To_api_StatusCause(in *StatusCause, out *newer.StatusCause, s conversion.Scope) error {
+func convert_v1beta3_StatusCause_To_api_StatusCause(in *StatusCause, out *api.StatusCause, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*StatusCause))(in)
 	}
-	out.Type = newer.CauseType(in.Type)
+	out.Type = api.CauseType(in.Type)
 	out.Message = in.Message
 	out.Field = in.Field
 	return nil
 }
 
-func convert_api_StatusCause_To_v1beta3_StatusCause(in *newer.StatusCause, out *StatusCause, s conversion.Scope) error {
+func convert_api_StatusCause_To_v1beta3_StatusCause(in *api.StatusCause, out *StatusCause, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.StatusCause))(in)
+		defaulting.(func(*api.StatusCause))(in)
 	}
 	out.Type = CauseType(in.Type)
 	out.Message = in.Message
@@ -4031,14 +4031,14 @@ func convert_api_StatusCause_To_v1beta3_StatusCause(in *newer.StatusCause, out *
 	return nil
 }
 
-func convert_v1beta3_StatusDetails_To_api_StatusDetails(in *StatusDetails, out *newer.StatusDetails, s conversion.Scope) error {
+func convert_v1beta3_StatusDetails_To_api_StatusDetails(in *StatusDetails, out *api.StatusDetails, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*StatusDetails))(in)
 	}
 	out.ID = in.ID
 	out.Kind = in.Kind
 	if in.Causes != nil {
-		out.Causes = make([]newer.StatusCause, len(in.Causes))
+		out.Causes = make([]api.StatusCause, len(in.Causes))
 		for i := range in.Causes {
 			if err := convert_v1beta3_StatusCause_To_api_StatusCause(&in.Causes[i], &out.Causes[i], s); err != nil {
 				return err
@@ -4051,9 +4051,9 @@ func convert_v1beta3_StatusDetails_To_api_StatusDetails(in *StatusDetails, out *
 	return nil
 }
 
-func convert_api_StatusDetails_To_v1beta3_StatusDetails(in *newer.StatusDetails, out *StatusDetails, s conversion.Scope) error {
+func convert_api_StatusDetails_To_v1beta3_StatusDetails(in *api.StatusDetails, out *StatusDetails, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.StatusDetails))(in)
+		defaulting.(func(*api.StatusDetails))(in)
 	}
 	out.ID = in.ID
 	out.Kind = in.Kind
@@ -4071,7 +4071,7 @@ func convert_api_StatusDetails_To_v1beta3_StatusDetails(in *newer.StatusDetails,
 	return nil
 }
 
-func convert_v1beta3_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out *newer.TCPSocketAction, s conversion.Scope) error {
+func convert_v1beta3_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction, out *api.TCPSocketAction, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*TCPSocketAction))(in)
 	}
@@ -4081,9 +4081,9 @@ func convert_v1beta3_TCPSocketAction_To_api_TCPSocketAction(in *TCPSocketAction,
 	return nil
 }
 
-func convert_api_TCPSocketAction_To_v1beta3_TCPSocketAction(in *newer.TCPSocketAction, out *TCPSocketAction, s conversion.Scope) error {
+func convert_api_TCPSocketAction_To_v1beta3_TCPSocketAction(in *api.TCPSocketAction, out *TCPSocketAction, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.TCPSocketAction))(in)
+		defaulting.(func(*api.TCPSocketAction))(in)
 	}
 	if err := s.Convert(&in.Port, &out.Port, 0); err != nil {
 		return err
@@ -4091,7 +4091,7 @@ func convert_api_TCPSocketAction_To_v1beta3_TCPSocketAction(in *newer.TCPSocketA
 	return nil
 }
 
-func convert_v1beta3_TypeMeta_To_api_TypeMeta(in *TypeMeta, out *newer.TypeMeta, s conversion.Scope) error {
+func convert_v1beta3_TypeMeta_To_api_TypeMeta(in *TypeMeta, out *api.TypeMeta, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*TypeMeta))(in)
 	}
@@ -4100,16 +4100,16 @@ func convert_v1beta3_TypeMeta_To_api_TypeMeta(in *TypeMeta, out *newer.TypeMeta,
 	return nil
 }
 
-func convert_api_TypeMeta_To_v1beta3_TypeMeta(in *newer.TypeMeta, out *TypeMeta, s conversion.Scope) error {
+func convert_api_TypeMeta_To_v1beta3_TypeMeta(in *api.TypeMeta, out *TypeMeta, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.TypeMeta))(in)
+		defaulting.(func(*api.TypeMeta))(in)
 	}
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
 	return nil
 }
 
-func convert_v1beta3_Volume_To_api_Volume(in *Volume, out *newer.Volume, s conversion.Scope) error {
+func convert_v1beta3_Volume_To_api_Volume(in *Volume, out *api.Volume, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Volume))(in)
 	}
@@ -4120,9 +4120,9 @@ func convert_v1beta3_Volume_To_api_Volume(in *Volume, out *newer.Volume, s conve
 	return nil
 }
 
-func convert_api_Volume_To_v1beta3_Volume(in *newer.Volume, out *Volume, s conversion.Scope) error {
+func convert_api_Volume_To_v1beta3_Volume(in *api.Volume, out *Volume, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Volume))(in)
+		defaulting.(func(*api.Volume))(in)
 	}
 	out.Name = in.Name
 	if err := convert_api_VolumeSource_To_v1beta3_VolumeSource(&in.VolumeSource, &out.VolumeSource, s); err != nil {
@@ -4131,7 +4131,7 @@ func convert_api_Volume_To_v1beta3_Volume(in *newer.Volume, out *Volume, s conve
 	return nil
 }
 
-func convert_v1beta3_VolumeMount_To_api_VolumeMount(in *VolumeMount, out *newer.VolumeMount, s conversion.Scope) error {
+func convert_v1beta3_VolumeMount_To_api_VolumeMount(in *VolumeMount, out *api.VolumeMount, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*VolumeMount))(in)
 	}
@@ -4141,9 +4141,9 @@ func convert_v1beta3_VolumeMount_To_api_VolumeMount(in *VolumeMount, out *newer.
 	return nil
 }
 
-func convert_api_VolumeMount_To_v1beta3_VolumeMount(in *newer.VolumeMount, out *VolumeMount, s conversion.Scope) error {
+func convert_api_VolumeMount_To_v1beta3_VolumeMount(in *api.VolumeMount, out *VolumeMount, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.VolumeMount))(in)
+		defaulting.(func(*api.VolumeMount))(in)
 	}
 	out.Name = in.Name
 	out.ReadOnly = in.ReadOnly
@@ -4151,12 +4151,12 @@ func convert_api_VolumeMount_To_v1beta3_VolumeMount(in *newer.VolumeMount, out *
 	return nil
 }
 
-func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *newer.VolumeSource, s conversion.Scope) error {
+func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.VolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*VolumeSource))(in)
 	}
 	if in.HostPath != nil {
-		out.HostPath = new(newer.HostPathVolumeSource)
+		out.HostPath = new(api.HostPathVolumeSource)
 		if err := convert_v1beta3_HostPathVolumeSource_To_api_HostPathVolumeSource(in.HostPath, out.HostPath, s); err != nil {
 			return err
 		}
@@ -4164,7 +4164,7 @@ func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *new
 		out.HostPath = nil
 	}
 	if in.EmptyDir != nil {
-		out.EmptyDir = new(newer.EmptyDirVolumeSource)
+		out.EmptyDir = new(api.EmptyDirVolumeSource)
 		if err := convert_v1beta3_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource(in.EmptyDir, out.EmptyDir, s); err != nil {
 			return err
 		}
@@ -4172,7 +4172,7 @@ func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *new
 		out.EmptyDir = nil
 	}
 	if in.GCEPersistentDisk != nil {
-		out.GCEPersistentDisk = new(newer.GCEPersistentDiskVolumeSource)
+		out.GCEPersistentDisk = new(api.GCEPersistentDiskVolumeSource)
 		if err := convert_v1beta3_GCEPersistentDiskVolumeSource_To_api_GCEPersistentDiskVolumeSource(in.GCEPersistentDisk, out.GCEPersistentDisk, s); err != nil {
 			return err
 		}
@@ -4180,7 +4180,7 @@ func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *new
 		out.GCEPersistentDisk = nil
 	}
 	if in.AWSElasticBlockStore != nil {
-		out.AWSElasticBlockStore = new(newer.AWSElasticBlockStoreVolumeSource)
+		out.AWSElasticBlockStore = new(api.AWSElasticBlockStoreVolumeSource)
 		if err := convert_v1beta3_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in.AWSElasticBlockStore, out.AWSElasticBlockStore, s); err != nil {
 			return err
 		}
@@ -4188,7 +4188,7 @@ func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *new
 		out.AWSElasticBlockStore = nil
 	}
 	if in.GitRepo != nil {
-		out.GitRepo = new(newer.GitRepoVolumeSource)
+		out.GitRepo = new(api.GitRepoVolumeSource)
 		if err := convert_v1beta3_GitRepoVolumeSource_To_api_GitRepoVolumeSource(in.GitRepo, out.GitRepo, s); err != nil {
 			return err
 		}
@@ -4196,7 +4196,7 @@ func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *new
 		out.GitRepo = nil
 	}
 	if in.Secret != nil {
-		out.Secret = new(newer.SecretVolumeSource)
+		out.Secret = new(api.SecretVolumeSource)
 		if err := convert_v1beta3_SecretVolumeSource_To_api_SecretVolumeSource(in.Secret, out.Secret, s); err != nil {
 			return err
 		}
@@ -4204,7 +4204,7 @@ func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *new
 		out.Secret = nil
 	}
 	if in.NFS != nil {
-		out.NFS = new(newer.NFSVolumeSource)
+		out.NFS = new(api.NFSVolumeSource)
 		if err := convert_v1beta3_NFSVolumeSource_To_api_NFSVolumeSource(in.NFS, out.NFS, s); err != nil {
 			return err
 		}
@@ -4212,7 +4212,7 @@ func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *new
 		out.NFS = nil
 	}
 	if in.ISCSI != nil {
-		out.ISCSI = new(newer.ISCSIVolumeSource)
+		out.ISCSI = new(api.ISCSIVolumeSource)
 		if err := convert_v1beta3_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in.ISCSI, out.ISCSI, s); err != nil {
 			return err
 		}
@@ -4220,7 +4220,7 @@ func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *new
 		out.ISCSI = nil
 	}
 	if in.Glusterfs != nil {
-		out.Glusterfs = new(newer.GlusterfsVolumeSource)
+		out.Glusterfs = new(api.GlusterfsVolumeSource)
 		if err := convert_v1beta3_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource(in.Glusterfs, out.Glusterfs, s); err != nil {
 			return err
 		}
@@ -4228,7 +4228,7 @@ func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *new
 		out.Glusterfs = nil
 	}
 	if in.PersistentVolumeClaimVolumeSource != nil {
-		out.PersistentVolumeClaimVolumeSource = new(newer.PersistentVolumeClaimVolumeSource)
+		out.PersistentVolumeClaimVolumeSource = new(api.PersistentVolumeClaimVolumeSource)
 		if err := convert_v1beta3_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeClaimVolumeSource(in.PersistentVolumeClaimVolumeSource, out.PersistentVolumeClaimVolumeSource, s); err != nil {
 			return err
 		}
@@ -4238,9 +4238,9 @@ func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *new
 	return nil
 }
 
-func convert_api_VolumeSource_To_v1beta3_VolumeSource(in *newer.VolumeSource, out *VolumeSource, s conversion.Scope) error {
+func convert_api_VolumeSource_To_v1beta3_VolumeSource(in *api.VolumeSource, out *VolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.VolumeSource))(in)
+		defaulting.(func(*api.VolumeSource))(in)
 	}
 	if in.HostPath != nil {
 		out.HostPath = new(HostPathVolumeSource)
@@ -4326,7 +4326,7 @@ func convert_api_VolumeSource_To_v1beta3_VolumeSource(in *newer.VolumeSource, ou
 }
 
 func init() {
-	err := newer.Scheme.AddGeneratedConversionFuncs(
+	err := api.Scheme.AddGeneratedConversionFuncs(
 		convert_api_AWSElasticBlockStoreVolumeSource_To_v1beta3_AWSElasticBlockStoreVolumeSource,
 		convert_api_Binding_To_v1beta3_Binding,
 		convert_api_Capabilities_To_v1beta3_Capabilities,

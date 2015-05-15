@@ -56,8 +56,6 @@ func main() {
 	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw())
 	// TODO(wojtek-t): Change the overwrites to a flag.
 	generator.OverwritePackage(*version, "")
-	// TODO(wojtek-t): Get rid of this overwrite.
-	generator.OverwritePackage("api", "newer")
 	for _, knownType := range api.Scheme.KnownTypes(*version) {
 		if err := generator.GenerateConversionsForType(*version, knownType); err != nil {
 			glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
