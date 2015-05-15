@@ -756,3 +756,105 @@ func TestPrintHumanReadableService(t *testing.T) {
 		}
 	}
 }
+
+func TestInterpretContainerStatus(t *testing.T) {
+	tests := []struct {
+		status          *api.ContainerStatus
+		expectedState   string
+		expectedMessage string
+		expectErr       bool
+		name            string
+	}{
+		{
+			status: &api.ContainerStatus{
+				State: api.ContainerState{
+					Running: &api.ContainerStateRunning{},
+				},
+				Ready: true,
+			},
+			expectedState:   "Running",
+			expectedMessage: "",
+			name:            "basic",
+		},
+		{
+			status: &api.ContainerStatus{
+				State: api.ContainerState{
+					Running: &api.ContainerStateRunning{},
+				},
+				Ready: false,
+			},
+			expectedState:   "Running *not ready*",
+			expectedMessage: "",
+			name:            "basic not ready",
+		},
+		{
+			status: &api.ContainerStatus{
+				State: api.ContainerState{
+					Waiting: &api.ContainerStateWaiting{},
+				},
+				Ready: false,
+			},
+			expectedState:   "Waiting",
+			expectedMessage: "",
+			name:            "waiting not ready",
+		},
+		{
+			status: &api.ContainerStatus{
+				State: api.ContainerState{
+					Waiting: &api.ContainerStateWaiting{},
+				},
+				Ready: true,
+			},
+			expectedState:   "Waiting",
+			expectedMessage: "",
+			name:            "waiting",
+		},
+		{
+			status: &api.ContainerStatus{
+				State: api.ContainerState{
+					Termination: &api.ContainerStateTerminated{
+						ExitCode: 3,
+					},
+				},
+				Ready: false,
+			},
+			expectedState:   "Terminated",
+			expectedMessage: "exit code 3",
+			name:            "terminated not ready",
+		},
+		{
+			status: &api.ContainerStatus{
+				State: api.ContainerState{
+					Termination: &api.ContainerStateTerminated{
+						ExitCode: 5,
+						Reason:   "test reason",
+					},
+				},
+				Ready: true,
+			},
+			expectedState:   "Terminated",
+			expectedMessage: "exit code 5, reason: test reason",
+			name:            "terminated",
+		},
+	}
+
+	for _, test := range tests {
+		// TODO: test timestamp printing.
+		state, _, msg, err := interpretContainerStatus(test.status)
+		if test.expectErr && err == nil {
+			t.Errorf("unexpected non-error (%s)", test.name)
+			continue
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v (%s)", err, test.name)
+			continue
+		}
+		if state != test.expectedState {
+			t.Errorf("expected: %s, got: %s", test.expectedState, state)
+		}
+		if msg != test.expectedMessage {
+			t.Errorf("expected: %s, got: %s", test.expectedMessage, msg)
+		}
+
+	}
+}
