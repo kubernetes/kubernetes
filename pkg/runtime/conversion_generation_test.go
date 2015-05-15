@@ -34,7 +34,7 @@ import (
 )
 
 func generateConversions(t *testing.T, version string) (bytes.Buffer, bytes.Buffer) {
-	g := runtime.NewGenerator(api.Scheme.Raw())
+	g := runtime.NewConversionGenerator(api.Scheme.Raw())
 	g.OverwritePackage(version, "")
 	g.OverwritePackage("api", "newer")
 	for _, knownType := range api.Scheme.KnownTypes(version) {

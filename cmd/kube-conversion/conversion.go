@@ -65,7 +65,7 @@ func main() {
 		nameOut = file
 	}
 
-	generator := pkg_runtime.NewGenerator(api.Scheme.Raw())
+	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw())
 	// TODO(wojtek-t): Change the overwrites to a flag.
 	generator.OverwritePackage(*version, "")
 	generator.OverwritePackage("api", "newer")
