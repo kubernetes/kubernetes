@@ -26,15 +26,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
-type Generator interface {
+type ConversionGenerator interface {
 	GenerateConversionsForType(version string, reflection reflect.Type) error
 	WriteConversionFunctions(w io.Writer) error
 	WriteConversionFunctionNames(w io.Writer) error
 	OverwritePackage(pkg, overwrite string)
 }
 
-func NewGenerator(scheme *conversion.Scheme) Generator {
-	return &generator{
+func NewConversionGenerator(scheme *conversion.Scheme) ConversionGenerator {
+	return &conversionGenerator{
 		scheme:        scheme,
 		convertibles:  make(map[reflect.Type]reflect.Type),
 		pkgOverwrites: make(map[string]string),
@@ -43,16 +43,19 @@ func NewGenerator(scheme *conversion.Scheme) Generator {
 
 var complexTypes []reflect.Kind = []reflect.Kind{reflect.Map, reflect.Ptr, reflect.Slice, reflect.Interface, reflect.Struct}
 
-type generator struct {
+type conversionGenerator struct {
 	scheme       *conversion.Scheme
 	convertibles map[reflect.Type]reflect.Type
 	// If pkgOverwrites is set for a given package name, that package name
 	// will be replaced while writing conversion function. If empty, package
 	// name will be omitted.
 	pkgOverwrites map[string]string
+
+	// A buffer that is used for storing lines that needs to be written.
+	linesToPrint []string
 }
 
-func (g *generator) GenerateConversionsForType(version string, reflection reflect.Type) error {
+func (g *conversionGenerator) GenerateConversionsForType(version string, reflection reflect.Type) error {
 	kind := reflection.Name()
 	internalObj, err := g.scheme.NewObject(g.scheme.InternalVersion, kind)
 	if err != nil {
@@ -65,7 +68,7 @@ func (g *generator) GenerateConversionsForType(version string, reflection reflec
 	return g.generateConversionsBetween(reflection, internalObjType.Elem())
 }
 
-func (g *generator) generateConversionsBetween(inType, outType reflect.Type) error {
+func (g *conversionGenerator) generateConversionsBetween(inType, outType reflect.Type) error {
 	existingConversion := g.scheme.Converter().HasConversionFunc(inType, outType) && g.scheme.Converter().HasConversionFunc(outType, inType)
 
 	// Avoid processing the same type multiple times.
@@ -146,7 +149,7 @@ func isComplexType(reflection reflect.Type) bool {
 	return false
 }
 
-func (g *generator) generateConversionsForMap(inType, outType reflect.Type) error {
+func (g *conversionGenerator) generateConversionsForMap(inType, outType reflect.Type) error {
 	inKey := inType.Key()
 	outKey := outType.Key()
 	if err := g.generateConversionsBetween(inKey, outKey); err != nil {
@@ -160,7 +163,7 @@ func (g *generator) generateConversionsForMap(inType, outType reflect.Type) erro
 	return nil
 }
 
-func (g *generator) generateConversionsForSlice(inType, outType reflect.Type) error {
+func (g *conversionGenerator) generateConversionsForSlice(inType, outType reflect.Type) error {
 	inElem := inType.Elem()
 	outElem := outType.Elem()
 	if err := g.generateConversionsBetween(inElem, outElem); err != nil {
@@ -169,7 +172,7 @@ func (g *generator) generateConversionsForSlice(inType, outType reflect.Type) er
 	return nil
 }
 
-func (g *generator) generateConversionsForStruct(inType, outType reflect.Type) error {
+func (g *conversionGenerator) generateConversionsForStruct(inType, outType reflect.Type) error {
 	for i := 0; i < inType.NumField(); i++ {
 		inField := inType.Field(i)
 		outField, found := outType.FieldByName(inField.Name)
@@ -180,6 +183,37 @@ func (g *generator) generateConversionsForStruct(inType, outType reflect.Type) e
 			if err := g.generateConversionsBetween(inField.Type, outField.Type); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+// A buffer of lines that will be written.
+type bufferedLine struct {
+	line        string
+	indentation int
+}
+
+type buffer struct {
+	lines []bufferedLine
+}
+
+func newBuffer() *buffer {
+	return &buffer{
+		lines: make([]bufferedLine, 0),
+	}
+}
+
+func (b *buffer) addLine(line string, indent int) {
+	b.lines = append(b.lines, bufferedLine{line, indent})
+}
+
+func (b *buffer) flushLines(w io.Writer) error {
+	for _, line := range b.lines {
+		indentation := strings.Repeat("\t", line.indentation)
+		fullLine := fmt.Sprintf("%s%s", indentation, line.line)
+		if _, err := io.WriteString(w, fullLine); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -199,7 +233,7 @@ func (s byName) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (g *generator) WriteConversionFunctions(w io.Writer) error {
+func (g *conversionGenerator) WriteConversionFunctions(w io.Writer) error {
 	// It's desired to print conversion functions always in the same order
 	// (e.g. for better tracking of what has really been added).
 	var keys []reflect.Type
@@ -208,6 +242,7 @@ func (g *generator) WriteConversionFunctions(w io.Writer) error {
 	}
 	sort.Sort(byName(keys))
 
+	buffer := newBuffer()
 	indent := 0
 	for _, inType := range keys {
 		outType := g.convertibles[inType]
@@ -215,35 +250,40 @@ func (g *generator) WriteConversionFunctions(w io.Writer) error {
 		if inType.Kind() != reflect.Struct {
 			return fmt.Errorf("non-struct conversions are not-supported")
 		}
-		if err := g.writeConversionForType(w, inType, outType, indent); err != nil {
+		if err := g.writeConversionForType(buffer, inType, outType, indent); err != nil {
 			return err
 		}
-		if err := g.writeConversionForType(w, outType, inType, indent); err != nil {
+		if err := g.writeConversionForType(buffer, outType, inType, indent); err != nil {
 			return err
 		}
+	}
+	if err := buffer.flushLines(w); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (g *generator) WriteConversionFunctionNames(w io.Writer) error {
+func (g *conversionGenerator) WriteConversionFunctionNames(w io.Writer) error {
 	// Write conversion function names alphabetically ordered.
 	var names []string
 	for inType, outType := range g.convertibles {
-		names = append(names, conversionFunctionName(inType, outType))
-		names = append(names, conversionFunctionName(outType, inType))
+		names = append(names, g.conversionFunctionName(inType, outType))
+		names = append(names, g.conversionFunctionName(outType, inType))
 	}
 	sort.Strings(names)
 
+	buffer := newBuffer()
 	indent := 2
 	for _, name := range names {
-		if err := writeLine(w, indent, fmt.Sprintf("%s,\n", name)); err != nil {
-			return err
-		}
+		buffer.addLine(fmt.Sprintf("%s,\n", name), indent)
+	}
+	if err := buffer.flushLines(w); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (g *generator) typeName(inType reflect.Type) string {
+func (g *conversionGenerator) typeName(inType reflect.Type) string {
 	switch inType.Kind() {
 	case reflect.Map:
 		return fmt.Sprintf("map[%s]%s", g.typeName(inType.Key()), g.typeName(inType.Elem()))
@@ -272,19 +312,13 @@ func (g *generator) typeName(inType reflect.Type) string {
 	}
 }
 
-func (g *generator) writeDefaultingFunc(w io.Writer, inType reflect.Type, indent int) error {
+func (g *conversionGenerator) writeDefaultingFunc(b *buffer, inType reflect.Type, indent int) error {
 	getStmt := "if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {\n"
-	if err := writeLine(w, indent, getStmt); err != nil {
-		return err
-	}
+	b.addLine(getStmt, indent)
 	callFormat := "defaulting.(func(*%s))(in)\n"
 	callStmt := fmt.Sprintf(callFormat, g.typeName(inType))
-	if err := writeLine(w, indent+1, callStmt); err != nil {
-		return err
-	}
-	if err := writeLine(w, indent, "}\n"); err != nil {
-		return err
-	}
+	b.addLine(callStmt, indent+1)
+	b.addLine("}\n", indent)
 	return nil
 }
 
@@ -296,7 +330,7 @@ func packageForName(inType reflect.Type) string {
 	return slices[len(slices)-1]
 }
 
-func conversionFunctionName(inType, outType reflect.Type) string {
+func (g *conversionGenerator) conversionFunctionName(inType, outType reflect.Type) string {
 	funcNameFormat := "convert_%s_%s_To_%s_%s"
 	inPkg := packageForName(inType)
 	outPkg := packageForName(outType)
@@ -304,76 +338,39 @@ func conversionFunctionName(inType, outType reflect.Type) string {
 	return funcName
 }
 
-func indentLine(w io.Writer, indent int) error {
-	indentation := ""
-	for i := 0; i < indent; i++ {
-		indentation = indentation + "\t"
-	}
-	_, err := io.WriteString(w, indentation)
-	return err
-}
-
-func writeLine(w io.Writer, indent int, line string) error {
-	if err := indentLine(w, indent); err != nil {
-		return err
-	}
-	if _, err := io.WriteString(w, line); err != nil {
-		return err
-	}
-	return nil
-}
-
-func writeHeader(w io.Writer, name, inType, outType string, indent int) error {
+func (g *conversionGenerator) writeHeader(b *buffer, name, inType, outType string, indent int) {
 	format := "func %s(in *%s, out *%s, s conversion.Scope) error {\n"
 	stmt := fmt.Sprintf(format, name, inType, outType)
-	return writeLine(w, indent, stmt)
+	b.addLine(stmt, indent)
 }
 
-func writeFooter(w io.Writer, indent int) error {
-	if err := writeLine(w, indent+1, "return nil\n"); err != nil {
-		return err
-	}
-	if err := writeLine(w, indent, "}\n"); err != nil {
-		return err
-	}
-	return nil
+func (g *conversionGenerator) writeFooter(b *buffer, indent int) {
+	b.addLine("return nil\n", indent+1)
+	b.addLine("}\n", indent)
 }
 
-func (g *generator) writeConversionForMap(w io.Writer, inField, outField reflect.StructField, indent int) error {
+func (g *conversionGenerator) writeConversionForMap(b *buffer, inField, outField reflect.StructField, indent int) error {
 	ifFormat := "if in.%s != nil {\n"
 	ifStmt := fmt.Sprintf(ifFormat, inField.Name)
-	if err := writeLine(w, indent, ifStmt); err != nil {
-		return err
-	}
+	b.addLine(ifStmt, indent)
 	makeFormat := "out.%s = make(%s)\n"
 	makeStmt := fmt.Sprintf(makeFormat, outField.Name, g.typeName(outField.Type))
-	if err := writeLine(w, indent+1, makeStmt); err != nil {
-		return err
-	}
+	b.addLine(makeStmt, indent+1)
 	forFormat := "for key, val := range in.%s {\n"
 	forStmt := fmt.Sprintf(forFormat, inField.Name)
-	if err := writeLine(w, indent+1, forStmt); err != nil {
-		return err
-	}
+	b.addLine(forStmt, indent+1)
+
 	// Whether we need to explicitly create a new value.
 	newValue := false
 	if isComplexType(inField.Type.Elem()) || !inField.Type.Elem().ConvertibleTo(outField.Type.Elem()) {
 		newValue = true
 		newFormat := "newVal := %s{}\n"
 		newStmt := fmt.Sprintf(newFormat, g.typeName(outField.Type.Elem()))
-		if err := writeLine(w, indent+2, newStmt); err != nil {
-			return err
-		}
+		b.addLine(newStmt, indent+2)
 		convertStmt := "if err := s.Convert(&val, &newVal, 0); err != nil {\n"
-		if err := writeLine(w, indent+2, convertStmt); err != nil {
-			return err
-		}
-		if err := writeLine(w, indent+3, "return err\n"); err != nil {
-			return err
-		}
-		if err := writeLine(w, indent+2, "}\n"); err != nil {
-			return err
-		}
+		b.addLine(convertStmt, indent+2)
+		b.addLine("return err\n", indent+3)
+		b.addLine("}\n", indent+2)
 	}
 	if inField.Type.Key().ConvertibleTo(outField.Type.Key()) {
 		value := "val"
@@ -386,47 +383,31 @@ func (g *generator) writeConversionForMap(w io.Writer, inField, outField reflect
 		} else {
 			assignStmt = fmt.Sprintf("out.%s[%s(key)] = %s\n", outField.Name, g.typeName(outField.Type.Key()), value)
 		}
-		if err := writeLine(w, indent+2, assignStmt); err != nil {
-			return err
-		}
+		b.addLine(assignStmt, indent+2)
 	} else {
 		// TODO(wojtek-t): Support maps with keys that are non-convertible to each other.
 		return fmt.Errorf("conversions between unconvertible keys in map are not supported.")
 	}
-	if err := writeLine(w, indent+1, "}\n"); err != nil {
-		return err
-	}
-	if err := writeLine(w, indent, "} else {\n"); err != nil {
-		return err
-	}
+	b.addLine("}\n", indent+1)
+	b.addLine("} else {\n", indent)
 	nilFormat := "out.%s = nil\n"
 	nilStmt := fmt.Sprintf(nilFormat, outField.Name)
-	if err := writeLine(w, indent+1, nilStmt); err != nil {
-		return err
-	}
-	if err := writeLine(w, indent, "}\n"); err != nil {
-		return err
-	}
+	b.addLine(nilStmt, indent+1)
+	b.addLine("}\n", indent)
 	return nil
 }
 
-func (g *generator) writeConversionForSlice(w io.Writer, inField, outField reflect.StructField, indent int) error {
+func (g *conversionGenerator) writeConversionForSlice(b *buffer, inField, outField reflect.StructField, indent int) error {
 	ifFormat := "if in.%s != nil {\n"
 	ifStmt := fmt.Sprintf(ifFormat, inField.Name)
-	if err := writeLine(w, indent, ifStmt); err != nil {
-		return err
-	}
-
+	b.addLine(ifStmt, indent)
 	makeFormat := "out.%s = make(%s, len(in.%s))\n"
 	makeStmt := fmt.Sprintf(makeFormat, outField.Name, g.typeName(outField.Type), inField.Name)
-	if err := writeLine(w, indent+1, makeStmt); err != nil {
-		return err
-	}
+	b.addLine(makeStmt, indent+1)
 	forFormat := "for i := range in.%s {\n"
 	forStmt := fmt.Sprintf(forFormat, inField.Name)
-	if err := writeLine(w, indent+1, forStmt); err != nil {
-		return err
-	}
+	b.addLine(forStmt, indent+1)
+
 	assigned := false
 	switch inField.Type.Elem().Kind() {
 	case reflect.Map, reflect.Ptr, reflect.Slice, reflect.Interface, reflect.Struct:
@@ -436,16 +417,12 @@ func (g *generator) writeConversionForSlice(w io.Writer, inField, outField refle
 		if inField.Type.Elem().AssignableTo(outField.Type.Elem()) {
 			assignFormat := "out.%s[i] = in.%s[i]\n"
 			assignStmt := fmt.Sprintf(assignFormat, outField.Name, inField.Name)
-			if err := writeLine(w, indent+2, assignStmt); err != nil {
-				return err
-			}
+			b.addLine(assignStmt, indent+2)
 			assigned = true
 		} else if inField.Type.Elem().ConvertibleTo(outField.Type.Elem()) {
 			assignFormat := "out.%s[i] = %s(in.%s[i])\n"
 			assignStmt := fmt.Sprintf(assignFormat, outField.Name, g.typeName(outField.Type.Elem()), inField.Name)
-			if err := writeLine(w, indent+2, assignStmt); err != nil {
-				return err
-			}
+			b.addLine(assignStmt, indent+2)
 			assigned = true
 		}
 	}
@@ -453,40 +430,26 @@ func (g *generator) writeConversionForSlice(w io.Writer, inField, outField refle
 		assignStmt := ""
 		if g.existsDedicatedConversionFunction(inField.Type.Elem(), outField.Type.Elem()) {
 			assignFormat := "if err := %s(&in.%s[i], &out.%s[i], s); err != nil {\n"
-			funcName := conversionFunctionName(inField.Type.Elem(), outField.Type.Elem())
+			funcName := g.conversionFunctionName(inField.Type.Elem(), outField.Type.Elem())
 			assignStmt = fmt.Sprintf(assignFormat, funcName, inField.Name, outField.Name)
 		} else {
 			assignFormat := "if err := s.Convert(&in.%s[i], &out.%s[i], 0); err != nil {\n"
 			assignStmt = fmt.Sprintf(assignFormat, inField.Name, outField.Name)
 		}
-		if err := writeLine(w, indent+2, assignStmt); err != nil {
-			return err
-		}
-		if err := writeLine(w, indent+3, "return err\n"); err != nil {
-			return err
-		}
-		if err := writeLine(w, indent+2, "}\n"); err != nil {
-			return err
-		}
+		b.addLine(assignStmt, indent+2)
+		b.addLine("return err\n", indent+3)
+		b.addLine("}\n", indent+2)
 	}
-	if err := writeLine(w, indent+1, "}\n"); err != nil {
-		return err
-	}
-	if err := writeLine(w, indent, "} else {\n"); err != nil {
-		return err
-	}
+	b.addLine("}\n", indent+1)
+	b.addLine("} else {\n", indent)
 	nilFormat := "out.%s = nil\n"
 	nilStmt := fmt.Sprintf(nilFormat, outField.Name)
-	if err := writeLine(w, indent+1, nilStmt); err != nil {
-		return err
-	}
-	if err := writeLine(w, indent, "}\n"); err != nil {
-		return err
-	}
+	b.addLine(nilStmt, indent+1)
+	b.addLine("}\n", indent)
 	return nil
 }
 
-func (g *generator) writeConversionForPtr(w io.Writer, inField, outField reflect.StructField, indent int) error {
+func (g *conversionGenerator) writeConversionForPtr(b *buffer, inField, outField reflect.StructField, indent int) error {
 	switch inField.Type.Elem().Kind() {
 	case reflect.Map, reflect.Ptr, reflect.Slice, reflect.Interface, reflect.Struct:
 		// Don't copy these via assignment/conversion!
@@ -497,87 +460,57 @@ func (g *generator) writeConversionForPtr(w io.Writer, inField, outField reflect
 		if assignable || convertible {
 			ifFormat := "if in.%s != nil {\n"
 			ifStmt := fmt.Sprintf(ifFormat, inField.Name)
-			if err := writeLine(w, indent, ifStmt); err != nil {
-				return err
-			}
+			b.addLine(ifStmt, indent)
 			newFormat := "out.%s = new(%s)\n"
 			newStmt := fmt.Sprintf(newFormat, outField.Name, g.typeName(outField.Type.Elem()))
-			if err := writeLine(w, indent+1, newStmt); err != nil {
-				return err
-			}
+			b.addLine(newStmt, indent+1)
 		}
 		if assignable {
 			assignFormat := "*out.%s = *in.%s\n"
 			assignStmt := fmt.Sprintf(assignFormat, outField.Name, inField.Name)
-			if err := writeLine(w, indent+1, assignStmt); err != nil {
-				return err
-			}
+			b.addLine(assignStmt, indent+1)
 		} else if convertible {
 			assignFormat := "*out.%s = %s(*in.%s)\n"
 			assignStmt := fmt.Sprintf(assignFormat, outField.Name, g.typeName(outField.Type.Elem()), inField.Name)
-			if err := writeLine(w, indent+1, assignStmt); err != nil {
-				return err
-			}
+			b.addLine(assignStmt, indent+1)
 		}
 		if assignable || convertible {
-			if err := writeLine(w, indent, "} else {\n"); err != nil {
-				return err
-			}
+			b.addLine("} else {\n", indent)
 			nilFormat := "out.%s = nil\n"
 			nilStmt := fmt.Sprintf(nilFormat, outField.Name)
-			if err := writeLine(w, indent+1, nilStmt); err != nil {
-				return err
-			}
-			if err := writeLine(w, indent, "}\n"); err != nil {
-				return err
-			}
+			b.addLine(nilStmt, indent+1)
+			b.addLine("}\n", indent)
 			return nil
 		}
 	}
 
 	ifFormat := "if in.%s != nil {\n"
 	ifStmt := fmt.Sprintf(ifFormat, inField.Name)
-	if err := writeLine(w, indent, ifStmt); err != nil {
-		return err
-	}
+	b.addLine(ifStmt, indent)
 	assignStmt := ""
 	if g.existsDedicatedConversionFunction(inField.Type.Elem(), outField.Type.Elem()) {
 		newFormat := "out.%s = new(%s)\n"
 		newStmt := fmt.Sprintf(newFormat, outField.Name, g.typeName(outField.Type.Elem()))
-		if err := writeLine(w, indent+1, newStmt); err != nil {
-			return err
-		}
+		b.addLine(newStmt, indent+1)
 		assignFormat := "if err := %s(in.%s, out.%s, s); err != nil {\n"
-		funcName := conversionFunctionName(inField.Type.Elem(), outField.Type.Elem())
+		funcName := g.conversionFunctionName(inField.Type.Elem(), outField.Type.Elem())
 		assignStmt = fmt.Sprintf(assignFormat, funcName, inField.Name, outField.Name)
 	} else {
 		assignFormat := "if err := s.Convert(&in.%s, &out.%s, 0); err != nil {\n"
 		assignStmt = fmt.Sprintf(assignFormat, inField.Name, outField.Name)
 	}
-	if err := writeLine(w, indent+1, assignStmt); err != nil {
-		return err
-	}
-	if err := writeLine(w, indent+2, "return err\n"); err != nil {
-		return err
-	}
-	if err := writeLine(w, indent+1, "}\n"); err != nil {
-		return err
-	}
-	if err := writeLine(w, indent, "} else {\n"); err != nil {
-		return err
-	}
+	b.addLine(assignStmt, indent+1)
+	b.addLine("return err\n", indent+2)
+	b.addLine("}\n", indent+1)
+	b.addLine("} else {\n", indent)
 	nilFormat := "out.%s = nil\n"
 	nilStmt := fmt.Sprintf(nilFormat, outField.Name)
-	if err := writeLine(w, indent+1, nilStmt); err != nil {
-		return err
-	}
-	if err := writeLine(w, indent, "}\n"); err != nil {
-		return err
-	}
+	b.addLine(nilStmt, indent+1)
+	b.addLine("}\n", indent)
 	return nil
 }
 
-func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflect.Type, indent int) error {
+func (g *conversionGenerator) writeConversionForStruct(b *buffer, inType, outType reflect.Type, indent int) error {
 	for i := 0; i < inType.NumField(); i++ {
 		inField := inType.Field(i)
 		outField, _ := outType.FieldByName(inField.Name)
@@ -587,113 +520,82 @@ func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflec
 			// Use the conversion method that is already defined.
 			assignFormat := "if err := s.Convert(&in.%s, &out.%s, 0); err != nil {\n"
 			assignStmt := fmt.Sprintf(assignFormat, inField.Name, outField.Name)
-			if err := writeLine(w, indent, assignStmt); err != nil {
-				return err
-			}
-			if err := writeLine(w, indent+1, "return err\n"); err != nil {
-				return err
-			}
-			if err := writeLine(w, indent, "}\n"); err != nil {
-				return err
-			}
+			b.addLine(assignStmt, indent)
+			b.addLine("return err\n", indent+1)
+			b.addLine("}\n", indent)
 			continue
 		}
 
 		switch inField.Type.Kind() {
-		case reflect.Map, reflect.Ptr, reflect.Slice, reflect.Interface, reflect.Struct:
+		case reflect.Map:
+			if err := g.writeConversionForMap(b, inField, outField, indent); err != nil {
+				return err
+			}
+			continue
+		case reflect.Ptr:
+			if err := g.writeConversionForPtr(b, inField, outField, indent); err != nil {
+				return err
+			}
+			continue
+		case reflect.Slice:
+			if err := g.writeConversionForSlice(b, inField, outField, indent); err != nil {
+				return err
+			}
+			continue
+		case reflect.Interface, reflect.Struct:
 			// Don't copy these via assignment/conversion!
 		default:
 			// This should handle all simple types.
 			if inField.Type.AssignableTo(outField.Type) {
 				assignFormat := "out.%s = in.%s\n"
 				assignStmt := fmt.Sprintf(assignFormat, outField.Name, inField.Name)
-				if err := writeLine(w, indent, assignStmt); err != nil {
-					return err
-				}
+				b.addLine(assignStmt, indent)
 				continue
 			}
 			if inField.Type.ConvertibleTo(outField.Type) {
 				assignFormat := "out.%s = %s(in.%s)\n"
 				assignStmt := fmt.Sprintf(assignFormat, outField.Name, g.typeName(outField.Type), inField.Name)
-				if err := writeLine(w, indent, assignStmt); err != nil {
-					return err
-				}
+				b.addLine(assignStmt, indent)
 				continue
 			}
-		}
-
-		// If the field is a slice, copy its elements one by one.
-		if inField.Type.Kind() == reflect.Slice {
-			if err := g.writeConversionForSlice(w, inField, outField, indent); err != nil {
-				return err
-			}
-			continue
-		}
-
-		// If the field is a map, copy its elements one by one.
-		if inField.Type.Kind() == reflect.Map {
-			if err := g.writeConversionForMap(w, inField, outField, indent); err != nil {
-				return err
-			}
-			continue
-		}
-
-		// If the field is a pointer, we can try to assign underlying values.
-		if inField.Type.Kind() == reflect.Ptr {
-			if err := g.writeConversionForPtr(w, inField, outField, indent); err != nil {
-				return err
-			}
-			continue
 		}
 
 		assignStmt := ""
 		if g.existsDedicatedConversionFunction(inField.Type, outField.Type) {
 			assignFormat := "if err := %s(&in.%s, &out.%s, s); err != nil {\n"
-			funcName := conversionFunctionName(inField.Type, outField.Type)
+			funcName := g.conversionFunctionName(inField.Type, outField.Type)
 			assignStmt = fmt.Sprintf(assignFormat, funcName, inField.Name, outField.Name)
 		} else {
 			assignFormat := "if err := s.Convert(&in.%s, &out.%s, 0); err != nil {\n"
 			assignStmt = fmt.Sprintf(assignFormat, inField.Name, outField.Name)
 		}
-		if err := writeLine(w, indent, assignStmt); err != nil {
-			return err
-		}
-		if err := writeLine(w, indent+1, "return err\n"); err != nil {
-			return err
-		}
-		if err := writeLine(w, indent, "}\n"); err != nil {
-			return err
-		}
+		b.addLine(assignStmt, indent)
+		b.addLine("return err\n", indent+1)
+		b.addLine("}\n", indent)
 	}
 	return nil
 }
 
-func (g *generator) writeConversionForType(w io.Writer, inType, outType reflect.Type, indent int) error {
-	funcName := conversionFunctionName(inType, outType)
-	if err := writeHeader(w, funcName, g.typeName(inType), g.typeName(outType), indent); err != nil {
-		return err
-	}
-	if err := g.writeDefaultingFunc(w, inType, indent+1); err != nil {
+func (g *conversionGenerator) writeConversionForType(b *buffer, inType, outType reflect.Type, indent int) error {
+	funcName := g.conversionFunctionName(inType, outType)
+	g.writeHeader(b, funcName, g.typeName(inType), g.typeName(outType), indent)
+	if err := g.writeDefaultingFunc(b, inType, indent+1); err != nil {
 		return err
 	}
 	switch inType.Kind() {
 	case reflect.Struct:
-		if err := g.writeConversionForStruct(w, inType, outType, indent+1); err != nil {
+		if err := g.writeConversionForStruct(b, inType, outType, indent+1); err != nil {
 			return err
 		}
 	default:
-		return fmt.Errorf("Type not supported: %v", inType)
+		return fmt.Errorf("type not supported: %v", inType)
 	}
-	if err := writeFooter(w, indent); err != nil {
-		return err
-	}
-	if err := writeLine(w, 0, "\n"); err != nil {
-		return err
-	}
+	g.writeFooter(b, indent)
+	b.addLine("\n", 0)
 	return nil
 }
 
-func (g *generator) existsConversionFunction(inType, outType reflect.Type) bool {
+func (g *conversionGenerator) existsConversionFunction(inType, outType reflect.Type) bool {
 	if val, found := g.convertibles[inType]; found && val == outType {
 		return true
 	}
@@ -718,7 +620,7 @@ var defaultConversions []typePair = []typePair{
 	{reflect.TypeOf(EmbeddedObject{}), reflect.TypeOf(RawExtension{})},
 }
 
-func (g *generator) existsDedicatedConversionFunction(inType, outType reflect.Type) bool {
+func (g *conversionGenerator) existsDedicatedConversionFunction(inType, outType reflect.Type) bool {
 	if inType == outType {
 		// Assume that conversion are not defined for "deep copies".
 		return false
@@ -741,6 +643,6 @@ func (g *generator) existsDedicatedConversionFunction(inType, outType reflect.Ty
 	return g.scheme.Converter().HasConversionFunc(inType, outType)
 }
 
-func (g *generator) OverwritePackage(pkg, overwrite string) {
+func (g *conversionGenerator) OverwritePackage(pkg, overwrite string) {
 	g.pkgOverwrites[pkg] = overwrite
 }
