@@ -1546,7 +1546,7 @@ func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerNa
 // or all of them.
 func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow, previous bool, stdout, stderr io.Writer) error {
 	// TODO(vmarmol): Refactor to not need the pod status and verification.
-	podStatus, err := kl.GetPodStatus(podFullName)
+	podStatus, err := kl.getPodStatus(podFullName)
 	if err != nil {
 		return fmt.Errorf("failed to get status for pod %q - %v", podFullName, err)
 	}
@@ -1872,9 +1872,9 @@ func getPodReadyCondition(spec *api.PodSpec, statuses []api.ContainerStatus) []a
 	return ready
 }
 
-// GetPodStatus returns information of the containers in the pod from the
+// getPodStatus returns information of the containers in the pod from the
 // container runtime.
-func (kl *Kubelet) GetPodStatus(podFullName string) (api.PodStatus, error) {
+func (kl *Kubelet) getPodStatus(podFullName string) (api.PodStatus, error) {
 	// Check to see if we have a cached version of the status.
 	cachedPodStatus, found := kl.statusManager.GetPodStatus(podFullName)
 	if found {

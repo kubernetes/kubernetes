@@ -36,7 +36,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/flushwriter"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
@@ -104,7 +103,6 @@ type HostInterface interface {
 	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
 	GetPods() []*api.Pod
 	GetPodByName(namespace, name string) (*api.Pod, bool)
-	GetPodStatus(name string) (api.PodStatus, error)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	GetKubeletContainerLogs(podFullName, containerName, tail string, follow, previous bool, stdout, stderr io.Writer) error
@@ -134,8 +132,6 @@ func (s *Server) InstallDefaultHandlers() {
 		healthz.NamedCheck("docker", s.dockerHealthCheck),
 		healthz.NamedCheck("hostname", s.hostnameHealthCheck),
 	)
-	s.mux.HandleFunc("/podInfo", s.handlePodInfoOld)
-	s.mux.HandleFunc("/api/v1beta1/podInfo", s.handlePodInfoVersioned)
 	s.mux.HandleFunc("/pods", s.handlePods)
 	s.mux.HandleFunc("/stats/", s.handleStats)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
@@ -272,50 +268,6 @@ func (s *Server) handlePods(w http.ResponseWriter, req *http.Request) {
 		podList.Items = append(podList.Items, *pod)
 	}
 	data, err := latest.Codec.Encode(podList)
-	if err != nil {
-		s.error(w, err)
-		return
-	}
-	w.Header().Add("Content-type", "application/json")
-	w.Write(data)
-}
-
-func (s *Server) handlePodInfoOld(w http.ResponseWriter, req *http.Request) {
-	s.handlePodStatus(w, req, false)
-}
-
-func (s *Server) handlePodInfoVersioned(w http.ResponseWriter, req *http.Request) {
-	s.handlePodStatus(w, req, true)
-}
-
-// handlePodStatus handles podInfo requests against the Kubelet
-func (s *Server) handlePodStatus(w http.ResponseWriter, req *http.Request, versioned bool) {
-	u, err := url.ParseRequestURI(req.RequestURI)
-	if err != nil {
-		s.error(w, err)
-		return
-	}
-	podID := u.Query().Get("podID")
-	podNamespace := u.Query().Get("podNamespace")
-	if len(podID) == 0 {
-		http.Error(w, "Missing 'podID=' query entry.", http.StatusBadRequest)
-		return
-	}
-	if len(podNamespace) == 0 {
-		http.Error(w, "Missing 'podNamespace=' query entry.", http.StatusBadRequest)
-		return
-	}
-	pod, ok := s.host.GetPodByName(podNamespace, podID)
-	if !ok {
-		http.Error(w, "Pod does not exist", http.StatusNotFound)
-		return
-	}
-	status, err := s.host.GetPodStatus(kubecontainer.GetPodFullName(pod))
-	if err != nil {
-		s.error(w, err)
-		return
-	}
-	data, err := exportPodStatus(status, versioned)
 	if err != nil {
 		s.error(w, err)
 		return
@@ -738,24 +690,4 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
 	return
-}
-
-func exportPodStatus(status api.PodStatus, versioned bool) ([]byte, error) {
-	if versioned {
-		// TODO: support arbitrary versions here
-		codec, err := findCodec("v1beta1")
-		if err != nil {
-			return nil, err
-		}
-		return codec.Encode(&api.PodStatusResult{Status: status})
-	}
-	return json.Marshal(status)
-}
-
-func findCodec(version string) (runtime.Codec, error) {
-	versions, err := latest.InterfacesFor(version)
-	if err != nil {
-		return nil, err
-	}
-	return versions.Codec, nil
 }

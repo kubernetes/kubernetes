@@ -3010,7 +3010,7 @@ func TestHandlePortConflicts(t *testing.T) {
 
 	kl.handleNotFittingPods(pods)
 	// Check pod status stored in the status map.
-	status, err := kl.GetPodStatus(conflictedPodName)
+	status, err := kl.getPodStatus(conflictedPodName)
 	if err != nil {
 		t.Fatalf("status of pod %q is not found in the status map: %#v", conflictedPodName, err)
 	}
@@ -3020,7 +3020,7 @@ func TestHandlePortConflicts(t *testing.T) {
 
 	// Check if we can retrieve the pod status from GetPodStatus().
 	kl.podManager.SetPods(pods)
-	status, err = kl.GetPodStatus(conflictedPodName)
+	status, err = kl.getPodStatus(conflictedPodName)
 	if err != nil {
 		t.Fatalf("unable to retrieve pod status for pod %q: %#v.", conflictedPodName, err)
 	}
@@ -3062,7 +3062,7 @@ func TestHandleNodeSelector(t *testing.T) {
 
 	kl.handleNotFittingPods(pods)
 	// Check pod status stored in the status map.
-	status, err := kl.GetPodStatus(notfittingPodName)
+	status, err := kl.getPodStatus(notfittingPodName)
 	if err != nil {
 		t.Fatalf("status of pod %q is not found in the status map: %#v", notfittingPodName, err)
 	}
@@ -3072,7 +3072,7 @@ func TestHandleNodeSelector(t *testing.T) {
 
 	// Check if we can retrieve the pod status from GetPodStatus().
 	kl.podManager.SetPods(pods)
-	status, err = kl.GetPodStatus(notfittingPodName)
+	status, err = kl.getPodStatus(notfittingPodName)
 	if err != nil {
 		t.Fatalf("unable to retrieve pod status for pod %q: %#v.", notfittingPodName, err)
 	}
@@ -3120,7 +3120,7 @@ func TestHandleMemExceeded(t *testing.T) {
 
 	kl.handleNotFittingPods(pods)
 	// Check pod status stored in the status map.
-	status, err := kl.GetPodStatus(notfittingPodName)
+	status, err := kl.getPodStatus(notfittingPodName)
 	if err != nil {
 		t.Fatalf("status of pod %q is not found in the status map: %#v", notfittingPodName, err)
 	}
@@ -3130,7 +3130,7 @@ func TestHandleMemExceeded(t *testing.T) {
 
 	// Check if we can retrieve the pod status from GetPodStatus().
 	kl.podManager.SetPods(pods)
-	status, err = kl.GetPodStatus(notfittingPodName)
+	status, err = kl.getPodStatus(notfittingPodName)
 	if err != nil {
 		t.Fatalf("unable to retrieve pod status for pod %q: %#v.", notfittingPodName, err)
 	}
@@ -3153,12 +3153,12 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 	// Run once to populate the status map.
 	kl.handleNotFittingPods(pods)
-	if _, err := kl.GetPodStatus(kubecontainer.BuildPodFullName("pod2", "")); err != nil {
+	if _, err := kl.getPodStatus(kubecontainer.BuildPodFullName("pod2", "")); err != nil {
 		t.Fatalf("expected to have status cached for %q: %v", "pod2", err)
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
 	kl.SyncPods([]*api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if _, err := kl.GetPodStatus(kubecontainer.BuildPodFullName("pod2", "")); err == nil {
+	if _, err := kl.getPodStatus(kubecontainer.BuildPodFullName("pod2", "")); err == nil {
 		t.Fatalf("expected to not have status cached for %q: %v", "pod2", err)
 	}
 }
@@ -4167,7 +4167,7 @@ func TestGetPodStatusWithLastTermination(t *testing.T) {
 
 		// Check if we can retrieve the pod status from GetPodStatus().
 		podName := kubecontainer.GetPodFullName(pods[0])
-		status, err := kubelet.GetPodStatus(podName)
+		status, err := kubelet.getPodStatus(podName)
 		if err != nil {
 			t.Fatalf("unable to retrieve pod status for pod %q: %#v.", podName, err)
 		} else {
@@ -4240,7 +4240,7 @@ func TestGetPodCreationFailureReason(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	status, err := kubelet.GetPodStatus(kubecontainer.GetPodFullName(pod))
+	status, err := kubelet.getPodStatus(kubecontainer.GetPodFullName(pod))
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -4306,7 +4306,7 @@ func TestGetPodPullImageFailureReason(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	status, err := kubelet.GetPodStatus(kubecontainer.GetPodFullName(pod))
+	status, err := kubelet.getPodStatus(kubecontainer.GetPodFullName(pod))
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
