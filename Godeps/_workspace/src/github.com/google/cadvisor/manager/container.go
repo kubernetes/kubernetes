@@ -130,9 +130,9 @@ func (c *containerData) GetProcessList() ([]v2.ProcessInfo, error) {
 		}
 	}
 	// TODO(rjnagal): Take format as an option?
-	format := "user,pid,ppid,stime,pcpu,rss,vsz,stat,time,comm"
+	format := "user,pid,ppid,stime,pcpu,pmem,rss,vsz,stat,time,comm"
 	args := []string{"-e", "-o", format}
-	expectedFields := 10
+	expectedFields := 11
 	out, err := exec.Command("ps", args...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute ps command: %v", err)
@@ -157,16 +157,17 @@ func (c *containerData) GetProcessList() ([]v2.ProcessInfo, error) {
 		}
 		if isRoot || pidMap[pid] == true {
 			processes = append(processes, v2.ProcessInfo{
-				User:        fields[0],
-				Pid:         pid,
-				Ppid:        ppid,
-				StartTime:   fields[3],
-				PercentCpu:  fields[4],
-				RSS:         fields[5],
-				VirtualSize: fields[6],
-				Status:      fields[7],
-				RunningTime: fields[8],
-				Cmd:         strings.Join(fields[9:], " "),
+				User:          fields[0],
+				Pid:           pid,
+				Ppid:          ppid,
+				StartTime:     fields[3],
+				PercentCpu:    fields[4],
+				PercentMemory: fields[5],
+				RSS:           fields[6],
+				VirtualSize:   fields[7],
+				Status:        fields[8],
+				RunningTime:   fields[9],
+				Cmd:           strings.Join(fields[10:], " "),
 			})
 		}
 	}
