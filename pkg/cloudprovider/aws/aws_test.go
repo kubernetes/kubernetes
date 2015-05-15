@@ -347,7 +347,7 @@ func TestNodeAddresses(t *testing.T) {
 	instance0.State = &state0
 
 	//1
-	instance1.PrivateDNSName = aws.String("instance2")
+	instance1.PrivateDNSName = aws.String("instance1")
 	instance1.PrivateIPAddress = aws.String("192.168.0.2")
 	instance1.InstanceType = aws.String("c3.large")
 	state1 := ec2.InstanceState{
