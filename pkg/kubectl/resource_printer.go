@@ -824,6 +824,8 @@ func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
 
 // PrintObj formats the obj with the Go Template.
 func (p *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	//FIXME: this is broken without JSON tags in pkg/api - it produces fields
+	//       named as internal names: e.g. Items vs items.
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return err
