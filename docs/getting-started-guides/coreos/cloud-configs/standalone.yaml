@@ -1,7 +1,6 @@
 #cloud-config
 
 ---
-write_files:
 hostname: master
 coreos:
   etcd2:
