@@ -94,15 +94,13 @@ var _ = Describe("kubectl", func() {
 		})
 
 		It("should do a rolling update of a replication controller", func() {
-			// Cleanup all resources in case we fail somewhere in the middle
-			defer cleanup(updateDemoRoot, ns, updateDemoSelector)
-
 			By("creating the initial replication controller")
 			runKubectl("create", "-f", nautilusPath, fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			By("rolling-update to new replication controller")
 			runKubectl("rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", kittenPath, fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
+			// Everything will hopefully be cleaned up when the namespace is deleted.
 		})
 	})
 
