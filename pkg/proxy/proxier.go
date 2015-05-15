@@ -40,7 +40,7 @@ type serviceInfo struct {
 	proxyPort           int
 	socket              proxySocket
 	timeout             time.Duration
-	publicIPs           []string // TODO: make this net.IP
+	loadBalancerStatus  api.LoadBalancerStatus
 	publicPort          int
 	sessionAffinityType api.AffinityType
 	stickyMaxAgeMinutes int
@@ -262,7 +262,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			}
 			info.portalIP = serviceIP
 			info.portalPort = servicePort.Port
-			info.publicIPs = service.Spec.PublicIPs
+			info.loadBalancerStatus = deepCopyLoadBalancerStatus(&service.Status.LoadBalancer)
 			info.publicPort = servicePort.PublicPort
 			info.sessionAffinityType = service.Spec.SessionAffinity
 			glog.V(4).Infof("info: %+v", info)
@@ -298,7 +298,7 @@ func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) 
 	if !info.portalIP.Equal(net.ParseIP(service.Spec.PortalIP)) {
 		return false
 	}
-	if !ipsEqual(info.publicIPs, service.Spec.PublicIPs) {
+	if !loadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
 		return false
 	}
 	if info.sessionAffinityType != service.Spec.SessionAffinity {
@@ -307,16 +307,43 @@ func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) 
 	return true
 }
 
-func ipsEqual(lhs, rhs []string) bool {
+func loadBalancerStatusEqual(lhs, rhs *api.LoadBalancerStatus) bool {
+	if lhs.Name != rhs.Name {
+		return false
+	}
+	return endpointsEqual(lhs.Endpoints, rhs.Endpoints)
+}
+
+func endpointsEqual(lhs, rhs []api.LoadBalancerEndpointStatus) bool {
 	if len(lhs) != len(rhs) {
 		return false
 	}
 	for i := range lhs {
-		if lhs[i] != rhs[i] {
+		if !endpointEqual(&lhs[i], &rhs[i]) {
 			return false
 		}
 	}
 	return true
+}
+
+func endpointEqual(lhs, rhs *api.LoadBalancerEndpointStatus) bool {
+	if lhs.IP != rhs.IP {
+		return false
+	}
+	if lhs.Hostname != rhs.Hostname {
+		return false
+	}
+	return true
+}
+
+func deepCopyLoadBalancerStatus(lb *api.LoadBalancerStatus) api.LoadBalancerStatus {
+	var c api.LoadBalancerStatus
+	c = *lb
+	c.Endpoints = make([]api.LoadBalancerEndpointStatus, len(lb.Endpoints))
+	for i := range lb.Endpoints {
+		c.Endpoints[i] = lb.Endpoints[i]
+	}
+	return c
 }
 
 func (proxier *Proxier) openPortal(service ServicePortName, info *serviceInfo) error {
@@ -324,10 +351,12 @@ func (proxier *Proxier) openPortal(service ServicePortName, info *serviceInfo) e
 	if err != nil {
 		return err
 	}
-	for _, publicIP := range info.publicIPs {
-		err = proxier.openOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
-		if err != nil {
-			return err
+	for _, endpoint := range info.loadBalancerStatus.Endpoints {
+		if endpoint.IP != "" {
+			err = proxier.openOnePortal(net.ParseIP(endpoint.IP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	if info.publicPort != 0 {
@@ -392,8 +421,10 @@ func (proxier *Proxier) openPublicPort(publicPort int, protocol api.Protocol, pr
 func (proxier *Proxier) closePortal(service ServicePortName, info *serviceInfo) error {
 	// Collect errors and report them all at the end.
 	el := proxier.closeOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
-	for _, publicIP := range info.publicIPs {
-		el = append(el, proxier.closeOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+	for _, endpoint := range info.loadBalancerStatus.Endpoints {
+		if endpoint.IP != "" {
+			el = append(el, proxier.closeOnePortal(net.ParseIP(endpoint.IP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+		}
 	}
 	if info.publicPort != 0 {
 		el = append(el, proxier.closePublicPort(info.publicPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
