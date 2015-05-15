@@ -16,17 +16,16 @@ limitations under the License.
 
 package api
 
-import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-)
+import "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 // Where possible, json tags match the cli argument names.
 // Top level config objects and all values required for proper functioning are not "omitempty".  Any truly optional piece of config is allowed to be omitted.
 
 // Config holds the information needed to build connect to remote kubernetes clusters as a given user
 type Config struct {
-	api.TypeMeta `json:",inline"`
+	// Kind is a string value representing the REST resource this object represents.
+	//FIXME: comment why/when thi sis needed
+	//Kind string `json:"kind,omitempty"`
 	// Preferences holds general information to be use for cli interactions
 	Preferences Preferences `json:"preferences"`
 	// Clusters is a map of referencable names to cluster configs
