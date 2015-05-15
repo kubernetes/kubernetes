@@ -889,9 +889,9 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 
 				// This simulates the watch events for all but 1 of the expected pods.
 				// None of these should wake the controller because it has expectations==BurstReplicas.
-				for _, pod := range pods.Items[:expectedPods-1] {
-					manager.podStore.Store.Add(&pod)
-					manager.addPod(&pod)
+				for i := 0; i < expectedPods-1; i++ {
+					manager.podStore.Store.Add(&pods.Items[i])
+					manager.addPod(&pods.Items[i])
 				}
 
 				podExp, exists, err := manager.expectations.GetExpectations(controllerSpec)
@@ -907,9 +907,9 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 					expectedPods = burstReplicas
 				}
 				validateSyncReplication(t, &fakePodControl, 0, expectedPods)
-				for _, pod := range pods.Items[:expectedPods-1] {
-					manager.podStore.Store.Delete(&pod)
-					manager.deletePod(&pod)
+				for i := 0; i < expectedPods-1; i++ {
+					manager.podStore.Store.Delete(&pods.Items[i])
+					manager.deletePod(&pods.Items[i])
 				}
 				podExp, exists, err := manager.expectations.GetExpectations(controllerSpec)
 				if !exists || err != nil {
