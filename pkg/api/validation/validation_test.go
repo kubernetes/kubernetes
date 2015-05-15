@@ -1384,7 +1384,7 @@ func makeValidService() api.Service {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"key": "val"},
 			SessionAffinity: "None",
-			Visibility:      "cluster",
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675}},
 		},
 	}
@@ -1597,8 +1597,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid load balancer protocol 1",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
-				s.Spec.Visibility = "loadbalancer"
+				s.Spec.Visibility = api.ServiceVisibilityLoadBalancer
 				s.Spec.Ports[0].Protocol = "UDP"
 			},
 			numErrs: 1,
@@ -1606,25 +1605,8 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid load balancer protocol 2",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
-				s.Spec.Visibility = "loadbalancer"
+				s.Spec.Visibility = api.ServiceVisibilityLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "UDP"})
-			},
-			numErrs: 1,
-		},
-		{
-			name: "createExternalLoadBalancer=true with visibility=cluster",
-			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
-				s.Spec.Visibility = "cluster"
-			},
-			numErrs: 1,
-		},
-		{
-			name: "createExternalLoadBalancer=false with visibility=loadbalancer",
-			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = false
-				s.Spec.Visibility = "loadbalancer"
 			},
 			numErrs: 1,
 		},
@@ -1666,68 +1648,46 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "valid external load balancer",
+			name: "valid visbility - cluster",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
-				s.Spec.Visibility = "loadbalancer"
+				s.Spec.Visibility = api.ServiceVisibilityCluster
 			},
 			numErrs: 0,
 		},
 		{
-			name: "valid external load balancer vs visibility=loadbalancer",
+			name: "valid visibility - nodeport",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
-				s.Spec.Visibility = "loadbalancer"
+				s.Spec.Visibility = api.ServiceVisibilityNodePort
 			},
 			numErrs: 0,
 		},
 		{
-			name: "valid external load balancer vs visibility=public",
+			name: "valid visbility - loadbalancer",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = false
-				s.Spec.Visibility = "public"
+				s.Spec.Visibility = api.ServiceVisibilityLoadBalancer
 			},
 			numErrs: 0,
 		},
 		{
-			name: "valid external load balancer vs visibility=cluster",
+			name: "valid visibility loadbalancer 2 ports",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = false
-				s.Spec.Visibility = "cluster"
-			},
-			numErrs: 0,
-		},
-		{
-			name: "valid external load balancer 2 ports",
-			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
-				s.Spec.Visibility = "loadbalancer"
+				s.Spec.Visibility = api.ServiceVisibilityLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
 		},
 		{
-			name: "valid external load balancer with PublicPort",
+			name: "valid visibility loadbalancer with PublicPort",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
-				s.Spec.Visibility = "loadbalancer"
+				s.Spec.Visibility = api.ServiceVisibilityLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", PublicPort: 12345})
-			},
-			numErrs: 0,
-		},
-		{
-			name: "valid external load balancer without PublicPort",
-			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
-				s.Spec.Visibility = "loadbalancer"
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
 		},
 		{
 			name: "valid public service with PublicPort",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Visibility = "public"
+				s.Spec.Visibility = api.ServiceVisibilityNodePort
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", PublicPort: 12345})
 			},
 			numErrs: 0,
@@ -1735,7 +1695,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "valid public service without PublicPort",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Visibility = "public"
+				s.Spec.Visibility = api.ServiceVisibilityNodePort
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
@@ -1743,7 +1703,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "valid cluster service without PublicPort",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Visibility = "cluster"
+				s.Spec.Visibility = api.ServiceVisibilityCluster
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
@@ -1751,7 +1711,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid cluster service with PublicPort",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Visibility = "cluster"
+				s.Spec.Visibility = api.ServiceVisibilityCluster
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", PublicPort: 12345})
 			},
 			numErrs: 1,
@@ -1759,7 +1719,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid public service with duplicate PublicPort",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.Visibility = "public"
+				s.Spec.Visibility = api.ServiceVisibilityNodePort
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p1", Port: 1, Protocol: "TCP", PublicPort: 1})
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p2", Port: 2, Protocol: "TCP", PublicPort: 1})
 			},
@@ -2529,7 +2489,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 		{
 			name: "change visibility",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Spec.Visibility = "public"
+				newSvc.Spec.Visibility = api.ServiceVisibilityNodePort
 			},
 			numErrs: 0,
 		},

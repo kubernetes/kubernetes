@@ -250,10 +250,9 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector:                   map[string]string{"bar": "baz"},
-			SessionAffinity:            api.AffinityTypeNone,
-			CreateExternalLoadBalancer: true,
-			Visibility:                 api.ServiceVisibilityLoadBalancer,
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.AffinityTypeNone,
+			Visibility:      api.ServiceVisibilityLoadBalancer,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -301,10 +300,9 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector:                   map[string]string{"bar": "baz"},
-			SessionAffinity:            api.AffinityTypeNone,
-			CreateExternalLoadBalancer: true,
-			Visibility:                 api.ServiceVisibilityLoadBalancer,
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.AffinityTypeNone,
+			Visibility:      api.ServiceVisibilityLoadBalancer,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -326,10 +324,9 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
-			Selector:                   map[string]string{"bar": "baz"},
-			SessionAffinity:            api.AffinityTypeNone,
-			CreateExternalLoadBalancer: false,
-			Visibility:                 api.ServiceVisibilityCluster,
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.AffinityTypeNone,
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -342,7 +339,6 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 
 	// Modify load balancer to be external.
 	svc2 := deepCloneService(svc1)
-	svc2.Spec.CreateExternalLoadBalancer = true
 	svc2.Spec.Visibility = api.ServiceVisibilityLoadBalancer
 	if _, _, err := storage.Update(ctx, svc2); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -364,10 +360,9 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
-			Selector:                   map[string]string{"bar": "baz"},
-			SessionAffinity:            api.AffinityTypeNone,
-			CreateExternalLoadBalancer: true,
-			Visibility:                 api.ServiceVisibilityLoadBalancer,
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.AffinityTypeNone,
+			Visibility:      api.ServiceVisibilityLoadBalancer,
 			Ports: []api.ServicePort{{
 				Name:     "p",
 				Port:     6502,
@@ -677,17 +672,16 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	}
 }
 
-func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
+func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 	rest, _ := NewTestREST(t, nil)
 	rest.portMgr.pool.(*MemoryPoolAllocator).randomAttempts = 0
 
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
-			Selector:                   map[string]string{"bar": "baz"},
-			SessionAffinity:            api.AffinityTypeNone,
-			CreateExternalLoadBalancer: true,
-			Visibility:                 api.ServiceVisibilityLoadBalancer,
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.AffinityTypeNone,
+			Visibility:      api.ServiceVisibilityLoadBalancer,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -826,7 +820,7 @@ func TestCreate(t *testing.T) {
 				Selector:        map[string]string{"bar": "baz"},
 				PortalIP:        "None",
 				SessionAffinity: "None",
-				Visibility:      "cluster",
+				Visibility:      api.ServiceVisibilityCluster,
 				Ports: []api.ServicePort{{
 					Port:     6502,
 					Protocol: api.ProtocolTCP,
@@ -843,7 +837,7 @@ func TestCreate(t *testing.T) {
 				Selector:        map[string]string{"bar": "baz"},
 				PortalIP:        "invalid",
 				SessionAffinity: "None",
-				Visibility:      "cluster",
+				Visibility:      api.ServiceVisibilityCluster,
 				Ports: []api.ServicePort{{
 					Port:     6502,
 					Protocol: api.ProtocolTCP,

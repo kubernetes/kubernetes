@@ -75,13 +75,7 @@ func addDefaultingFuncs() {
 				obj.SessionAffinity = AffinityTypeNone
 			}
 			if obj.Visibility == "" {
-				if obj.CreateExternalLoadBalancer {
-					obj.Visibility = ServiceVisibilityLoadBalancer
-				} else {
-					obj.Visibility = ServiceVisibilityCluster
-				}
-			} else if obj.Visibility == ServiceVisibilityLoadBalancer {
-				obj.CreateExternalLoadBalancer = true
+				obj.Visibility = ServiceVisibilityCluster
 			}
 			for i := range obj.Ports {
 				sp := &obj.Ports[i]

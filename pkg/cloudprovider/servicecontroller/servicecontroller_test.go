@@ -45,7 +45,20 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: api.ServiceSpec{
-					CreateExternalLoadBalancer: false,
+					Visibility: api.ServiceVisibilityCluster,
+				},
+			},
+			expectErr:           false,
+			expectCreateAttempt: false,
+		},
+		{
+			service: &api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "no-external-balancer",
+					Namespace: "default",
+				},
+				Spec: api.ServiceSpec{
+					Visibility: api.ServiceVisibilityNodePort,
 				},
 			},
 			expectErr:           false,
@@ -62,7 +75,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 						Port:     80,
 						Protocol: api.ProtocolUDP,
 					}},
-					CreateExternalLoadBalancer: true,
+					Visibility: api.ServiceVisibilityLoadBalancer,
 				},
 			},
 			expectErr:           true,
@@ -79,67 +92,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 						Port:     80,
 						Protocol: api.ProtocolTCP,
 					}},
-					CreateExternalLoadBalancer: true,
-				},
-			},
-			expectErr:           false,
-			expectCreateAttempt: true,
-		},
-		{
-			service: &api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "no-external-balancer",
-					Namespace: "default",
-				},
-				Spec: api.ServiceSpec{
-					Visibility: "cluster",
-				},
-			},
-			expectErr:           false,
-			expectCreateAttempt: false,
-		},
-		{
-			service: &api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "no-external-balancer",
-					Namespace: "default",
-				},
-				Spec: api.ServiceSpec{
-					Visibility: "public",
-				},
-			},
-			expectErr:           false,
-			expectCreateAttempt: false,
-		},
-		{
-			service: &api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "udp-service",
-					Namespace: "default",
-				},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{{
-						Port:     80,
-						Protocol: api.ProtocolUDP,
-					}},
-					Visibility: "loadbalancer",
-				},
-			},
-			expectErr:           true,
-			expectCreateAttempt: false,
-		},
-		{
-			service: &api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "basic-service1",
-					Namespace: "default",
-				},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{{
-						Port:     80,
-						Protocol: api.ProtocolTCP,
-					}},
-					Visibility: "loadbalancer",
+					Visibility: api.ServiceVisibilityLoadBalancer,
 				},
 			},
 			expectErr:           false,

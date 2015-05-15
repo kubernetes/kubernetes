@@ -267,8 +267,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 					ss.Ports[i].TargetPort.StrVal = "x" + ss.Ports[i].TargetPort.StrVal // non-empty
 				}
 			}
-			// CreateExternalLoadBalancer must be consistent with Visibility
-			ss.CreateExternalLoadBalancer = ss.Visibility == api.ServiceVisibilityLoadBalancer
 		},
 		func(n *api.Node, c fuzz.Continue) {
 			c.FuzzNoCustom(n)

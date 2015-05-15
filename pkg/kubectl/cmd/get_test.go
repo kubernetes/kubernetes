@@ -68,7 +68,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
-					Visibility:      "cluster",
+					Visibility:      api.ServiceVisibilityCluster,
 				},
 			},
 		},

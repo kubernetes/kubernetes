@@ -167,16 +167,6 @@ func TestSetDefaultService(t *testing.T) {
 	}
 }
 
-func TestSetDefaultServiceWithLoadbalancer(t *testing.T) {
-	svc := &current.Service{}
-	svc.Spec.CreateExternalLoadBalancer = true
-	obj2 := roundTrip(t, runtime.Object(svc))
-	svc2 := obj2.(*current.Service)
-	if svc2.Spec.Visibility != current.ServiceVisibilityLoadBalancer {
-		t.Errorf("Expected default visibility type:%s, got: %s", current.ServiceVisibilityLoadBalancer, svc2.Spec.Visibility)
-	}
-}
-
 func TestSetDefaultSecret(t *testing.T) {
 	s := &current.Secret{}
 	obj2 := roundTrip(t, runtime.Object(s))

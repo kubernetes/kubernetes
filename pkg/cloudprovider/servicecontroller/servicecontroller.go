@@ -586,9 +586,5 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 }
 
 func wantsExternalLoadBalancer(service *api.Service) bool {
-	if service.Spec.Visibility == api.ServiceVisibility("") {
-		// TODO: does something do a version upgrade for us?  should we warn here?
-		return service.Spec.CreateExternalLoadBalancer
-	}
 	return service.Spec.Visibility == api.ServiceVisibilityLoadBalancer
 }

@@ -1017,9 +1017,6 @@ type ServiceSpec struct {
 	// None can be specified for headless services when proxying is not required
 	PortalIP string `json:"portalIP,omitempty"`
 
-	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
-	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty"`
-
 	// Visibility determines how the service will be exposed.  Valid options: Cluster, NodePort, LoadBalancer
 	Visibility ServiceVisibility `json:"visibility,omitempty"`
 

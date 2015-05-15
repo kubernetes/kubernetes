@@ -781,18 +781,10 @@ func addConversionFuncs() {
 				return err
 			}
 
-			visibilityIn := in.Spec.Visibility
-			if visibilityIn == "" {
-				if in.Spec.CreateExternalLoadBalancer {
-					visibilityIn = newer.ServiceVisibilityLoadBalancer
-				} else {
-					visibilityIn = newer.ServiceVisibilityCluster
-				}
-			}
-			if err := s.Convert(&visibilityIn, &out.Visibility, 0); err != nil {
+			if err := s.Convert(&in.Spec.Visibility, &out.Visibility, 0); err != nil {
 				return err
 			}
-			out.CreateExternalLoadBalancer = visibilityIn == newer.ServiceVisibilityLoadBalancer
+			out.CreateExternalLoadBalancer = in.Spec.Visibility == newer.ServiceVisibilityLoadBalancer
 
 			return nil
 		},
@@ -848,7 +840,6 @@ func addConversionFuncs() {
 			if err := s.Convert(&visibilityIn, &out.Spec.Visibility, 0); err != nil {
 				return err
 			}
-			out.Spec.CreateExternalLoadBalancer = visibilityIn == ServiceVisibilityLoadBalancer
 
 			return nil
 		},

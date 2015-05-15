@@ -253,7 +253,7 @@ var _ = Describe("Services", func() {
 
 	It("should be able to create a functioning external load balancer", func() {
 		if !providerIs("gce", "gke") {
-			By(fmt.Sprintf("Skipping service external load balancer test; uses createExternalLoadBalancer, a (gce|gke) feature"))
+			By(fmt.Sprintf("Skipping service external load balancer test; uses ServiceVisibilityLoadBalancer, a (gce|gke) feature"))
 			return
 		}
 
@@ -272,7 +272,7 @@ var _ = Describe("Services", func() {
 					Port:       80,
 					TargetPort: util.NewIntOrStringFromInt(80),
 				}},
-				CreateExternalLoadBalancer: true,
+				Visibility: api.ServiceVisibilityLoadBalancer,
 			},
 		}
 
@@ -363,7 +363,7 @@ var _ = Describe("Services", func() {
 					Port:       80,
 					TargetPort: util.NewIntOrStringFromInt(80),
 				}},
-				Visibility: "public",
+				Visibility: api.ServiceVisibilityNodePort,
 			},
 		}
 
@@ -446,7 +446,7 @@ var _ = Describe("Services", func() {
 
 	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
 		if !providerIs("gce", "gke") {
-			By(fmt.Sprintf("Skipping service namespace collision test; uses createExternalLoadBalancer, a (gce|gke) feature"))
+			By(fmt.Sprintf("Skipping service namespace collision test; uses ServiceVisibilityLoadBalancer, a (gce|gke) feature"))
 			return
 		}
 
@@ -463,7 +463,7 @@ var _ = Describe("Services", func() {
 					Port:       80,
 					TargetPort: util.NewIntOrStringFromInt(80),
 				}},
-				CreateExternalLoadBalancer: true,
+				Visibility: api.ServiceVisibilityLoadBalancer,
 			},
 		}
 

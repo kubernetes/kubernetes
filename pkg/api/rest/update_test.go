@@ -35,7 +35,7 @@ func makeValidService() api.Service {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"key": "val"},
 			SessionAffinity: "None",
-			Visibility:      "cluster",
+			Visibility:      api.ServiceVisibilityCluster,
 			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675}},
 		},
 	}

@@ -103,7 +103,7 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 		service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(port)
 	}
 	if params["create-external-load-balancer"] == "true" {
-		service.Spec.CreateExternalLoadBalancer = true
+		service.Spec.Visibility = api.ServiceVisibilityLoadBalancer
 	}
 	if len(params["visibility"]) != 0 {
 		service.Spec.Visibility = api.ServiceVisibility(params["visibility"])
