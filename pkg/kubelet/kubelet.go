@@ -1587,9 +1587,12 @@ func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerNa
 // or all of them.
 func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow, previous bool, stdout, stderr io.Writer) error {
 	// TODO(vmarmol): Refactor to not need the pod status and verification.
-	podStatus, err := kl.getPodStatus(podFullName)
-	if err != nil {
-		return fmt.Errorf("failed to get status for pod %q - %v", podFullName, err)
+	// Pod workers periodically write status to statusManager. If status is not
+	// cached there, something is wrong (or kubelet just restarted and hasn't
+	// caught up yet). Just assume the pod is not ready yet.
+	podStatus, found := kl.statusManager.GetPodStatus(podFullName)
+	if !found {
+		return fmt.Errorf("failed to get status for pod %q", podFullName)
 	}
 	if err := kl.validatePodPhase(&podStatus); err != nil {
 		// No log is available if pod is not in a "known" phase (e.g. Unknown).
@@ -1911,22 +1914,6 @@ func getPodReadyCondition(spec *api.PodSpec, statuses []api.ContainerStatus) []a
 		}
 	}
 	return ready
-}
-
-// getPodStatus returns information of the containers in the pod from the
-// container runtime.
-func (kl *Kubelet) getPodStatus(podFullName string) (api.PodStatus, error) {
-	// Check to see if we have a cached version of the status.
-	cachedPodStatus, found := kl.statusManager.GetPodStatus(podFullName)
-	if found {
-		glog.V(3).Infof("Returning cached status for %q", podFullName)
-		return cachedPodStatus, nil
-	}
-	pod, found := kl.GetPodByFullName(podFullName)
-	if !found {
-		return api.PodStatus{}, fmt.Errorf("couldn't find pod %q", podFullName)
-	}
-	return kl.generatePodStatus(pod)
 }
 
 // By passing the pod directly, this method avoids pod lookup, which requires
