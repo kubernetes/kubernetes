@@ -17,9 +17,11 @@ limitations under the License.
 package container
 
 import (
+	"hash/adler32"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -79,4 +81,12 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 		}
 	}
 	return true
+}
+
+// HashContainer returns the hash of the container. It is used to compare
+// the running container with its desired spec.
+func HashContainer(container *api.Container) uint64 {
+	hash := adler32.New()
+	util.DeepHashObject(hash, *container)
+	return uint64(hash.Sum32())
 }

@@ -18,7 +18,6 @@ package dockertools
 
 import (
 	"fmt"
-	"hash/adler32"
 	"math/rand"
 	"os"
 	"strconv"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -212,15 +212,9 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 
 const containerNamePrefix = "k8s"
 
-func HashContainer(container *api.Container) uint64 {
-	hash := adler32.New()
-	util.DeepHashObject(hash, *container)
-	return uint64(hash.Sum32())
-}
-
 // Creates a name which can be reversed to identify both full pod name and container name.
 func BuildDockerName(dockerName KubeletContainerName, container *api.Container) string {
-	containerName := dockerName.ContainerName + "." + strconv.FormatUint(HashContainer(container), 16)
+	containerName := dockerName.ContainerName + "." + strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	return fmt.Sprintf("%s_%s_%s_%s_%08x",
 		containerNamePrefix,
 		containerName,
