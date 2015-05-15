@@ -273,6 +273,11 @@ func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
 	return aws, true
 }
 
+// Routes returns an implementation of Routes for Amazon Web Services.
+func (aws *AWSCloud) Routes() (cloudprovider.Routes, bool) {
+	return nil, false
+}
+
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	instance, err := aws.getInstancesByDnsName(name)
@@ -972,12 +977,4 @@ func (aws *AWSCloud) DeleteVolume(volumeName string) error {
 		return err
 	}
 	return awsDisk.delete()
-}
-
-func (v *AWSCloud) Configure(name string, spec *api.NodeSpec) error {
-	return nil
-}
-
-func (v *AWSCloud) Release(name string) error {
-	return nil
 }

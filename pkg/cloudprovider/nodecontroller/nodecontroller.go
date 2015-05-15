@@ -170,34 +170,10 @@ func (nc *NodeController) reconcilePodCIDRs(nodes *api.NodeList) {
 			}
 			glog.V(4).Infof("Assigning node %s CIDR %s", node.Name, podCIDR)
 			node.Spec.PodCIDR = podCIDR
-			if err := nc.configureNodeCIDR(&node); err != nil {
-				glog.Errorf("Error configuring node %s: %s", node.Name, err)
-				// The newly assigned CIDR was not properly configured, so don't save it in the API server.
-				continue
-			}
 			if _, err := nc.kubeClient.Nodes().Update(&node); err != nil {
 				glog.Errorf("Unable to assign node %s CIDR %s: %v", node.Name, podCIDR, err)
 			}
 		}
-	}
-}
-
-func (nc *NodeController) configureNodeCIDR(node *api.Node) error {
-	instances, ok := nc.cloud.Instances()
-	if !ok {
-		return fmt.Errorf("error configuring node %s: CloudProvider does not support Instances()", node.Name)
-	}
-	return instances.Configure(node.Name, &node.Spec)
-}
-
-func (nc *NodeController) unassignNodeCIDR(nodeName string) {
-	instances, ok := nc.cloud.Instances()
-	if !ok {
-		glog.Errorf("Error deconfiguring node %s: CloudProvider does not support Instances()", nodeName)
-		return
-	}
-	if err := instances.Release(nodeName); err != nil {
-		glog.Errorf("Error deconfiguring node %s: %s", nodeName, err)
 	}
 }
 
@@ -435,9 +411,6 @@ func (nc *NodeController) monitorNodeStatus() error {
 					continue
 				}
 				if _, err := instances.ExternalID(node.Name); err != nil && err == cloudprovider.InstanceNotFound {
-					if nc.allocateNodeCIDRs {
-						nc.unassignNodeCIDR(node.Name)
-					}
 					if err := nc.kubeClient.Nodes().Delete(node.Name); err != nil {
 						glog.Errorf("Unable to delete node %s: %v", node.Name, err)
 						continue

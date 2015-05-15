@@ -33,6 +33,7 @@ import (
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/routecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
@@ -236,6 +237,15 @@ func (s *CMServer) Run(_ []string) error {
 	serviceController := servicecontroller.New(cloud, kubeClient, s.ClusterName)
 	if err := serviceController.Run(s.NodeSyncPeriod); err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
+	}
+
+	if s.AllocateNodeCIDRs {
+		routes, ok := cloud.Routes()
+		if !ok {
+			glog.Fatal("Cloud provider must support routes if allocate-node-cidrs is set")
+		}
+		routeController := routecontroller.New(routes, kubeClient, s.ClusterName, (*net.IPNet)(&s.ClusterCIDR))
+		routeController.Run(s.NodeSyncPeriod)
 	}
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)

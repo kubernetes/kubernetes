@@ -772,7 +772,7 @@ function kube-down {
   # Delete routes.
   local -a routes
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
-              --regexp "${NODE_INSTANCE_PREFIX}-.+" | awk 'NR >= 2 { print $1 }') )
+    --regexp "${INSTANCE_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}" | awk 'NR >= 2 { print $1 }') )
   routes+=("${MASTER_NAME}")
   while (( "${#routes[@]}" > 0 )); do
     echo Deleting routes "${routes[*]::10}"

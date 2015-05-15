@@ -105,6 +105,11 @@ func (c *MesosCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return c, true
 }
 
+// Routes always returns nil, false in this implementation.
+func (c *MesosCloud) Routes() (cloudprovider.Routes, bool) {
+	return nil, false
+}
+
 // ListClusters lists the names of the available Mesos clusters.
 func (c *MesosCloud) ListClusters() ([]string, error) {
 	// Always returns a single cluster (this one!)
@@ -223,16 +228,4 @@ func (c *MesosCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 		return nil, err
 	}
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
-}
-
-// Configure the specified instance using the spec.
-// Ths implementation is a noop.
-func (c *MesosCloud) Configure(name string, spec *api.NodeSpec) error {
-	return nil
-}
-
-// Release deletes all the configuration related to the instance, including other cloud resources.
-// Ths implementation is a noop.
-func (c *MesosCloud) Release(name string) error {
-	return nil
 }

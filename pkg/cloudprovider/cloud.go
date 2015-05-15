@@ -34,6 +34,8 @@ type Interface interface {
 	Zones() (Zones, bool)
 	// Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
 	Clusters() (Clusters, bool)
+	// Routes returns a routes interface along with whether the interface is supported.
+	Routes() (Routes, bool)
 }
 
 // Clusters is an abstract, pluggable interface for clusters of containers.
@@ -81,10 +83,23 @@ type Instances interface {
 	List(filter string) ([]string, error)
 	// GetNodeResources gets the resources for a particular node
 	GetNodeResources(name string) (*api.NodeResources, error)
-	// Configure the specified instance using the spec
-	Configure(name string, spec *api.NodeSpec) error
-	// Delete all the configuration related to the instance, including other cloud resources
-	Release(name string) error
+}
+
+// Route is a representation of an advanced routing rule.
+type Route struct {
+	Name            string
+	TargetInstance  string
+	DestinationCIDR string
+	Description     string
+}
+
+// Routes is an abstract, pluggable interface for advanced routing rules.
+type Routes interface {
+	ListRoutes(filter string) ([]*Route, error)
+	// Create the described route
+	CreateRoute(route *Route) error
+	// Delete the specified route
+	DeleteRoute(name string) error
 }
 
 var InstanceNotFound = errors.New("instance not found")
