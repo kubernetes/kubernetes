@@ -1704,6 +1704,34 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "valid visibility=LoadBalancer with LoadBalancer",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Visibility = api.ServiceVisibilityLoadBalancer
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
+				s.Spec.LoadBalancer = "1.2.3.4"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid visibility=Cluster with LoadBalancer",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Visibility = api.ServiceVisibilityCluster
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
+				s.Spec.LoadBalancer = "1.2.3.4"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid visibility=NodePort with LoadBalancer",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Visibility = api.ServiceVisibilityNodePort
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
+				s.Spec.LoadBalancer = "1.2.3.4"
+			},
+			numErrs: 1,
+		},
+
 	}
 
 	for _, tc := range testCases {

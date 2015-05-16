@@ -1038,6 +1038,10 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot create an external load balancer with non-TCP ports"))
 			}
 		}
+	} else {
+		if service.Spec.LoadBalancer != "" {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.loadBalancer", service.Spec.LoadBalancer, "cannot specify a load balancer when visibility is not LoadBalancer"))
+		}
 	}
 
 	if service.Spec.Visibility == api.ServiceVisibilityCluster {
