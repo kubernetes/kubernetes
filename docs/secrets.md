@@ -108,12 +108,14 @@ To create a pod that uses an ssh key stored as a secret, we first need to create
 
 ```json
 {
-  "apiVersion": "v1beta2",
   "kind": "Secret",
-  "id": "ssh-key-secret",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "ssh-key-secret"
+  },
   "data": {
-    "id-rsa.pub": "dmFsdWUtMQ0K",
-    "id-rsa": "dmFsdWUtMg0KDQo="
+    "id-rsa": "dmFsdWUtMg0KDQo=",
+    "id-rsa.pub": "dmFsdWUtMQ0K"
   }
 }
 ```
@@ -127,34 +129,36 @@ consumes it in a volume:
 
 ```json
 {
-  "id": "secret-test-pod",
   "kind": "Pod",
-  "apiVersion":"v1beta2",
-  "labels": {
-    "name": "secret-test"
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "secret-test-pod",
+    "labels": {
+      "name": "secret-test"
+    }
   },
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "secret-test-pod",
-      "containers": [{
+  "spec": {
+    "volumes": [
+      {
+        "name": "secret-volume",
+        "secret": {
+          "secretName": "ssh-key-secret"
+        }
+      }
+    ],
+    "containers": [
+      {
         "name": "ssh-test-container",
         "image": "mySshImage",
-        "volumeMounts": [{
-          "name": "secret-volume",
-          "mountPath": "/etc/secret-volume",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
-        "name": "secret-volume",
-        "source": {
-          "secret": {
-            "secretName": "ssh-key-secret"
+        "volumeMounts": [
+          {
+            "name": "secret-volume",
+            "readOnly": true,
+            "mountPath": "/etc/secret-volume"
           }
-        }
-      }]
-    }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -176,21 +180,25 @@ The secrets:
 
 ```json
 [{
-  "apiVersion": "v1beta2",
   "kind": "Secret",
-  "id": "prod-db-secret",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "prod-db-secret"
+  },
   "data": {
-    "username": "dmFsdWUtMQ0K",
-    "password": "dmFsdWUtMg0KDQo="
+    "password": "dmFsdWUtMg0KDQo=",
+    "username": "dmFsdWUtMQ0K"
   }
 },
 {
-  "apiVersion": "v1beta2",
   "kind": "Secret",
-  "id": "test-db-secret",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "test-db-secret"
+  },
   "data": {
-    "username": "dmFsdWUtMQ0K",
-    "password": "dmFsdWUtMg0KDQo="
+    "password": "dmFsdWUtMg0KDQo=",
+    "username": "dmFsdWUtMQ0K"
   }
 }]
 ```
@@ -199,65 +207,69 @@ The pods:
 
 ```json
 [{
-  "id": "prod-db-client-pod",
   "kind": "Pod",
-  "apiVersion":"v1beta2",
-  "labels": {
-    "name": "prod-db-client"
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "prod-db-client-pod",
+    "labels": {
+      "name": "prod-db-client"
+    }
   },
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "prod-db-pod",
-      "containers": [{
+  "spec": {
+    "volumes": [
+      {
+        "name": "secret-volume",
+        "secret": {
+          "secretName": "prod-db-secret"
+        }
+      }
+    ],
+    "containers": [
+      {
         "name": "db-client-container",
         "image": "myClientImage",
-        "volumeMounts": [{
-          "name": "secret-volume",
-          "mountPath": "/etc/secret-volume",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
-        "name": "secret-volume",
-        "source": {
-          "secret": {
-            "secretName": "prod-db-secret"
+        "volumeMounts": [
+          {
+            "name": "secret-volume",
+            "readOnly": true,
+            "mountPath": "/etc/secret-volume"
           }
-        }
-      }]
-    }
+        ]
+      }
+    ]
   }
 },
 {
-  "id": "test-db-client-pod",
   "kind": "Pod",
-  "apiVersion":"v1beta2",
-  "labels": {
-    "name": "test-db-client"
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "test-db-client-pod",
+    "labels": {
+      "name": "test-db-client"
+    }
   },
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "test-db-pod",
-      "containers": [{
+  "spec": {
+    "volumes": [
+      {
+        "name": "secret-volume",
+        "secret": {
+          "secretName": "test-db-secret"
+        }
+      }
+    ],
+    "containers": [
+      {
         "name": "db-client-container",
         "image": "myClientImage",
-        "volumeMounts": [{
-          "name": "secret-volume",
-          "mountPath": "/etc/secret-volume",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
-        "name": "secret-volume",
-        "source": {
-          "secret": {
-            "secretName": "test-db-secret"
+        "volumeMounts": [
+          {
+            "name": "secret-volume",
+            "readOnly": true,
+            "mountPath": "/etc/secret-volume"
           }
-        }
-      }]
-    }
+        ]
+      }
+    ]
   }
 }]
 ```
