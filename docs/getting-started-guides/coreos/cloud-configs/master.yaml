@@ -39,7 +39,7 @@ coreos:
         - name: 50-network-config.conf
           content: |
             [Unit]
-            Requires=etcd2.service
+            Requires=etcd.service
             [Service]
             ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
     - name: docker-cache.service
@@ -102,8 +102,8 @@ coreos:
         [Unit]
         Description=Kubernetes API Server
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=etcd2.service setup-network-environment.service
-        After=etcd2.service setup-network-environment.service
+        Requires=etcd.service setup-network-environment.service
+        After=etcd.service setup-network-environment.service
 
         [Service]
         EnvironmentFile=/etc/network-environment
