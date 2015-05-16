@@ -69,6 +69,11 @@ type TestContextType struct {
 
 var testContext TestContextType
 
+type ContainerFailures struct {
+	status   *api.ContainerStateTerminated
+	restarts int
+}
+
 func Logf(format string, a ...interface{}) {
 	fmt.Fprintf(GinkgoWriter, "INFO: "+format+"\n", a...)
 }
@@ -555,6 +560,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 		pending := 0
 		unknown := 0
 		inactive := 0
+		failedContainers := 0
 		time.Sleep(10 * time.Second)
 
 		// TODO: Use a reflector both to put less strain on the cluster and
@@ -566,8 +572,8 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 		for _, p := range currentPods.Items {
 			if p.Status.Phase == api.PodRunning {
 				current++
-				if err := VerifyContainersAreNotFailed(p, maxContainerFailures); err != nil {
-					return err
+				for _, v := range FailedContainers(p) {
+					failedContainers = failedContainers + v.restarts
 				}
 			} else if p.Status.Phase == api.PodPending {
 				if p.Spec.Host == "" {
@@ -618,6 +624,10 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 		}
 		last = current
 		oldPods = currentPods
+
+		if failedContainers > maxContainerFailures {
+			return fmt.Errorf("%d containers failed which is more than allowed %d", failedContainers, maxContainerFailures)
+		}
 	}
 	if current != replicas {
 		return fmt.Errorf("Only %d pods started out of %d", current, replicas)
@@ -686,35 +696,36 @@ func listPods(c *client.Client, namespace string, label labels.Selector, field f
 	return pods, err
 }
 
-//VerifyContainersAreNotFailed confirms that containers didn't enter an invalid state.
-//For example, too many restarts, or non nill Termination, and so on.
-func VerifyContainersAreNotFailed(pod api.Pod, restartMax int) error {
-	var errStrings []string
+// FailedContainers inspects all containers in a pod and returns failure
+// information for containers that have failed or been restarted.
+// A map is returned where the key is the containerID and the value is a
+// struct containing the restart and failure information
+func FailedContainers(pod api.Pod) map[string]ContainerFailures {
+	var state ContainerFailures
+	states := make(map[string]ContainerFailures)
 
 	statuses := pod.Status.ContainerStatuses
 	if len(statuses) == 0 {
 		return nil
 	} else {
 		for _, status := range statuses {
-			var errormsg string = ""
 			if status.State.Termination != nil {
-				errormsg = "status.State.Termination was nil"
+				states[status.ContainerID] = ContainerFailures{status: status.State.Termination}
 			} else if status.LastTerminationState.Termination != nil {
-				errormsg = "status.LastTerminationState.Termination was nil"
-			} else if status.RestartCount > restartMax {
-				errormsg = fmt.Sprintf("restarted %d times", restartMax)
+				states[status.ContainerID] = ContainerFailures{status: status.LastTerminationState.Termination}
 			}
-
-			if len(errormsg) != 0 {
-				errStrings = append(errStrings, fmt.Sprintf("Error: Pod %s (host: %s) : Container w/ name %s status was bad (%v).", pod.Name, pod.Spec.Host, status.Name, errormsg))
+			if status.RestartCount > 0 {
+				var ok bool
+				if state, ok = states[status.ContainerID]; !ok {
+					state = ContainerFailures{}
+				}
+				state.restarts = status.RestartCount
+				states[status.ContainerID] = state
 			}
 		}
 	}
 
-	if len(errStrings) > 0 {
-		return fmt.Errorf(strings.Join(errStrings, "\n"))
-	}
-	return nil
+	return states
 }
 
 // Prints the histogram of the events and returns the number of bad events.
