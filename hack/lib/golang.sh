@@ -44,13 +44,13 @@ readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 
 # The set of test targets that we are building for all platforms
 readonly KUBE_TEST_TARGETS=(
-  cmd/e2e
   cmd/integration
   cmd/gendocs
   cmd/genman
   cmd/genbashcomp
   examples/k8petstore/web-server
   github.com/onsi/ginkgo/ginkgo
+  test/e2e/e2e.test
 )
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
@@ -289,14 +289,33 @@ kube::golang::fallback_if_stdlib_not_installable() {
   use_go_build=true
 }
 
+# Try and replicate the native binary placement of go install without
+# calling go install.
+kube::golang::output_filename_for_binary() {
+  local binary=$1
+  local platform=$2
+  local output_path="${KUBE_GOPATH}/bin"
+  if [[ $platform != $host_platform ]]; then
+    output_path="${output_path}/${platform//\//_}"
+  fi
+  local bin=$(basename "${binary}")
+  if [[ ${GOOS} == "windows" ]]; then
+    bin="${bin}.exe"
+  fi
+  echo "${output_path}/${bin}"
+}
+
 kube::golang::build_binaries_for_platform() {
   local platform=$1
   local use_go_build=${2-}
 
   local -a statics=()
   local -a nonstatics=()
+  local -a tests=()
   for binary in "${binaries[@]}"; do
-    if kube::golang::is_statically_linked_library "${binary}"; then
+    if [[ "${binary}" =~ ".test"$ ]]; then
+      tests+=($binary)
+    elif kube::golang::is_statically_linked_library "${binary}"; then
       statics+=($binary)
     else
       nonstatics+=($binary)
@@ -307,27 +326,17 @@ kube::golang::build_binaries_for_platform() {
   fi
 
   if [[ -n ${use_go_build:-} ]]; then
-    # Try and replicate the native binary placement of go install without
-    # calling go install.  This means we have to iterate each binary.
-    local output_path="${KUBE_GOPATH}/bin"
-    if [[ $platform != $host_platform ]]; then
-      output_path="${output_path}/${platform//\//_}"
-    fi
-
     kube::log::progress "    "
     for binary in "${binaries[@]}"; do
-      local bin=$(basename "${binary}")
-      if [[ ${GOOS} == "windows" ]]; then
-        bin="${bin}.exe"
-      fi
-
+      local outfile=$(kube::golang::output_filename_for_binary "${binary}" \
+        "${platform}")
       if kube::golang::is_statically_linked_library "${binary}"; then
-        CGO_ENABLED=0 go build -o "${output_path}/${bin}" \
+        CGO_ENABLED=0 go build -o "${outfile}" \
           "${goflags[@]:+${goflags[@]}}" \
           -ldflags "${version_ldflags}" \
           "${binary}"
       else
-        go build -o "${output_path}/${bin}" \
+        go build -o "${outfile}" \
           "${goflags[@]:+${goflags[@]}}" \
           -ldflags "${version_ldflags}" \
           "${binary}"
@@ -349,6 +358,14 @@ kube::golang::build_binaries_for_platform() {
     fi
   fi
 
+  for test in "${tests[@]:+${tests[@]}}"; do
+      local outfile=$(kube::golang::output_filename_for_binary "${test}" \
+        "${platform}")
+    go test -c -o "${outfile}" \
+      "${goflags[@]:+${goflags[@]}}" \
+      -ldflags "${version_ldflags}" \
+      "$(dirname ${test})"
+  done
 }
 
 # Return approximate physical memory in gigabytes.
