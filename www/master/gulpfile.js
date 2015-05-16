@@ -105,7 +105,8 @@ var source = {
       '!components/**/config/*.*',
       '!master/shared/js/modules/config.js',
       '!components/*/less/*.*',
-      '!components/**/less/**/*.*'
+      '!components/**/less/**/*.*',
+      '!components/**/README.md'
     ],
     dest: 'components',
     watch: [

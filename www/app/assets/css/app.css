@@ -7,7 +7,6 @@
 .nav-back {
   /* :before */
   /* content: ""; */
-  background: url('../img/arrow-back.png');
   background-size: 14px 14px;
   background-repeat: no-repeat;
   display: block;

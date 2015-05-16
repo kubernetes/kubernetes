@@ -20,7 +20,8 @@ app.factory('menu', [
   '$location',
   '$rootScope',
   'sections',
-  function($location, $rootScope, sections) {
+  '$route',
+  function($location, $rootScope, sections, $route) {
 
     var self;
 
@@ -37,7 +38,6 @@ app.factory('menu', [
       },
       isSectionSelected: function(section) { return self.openedSection === section; },
       selectPage: function(section, page) {
-        page && page.url && $location.path(page.url);
         self.currentSection = section;
         self.currentPage = page;
       },
@@ -45,10 +45,10 @@ app.factory('menu', [
     };
 
     function onLocationChange() {
-      var path = $location.path();
+      var path = $route.current.originalPath;
 
       var matchPage = function(section, page) {
-        if (path === page.url) {
+        if (path === page.url || path === (page.url + '/')) {
           self.selectSection(section);
           self.selectPage(section, page);
         }
@@ -101,7 +101,7 @@ app.config([
       }
     ]);
 
-app.value("sections", [{"name":"Dashboard","url":"/dashboard","type":"link","templateUrl":"/components/dashboard/pages/home.html"},{"name":"Dashboard","type":"heading","children":[{"name":"Dashboard","type":"toggle","url":"/dashboard","templateUrl":"/components/dashboard/pages/home.html","pages":[{"name":"Pods","url":"/dashboard/pods","templateUrl":"/components/dashboard/views/listPods.html","type":"link"},{"name":"Pod Visualizer","url":"/dashboard/visualpods","templateUrl":"/components/dashboard/views/listPodsVisualizer.html","type":"link"},{"name":"Services","url":"/dashboard/services","templateUrl":"/components/dashboard/views/listServices.html","type":"link"},{"name":"Replication Controllers","url":"/dashboard/replicationcontrollers","templateUrl":"/components/dashboard/views/listReplicationControllers.html","type":"link"},{"name":"Events","url":"/dashboard/events","templateUrl":"/components/dashboard/views/listEvents.html","type":"link"},{"name":"Nodes","url":"/dashboard/minions","templateUrl":"/components/dashboard/views/listMinions.html","type":"link"},{"name":"Replication Controller","url":"/dashboard/replicationcontrollers/:replicationControllerId","templateUrl":"/components/dashboard/views/replication.html","type":"link"},{"name":"Service","url":"/dashboard/services/:serviceId","templateUrl":"/components/dashboard/views/service.html","type":"link"},{"name":"Explore","url":"/dashboard/groups/:grouping*?/selector/:selector*?","templateUrl":"/components/dashboard/views/groups.html","type":"link"},{"name":"Pod","url":"/dashboard/pods/:podId","templateUrl":"/components/dashboard/views/pod.html","type":"link"}]}]},{"name":"Graph","url":"/graph","type":"link","templateUrl":"/components/graph/pages/home.html"},{"name":"Graph","url":"/graph/inspect","type":"link","templateUrl":"/components/graph/pages/inspect.html","css":"/components/graph/css/show-details-table.css"},{"name":"Graph","type":"heading","children":[{"name":"Graph","type":"toggle","url":"/graph","templateUrl":"/components/graph/pages/home.html","pages":[{"name":"Test","url":"/graph/test","type":"link","templateUrl":"/components/graph/pages/home.html"}]}]}]);
+app.value("sections", [{"name":"Dashboard","url":"/dashboard","type":"link","templateUrl":"/components/dashboard/pages/home.html"},{"name":"Dashboard","type":"heading","children":[{"name":"Dashboard","type":"toggle","url":"/dashboard","templateUrl":"/components/dashboard/pages/home.html","pages":[{"name":"Pods","url":"/dashboard/pods","templateUrl":"/components/dashboard/views/listPods.html","type":"link"},{"name":"Pod Visualizer","url":"/dashboard/visualpods","templateUrl":"/components/dashboard/views/listPodsVisualizer.html","type":"link"},{"name":"Services","url":"/dashboard/services","templateUrl":"/components/dashboard/views/listServices.html","type":"link"},{"name":"Replication Controllers","url":"/dashboard/replicationcontrollers","templateUrl":"/components/dashboard/views/listReplicationControllers.html","type":"link"},{"name":"Events","url":"/dashboard/events","templateUrl":"/components/dashboard/views/listEvents.html","type":"link"},{"name":"Nodes","url":"/dashboard/nodes","templateUrl":"/components/dashboard/views/listMinions.html","type":"link"},{"name":"Replication Controller","url":"/dashboard/replicationcontrollers/:replicationControllerId","templateUrl":"/components/dashboard/views/replication.html","type":"link"},{"name":"Service","url":"/dashboard/services/:serviceId","templateUrl":"/components/dashboard/views/service.html","type":"link"},{"name": "Node","url": "/dashboard/nodes/:nodeId","templateUrl": "/components/dashboard/views/node.html","type": "link"},{"name":"Explore","url":"/dashboard/groups/:grouping*?/selector/:selector*?","templateUrl":"/components/dashboard/views/groups.html","type":"link"},{"name":"Pod","url":"/dashboard/pods/:podId","templateUrl":"/components/dashboard/views/pod.html","type":"link"}]}]},{"name":"Graph","url":"/graph","type":"link","templateUrl":"/components/graph/pages/home.html"},{"name":"Graph","url":"/graph/inspect","type":"link","templateUrl":"/components/graph/pages/inspect.html","css":"/components/graph/css/show-details-table.css"},{"name":"Graph","type":"heading","children":[{"name":"Graph","type":"toggle","url":"/graph","templateUrl":"/components/graph/pages/home.html","pages":[{"name":"Test","url":"/graph/test","type":"link","templateUrl":"/components/graph/pages/home.html"}]}]}]);
 
 app.directive('includeReplace',
               function() {
@@ -194,7 +194,7 @@ app.service('SidebarService', [
 
 
 app.value("tabs", [{"component":"dashboard","title":"Dashboard"}]);
-app.constant("manifestRoutes", [{"description":"Dashboard visualization.","url":"/dashboard/","templateUrl":"components/dashboard/pages/home.html"},{"description":"Pods","url":"/dashboard/pods","templateUrl":"components/dashboard/views/listPods.html"},{"description":"Pod Visualizer","url":"/dashboard/visualpods","templateUrl":"components/dashboard/views/listPodsVisualizer.html"},{"description":"Services","url":"/dashboard/services","templateUrl":"components/dashboard/views/listServices.html"},{"description":"Replication Controllers","url":"/dashboard/replicationcontrollers","templateUrl":"components/dashboard/views/listReplicationControllers.html"},{"description":"Events","url":"/dashboard/events","templateUrl":"components/dashboard/views/listEvents.html"},{"description":"Nodes","url":"/dashboard/minions","templateUrl":"components/dashboard/views/listMinions.html"},{"description":"Replication Controller","url":"/dashboard/replicationcontrollers/:replicationControllerId","templateUrl":"components/dashboard/views/replication.html"},{"description":"Service","url":"/dashboard/services/:serviceId","templateUrl":"components/dashboard/views/service.html"},{"description":"Explore","url":"/dashboard/groups/:grouping*?/selector/:selector*?","templateUrl":"components/dashboard/views/groups.html"},{"description":"Pod","url":"/dashboard/pods/:podId","templateUrl":"components/dashboard/views/pod.html"}]);
+app.constant("manifestRoutes", [{"description":"Dashboard visualization.","url":"/dashboard/","templateUrl":"components/dashboard/pages/home.html"},{"description":"Pods","url":"/dashboard/pods","templateUrl":"components/dashboard/views/listPods.html"},{"description":"Pod Visualizer","url":"/dashboard/visualpods","templateUrl":"components/dashboard/views/listPodsVisualizer.html"},{"description":"Services","url":"/dashboard/services","templateUrl":"components/dashboard/views/listServices.html"},{"description":"Replication Controllers","url":"/dashboard/replicationcontrollers","templateUrl":"components/dashboard/views/listReplicationControllers.html"},{"description":"Events","url":"/dashboard/events","templateUrl":"components/dashboard/views/listEvents.html"},{"description":"Nodes","url":"/dashboard/nodes","templateUrl":"components/dashboard/views/listMinions.html"},{"description":"Replication Controller","url":"/dashboard/replicationcontrollers/:replicationControllerId","templateUrl":"components/dashboard/views/replication.html"},{"description":"Service","url":"/dashboard/services/:serviceId","templateUrl":"components/dashboard/views/service.html"},{"description":"Node","url":"/dashboard/nodes/:nodeId","templateUrl":"components/dashboard/views/node.html"},{"description":"Explore","url":"/dashboard/groups/:grouping*?/selector/:selector*?","templateUrl":"components/dashboard/views/groups.html"},{"description":"Pod","url":"/dashboard/pods/:podId","templateUrl":"components/dashboard/views/pod.html"}]);
 
 angular.module("kubernetesApp.config", [])
 
@@ -591,7 +591,9 @@ app.provider('k8sApi',
 
                  api.getPods = function(query) { return _get($http, urlBase + '/pods', query); };
 
-                 api.getMinions = function(query) { return _get($http, urlBase + '/minions', query); };
+                 api.getMinions = function(query) { return _get($http, urlBase + '/nodes', query); };
+
+                 api.getNodes = api.getMinions;
 
                  api.getServices = function(query) { return _get($http, urlBase + '/services', query); };
 
@@ -1291,7 +1293,7 @@ angular.module('kubernetesApp.components.dashboard', [])
         $scope.subPages = [
           {category: 'dashboard', name: 'Explore', value: '/dashboard/groups/type/selector/'},
           {category: 'dashboard', name: 'Pods', value: '/dashboard/pods'},
-          {category: 'dashboard', name: 'Minions', value: '/dashboard/minions'},
+          {category: 'dashboard', name: 'Nodes', value: '/dashboard/nodes'},
           {category: 'dashboard', name: 'Replication Controllers', value: '/dashboard/replicationcontrollers'},
           {category: 'dashboard', name: 'Services', value: '/dashboard/services'},
           {category: 'dashboard', name: 'Events', value: '/dashboard/events'}
@@ -1340,11 +1342,6 @@ app.controller('ListEventsCtrl', [
 
     $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
 
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
-
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
       $scope.loading = false;
@@ -1352,7 +1349,7 @@ app.controller('ListEventsCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getEvents().success(function(data) {
         $scope.loading = false;
@@ -1380,7 +1377,7 @@ app.controller('ListEventsCtrl', [
       }).error($scope.handleError);
     }
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);
@@ -1415,12 +1412,7 @@ app.controller('ListMinionsCtrl', [
     $scope.thumbs = 'thumb';
     $scope.count = 10;
 
-    $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
-
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
+    $scope.go = function(data) { $location.path('/dashboard/nodes/' + data.name); };
 
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
@@ -1429,7 +1421,7 @@ app.controller('ListMinionsCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getMinions().success(function(data) {
         $scope.loading = false;
@@ -1457,7 +1449,7 @@ app.controller('ListMinionsCtrl', [
       }).error($scope.handleError);
     }
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);
@@ -1501,12 +1493,7 @@ app.controller('ListPodsCtrl', [
     $scope.sortable = ['pod', 'ip', 'status'];
     $scope.count = 10;
 
-    $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
-
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
+    $scope.go = function(data) { $location.path('/dashboard/pods/' + data.pod); };
 
     var orderedPodNames = [];
 
@@ -1519,7 +1506,7 @@ app.controller('ListPodsCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getPods().success(angular.bind(this, function(data) {
         $scope.loading = false;
@@ -1594,7 +1581,7 @@ app.controller('ListPodsCtrl', [
       return _.indexOf(orderedPodNames, name) + 1;
     };
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);
@@ -1637,12 +1624,7 @@ app.controller('ListReplicationControllersCtrl', [
     $scope.thumbs = 'thumb';
     $scope.count = 10;
 
-    $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
-
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
+    $scope.go = function(data) { $location.path('/dashboard/replicationcontrollers/' + data.controller); };
 
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
@@ -1651,7 +1633,7 @@ app.controller('ListReplicationControllersCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getReplicationControllers().success(function(data) {
         $scope.loading = false;
@@ -1696,7 +1678,7 @@ app.controller('ListReplicationControllersCtrl', [
       }).error($scope.handleError);
     }
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);
@@ -1712,7 +1694,8 @@ app.controller('ListServicesCtrl', [
   '$routeParams',
   'k8sApi',
   '$rootScope',
-  function($scope, $interval, $routeParams, k8sApi, $rootScope) {
+  '$location',
+  function($scope, $interval, $routeParams, k8sApi, $rootScope, $location) {
     'use strict';
     $scope.doTheBack = function() { window.history.back(); };
 
@@ -1734,6 +1717,8 @@ app.controller('ListServicesCtrl', [
     $scope.sortable = ['name', 'ip', 'port'];
     $scope.count = 10;
 
+    $scope.go = function(data) { $location.path('/dashboard/services/' + data.name); };
+
     $scope.content = [];
 
     $rootScope.doTheBack = $scope.doTheBack;
@@ -1743,9 +1728,9 @@ app.controller('ListServicesCtrl', [
       $scope_.loading = false;
     };
 
-    $scope.getData = function(dataId) {
+    $scope.getData = function() {
       $scope.loading = true;
-      k8sApi.getServices(dataId).success(angular.bind(this, function(data) {
+      k8sApi.getServices().success(angular.bind(this, function(data) {
         $scope.services = data;
         $scope.loading = false;
 
@@ -1808,7 +1793,41 @@ app.controller('ListServicesCtrl', [
       })).error($scope.handleError);
     };
 
-    $scope.getData($routeParams.serviceId);
+    $scope.getData();
+  }
+]);
+
+/**=========================================================
+ * Module: Nodes
+ * Visualizer for nodes
+ =========================================================*/
+
+app.controller('NodeCtrl', [
+  '$scope',
+  '$interval',
+  '$routeParams',
+  'k8sApi',
+  '$rootScope',
+  function($scope, $interval, $routeParams, k8sApi, $rootScope) {
+    'use strict';
+    $scope.doTheBack = function() { window.history.back(); };
+
+    $rootScope.doTheBack = $scope.doTheBack;
+
+    $scope.handleError = function(data, status, headers, config) {
+      console.log("Error (" + status + "): " + data);
+      $scope_.loading = false;
+    };
+
+    $scope.handleNode = function(nodeId) {
+      $scope.loading = true;
+      k8sApi.getNodes(nodeId).success(angular.bind(this, function(data) {
+        $scope.node = data;
+        $scope.loading = false;
+      })).error($scope.handleError);
+    };
+
+    $scope.handleNode($routeParams.nodeId);
   }
 ]);
 
@@ -1876,6 +1895,9 @@ app.controller('ReplicationControllerCtrl', [
     $scope.controller.k8sApi = k8sApi;
     $scope.controller.scope = $scope;
     $scope.controller.getData($routeParams.replicationControllerId);
+
+    $scope.doTheBack = function() { window.history.back(); };
+
   }
 ]);
 
@@ -1911,12 +1933,8 @@ app.controller('ServiceCtrl', [
     $scope.controller.scope = $scope;
     $scope.controller.getData($routeParams.serviceId);
 
-    $scope.go = function(d) { $location.path('/dashboard/services/' + d.id); }
+    $scope.doTheBack = function() { window.history.back(); };
 
-                $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/services/' + d.id);
-      e.stopPropagation();
-    }
   }
 ]);
 
@@ -2297,12 +2315,12 @@ app.controller('ServiceCtrl', [
                    $scope.subpages = [
                      {
                        category: 'dashboard',
-                       name: 'Groups',
+                       name: 'Explore',
                        value: '/dashboard/groups/type/selector/',
                        id: 'groupsView'
                      },
                      {category: 'dashboard', name: 'Pods', value: '/dashboard/pods', id: 'podsView'},
-                     {category: 'dashboard', name: 'Nodes', value: '/dashboard/minions', id: 'minionsView'},
+                     {category: 'dashboard', name: 'Nodes', value: '/dashboard/nodes', id: 'minionsView'},
                      {
                        category: 'dashboard',
                        name: 'Replication Controllers',
@@ -2337,8 +2355,10 @@ app.controller('ServiceCtrl', [
             filters: '=',
             customClass: '=customClass',
             thumbs: '=',
-            count: '='
+            count: '=',
+            doSelect: '&onSelect'
           },
+          transclude: true,
           controller: ["$scope", "$filter", "$window", "$location", function($scope, $filter, $window, $location) {
             var orderBy = $filter('orderBy');
             $scope.currentPage = 0;
@@ -2350,13 +2370,6 @@ app.controller('ServiceCtrl', [
                 return false;
               }
             };
-            $scope.go = function(d) {
-              if (d.pod) {
-                $location.path('/dashboard/pods/' + d.pod);
-              } else if (d.name) {
-                $location.path('/dashboard/services/' + d.name);
-              }
-            };
             $scope.order = function(predicate, reverse) {
               $scope.content = orderBy($scope.content, predicate, reverse);
               $scope.predicate = predicate;
@@ -2364,6 +2377,7 @@ app.controller('ServiceCtrl', [
             $scope.order($scope.sortable[0], false);
             $scope.getNumber = function(num) { return new Array(num); };
             $scope.goToPage = function(page) { $scope.currentPage = page; };
+            $scope.showMore = function() { return angular.isDefined($scope.moreClick);}
           }],
           templateUrl: 'views/partials/md-table.tmpl.html'
         };

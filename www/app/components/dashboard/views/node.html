@@ -1,0 +1,61 @@
+<div dashboard-header></div>
+<div class="dashboard">
+  <div ng-controller="NodeCtrl" layout="column" class="body-wrapper node">
+    <div class="detail">
+
+      <div class="back">
+        <md-button class="md-default-theme" ng-click="doTheBack()">‹ BACK</md-button>
+      </div>
+
+
+      <div class="heading">
+        <span class="label">Name:</span>
+        <span>{{node.id}}</span>
+      </div>
+
+
+      <table>
+        <tbody>
+          <tr>
+            <td class="name">Labels</td>
+            <td class="value">
+              <div ng-repeat="(label, value) in node.labels">
+                {{label}}: {{value}}
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Created</td>
+            <td class="value">
+              {{node.creationTimestamp | date:'medium'}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Host IP</td>
+            <td class="value">
+              {{node.hostIP}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">System Info</td>
+            <td class="value">
+              <div ng-repeat="(label, value) in node.status.nodeInfo">
+                {{label}}: {{value}}
+              </div>
+            </td>
+          </tr>
+
+
+        </tbody>
+      </table>
+
+
+
+    </div>
+  </div>
+</div>
+<div dashboard-footer></div>
+

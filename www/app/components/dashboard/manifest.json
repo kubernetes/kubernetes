@@ -33,7 +33,7 @@
     },
     {
       "description": "Nodes",
-      "url": "/minions",
+      "url": "/nodes",
       "templateUrl": "components/dashboard/views/listMinions.html"
     },
     {
@@ -45,6 +45,11 @@
       "description": "Service",
       "url": "/services/:serviceId",
       "templateUrl": "components/dashboard/views/service.html"
+    },
+    {
+      "description": "Node",
+      "url": "/nodes/:nodeId",
+      "templateUrl": "components/dashboard/views/node.html"
     },
     {
       "description": "Explore",

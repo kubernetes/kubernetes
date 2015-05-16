@@ -9,7 +9,8 @@ app.controller('ListServicesCtrl', [
   '$routeParams',
   'k8sApi',
   '$rootScope',
-  function($scope, $interval, $routeParams, k8sApi, $rootScope) {
+  '$location',
+  function($scope, $interval, $routeParams, k8sApi, $rootScope, $location) {
     'use strict';
     $scope.doTheBack = function() { window.history.back(); };
 
@@ -31,6 +32,8 @@ app.controller('ListServicesCtrl', [
     $scope.sortable = ['name', 'ip', 'port'];
     $scope.count = 10;
 
+    $scope.go = function(data) { $location.path('/dashboard/services/' + data.name); };
+
     $scope.content = [];
 
     $rootScope.doTheBack = $scope.doTheBack;
@@ -40,9 +43,9 @@ app.controller('ListServicesCtrl', [
       $scope_.loading = false;
     };
 
-    $scope.getData = function(dataId) {
+    $scope.getData = function() {
       $scope.loading = true;
-      k8sApi.getServices(dataId).success(angular.bind(this, function(data) {
+      k8sApi.getServices().success(angular.bind(this, function(data) {
         $scope.services = data;
         $scope.loading = false;
 
@@ -105,6 +108,6 @@ app.controller('ListServicesCtrl', [
       })).error($scope.handleError);
     };
 
-    $scope.getData($routeParams.serviceId);
+    $scope.getData();
   }
 ]);

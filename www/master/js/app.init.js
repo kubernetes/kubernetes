@@ -19,7 +19,8 @@ app.factory('menu', [
   '$location',
   '$rootScope',
   'sections',
-  function($location, $rootScope, sections) {
+  '$route',
+  function($location, $rootScope, sections, $route) {
 
     var self;
 
@@ -36,7 +37,6 @@ app.factory('menu', [
       },
       isSectionSelected: function(section) { return self.openedSection === section; },
       selectPage: function(section, page) {
-        page && page.url && $location.path(page.url);
         self.currentSection = section;
         self.currentPage = page;
       },
@@ -44,10 +44,10 @@ app.factory('menu', [
     };
 
     function onLocationChange() {
-      var path = $location.path();
+      var path = $route.current.originalPath;
 
       var matchPage = function(section, page) {
-        if (path === page.url) {
+        if (path === page.url || path === (page.url + '/')) {
           self.selectSection(section);
           self.selectPage(section, page);
         }

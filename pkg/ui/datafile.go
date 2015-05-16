@@ -68,7 +68,6 @@ var _www_app_assets_css_app_css = []byte(`.nav-back {
 .nav-back {
   /* :before */
   /* content: ""; */
-  background: url('../img/arrow-back.png');
   background-size: 14px 14px;
   background-repeat: no-repeat;
   display: block;
@@ -1582,7 +1581,7 @@ func www_app_assets_css_app_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37094, mode: os.FileMode(436), modTime: time.Unix(1431747253, 0)}
+	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37050, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1934,7 +1933,8 @@ app.factory('menu', [
   '$location',
   '$rootScope',
   'sections',
-  function($location, $rootScope, sections) {
+  '$route',
+  function($location, $rootScope, sections, $route) {
 
     var self;
 
@@ -1951,7 +1951,6 @@ app.factory('menu', [
       },
       isSectionSelected: function(section) { return self.openedSection === section; },
       selectPage: function(section, page) {
-        page && page.url && $location.path(page.url);
         self.currentSection = section;
         self.currentPage = page;
       },
@@ -1959,10 +1958,10 @@ app.factory('menu', [
     };
 
     function onLocationChange() {
-      var path = $location.path();
+      var path = $route.current.originalPath;
 
       var matchPage = function(section, page) {
-        if (path === page.url) {
+        if (path === page.url || path === (page.url + '/')) {
           self.selectSection(section);
           self.selectPage(section, page);
         }
@@ -2015,7 +2014,7 @@ app.config([
       }
     ]);
 
-app.value("sections", [{"name":"Dashboard","url":"/dashboard","type":"link","templateUrl":"/components/dashboard/pages/home.html"},{"name":"Dashboard","type":"heading","children":[{"name":"Dashboard","type":"toggle","url":"/dashboard","templateUrl":"/components/dashboard/pages/home.html","pages":[{"name":"Pods","url":"/dashboard/pods","templateUrl":"/components/dashboard/views/listPods.html","type":"link"},{"name":"Pod Visualizer","url":"/dashboard/visualpods","templateUrl":"/components/dashboard/views/listPodsVisualizer.html","type":"link"},{"name":"Services","url":"/dashboard/services","templateUrl":"/components/dashboard/views/listServices.html","type":"link"},{"name":"Replication Controllers","url":"/dashboard/replicationcontrollers","templateUrl":"/components/dashboard/views/listReplicationControllers.html","type":"link"},{"name":"Events","url":"/dashboard/events","templateUrl":"/components/dashboard/views/listEvents.html","type":"link"},{"name":"Nodes","url":"/dashboard/minions","templateUrl":"/components/dashboard/views/listMinions.html","type":"link"},{"name":"Replication Controller","url":"/dashboard/replicationcontrollers/:replicationControllerId","templateUrl":"/components/dashboard/views/replication.html","type":"link"},{"name":"Service","url":"/dashboard/services/:serviceId","templateUrl":"/components/dashboard/views/service.html","type":"link"},{"name":"Explore","url":"/dashboard/groups/:grouping*?/selector/:selector*?","templateUrl":"/components/dashboard/views/groups.html","type":"link"},{"name":"Pod","url":"/dashboard/pods/:podId","templateUrl":"/components/dashboard/views/pod.html","type":"link"}]}]},{"name":"Graph","url":"/graph","type":"link","templateUrl":"/components/graph/pages/home.html"},{"name":"Graph","url":"/graph/inspect","type":"link","templateUrl":"/components/graph/pages/inspect.html","css":"/components/graph/css/show-details-table.css"},{"name":"Graph","type":"heading","children":[{"name":"Graph","type":"toggle","url":"/graph","templateUrl":"/components/graph/pages/home.html","pages":[{"name":"Test","url":"/graph/test","type":"link","templateUrl":"/components/graph/pages/home.html"}]}]}]);
+app.value("sections", [{"name":"Dashboard","url":"/dashboard","type":"link","templateUrl":"/components/dashboard/pages/home.html"},{"name":"Dashboard","type":"heading","children":[{"name":"Dashboard","type":"toggle","url":"/dashboard","templateUrl":"/components/dashboard/pages/home.html","pages":[{"name":"Pods","url":"/dashboard/pods","templateUrl":"/components/dashboard/views/listPods.html","type":"link"},{"name":"Pod Visualizer","url":"/dashboard/visualpods","templateUrl":"/components/dashboard/views/listPodsVisualizer.html","type":"link"},{"name":"Services","url":"/dashboard/services","templateUrl":"/components/dashboard/views/listServices.html","type":"link"},{"name":"Replication Controllers","url":"/dashboard/replicationcontrollers","templateUrl":"/components/dashboard/views/listReplicationControllers.html","type":"link"},{"name":"Events","url":"/dashboard/events","templateUrl":"/components/dashboard/views/listEvents.html","type":"link"},{"name":"Nodes","url":"/dashboard/nodes","templateUrl":"/components/dashboard/views/listMinions.html","type":"link"},{"name":"Replication Controller","url":"/dashboard/replicationcontrollers/:replicationControllerId","templateUrl":"/components/dashboard/views/replication.html","type":"link"},{"name":"Service","url":"/dashboard/services/:serviceId","templateUrl":"/components/dashboard/views/service.html","type":"link"},{"name": "Node","url": "/dashboard/nodes/:nodeId","templateUrl": "/components/dashboard/views/node.html","type": "link"},{"name":"Explore","url":"/dashboard/groups/:grouping*?/selector/:selector*?","templateUrl":"/components/dashboard/views/groups.html","type":"link"},{"name":"Pod","url":"/dashboard/pods/:podId","templateUrl":"/components/dashboard/views/pod.html","type":"link"}]}]},{"name":"Graph","url":"/graph","type":"link","templateUrl":"/components/graph/pages/home.html"},{"name":"Graph","url":"/graph/inspect","type":"link","templateUrl":"/components/graph/pages/inspect.html","css":"/components/graph/css/show-details-table.css"},{"name":"Graph","type":"heading","children":[{"name":"Graph","type":"toggle","url":"/graph","templateUrl":"/components/graph/pages/home.html","pages":[{"name":"Test","url":"/graph/test","type":"link","templateUrl":"/components/graph/pages/home.html"}]}]}]);
 
 app.directive('includeReplace',
               function() {
@@ -2108,7 +2107,7 @@ app.service('SidebarService', [
 
 
 app.value("tabs", [{"component":"dashboard","title":"Dashboard"}]);
-app.constant("manifestRoutes", [{"description":"Dashboard visualization.","url":"/dashboard/","templateUrl":"components/dashboard/pages/home.html"},{"description":"Pods","url":"/dashboard/pods","templateUrl":"components/dashboard/views/listPods.html"},{"description":"Pod Visualizer","url":"/dashboard/visualpods","templateUrl":"components/dashboard/views/listPodsVisualizer.html"},{"description":"Services","url":"/dashboard/services","templateUrl":"components/dashboard/views/listServices.html"},{"description":"Replication Controllers","url":"/dashboard/replicationcontrollers","templateUrl":"components/dashboard/views/listReplicationControllers.html"},{"description":"Events","url":"/dashboard/events","templateUrl":"components/dashboard/views/listEvents.html"},{"description":"Nodes","url":"/dashboard/minions","templateUrl":"components/dashboard/views/listMinions.html"},{"description":"Replication Controller","url":"/dashboard/replicationcontrollers/:replicationControllerId","templateUrl":"components/dashboard/views/replication.html"},{"description":"Service","url":"/dashboard/services/:serviceId","templateUrl":"components/dashboard/views/service.html"},{"description":"Explore","url":"/dashboard/groups/:grouping*?/selector/:selector*?","templateUrl":"components/dashboard/views/groups.html"},{"description":"Pod","url":"/dashboard/pods/:podId","templateUrl":"components/dashboard/views/pod.html"}]);
+app.constant("manifestRoutes", [{"description":"Dashboard visualization.","url":"/dashboard/","templateUrl":"components/dashboard/pages/home.html"},{"description":"Pods","url":"/dashboard/pods","templateUrl":"components/dashboard/views/listPods.html"},{"description":"Pod Visualizer","url":"/dashboard/visualpods","templateUrl":"components/dashboard/views/listPodsVisualizer.html"},{"description":"Services","url":"/dashboard/services","templateUrl":"components/dashboard/views/listServices.html"},{"description":"Replication Controllers","url":"/dashboard/replicationcontrollers","templateUrl":"components/dashboard/views/listReplicationControllers.html"},{"description":"Events","url":"/dashboard/events","templateUrl":"components/dashboard/views/listEvents.html"},{"description":"Nodes","url":"/dashboard/nodes","templateUrl":"components/dashboard/views/listMinions.html"},{"description":"Replication Controller","url":"/dashboard/replicationcontrollers/:replicationControllerId","templateUrl":"components/dashboard/views/replication.html"},{"description":"Service","url":"/dashboard/services/:serviceId","templateUrl":"components/dashboard/views/service.html"},{"description":"Node","url":"/dashboard/nodes/:nodeId","templateUrl":"components/dashboard/views/node.html"},{"description":"Explore","url":"/dashboard/groups/:grouping*?/selector/:selector*?","templateUrl":"components/dashboard/views/groups.html"},{"description":"Pod","url":"/dashboard/pods/:podId","templateUrl":"components/dashboard/views/pod.html"}]);
 
 angular.module("kubernetesApp.config", [])
 
@@ -2505,7 +2504,9 @@ app.provider('k8sApi',
 
                  api.getPods = function(query) { return _get($http, urlBase + '/pods', query); };
 
-                 api.getMinions = function(query) { return _get($http, urlBase + '/minions', query); };
+                 api.getMinions = function(query) { return _get($http, urlBase + '/nodes', query); };
+
+                 api.getNodes = api.getMinions;
 
                  api.getServices = function(query) { return _get($http, urlBase + '/services', query); };
 
@@ -3205,7 +3206,7 @@ angular.module('kubernetesApp.components.dashboard', [])
         $scope.subPages = [
           {category: 'dashboard', name: 'Explore', value: '/dashboard/groups/type/selector/'},
           {category: 'dashboard', name: 'Pods', value: '/dashboard/pods'},
-          {category: 'dashboard', name: 'Minions', value: '/dashboard/minions'},
+          {category: 'dashboard', name: 'Nodes', value: '/dashboard/nodes'},
           {category: 'dashboard', name: 'Replication Controllers', value: '/dashboard/replicationcontrollers'},
           {category: 'dashboard', name: 'Services', value: '/dashboard/services'},
           {category: 'dashboard', name: 'Events', value: '/dashboard/events'}
@@ -3254,11 +3255,6 @@ app.controller('ListEventsCtrl', [
 
     $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
 
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
-
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
       $scope.loading = false;
@@ -3266,7 +3262,7 @@ app.controller('ListEventsCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getEvents().success(function(data) {
         $scope.loading = false;
@@ -3294,7 +3290,7 @@ app.controller('ListEventsCtrl', [
       }).error($scope.handleError);
     }
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);
@@ -3329,12 +3325,7 @@ app.controller('ListMinionsCtrl', [
     $scope.thumbs = 'thumb';
     $scope.count = 10;
 
-    $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
-
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
+    $scope.go = function(data) { $location.path('/dashboard/nodes/' + data.name); };
 
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
@@ -3343,7 +3334,7 @@ app.controller('ListMinionsCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getMinions().success(function(data) {
         $scope.loading = false;
@@ -3371,7 +3362,7 @@ app.controller('ListMinionsCtrl', [
       }).error($scope.handleError);
     }
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);
@@ -3415,12 +3406,7 @@ app.controller('ListPodsCtrl', [
     $scope.sortable = ['pod', 'ip', 'status'];
     $scope.count = 10;
 
-    $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
-
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
+    $scope.go = function(data) { $location.path('/dashboard/pods/' + data.pod); };
 
     var orderedPodNames = [];
 
@@ -3433,7 +3419,7 @@ app.controller('ListPodsCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getPods().success(angular.bind(this, function(data) {
         $scope.loading = false;
@@ -3508,7 +3494,7 @@ app.controller('ListPodsCtrl', [
       return _.indexOf(orderedPodNames, name) + 1;
     };
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);
@@ -3551,12 +3537,7 @@ app.controller('ListReplicationControllersCtrl', [
     $scope.thumbs = 'thumb';
     $scope.count = 10;
 
-    $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
-
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
+    $scope.go = function(data) { $location.path('/dashboard/replicationcontrollers/' + data.controller); };
 
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
@@ -3565,7 +3546,7 @@ app.controller('ListReplicationControllersCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getReplicationControllers().success(function(data) {
         $scope.loading = false;
@@ -3610,7 +3591,7 @@ app.controller('ListReplicationControllersCtrl', [
       }).error($scope.handleError);
     }
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);
@@ -3626,7 +3607,8 @@ app.controller('ListServicesCtrl', [
   '$routeParams',
   'k8sApi',
   '$rootScope',
-  function($scope, $interval, $routeParams, k8sApi, $rootScope) {
+  '$location',
+  function($scope, $interval, $routeParams, k8sApi, $rootScope, $location) {
     'use strict';
     $scope.doTheBack = function() { window.history.back(); };
 
@@ -3648,6 +3630,8 @@ app.controller('ListServicesCtrl', [
     $scope.sortable = ['name', 'ip', 'port'];
     $scope.count = 10;
 
+    $scope.go = function(data) { $location.path('/dashboard/services/' + data.name); };
+
     $scope.content = [];
 
     $rootScope.doTheBack = $scope.doTheBack;
@@ -3657,9 +3641,9 @@ app.controller('ListServicesCtrl', [
       $scope_.loading = false;
     };
 
-    $scope.getData = function(dataId) {
+    $scope.getData = function() {
       $scope.loading = true;
-      k8sApi.getServices(dataId).success(angular.bind(this, function(data) {
+      k8sApi.getServices().success(angular.bind(this, function(data) {
         $scope.services = data;
         $scope.loading = false;
 
@@ -3722,7 +3706,41 @@ app.controller('ListServicesCtrl', [
       })).error($scope.handleError);
     };
 
-    $scope.getData($routeParams.serviceId);
+    $scope.getData();
+  }
+]);
+
+/**=========================================================
+ * Module: Nodes
+ * Visualizer for nodes
+ =========================================================*/
+
+app.controller('NodeCtrl', [
+  '$scope',
+  '$interval',
+  '$routeParams',
+  'k8sApi',
+  '$rootScope',
+  function($scope, $interval, $routeParams, k8sApi, $rootScope) {
+    'use strict';
+    $scope.doTheBack = function() { window.history.back(); };
+
+    $rootScope.doTheBack = $scope.doTheBack;
+
+    $scope.handleError = function(data, status, headers, config) {
+      console.log("Error (" + status + "): " + data);
+      $scope_.loading = false;
+    };
+
+    $scope.handleNode = function(nodeId) {
+      $scope.loading = true;
+      k8sApi.getNodes(nodeId).success(angular.bind(this, function(data) {
+        $scope.node = data;
+        $scope.loading = false;
+      })).error($scope.handleError);
+    };
+
+    $scope.handleNode($routeParams.nodeId);
   }
 ]);
 
@@ -3790,6 +3808,9 @@ app.controller('ReplicationControllerCtrl', [
     $scope.controller.k8sApi = k8sApi;
     $scope.controller.scope = $scope;
     $scope.controller.getData($routeParams.replicationControllerId);
+
+    $scope.doTheBack = function() { window.history.back(); };
+
   }
 ]);
 
@@ -3825,12 +3846,8 @@ app.controller('ServiceCtrl', [
     $scope.controller.scope = $scope;
     $scope.controller.getData($routeParams.serviceId);
 
-    $scope.go = function(d) { $location.path('/dashboard/services/' + d.id); }
+    $scope.doTheBack = function() { window.history.back(); };
 
-                $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/services/' + d.id);
-      e.stopPropagation();
-    }
   }
 ]);
 
@@ -4211,12 +4228,12 @@ app.controller('ServiceCtrl', [
                    $scope.subpages = [
                      {
                        category: 'dashboard',
-                       name: 'Groups',
+                       name: 'Explore',
                        value: '/dashboard/groups/type/selector/',
                        id: 'groupsView'
                      },
                      {category: 'dashboard', name: 'Pods', value: '/dashboard/pods', id: 'podsView'},
-                     {category: 'dashboard', name: 'Nodes', value: '/dashboard/minions', id: 'minionsView'},
+                     {category: 'dashboard', name: 'Nodes', value: '/dashboard/nodes', id: 'minionsView'},
                      {
                        category: 'dashboard',
                        name: 'Replication Controllers',
@@ -4251,8 +4268,10 @@ app.controller('ServiceCtrl', [
             filters: '=',
             customClass: '=customClass',
             thumbs: '=',
-            count: '='
+            count: '=',
+            doSelect: '&onSelect'
           },
+          transclude: true,
           controller: ["$scope", "$filter", "$window", "$location", function($scope, $filter, $window, $location) {
             var orderBy = $filter('orderBy');
             $scope.currentPage = 0;
@@ -4264,13 +4283,6 @@ app.controller('ServiceCtrl', [
                 return false;
               }
             };
-            $scope.go = function(d) {
-              if (d.pod) {
-                $location.path('/dashboard/pods/' + d.pod);
-              } else if (d.name) {
-                $location.path('/dashboard/services/' + d.name);
-              }
-            };
             $scope.order = function(predicate, reverse) {
               $scope.content = orderBy($scope.content, predicate, reverse);
               $scope.predicate = predicate;
@@ -4278,6 +4290,7 @@ app.controller('ServiceCtrl', [
             $scope.order($scope.sortable[0], false);
             $scope.getNumber = function(num) { return new Array(num); };
             $scope.goToPage = function(page) { $scope.currentPage = page; };
+            $scope.showMore = function() { return angular.isDefined($scope.moreClick);}
           }],
           templateUrl: 'views/partials/md-table.tmpl.html'
         };
@@ -4649,7 +4662,7 @@ func www_app_assets_js_app_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 92491, mode: os.FileMode(436), modTime: time.Unix(1431747252, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 93013, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4692,172 +4705,6 @@ func www_app_assets_js_base_js() (*asset, error) {
 	}
 
 	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477058, mode: os.FileMode(436), modTime: time.Unix(1431747252, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _www_app_components_readme_md = []byte(`Components
-==========
-
-A tab in the Kubernetes UI with its set of visualizations is referred to as a *component*. Components are separated from the UI chrome and base data providers to simplify the development of new visualizations. This document provides reference for creation and modification of components.
-
-Each component has its own directory, which contains a manifest file, HTML views, Angular providers, CSS, Less and other assets. Below is the recommended directory structure for a component.
-` + "`" + `` + "`" + `` + "`" + `
-foo_component
-├── config
-├── css
-├── img
-├── js
-│   └── modules
-│       ├── controllers
-│       ├── directives
-│       └── services
-├── less
-├── pages
-├── views
-│   └── partials
-└── manifest.json
-` + "`" + `` + "`" + `` + "`" + `
-
-###Manifest file
-
-The JSON-formatted manifest file, named ` + "`" + `` + "`" + `` + "`" + `manifest.json` + "`" + `` + "`" + `` + "`" + `, is located at the root of a component. Based on the component directory name and the contents of the manifest, the Kubernetes UI automatically adds a tab to the chrome, a dependency on the component's AngularJS module to main AngularJS app and Angular routes for the component.
-
-For example, consider a manifest file at ` + "`" + `` + "`" + `` + "`" + `master/components/foo_component/manifest.json` + "`" + `` + "`" + `` + "`" + `:
-` + "`" + `` + "`" + `` + "`" + `
-{
-  "routes": [
-    {
-      "url": "/",
-      "templateUrl": "/components/foo_component/pages/home.html"
-    },
-    {
-      "url": "/kittens",
-      "templateUrl": "/components/foo_component/pages/kittens.html",
-      "css": "/components/foo_component/css/kittens.css"
-    }
-  ]
-}
-` + "`" + `` + "`" + `` + "`" + `
-
-From the name of the component directory, the Kubernetes UI
-* creates a tab called "Foo Component",
-* adds Angular module ` + "`" + `` + "`" + `` + "`" + `kubernetesApp.components.fooComponent` + "`" + `` + "`" + `` + "`" + ` to the dependencies of ` + "`" + `` + "`" + `` + "`" + `kubernetesApp` + "`" + `` + "`" + `` + "`" + `, and
-* defines Angular routes ` + "`" + `` + "`" + `` + "`" + `/foo_component/` + "`" + `` + "`" + `` + "`" + ` and ` + "`" + `` + "`" + `` + "`" + `/foo_component/kittens` + "`" + `` + "`" + `` + "`" + `.
-
-Every tab links to ` + "`" + `` + "`" + `` + "`" + `/` + "`" + `` + "`" + `` + "`" + ` relative to its component, so it is important to always define a ` + "`" + `` + "`" + `` + "`" + `/` + "`" + `` + "`" + `` + "`" + ` route.
-
-###Source files
-In general, all files located in ` + "`" + `` + "`" + `` + "`" + `master/components/<component>` + "`" + `` + "`" + `` + "`" + ` are copied to ` + "`" + `` + "`" + `` + "`" + `app/components/<component>/` + "`" + `` + "`" + `` + "`" + ` on each gulp build. This includes (but is not limited to) HTML views, CSS and images. Exceptions to this copy are the ` + "`" + `` + "`" + `` + "`" + `config` + "`" + `` + "`" + `` + "`" + ` and ` + "`" + `` + "`" + `` + "`" + `less` + "`" + `` + "`" + `` + "`" + ` directories as well as all ` + "`" + `` + "`" + `` + "`" + `.js` + "`" + `` + "`" + `` + "`" + ` files.
-
-The sections below describe how the exceptions are built into the UI.
-
-####JavaScript
-All JavaScript files located in the ` + "`" + `` + "`" + `` + "`" + `master/components/<component>/js` + "`" + `` + "`" + `` + "`" + ` are uglified and concatenated together with the rest of the UI's JavaScript. Once aggregated, the JavaScript file is minified and written to ` + "`" + `` + "`" + `` + "`" + `app/assets/js/app.js` + "`" + `` + "`" + `` + "`" + `.
-
-####Configuration
-
-Similar to the [UI-wide configuration](../../README.md#configuration), components can define different configuration for each environment. The gulp task creates the constant ` + "`" + `` + "`" + `` + "`" + `ENV` + "`" + `` + "`" + `` + "`" + ` under the ` + "`" + `` + "`" + `` + "`" + `kubernetesApp.config` + "`" + `` + "`" + `` + "`" + ` module for configuration, which is an object with a property for the root UI and each component.
-
-For example, a configuration for the ` + "`" + `` + "`" + `` + "`" + `development` + "`" + `` + "`" + `` + "`" + ` environment specific to ` + "`" + `` + "`" + `` + "`" + `foo_component` + "`" + `` + "`" + `` + "`" + ` would be located at ` + "`" + `` + "`" + `` + "`" + `master/components/foo_component/config/development.json` + "`" + `` + "`" + `` + "`" + `. Such a component would access its ` + "`" + `` + "`" + `` + "`" + `development.json` + "`" + `` + "`" + `` + "`" + ` configuration verbatim at ` + "`" + `` + "`" + `` + "`" + `ENV.foo_component` + "`" + `` + "`" + `` + "`" + `:
-` + "`" + `` + "`" + `` + "`" + `
-angular.module('kubernetesApp.components.fooComponent', ['kubernetesApp.config'])
-    .provider('foo', ...)
-    .config(['fooProvider', 'ENV', function(fooProvider, ENV) {
-      // Configure fooProvider using ENV['foo_component'].
-    });
-` + "`" + `` + "`" + `` + "`" + `
-
-####Less
-
-Like JavaScript, the component's Less files are built into one monolithic CSS file. All top-level Less files located at ` + "`" + `` + "`" + `` + "`" + `master/components/<component>/less/*.less` + "`" + `` + "`" + `` + "`" + ` are imported into the main UI's Less file. The result is then minified and copied to ` + "`" + `` + "`" + `` + "`" + `app/assets/css/app.css` + "`" + `` + "`" + `` + "`" + `.
-
-Sub-directories of this path are watched for changes, but not directly imported. This is useful for defining common colors, mixins and other functions or variables used by the top-level Less files.
-
-###Appendix
-
-####Manifest schema
-
-` + "`" + `` + "`" + `` + "`" + `
-{
-  "$schema": "http://json-schema.org/draft-04/schema#",
-  "type": "object",
-  "properties": {
-    "description": {
-      "type": "string",
-      "description": "Very brief summary of the component. Use a README.md file for detailed descriptions."
-    },
-    "routes": {
-      "type": "array",
-      "description": "Angular routes for the component.",
-      "items": {
-        "type": "object",
-        "properties": {
-          "description": {
-            "type": "string",
-            "description": "Short description of the route."
-          },
-          "url": {
-            "type": "string",
-            "description": "Route location relative to '/<component>'."
-          },
-          "templateUrl": {
-            "type": "string",
-            "description": "Absolute location of the HTML template."
-          },
-          "css": {
-            "type": "string",
-            "description": "Absolute location of CSS to use with this route."
-          }
-        },
-        "required": ["url", "templateUrl"]
-      },
-      "minItems": 1
-    }
-  },
-  "required": ["routes"]
-}
-` + "`" + `` + "`" + `` + "`" + `
-
-Content available under the [CC-By 3.0
-license](http://creativecommons.org/licenses/by/3.0/)
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/www/master/components/README.md?pixel)]()
-`)
-
-func www_app_components_readme_md_bytes() ([]byte, error) {
-	return _www_app_components_readme_md, nil
-}
-
-func www_app_components_readme_md() (*asset, error) {
-	bytes, err := www_app_components_readme_md_bytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindata_file_info{name: "www/app/components/README.md", size: 5312, mode: os.FileMode(436), modTime: time.Unix(1431747253, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _www_app_components_dashboard_readme_md = []byte(`Dashboard Component for Kubernetes WebUI
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/www/master/components/dashboard/README.md?pixel)]()
-`)
-
-func www_app_components_dashboard_readme_md_bytes() ([]byte, error) {
-	return _www_app_components_dashboard_readme_md, nil
-}
-
-func www_app_components_dashboard_readme_md() (*asset, error) {
-	bytes, err := www_app_components_dashboard_readme_md_bytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindata_file_info{name: "www/app/components/dashboard/README.md", size: 167, mode: os.FileMode(436), modTime: time.Unix(1431747253, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4969,7 +4816,7 @@ var _www_app_components_dashboard_manifest_json = []byte(`{
     },
     {
       "description": "Nodes",
-      "url": "/minions",
+      "url": "/nodes",
       "templateUrl": "components/dashboard/views/listMinions.html"
     },
     {
@@ -4981,6 +4828,11 @@ var _www_app_components_dashboard_manifest_json = []byte(`{
       "description": "Service",
       "url": "/services/:serviceId",
       "templateUrl": "components/dashboard/views/service.html"
+    },
+    {
+      "description": "Node",
+      "url": "/nodes/:nodeId",
+      "templateUrl": "components/dashboard/views/node.html"
     },
     {
       "description": "Explore",
@@ -5006,7 +4858,7 @@ func www_app_components_dashboard_manifest_json() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1723, mode: os.FileMode(436), modTime: time.Unix(1431747253, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5207,7 +5059,7 @@ func www_app_components_dashboard_views_listevents_html() (*asset, error) {
 var _www_app_components_dashboard_views_listminions_html = []byte(`<div dashboard-header></div>
 <div class="dashboard">
   <div ng-controller="ListMinionsCtrl" style="padding:25px;" class="list-pods">
-  <md-table headers="headers" content="content" sortable="sortable" filters="search" custom-class="custom" thumbs="thumbs" count="count"></md-table>
+  <md-table headers="headers" content="content" sortable="sortable" filters="search" custom-class="custom" thumbs="thumbs" count="count" on-select="go(data)"></md-table>
   </div>
 </div>
 <div dashboard-footer></div>
@@ -5223,7 +5075,7 @@ func www_app_components_dashboard_views_listminions_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 327, mode: os.FileMode(436), modTime: time.Unix(1431747253, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5231,7 +5083,7 @@ func www_app_components_dashboard_views_listminions_html() (*asset, error) {
 var _www_app_components_dashboard_views_listpods_html = []byte(`<div dashboard-header></div>
 <div class="dashboard">
   <div ng-controller="ListPodsCtrl" style="padding:25px;" class="list-pods">
-  <md-table headers="headers" content="content" sortable="sortable" filters="search" custom-class="custom" thumbs="thumbs" count="count"></md-table>
+  <md-table headers="headers" content="content" sortable="sortable" filters="search" custom-class="custom" thumbs="thumbs" count="count" on-select="go(data)"></md-table>
   </div>
 </div>
 <div dashboard-footer></div>
@@ -5247,7 +5099,7 @@ func www_app_components_dashboard_views_listpods_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 324, mode: os.FileMode(436), modTime: time.Unix(1431747253, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5365,7 +5217,7 @@ func www_app_components_dashboard_views_listpodsvisualizer_html() (*asset, error
 var _www_app_components_dashboard_views_listreplicationcontrollers_html = []byte(`<div dashboard-header></div>
 <div class="dashboard">
   <div ng-controller="ListReplicationControllersCtrl" style="padding:25px;" class="list-pods">
-  <md-table headers="headers" content="content" sortable="sortable" filters="search" custom-class="custom" thumbs="thumbs" count="count"></md-table>
+  <md-table headers="headers" content="content" sortable="sortable" filters="search" custom-class="custom" thumbs="thumbs" count="count" on-select="go(data)"></md-table>
   </div>
 </div>
 <div dashboard-footer></div>
@@ -5381,7 +5233,7 @@ func www_app_components_dashboard_views_listreplicationcontrollers_html() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 342, mode: os.FileMode(436), modTime: time.Unix(1431747253, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5389,7 +5241,7 @@ func www_app_components_dashboard_views_listreplicationcontrollers_html() (*asse
 var _www_app_components_dashboard_views_listservices_html = []byte(`<div dashboard-header></div>
 <div class="dashboard">
   <div ng-controller="ListServicesCtrl" style="padding:25px;" class="list-pods">
-  <md-table headers="headers" content="content" sortable="sortable" filters="search" custom-class="custom" thumbs="thumbs" count="count"></md-table>
+  <md-table headers="headers" content="content" sortable="sortable" filters="search" custom-class="custom" thumbs="thumbs" count="count" on-select="go(data)"></md-table>
   </div>
 </div>
 <div dashboard-footer></div>
@@ -5405,7 +5257,85 @@ func www_app_components_dashboard_views_listservices_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 328, mode: os.FileMode(436), modTime: time.Unix(1431747253, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _www_app_components_dashboard_views_node_html = []byte(`<div dashboard-header></div>
+<div class="dashboard">
+  <div ng-controller="NodeCtrl" layout="column" class="body-wrapper node">
+    <div class="detail">
+
+      <div class="back">
+        <md-button class="md-default-theme" ng-click="doTheBack()">‹ BACK</md-button>
+      </div>
+
+
+      <div class="heading">
+        <span class="label">Name:</span>
+        <span>{{node.id}}</span>
+      </div>
+
+
+      <table>
+        <tbody>
+          <tr>
+            <td class="name">Labels</td>
+            <td class="value">
+              <div ng-repeat="(label, value) in node.labels">
+                {{label}}: {{value}}
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Created</td>
+            <td class="value">
+              {{node.creationTimestamp | date:'medium'}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Host IP</td>
+            <td class="value">
+              {{node.hostIP}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">System Info</td>
+            <td class="value">
+              <div ng-repeat="(label, value) in node.status.nodeInfo">
+                {{label}}: {{value}}
+              </div>
+            </td>
+          </tr>
+
+
+        </tbody>
+      </table>
+
+
+
+    </div>
+  </div>
+</div>
+<div dashboard-footer></div>
+
+`)
+
+func www_app_components_dashboard_views_node_html_bytes() ([]byte, error) {
+	return _www_app_components_dashboard_views_node_html, nil
+}
+
+func www_app_components_dashboard_views_node_html() (*asset, error) {
+	bytes, err := www_app_components_dashboard_views_node_html_bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 1353, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5638,10 +5568,7 @@ var _www_app_components_dashboard_views_pod_html = []byte(`<div dashboard-header
     <div class="detail">
 
       <div class="back">
-        <div class="nav-back">
-          <a ng-click="doTheBack()">BACK</a>
-        </div>
-        <!-- <md-button class="md-default-theme" ng-click="doTheBack">BACK</md-button> -->
+        <md-button class="md-default-theme" ng-click="doTheBack()">‹ BACK</md-button>
       </div>
 
       <div class="heading">
@@ -5741,7 +5668,7 @@ func www_app_components_dashboard_views_pod_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 2740, mode: os.FileMode(436), modTime: time.Unix(1431747253, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 2646, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5753,7 +5680,7 @@ var _www_app_components_dashboard_views_replication_html = []byte(`<div dashboar
   <div class="detail">
 
       <div class="back">
-        <md-button class="md-default-theme" ng-href="#/dashboard/replicationcontrollers">‹ BACK</md-button>
+        <md-button class="md-default-theme" ng-click="doTheBack()">‹ BACK</md-button>
       </div>
 
       <div class="heading">
@@ -5840,7 +5767,7 @@ func www_app_components_dashboard_views_replication_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 2187, mode: os.FileMode(436), modTime: time.Unix(1431747253, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 2165, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5852,7 +5779,7 @@ var _www_app_components_dashboard_views_service_html = []byte(`<div dashboard-he
     <div class="detail">
 
       <div class="back">
-        <md-button class="md-default-theme" ng-href="#/dashboard/services">‹ BACK</md-button>
+        <md-button class="md-default-theme" ng-click="doTheBack()">‹ BACK</md-button>
       </div>
 
       <div class="heading">
@@ -5954,7 +5881,7 @@ func www_app_components_dashboard_views_service_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 2485, mode: os.FileMode(436), modTime: time.Unix(1431747253, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 2477, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6168,7 +6095,7 @@ var _www_app_views_partials_md_table_tmpl_html = []byte(`<table class="md-table"
         <a href ng-if="handleSort(h.field)" ng-click="reverse=!reverse;order(h.field,reverse)">{{h.name}} <span class="md-table-caret" ng-show="reverse && h.field == predicate"><img src="assets/img/ic_arrow_drop_up_24px.svg"></span><span  class="md-table-caret" ng-show="!reverse && h.field == predicate"><img src="assets/img/ic_arrow_drop_down_24px.svg"></span></a>
         <span ng-if="!handleSort(h.field)">{{h.name}}</span>
       </th>
-      <th class="md-table-header"></th>
+      <th class="md-table-header" ng-show="showMore()"></th>
     </tr>
   </thead>
   <tbody>
@@ -6176,11 +6103,11 @@ var _www_app_views_partials_md_table_tmpl_html = []byte(`<table class="md-table"
       <td ng-repeat="h in headers" ng-if="h.field == thumbs" class="md-table-thumbs">
         <div ng-if="h.field == thumbs" style="background-image:url({{c.thumb}})"></div>
       </td>
-      <td class="md-table-content" ng-click="go(c)" ng-repeat="h in headers" ng-class="customClass[h.field]" ng-if="h.field != thumbs">
+      <td class="md-table-content" ng-click="doSelect({data:c})" ng-repeat="h in headers" ng-class="customClass[h.field]" ng-if="h.field != thumbs">
         {{c[h.field]}}
       </td>
-      <td class="md-table-td-more">
-        <md-button aria-label="More">
+      <td class="md-table-td-more" ng-show="showMore()">
+        <md-button aria-label="More" ng-click="moreClick(c, $event)">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
             <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
           </svg>
@@ -6218,7 +6145,7 @@ func www_app_views_partials_md_table_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 2732, mode: os.FileMode(436), modTime: time.Unix(1431747225, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 2819, mode: os.FileMode(436), modTime: time.Unix(1431747314, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -23076,8 +23003,6 @@ var _bindata = map[string]func() (*asset, error){
 	"www/app/assets/js/.gitkeep":                                         www_app_assets_js_gitkeep,
 	"www/app/assets/js/app.js":                                           www_app_assets_js_app_js,
 	"www/app/assets/js/base.js":                                          www_app_assets_js_base_js,
-	"www/app/components/README.md":                                       www_app_components_readme_md,
-	"www/app/components/dashboard/README.md":                             www_app_components_dashboard_readme_md,
 	"www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg": www_app_components_dashboard_img_icons_ic_arrow_drop_down_18px_svg,
 	"www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg": www_app_components_dashboard_img_icons_ic_arrow_drop_down_24px_svg,
 	"www/app/components/dashboard/img/icons/ic_close_18px.svg":           www_app_components_dashboard_img_icons_ic_close_18px_svg,
@@ -23096,6 +23021,7 @@ var _bindata = map[string]func() (*asset, error){
 	"www/app/components/dashboard/views/listPodsVisualizer.html":         www_app_components_dashboard_views_listpodsvisualizer_html,
 	"www/app/components/dashboard/views/listReplicationControllers.html": www_app_components_dashboard_views_listreplicationcontrollers_html,
 	"www/app/components/dashboard/views/listServices.html":               www_app_components_dashboard_views_listservices_html,
+	"www/app/components/dashboard/views/node.html":                       www_app_components_dashboard_views_node_html,
 	"www/app/components/dashboard/views/partials/cadvisor.html":          www_app_components_dashboard_views_partials_cadvisor_html,
 	"www/app/components/dashboard/views/partials/groupBox.html":          www_app_components_dashboard_views_partials_groupbox_html,
 	"www/app/components/dashboard/views/partials/groupItem.html":         www_app_components_dashboard_views_partials_groupitem_html,
@@ -23279,9 +23205,7 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 				}},
 			}},
 			"components": {nil, map[string]*_bintree_t{
-				"README.md": {www_app_components_readme_md, map[string]*_bintree_t{}},
 				"dashboard": {nil, map[string]*_bintree_t{
-					"README.md": {www_app_components_dashboard_readme_md, map[string]*_bintree_t{}},
 					"img": {nil, map[string]*_bintree_t{
 						"icons": {nil, map[string]*_bintree_t{
 							"ic_arrow_drop_down_18px.svg": {www_app_components_dashboard_img_icons_ic_arrow_drop_down_18px_svg, map[string]*_bintree_t{}},
@@ -23313,6 +23237,7 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 						"listPodsVisualizer.html":         {www_app_components_dashboard_views_listpodsvisualizer_html, map[string]*_bintree_t{}},
 						"listReplicationControllers.html": {www_app_components_dashboard_views_listreplicationcontrollers_html, map[string]*_bintree_t{}},
 						"listServices.html":               {www_app_components_dashboard_views_listservices_html, map[string]*_bintree_t{}},
+						"node.html":                       {www_app_components_dashboard_views_node_html, map[string]*_bintree_t{}},
 						"partials": {nil, map[string]*_bintree_t{
 							"cadvisor.html":         {www_app_components_dashboard_views_partials_cadvisor_html, map[string]*_bintree_t{}},
 							"groupBox.html":         {www_app_components_dashboard_views_partials_groupbox_html, map[string]*_bintree_t{}},
