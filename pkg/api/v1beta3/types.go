@@ -995,7 +995,7 @@ type ServiceStatus struct {
 type LoadBalancerStatus struct {
 	// Name is an identifier for the load-balancer, which can be used
 	// when specifying LoadBalancer during Service create/update
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
 
 	// Endpoints is a list containing endpoints for the load-balancer;
 	// traffic intended for the service should be sent to these endpoints.
