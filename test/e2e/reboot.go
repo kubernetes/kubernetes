@@ -112,7 +112,7 @@ func rebootNode(c *client.Client, provider, name string, result chan bool) {
 	Logf("Getting %s", name)
 	node, err := c.Nodes().Get(name)
 	if err != nil {
-		Logf("Gouldn't get node %s", name)
+		Logf("Couldn't get node %s", name)
 		result <- false
 		return
 	}
@@ -215,15 +215,13 @@ func checkPodsRunning(c *client.Client, podNames []string, timeout time.Duration
 	desc := "running and ready"
 	Logf("Waiting up to %v for the following pods to be %s: %s", timeout, desc, podNames)
 	result := make(chan bool, len(podNames))
-	for _, podName := range podNames {
-		// Don't you just love Go?
-		podName := podName
+	for ix := range podNames {
 		// Launch off pod readiness checkers.
-		go func() {
-			err := waitForPodCondition(c, api.NamespaceDefault, podName, desc,
+		go func(name string) {
+			err := waitForPodCondition(c, api.NamespaceDefault, name, desc,
 				poll, timeout, podRunningReady)
 			result <- err == nil
-		}()
+		}(podNames[ix])
 	}
 	// Wait for them all to finish.
 	success := true
