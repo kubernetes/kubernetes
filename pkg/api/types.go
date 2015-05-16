@@ -998,7 +998,7 @@ const (
 )
 
 // ServiceStatus represents the current status of a service
-type ServiceStatus struct{
+type ServiceStatus struct {
 	// LoadBalancer contains the current status of the load-balancer,
 	// if one is present.
 	LoadBalancer LoadBalancerStatus `json:"loadBalancer,omitempty"`
@@ -1050,10 +1050,10 @@ type ServiceSpec struct {
 	// The Name of an existing load-balancer, as used here, can be found in the Name field of LoadBalancerStatus.
 	LoadBalancer string `json:"loadBalancer,omitempty"`
 
-	// PublicIPs are deprecated and silently ignored.
+	// DeprecatedPublicIPs are deprecated and silently ignored.
 	// Old behaviour: PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
-	PublicIPs []string `json:"publicIPs,omitempty"`
+	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty"`
 
 	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty"`

@@ -33,7 +33,7 @@ func (ServiceGenerator) ParamNames() []GeneratorParam {
 		{"selector", true},
 		{"port", true},
 		{"labels", false},
-		{"public-ip", false},
+		{"load-balancer", false},
 		{"create-external-load-balancer", false},
 		{"visibility", false},
 		{"protocol", false},
@@ -108,8 +108,8 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 	if len(params["visibility"]) != 0 {
 		service.Spec.Visibility = api.ServiceVisibility(params["visibility"])
 	}
-	if len(params["public-ip"]) != 0 {
-		service.Spec.PublicIPs = []string{params["public-ip"]}
+	if len(params["load-balancer"]) != 0 {
+		service.Spec.LoadBalancer = params["load-balancer"]
 	}
 	return &service, nil
 }

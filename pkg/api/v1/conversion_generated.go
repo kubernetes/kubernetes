@@ -3920,13 +3920,13 @@ func convert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *newer.Servi
 	out.PortalIP = in.PortalIP
 	out.Visibility = newer.ServiceVisibility(in.Visibility)
 	out.LoadBalancer = in.LoadBalancer
-	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
-		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
+	if in.DeprecatedPublicIPs != nil {
+		out.DeprecatedPublicIPs = make([]string, len(in.DeprecatedPublicIPs))
+		for i := range in.DeprecatedPublicIPs {
+			out.DeprecatedPublicIPs[i] = in.DeprecatedPublicIPs[i]
 		}
 	} else {
-		out.PublicIPs = nil
+		out.DeprecatedPublicIPs = nil
 	}
 	out.SessionAffinity = newer.AffinityType(in.SessionAffinity)
 	return nil
@@ -3957,13 +3957,13 @@ func convert_api_ServiceSpec_To_v1_ServiceSpec(in *newer.ServiceSpec, out *Servi
 	out.PortalIP = in.PortalIP
 	out.Visibility = ServiceVisibility(in.Visibility)
 	out.LoadBalancer = in.LoadBalancer
-	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
-		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
+	if in.DeprecatedPublicIPs != nil {
+		out.DeprecatedPublicIPs = make([]string, len(in.DeprecatedPublicIPs))
+		for i := range in.DeprecatedPublicIPs {
+			out.DeprecatedPublicIPs[i] = in.DeprecatedPublicIPs[i]
 		}
 	} else {
-		out.PublicIPs = nil
+		out.DeprecatedPublicIPs = nil
 	}
 	out.SessionAffinity = AffinityType(in.SessionAffinity)
 	return nil

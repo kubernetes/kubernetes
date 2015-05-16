@@ -289,10 +289,14 @@ var _ = Describe("Services", func() {
 		// currently indicated by a public IP address being added to the spec.
 		result, err = waitForPublicIPs(c, serviceName, ns)
 		Expect(err).NotTo(HaveOccurred())
-		if len(result.Spec.PublicIPs) != 1 {
-			Failf("got unexpected number (%d) of public IPs for externally load balanced service: %v", result.Spec.PublicIPs, result)
+		if len(result.Status.LoadBalancer.Endpoints) != 1 {
+			Failf("got unexpected number (%d) of endpoints for externally load balanced service: %v", result.Status.LoadBalancer.Endpoints, result)
 		}
-		ip := result.Spec.PublicIPs[0]
+		endpoint := result.Status.LoadBalancer.Endpoints[0]
+		ip := endpoint.IP
+		if ip == "" {
+			ip = endpoint.Hostname
+		}
 		port := result.Spec.Ports[0].Port
 
 		pod := &api.Pod{
@@ -467,7 +471,7 @@ var _ = Describe("Services", func() {
 			},
 		}
 
-		publicIPs := []string{}
+		endpoints := []string{}
 		for _, namespace := range namespaces {
 			for _, serviceName := range serviceNames {
 				service.ObjectMeta.Name = serviceName
@@ -486,10 +490,16 @@ var _ = Describe("Services", func() {
 			for _, serviceName := range serviceNames {
 				result, err := waitForPublicIPs(c, serviceName, namespace)
 				Expect(err).NotTo(HaveOccurred())
-				publicIPs = append(publicIPs, result.Spec.PublicIPs...) // Save 'em to check uniqueness
+				for i := range result.Status.LoadBalancer.Endpoints {
+					endpoint := result.Status.LoadBalancer.Endpoints[i].IP
+					if endpoint == "" {
+						endpoint = result.Status.LoadBalancer.Endpoints[i].Hostname
+					}
+					endpoints = append(endpoints, endpoint) // Save 'em to check uniqueness
+				}
 			}
 		}
-		validateUniqueOrFail(publicIPs)
+		validateUniqueOrFail(endpoints)
 	})
 })
 
@@ -503,12 +513,12 @@ func waitForPublicIPs(c *client.Client, serviceName, namespace string) (*api.Ser
 			Logf("Get service failed, ignoring for 5s: %v", err)
 			continue
 		}
-		if len(service.Spec.PublicIPs) > 0 {
+		if len(service.Status.LoadBalancer.Endpoints) > 0 {
 			return service, nil
 		}
-		Logf("Waiting for service %s in namespace %s to have a public IP (%v)", serviceName, namespace, time.Since(start))
+		Logf("Waiting for service %s in namespace %s to have an endpoint (%v)", serviceName, namespace, time.Since(start))
 	}
-	return service, fmt.Errorf("service %s in namespace %s doesn't have a public IP after %.2f seconds", serviceName, namespace, timeout.Seconds())
+	return service, fmt.Errorf("service %s in namespace %s doesn't have an endpoint after %.2f seconds", serviceName, namespace, timeout.Seconds())
 }
 
 func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []string {

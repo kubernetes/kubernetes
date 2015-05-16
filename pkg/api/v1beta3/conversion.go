@@ -371,12 +371,12 @@ func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *newer.
 	out.LoadBalancer = in.LoadBalancer
 
 	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
+		out.DeprecatedPublicIPs = make([]string, len(in.PublicIPs))
 		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
+			out.DeprecatedPublicIPs[i] = in.PublicIPs[i]
 		}
 	} else {
-		out.PublicIPs = nil
+		out.DeprecatedPublicIPs = nil
 	}
 	out.SessionAffinity = newer.AffinityType(in.SessionAffinity)
 	return nil
@@ -412,10 +412,10 @@ func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *newer.ServiceSpec, out *
 	out.CreateExternalLoadBalancer = in.Visibility == newer.ServiceVisibilityLoadBalancer
 	out.LoadBalancer = in.LoadBalancer
 
-	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
-		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
+	if in.DeprecatedPublicIPs != nil {
+		out.PublicIPs = make([]string, len(in.DeprecatedPublicIPs))
+		for i := range in.DeprecatedPublicIPs {
+			out.PublicIPs[i] = in.DeprecatedPublicIPs[i]
 		}
 	} else {
 		out.PublicIPs = nil

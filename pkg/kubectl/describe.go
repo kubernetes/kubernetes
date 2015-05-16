@@ -17,6 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -480,6 +481,22 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 	return describeService(service, endpoints, events)
 }
 
+func buildEndpointsString(endpoints []api.LoadBalancerEndpointStatus) string {
+	var buffer bytes.Buffer
+
+	for i := range endpoints {
+		if i != 0 {
+			buffer.WriteString(", ")
+		}
+		if endpoints[i].IP != "" {
+			buffer.WriteString(endpoints[i].IP)
+		} else {
+			buffer.WriteString(endpoints[i].Hostname)
+		}
+	}
+	return buffer.String()
+}
+
 func describeService(service *api.Service, endpoints *api.Endpoints, events *api.EventList) (string, error) {
 	if endpoints == nil {
 		endpoints = &api.Endpoints{}
@@ -490,9 +507,9 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
 		fmt.Fprintf(out, "Visibility:\t%s\n", service.Spec.Visibility)
 		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.PortalIP)
-		if len(service.Spec.PublicIPs) > 0 {
-			list := strings.Join(service.Spec.PublicIPs, ", ")
-			fmt.Fprintf(out, "Public IPs:\t%s\n", list)
+		if len(service.Status.LoadBalancer.Endpoints) > 0 {
+			list := buildEndpointsString(service.Status.LoadBalancer.Endpoints)
+			fmt.Fprintf(out, "Endpoints:\t%s\n", list)
 		}
 		for i := range service.Spec.Ports {
 			sp := &service.Spec.Ports[i]
