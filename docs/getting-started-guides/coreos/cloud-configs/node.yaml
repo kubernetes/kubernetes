@@ -25,7 +25,7 @@ coreos:
         - name: 50-network-config.conf
           content: |
             [Unit]
-            Requires=etcd2.service
+            Requires=etcd.service
             [Service]
             ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
     - name: docker.service
