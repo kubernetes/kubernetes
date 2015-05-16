@@ -28,7 +28,7 @@ spec:
         - -initial-cluster-token
         - skydns-etcd
       - name: kube2sky
-        image: gcr.io/google_containers/kube2sky:1.4
+        image: gcr.io/google_containers/kube2sky:1.5
         args:
         # command = "/kube2sky"
         - -domain={{ pillar['dns_domain'] }}

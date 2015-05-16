@@ -195,7 +195,7 @@ func newKubeClient() (*kclient.Client, error) {
 		var err error
 		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 			&kclientcmd.ClientConfigLoadingRules{ExplicitPath: *argKubecfgFile},
-			&kclientcmd.ConfigOverrides{ClusterInfo: kclientcmdapi.Cluster{Server: masterUrl}}).ClientConfig(); err != nil {
+			&kclientcmd.ConfigOverrides{ClusterInfo: kclientcmdapi.Cluster{Server: masterUrl, InsecureSkipTLSVerify: true}}).ClientConfig(); err != nil {
 			return nil, err
 		}
 	}
