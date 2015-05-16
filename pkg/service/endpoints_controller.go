@@ -312,11 +312,11 @@ func (e *EndpointController) syncService(key string) {
 			portProto := servicePort.Protocol
 			portNum, err := findPort(pod, servicePort)
 			if err != nil {
-				glog.Errorf("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
+				glog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 				continue
 			}
 			if len(pod.Status.PodIP) == 0 {
-				glog.Errorf("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
+				glog.V(4).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
 
