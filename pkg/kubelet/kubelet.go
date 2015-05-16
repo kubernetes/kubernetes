@@ -1151,37 +1151,33 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubeco
 	return nil
 }
 
-// filterOutPodsPastActiveDeadline filters pods with an ActiveDeadlineSeconds value that has been exceeded.
-// It records an event that the pod has been active longer than the allocated time, and updates the pod status as failed.
-// By filtering the pod from the result set, the Kubelet will kill the pod's containers as part of normal SyncPods workflow.
-func (kl *Kubelet) filterOutPodsPastActiveDeadline(allPods []*api.Pod) (pods []*api.Pod) {
+// pastActiveDeadline returns true if the pod has been active for more than
+// ActiveDeadlineSeconds.
+func (kl *Kubelet) pastActiveDeadline(pod *api.Pod) bool {
 	now := util.Now()
-	for _, pod := range allPods {
-		keepPod := true
-		if pod.Spec.ActiveDeadlineSeconds != nil {
-			podStatus, ok := kl.statusManager.GetPodStatus(kubecontainer.GetPodFullName(pod))
-			if !ok {
-				podStatus = pod.Status
-			}
-			if !podStatus.StartTime.IsZero() {
-				startTime := podStatus.StartTime.Time
-				duration := now.Time.Sub(startTime)
-				allowedDuration := time.Duration(*pod.Spec.ActiveDeadlineSeconds) * time.Second
-				if duration >= allowedDuration {
-					keepPod = false
-				}
-			}
+	if pod.Spec.ActiveDeadlineSeconds != nil {
+		podStatus, ok := kl.statusManager.GetPodStatus(kubecontainer.GetPodFullName(pod))
+		if !ok {
+			podStatus = pod.Status
 		}
-		if keepPod {
-			pods = append(pods, pod)
-		} else {
-			kl.recorder.Eventf(pod, "deadline", "Pod was active on the node longer than specified deadline")
-			kl.statusManager.SetPodStatus(pod, api.PodStatus{
-				Phase:   api.PodFailed,
-				Message: "Pod was active on the node longer than specified deadline"})
+		if !podStatus.StartTime.IsZero() {
+			startTime := podStatus.StartTime.Time
+			duration := now.Time.Sub(startTime)
+			allowedDuration := time.Duration(*pod.Spec.ActiveDeadlineSeconds) * time.Second
+			if duration >= allowedDuration {
+				return true
+			}
 		}
 	}
-	return pods
+	return false
+}
+
+//podIsTerminated returns true if status is in one of the terminated state.
+func podIsTerminated(status *api.PodStatus) bool {
+	if status.Phase == api.PodFailed || status.Phase == api.PodSucceeded {
+		return true
+	}
+	return false
 }
 
 // Filter out pods in the terminated state ("Failed" or "Succeeded").
@@ -1197,8 +1193,7 @@ func (kl *Kubelet) filterOutTerminatedPods(allPods []*api.Pod) []*api.Pod {
 			// restarted.
 			status = pod.Status
 		}
-		if status.Phase == api.PodFailed || status.Phase == api.PodSucceeded {
-			// Pod has reached the final state; ignore it.
+		if podIsTerminated(&status) {
 			continue
 		}
 		pods = append(pods, pod)
@@ -1486,8 +1481,6 @@ func (kl *Kubelet) admitPods(allPods []*api.Pod, podSyncTypes map[types.UID]metr
 	//      though the pod was not considered terminated by the apiserver).
 	// These two conditions could be alleviated by checkpointing kubelet.
 	pods := kl.filterOutTerminatedPods(allPods)
-
-	pods = kl.filterOutPodsPastActiveDeadline(pods)
 
 	// Respect the pod creation order when resolving conflicts.
 	sort.Sort(podsByCreationTime(pods))
@@ -1922,8 +1915,15 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	glog.V(3).Infof("Generating status for %q", podFullName)
 
-	spec := &pod.Spec
+	// TODO: Consider include the container information.
+	if kl.pastActiveDeadline(pod) {
+		kl.recorder.Eventf(pod, "deadline", "Pod was active on the node longer than specified deadline")
+		return api.PodStatus{
+			Phase:   api.PodFailed,
+			Message: "Pod was active on the node longer than specified deadline"}, nil
+	}
 
+	spec := &pod.Spec
 	podStatus, err := kl.containerRuntime.GetPodStatus(pod)
 
 	if err != nil {

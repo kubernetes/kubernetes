@@ -81,6 +81,9 @@ func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	}
 
 	// if the status has no start time, we need to set an initial time
+	// TODO(yujuhong): Consider setting StartTime when generating the pod
+	// status instead, which would allow statusManager to become a simple cache
+	// again.
 	if status.StartTime.IsZero() {
 		if pod.Status.StartTime.IsZero() {
 			// the pod did not have a previously recorded value so set to now

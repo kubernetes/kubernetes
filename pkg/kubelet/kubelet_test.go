@@ -4472,7 +4472,7 @@ func TestMakePortMappings(t *testing.T) {
 	}
 }
 
-func TestFilterOutPodsPastActiveDeadline(t *testing.T) {
+func TestIsPodPastActiveDeadline(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	pods := newTestPods(5)
@@ -4485,23 +4485,21 @@ func TestFilterOutPodsPastActiveDeadline(t *testing.T) {
 	pods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
 	pods[1].Status.StartTime = &startTime
 	pods[1].Spec.ActiveDeadlineSeconds = &notYetActiveDeadlineSeconds
-	expected := []*api.Pod{pods[1], pods[2], pods[3], pods[4]}
+	tests := []struct {
+		pod      *api.Pod
+		expected bool
+	}{{pods[0], true}, {pods[1], false}, {pods[2], false}, {pods[3], false}, {pods[4], false}}
+
 	kubelet.podManager.SetPods(pods)
-	actual := kubelet.filterOutPodsPastActiveDeadline(pods)
-	if !reflect.DeepEqual(expected, actual) {
-		expectedNames := ""
-		for _, pod := range expected {
-			expectedNames = expectedNames + pod.Name + " "
+	for i, tt := range tests {
+		actual := kubelet.pastActiveDeadline(tt.pod)
+		if actual != tt.expected {
+			t.Errorf("[%d] expected %#v, got %#v", i, tt.expected, actual)
 		}
-		actualNames := ""
-		for _, pod := range actual {
-			actualNames = actualNames + pod.Name + " "
-		}
-		t.Errorf("expected %#v, got %#v", expectedNames, actualNames)
 	}
 }
 
-func TestSyncPodsDeletesPodsThatRunTooLong(t *testing.T) {
+func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
@@ -4559,27 +4557,22 @@ func TestSyncPodsDeletesPodsThatRunTooLong(t *testing.T) {
 		},
 	}
 
+	// Let the pod worker sets the status to fail after this sync.
 	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
-	verifyCalls(t, fakeDocker, []string{"list", "inspect_container", "stop", "inspect_container", "stop", "list"})
-
-	// A map iteration is used to delete containers, so must not depend on
-	// order here.
-	expectedToStop := map[string]bool{
-		"1234": true,
-		"9876": true,
+	podFullName := kubecontainer.GetPodFullName(pods[0])
+	status, found := kubelet.statusManager.GetPodStatus(podFullName)
+	if !found {
+		t.Errorf("expected to found status for pod %q", status)
 	}
-	if len(fakeDocker.Stopped) != 2 ||
-		!expectedToStop[fakeDocker.Stopped[0]] ||
-		!expectedToStop[fakeDocker.Stopped[1]] {
-		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
+	if status.Phase != api.PodFailed {
+		t.Fatalf("expected pod status %q, ot %q.", api.PodFailed, status.Phase)
 	}
 }
 
-func TestSyncPodsDoesNotDeletePodsThatRunTooLong(t *testing.T) {
+func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
@@ -4642,12 +4635,12 @@ func TestSyncPodsDoesNotDeletePodsThatRunTooLong(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list",
-		// Get pod status.
-		"inspect_container", "inspect_container",
-		// Check the pod infra container.
-		"inspect_container",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container", "list"})
+	podFullName := kubecontainer.GetPodFullName(pods[0])
+	status, found := kubelet.statusManager.GetPodStatus(podFullName)
+	if !found {
+		t.Errorf("expected to found status for pod %q", status)
+	}
+	if status.Phase == api.PodFailed {
+		t.Fatalf("expected pod status to not be %q", status.Phase)
+	}
 }
