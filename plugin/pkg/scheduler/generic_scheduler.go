@@ -36,6 +36,8 @@ type FitError struct {
 	FailedPredicates FailedPredicateMap
 }
 
+var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
+
 // implementation of the error interface
 func (f *FitError) Error() string {
 	output := fmt.Sprintf("failed to find fit for pod: %v", f.Pod)
@@ -59,7 +61,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, minionLister algorithm.MinionL
 		return "", err
 	}
 	if len(minions.Items) == 0 {
-		return "", fmt.Errorf("no minions available to schedule pods")
+		return "", ErrNoNodesAvailable
 	}
 
 	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.pods, g.predicates, minions)
