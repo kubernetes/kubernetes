@@ -65,9 +65,9 @@ $ kubectl get rc/web service/frontend pods/web-pod-13je7
       --context="": The name of the kubeconfig context to use
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
-      --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
-      --log_dir=: If non-empty, write log files in this directory
-      --log_flush_frequency=5s: Maximum number of seconds between log flushes
+      --log-backtrace-at=:0: when logging hits line file:N, emit a stack trace
+      --log-dir=: If non-empty, write log files in this directory
+      --log-flush-frequency=5s: Maximum number of seconds between log flushes
       --logtostderr=true: log to standard error instead of files
       --match-server-version=false: Require server version to match client version
       --namespace="": If present, the namespace scope for this CLI request.
