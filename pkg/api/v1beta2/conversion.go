@@ -690,7 +690,7 @@ func addConversionFuncs() {
 					Port:          in.Spec.Ports[i].Port,
 					Protocol:      Protocol(in.Spec.Ports[i].Protocol),
 					ContainerPort: in.Spec.Ports[i].TargetPort,
-					NodePort:    in.Spec.Ports[i].NodePort,
+					NodePort:      in.Spec.Ports[i].NodePort,
 				})
 			}
 
@@ -742,7 +742,7 @@ func addConversionFuncs() {
 						Port:       in.Ports[i].Port,
 						Protocol:   newer.Protocol(in.Ports[i].Protocol),
 						TargetPort: in.Ports[i].ContainerPort,
-						NodePort: in.Ports[i].NodePort,
+						NodePort:   in.Ports[i].NodePort,
 					})
 				}
 			}

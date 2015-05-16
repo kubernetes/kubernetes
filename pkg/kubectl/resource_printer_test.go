@@ -741,7 +741,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 							IP: "3.4.5.6",
 						},
 						{
-							IP: "5.6.7.8",
+							IP:       "5.6.7.8",
 							Hostname: "host5678",
 						},
 					},

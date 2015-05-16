@@ -142,7 +142,6 @@ func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
 	return fmt.Sprintf("%x", md5.Sum(data)), nil
 }
 
-
 func (l *LoadBalancerStatus) Equal(r *LoadBalancerStatus) bool {
 	if l.Name != r.Name {
 		return false

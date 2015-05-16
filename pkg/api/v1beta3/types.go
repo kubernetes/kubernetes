@@ -985,7 +985,7 @@ const (
 )
 
 // ServiceStatus represents the current status of a service
-type ServiceStatus struct{
+type ServiceStatus struct {
 	// LoadBalancer contains the current status of the load-balancer,
 	// if one is present.
 	LoadBalancer LoadBalancerStatus `json:"loadBalancer,omitempty" description:"status of load-balancer"`

@@ -684,7 +684,7 @@ func TestProxyUpdatePublicIPs(t *testing.T) {
 				Port:     svcInfo.portalPort,
 				Protocol: "TCP",
 			}},
-			PortalIP:  svcInfo.portalIP.String(),
+			PortalIP:     svcInfo.portalIP.String(),
 			LoadBalancer: "4.3.2.1",
 		},
 	}})

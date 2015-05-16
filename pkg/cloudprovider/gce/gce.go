@@ -281,7 +281,7 @@ func (gce *GCECloud) GetTCPLoadBalancer(name, region string) (status api.LoadBal
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err == nil {
 		status.Name = fwd.IPAddress
-		status.Endpoints = []api.LoadBalancerEndpointStatus { { IP: fwd.IPAddress  } }
+		status.Endpoints = []api.LoadBalancerEndpointStatus{{IP: fwd.IPAddress}}
 
 		return status, true, nil
 	}
@@ -358,7 +358,7 @@ func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, forceLoadBalance
 	}
 
 	status.Name = fwd.IPAddress
-	status.Endpoints = []api.LoadBalancerEndpointStatus { { IP: fwd.IPAddress  } }
+	status.Endpoints = []api.LoadBalancerEndpointStatus{{IP: fwd.IPAddress}}
 
 	return status, nil
 }

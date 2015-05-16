@@ -41,7 +41,7 @@ type serviceInfo struct {
 	socket              proxySocket
 	timeout             time.Duration
 	loadBalancerStatus  api.LoadBalancerStatus
-	nodePort          int
+	nodePort            int
 	sessionAffinityType api.AffinityType
 	stickyMaxAgeMinutes int
 }
