@@ -66,7 +66,7 @@ var _ = Describe("Reboot", func() {
 		// there (the limiting factor is the implementation of util.go's
 		// getSigner(...)).
 		provider := testContext.Provider
-		if !providerIs("gce") {
+		if !providerIs("gce", "gke") {
 			By(fmt.Sprintf("Skipping reboot test, which is not implemented for %s", provider))
 			return
 		}
