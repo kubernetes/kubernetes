@@ -364,7 +364,7 @@ func interpretContainerStatus(status *api.ContainerStatus) (string, string, stri
 		if state != nil {
 			message = fmt.Sprintf("exit code %d", state.ExitCode)
 			if state.Reason != "" {
-				message = fmt.Sprintf("%s, reason: %s", state.Reason)
+				message = fmt.Sprintf("%s, reason: %s", message, state.Reason)
 			}
 		}
 		return message
@@ -380,7 +380,11 @@ func interpretContainerStatus(status *api.ContainerStatus) (string, string, stri
 		if message != "" {
 			message = "last termination: " + message
 		}
-		return "Running", translateTimestamp(state.Running.StartedAt), message, nil
+		stateMsg := "Running"
+		if !status.Ready {
+			stateMsg = stateMsg + " *not ready*"
+		}
+		return stateMsg, translateTimestamp(state.Running.StartedAt), message, nil
 	} else if state.Termination != nil {
 		return "Terminated", translateTimestamp(state.Termination.StartedAt), getTermMsg(state.Termination), nil
 	}
