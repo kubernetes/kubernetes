@@ -307,12 +307,20 @@ func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) 
 	return true
 }
 
+func deepCopyMap(m map[string]string) map[string]string {
+	c := make(map[string]string, len(m))
+	for k, v := range m {
+		c[k] = v
+	}
+	return c
+}
+
 func deepCopyLoadBalancerStatus(lb *api.LoadBalancerStatus) api.LoadBalancerStatus {
 	var c api.LoadBalancerStatus
 	c = *lb
-	c.Endpoints = make([]api.LoadBalancerEndpointStatus, len(lb.Endpoints))
+	c.Endpoints = make([]map[string]string, len(lb.Endpoints))
 	for i := range lb.Endpoints {
-		c.Endpoints[i] = lb.Endpoints[i]
+		c.Endpoints[i] = deepCopyMap(lb.Endpoints[i])
 	}
 	return c
 }
@@ -323,8 +331,9 @@ func (proxier *Proxier) openPortal(service ServicePortName, info *serviceInfo) e
 		return err
 	}
 	for _, endpoint := range info.loadBalancerStatus.Endpoints {
-		if endpoint.IP != "" {
-			err = proxier.openOnePortal(net.ParseIP(endpoint.IP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+		ip := endpoint[api.LoadBalancerEndpointIP]
+		if ip != "" {
+			err = proxier.openOnePortal(net.ParseIP(ip), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
 			if err != nil {
 				return err
 			}
@@ -393,8 +402,9 @@ func (proxier *Proxier) closePortal(service ServicePortName, info *serviceInfo) 
 	// Collect errors and report them all at the end.
 	el := proxier.closeOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
 	for _, endpoint := range info.loadBalancerStatus.Endpoints {
-		if endpoint.IP != "" {
-			el = append(el, proxier.closeOnePortal(net.ParseIP(endpoint.IP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+		ip := endpoint[api.LoadBalancerEndpointIP]
+		if ip != "" {
+			el = append(el, proxier.closeOnePortal(net.ParseIP(ip), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
 		}
 	}
 	if info.nodePort != 0 {

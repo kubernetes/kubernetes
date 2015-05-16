@@ -1004,6 +1004,14 @@ type ServiceStatus struct {
 	LoadBalancer LoadBalancerStatus `json:"loadBalancer,omitempty"`
 }
 
+
+const (
+	// LoadBalancerEndpointIP is used when the load balancer should be targeted by IP address
+	LoadBalancerEndpointIP string = "ip"
+	// LoadBalancerEndpointHostname is used when the load balancer should be targeted by hostname (e.g. AWS ELB)
+	LoadBalancerEndpointHostname string = "hostname"
+)
+
 // LoadBalancerStatus represents the status of a load-balancer
 type LoadBalancerStatus struct {
 	// Name is an identifier for the load-balancer, which can be used
@@ -1012,18 +1020,7 @@ type LoadBalancerStatus struct {
 
 	// Endpoints is a list containing endpoints for the load-balancer;
 	// traffic intended for the service should be sent to these endpoints.
-	Endpoints []LoadBalancerEndpointStatus `json:"endpoints,omitempty"`
-}
-
-// EndpointStatus represents the status of a load-balancer endpoint
-type LoadBalancerEndpointStatus struct {
-	// IP is set for load-balancer endpoints that are IP based
-	// (typically GCE or OpenStack load-balancers.)
-	IP string `json:"ip,omitempty"`
-
-	// Hostname is set for load-balancer endpoints that are DNS based
-	// (typically AWS load-balancers.)
-	Hostname string `json:"hostname,omitempty"`
+	Endpoints []map[string]string `json:"endpoints,omitempty"`
 }
 
 // ServiceSpec describes the attributes that a user creates on a service

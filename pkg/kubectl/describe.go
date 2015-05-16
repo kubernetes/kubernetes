@@ -481,18 +481,28 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 	return describeService(service, endpoints, events)
 }
 
-func buildEndpointsString(endpoints []api.LoadBalancerEndpointStatus) string {
+func buildEndpointString(endpoint map[string]string) string {
+	var buffer bytes.Buffer
+
+	for k, v := range endpoint {
+		if buffer.Len() == 0 {
+			buffer.WriteString(",")
+		}
+		buffer.WriteString(k)
+		buffer.WriteString("=")
+		buffer.WriteString(v)
+	}
+	return buffer.String()
+}
+
+func buildEndpointsString(endpoints []map[string]string) string {
 	var buffer bytes.Buffer
 
 	for i := range endpoints {
 		if i != 0 {
-			buffer.WriteString(", ")
+			buffer.WriteString("; ")
 		}
-		if endpoints[i].IP != "" {
-			buffer.WriteString(endpoints[i].IP)
-		} else {
-			buffer.WriteString(endpoints[i].Hostname)
-		}
+		buffer.WriteString(buildEndpointString(endpoints[i]))
 	}
 	return buffer.String()
 }

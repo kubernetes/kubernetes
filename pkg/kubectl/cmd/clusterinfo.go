@@ -74,9 +74,9 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 			var link string
 			if len(service.Status.LoadBalancer.Endpoints) > 0 {
 				endpoint := service.Status.LoadBalancer.Endpoints[0]
-				ip := endpoint.IP
+				ip := endpoint[api.LoadBalancerEndpointIP]
 				if ip == "" {
-					ip = endpoint.Hostname
+					ip = endpoint[api.LoadBalancerEndpointHostname]
 				}
 				for _, port := range service.Spec.Ports {
 					link += "http://" + ip + ":" + strconv.Itoa(port.Port) + " "

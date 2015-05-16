@@ -475,7 +475,7 @@ func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (endpoint api.Lo
 	}
 
 	status.Name = vip.Address
-	status.Endpoints = []api.LoadBalancerEndpointStatus{{IP: vip.Address}}
+	status.Endpoints = []map[string]string{ { api.LoadBalancerEndpointIP: vip.Address} }
 
 	return status, true, err
 }
@@ -574,7 +574,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, forceLoadBala
 	}
 
 	status.Name = vip.Address
-	status.Endpoints = []api.LoadBalancerEndpointStatus{{IP: vip.Address}}
+	status.Endpoints = []map[string]string{ { api.LoadBalancerEndpointIP: vip.Address} }
 
 	return status, nil
 }

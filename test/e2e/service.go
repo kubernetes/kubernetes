@@ -293,9 +293,9 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected number (%d) of endpoints for externally load balanced service: %v", result.Status.LoadBalancer.Endpoints, result)
 		}
 		endpoint := result.Status.LoadBalancer.Endpoints[0]
-		ip := endpoint.IP
+		ip := endpoint[api.LoadBalancerEndpointIP]
 		if ip == "" {
-			ip = endpoint.Hostname
+			ip = endpoint[api.LoadBalancerEndpointHostname]
 		}
 		port := result.Spec.Ports[0].Port
 
@@ -491,9 +491,9 @@ var _ = Describe("Services", func() {
 				result, err := waitForPublicIPs(c, serviceName, namespace)
 				Expect(err).NotTo(HaveOccurred())
 				for i := range result.Status.LoadBalancer.Endpoints {
-					endpoint := result.Status.LoadBalancer.Endpoints[i].IP
+					endpoint := result.Status.LoadBalancer.Endpoints[i][api.LoadBalancerEndpointIP]
 					if endpoint == "" {
-						endpoint = result.Status.LoadBalancer.Endpoints[i].Hostname
+						endpoint = result.Status.LoadBalancer.Endpoints[i][api.LoadBalancerEndpointHostname]
 					}
 					endpoints = append(endpoints, endpoint) // Save 'em to check uniqueness
 				}

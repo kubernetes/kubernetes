@@ -999,20 +999,8 @@ type LoadBalancerStatus struct {
 
 	// Endpoints is a list containing endpoints for the load-balancer;
 	// traffic intended for the service should be sent to these endpoints.
-	Endpoints []LoadBalancerEndpointStatus `json:"endpoints,omitempty" description:"load-balancer endpoints"`
+	Endpoints []map[string]string `json:"endpoints,omitempty" description:"load-balancer endpoints"`
 }
-
-// EndpointStatus represents the status of a load-balancer endpoint
-type LoadBalancerEndpointStatus struct {
-	// IP is set for load-balancer endpoints that are IP based
-	// (typically GCE or OpenStack load-balancers.)
-	IP string `json:"ip,omitempty" description:"IP address of endpoint"`
-
-	// Hostname is set for load-balancer endpoints that are DNS based
-	// (typically AWS load-balancers.
-	Hostname string `json:"hostname,omitempty" description:"hostname of endpoint"`
-}
-
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
 	// Required: The list of ports that are exposed by this service.

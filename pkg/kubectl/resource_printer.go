@@ -524,8 +524,9 @@ func printService(svc *api.Service, w io.Writer) error {
 
 	endpoints := svc.Status.LoadBalancer.Endpoints
 	for i := range endpoints {
-		if endpoints[i].IP != "" {
-			ips = append(ips, endpoints[i].IP)
+		ip := endpoints[i][api.LoadBalancerEndpointIP]
+		if ip != "" {
+			ips = append(ips, ip)
 		}
 	}
 

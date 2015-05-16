@@ -655,12 +655,12 @@ func TestPrintHumanReadableService(t *testing.T) {
 			},
 			Status: api.ServiceStatus{
 				LoadBalancer: api.LoadBalancerStatus{
-					Endpoints: []api.LoadBalancerEndpointStatus{
+					Endpoints: []map[string]string{
 						{
-							IP: "2.3.4.5",
+							api.LoadBalancerEndpointIP: "2.3.4.5",
 						},
 						{
-							IP: "3.4.5.6",
+							api.LoadBalancerEndpointIP: "3.4.5.6",
 						},
 					},
 				},
@@ -681,34 +681,6 @@ func TestPrintHumanReadableService(t *testing.T) {
 					{
 						Port:     8000,
 						Protocol: "TCP",
-					},
-				},
-			},
-		},
-		{
-			Spec: api.ServiceSpec{
-				PortalIP: "1.2.3.4",
-				Ports: []api.ServicePort{
-					{
-						Port:     80,
-						Protocol: "TCP",
-					},
-					{
-						Port:     8090,
-						Protocol: "UDP",
-					},
-					{
-						Port:     8000,
-						Protocol: "TCP",
-					},
-				},
-			},
-			Status: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Endpoints: []api.LoadBalancerEndpointStatus{
-						{
-							IP: "2.3.4.5",
-						},
 					},
 				},
 			},
@@ -733,16 +705,44 @@ func TestPrintHumanReadableService(t *testing.T) {
 			},
 			Status: api.ServiceStatus{
 				LoadBalancer: api.LoadBalancerStatus{
-					Endpoints: []api.LoadBalancerEndpointStatus{
+					Endpoints: []map[string]string{
 						{
-							IP: "2.3.4.5",
+							api.LoadBalancerEndpointIP: "2.3.4.5",
+						},
+					},
+				},
+			},
+		},
+		{
+			Spec: api.ServiceSpec{
+				PortalIP: "1.2.3.4",
+				Ports: []api.ServicePort{
+					{
+						Port:     80,
+						Protocol: "TCP",
+					},
+					{
+						Port:     8090,
+						Protocol: "UDP",
+					},
+					{
+						Port:     8000,
+						Protocol: "TCP",
+					},
+				},
+			},
+			Status: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Endpoints: []map[string]string{
+						{
+							api.LoadBalancerEndpointIP: "2.3.4.5",
 						},
 						{
-							IP: "3.4.5.6",
+							api.LoadBalancerEndpointIP: "3.4.5.6",
 						},
 						{
-							IP:       "5.6.7.8",
-							Hostname: "host5678",
+							api.LoadBalancerEndpointIP:       "5.6.7.8",
+							api.LoadBalancerEndpointHostname: "host5678",
 						},
 					},
 				},
@@ -760,7 +760,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 		}
 
 		for _, endpoint := range svc.Status.LoadBalancer.Endpoints {
-			ip = endpoint.IP
+			ip = endpoint[api.LoadBalancerEndpointIP]
 			if !strings.Contains(output, ip) {
 				t.Errorf("expected to contain endpoint ip %s, but doesn't: %s", ip, output)
 			}

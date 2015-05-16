@@ -149,24 +149,27 @@ func (l *LoadBalancerStatus) Equal(r *LoadBalancerStatus) bool {
 	return endpointsEqual(l.Endpoints, r.Endpoints)
 }
 
-func endpointsEqual(lhs, rhs []LoadBalancerEndpointStatus) bool {
+func endpointsEqual(lhs, rhs []map[string]string) bool {
 	if len(lhs) != len(rhs) {
 		return false
 	}
 	for i := range lhs {
-		if !endpointEqual(&lhs[i], &rhs[i]) {
+		if !endpointEqual(lhs[i], rhs[i]) {
 			return false
 		}
 	}
 	return true
 }
 
-func endpointEqual(lhs, rhs *LoadBalancerEndpointStatus) bool {
-	if lhs.IP != rhs.IP {
+func endpointEqual(lhs, rhs map[string]string) bool {
+	if len(lhs) != len(rhs) {
 		return false
 	}
-	if lhs.Hostname != rhs.Hostname {
-		return false
+	for k, vL := range lhs {
+		vR, found := rhs[k]
+		if !found || vR != vL {
+			return false
+		}
 	}
 	return true
 }
