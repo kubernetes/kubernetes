@@ -1731,7 +1731,6 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 1,
 		},
-
 	}
 
 	for _, tc := range testCases {
