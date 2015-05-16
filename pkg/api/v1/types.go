@@ -1065,7 +1065,7 @@ type ServicePort struct {
 
 	// The port on each node on which this service is exposed.
 	// Default is to auto-allocate a port if the visibility of this Service requires one.
-	PublicPort int `json:"publicPort" description:"the port on each node on which this service is exposed"`
+	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port

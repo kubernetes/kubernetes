@@ -1042,22 +1042,22 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 
 	if service.Spec.Visibility == api.ServiceVisibilityCluster {
 		for i := range service.Spec.Ports {
-			if service.Spec.Ports[i].PublicPort != 0 {
+			if service.Spec.Ports[i].NodePort != 0 {
 				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot specify a public port with cluster-visibility services"))
 			}
 		}
 	}
 
-	// Check for duplicate PublicPorts
-	publicPorts := []int{}
+	// Check for duplicate NodePorts
+	nodePorts := []int{}
 	for i := range service.Spec.Ports {
-		if service.Spec.Ports[i].PublicPort != 0 {
-			publicPorts = append(publicPorts, service.Spec.Ports[i].PublicPort)
+		if service.Spec.Ports[i].NodePort != 0 {
+			nodePorts = append(nodePorts, service.Spec.Ports[i].NodePort)
 		}
 	}
-	sort.Ints(publicPorts)
-	for i := 1; i < len(publicPorts); i++ {
-		if publicPorts[i-1] == publicPorts[i] {
+	sort.Ints(nodePorts)
+	for i := 1; i < len(nodePorts); i++ {
+		if nodePorts[i-1] == nodePorts[i] {
 			allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "duplicate public port specified"))
 		}
 	}

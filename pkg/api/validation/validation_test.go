@@ -1656,23 +1656,23 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "valid visibility loadbalancer with PublicPort",
+			name: "valid visibility loadbalancer with NodePort",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Visibility = api.ServiceVisibilityLoadBalancer
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", PublicPort: 12345})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345})
 			},
 			numErrs: 0,
 		},
 		{
-			name: "valid public service with PublicPort",
+			name: "valid public service with NodePort",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Visibility = api.ServiceVisibilityNodePort
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", PublicPort: 12345})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345})
 			},
 			numErrs: 0,
 		},
 		{
-			name: "valid public service without PublicPort",
+			name: "valid public service without NodePort",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Visibility = api.ServiceVisibilityNodePort
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
@@ -1680,7 +1680,7 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "valid cluster service without PublicPort",
+			name: "valid cluster service without NodePort",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Visibility = api.ServiceVisibilityCluster
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
@@ -1688,19 +1688,19 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "invalid cluster service with PublicPort",
+			name: "invalid cluster service with NodePort",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Visibility = api.ServiceVisibilityCluster
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", PublicPort: 12345})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345})
 			},
 			numErrs: 1,
 		},
 		{
-			name: "invalid public service with duplicate PublicPort",
+			name: "invalid public service with duplicate NodePort",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Visibility = api.ServiceVisibilityNodePort
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p1", Port: 1, Protocol: "TCP", PublicPort: 1})
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p2", Port: 2, Protocol: "TCP", PublicPort: 1})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p1", Port: 1, Protocol: "TCP", NodePort: 1})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p2", Port: 2, Protocol: "TCP", NodePort: 1})
 			},
 			numErrs: 1,
 		},

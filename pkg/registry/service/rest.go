@@ -160,11 +160,11 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		}
 	}()
 
-	var publicPortOp portAllocationOperation
-	publicPortOp.Init(rs.portMgr)
+	var nodePortOp portAllocationOperation
+	nodePortOp.Init(rs.portMgr)
 	defer func() {
-		if publicPortOp.ShouldRollback {
-			publicPortOp.Rollback()
+		if nodePortOp.ShouldRollback {
+			nodePortOp.Rollback()
 		}
 	}()
 
@@ -186,20 +186,20 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		releaseServiceIP = true
 	}
 
-	assignPublicPorts := shouldAssignPublicPorts(service)
+	assignNodePorts := shouldAssignNodePorts(service)
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
-		if servicePort.PublicPort != 0 {
-			err := publicPortOp.Allocate(servicePort.PublicPort)
+		if servicePort.NodePort != 0 {
+			err := nodePortOp.Allocate(servicePort.NodePort)
 			if err != nil {
 				return nil, err
 			}
-		} else if assignPublicPorts {
-			publicPort, err := publicPortOp.AllocateNext()
+		} else if assignNodePorts {
+			nodePort, err := nodePortOp.AllocateNext()
 			if err != nil {
 				return nil, err
 			}
-			servicePort.PublicPort = publicPort
+			servicePort.NodePort = nodePort
 		}
 	}
 
@@ -209,12 +209,12 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	}
 
 	if err == nil {
-		el := publicPortOp.Commit()
+		el := nodePortOp.Commit()
 		if el != nil {
 			// these should be caught by an eventual reconciliation / restart
 			glog.Errorf("error(s) committing public-ports changes: %v", el)
 		}
-		publicPortOp.ShouldRollback = false
+		nodePortOp.ShouldRollback = false
 
 		releaseServiceIP = false
 	}
@@ -239,11 +239,11 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
-		if servicePort.PublicPort != 0 {
-			err := rs.portMgr.Release(servicePort.PublicPort)
+		if servicePort.NodePort != 0 {
+			err := rs.portMgr.Release(servicePort.NodePort)
 			if err != nil {
 				// these should be caught by an eventual reconciliation / restart
-				glog.Errorf("Error releasing service %s public port %d: %v", service.Name, servicePort.PublicPort, err)
+				glog.Errorf("Error releasing service %s public port %d: %v", service.Name, servicePort.NodePort, err)
 			}
 		}
 	}
@@ -305,76 +305,76 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 		return nil, false, errors.NewInvalid("service", service.Name, errs)
 	}
 
-	var publicPortOp portAllocationOperation
-	publicPortOp.Init(rs.portMgr)
+	var nodePortOp portAllocationOperation
+	nodePortOp.Init(rs.portMgr)
 	defer func() {
-		if publicPortOp.ShouldRollback {
-			publicPortOp.Rollback()
+		if nodePortOp.ShouldRollback {
+			nodePortOp.Rollback()
 		}
 	}()
 
-	assignPublicPorts := shouldAssignPublicPorts(service)
+	assignNodePorts := shouldAssignNodePorts(service)
 
-	oldPublicPorts := collectServicePublicPorts(oldService)
+	oldNodePorts := collectServiceNodePorts(oldService)
 
-	newPublicPorts := []int{}
-	if assignPublicPorts {
+	newNodePorts := []int{}
+	if assignNodePorts {
 		for i := range service.Spec.Ports {
 			servicePort := &service.Spec.Ports[i]
-			publicPort := servicePort.PublicPort
-			if publicPort != 0 {
-				if !contains(oldPublicPorts, publicPort) {
-					err := publicPortOp.Allocate(publicPort)
+			nodePort := servicePort.NodePort
+			if nodePort != 0 {
+				if !contains(oldNodePorts, nodePort) {
+					err := nodePortOp.Allocate(nodePort)
 					if err != nil {
 						return nil, false, err
 					}
 				}
 			} else {
-				publicPort, err = publicPortOp.AllocateNext()
+				nodePort, err = nodePortOp.AllocateNext()
 				if err != nil {
 					return nil, false, err
 				}
-				servicePort.PublicPort = publicPort
+				servicePort.NodePort = nodePort
 			}
 			// Detect duplicate public ports; this should have been caught by validation, so we panic
-			if contains(newPublicPorts, publicPort) {
+			if contains(newNodePorts, nodePort) {
 				panic("duplicate public port")
 			}
-			newPublicPorts = append(newPublicPorts, publicPort)
+			newNodePorts = append(newNodePorts, nodePort)
 		}
 	} else {
-		// Validate should have validated that publicPort == 0
+		// Validate should have validated that nodePort == 0
 	}
 
 	// The comparison loops are O(N^2), but we don't expect N to be huge
 	// (there's a hard-limit at 2^16, because they're ports; and even 4 ports would be a lot)
-	for _, oldPublicPort := range oldPublicPorts {
-		if !contains(newPublicPorts, oldPublicPort) {
+	for _, oldNodePort := range oldNodePorts {
+		if !contains(newNodePorts, oldNodePort) {
 			continue
 		}
-		publicPortOp.ReleaseDeferred(oldPublicPort)
+		nodePortOp.ReleaseDeferred(oldNodePort)
 	}
 
 	out, err := rs.registry.UpdateService(ctx, service)
 
 	if err == nil {
-		el := publicPortOp.Commit()
+		el := nodePortOp.Commit()
 		if el != nil {
 			// problems should be fixed by an eventual reconciliation / restart
 			glog.Errorf("error(s) committing public-ports changes: %v", el)
 		}
-		publicPortOp.ShouldRollback = false
+		nodePortOp.ShouldRollback = false
 	}
 
 	return out, false, err
 }
 
-func collectServicePublicPorts(service *api.Service) []int {
+func collectServiceNodePorts(service *api.Service) []int {
 	servicePorts := []int{}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
-		if servicePort.PublicPort != 0 {
-			servicePorts = append(servicePorts, servicePort.PublicPort)
+		if servicePort.NodePort != 0 {
+			servicePorts = append(servicePorts, servicePort.NodePort)
 		}
 	}
 	return servicePorts
@@ -419,7 +419,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 	return nil, nil, fmt.Errorf("no endpoints available for %q", id)
 }
 
-func shouldAssignPublicPorts(service *api.Service) bool {
+func shouldAssignNodePorts(service *api.Service) bool {
 	switch service.Spec.Visibility {
 	case api.ServiceVisibilityLoadBalancer:
 		return true
