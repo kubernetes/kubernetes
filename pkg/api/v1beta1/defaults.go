@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 )
 
-func init() {
+func addDefaultingFuncs() {
 	api.Scheme.AddDefaultingFuncs(
 		func(obj *ReplicationController) {
 			if len(obj.DesiredState.ReplicaSelector) == 0 {

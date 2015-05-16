@@ -28,7 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func init() {
+func addConversionFuncs() {
 	// Our TypeMeta was split into two different structs.
 	newer.Scheme.AddStructFieldConversion(TypeMeta{}, "TypeMeta", newer.TypeMeta{}, "TypeMeta")
 	newer.Scheme.AddStructFieldConversion(TypeMeta{}, "TypeMeta", newer.ObjectMeta{}, "ObjectMeta")

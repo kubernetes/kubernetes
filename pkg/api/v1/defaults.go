@@ -25,7 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func init() {
+func addDefaultingFuncs() {
 	api.Scheme.AddDefaultingFuncs(
 		func(obj *ReplicationController) {
 			var labels map[string]string

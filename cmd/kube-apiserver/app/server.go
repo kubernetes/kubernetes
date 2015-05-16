@@ -178,7 +178,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
 	fs.Var(&s.PortalNet, "portal-net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
-	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver.")
+	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver. api/<version> key can be used to turn on/off specific api versions. api/all and api/legacy are special keys to control all and legacy api versions respectively.")
 	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
 	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
@@ -238,19 +238,39 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Failure to start kubelet client: %v", err)
 	}
 
-	disableV1beta3 := false
-	v1beta3FlagValue, ok := s.RuntimeConfig["api/v1beta3"]
-	if ok && v1beta3FlagValue == "false" {
-		disableV1beta3 = true
+	// "api/all=false" allows users to selectively enable specific api versions.
+	disableAllAPIs := false
+	allAPIFlagValue, ok := s.RuntimeConfig["api/all"]
+	if ok && allAPIFlagValue == "false" {
+		disableAllAPIs = true
 	}
 
-	_, enableV1 := s.RuntimeConfig["api/v1"]
-
+	// "api/legacy=false" allows users to disable legacy api versions.
+	// Right now, v1beta1 and v1beta2 are considered legacy.
 	disableLegacyAPIs := false
 	legacyAPIFlagValue, ok := s.RuntimeConfig["api/legacy"]
 	if ok && legacyAPIFlagValue == "false" {
 		disableLegacyAPIs = true
 	}
+
+	// "api/v1beta1={true|false} allows users to enable/disable v1beta1 API.
+	// This takes preference over api/all and api/legacy, if specified.
+	disableV1beta1 := disableAllAPIs || disableLegacyAPIs
+	disableV1beta1 = !s.getRuntimeConfigValue("api/v1beta1", !disableV1beta1)
+
+	// "api/v1beta2={true|false} allows users to enable/disable v1beta2 API.
+	// This takes preference over api/all and api/legacy, if specified.
+	disableV1beta2 := disableAllAPIs || disableLegacyAPIs
+	disableV1beta2 = !s.getRuntimeConfigValue("api/v1beta2", !disableV1beta2)
+
+	// "api/v1beta3={true|false} allows users to enable/disable v1beta3 API.
+	// This takes preference over api/all and api/legacy, if specified.
+	disableV1beta3 := disableAllAPIs
+	disableV1beta3 = !s.getRuntimeConfigValue("api/v1beta3", !disableV1beta3)
+
+	// V1 is disabled by default. Users can enable it using "api/v1={true}".
+	_, enableV1 := s.RuntimeConfig["api/v1"]
+
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
@@ -337,7 +357,8 @@ func (s *APIServer) Run(_ []string) error {
 		SupportsBasicAuth:      len(s.BasicAuthFile) > 0,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
-		DisableLegacyAPIs:      disableLegacyAPIs,
+		DisableV1Beta1:         disableV1beta1,
+		DisableV1Beta2:         disableV1beta2,
 		DisableV1Beta3:         disableV1beta3,
 		EnableV1:               enableV1,
 		MasterServiceNamespace: s.MasterServiceNamespace,
@@ -444,4 +465,19 @@ func (s *APIServer) Run(_ []string) error {
 	glog.Infof("Serving insecurely on %s", insecureLocation)
 	glog.Fatal(http.ListenAndServe())
 	return nil
+}
+
+func (s *APIServer) getRuntimeConfigValue(apiKey string, defaultValue bool) bool {
+	flagValue, ok := s.RuntimeConfig[apiKey]
+	if ok {
+		if flagValue == "" {
+			return true
+		}
+		boolValue, err := strconv.ParseBool(flagValue)
+		if err != nil {
+			glog.Fatalf("Invalid value of %s: %s", apiKey, flagValue)
+		}
+		return boolValue
+	}
+	return defaultValue
 }

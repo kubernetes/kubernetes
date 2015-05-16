@@ -10,18 +10,20 @@ The `cluster/kube-push.sh` script will do a rudimentary update; it is a 1.0 road
 
 There is a sequence of steps to upgrade to a new API version.
 
-1. Turn on the new version.
+1. Turn on the new api version
 2. Upgrade the cluster's storage to use the new version.
 3. Upgrade all config files. Identify users of the old api version endpoints.
+4. Update existing objects in the storage to new version by running cluster/update-storage-objects.sh
 3. Turn off the old version.
 
 ### Turn on or off an API version for your cluster
 
-TODO: There's an apiserver flag for this.
+Specific API versions can be turned on or off by passing --runtime-config=api/<version> flag while bringing up the server. For example: to turn off v1beta3 API, pass --runtime-config=api/v1beta3=false.
+runtime-config also supports 2 special keys: api/all and api/legacy to control all and legacy APIs respectively. For example, for turning off all api versions except v1beta3, pass --runtime-config=api/all=false,api/v1beta3=true.
 
 ### Switching your cluster's storage API version
 
-TODO: This functionality hasn't been written yet.
+KUBE_API_VERSIONS env var controls the API versions that are supported in the cluster. The first version in the list is used as the cluster's storage version. Hence, to set a specific version as the storage version, bring it to the front of list of versions in the value of KUBE_API_VERSIONS.
 
 ### Switching your config files to a new API version
 

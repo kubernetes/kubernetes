@@ -18,19 +18,17 @@ package latest
 
 import (
 	"fmt"
-	"os"
-	"sort"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/golang/glog"
 )
 
 // Version is the string that represents the current external default version.
@@ -68,63 +66,14 @@ var RESTMapper meta.RESTMapper
 // userResources is a group of resources mostly used by a kubectl user
 var userResources = []string{"rc", "svc", "pods", "pvc"}
 
-// InterfacesFor returns the default Codec and ResourceVersioner for a given version
-// string, or an error if the version is not known.
-func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
-	switch version {
-	case "v1beta1":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta1.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case "v1beta2":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta2.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case "v1beta3":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta3.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case "v1":
-		return &meta.VersionInterfaces{
-			Codec:            v1.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
-	}
-}
-
 func init() {
-	// The list of valid API versions to test that KUBE_API_VERSIONS does not contain an invalid version.
-	// Note that the list is in ascending sorted order.
-	validAPIVersions := []string{"v1", "v1beta1", "v1beta2", "v1beta3"}
-	// Env var KUBE_API_VERSIONS is a comma separated list of supported API versions.
-	// The versions should be in the order of most preferred to the least.
-	supportedVersions := os.Getenv("KUBE_API_VERSIONS")
-	if supportedVersions == "" {
-		supportedVersions = "v1beta3,v1beta1,v1beta2,v1"
-	}
-	versions := strings.Split(supportedVersions, ",")
-	// The first version in the list is the latest version.
-	Version = versions[0]
+	// Use the first API version in the list of registered versions as the latest.
+	Version = registered.RegisteredVersions[0]
 	Codec = runtime.CodecFor(api.Scheme, Version)
-	// Put the versions in Versions in reverse order.
+	// Put the registered versions in Versions in reverse order.
+	versions := registered.RegisteredVersions
 	Versions = []string{}
 	for i := len(versions) - 1; i >= 0; i-- {
-		version := versions[i]
-		// Verify that the version is valid.
-		searchIndex := sort.SearchStrings(validAPIVersions, version)
-		if searchIndex == len(validAPIVersions) || validAPIVersions[searchIndex] != version {
-			// Not a valid API version.
-			glog.Fatalf("invalid api version: %s in KUBE_API_VERSIONS: %s. List of valid API versions: %s", version, os.Getenv("KUBE_API_VERSIONS"), strings.Join(validAPIVersions, ", "))
-		}
 		Versions = append(Versions, versions[i])
 	}
 
@@ -194,4 +143,37 @@ func init() {
 		}
 	}
 	RESTMapper = mapper
+}
+
+// InterfacesFor returns the default Codec and ResourceVersioner for a given version
+// string, or an error if the version is not known.
+func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
+	switch version {
+	case "v1beta1":
+		return &meta.VersionInterfaces{
+			Codec:            v1beta1.Codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
+	case "v1beta2":
+		return &meta.VersionInterfaces{
+			Codec:            v1beta2.Codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
+	case "v1beta3":
+		return &meta.VersionInterfaces{
+			Codec:            v1beta3.Codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
+	case "v1":
+		return &meta.VersionInterfaces{
+			Codec:            v1.Codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
+	}
 }
