@@ -104,20 +104,21 @@ func (s *Scheduler) Run() {
 	go util.Until(s.scheduleOne, 0, s.config.StopEverything)
 }
 
-func (s *Scheduler) scheduleOne() {
+func (s *Scheduler) schedule() (executeBinding func()) {
 	pod := s.config.NextPod()
 	glog.V(3).Infof("Attempting to schedule: %v", pod)
 	start := time.Now()
-	defer func() {
+	recordTime := func() {
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
-	}()
+	}
 	dest, err := s.config.Algorithm.Schedule(pod, s.config.MinionLister)
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %v", pod)
 		s.config.Recorder.Eventf(pod, "failedScheduling", "Error scheduling: %v", err)
 		s.config.Error(pod, err)
-		return
+		recordTime()
+		return func() {}
 	}
 	b := &api.Binding{
 		ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
@@ -127,22 +128,32 @@ func (s *Scheduler) scheduleOne() {
 		},
 	}
 
-	// We want to add the pod to the model iff the bind succeeds, but we don't want to race
-	// with any deletions, which happen asyncronously.
-	s.config.Modeler.LockedAction(func() {
+	// Actually do the binding asynchronously with respect to the scheduling queue.
+	return func() {
+		defer recordTime()
+		defer util.HandleCrash()
+
+		// Make an object representing our assumtion that the bind will succeed.
+		assumed := *pod
+		assumed.Spec.Host = dest
+		s.config.Modeler.AssumePod(&assumed)
+
 		bindingStart := time.Now()
 		err := s.config.Binder.Bind(b)
 		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 		if err != nil {
+			// Remove our (now invalid) assumption
+			s.config.Modeler.ForgetPod(&assumed)
 			glog.V(1).Infof("Failed to bind pod: %v", err)
 			s.config.Recorder.Eventf(pod, "failedScheduling", "Binding rejected: %v", err)
 			s.config.Error(pod, err)
 			return
 		}
 		s.config.Recorder.Eventf(pod, "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
-		// tell the model to assume that this binding took effect.
-		assumed := *pod
-		assumed.Spec.Host = dest
-		s.config.Modeler.AssumePod(&assumed)
-	})
+	}
+}
+
+func (s *Scheduler) scheduleOne() {
+	bind := s.schedule()
+	go bind()
 }
