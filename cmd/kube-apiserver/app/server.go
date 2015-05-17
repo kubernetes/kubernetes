@@ -300,7 +300,7 @@ func (s *APIServer) Run(_ []string) error {
 	if s.ServiceAccountKeyFile == "" && s.TLSPrivateKeyFile != "" {
 		s.ServiceAccountKeyFile = s.TLSPrivateKeyFile
 	}
-	authenticator, err := apiserver.NewAuthenticator(s.BasicAuthFile, s.ClientCAFile, s.TokenAuthFile, s.ServiceAccountKeyFile, s.ServiceAccountLookup, client)
+	authenticator, err := apiserver.NewAuthenticator(s.BasicAuthFile, s.ClientCAFile, s.TokenAuthFile, s.ServiceAccountKeyFile, s.ServiceAccountLookup, helper)
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}

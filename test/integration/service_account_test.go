@@ -366,7 +366,8 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 		return nil, false, nil
 	})
 	serviceAccountKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]*rsa.PublicKey{&serviceAccountKey.PublicKey}, true, rootClient)
+	serviceAccountTokenGetter := serviceaccount.NewGetterFromClient(rootClient)
+	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]*rsa.PublicKey{&serviceAccountKey.PublicKey}, true, serviceAccountTokenGetter)
 	authenticator := union.New(
 		bearertoken.New(rootTokenAuth),
 		bearertoken.New(serviceAccountTokenAuth),

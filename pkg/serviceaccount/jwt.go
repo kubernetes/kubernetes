@@ -29,7 +29,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
 const (
@@ -124,15 +123,15 @@ func (j *jwtTokenGenerator) GenerateToken(serviceAccount api.ServiceAccount, sec
 
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
 // Token signatures are verified using each of the given public keys until one works (allowing key rotation)
-// If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified using the given client
-func JWTTokenAuthenticator(keys []*rsa.PublicKey, lookup bool, client client.Interface) authenticator.Token {
-	return &jwtTokenAuthenticator{keys, lookup, client}
+// If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided ServiceAccountTokenGetter
+func JWTTokenAuthenticator(keys []*rsa.PublicKey, lookup bool, getter ServiceAccountTokenGetter) authenticator.Token {
+	return &jwtTokenAuthenticator{keys, lookup, getter}
 }
 
 type jwtTokenAuthenticator struct {
 	keys   []*rsa.PublicKey
 	lookup bool
-	client client.Interface
+	getter ServiceAccountTokenGetter
 }
 
 func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
@@ -199,7 +198,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 
 		if j.lookup {
 			// Make sure token hasn't been invalidated by deletion of the secret
-			secret, err := j.client.Secrets(namespace).Get(secretName)
+			secret, err := j.getter.GetSecret(namespace, secretName)
 			if err != nil {
 				return nil, false, errors.New("Token has been invalidated")
 			}
@@ -208,7 +207,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 			}
 
 			// Make sure service account still exists (name and UID)
-			serviceAccount, err := j.client.ServiceAccounts(namespace).Get(serviceAccountName)
+			serviceAccount, err := j.getter.GetServiceAccount(namespace, serviceAccountName)
 			if err != nil {
 				return nil, false, err
 			}
