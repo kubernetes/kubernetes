@@ -179,99 +179,109 @@ credentials.
 The secrets:
 
 ```json
-[{
-  "kind": "Secret",
-  "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "prod-db-secret"
-  },
-  "data": {
-    "password": "dmFsdWUtMg0KDQo=",
-    "username": "dmFsdWUtMQ0K"
-  }
-},
 {
-  "kind": "Secret",
   "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "test-db-secret"
+  "kind": "List",
+  "items":
+  [{
+    "kind": "Secret",
+    "apiVersion": "v1beta3",
+    "metadata": {
+      "name": "prod-db-secret"
+    },
+    "data": {
+      "password": "dmFsdWUtMg0KDQo=",
+      "username": "dmFsdWUtMQ0K"
+    }
   },
-  "data": {
-    "password": "dmFsdWUtMg0KDQo=",
-    "username": "dmFsdWUtMQ0K"
-  }
-}]
+  {
+    "kind": "Secret",
+    "apiVersion": "v1beta3",
+    "metadata": {
+      "name": "test-db-secret"
+    },
+    "data": {
+      "password": "dmFsdWUtMg0KDQo=",
+      "username": "dmFsdWUtMQ0K"
+    }
+  }]
+}
 ```
 
 The pods:
 
 ```json
-[{
-  "kind": "Pod",
-  "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "prod-db-client-pod",
-    "labels": {
-      "name": "prod-db-client"
-    }
-  },
-  "spec": {
-    "volumes": [
-      {
-        "name": "secret-volume",
-        "secret": {
-          "secretName": "prod-db-secret"
-        }
-      }
-    ],
-    "containers": [
-      {
-        "name": "db-client-container",
-        "image": "myClientImage",
-        "volumeMounts": [
-          {
-            "name": "secret-volume",
-            "readOnly": true,
-            "mountPath": "/etc/secret-volume"
-          }
-        ]
-      }
-    ]
-  }
-},
 {
-  "kind": "Pod",
   "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "test-db-client-pod",
-    "labels": {
-      "name": "test-db-client"
+  "kind": "List",
+  "items":
+  [{
+    "kind": "Pod",
+    "apiVersion": "v1beta3",
+    "metadata": {
+      "name": "prod-db-client-pod",
+      "labels": {
+        "name": "prod-db-client"
+      }
+    },
+    "spec": {
+      "volumes": [
+        {
+          "name": "secret-volume",
+          "secret": {
+            "secretName": "prod-db-secret"
+          }
+        }
+      ],
+      "containers": [
+        {
+          "name": "db-client-container",
+          "image": "myClientImage",
+          "volumeMounts": [
+            {
+              "name": "secret-volume",
+              "readOnly": true,
+              "mountPath": "/etc/secret-volume"
+            }
+          ]
+        }
+      ]
     }
   },
-  "spec": {
-    "volumes": [
-      {
-        "name": "secret-volume",
-        "secret": {
-          "secretName": "test-db-secret"
-        }
+  {
+    "kind": "Pod",
+    "apiVersion": "v1beta3",
+    "metadata": {
+      "name": "test-db-client-pod",
+      "labels": {
+        "name": "test-db-client"
       }
-    ],
-    "containers": [
-      {
-        "name": "db-client-container",
-        "image": "myClientImage",
-        "volumeMounts": [
-          {
-            "name": "secret-volume",
-            "readOnly": true,
-            "mountPath": "/etc/secret-volume"
+    },
+    "spec": {
+      "volumes": [
+        {
+          "name": "secret-volume",
+          "secret": {
+            "secretName": "test-db-secret"
           }
-        ]
-      }
-    ]
-  }
-}]
+        }
+      ],
+      "containers": [
+        {
+          "name": "db-client-container",
+          "image": "myClientImage",
+          "volumeMounts": [
+            {
+              "name": "secret-volume",
+              "readOnly": true,
+              "mountPath": "/etc/secret-volume"
+            }
+          ]
+        }
+      ]
+    }
+  }]
+}
 ```
 
 Both containers will have the following files present on their filesystems:
