@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
@@ -244,7 +245,11 @@ func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
 	return func(pod *api.Pod, err error) {
-		glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
+		if err == scheduler.ErrNoNodesAvailable {
+			glog.V(4).Infof("Unable to schedule %v %v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
+		} else {
+			glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
+		}
 		backoff.gc()
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
@@ -257,7 +262,9 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 			pod = &api.Pod{}
 			err := factory.Client.Get().Namespace(podNamespace).Resource("pods").Name(podID).Do().Into(pod)
 			if err != nil {
-				glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
+				if !errors.IsNotFound(err) {
+					glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
+				}
 				return
 			}
 			if pod.Spec.Host == "" {
