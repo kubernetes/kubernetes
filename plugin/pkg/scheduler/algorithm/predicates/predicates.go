@@ -142,13 +142,13 @@ func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, no
 		return false, err
 	}
 	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
-		return int64(len(existingPods)) < info.Status.Capacity.MaxPods().Value(), nil
+		return int64(len(existingPods)) < info.Status.Capacity.Pods().Value(), nil
 	}
 	pods := []*api.Pod{}
 	copy(pods, existingPods)
 	pods = append(existingPods, pod)
 	_, exceeding := CheckPodsExceedingCapacity(pods, info.Status.Capacity)
-	if len(exceeding) > 0 || int64(len(pods)) > info.Status.Capacity.MaxPods().Value() {
+	if len(exceeding) > 0 || int64(len(pods)) > info.Status.Capacity.Pods().Value() {
 		return false, nil
 	}
 	return true, nil

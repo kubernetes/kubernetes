@@ -672,7 +672,7 @@ func (nc *NodeController) getCloudNodesWithSpec() (*api.NodeList, error) {
 		if resources != nil {
 			node.Status.Capacity = resources.Capacity
 			if node.Status.Capacity != nil {
-				node.Status.Capacity[api.ResourceMaxPods] = *resource.NewQuantity(0, resource.DecimalSI)
+				node.Status.Capacity[api.ResourcePods] = *resource.NewQuantity(0, resource.DecimalSI)
 			}
 		}
 		instanceID, err := instances.ExternalID(node.Name)
