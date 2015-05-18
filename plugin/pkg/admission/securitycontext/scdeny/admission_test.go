@@ -44,7 +44,7 @@ func TestAdmission(t *testing.T) {
 	}
 	for k, v := range successCases {
 		pod.Spec.Containers[0].SecurityContext = v
-		err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", "foo", string(api.ResourcePods), "ignored"))
+		err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", "foo", string(api.ResourcePods), "ignored", nil))
 		if err != nil {
 			t.Errorf("Unexpected error returned from admission handler for case %s", k)
 		}
@@ -57,7 +57,7 @@ func TestAdmission(t *testing.T) {
 	}
 	for k, v := range errorCases {
 		pod.Spec.Containers[0].SecurityContext = v
-		err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", "foo", string(api.ResourcePods), "ignored"))
+		err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", "foo", string(api.ResourcePods), "ignored", nil))
 		if err == nil {
 			t.Errorf("Expected error returned from admission handler for case %s", k)
 		}
