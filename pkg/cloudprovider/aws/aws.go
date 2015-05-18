@@ -438,7 +438,13 @@ func (aws *AWSCloud) ExternalID(name string) (string, error) {
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (aws *AWSCloud) InstanceID(name string) (string, error) {
-	return "", nil
+	inst, err := aws.getInstancesByDnsName(name)
+	if err != nil {
+		return "", err
+	}
+	// In the future it is possible to also return an endpoint as:
+	// <endpoint>/<zone>/<instanceid>
+	return "/" + *inst.Placement.AvailabilityZone + "/" + *inst.InstanceID, nil
 }
 
 // Return the instances matching the relevant private dns name.
