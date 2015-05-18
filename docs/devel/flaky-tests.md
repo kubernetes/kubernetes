@@ -11,33 +11,27 @@ There is a testing image ```brendanburns/flake``` up on the docker hub.  We will
 
 Create a replication controller with the following config:
 ```yaml
-id: flakecontroller
+apiVersion: v1beta3
 kind: ReplicationController
-apiVersion: v1beta1
-desiredState:
+metadata:
+  name: flakecontroller
+spec:
   replicas: 24
-  replicaSelector:
-    name: flake
-  podTemplate:
-    desiredState:
-      manifest:
-        version: v1beta1
-        id: ""
-        volumes: []
-        containers:
-        - name: flake
-          image: brendanburns/flake
-          env:
-          - name: TEST_PACKAGE
-            value: pkg/tools
-          - name: REPO_SPEC
-            value: https://github.com/GoogleCloudPlatform/kubernetes
-      restartpolicy: {}
-    labels:
-      name: flake
-labels:
-  name: flake
+  template:
+    metadata:
+      labels:
+        name: flake
+    spec:
+      containers:
+      - name: flake
+        image: brendanburns/flake
+        env:
+        - name: TEST_PACKAGE
+          value: pkg/tools
+        - name: REPO_SPEC
+          value: https://github.com/GoogleCloudPlatform/kubernetes
 ```
+Note that we omit the labels and the selector fields of the replication controller, because they will be populated from the labels field of the pod template by default.
 
 ```./cluster/kubectl.sh create -f controller.yaml```
 
