@@ -59,7 +59,7 @@ func (SimpleMetaFactory) Interpret(data []byte) (version, kind string, err error
 	}{}
 	err = json.Unmarshal(data, &findKind)
 	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
+		return "", "", fmt.Errorf("couldn't get version/kind; json parse error: %v", err)
 	}
 	return findKind.APIVersion, findKind.Kind, nil
 }
