@@ -33,3 +33,5 @@ Hello, Go examples!
 - [ ] add push command
 - [ ] test more complicated package (ex: etcd)
 - [ ] fix permission inside the tar
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/go2docker/README.md?pixel)]()

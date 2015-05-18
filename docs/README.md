@@ -14,3 +14,6 @@
 * An overview of the [Design of Kubernetes](design)
 
 * There are example files and walkthroughs in the [examples](../examples) folder.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/README.md?pixel)]()

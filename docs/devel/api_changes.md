@@ -332,3 +332,6 @@ the change gets in. If you are unsure, ask. Also make sure that the change gets 
 ## Adding new REST objects
 
 TODO(smarterclayton): write this.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api_changes.md?pixel)]()

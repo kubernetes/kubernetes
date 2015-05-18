@@ -153,3 +153,6 @@ $ docker run --privileged --entrypoint="/usr/bin/bash" -it -e="OPENSHIFTCONFIG=/
 $ osc config use-context public-default
 $ osc --help
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/openshift-origin/README.md?pixel)]()

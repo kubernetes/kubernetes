@@ -202,3 +202,6 @@ monitoring-heapster-controller-fplln         10.244.0.4          heapster       
 monitoring-influx-grafana-controller-0133o   10.244.3.4          influxdb                kubernetes/heapster_influxdb:v0.3   kubernetes-minion-kmin.c.kubernetes-user2.internal/130.211.173.22   kubernetes.io/cluster-service=true,name=influxGrafana                       Running             5 hours
                                                                  grafana                 kubernetes/heapster_grafana:v0.4
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/accessing-the-cluster.md?pixel)]()

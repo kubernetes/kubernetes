@@ -87,3 +87,6 @@ To delete the replication controller (and the pods it created):
 ```bash
 kubectl delete rc nginx
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/simple-yaml.md?pixel)]()

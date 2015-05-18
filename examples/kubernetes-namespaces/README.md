@@ -247,3 +247,6 @@ At this point, it should be clear that the resources users create in one namespa
 
 As the policy support in Kubernetes evolves, we will extend this scenario to show how you can provide different
 authorization rules for each namespace.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/kubernetes-namespaces/README.md?pixel)]()

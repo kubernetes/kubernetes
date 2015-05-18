@@ -123,3 +123,6 @@ running at port 8000.
 
 To write new protractor tests, put the test files (`*.spec.js`) in the
 corresponding `www/master/components/**/protractor/` directory.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/www/README.md?pixel)]()

@@ -352,3 +352,6 @@ Pod level](#use-case-two-containers).
    by impersonating the kubelet.  It is a planned feature to only send secrets to
    nodes that actually require them, to restrict the impact of a root exploit on a
    single node.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/secrets.md?pixel)]()

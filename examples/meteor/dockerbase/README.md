@@ -7,3 +7,6 @@ To build and push the base meteor-kubernetes image:
 
     docker build -t chees/meteor-kubernetes .
     docker push chees/meteor-kubernetes
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/meteor/dockerbase/README.md?pixel)]()

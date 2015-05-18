@@ -57,3 +57,6 @@ Definition of columns:
     - **Community**: Actively supported by community contributions. May not work with more recent releases of kubernetes.
     - **Inactive**: No active maintainer.  Not recommended for first-time K8s users, and may be deleted soon.
   - **Notes** is relevant information such as version k8s used.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/README.md?pixel)]()

@@ -209,3 +209,6 @@ To turn down a Kubernetes cluster:
 ```shell
 $ cluster/kube-down.sh
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/guestbook-go/README.md?pixel)]()

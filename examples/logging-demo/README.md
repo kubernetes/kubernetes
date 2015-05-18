@@ -241,3 +241,6 @@ Access the Elasticsearch service at URL `https://130.211.122.180/api/v1beta3/pro
 }
 ```
 Visiting the URL `https://130.211.122.180/api/v1beta3/proxy/namespaces/default/services/kibana-logging` should show the Kibana viewer for the logging information stored in the Elasticsearch service.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/logging-demo/README.md?pixel)]()

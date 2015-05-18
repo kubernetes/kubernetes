@@ -89,3 +89,6 @@ then ```foo-next``` is synthesized using the pattern ```<controller-name>-<hash-
    * Otherwise, ```foo-next``` and ```foo``` both exist
       * Set ```desired-replicas``` annotation on ```foo``` to match the annotation on ```foo-next```
       * Goto Rollout with ```foo``` and ```foo-next``` trading places.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/simple-rolling-update.md?pixel)]()

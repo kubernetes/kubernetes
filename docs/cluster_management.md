@@ -57,3 +57,6 @@ If you want more control over the upgrading process, you may use the following w
     If you deleted the node's VM instance and created a new one, then a new schedulable node resource will
     be created automatically when you create a new VM instance (if you're using a cloud provider that supports
     node discovery; currently this is only GCE, not including CoreOS on GCE using kube-register). See [Node](node.md).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/cluster_management.md?pixel)]()

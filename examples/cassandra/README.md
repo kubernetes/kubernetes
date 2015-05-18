@@ -360,3 +360,6 @@ public class KubernetesSeedProvider implements SeedProvider {
     }
 }
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/cassandra/README.md?pixel)]()

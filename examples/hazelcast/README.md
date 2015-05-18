@@ -329,3 +329,6 @@ public class HazelcastDiscoveryController implements CommandLineRunner {
 }
 
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/hazelcast/README.md?pixel)]()

@@ -28,3 +28,6 @@ With the final markdown all set, cut and paste it to the top of ```CHANGELOG.md`
    * Cut and paste the final markdown from above into the release notes
    * Press Save.
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/making-release-notes.md?pixel)]()

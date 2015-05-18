@@ -189,3 +189,6 @@ $ kubectl delete -f node.json
 **The cluster should be running! Launch a test pod.**
 
 You should have a functional cluster, check out [101](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/walkthrough/README.md)!
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/fedora/fedora_manual_config.md?pixel)]()

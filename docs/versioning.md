@@ -43,3 +43,6 @@ It may seem a bit strange to complete the v2 API before v2.0 is released, but *a
  * For example, if a user is at Kube 1.x, we may require them to upgrade to Kube 1.x+y before upgrading to Kube 2.x. In others words, an upgrade across major versions (e.g. Kube 1.x to Kube 2.x) should effectively be a no-op and as graceful as an upgrade from Kube 1.x to Kube 1.x+1. But you can require someone to go from 1.x to 1.x+y before they go to 2.x.
 
 There is a separate question of how to track the capabilities of a kubelet to facilitate rolling upgrades. That is not addressed here.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/versioning.md?pixel)]()

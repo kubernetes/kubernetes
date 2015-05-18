@@ -80,3 +80,6 @@ $ mount | grep kube_vol
 ```
 
 You may also run `docker ps` on the host to see the actual container.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/glusterfs/README.md?pixel)]()

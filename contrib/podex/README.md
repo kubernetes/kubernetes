@@ -27,3 +27,6 @@ $ podex -format json -type container -name nodejs-nginx google/nodejs-hello ngin
 - [ ] option to merge multiple container manifest into one pod
 - [ ] docker run flags support
 - [ ] option to generate service bindings from links
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/podex/README.md?pixel)]()

@@ -23,3 +23,6 @@ You should see the logs show up in the cluster's Kibana log viewer shortly after
 ```
 kubectl delete -f logging-sidecar-pod.yaml
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/logging/fluentd-sidecar-es/README.md?pixel)]()

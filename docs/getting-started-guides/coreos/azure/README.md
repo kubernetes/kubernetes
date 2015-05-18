@@ -185,3 +185,6 @@ If you don't wish care about the Azure bill, you can tear down the cluster. It's
 > Note: make sure to use the _latest state file_, as after resizing there is a new one.
 
 By the way, with the scripts shown, you can deploy multiple clusters, if you like :)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/azure/README.md?pixel)]()

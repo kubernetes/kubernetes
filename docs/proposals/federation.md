@@ -429,3 +429,6 @@ does the zookeeper config look like for N=3 across 3 AZs -- and how
 does each replica find the other replicas and how do clients find
 their primary zookeeper replica? And now how do I do a shared, highly
 available redis database?
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/federation.md?pixel)]()
