@@ -16,8 +16,10 @@ This is an example of a simple secret, in json format:
 {
   "apiVersion": "v1beta3",
   "kind": "Secret",
-  "name": "mysecret",
-  "namespace": "myns",
+  "metadata" : {
+    "name": "mysecret",
+    "namespace": "myns",
+  },  
   "data": {
     "username": "dmFsdWUtMQ0K",
     "password": "dmFsdWUtMg0KDQo="
