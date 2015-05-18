@@ -3,8 +3,6 @@ kind: Service
 metadata: 
   labels: 
     name: influxGrafana
-    kubernetes.io/cluster-service: "true"
-    kubernetes.io/name: "InfluxDB"
   name: monitoring-influxdb
 spec: 
   ports: 
