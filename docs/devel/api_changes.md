@@ -12,7 +12,7 @@ not all API changes will need all of these steps.
 
 ## Operational overview
 
-It's important to have a high level understanding of the API system used in
+It is important to have a high level understanding of the API system used in
 Kubernetes in order to navigate the rest of this document.
 
 As mentioned above, the internal representation of an API object is decoupled
@@ -24,13 +24,13 @@ a GET involves a great deal of machinery.
 The conversion process is logically a "star" with the internal form at the
 center. Every versioned API can be converted to the internal form (and
 vice-versa), but versioned APIs do not convert to other versioned APIs directly.
-This sounds like a heavy process, but in reality we don't intend to keep more
+This sounds like a heavy process, but in reality we do not intend to keep more
 than a small number of versions alive at once.  While all of the Kubernetes code
 operates on the internal structures, they are always converted to a versioned
 form before being written to storage (disk or etcd) or being sent over a wire.
 Clients should consume and operate on the versioned APIs exclusively.
 
-To demonstrate the general process, let's walk through a (hypothetical) example:
+To demonstrate the general process, here is a (hypothetical) example:
 
    1. A user POSTs a `Pod` object to `/api/v7beta1/...`
    2. The JSON is unmarshalled into a `v7beta1.Pod` structure
@@ -175,6 +175,12 @@ documentation.
 If your change includes new fields for which you will need default values, you
 need to add cases to `pkg/api/<version>/defaults.go`.  Of course, since you
 have added code, you have to add a test: `pkg/api/<version>/defaults_test.go`.
+
+Do use pointers to scalars when you need to distinguish between an unset value
+and an an automatic zero value.  For example,
+`PodSpec.TerminationGracePeriodSeconds` is defined as `*int64` the go type
+definition.  A zero value means 0 seconds, and a nil value asks the system to
+pick a default.
 
 Don't forget to run the tests!
 
