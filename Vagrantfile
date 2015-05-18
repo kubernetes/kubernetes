@@ -12,6 +12,7 @@ if ARGV.first == "up" && ENV['USING_KUBE_SCRIPTS'] != 'true'
 Calling 'vagrant up' directly is not supported.  Instead, please run the following:
 
   export KUBERNETES_PROVIDER=vagrant
+  export VAGRANT_DEFAULT_PROVIDER=providername
   ./cluster/kube-up.sh
 END
 end
@@ -60,6 +61,12 @@ $kube_provider_boxes = {
     'fedora' => {
       :box_name => 'kube-fedora20',
       :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-20_chef-provisionerless.box'
+    }
+  },
+  :libvirt => {
+    'fedora' => {
+      :box_name => 'kube-fedora20',
+      :box_url => 'http://citozin.com/opscode_fedora-20_chef-provisionerless_libvirt.box'
     }
   },
   :vmware_desktop => {
@@ -129,6 +136,15 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       setvmboxandurl(override, :vmware_desktop)
       v.vmx['memsize'] = vm_mem
       v.vmx['numvcpus'] = $vm_cpus
+    end
+
+    # configure libvirt provider
+    config.vm.provider :libvirt do |v, override|
+      setvmboxandurl(override, :libvirt)
+      v.memory = vm_mem
+      v.cpus = $vm_cpus
+      v.nested = true
+      v.volume_cache = 'none'
     end
 
     # Then try VMWare Workstation
