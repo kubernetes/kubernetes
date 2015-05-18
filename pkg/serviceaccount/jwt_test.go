@@ -214,7 +214,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	for k, tc := range testCases {
-		authenticator := JWTTokenAuthenticator(tc.Keys, tc.Client != nil, tc.Client)
+		getter := NewGetterFromClient(tc.Client)
+		authenticator := JWTTokenAuthenticator(tc.Keys, tc.Client != nil, getter)
 
 		user, ok, err := authenticator.AuthenticateToken(token)
 		if (err != nil) != tc.ExpectedErr {
