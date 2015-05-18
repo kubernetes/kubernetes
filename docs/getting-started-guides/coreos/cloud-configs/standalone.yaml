@@ -10,7 +10,7 @@ coreos:
     initial-cluster-token: k8s_etcd
     listen-peer-urls: http://0.0.0.0:2380,http://0.0.0.0:7001
     initial-advertise-peer-urls: http://0.0.0.0:2380
-    initial-cluster: master=http://0.0.0.0:2380"
+    initial-cluster: master=http://0.0.0.0:2380
     initial-cluster-state: new
   units:
     - name: etcd.service
