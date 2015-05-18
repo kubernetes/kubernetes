@@ -57,7 +57,7 @@ func TestExampleObjects(t *testing.T) {
 		"claims/claim-01.yaml": {
 			expected: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceName(api.ResourceStorage): resource.MustParse("3Gi"),
@@ -69,7 +69,7 @@ func TestExampleObjects(t *testing.T) {
 		"claims/claim-02.yaml": {
 			expected: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceName(api.ResourceStorage): resource.MustParse("8Gi"),
@@ -81,7 +81,7 @@ func TestExampleObjects(t *testing.T) {
 		"volumes/local-01.yaml": {
 			expected: &api.PersistentVolume{
 				Spec: api.PersistentVolumeSpec{
-					AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Capacity: api.ResourceList{
 						api.ResourceName(api.ResourceStorage): resource.MustParse("10Gi"),
 					},
@@ -96,7 +96,7 @@ func TestExampleObjects(t *testing.T) {
 		"volumes/local-02.yaml": {
 			expected: &api.PersistentVolume{
 				Spec: api.PersistentVolumeSpec{
-					AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Capacity: api.ResourceList{
 						api.ResourceName(api.ResourceStorage): resource.MustParse("5Gi"),
 					},

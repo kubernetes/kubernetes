@@ -8165,8 +8165,8 @@
      }
     }
    },
-   "v1beta1.AccessModeType": {
-    "id": "v1beta1.AccessModeType",
+   "v1beta1.PersistentVolumeAccessMode": {
+    "id": "v1beta1.PersistentVolumeAccessMode",
     "properties": {}
    },
    "v1beta1.Binding": {
@@ -10054,7 +10054,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.AccessModeType"
+       "$ref": "v1beta1.PersistentVolumeAccessMode"
       },
       "description": "the desired access modes the volume should have"
      },
@@ -10074,7 +10074,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.AccessModeType"
+       "$ref": "v1beta1.PersistentVolumeAccessMode"
       },
       "description": "the actual access modes the volume has"
      },
@@ -10170,7 +10170,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.AccessModeType"
+       "$ref": "v1beta1.PersistentVolumeAccessMode"
       },
       "description": "all ways the volume can be mounted"
      },

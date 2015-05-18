@@ -2272,9 +2272,9 @@ func convert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(in *P
 		defaulting.(func(*PersistentVolumeClaimSpec))(in)
 	}
 	if in.AccessModes != nil {
-		out.AccessModes = make([]newer.AccessModeType, len(in.AccessModes))
+		out.AccessModes = make([]newer.PersistentVolumeAccessMode, len(in.AccessModes))
 		for i := range in.AccessModes {
-			out.AccessModes[i] = newer.AccessModeType(in.AccessModes[i])
+			out.AccessModes[i] = newer.PersistentVolumeAccessMode(in.AccessModes[i])
 		}
 	} else {
 		out.AccessModes = nil
@@ -2291,9 +2291,9 @@ func convert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(in *n
 		defaulting.(func(*newer.PersistentVolumeClaimSpec))(in)
 	}
 	if in.AccessModes != nil {
-		out.AccessModes = make([]AccessModeType, len(in.AccessModes))
+		out.AccessModes = make([]PersistentVolumeAccessMode, len(in.AccessModes))
 		for i := range in.AccessModes {
-			out.AccessModes[i] = AccessModeType(in.AccessModes[i])
+			out.AccessModes[i] = PersistentVolumeAccessMode(in.AccessModes[i])
 		}
 	} else {
 		out.AccessModes = nil
@@ -2311,9 +2311,9 @@ func convert_v1_PersistentVolumeClaimStatus_To_api_PersistentVolumeClaimStatus(i
 	}
 	out.Phase = newer.PersistentVolumeClaimPhase(in.Phase)
 	if in.AccessModes != nil {
-		out.AccessModes = make([]newer.AccessModeType, len(in.AccessModes))
+		out.AccessModes = make([]newer.PersistentVolumeAccessMode, len(in.AccessModes))
 		for i := range in.AccessModes {
-			out.AccessModes[i] = newer.AccessModeType(in.AccessModes[i])
+			out.AccessModes[i] = newer.PersistentVolumeAccessMode(in.AccessModes[i])
 		}
 	} else {
 		out.AccessModes = nil
@@ -2339,9 +2339,9 @@ func convert_api_PersistentVolumeClaimStatus_To_v1_PersistentVolumeClaimStatus(i
 	}
 	out.Phase = PersistentVolumeClaimPhase(in.Phase)
 	if in.AccessModes != nil {
-		out.AccessModes = make([]AccessModeType, len(in.AccessModes))
+		out.AccessModes = make([]PersistentVolumeAccessMode, len(in.AccessModes))
 		for i := range in.AccessModes {
-			out.AccessModes[i] = AccessModeType(in.AccessModes[i])
+			out.AccessModes[i] = PersistentVolumeAccessMode(in.AccessModes[i])
 		}
 	} else {
 		out.AccessModes = nil
@@ -2539,9 +2539,9 @@ func convert_v1_PersistentVolumeSpec_To_api_PersistentVolumeSpec(in *PersistentV
 		return err
 	}
 	if in.AccessModes != nil {
-		out.AccessModes = make([]newer.AccessModeType, len(in.AccessModes))
+		out.AccessModes = make([]newer.PersistentVolumeAccessMode, len(in.AccessModes))
 		for i := range in.AccessModes {
-			out.AccessModes[i] = newer.AccessModeType(in.AccessModes[i])
+			out.AccessModes[i] = newer.PersistentVolumeAccessMode(in.AccessModes[i])
 		}
 	} else {
 		out.AccessModes = nil
@@ -2577,9 +2577,9 @@ func convert_api_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *newer.Persi
 		return err
 	}
 	if in.AccessModes != nil {
-		out.AccessModes = make([]AccessModeType, len(in.AccessModes))
+		out.AccessModes = make([]PersistentVolumeAccessMode, len(in.AccessModes))
 		for i := range in.AccessModes {
-			out.AccessModes[i] = AccessModeType(in.AccessModes[i])
+			out.AccessModes[i] = PersistentVolumeAccessMode(in.AccessModes[i])
 		}
 	} else {
 		out.AccessModes = nil
