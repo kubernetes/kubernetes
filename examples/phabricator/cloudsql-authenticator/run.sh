@@ -18,10 +18,13 @@
 #       should only send updates if something changes. We should be able to do
 #       this by comparing pod creation time with the last scan time.
 while true; do
-  hostport="${KUBERNETES_RO_SERVICE_HOST}:${KUBERNETES_RO_SERVICE_PORT}"
-  path="api/v1beta1/pods"
+  hostport="https://kubernetes.default.cluster.local"
+  token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+  path="api/v1beta3/pods"
   query="labels=$SELECTOR"
-  ips_json=`curl ${hostport}/${path}?${query} 2>/dev/null | grep hostIP`
+
+  # TODO: load in the CAS cert when we distributed it on all platforms.
+  ips_json=`curl ${hostport}/${path}?${query} --insecure --header "Authorization: Bearer ${token}" 2>/dev/null | grep hostIP`
   ips=`echo $ips_json | cut -d'"' -f 4 | sed 's/,$//'`
   echo "Adding IPs $ips"
   gcloud sql instances patch $CLOUDSQL_DB --authorized-networks $ips

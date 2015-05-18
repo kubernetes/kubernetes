@@ -140,7 +140,7 @@ To automate this process and make sure that a proper host is authorized even if 
         "containers": [
           {
             "name": "authenticator",
-            "image": "fgrzadkowski/example-cloudsql-authenticator"
+            "image": "gcr.io.google_containers/cloudsql-authenticator:v1"
           }
         ]
       }
