@@ -111,22 +111,16 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	// List the pods, making sure we observe all the replicas.
 	listTimeout := time.Minute
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	pods, err := c.Pods(ns).List(label, fields.Everything())
-	Expect(err).NotTo(HaveOccurred())
-	t := time.Now()
-	for {
+
+	var pods *api.PodList
+	expectNoError(wait.Poll(5*time.Second, listTimeout, func() (bool, error) {
+		pods, err = c.Pods(ns).List(label, fields.Everything())
 		Logf("Controller %s: Found %d pods out of %d", name, len(pods.Items), replicas)
 		if len(pods.Items) == replicas {
-			break
+			return true, nil
 		}
-		if time.Since(t) > listTimeout {
-			Failf("Controller %s: Gave up waiting for %d pods to come up after seeing only %d pods after %v seconds",
-				name, replicas, len(pods.Items), time.Since(t).Seconds())
-		}
-		time.Sleep(5 * time.Second)
-		pods, err = c.Pods(ns).List(label, fields.Everything())
-		Expect(err).NotTo(HaveOccurred())
-	}
+		return false, nil
+	}))
 
 	By("Ensuring each pod is running")
 
