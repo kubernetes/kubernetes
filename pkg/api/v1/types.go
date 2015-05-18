@@ -639,12 +639,8 @@ type Container struct {
 	Lifecycle      *Lifecycle           `json:"lifecycle,omitempty" description:"actions that the management system should take in response to container lifecycle events; cannot be updated"`
 	// Optional: Defaults to /dev/termination-log
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" description:"path at which the file to which the container's termination message will be written is mounted into the container's filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log; cannot be updated"`
-	// Deprecated - see SecurityContext.  Optional: Default to false.
-	Privileged bool `json:"privileged,omitempty" description:"hether or not the container is granted privileged status; defaults to false; cannot be updated; deprecated; See SecurityContext"`
 	// Optional: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy,omitempty" description:"image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"`
-	// Deprecated - see SecurityContext.  Optional: Capabilities for container.
-	Capabilities Capabilities `json:"capabilities,omitempty" description:"capabilities for container; cannot be updated; deprecated; See SecurityContext"`
 	// Optional: SecurityContext defines the security options the pod should be run with
 	SecurityContext *SecurityContext `json:"securityContext,omitempty" description:"security options the pod should run with"`
 }
