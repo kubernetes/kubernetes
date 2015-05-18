@@ -36,18 +36,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
+	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
 )
-
-func init() {
-	requireEtcd()
-}
 
 type nodeMutationFunc func(t *testing.T, n *api.Node, nodeStore cache.Store, c *client.Client)
 
@@ -57,11 +53,11 @@ type nodeStateManager struct {
 }
 
 func TestUnschedulableNodes(t *testing.T) {
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	helper, err := framework.NewHelper()
 	if err != nil {
 		t.Fatalf("Couldn't create etcd helper: %v", err)
 	}
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

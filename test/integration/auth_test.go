@@ -46,15 +46,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
+	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
 )
 
 var nodeResourceName string
 
 func init() {
-	requireEtcd()
 	if api.PreV1Beta3(testapi.Version()) {
 		nodeResourceName = "minions"
 	} else {
@@ -375,15 +374,13 @@ func getTestRequests() []struct {
 //
 // TODO(etune): write a fuzz test of the REST API.
 func TestAuthModeAlwaysAllow(t *testing.T) {
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// Set up a master
-
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	helper, err := framework.NewHelper()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		m.Handler.ServeHTTP(w, req)
@@ -516,10 +513,10 @@ func getPreviousResourceVersionKey(url, id string) string {
 }
 
 func TestAuthModeAlwaysDeny(t *testing.T) {
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// Set up a master
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	helper, err := framework.NewHelper()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -581,12 +578,12 @@ func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) error {
 // the authentication system and authorized to do any actions.
 func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	helper, err := framework.NewHelper()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -670,12 +667,10 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 // the authentication system but not authorized to do any actions
 // should receive "Forbidden".
 func TestBobIsForbidden(t *testing.T) {
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
-
-	// Set up a master
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	helper, err := framework.NewHelper()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -731,12 +726,12 @@ func TestBobIsForbidden(t *testing.T) {
 // An authorization module is installed in this scenario for integration
 // test purposes, but requests aren't expected to reach it.
 func TestUnknownUserIsUnauthorized(t *testing.T) {
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	helper, err := framework.NewHelper()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -810,10 +805,10 @@ func newAuthorizerWithContents(t *testing.T, contents string) authorizer.Authori
 // TestNamespaceAuthorization tests that authorization can be controlled
 // by namespace.
 func TestNamespaceAuthorization(t *testing.T) {
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	helper, err := framework.NewHelper()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -923,12 +918,12 @@ func TestNamespaceAuthorization(t *testing.T) {
 // TestKindAuthorization tests that authorization can be controlled
 // by namespace.
 func TestKindAuthorization(t *testing.T) {
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	helper, err := framework.NewHelper()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1026,12 +1021,12 @@ func TestKindAuthorization(t *testing.T) {
 // TestReadOnlyAuthorization tests that authorization can be controlled
 // by namespace.
 func TestReadOnlyAuthorization(t *testing.T) {
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	// This file has alice and bob in it.
 
 	// Set up a master
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	helper, err := framework.NewHelper()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
