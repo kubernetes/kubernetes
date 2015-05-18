@@ -52,17 +52,20 @@ var (
 )
 
 const (
-	// Maximum number of retries to connect to etcd server.
-	maxConnectRetries = 12
+	// Maximum number of attempts to connect to etcd server.
+	maxConnectAttempts = 12
 	// Resync period for the kube controller loop.
 	resyncPeriod = 5 * time.Second
 )
 
+type etcdClient interface {
+	Set(path, value string, ttl uint64) (*etcd.Response, error)
+	Delete(path string, recursive bool) (*etcd.Response, error)
+}
+
 type kube2sky struct {
 	// Etcd client.
-	etcdClient *etcd.Client
-	// Kubernetes client.
-	kubeClient *kclient.Client
+	etcdClient etcdClient
 	// DNS domain name.
 	domain string
 	// Etcd mutation timeout.
@@ -95,7 +98,6 @@ func (ks *kube2sky) addDNS(record string, service *kapi.Service) error {
 			return err
 		}
 		// Set with no TTL, and hope that kubernetes events are accurate.
-
 		glog.V(2).Infof("Setting DNS record: %v -> %s:%d\n", record, service.Spec.PortalIP, service.Spec.Ports[i].Port)
 		_, err = ks.etcdClient.Set(skymsg.Path(record), string(b), uint64(0))
 		if err != nil {
@@ -130,17 +132,15 @@ func newEtcdClient(etcdServer string) (*etcd.Client, error) {
 		client *etcd.Client
 		err    error
 	)
-	retries := maxConnectRetries
-	for retries > 0 {
+	for attempt := 1; attempt <= maxConnectAttempts; attempt++ {
 		if _, err = tools.GetEtcdVersion(etcdServer); err == nil {
 			break
 		}
-		if maxConnectRetries == 1 {
+		if attempt == maxConnectAttempts {
 			break
 		}
-		glog.Info("[Attempt: %d] Retrying request after 5 second sleep", retries)
+		glog.Infof("[Attempt: %d] Attempting access to etcd after 5 second sleep", attempt)
 		time.Sleep(5 * time.Second)
-		retries--
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to etcd server: %v, error: %v", etcdServer, err)
@@ -204,33 +204,33 @@ func newKubeClient() (*kclient.Client, error) {
 	return kclient.New(config)
 }
 
-func (ks *kube2sky) buildNameString(service, namespace, domain string) string {
+func buildNameString(service, namespace, domain string) string {
 	return fmt.Sprintf("%s.%s.%s.", service, namespace, domain)
 }
 
 // Returns a cache.ListWatch that gets all changes to services.
-func (ks *kube2sky) createServiceLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(ks.kubeClient, "services", kapi.NamespaceAll, kSelector.Everything())
+func createServiceLW(kubeClient *kclient.Client) *cache.ListWatch {
+	return cache.NewListWatchFromClient(kubeClient, "services", kapi.NamespaceAll, kSelector.Everything())
 }
 
 func (ks *kube2sky) newService(obj interface{}) {
 	if s, ok := obj.(*kapi.Service); ok {
-		name := ks.buildNameString(s.Name, s.Namespace, ks.domain)
+		name := buildNameString(s.Name, s.Namespace, ks.domain)
 		ks.mutateEtcdOrDie(func() error { return ks.addDNS(name, s) })
 	}
 }
 
 func (ks *kube2sky) removeService(obj interface{}) {
 	if s, ok := obj.(*kapi.Service); ok {
-		name := ks.buildNameString(s.Name, s.Namespace, ks.domain)
+		name := buildNameString(s.Name, s.Namespace, ks.domain)
 		ks.mutateEtcdOrDie(func() error { return ks.removeDNS(name) })
 	}
 }
 
-func (ks *kube2sky) watchForServices() {
+func watchForServices(kubeClient *kclient.Client, ks *kube2sky) {
 	var serviceController *kcontrollerFramework.Controller
 	_, serviceController = framework.NewInformer(
-		ks.createServiceLW(),
+		createServiceLW(kubeClient),
 		&kapi.Service{},
 		resyncPeriod,
 		framework.ResourceEventHandlerFuncs{
@@ -256,9 +256,10 @@ func main() {
 		glog.Fatalf("Failed to create etcd client - %v", err)
 	}
 
-	if ks.kubeClient, err = newKubeClient(); err != nil {
+	kubeClient, err := newKubeClient()
+	if err != nil {
 		glog.Fatalf("Failed to create a kubernetes client: %v", err)
 	}
 
-	ks.watchForServices()
+	watchForServices(kubeClient, &ks)
 }
