@@ -186,6 +186,8 @@ func TestIsQualifiedName(t *testing.T) {
 		"only/one/slash",
 		"Example.com/abc",
 		"example_com/abc",
+		"example.com/",
+		"/simple",
 		strings.Repeat("a", 64),
 		strings.Repeat("a", 254) + "/abc",
 	}

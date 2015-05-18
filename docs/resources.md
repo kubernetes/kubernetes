@@ -21,12 +21,12 @@ Note that the resource model currently prohibits over-committing resources; we w
 
 All resources have a _type_ that is identified by their _typename_ (a string, e.g., "memory").  Several resource types are predefined by Kubernetes (a full list is below), although only two will be supported at first: CPU and memory.  Users and system administrators can define their own resource types if they wish (e.g., Hadoop slots).
 
-A fully-qualified resource typename is constructed from a DNS-style _subdomain_, followed by a slash `/`, followed by a DNS Label.
-* The subdomain must conform to [RFC 1035](http://tools.ietf.org/html/rfc1035) / [RFC 1123](http://www.ietf.org/rfc/rfc1123.txt) (e.g., `kubernetes.io`, `myveryown.org`).
-* The DNS label must conform to [RFC 1123](http://www.ietf.org/rfc/rfc1123.txt) - alphanumeric characters, with a maximum length of 63 characters, with the '-' character allowed anywhere except the first or last character.
+A fully-qualified resource typename is constructed from a DNS-style _subdomain_, followed by a slash `/`, followed by a name.
+* The subdomain must conform to [RFC 1123](http://www.ietf.org/rfc/rfc1123.txt) (e.g., `kubernetes.io`, `example.com`).
+* The name must be not more than 63 characters, consisting of upper- or lower-case alphanumeric characters, with the `-`, `_`, and `.` characters allowed anywhere except the first or last character.
 * As a shorthand, any resource typename that does not start with a subdomain and a slash will automatically be prefixed with the built-in Kubernetes _namespace_, `kubernetes.io/` in order to fully-qualify it.  This namespace is reserved for code in the open source Kubernetes repository; as a result, all user typenames MUST be fully qualified, and cannot be created in this namespace.
 
-Some example typenames include `memory` (which will be fully-qualified as `kubernetes.io/memory`), and `myveryown.org/shiny-new-resource`.
+Some example typenames include `memory` (which will be fully-qualified as `kubernetes.io/memory`), and `example.com/Shiny_New-Resource.Type`.
 
 For future reference, note that some resources, such as CPU and network bandwidth, are _compressible_, which means that their usage can potentially be throttled in a relatively benign manner. All other resources are _incompressible_, which means that any attempt to throttle them is likely to cause grief.  This distinction will be important if a Kubernetes implementation supports over-committing of resources.
 
