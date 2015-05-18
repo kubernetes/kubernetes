@@ -789,7 +789,12 @@ func (r *runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 		tag = "latest"
 	}
 
-	creds, ok := r.dockerKeyring.Lookup(repoToPull)
+	keyring, err := credentialprovider.MakeDockerKeyring(pullSecrets, r.dockerKeyring)
+	if err != nil {
+		return err
+	}
+
+	creds, ok := keyring.Lookup(repoToPull)
 	if !ok {
 		glog.V(1).Infof("Pulling image %s without credentials", img)
 	}
@@ -827,7 +832,7 @@ func (r *runtime) RemoveImage(image kubecontainer.ImageSpec) error {
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.
-func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus) error {
+func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	if len(runningPod.Containers) == 0 {
 		glog.V(4).Infof("Pod %q is not running, will start it", podFullName)

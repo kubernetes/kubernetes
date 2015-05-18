@@ -486,6 +486,9 @@ func addConversionFuncs() {
 			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.ImagePullSecrets, &out.ImagePullSecrets, 0); err != nil {
+				return err
+			}
 			if in.TerminationGracePeriodSeconds != nil {
 				out.TerminationGracePeriodSeconds = new(int64)
 				*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
@@ -507,6 +510,9 @@ func addConversionFuncs() {
 				return err
 			}
 			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ImagePullSecrets, &out.ImagePullSecrets, 0); err != nil {
 				return err
 			}
 			if in.TerminationGracePeriodSeconds != nil {

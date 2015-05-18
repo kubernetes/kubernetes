@@ -20,6 +20,7 @@ import (
 	"io"
 
 	cmdconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/config"
+	cmdsecrets "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/secrets"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/golang/glog"
 
@@ -129,6 +130,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdLabel(f, out))
 
 	cmds.AddCommand(cmdconfig.NewCmdConfig(cmdconfig.NewDefaultPathOptions(), out))
+	cmds.AddCommand(cmdsecrets.NewCmdSecrets("secrets", "kubectl secrets", f, out))
 	cmds.AddCommand(NewCmdClusterInfo(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
 	cmds.AddCommand(NewCmdVersion(f, out))

@@ -2670,6 +2670,16 @@ func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s c
 	out.ServiceAccount = in.ServiceAccount
 	out.Host = in.Host
 	out.HostNetwork = in.HostNetwork
+	if in.ImagePullSecrets != nil {
+		out.ImagePullSecrets = make([]newer.ObjectReference, len(in.ImagePullSecrets))
+		for i := range in.ImagePullSecrets {
+			if err := convert_v1beta3_ObjectReference_To_api_ObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ImagePullSecrets = nil
+	}
 	return nil
 }
 
@@ -2722,6 +2732,16 @@ func convert_api_PodSpec_To_v1beta3_PodSpec(in *newer.PodSpec, out *PodSpec, s c
 	out.ServiceAccount = in.ServiceAccount
 	out.Host = in.Host
 	out.HostNetwork = in.HostNetwork
+	if in.ImagePullSecrets != nil {
+		out.ImagePullSecrets = make([]ObjectReference, len(in.ImagePullSecrets))
+		for i := range in.ImagePullSecrets {
+			if err := convert_api_ObjectReference_To_v1beta3_ObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ImagePullSecrets = nil
+	}
 	return nil
 }
 

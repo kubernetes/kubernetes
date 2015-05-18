@@ -774,7 +774,7 @@ func (dm *DockerManager) ListImages() ([]kubecontainer.Image, error) {
 // TODO(vmarmol): Consider unexporting.
 // PullImage pulls an image from network to local storage.
 func (dm *DockerManager) PullImage(image kubecontainer.ImageSpec, secrets []api.Secret) error {
-	return dm.Puller.Pull(image.Image)
+	return dm.Puller.Pull(image.Image, secrets)
 }
 
 // IsImagePresent checks whether the container image is already in the local storage.
@@ -1230,7 +1230,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 }
 
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
-func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.DockerID, error) {
+func (dm *DockerManager) createPodInfraContainer(pod *api.Pod, pullSecrets []api.Secret) (kubeletTypes.DockerID, error) {
 	// Use host networking if specified.
 	netNamespace := ""
 	var ports []api.ContainerPort
@@ -1264,8 +1264,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 		return "", err
 	}
 	if !ok {
-		// TODO get the pull secrets from the container's ImageSpec and the pod's service account
-		if err := dm.PullImage(spec, nil); err != nil {
+		if err := dm.PullImage(spec, pullSecrets); err != nil {
 			if ref != nil {
 				dm.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, err)
 			}
@@ -1438,7 +1437,7 @@ func (dm *DockerManager) clearReasonCache(pod *api.Pod, container *api.Container
 }
 
 // Pull the image for the specified pod and container.
-func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container) error {
+func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) error {
 	spec := kubecontainer.ImageSpec{container.Image}
 	present, err := dm.IsImagePresent(spec)
 
@@ -1456,14 +1455,13 @@ func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container) error
 		return nil
 	}
 
-	// TODO get the pull secrets from the container's ImageSpec and the pod's service account
-	err = dm.PullImage(spec, nil)
+	err = dm.PullImage(spec, pullSecrets)
 	dm.runtimeHooks.ReportImagePull(pod, container, err)
 	return err
 }
 
 // Sync the running pod to match the specified desired pod.
-func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus) error {
+func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	containerChanges, err := dm.computePodContainerChanges(pod, runningPod, podStatus)
 	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
@@ -1501,7 +1499,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	podInfraContainerID := containerChanges.InfraContainerId
 	if containerChanges.StartInfraContainer && (len(containerChanges.ContainersToStart) > 0) {
 		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
-		podInfraContainerID, err = dm.createPodInfraContainer(pod)
+		podInfraContainerID, err = dm.createPodInfraContainer(pod, pullSecrets)
 
 		// Call the networking plugin
 		if err == nil {
@@ -1517,7 +1515,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	for idx := range containerChanges.ContainersToStart {
 		container := &pod.Spec.Containers[idx]
 		glog.V(4).Infof("Creating container %+v", container)
-		err := dm.pullImage(pod, container)
+		err := dm.pullImage(pod, container, pullSecrets)
 		dm.updateReasonCache(pod, container, err)
 		if err != nil {
 			glog.Warningf("Failed to pull image %q from pod %q and container %q: %v", container.Image, kubecontainer.GetPodFullName(pod), container.Name, err)

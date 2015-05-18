@@ -17,9 +17,12 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"path"
+	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -888,6 +891,18 @@ func validateHostNetwork(hostNetwork bool, containers []api.Container) errs.Vali
 	return allErrors
 }
 
+func validateImagePullSecrets(imagePullSecrets []api.ObjectReference) errs.ValidationErrorList {
+	allErrors := errs.ValidationErrorList{}
+	for i, currPullSecret := range imagePullSecrets {
+		strippedRef := api.ObjectReference{Name: currPullSecret.Name}
+
+		if !reflect.DeepEqual(strippedRef, currPullSecret) {
+			allErrors = append(allErrors, errs.NewFieldInvalid(fmt.Sprintf("[%d]", i), currPullSecret, "only name may be set"))
+		}
+	}
+	return allErrors
+}
+
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -911,6 +926,7 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy).Prefix("dnsPolicy")...)
 	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, "nodeSelector")...)
 	allErrs = append(allErrs, validateHostNetwork(spec.HostNetwork, spec.Containers).Prefix("hostNetwork")...)
+	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets).Prefix("imagePullSecrets")...)
 
 	if spec.ActiveDeadlineSeconds != nil {
 		if *spec.ActiveDeadlineSeconds <= 0 {
@@ -1257,6 +1273,16 @@ func ValidateServiceAccountUpdate(oldServiceAccount, newServiceAccount *api.Serv
 	return allErrs
 }
 
+const SecretKeyFmt string = "\\.?" + util.DNS1123LabelFmt + "(\\." + util.DNS1123LabelFmt + ")*"
+
+var secretKeyRegexp = regexp.MustCompile("^" + SecretKeyFmt + "$")
+
+// IsSecretKey tests for a string that conforms to the definition of a
+// subdomain in DNS (RFC 1123), except that a leading dot is allowed
+func IsSecretKey(value string) bool {
+	return len(value) <= util.DNS1123SubdomainMaxLength && secretKeyRegexp.MatchString(value)
+}
+
 // ValidateSecret tests if required fields in the Secret are set.
 func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -1264,8 +1290,8 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 
 	totalSize := 0
 	for key, value := range secret.Data {
-		if !util.IsDNS1123Subdomain(key) {
-			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%s]", key), key, dnsSubdomainErrorMsg))
+		if !IsSecretKey(key) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%s]", key), key, fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS1123SubdomainMaxLength, SecretKeyFmt)))
 		}
 
 		totalSize += len(value)
@@ -1284,6 +1310,18 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 		}
 	case api.SecretTypeOpaque, "":
 		// no-op
+	case api.SecretTypeDockercfg:
+		dockercfgBytes, exists := secret.Data[api.DockerConfigKey]
+		if !exists {
+			allErrs = append(allErrs, errs.NewFieldRequired(fmt.Sprintf("data[%s]", api.DockerConfigKey)))
+			break
+		}
+
+		// make sure that the content is well-formed json.
+		if err := json.Unmarshal(dockercfgBytes, &map[string]interface{}{}); err != nil {
+			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%s]", api.DockerConfigKey), "<secret contents redacted>", err.Error()))
+		}
+
 	default:
 		// no-op
 	}

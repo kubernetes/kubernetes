@@ -830,6 +830,45 @@ _kubectl_config()
     must_have_one_noun=()
 }
 
+_kubectl_secrets_create-dockercfg()
+{
+    last_command="kubectl_secrets_create-dockercfg"
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--docker-email=")
+    flags+=("--docker-password=")
+    flags+=("--docker-server=")
+    flags+=("--docker-username=")
+    flags+=("--help")
+    flags+=("-h")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+}
+
+_kubectl_secrets()
+{
+    last_command="kubectl_secrets"
+    commands=()
+    commands+=("create-dockercfg")
+
+    flags=()
+    two_word_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--help")
+    flags+=("-h")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+}
+
 _kubectl_cluster-info()
 {
     last_command="kubectl_cluster-info"
@@ -904,6 +943,7 @@ _kubectl()
     commands+=("expose")
     commands+=("label")
     commands+=("config")
+    commands+=("secrets")
     commands+=("cluster-info")
     commands+=("api-versions")
     commands+=("version")
