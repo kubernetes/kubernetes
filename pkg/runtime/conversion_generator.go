@@ -29,7 +29,7 @@ import (
 type ConversionGenerator interface {
 	GenerateConversionsForType(version string, reflection reflect.Type) error
 	WriteConversionFunctions(w io.Writer) error
-	WriteConversionFunctionNames(w io.Writer) error
+	RegisterConversionFunctions(w io.Writer) error
 	OverwritePackage(pkg, overwrite string)
 }
 
@@ -263,7 +263,22 @@ func (g *conversionGenerator) WriteConversionFunctions(w io.Writer) error {
 	return nil
 }
 
-func (g *conversionGenerator) WriteConversionFunctionNames(w io.Writer) error {
+func (g *conversionGenerator) writeRegisterHeader(b *buffer, indent int) {
+	b.addLine("func init() {\n", indent)
+	b.addLine("err := newer.Scheme.AddGeneratedConversionFuncs(\n", indent+1)
+}
+
+func (g *conversionGenerator) writeRegisterFooter(b *buffer, indent int) {
+	b.addLine(")\n", indent+1)
+	b.addLine("if err != nil {\n", indent+1)
+	b.addLine("// If one of the conversion functions is malformed, detect it immediately.\n", indent+2)
+	b.addLine("panic(err)\n", indent+2)
+	b.addLine("}\n", indent+1)
+	b.addLine("}\n", indent)
+	b.addLine("\n", indent)
+}
+
+func (g *conversionGenerator) RegisterConversionFunctions(w io.Writer) error {
 	// Write conversion function names alphabetically ordered.
 	var names []string
 	for inType, outType := range g.convertibles {
@@ -273,10 +288,12 @@ func (g *conversionGenerator) WriteConversionFunctionNames(w io.Writer) error {
 	sort.Strings(names)
 
 	buffer := newBuffer()
-	indent := 2
+	indent := 0
+	g.writeRegisterHeader(buffer, indent)
 	for _, name := range names {
-		buffer.addLine(fmt.Sprintf("%s,\n", name), indent)
+		buffer.addLine(fmt.Sprintf("%s,\n", name), indent+2)
 	}
+	g.writeRegisterFooter(buffer, indent)
 	if err := buffer.flushLines(w); err != nil {
 		return err
 	}
