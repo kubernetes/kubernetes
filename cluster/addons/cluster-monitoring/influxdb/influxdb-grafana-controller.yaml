@@ -1,18 +1,22 @@
 apiVersion: v1beta3
 kind: ReplicationController
-metadata: 
+metadata:
+  name: monitoring-influx-grafana-v1
+  namespace: default 
   labels: 
-    name: influxGrafana
+    k8s-app: influxGrafana
+    version: v1
     kubernetes.io/cluster-service: "true"
-  name: monitoring-influx-grafana-controller
 spec: 
   replicas: 1
   selector: 
-    name: influxGrafana
+    k8s-app: influxGrafana
+    version: v1
   template: 
     metadata: 
       labels: 
-        name: influxGrafana
+        k8s-app: influxGrafana
+        version: v1
         kubernetes.io/cluster-service: "true"
     spec: 
       containers: 

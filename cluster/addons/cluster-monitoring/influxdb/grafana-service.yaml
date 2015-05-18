@@ -1,14 +1,15 @@
 apiVersion: v1beta3
 kind: Service
-metadata: 
+metadata:
+  name: monitoring-grafana
+  namespace: default 
   labels: 
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "Grafana"
-  name: monitoring-grafana
 spec: 
   ports: 
     - port: 80
       targetPort: 8080
   selector: 
-    name: influxGrafana
+    k8s-app: influxGrafana
 
