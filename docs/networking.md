@@ -170,6 +170,14 @@ network, primarily aiming at Docker integration.
 [Calico](https://github.com/Metaswitch/calico) uses BGP to enable real container
 IPs.
 
+### Socialvpn
+
+[Socialvpn](http://socialvpn.org) is a research project from University of Florida that enables decentralized mesh networks with relationships derived from XMPP identities. Supports both point-to-point VPN and NAT ("GroupVPN").
+
+### Tinc
+
+[Tinc](http://www.tinc-vpn.org/) is a mature project enabling userspace point-to-point encrypted VPN. It is popular for building application-level mesh networks.
+
 ## Other reading
 
 The early design of the networking model and its rationale, and some future
