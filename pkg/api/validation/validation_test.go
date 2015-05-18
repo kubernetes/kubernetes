@@ -2869,12 +2869,15 @@ func TestValidateSecret(t *testing.T) {
 	}
 
 	var (
-		emptyName   = validSecret()
-		invalidName = validSecret()
-		emptyNs     = validSecret()
-		invalidNs   = validSecret()
-		overMaxSize = validSecret()
-		invalidKey  = validSecret()
+		emptyName     = validSecret()
+		invalidName   = validSecret()
+		emptyNs       = validSecret()
+		invalidNs     = validSecret()
+		overMaxSize   = validSecret()
+		invalidKey    = validSecret()
+		leadingDotKey = validSecret()
+		dotKey        = validSecret()
+		doubleDotKey  = validSecret()
 	)
 
 	emptyName.Name = ""
@@ -2885,6 +2888,9 @@ func TestValidateSecret(t *testing.T) {
 		"over": make([]byte, api.MaxSecretSize+1),
 	}
 	invalidKey.Data["a..b"] = []byte("whoops")
+	leadingDotKey.Data[".key"] = []byte("bar")
+	dotKey.Data["."] = []byte("bar")
+	doubleDotKey.Data[".."] = []byte("bar")
 
 	// kubernetes.io/service-account-token secret validation
 	validServiceAccountTokenSecret := func() api.Secret {
@@ -2916,18 +2922,20 @@ func TestValidateSecret(t *testing.T) {
 		secret api.Secret
 		valid  bool
 	}{
-		"valid":             {validSecret(), true},
-		"empty name":        {emptyName, false},
-		"invalid name":      {invalidName, false},
-		"empty namespace":   {emptyNs, false},
-		"invalid namespace": {invalidNs, false},
-		"over max size":     {overMaxSize, false},
-		"invalid key":       {invalidKey, false},
-
+		"valid":                                     {validSecret(), true},
+		"empty name":                                {emptyName, false},
+		"invalid name":                              {invalidName, false},
+		"empty namespace":                           {emptyNs, false},
+		"invalid namespace":                         {invalidNs, false},
+		"over max size":                             {overMaxSize, false},
+		"invalid key":                               {invalidKey, false},
 		"valid service-account-token secret":        {validServiceAccountTokenSecret(), true},
 		"empty service-account-token annotation":    {emptyTokenAnnotation, false},
 		"missing service-account-token annotation":  {missingTokenAnnotation, false},
 		"missing service-account-token annotations": {missingTokenAnnotations, false},
+		"leading dot key":                           {leadingDotKey, true},
+		"dot key":                                   {dotKey, false},
+		"double dot key":                            {doubleDotKey, false},
 	}
 
 	for name, tc := range tests {
