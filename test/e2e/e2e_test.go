@@ -22,7 +22,9 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -31,6 +33,28 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
+)
+
+const (
+	// podStartupTimeout is the time to allow all pods in the cluster to become
+	// running and ready before any e2e tests run. It includes pulling all of
+	// the pods (as of 5/18/15 this is 8 pods).
+	podStartupTimeout = 10 * time.Minute
+
+	// minStartupPods is the minimum number of pods that will allow
+	// wiatForPodsRunningReady(...) to succeed. More verbosely, that function
+	// checks that all pods in the cluster are both in a phase of "running" and
+	// have a condition of "ready": "true". It aims to ensure that the cluster's
+	// pods are fully healthy before beginning e2e tests. However, if there were
+	// only 0 pods, it would technically pass if there wasn't a required minimum
+	// number of pods. We expect every cluster to come up with some number of
+	// pods (which in practice is more than this number), so we have this
+	// minimum here as a sanity check to make sure that there are actually pods
+	// on the cluster (i.e. preventing a possible race with kube-addons). This
+	// does *not* mean that the function will succeed as soon as minStartupPods
+	// are found to be running and ready; it ensures that *all* pods it finds
+	// are running and ready. This is the minimum number it must find.
+	minStartupPods = 1
 )
 
 var (
@@ -92,6 +116,15 @@ func TestE2E(t *testing.T) {
 	}
 
 	gomega.RegisterFailHandler(ginkgo.Fail)
+
+	// Ensure all pods are running and ready before starting tests (otherwise,
+	// cluster infrastructure pods that are being pulled or started can block
+	// test pods from running, and tests that ensure all pods are running and
+	// ready will fail).
+	if err := waitForPodsRunningReady(api.NamespaceDefault, minStartupPods, podStartupTimeout); err != nil {
+		glog.Fatalf("Error waiting for all pods to be running and ready: %v", err)
+	}
+
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	var r []ginkgo.Reporter
 	if *reportDir != "" {
