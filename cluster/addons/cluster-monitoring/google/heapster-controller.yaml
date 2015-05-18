@@ -16,17 +16,28 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec: 
       containers: 
-        - image: gcr.io/google_containers/heapster:v0.11.0
+        - image: gcr.io/google_containers/heapster:v0.12.1
           name: heapster
-          env: 
-            - name: FLAGS
-              value: "--poll_duration=2m --stats_resolution=1m --sink=gcm --sink=gcl"
+          command:
+            - /heapster
+            - --source=kubernetes:https://kubernetes
+            - --sink=gcm
+            - --sink=gcl
+            - --poll_duration=2m
+            - --stats_resolution=1m
           volumeMounts: 
             - name: ssl-certs
               mountPath: /etc/ssl/certs
               readOnly: true
+            - name: monitoring-token
+              mountPath: /etc/kubernetes/kubeconfig
+              readOnly: true
+
       volumes: 
         - name: ssl-certs
           hostPath: 
             path: /etc/ssl/certs
+        - name: monitoring-token
+          secret:
+            secretName: token-system-monitoring
 
