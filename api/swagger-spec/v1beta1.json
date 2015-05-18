@@ -8236,21 +8236,21 @@
      "add": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.CapabilityType"
+       "$ref": "v1beta1.Capability"
       },
       "description": "added capabilities"
      },
      "drop": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.CapabilityType"
+       "$ref": "v1beta1.Capability"
       },
       "description": "droped capabilities"
      }
     }
    },
-   "v1beta1.CapabilityType": {
-    "id": "v1beta1.CapabilityType",
+   "v1beta1.Capability": {
+    "id": "v1beta1.Capability",
     "properties": {}
    },
    "v1beta1.ComponentCondition": {

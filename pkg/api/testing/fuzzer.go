@@ -209,8 +209,8 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			priv := c.RandBool()
 			sc.Privileged = &priv
 			sc.Capabilities = &api.Capabilities{
-				Add:  make([]api.CapabilityType, 0),
-				Drop: make([]api.CapabilityType, 0),
+				Add:  make([]api.Capability, 0),
+				Drop: make([]api.Capability, 0),
 			}
 			c.Fuzz(&sc.Capabilities.Add)
 			c.Fuzz(&sc.Capabilities.Drop)

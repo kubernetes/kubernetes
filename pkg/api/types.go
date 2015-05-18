@@ -582,15 +582,15 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
-// CapabilityType represent POSIX capabilities type
-type CapabilityType string
+// Capability represent POSIX capabilities type
+type Capability string
 
 // Capabilities represent POSIX capabilities that can be added or removed to a running container.
 type Capabilities struct {
 	// Added capabilities
-	Add []CapabilityType `json:"add,omitempty"`
+	Add []Capability `json:"add,omitempty"`
 	// Removed capabilities
-	Drop []CapabilityType `json:"drop,omitempty"`
+	Drop []Capability `json:"drop,omitempty"`
 }
 
 // ResourceRequirements describes the compute resource requirements.

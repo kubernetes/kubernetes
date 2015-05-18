@@ -81,8 +81,8 @@ func modifySecurityOption(config []string, name, value string) []string {
 	return config
 }
 
-// makeCapabilites creates string slices from CapabilityType slices
-func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) ([]string, []string) {
+// makeCapabilites creates string slices from Capability slices
+func makeCapabilites(capAdd []api.Capability, capDrop []api.Capability) ([]string, []string) {
 	var (
 		addCaps  []string
 		dropCaps []string

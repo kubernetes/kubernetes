@@ -360,8 +360,8 @@ func TestSetDefaultSecurityContext(t *testing.T) {
 			c: current.Container{
 				Privileged: false,
 				Capabilities: current.Capabilities{
-					Add:  []current.CapabilityType{"foo"},
-					Drop: []current.CapabilityType{"bar"},
+					Add:  []current.Capability{"foo"},
+					Drop: []current.Capability{"bar"},
 				},
 				SecurityContext: &current.SecurityContext{
 					Privileged: &priv,
@@ -372,13 +372,13 @@ func TestSetDefaultSecurityContext(t *testing.T) {
 			c: current.Container{
 				Privileged: false,
 				Capabilities: current.Capabilities{
-					Add:  []current.CapabilityType{"foo"},
-					Drop: []current.CapabilityType{"bar"},
+					Add:  []current.Capability{"foo"},
+					Drop: []current.Capability{"bar"},
 				},
 				SecurityContext: &current.SecurityContext{
 					Capabilities: &current.Capabilities{
-						Add:  []current.CapabilityType{"foo"},
-						Drop: []current.CapabilityType{"bar"},
+						Add:  []current.Capability{"foo"},
+						Drop: []current.Capability{"bar"},
 					},
 				},
 			},
@@ -389,8 +389,8 @@ func TestSetDefaultSecurityContext(t *testing.T) {
 				SecurityContext: &current.SecurityContext{
 					Privileged: &priv,
 					Capabilities: &current.Capabilities{
-						Add:  []current.CapabilityType{"biz"},
-						Drop: []current.CapabilityType{"baz"},
+						Add:  []current.Capability{"biz"},
+						Drop: []current.Capability{"baz"},
 					},
 				},
 			},
@@ -398,14 +398,14 @@ func TestSetDefaultSecurityContext(t *testing.T) {
 		"upward defaulting priv": {
 			c: current.Container{
 				Capabilities: current.Capabilities{
-					Add:  []current.CapabilityType{"foo"},
-					Drop: []current.CapabilityType{"bar"},
+					Add:  []current.Capability{"foo"},
+					Drop: []current.Capability{"bar"},
 				},
 				SecurityContext: &current.SecurityContext{
 					Privileged: &privTrue,
 					Capabilities: &current.Capabilities{
-						Add:  []current.CapabilityType{"foo"},
-						Drop: []current.CapabilityType{"bar"},
+						Add:  []current.Capability{"foo"},
+						Drop: []current.Capability{"bar"},
 					},
 				},
 			},

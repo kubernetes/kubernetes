@@ -3175,8 +3175,8 @@ func TestValidateSecurityContext(t *testing.T) {
 		return &api.SecurityContext{
 			Privileged: &priv,
 			Capabilities: &api.Capabilities{
-				Add:  []api.CapabilityType{"foo"},
-				Drop: []api.CapabilityType{"bar"},
+				Add:  []api.Capability{"foo"},
+				Drop: []api.Capability{"bar"},
 			},
 			SELinuxOptions: &api.SELinuxOptions{
 				User:  "user",

@@ -84,17 +84,17 @@ func convert_v1_Capabilities_To_api_Capabilities(in *Capabilities, out *newer.Ca
 		defaulting.(func(*Capabilities))(in)
 	}
 	if in.Add != nil {
-		out.Add = make([]newer.CapabilityType, len(in.Add))
+		out.Add = make([]newer.Capability, len(in.Add))
 		for i := range in.Add {
-			out.Add[i] = newer.CapabilityType(in.Add[i])
+			out.Add[i] = newer.Capability(in.Add[i])
 		}
 	} else {
 		out.Add = nil
 	}
 	if in.Drop != nil {
-		out.Drop = make([]newer.CapabilityType, len(in.Drop))
+		out.Drop = make([]newer.Capability, len(in.Drop))
 		for i := range in.Drop {
-			out.Drop[i] = newer.CapabilityType(in.Drop[i])
+			out.Drop[i] = newer.Capability(in.Drop[i])
 		}
 	} else {
 		out.Drop = nil
@@ -107,17 +107,17 @@ func convert_api_Capabilities_To_v1_Capabilities(in *newer.Capabilities, out *Ca
 		defaulting.(func(*newer.Capabilities))(in)
 	}
 	if in.Add != nil {
-		out.Add = make([]CapabilityType, len(in.Add))
+		out.Add = make([]Capability, len(in.Add))
 		for i := range in.Add {
-			out.Add[i] = CapabilityType(in.Add[i])
+			out.Add[i] = Capability(in.Add[i])
 		}
 	} else {
 		out.Add = nil
 	}
 	if in.Drop != nil {
-		out.Drop = make([]CapabilityType, len(in.Drop))
+		out.Drop = make([]Capability, len(in.Drop))
 		for i := range in.Drop {
-			out.Drop[i] = CapabilityType(in.Drop[i])
+			out.Drop[i] = Capability(in.Drop[i])
 		}
 	} else {
 		out.Drop = nil

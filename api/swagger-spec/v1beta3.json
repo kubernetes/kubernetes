@@ -9609,21 +9609,21 @@
      "add": {
       "type": "array",
       "items": {
-       "$ref": "v1beta3.CapabilityType"
+       "$ref": "v1beta3.Capability"
       },
       "description": "added capabilities"
      },
      "drop": {
       "type": "array",
       "items": {
-       "$ref": "v1beta3.CapabilityType"
+       "$ref": "v1beta3.Capability"
       },
       "description": "droped capabilities"
      }
     }
    },
-   "v1beta3.CapabilityType": {
-    "id": "v1beta3.CapabilityType",
+   "v1beta3.Capability": {
+    "id": "v1beta3.Capability",
     "properties": {}
    },
    "v1beta3.ComponentCondition": {
