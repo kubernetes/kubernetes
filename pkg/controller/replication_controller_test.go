@@ -953,3 +953,40 @@ func TestControllerBurstReplicas(t *testing.T) {
 	doTestControllerBurstReplicas(t, 5, 12)
 	doTestControllerBurstReplicas(t, 3, 2)
 }
+
+type FakeRCExpectations struct {
+	*RCExpectations
+	satisfied    bool
+	expSatisfied func()
+}
+
+func (fe FakeRCExpectations) SatisfiedExpectations(rc *api.ReplicationController) bool {
+	fe.expSatisfied()
+	return fe.satisfied
+}
+
+// TestRCSyncExpectations tests that a pod cannot sneak in between counting active pods
+// and checking expectations.
+func TestRCSyncExpectations(t *testing.T) {
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	fakePodControl := FakePodControl{}
+	manager := NewReplicationManager(client, 2)
+	manager.podControl = &fakePodControl
+
+	controllerSpec := newReplicationController(2)
+	manager.controllerStore.Store.Add(controllerSpec)
+	pods := newPodList(nil, 2, api.PodPending, controllerSpec)
+	manager.podStore.Store.Add(&pods.Items[0])
+	postExpectationsPod := pods.Items[1]
+
+	manager.expectations = FakeRCExpectations{
+		NewRCExpectations(), true, func() {
+			// If we check active pods before checking expectataions, the rc
+			// will create a new replica because it doesn't see this pod, but
+			// has fulfilled its expectations.
+			manager.podStore.Store.Add(&postExpectationsPod)
+		},
+	}
+	manager.syncReplicationController(getKey(controllerSpec, t))
+	validateSyncReplication(t, &fakePodControl, 0, 0)
+}

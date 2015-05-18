@@ -81,7 +81,7 @@ type ReplicationManager struct {
 	// To allow injection of syncReplicationController for testing.
 	syncHandler func(rcKey string) error
 	// A TTLCache of pod creates/deletes each rc expects to see
-	expectations *RCExpectations
+	expectations RCExpectationsManager
 	// A store of controllers, populated by the rcController
 	controllerStore cache.StoreToControllerLister
 	// A store of pods, populated by the podController
@@ -360,16 +360,20 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 	controller := *obj.(*api.ReplicationController)
 
+	// Check the expectations of the rc before counting active pods, otherwise a new pod can sneak in
+	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
+	// the store after we've checked the expectation, the rc sync is just deferred till the next relist.
+	rcNeedsSync := rm.expectations.SatisfiedExpectations(&controller)
 	podList, err := rm.podStore.Pods(controller.Namespace).List(labels.Set(controller.Spec.Selector).AsSelector())
 	if err != nil {
 		glog.Errorf("Error getting pods for rc %q: %v", key, err)
 		rm.queue.Add(key)
 		return err
 	}
+
 	// TODO: Do this in a single pass, or use an index.
 	filteredPods := filterActivePods(podList.Items)
-
-	if rm.expectations.SatisfiedExpectations(&controller) {
+	if rcNeedsSync {
 		rm.manageReplicas(filteredPods, &controller)
 	}
 
