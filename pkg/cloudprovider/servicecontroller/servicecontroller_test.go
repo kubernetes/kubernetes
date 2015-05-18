@@ -184,6 +184,16 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				{Name: "a999", Region: region, Hosts: []string{"node0", "node1", "node73"}},
 			},
 		},
+		{
+			// One service has an external load balancer and one is nil: one call.
+			services: []*api.Service{
+				newService("s0", "234", true),
+				nil,
+			},
+			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
+				{Name: "a234", Region: region, Hosts: []string{"node0", "node1", "node73"}},
+			},
+		},
 	}
 	for _, item := range table {
 		cloud := &fake_cloud.FakeCloud{}
