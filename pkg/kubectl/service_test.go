@@ -125,7 +125,7 @@ func TestGenerateService(t *testing.T) {
 				"port":           "80",
 				"protocol":       "UDP",
 				"container-port": "foobar",
-				"public-ip":      "1.2.3.4",
+				"load-balancer":  "1.2.3.4",
 			},
 			expected: api.Service{
 				ObjectMeta: api.ObjectMeta{
@@ -144,7 +144,7 @@ func TestGenerateService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromString("foobar"),
 						},
 					},
-					PublicIPs: []string{"1.2.3.4"},
+					LoadBalancer: "1.2.3.4",
 				},
 			},
 		},
@@ -155,7 +155,7 @@ func TestGenerateService(t *testing.T) {
 				"port":                          "80",
 				"protocol":                      "UDP",
 				"container-port":                "foobar",
-				"public-ip":                     "1.2.3.4",
+				"load-balancer":                 "1.2.3.4",
 				"create-external-load-balancer": "true",
 			},
 			expected: api.Service{
@@ -175,8 +175,73 @@ func TestGenerateService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromString("foobar"),
 						},
 					},
-					PublicIPs:                  []string{"1.2.3.4"},
-					CreateExternalLoadBalancer: true,
+					LoadBalancer: "1.2.3.4",
+					Visibility:   api.ServiceVisibilityLoadBalancer,
+				},
+			},
+		},
+		{
+			params: map[string]string{
+				"selector":       "foo=bar,baz=blah",
+				"name":           "test",
+				"port":           "80",
+				"protocol":       "UDP",
+				"container-port": "foobar",
+				"load-balancer":  "1.2.3.4",
+				"visibility":     string(api.ServiceVisibilityNodePort),
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "default",
+							Port:       80,
+							Protocol:   "UDP",
+							TargetPort: util.NewIntOrStringFromString("foobar"),
+						},
+					},
+					LoadBalancer: "1.2.3.4",
+					Visibility:   api.ServiceVisibilityNodePort,
+				},
+			},
+		},
+		{
+			params: map[string]string{
+				"selector":                      "foo=bar,baz=blah",
+				"name":                          "test",
+				"port":                          "80",
+				"protocol":                      "UDP",
+				"container-port":                "foobar",
+				"load-balancer":                 "1.2.3.4",
+				"create-external-load-balancer": "true", // ignored when visibility is present
+				"visibility":                    string(api.ServiceVisibilityNodePort),
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "default",
+							Port:       80,
+							Protocol:   "UDP",
+							TargetPort: util.NewIntOrStringFromString("foobar"),
+						},
+					},
+					LoadBalancer: "1.2.3.4",
+					Visibility:   api.ServiceVisibilityNodePort,
 				},
 			},
 		},

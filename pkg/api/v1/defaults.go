@@ -74,6 +74,9 @@ func addDefaultingFuncs() {
 			if obj.SessionAffinity == "" {
 				obj.SessionAffinity = AffinityTypeNone
 			}
+			if obj.Visibility == "" {
+				obj.Visibility = ServiceVisibilityCluster
+			}
 			for i := range obj.Ports {
 				sp := &obj.Ports[i]
 				if sp.Protocol == "" {

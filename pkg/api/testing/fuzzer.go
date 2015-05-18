@@ -186,6 +186,10 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			types := []api.AffinityType{api.AffinityTypeClientIP, api.AffinityTypeNone}
 			*p = types[c.Rand.Intn(len(types))]
 		},
+		func(p *api.ServiceVisibility, c fuzz.Continue) {
+			types := []api.ServiceVisibility{api.ServiceVisibilityCluster, api.ServiceVisibilityNodePort, api.ServiceVisibilityLoadBalancer}
+			*p = types[c.Rand.Intn(len(types))]
+		},
 		func(ct *api.Container, c fuzz.Continue) {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty

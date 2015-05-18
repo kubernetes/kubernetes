@@ -34,7 +34,7 @@ import (
 // * Duplicate PortalIP assignments caused by operator action or undetected race conditions
 // * PortalIPs that do not match the current portal network
 // * Allocations to services that were not actually created due to a crash or powerloss
-// * Migrates old versions of Kubernetes services into the atomic ipallocator model automatically
+// * Migrates old versions of Kubernetes services into the atomic ipallocatowr model automatically
 //
 // Can be run at infrequent intervals, and is best performed on startup of the master.
 // Is level driven and idempotent - all valid PortalIPs will be updated into the ipallocator

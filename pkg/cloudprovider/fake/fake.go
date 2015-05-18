@@ -26,11 +26,11 @@ import (
 
 // FakeBalancer is a fake storage of balancer information
 type FakeBalancer struct {
-	Name       string
-	Region     string
-	ExternalIP net.IP
-	Ports      []int
-	Hosts      []string
+	Name    string
+	Region  string
+	ForceLB string
+	Ports   []int
+	Hosts   []string
 }
 
 type FakeUpdateBalancerCall struct {
@@ -95,16 +95,25 @@ func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
 }
 
 // GetTCPLoadBalancer is a stub implementation of TCPLoadBalancer.GetTCPLoadBalancer.
-func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error) {
-	return f.ExternalIP.String(), f.Exists, f.Err
+func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (endpoint api.LoadBalancerStatus, exists bool, err error) {
+	status := api.LoadBalancerStatus{}
+	status.Name = f.ExternalIP.String()
+	status.Endpoints = []map[string]string{ { api.LoadBalancerEndpointIP: f.ExternalIP.String()} }
+
+	return status, f.Exists, f.Err
 }
 
 // CreateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error) {
+func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, forceLoadBalancer string, ports []int, hosts []string, affinityType api.AffinityType) (api.LoadBalancerStatus, error) {
 	f.addCall("create")
-	f.Balancers = append(f.Balancers, FakeBalancer{name, region, externalIP, ports, hosts})
-	return f.ExternalIP.String(), f.Err
+	f.Balancers = append(f.Balancers, FakeBalancer{name, region, forceLoadBalancer, ports, hosts})
+
+	status := api.LoadBalancerStatus{}
+	status.Name = f.ExternalIP.String()
+	status.Endpoints = []map[string]string{ { api.LoadBalancerEndpointIP: f.ExternalIP.String()} }
+
+	return status, f.Err
 }
 
 // UpdateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.

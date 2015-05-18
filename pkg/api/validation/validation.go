@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -984,6 +985,9 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 }
 
 var supportedSessionAffinityType = util.NewStringSet(string(api.AffinityTypeClientIP), string(api.AffinityTypeNone))
+var supportedServiceVisibility = util.NewStringSet(string(api.ServiceVisibilityCluster),
+	string(api.ServiceVisibilityNodePort),
+	string(api.ServiceVisibilityLoadBalancer))
 
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
@@ -1008,13 +1012,19 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.sessionAffinity", service.Spec.SessionAffinity))
 	}
 
+	if service.Spec.Visibility == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.visibility"))
+	} else if !supportedServiceVisibility.Has(string(service.Spec.Visibility)) {
+		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.visibility", service.Spec.Visibility))
+	}
+
 	if api.IsServiceIPSet(service) {
 		if ip := net.ParseIP(service.Spec.PortalIP); ip == nil {
 			allErrs = append(allErrs, errs.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, "portalIP should be empty, 'None', or a valid IP address"))
 		}
 	}
 
-	for _, ip := range service.Spec.PublicIPs {
+	for _, ip := range service.Spec.DeprecatedPublicIPs {
 		if ip == "0.0.0.0" {
 			allErrs = append(allErrs, errs.NewFieldInvalid("spec.publicIPs", ip, "is not an IP address"))
 		} else if util.IsValidIPv4(ip) && net.ParseIP(ip).IsLoopback() {
@@ -1022,11 +1032,37 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		}
 	}
 
-	if service.Spec.CreateExternalLoadBalancer {
+	if service.Spec.Visibility == api.ServiceVisibilityLoadBalancer {
 		for i := range service.Spec.Ports {
 			if service.Spec.Ports[i].Protocol != api.ProtocolTCP {
 				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot create an external load balancer with non-TCP ports"))
 			}
+		}
+	} else {
+		if service.Spec.LoadBalancer != "" {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.loadBalancer", service.Spec.LoadBalancer, "cannot specify a load balancer when visibility is not LoadBalancer"))
+		}
+	}
+
+	if service.Spec.Visibility == api.ServiceVisibilityCluster {
+		for i := range service.Spec.Ports {
+			if service.Spec.Ports[i].NodePort != 0 {
+				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot specify a public port with cluster-visibility services"))
+			}
+		}
+	}
+
+	// Check for duplicate NodePorts
+	nodePorts := []int{}
+	for i := range service.Spec.Ports {
+		if service.Spec.Ports[i].NodePort != 0 {
+			nodePorts = append(nodePorts, service.Spec.Ports[i].NodePort)
+		}
+	}
+	sort.Ints(nodePorts)
+	for i := 1; i < len(nodePorts); i++ {
+		if nodePorts[i-1] == nodePorts[i] {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "duplicate public port specified"))
 		}
 	}
 

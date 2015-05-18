@@ -1413,6 +1413,42 @@ func convert_api_ListOptions_To_v1beta3_ListOptions(in *newer.ListOptions, out *
 	return nil
 }
 
+func convert_v1beta3_LoadBalancerStatus_To_api_LoadBalancerStatus(in *LoadBalancerStatus, out *newer.LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LoadBalancerStatus))(in)
+	}
+	out.Name = in.Name
+	if in.Endpoints != nil {
+		out.Endpoints = make([]map[string]string, len(in.Endpoints))
+		for i := range in.Endpoints {
+			if err := s.Convert(&in.Endpoints[i], &out.Endpoints[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Endpoints = nil
+	}
+	return nil
+}
+
+func convert_api_LoadBalancerStatus_To_v1beta3_LoadBalancerStatus(in *newer.LoadBalancerStatus, out *LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*newer.LoadBalancerStatus))(in)
+	}
+	out.Name = in.Name
+	if in.Endpoints != nil {
+		out.Endpoints = make([]map[string]string, len(in.Endpoints))
+		for i := range in.Endpoints {
+			if err := s.Convert(&in.Endpoints[i], &out.Endpoints[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Endpoints = nil
+	}
+	return nil
+}
+
 func convert_v1beta3_NFSVolumeSource_To_api_NFSVolumeSource(in *NFSVolumeSource, out *newer.NFSVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NFSVolumeSource))(in)
@@ -3823,6 +3859,7 @@ func convert_v1beta3_ServicePort_To_api_ServicePort(in *ServicePort, out *newer.
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
+	out.NodePort = in.NodePort
 	return nil
 }
 
@@ -3836,78 +3873,7 @@ func convert_api_ServicePort_To_v1beta3_ServicePort(in *newer.ServicePort, out *
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
-	return nil
-}
-
-func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *newer.ServiceSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ServiceSpec))(in)
-	}
-	if in.Ports != nil {
-		out.Ports = make([]newer.ServicePort, len(in.Ports))
-		for i := range in.Ports {
-			if err := convert_v1beta3_ServicePort_To_api_ServicePort(&in.Ports[i], &out.Ports[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Ports = nil
-	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	out.PortalIP = in.PortalIP
-	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
-		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
-		}
-	} else {
-		out.PublicIPs = nil
-	}
-	out.SessionAffinity = newer.AffinityType(in.SessionAffinity)
-	return nil
-}
-
-func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *newer.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.ServiceSpec))(in)
-	}
-	if in.Ports != nil {
-		out.Ports = make([]ServicePort, len(in.Ports))
-		for i := range in.Ports {
-			if err := convert_api_ServicePort_To_v1beta3_ServicePort(&in.Ports[i], &out.Ports[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Ports = nil
-	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	out.PortalIP = in.PortalIP
-	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
-		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
-		}
-	} else {
-		out.PublicIPs = nil
-	}
-	out.SessionAffinity = AffinityType(in.SessionAffinity)
+	out.NodePort = in.NodePort
 	return nil
 }
 
@@ -3915,12 +3881,18 @@ func convert_v1beta3_ServiceStatus_To_api_ServiceStatus(in *ServiceStatus, out *
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceStatus))(in)
 	}
+	if err := convert_v1beta3_LoadBalancerStatus_To_api_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func convert_api_ServiceStatus_To_v1beta3_ServiceStatus(in *newer.ServiceStatus, out *ServiceStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*newer.ServiceStatus))(in)
+	}
+	if err := convert_api_LoadBalancerStatus_To_v1beta3_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -4333,6 +4305,7 @@ func init() {
 		convert_api_ListMeta_To_v1beta3_ListMeta,
 		convert_api_ListOptions_To_v1beta3_ListOptions,
 		convert_api_List_To_v1beta3_List,
+		convert_api_LoadBalancerStatus_To_v1beta3_LoadBalancerStatus,
 		convert_api_NFSVolumeSource_To_v1beta3_NFSVolumeSource,
 		convert_api_NamespaceList_To_v1beta3_NamespaceList,
 		convert_api_NamespaceSpec_To_v1beta3_NamespaceSpec,
@@ -4391,7 +4364,6 @@ func init() {
 		convert_api_ServiceAccount_To_v1beta3_ServiceAccount,
 		convert_api_ServiceList_To_v1beta3_ServiceList,
 		convert_api_ServicePort_To_v1beta3_ServicePort,
-		convert_api_ServiceSpec_To_v1beta3_ServiceSpec,
 		convert_api_ServiceStatus_To_v1beta3_ServiceStatus,
 		convert_api_Service_To_v1beta3_Service,
 		convert_api_StatusCause_To_v1beta3_StatusCause,
@@ -4442,6 +4414,7 @@ func init() {
 		convert_v1beta3_ListMeta_To_api_ListMeta,
 		convert_v1beta3_ListOptions_To_api_ListOptions,
 		convert_v1beta3_List_To_api_List,
+		convert_v1beta3_LoadBalancerStatus_To_api_LoadBalancerStatus,
 		convert_v1beta3_NFSVolumeSource_To_api_NFSVolumeSource,
 		convert_v1beta3_NamespaceList_To_api_NamespaceList,
 		convert_v1beta3_NamespaceSpec_To_api_NamespaceSpec,
@@ -4500,7 +4473,6 @@ func init() {
 		convert_v1beta3_ServiceAccount_To_api_ServiceAccount,
 		convert_v1beta3_ServiceList_To_api_ServiceList,
 		convert_v1beta3_ServicePort_To_api_ServicePort,
-		convert_v1beta3_ServiceSpec_To_api_ServiceSpec,
 		convert_v1beta3_ServiceStatus_To_api_ServiceStatus,
 		convert_v1beta3_Service_To_api_Service,
 		convert_v1beta3_StatusCause_To_api_StatusCause,

@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"regexp"
 	"time"
 
@@ -464,15 +463,21 @@ func getVipByName(client *gophercloud.ServiceClient, name string) (*vips.Virtual
 	return &vipList[0], nil
 }
 
-func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error) {
+func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (endpoint api.LoadBalancerStatus, exists bool, err error) {
+	status := api.LoadBalancerStatus{}
+
 	vip, err := getVipByName(lb.network, name)
 	if err == ErrNotFound {
-		return "", false, nil
+		return status, false, nil
 	}
 	if vip == nil {
-		return "", false, err
+		return status, false, err
 	}
-	return vip.Address, true, err
+
+	status.Name = vip.Address
+	status.Endpoints = []map[string]string{ { api.LoadBalancerEndpointIP: vip.Address} }
+
+	return status, true, err
 }
 
 // TODO: This code currently ignores 'region' and always creates a
@@ -480,11 +485,13 @@ func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (endpoint string
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinity api.AffinityType) (string, error) {
-	glog.V(4).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, externalIP, ports, hosts, affinity)
+func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, forceLoadBalancer string, ports []int, hosts []string, affinity api.AffinityType) (api.LoadBalancerStatus, error) {
+	glog.V(4).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, forceLoadBalancer, ports, hosts, affinity)
+
+	status := api.LoadBalancerStatus{}
 
 	if len(ports) > 1 {
-		return "", fmt.Errorf("multiple ports are not yet supported in openstack load balancers")
+		return status, fmt.Errorf("multiple ports are not yet supported in openstack load balancers")
 	}
 
 	var persistence *vips.SessionPersistence
@@ -494,7 +501,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 	case api.AffinityTypeClientIP:
 		persistence = &vips.SessionPersistence{Type: "SOURCE_IP"}
 	default:
-		return "", fmt.Errorf("unsupported load balancer affinity: %v", affinity)
+		return status, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
 
 	lbmethod := lb.opts.LBMethod
@@ -508,13 +515,13 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		LBMethod: lbmethod,
 	}).Extract()
 	if err != nil {
-		return "", err
+		return status, err
 	}
 
 	for _, host := range hosts {
 		addr, err := getAddressByName(lb.compute, host)
 		if err != nil {
-			return "", err
+			return status, err
 		}
 
 		_, err = members.Create(lb.network, members.CreateOpts{
@@ -524,7 +531,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		}).Extract()
 		if err != nil {
 			pools.Delete(lb.network, pool.ID)
-			return "", err
+			return status, err
 		}
 	}
 
@@ -538,21 +545,21 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		}).Extract()
 		if err != nil {
 			pools.Delete(lb.network, pool.ID)
-			return "", err
+			return status, err
 		}
 
 		_, err = pools.AssociateMonitor(lb.network, pool.ID, mon.ID).Extract()
 		if err != nil {
 			monitors.Delete(lb.network, mon.ID)
 			pools.Delete(lb.network, pool.ID)
-			return "", err
+			return status, err
 		}
 	}
 
 	vip, err := vips.Create(lb.network, vips.CreateOpts{
 		Name:         name,
 		Description:  fmt.Sprintf("Kubernetes external service %s", name),
-		Address:      externalIP.String(),
+		Address:      forceLoadBalancer,
 		Protocol:     "TCP",
 		ProtocolPort: ports[0], //TODO: need to handle multi-port
 		PoolID:       pool.ID,
@@ -563,10 +570,13 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 			monitors.Delete(lb.network, mon.ID)
 		}
 		pools.Delete(lb.network, pool.ID)
-		return "", err
+		return status, err
 	}
 
-	return vip.Address, nil
+	status.Name = vip.Address
+	status.Endpoints = []map[string]string{ { api.LoadBalancerEndpointIP: vip.Address} }
+
+	return status, nil
 }
 
 func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []string) error {

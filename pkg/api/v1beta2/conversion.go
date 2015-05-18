@@ -690,16 +690,26 @@ func addConversionFuncs() {
 					Port:          in.Spec.Ports[i].Port,
 					Protocol:      Protocol(in.Spec.Ports[i].Protocol),
 					ContainerPort: in.Spec.Ports[i].TargetPort,
+					NodePort:      in.Spec.Ports[i].NodePort,
 				})
 			}
 
 			if err := s.Convert(&in.Spec.Selector, &out.Selector, 0); err != nil {
 				return err
 			}
-			out.CreateExternalLoadBalancer = in.Spec.CreateExternalLoadBalancer
-			out.PublicIPs = in.Spec.PublicIPs
+			out.PublicIPs = in.Spec.DeprecatedPublicIPs
 			out.PortalIP = in.Spec.PortalIP
 			if err := s.Convert(&in.Spec.SessionAffinity, &out.SessionAffinity, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.Spec.Visibility, &out.Visibility, 0); err != nil {
+				return err
+			}
+			out.CreateExternalLoadBalancer = in.Spec.Visibility == newer.ServiceVisibilityLoadBalancer
+			out.LoadBalancer = in.Spec.LoadBalancer
+
+			if err := s.Convert(&in.Status.LoadBalancer, &out.LoadBalancerStatus, 0); err != nil {
 				return err
 			}
 
@@ -732,6 +742,7 @@ func addConversionFuncs() {
 						Port:       in.Ports[i].Port,
 						Protocol:   newer.Protocol(in.Ports[i].Protocol),
 						TargetPort: in.Ports[i].ContainerPort,
+						NodePort:   in.Ports[i].NodePort,
 					})
 				}
 			}
@@ -739,10 +750,27 @@ func addConversionFuncs() {
 			if err := s.Convert(&in.Selector, &out.Spec.Selector, 0); err != nil {
 				return err
 			}
-			out.Spec.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-			out.Spec.PublicIPs = in.PublicIPs
+			out.Spec.DeprecatedPublicIPs = in.PublicIPs
 			out.Spec.PortalIP = in.PortalIP
 			if err := s.Convert(&in.SessionAffinity, &out.Spec.SessionAffinity, 0); err != nil {
+				return err
+			}
+
+			visibilityIn := in.Visibility
+			if visibilityIn == "" {
+				if in.CreateExternalLoadBalancer {
+					visibilityIn = ServiceVisibilityLoadBalancer
+				} else {
+					visibilityIn = ServiceVisibilityCluster
+				}
+			}
+			if err := s.Convert(&visibilityIn, &out.Spec.Visibility, 0); err != nil {
+				return err
+			}
+
+			out.Spec.LoadBalancer = in.LoadBalancer
+
+			if err := s.Convert(&in.LoadBalancerStatus, &out.Status.LoadBalancer, 0); err != nil {
 				return err
 			}
 

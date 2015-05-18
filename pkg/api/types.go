@@ -979,8 +979,49 @@ const (
 	AffinityTypeNone AffinityType = "None"
 )
 
+// Session Visibility Type string
+type ServiceVisibility string
+
+const (
+	// ServiceVisibilityCluster means a service will only be accessible inside the
+	// cluster, via the portal IP.
+	ServiceVisibilityCluster ServiceVisibility = "Cluster"
+
+	// ServiceVisibilityNodePort means a service will be exposed on one port of
+	// every node, in addition to 'Cluster' visibility.
+	ServiceVisibilityNodePort ServiceVisibility = "NodePort"
+
+	// ServiceVisibilityLoadBalancer means a service will be exposed via an
+	// external load balancer (if the cloud provider supports it), in addition
+	// to 'NodePort' visibility.
+	ServiceVisibilityLoadBalancer ServiceVisibility = "LoadBalancer"
+)
+
 // ServiceStatus represents the current status of a service
-type ServiceStatus struct{}
+type ServiceStatus struct {
+	// LoadBalancer contains the current status of the load-balancer,
+	// if one is present.
+	LoadBalancer LoadBalancerStatus `json:"loadBalancer,omitempty"`
+}
+
+
+const (
+	// LoadBalancerEndpointIP is used when the load balancer should be targeted by IP address
+	LoadBalancerEndpointIP string = "ip"
+	// LoadBalancerEndpointHostname is used when the load balancer should be targeted by hostname (e.g. AWS ELB)
+	LoadBalancerEndpointHostname string = "hostname"
+)
+
+// LoadBalancerStatus represents the status of a load-balancer
+type LoadBalancerStatus struct {
+	// Name is an identifier for the load-balancer, which can be used
+	// when specifying LoadBalancer during Service create/update
+	Name string `json:"name,omitempty"`
+
+	// Endpoints is a list containing endpoints for the load-balancer;
+	// traffic intended for the service should be sent to these endpoints.
+	Endpoints []map[string]string `json:"endpoints,omitempty"`
+}
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
@@ -999,14 +1040,17 @@ type ServiceSpec struct {
 	// None can be specified for headless services when proxying is not required
 	PortalIP string `json:"portalIP,omitempty"`
 
-	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
-	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty"`
-	// PublicIPs are used by external load balancers, or can be set by
+	// Visibility determines how the service will be exposed.  Valid options: Cluster, NodePort, LoadBalancer
+	Visibility ServiceVisibility `json:"visibility,omitempty"`
+
+	// LoadBalancer can be specified by a user to request a particular load-balancer.
+	// The Name of an existing load-balancer, as used here, can be found in the Name field of LoadBalancerStatus.
+	LoadBalancer string `json:"loadBalancer,omitempty"`
+
+	// DeprecatedPublicIPs are deprecated and silently ignored.
+	// Old behaviour: PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
-	// For load balancers, the publicIP will usually be the IP address of the load balancer,
-	// but some load balancers (notably AWS ELB) use a hostname instead of an IP address.
-	// For hostnames, the user will use a CNAME record (instead of using an A record with the IP)
-	PublicIPs []string `json:"publicIPs,omitempty"`
+	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty"`
 
 	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty"`
@@ -1032,6 +1076,10 @@ type ServicePort struct {
 	// of v1beta3 the default value is the sames as the Port field (an
 	// identity map).
 	TargetPort util.IntOrString `json:"targetPort"`
+
+	// The port on each node on which this service is exposed.
+	// Default is to auto-allocate a port if the visibility of this Service requires one.
+	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port

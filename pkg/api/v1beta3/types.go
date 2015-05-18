@@ -966,8 +966,41 @@ const (
 	AffinityTypeNone AffinityType = "None"
 )
 
+// Session Visibility Type string
+type ServiceVisibility string
+
+const (
+	// ServiceVisibilityCluster means a service will only be accessible inside the
+	// cluster, via the portal IP.
+	ServiceVisibilityCluster ServiceVisibility = "Cluster"
+
+	// ServiceVisibilityNodePort means a service will be exposed on one port of
+	// every node, in addition to 'Cluster' visibility.
+	ServiceVisibilityNodePort ServiceVisibility = "NodePort"
+
+	// ServiceVisibilityLoadBalancer means a service will be exposed via an
+	// external load balancer (if the cloud provider supports it), in addition
+	// to 'NodePort' visibility.
+	ServiceVisibilityLoadBalancer ServiceVisibility = "LoadBalancer"
+)
+
 // ServiceStatus represents the current status of a service
-type ServiceStatus struct{}
+type ServiceStatus struct {
+	// LoadBalancer contains the current status of the load-balancer,
+	// if one is present.
+	LoadBalancer LoadBalancerStatus `json:"loadBalancer,omitempty" description:"status of load-balancer"`
+}
+
+// LoadBalancerStatus represents the status of a load-balancer
+type LoadBalancerStatus struct {
+	// Name is an identifier for the load-balancer, which can be used
+	// when specifying LoadBalancer during Service create/update
+	Name string `json:"name,omitempty" description:"the name of the load-balancer"`
+
+	// Endpoints is a list containing endpoints for the load-balancer;
+	// traffic intended for the service should be sent to these endpoints.
+	Endpoints []map[string]string `json:"endpoints,omitempty" description:"load-balancer endpoints"`
+}
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
@@ -987,9 +1020,16 @@ type ServiceSpec struct {
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`
 
-	// PublicIPs are used by external load balancers, or can be set by
+	// Visibility determines how the service will be exposed.  Valid options: Cluster, NodePort, LoadBalancer
+	Visibility ServiceVisibility `json:"visibility,omitempty" description:"visibility level of this service; must be Cluster, NodePort, or LoadBalancer; defaults to Cluster"`
+
+	// LoadBalancer can be specified by a user to request a particular load-balancer.
+	// The Name of an existing load-balancer, as used here, can be found in the Name field of LoadBalancerStatus.
+	LoadBalancer string `json:"loadBalancer,omitempty" description:"load balancer to use, defaults to automatically created"`
+
+	// Deprecated. PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
-	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs (e.g. load balancers) that should be proxied to this service"`
+	PublicIPs []string `json:"publicIPs,omitempty" description:"deprecated. externally visible IPs (e.g. load balancers) that should be proxied to this service"`
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`
@@ -1014,6 +1054,10 @@ type ServicePort struct {
 	// target Pod's container ports.  If this is not specified, the value
 	// of Port is used (an identity map).
 	TargetPort util.IntOrString `json:"targetPort" description:"the port to access on the pods targeted by the service; defaults to the service port"`
+
+	// The port on each node on which this service is exposed.
+	// Default is to auto-allocate a port if the visibility of this Service requires one.
+	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port

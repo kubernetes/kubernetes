@@ -160,7 +160,20 @@ func TestSetDefaultService(t *testing.T) {
 	obj2 := roundTrip(t, runtime.Object(svc))
 	svc2 := obj2.(*current.Service)
 	if svc2.Spec.SessionAffinity != current.AffinityTypeNone {
-		t.Errorf("Expected default sesseion affinity type:%s, got: %s", current.AffinityTypeNone, svc2.Spec.SessionAffinity)
+		t.Errorf("Expected default session affinity type:%s, got: %s", current.AffinityTypeNone, svc2.Spec.SessionAffinity)
+	}
+	if svc2.Spec.Visibility != current.ServiceVisibilityCluster {
+		t.Errorf("Expected default visibility type:%s, got: %s", current.ServiceVisibilityCluster, svc2.Spec.Visibility)
+	}
+}
+
+func TestSetDefaultServiceWithLoadbalancer(t *testing.T) {
+	svc := &current.Service{}
+	svc.Spec.CreateExternalLoadBalancer = true
+	obj2 := roundTrip(t, runtime.Object(svc))
+	svc2 := obj2.(*current.Service)
+	if svc2.Spec.Visibility != current.ServiceVisibilityLoadBalancer {
+		t.Errorf("Expected default visibility type:%s, got: %s", current.ServiceVisibilityLoadBalancer, svc2.Spec.Visibility)
 	}
 }
 

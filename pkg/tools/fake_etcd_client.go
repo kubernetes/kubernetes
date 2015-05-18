@@ -264,6 +264,49 @@ func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue
 	return f.setLocked(key, value, ttl)
 }
 
+func (f *FakeEtcdClient) CompareAndDelete(key string, prevValue string, prevIndex uint64) (*etcd.Response, error) {
+	if f.Err != nil {
+		f.t.Logf("c&d: returning err %v", f.Err)
+		return nil, f.Err
+	}
+	if f.CasErr != nil {
+		f.t.Logf("c&d: returning err %v", f.CasErr)
+		return nil, f.CasErr
+	}
+
+	if !f.TestIndex {
+		f.t.Errorf("Enable TestIndex for test involving CompareAndDelete")
+		return nil, errors.New("Enable TestIndex for test involving CompareAndDelete")
+	}
+
+	if prevValue == "" && prevIndex == 0 {
+		return nil, errors.New("Either prevValue or prevIndex must be specified.")
+	}
+
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
+
+	if !f.nodeExists(key) {
+		f.t.Logf("c&d: node doesn't exist")
+		return nil, EtcdErrorNotFound
+	}
+
+	prevNode := f.Data[key].R.Node
+
+	if prevValue != "" && prevValue != prevNode.Value {
+		f.t.Logf("body didn't match")
+		return nil, EtcdErrorTestFailed
+	}
+
+	if prevIndex != 0 && prevIndex != prevNode.ModifiedIndex {
+		f.t.Logf("got index %v but needed %v", prevIndex, prevNode.ModifiedIndex)
+		return nil, EtcdErrorTestFailed
+	}
+
+	recursive := false
+	return f.deleteLocked(key, recursive)
+}
+
 func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, error) {
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
@@ -283,6 +326,15 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+
+	return f.deleteLocked(key, recursive)
+}
+
+func (f *FakeEtcdClient) deleteLocked(key string, recursive bool) (*etcd.Response, error) {
+	if f.Err != nil {
+		return nil, f.Err
+	}
+
 	existing, ok := f.Data[key]
 	if !ok {
 		return &etcd.Response{}, &etcd.EtcdError{

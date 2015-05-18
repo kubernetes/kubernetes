@@ -33,10 +33,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/golang/glog"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.
@@ -45,19 +47,104 @@ type REST struct {
 	machines    minion.Registry
 	endpoints   endpoint.Registry
 	portals     ipallocator.Interface
+	portMgr     *portallocator.PortAllocator
 	clusterName string
 }
 
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, portals ipallocator.Interface,
-	clusterName string) *REST {
+	publicServicePorts *portallocator.PortAllocator, clusterName string) *REST {
+
 	return &REST{
 		registry:    registry,
 		machines:    machines,
 		endpoints:   endpoints,
 		portals:     portals,
+		portMgr:     publicServicePorts,
 		clusterName: clusterName,
 	}
+}
+
+// Encapsulates the semantics of a port allocation 'transaction':
+// It is better to leak ports than to double-allocate them,
+// so we allocate immediately, but defer release.
+// On commit we best-effort release the deferred releases.
+// On rollback we best-effort release any allocations we did.
+type portAllocationOperation struct {
+	pa              *portallocator.PortAllocator
+	allocated       []int
+	releaseDeferred []int
+	ShouldRollback  bool
+}
+
+func (op *portAllocationOperation) Init(pa *portallocator.PortAllocator) {
+	op.pa = pa
+	op.allocated = []int{}
+	op.releaseDeferred = []int{}
+	op.ShouldRollback = true
+}
+
+func (op *portAllocationOperation) Rollback() []error {
+	errors := []error{}
+
+	for _, allocated := range op.allocated {
+		err := op.pa.Release(allocated)
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
+}
+
+func (op *portAllocationOperation) Commit() []error {
+	errors := []error{}
+
+	for _, release := range op.releaseDeferred {
+		err := op.pa.Release(release)
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors
+}
+
+func (op *portAllocationOperation) Allocate(port int, owner *api.Service) error {
+	name := owner.Namespace + "/" + owner.Name
+	err := op.pa.Allocate(port, name)
+	if err == nil {
+		op.allocated = append(op.allocated, port)
+	}
+	return err
+}
+
+func (op *portAllocationOperation) AllocateNext(owner *api.Service) (int, error) {
+	name := owner.Namespace + "/" + owner.Name
+	port, err := op.pa.AllocateNext(name)
+	if err == nil {
+		op.allocated = append(op.allocated, port)
+	}
+	return port, err
+}
+
+func (op *portAllocationOperation) ReleaseDeferred(port int) {
+	op.releaseDeferred = append(op.releaseDeferred, port)
+}
+
+func contains(haystack []int, needle int) bool {
+	for _, v := range haystack {
+		if v == needle {
+			return true
+		}
+	}
+	return false
 }
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
@@ -73,6 +160,14 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 			if api.IsServiceIPSet(service) {
 				rs.portals.Release(net.ParseIP(service.Spec.PortalIP))
 			}
+		}
+	}()
+
+	var nodePortOp portAllocationOperation
+	nodePortOp.Init(rs.portMgr)
+	defer func() {
+		if nodePortOp.ShouldRollback {
+			nodePortOp.Rollback()
 		}
 	}()
 
@@ -94,12 +189,36 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		releaseServiceIP = true
 	}
 
+	assignNodePorts := shouldAssignNodePorts(service)
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort != 0 {
+			err := nodePortOp.Allocate(servicePort.NodePort, service)
+			if err != nil {
+				return nil, err
+			}
+		} else if assignNodePorts {
+			nodePort, err := nodePortOp.AllocateNext(service)
+			if err != nil {
+				return nil, err
+			}
+			servicePort.NodePort = nodePort
+		}
+	}
+
 	out, err := rs.registry.CreateService(ctx, service)
 	if err != nil {
 		err = rest.CheckGeneratedNameError(rest.Services, err, service)
 	}
 
 	if err == nil {
+		el := nodePortOp.Commit()
+		if el != nil {
+			// these should be caught by an eventual reconciliation / restart
+			glog.Errorf("error(s) committing public-ports changes: %v", el)
+		}
+		nodePortOp.ShouldRollback = false
+
 		releaseServiceIP = false
 	}
 
@@ -111,10 +230,28 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	err = rs.registry.DeleteService(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
 	if api.IsServiceIPSet(service) {
 		rs.portals.Release(net.ParseIP(service.Spec.PortalIP))
 	}
-	return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(ctx, id)
+
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort != 0 {
+			err := rs.portMgr.Release(servicePort.NodePort)
+			if err != nil {
+				// these should be caught by an eventual reconciliation / restart
+				glog.Errorf("Error releasing service %s public port %d: %v", service.Name, servicePort.NodePort, err)
+			}
+		}
+	}
+
+	return &api.Status{Status: api.StatusSuccess}, nil
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
@@ -170,8 +307,80 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	if errs := validation.ValidateServiceUpdate(oldService, service); len(errs) > 0 {
 		return nil, false, errors.NewInvalid("service", service.Name, errs)
 	}
+
+	var nodePortOp portAllocationOperation
+	nodePortOp.Init(rs.portMgr)
+	defer func() {
+		if nodePortOp.ShouldRollback {
+			nodePortOp.Rollback()
+		}
+	}()
+
+	assignNodePorts := shouldAssignNodePorts(service)
+
+	oldNodePorts := collectServiceNodePorts(oldService)
+
+	newNodePorts := []int{}
+	if assignNodePorts {
+		for i := range service.Spec.Ports {
+			servicePort := &service.Spec.Ports[i]
+			nodePort := servicePort.NodePort
+			if nodePort != 0 {
+				if !contains(oldNodePorts, nodePort) {
+					err := nodePortOp.Allocate(nodePort, service)
+					if err != nil {
+						return nil, false, err
+					}
+				}
+			} else {
+				nodePort, err = nodePortOp.AllocateNext(service)
+				if err != nil {
+					return nil, false, err
+				}
+				servicePort.NodePort = nodePort
+			}
+			// Detect duplicate public ports; this should have been caught by validation, so we panic
+			if contains(newNodePorts, nodePort) {
+				panic("duplicate public port")
+			}
+			newNodePorts = append(newNodePorts, nodePort)
+		}
+	} else {
+		// Validate should have validated that nodePort == 0
+	}
+
+	// The comparison loops are O(N^2), but we don't expect N to be huge
+	// (there's a hard-limit at 2^16, because they're ports; and even 4 ports would be a lot)
+	for _, oldNodePort := range oldNodePorts {
+		if !contains(newNodePorts, oldNodePort) {
+			continue
+		}
+		nodePortOp.ReleaseDeferred(oldNodePort)
+	}
+
 	out, err := rs.registry.UpdateService(ctx, service)
+
+	if err == nil {
+		el := nodePortOp.Commit()
+		if el != nil {
+			// problems should be fixed by an eventual reconciliation / restart
+			glog.Errorf("error(s) committing public-ports changes: %v", el)
+		}
+		nodePortOp.ShouldRollback = false
+	}
+
 	return out, false, err
+}
+
+func collectServiceNodePorts(service *api.Service) []int {
+	servicePorts := []int{}
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort != 0 {
+			servicePorts = append(servicePorts, servicePort.NodePort)
+		}
+	}
+	return servicePorts
 }
 
 // Implement Redirector.
@@ -211,4 +420,18 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 		}
 	}
 	return nil, nil, fmt.Errorf("no endpoints available for %q", id)
+}
+
+func shouldAssignNodePorts(service *api.Service) bool {
+	switch service.Spec.Visibility {
+	case api.ServiceVisibilityLoadBalancer:
+		return true
+	case api.ServiceVisibilityNodePort:
+		return true
+	case api.ServiceVisibilityCluster:
+		return false
+	default:
+		glog.Errorf("Unknown visibility value: %v", service.Spec.Visibility)
+		return false
+	}
 }
