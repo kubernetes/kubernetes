@@ -1,20 +1,21 @@
 apiVersion: v1beta3
 kind: ReplicationController
 metadata:
+  name: kibana-logging-v1
+  namespace: default
   labels:
-    app: kibana-logging
+    k8s-app: kibana-logging
     version: v1
     kubernetes.io/cluster-service: "true"
-  name: kibana-logging
 spec:
   replicas: 1
   selector:
-    app: kibana-logging
+    k8s-app: kibana-logging
     version: v1
   template:
     metadata:
       labels:
-        app: kibana-logging
+        k8s-app: kibana-logging
         version: v1
         kubernetes.io/cluster-service: "true"
     spec:

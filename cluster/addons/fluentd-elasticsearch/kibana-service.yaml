@@ -2,15 +2,16 @@
 apiVersion: v1beta3
 kind: Service
 metadata:
+  name: kibana-logging
+  namespace: default
   labels:
-    app: kibana-logging
+    k8s-app: kibana-logging
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "Kibana"
-  name: kibana-logging
 spec:
   ports:
   - port: 5601
     protocol: TCP
     targetPort: kibana-port
   selector:
-    app: kibana-logging
+    k8s-app: kibana-logging
