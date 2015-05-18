@@ -23,8 +23,8 @@ source "config-default.sh"
 
 if [ "${ENABLE_CLUSTER_DNS}" == true ]; then
 	echo "Deploying DNS on kubernetes"
-	sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" ../../cluster/addons/dns/skydns-rc.yaml.in > skydns-rc.yaml
-	sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" ../../cluster/addons/dns/skydns-svc.yaml.in > skydns-svc.yaml
+	sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" skydns-rc.yaml.template > skydns-rc.yaml
+	sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" skydns-svc.yaml.template > skydns-svc.yaml
 	# use kubectl to create skydns rc and service
 	"${KUBE_ROOT}/cluster/kubectl.sh" create -f skydns-rc.yaml
 	"${KUBE_ROOT}/cluster/kubectl.sh" create -f skydns-svc.yaml
