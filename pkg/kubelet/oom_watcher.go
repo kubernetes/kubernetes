@@ -17,8 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"fmt"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
@@ -29,7 +27,7 @@ import (
 )
 
 type OOMWatcher interface {
-	RecordSysOOMs(ref *api.ObjectReference) error
+	Start(ref *api.ObjectReference) error
 }
 
 type realOOMWatcher struct {
@@ -47,7 +45,7 @@ func NewOOMWatcher(cadvisor cadvisor.Interface, recorder record.EventRecorder) O
 const systemOOMEvent = "SystemOOM"
 
 // Watches cadvisor for system oom's and records an event for every system oom encountered.
-func (ow *realOOMWatcher) RecordSysOOMs(ref *api.ObjectReference) error {
+func (ow *realOOMWatcher) Start(ref *api.ObjectReference) error {
 	request := events.Request{
 		EventType: map[cadvisorApi.EventType]bool{
 			cadvisorApi.EventOom: true,
@@ -59,9 +57,15 @@ func (ow *realOOMWatcher) RecordSysOOMs(ref *api.ObjectReference) error {
 	if err != nil {
 		return err
 	}
-	for event := range eventChannel.GetChannel() {
-		glog.V(2).Infof("got sys oom event from cadvisor: %v", event)
-		ow.recorder.PastEventf(ref, util.Time{event.Timestamp}, systemOOMEvent, "System OOM encountered")
-	}
-	return fmt.Errorf("failed to watch cadvisor for sys oom events")
+
+	go func() {
+		defer util.HandleCrash()
+
+		for event := range eventChannel.GetChannel() {
+			glog.V(2).Infof("Got sys oom event from cadvisor: %v", event)
+			ow.recorder.PastEventf(ref, util.Time{event.Timestamp}, systemOOMEvent, "System OOM encountered")
+		}
+		glog.Errorf("Unexpectedly stopped receiving OOM notifications from cAdvisor")
+	}()
+	return nil
 }
