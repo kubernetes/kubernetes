@@ -310,9 +310,9 @@ func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) 
 func deepCopyLoadBalancerStatus(lb *api.LoadBalancerStatus) api.LoadBalancerStatus {
 	var c api.LoadBalancerStatus
 	c = *lb
-	c.Endpoints = make([]api.LoadBalancerEndpointStatus, len(lb.Endpoints))
-	for i := range lb.Endpoints {
-		c.Endpoints[i] = lb.Endpoints[i]
+	c.Ingress = make([]api.LoadBalancerIngress, len(lb.Ingress))
+	for i := range lb.Ingress {
+		c.Ingress[i] = lb.Ingress[i]
 	}
 	return c
 }
@@ -322,9 +322,9 @@ func (proxier *Proxier) openPortal(service ServicePortName, info *serviceInfo) e
 	if err != nil {
 		return err
 	}
-	for _, endpoint := range info.loadBalancerStatus.Endpoints {
-		if endpoint.IP != "" {
-			err = proxier.openOnePortal(net.ParseIP(endpoint.IP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+	for _, ingress := range info.loadBalancerStatus.Ingress {
+		if ingress.IP != "" {
+			err = proxier.openOnePortal(net.ParseIP(ingress.IP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
 			if err != nil {
 				return err
 			}

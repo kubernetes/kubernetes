@@ -522,10 +522,10 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 func printService(svc *api.Service, w io.Writer) error {
 	ips := []string{svc.Spec.PortalIP}
 
-	endpoints := svc.Status.LoadBalancer.Endpoints
-	for i := range endpoints {
-		if endpoints[i].IP != "" {
-			ips = append(ips, endpoints[i].IP)
+	ingress := svc.Status.LoadBalancer.Ingress
+	for i := range ingress {
+		if ingress[i].IP != "" {
+			ips = append(ips, ingress[i].IP)
 		}
 	}
 

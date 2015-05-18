@@ -481,17 +481,17 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 	return describeService(service, endpoints, events)
 }
 
-func buildEndpointsString(endpoints []api.LoadBalancerEndpointStatus) string {
+func buildIngressString(ingress []api.LoadBalancerIngress) string {
 	var buffer bytes.Buffer
 
-	for i := range endpoints {
+	for i := range ingress {
 		if i != 0 {
 			buffer.WriteString(", ")
 		}
-		if endpoints[i].IP != "" {
-			buffer.WriteString(endpoints[i].IP)
+		if ingress[i].IP != "" {
+			buffer.WriteString(ingress[i].IP)
 		} else {
-			buffer.WriteString(endpoints[i].Hostname)
+			buffer.WriteString(ingress[i].Hostname)
 		}
 	}
 	return buffer.String()
@@ -507,9 +507,9 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
 		fmt.Fprintf(out, "Visibility:\t%s\n", service.Spec.Visibility)
 		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.PortalIP)
-		if len(service.Status.LoadBalancer.Endpoints) > 0 {
-			list := buildEndpointsString(service.Status.LoadBalancer.Endpoints)
-			fmt.Fprintf(out, "Endpoints:\t%s\n", list)
+		if len(service.Status.LoadBalancer.Ingress) > 0 {
+			list := buildIngressString(service.Status.LoadBalancer.Ingress)
+			fmt.Fprintf(out, "Ingress:\t%s\n", list)
 		}
 		for i := range service.Spec.Ports {
 			sp := &service.Spec.Ports[i]

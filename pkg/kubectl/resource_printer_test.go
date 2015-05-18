@@ -655,7 +655,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 			},
 			Status: api.ServiceStatus{
 				LoadBalancer: api.LoadBalancerStatus{
-					Endpoints: []api.LoadBalancerEndpointStatus{
+					Ingress: []api.LoadBalancerIngress{
 						{
 							IP: "2.3.4.5",
 						},
@@ -705,7 +705,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 			},
 			Status: api.ServiceStatus{
 				LoadBalancer: api.LoadBalancerStatus{
-					Endpoints: []api.LoadBalancerEndpointStatus{
+					Ingress: []api.LoadBalancerIngress{
 						{
 							IP: "2.3.4.5",
 						},
@@ -733,7 +733,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 			},
 			Status: api.ServiceStatus{
 				LoadBalancer: api.LoadBalancerStatus{
-					Endpoints: []api.LoadBalancerEndpointStatus{
+					Ingress: []api.LoadBalancerIngress{
 						{
 							IP: "2.3.4.5",
 						},

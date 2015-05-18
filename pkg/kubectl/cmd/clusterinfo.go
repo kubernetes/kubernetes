@@ -72,11 +72,11 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 		services := r.Object.(*api.ServiceList).Items
 		for _, service := range services {
 			var link string
-			if len(service.Status.LoadBalancer.Endpoints) > 0 {
-				endpoint := service.Status.LoadBalancer.Endpoints[0]
-				ip := endpoint.IP
+			if len(service.Status.LoadBalancer.Ingress) > 0 {
+				ingress := service.Status.LoadBalancer.Ingress[0]
+				ip := ingress.IP
 				if ip == "" {
-					ip = endpoint.Hostname
+					ip = ingress.Hostname
 				}
 				for _, port := range service.Spec.Ports {
 					link += "http://" + ip + ":" + strconv.Itoa(port.Port) + " "

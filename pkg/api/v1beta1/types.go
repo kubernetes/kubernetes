@@ -901,19 +901,20 @@ type LoadBalancerStatus struct {
 	// when specifying LoadBalancer during Service create/update
 	Name string `json:"name,omitempty" description:"the name of the load-balancer"`
 
-	// Endpoints is a list containing endpoints for the load-balancer;
-	// traffic intended for the service should be sent to these endpoints.
-	Endpoints []LoadBalancerEndpointStatus `json:"endpoints,omitempty" description:"load-balancer endpoints"`
+	// Ingress is a list containing ingress points for the load-balancer;
+	// traffic intended for the service should be sent to these ingress points.
+	Ingress []LoadBalancerIngress `json:"ingress,omitempty" description:"load-balancer ingress points"`
 }
 
-// EndpointStatus represents the status of a load-balancer endpoint
-type LoadBalancerEndpointStatus struct {
-	// IP is set for load-balancer endpoints that are IP based
-	// (typically GCE or OpenStack load-balancers.)
+// LoadBalancerIngress represents the status of a load-balancer ingress point:
+// traffic intended for the service should be sent to an ingress point.
+type LoadBalancerIngress struct {
+	// IP is set for load-balancer ingress points that are IP based
+	// (typically GCE or OpenStack load-balancers)
 	IP string `json:"ip,omitempty" description:"IP address of endpoint"`
 
-	// Hostname is set for load-balancer endpoints that are DNS based
-	// (typically AWS load-balancers.
+	// Hostname is set for load-balancer ingress points that are DNS based
+	// (typically AWS load-balancers)
 	Hostname string `json:"hostname,omitempty" description:"hostname of endpoint"`
 }
 

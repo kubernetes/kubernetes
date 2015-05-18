@@ -146,22 +146,22 @@ func (l *LoadBalancerStatus) Equal(r *LoadBalancerStatus) bool {
 	if l.Name != r.Name {
 		return false
 	}
-	return endpointsEqual(l.Endpoints, r.Endpoints)
+	return ingressSliceEqual(l.Ingress, r.Ingress)
 }
 
-func endpointsEqual(lhs, rhs []LoadBalancerEndpointStatus) bool {
+func ingressSliceEqual(lhs, rhs []LoadBalancerIngress) bool {
 	if len(lhs) != len(rhs) {
 		return false
 	}
 	for i := range lhs {
-		if !endpointEqual(&lhs[i], &rhs[i]) {
+		if !ingressEqual(&lhs[i], &rhs[i]) {
 			return false
 		}
 	}
 	return true
 }
 
-func endpointEqual(lhs, rhs *LoadBalancerEndpointStatus) bool {
+func ingressEqual(lhs, rhs *LoadBalancerIngress) bool {
 	if lhs.IP != rhs.IP {
 		return false
 	}
