@@ -521,9 +521,14 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 
 func printService(svc *api.Service, w io.Writer) error {
 	ips := []string{svc.Spec.PortalIP}
-	for _, publicIP := range svc.Spec.PublicIPs {
-		ips = append(ips, publicIP)
+
+	ingress := svc.Status.LoadBalancer.Ingress
+	for i := range ingress {
+		if ingress[i].IP != "" {
+			ips = append(ips, ingress[i].IP)
+		}
 	}
+
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s\n", svc.Name, formatLabels(svc.Labels),
 		formatLabels(svc.Spec.Selector), ips[0], svc.Spec.Ports[0].Port, svc.Spec.Ports[0].Protocol); err != nil {
 		return err

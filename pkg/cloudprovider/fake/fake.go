@@ -95,16 +95,25 @@ func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
 }
 
 // GetTCPLoadBalancer is a stub implementation of TCPLoadBalancer.GetTCPLoadBalancer.
-func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error) {
-	return f.ExternalIP.String(), f.Exists, f.Err
+func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
+	status := &api.LoadBalancerStatus{}
+	status.Name = f.ExternalIP.String()
+	status.Ingress = []api.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
+
+	return status, f.Exists, f.Err
 }
 
 // CreateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (string, error) {
+func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	f.addCall("create")
 	f.Balancers = append(f.Balancers, FakeBalancer{name, region, externalIP, ports, hosts})
-	return f.ExternalIP.String(), f.Err
+
+	status := &api.LoadBalancerStatus{}
+	status.Name = f.ExternalIP.String()
+	status.Ingress = []api.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
+
+	return status, f.Err
 }
 
 // UpdateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
