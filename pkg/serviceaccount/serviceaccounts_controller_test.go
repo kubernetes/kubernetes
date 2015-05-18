@@ -23,7 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -51,6 +51,9 @@ func makeTestServer(t *testing.T, namespace string, serviceAccountResponse serve
 func TestServiceAccountCreation(t *testing.T) {
 	ns := api.NamespaceDefault
 
+	defaultName := "default"
+	managedName := "managed"
+
 	activeNS := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{Name: ns},
 		Status: api.NamespaceStatus{
@@ -63,79 +66,118 @@ func TestServiceAccountCreation(t *testing.T) {
 			Phase: api.NamespaceTerminating,
 		},
 	}
-	serviceAccount := &api.ServiceAccount{
+	defaultServiceAccount := &api.ServiceAccount{
 		ObjectMeta: api.ObjectMeta{
-			Name:            "default",
+			Name:            defaultName,
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+	}
+	managedServiceAccount := &api.ServiceAccount{
+		ObjectMeta: api.ObjectMeta{
+			Name:            managedName,
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+	}
+	unmanagedServiceAccount := &api.ServiceAccount{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "other-unmanaged",
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
 	}
 
 	testcases := map[string]struct {
-		ExistingNamespace      *api.Namespace
-		ExistingServiceAccount *api.ServiceAccount
+		ExistingNamespace       *api.Namespace
+		ExistingServiceAccounts []*api.ServiceAccount
 
 		AddedNamespace        *api.Namespace
 		UpdatedNamespace      *api.Namespace
 		DeletedServiceAccount *api.ServiceAccount
 
-		ExpectCreatedServiceAccount bool
+		ExpectCreatedServiceAccounts []string
 	}{
+		"new active namespace missing serviceaccounts": {
+			ExistingServiceAccounts:      []*api.ServiceAccount{},
+			AddedNamespace:               activeNS,
+			ExpectCreatedServiceAccounts: util.NewStringSet(defaultName, managedName).List(),
+		},
 		"new active namespace missing serviceaccount": {
-			AddedNamespace:              activeNS,
-			ExpectCreatedServiceAccount: true,
+			ExistingServiceAccounts:      []*api.ServiceAccount{managedServiceAccount},
+			AddedNamespace:               activeNS,
+			ExpectCreatedServiceAccounts: []string{defaultName},
 		},
-		"new active namespace with serviceaccount": {
-			ExistingServiceAccount:      serviceAccount,
-			AddedNamespace:              activeNS,
-			ExpectCreatedServiceAccount: false,
-		},
-		"new terminating namespace": {
-			AddedNamespace:              terminatingNS,
-			ExpectCreatedServiceAccount: false,
+		"new active namespace with serviceaccounts": {
+			ExistingServiceAccounts:      []*api.ServiceAccount{defaultServiceAccount, managedServiceAccount},
+			AddedNamespace:               activeNS,
+			ExpectCreatedServiceAccounts: []string{},
 		},
 
-		"updated active namespace missing serviceaccount": {
-			UpdatedNamespace:            activeNS,
-			ExpectCreatedServiceAccount: true,
+		"new terminating namespace": {
+			ExistingServiceAccounts:      []*api.ServiceAccount{},
+			AddedNamespace:               terminatingNS,
+			ExpectCreatedServiceAccounts: []string{},
 		},
-		"updated active namespace with serviceaccount": {
-			ExistingServiceAccount:      serviceAccount,
-			UpdatedNamespace:            activeNS,
-			ExpectCreatedServiceAccount: false,
+
+		"updated active namespace missing serviceaccounts": {
+			ExistingServiceAccounts:      []*api.ServiceAccount{},
+			UpdatedNamespace:             activeNS,
+			ExpectCreatedServiceAccounts: util.NewStringSet(defaultName, managedName).List(),
+		},
+		"updated active namespace missing serviceaccount": {
+			ExistingServiceAccounts:      []*api.ServiceAccount{defaultServiceAccount},
+			UpdatedNamespace:             activeNS,
+			ExpectCreatedServiceAccounts: []string{managedName},
+		},
+		"updated active namespace with serviceaccounts": {
+			ExistingServiceAccounts:      []*api.ServiceAccount{defaultServiceAccount, managedServiceAccount},
+			UpdatedNamespace:             activeNS,
+			ExpectCreatedServiceAccounts: []string{},
 		},
 		"updated terminating namespace": {
-			UpdatedNamespace:            terminatingNS,
-			ExpectCreatedServiceAccount: false,
+			ExistingServiceAccounts:      []*api.ServiceAccount{},
+			UpdatedNamespace:             terminatingNS,
+			ExpectCreatedServiceAccounts: []string{},
 		},
 
 		"deleted serviceaccount without namespace": {
-			DeletedServiceAccount:       serviceAccount,
-			ExpectCreatedServiceAccount: false,
+			DeletedServiceAccount:        defaultServiceAccount,
+			ExpectCreatedServiceAccounts: []string{},
 		},
 		"deleted serviceaccount with active namespace": {
-			ExistingNamespace:           activeNS,
-			DeletedServiceAccount:       serviceAccount,
-			ExpectCreatedServiceAccount: true,
+			ExistingNamespace:            activeNS,
+			DeletedServiceAccount:        defaultServiceAccount,
+			ExpectCreatedServiceAccounts: []string{defaultName},
 		},
 		"deleted serviceaccount with terminating namespace": {
-			ExistingNamespace:           terminatingNS,
-			DeletedServiceAccount:       serviceAccount,
-			ExpectCreatedServiceAccount: false,
+			ExistingNamespace:            terminatingNS,
+			DeletedServiceAccount:        defaultServiceAccount,
+			ExpectCreatedServiceAccounts: []string{},
+		},
+		"deleted unmanaged serviceaccount with active namespace": {
+			ExistingNamespace:            activeNS,
+			DeletedServiceAccount:        unmanagedServiceAccount,
+			ExpectCreatedServiceAccounts: []string{},
+		},
+		"deleted unmanaged serviceaccount with terminating namespace": {
+			ExistingNamespace:            terminatingNS,
+			DeletedServiceAccount:        unmanagedServiceAccount,
+			ExpectCreatedServiceAccounts: []string{},
 		},
 	}
 
 	for k, tc := range testcases {
-
-		testServer, handler := makeTestServer(t, ns, serverResponse{http.StatusOK, serviceAccount})
-		client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-		controller := NewServiceAccountsController(client, DefaultServiceAccountControllerOptions())
+		client := testclient.NewSimpleFake(defaultServiceAccount, managedServiceAccount)
+		options := DefaultServiceAccountsControllerOptions()
+		options.Names = util.NewStringSet(defaultName, managedName)
+		controller := NewServiceAccountsController(client, options)
 
 		if tc.ExistingNamespace != nil {
 			controller.namespaces.Add(tc.ExistingNamespace)
 		}
-		if tc.ExistingServiceAccount != nil {
-			controller.serviceAccounts.Add(tc.ExistingServiceAccount)
+		for _, s := range tc.ExistingServiceAccounts {
+			controller.serviceAccounts.Add(s)
 		}
 
 		if tc.AddedNamespace != nil {
@@ -150,16 +192,20 @@ func TestServiceAccountCreation(t *testing.T) {
 			controller.serviceAccountDeleted(tc.DeletedServiceAccount)
 		}
 
-		if tc.ExpectCreatedServiceAccount {
-			if !handler.ValidateRequestCount(t, 1) {
-				t.Errorf("%s: Expected a single creation call", k)
+		if len(tc.ExpectCreatedServiceAccounts) != len(client.Actions) {
+			t.Errorf("%s: Expected to create accounts %#v. Actual actions were: %#v", k, tc.ExpectCreatedServiceAccounts, client.Actions)
+			continue
+		}
+		for i, expectedName := range tc.ExpectCreatedServiceAccounts {
+			action := client.Actions[i]
+			if action.Action != "create-serviceaccount" {
+				t.Errorf("%s: Unexpected action %s", k, action.Action)
+				break
 			}
-		} else {
-			if !handler.ValidateRequestCount(t, 0) {
-				t.Errorf("%s: Expected no creation calls", k)
+			createdAccount := action.Value.(*api.ServiceAccount)
+			if createdAccount.Name != expectedName {
+				t.Errorf("%s: Expected %s to be created, got %s", k, expectedName, createdAccount.Name)
 			}
 		}
-
-		testServer.Close()
 	}
 }
