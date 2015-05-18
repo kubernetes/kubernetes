@@ -809,4 +809,20 @@ func TestProxyUpdatePortal(t *testing.T) {
 	waitForNumProxyLoops(t, p, 1)
 }
 
+func TestListenAnyAddressIPTablesPortalArgs(t *testing.T) {
+	args := iptablesCommonPortalArgs(net.ParseIP("0.0.0.0"), 9999,
+		"version", ServicePortName{
+			NamespacedName: types.NamespacedName{
+				Namespace: "ns",
+				Name:      "name",
+			},
+			Port: "9999",
+		})
+	for _, arg := range args {
+		if arg == "-d" {
+			t.Fatalf("args should omit the destination when listening on 0.0.0.0")
+		}
+	}
+}
+
 // TODO: Test UDP timeouts.

@@ -475,8 +475,11 @@ func iptablesCommonPortalArgs(destIP net.IP, destPort int, protocol api.Protocol
 		"--comment", service.String(),
 		"-p", strings.ToLower(string(protocol)),
 		"-m", strings.ToLower(string(protocol)),
-		"-d", fmt.Sprintf("%s/32", destIP.String()),
 		"--dport", fmt.Sprintf("%d", destPort),
+	}
+
+	if destIP.String() != "0.0.0.0" {
+		args = append(args, "-d", fmt.Sprintf("%s/32", destIP.String()))
 	}
 	return args
 }
