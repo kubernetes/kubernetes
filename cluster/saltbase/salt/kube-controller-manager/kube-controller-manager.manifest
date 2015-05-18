@@ -14,6 +14,8 @@
 
 {% set cloud_provider = "" -%}
 {% set cloud_config = "" -%}
+{% set cloud_config_mount = "" -%}
+{% set cloud_config_volume = "" -%}
 
 {% if grains.cloud is defined -%}
   {% set cloud_provider = "--cloud_provider=" + grains.cloud -%}
@@ -21,6 +23,8 @@
 
   {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
     {% set cloud_config = "--cloud_config=" + grains.cloud_config -%}
+    {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
+    {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
   {% endif -%}
 {% endif -%}
 
@@ -42,6 +46,7 @@
                  "/usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
                ],
     "volumeMounts": [
+        {{cloud_config_mount}}
         { "name": "srvkube",
         "mountPath": "/srv/kubernetes",
         "readOnly": true},
@@ -76,6 +81,7 @@
     }
 ],
 "volumes":[
+  {{cloud_config_volume}}
   { "name": "srvkube",
     "hostPath": {
         "path": "/srv/kubernetes"}
