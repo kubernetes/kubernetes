@@ -46,6 +46,8 @@ KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 CA_CERT: $(yaml-quote ${CA_CERT_BASE64})
+KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
+KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
 EOF
 
   if [[ "${master}" == "true" ]]; then
@@ -66,8 +68,6 @@ KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
 ZONE: $(yaml-quote ${ZONE})
 EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS})
 ENABLE_DOCKER_REGISTRY_CACHE: $(yaml-quote ${ENABLE_DOCKER_REGISTRY_CACHE:-false})
-KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
-KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
 EOF
   fi
 }
