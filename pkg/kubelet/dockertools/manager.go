@@ -220,7 +220,7 @@ func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID, tail string
 		Stderr:       true,
 		OutputStream: stdout,
 		ErrorStream:  stderr,
-		Timestamps:   true,
+		Timestamps:   false,
 		RawTerminal:  false,
 		Follow:       follow,
 	}
