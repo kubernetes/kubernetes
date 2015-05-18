@@ -238,7 +238,7 @@ func (e *Etcd) UpdateWithName(ctx api.Context, name string, obj runtime.Object) 
 	}
 	ttl := uint64(0)
 	if e.TTLFunc != nil {
-		ttl, err = e.TTLFunc(obj, false)
+		ttl, err = e.TTLFunc(obj, true)
 		if err != nil {
 			return err
 		}
@@ -281,7 +281,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 			}
 			ttl := uint64(0)
 			if e.TTLFunc != nil {
-				ttl, err = e.TTLFunc(obj, true)
+				ttl, err = e.TTLFunc(obj, false)
 				if err != nil {
 					return nil, 0, err
 				}
@@ -303,7 +303,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		}
 		ttl := uint64(0)
 		if e.TTLFunc != nil {
-			ttl, err = e.TTLFunc(obj, false)
+			ttl, err = e.TTLFunc(obj, true)
 			if err != nil {
 				return nil, 0, err
 			}
