@@ -63,7 +63,7 @@ func TestCreate(t *testing.T) {
 		},
 		&api.Secret{
 			ObjectMeta: api.ObjectMeta{Name: "name"},
-			Data:       map[string][]byte{".dotfile": []byte("")},
+			Data:       map[string][]byte{"~.dotfile": []byte("")},
 		},
 	)
 }
