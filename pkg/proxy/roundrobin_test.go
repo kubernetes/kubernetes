@@ -351,7 +351,7 @@ func TestStickyLoadBalanceWorksWithSingleEndpoint(t *testing.T) {
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
 	}
-	loadBalancer.NewService(service, api.AffinityTypeClientIP, 0)
+	loadBalancer.NewService(service, api.ServiceAffinityClientIP, 0)
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -375,7 +375,7 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpoints(t *testing.T) {
 		t.Errorf("Didn't fail with non-existent service")
 	}
 
-	loadBalancer.NewService(service, api.AffinityTypeClientIP, 0)
+	loadBalancer.NewService(service, api.ServiceAffinityClientIP, 0)
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -409,7 +409,7 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpointsStickyNone(t *testing.T) {
 		t.Errorf("Didn't fail with non-existent service")
 	}
 
-	loadBalancer.NewService(service, api.AffinityTypeNone, 0)
+	loadBalancer.NewService(service, api.ServiceAffinityNone, 0)
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -447,7 +447,7 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpointsRemoveOne(t *testing.T) {
 		t.Errorf("Didn't fail with non-existent service")
 	}
 
-	loadBalancer.NewService(service, api.AffinityTypeClientIP, 0)
+	loadBalancer.NewService(service, api.ServiceAffinityClientIP, 0)
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -521,7 +521,7 @@ func TestStickyLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 		t.Errorf("Didn't fail with non-existent service")
 	}
 
-	loadBalancer.NewService(service, api.AffinityTypeClientIP, 0)
+	loadBalancer.NewService(service, api.ServiceAffinityClientIP, 0)
 	endpoints := make([]api.Endpoints, 1)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
@@ -581,7 +581,7 @@ func TestStickyLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
 	}
-	loadBalancer.NewService(fooService, api.AffinityTypeClientIP, 0)
+	loadBalancer.NewService(fooService, api.ServiceAffinityClientIP, 0)
 	endpoints := make([]api.Endpoints, 2)
 	endpoints[0] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: fooService.Name, Namespace: fooService.Namespace},
@@ -593,7 +593,7 @@ func TestStickyLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 		},
 	}
 	barService := ServicePortName{types.NamespacedName{"testnamespace", "bar"}, ""}
-	loadBalancer.NewService(barService, api.AffinityTypeClientIP, 0)
+	loadBalancer.NewService(barService, api.ServiceAffinityClientIP, 0)
 	endpoints[1] = api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: barService.Name, Namespace: barService.Namespace},
 		Subsets: []api.EndpointSubset{

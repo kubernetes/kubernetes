@@ -969,14 +969,14 @@ type ServiceList struct {
 }
 
 // Session Affinity Type string
-type AffinityType string
+type ServiceAffinity string
 
 const (
-	// AffinityTypeClientIP is the Client IP based.
-	AffinityTypeClientIP AffinityType = "ClientIP"
+	// ServiceAffinityClientIP is the Client IP based.
+	ServiceAffinityClientIP ServiceAffinity = "ClientIP"
 
-	// AffinityTypeNone - no session affinity.
-	AffinityTypeNone AffinityType = "None"
+	// ServiceAffinityNone - no session affinity.
+	ServiceAffinityNone ServiceAffinity = "None"
 )
 
 // ServiceStatus represents the current status of a service
@@ -1009,7 +1009,7 @@ type ServiceSpec struct {
 	PublicIPs []string `json:"publicIPs,omitempty"`
 
 	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
-	SessionAffinity AffinityType `json:"sessionAffinity,omitempty"`
+	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty"`
 }
 
 type ServicePort struct {

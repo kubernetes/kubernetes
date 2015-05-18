@@ -149,8 +149,8 @@ func TestSetDefaultService(t *testing.T) {
 	if svc2.Protocol != current.ProtocolTCP {
 		t.Errorf("Expected default protocol :%s, got: %s", current.ProtocolTCP, svc2.Protocol)
 	}
-	if svc2.SessionAffinity != current.AffinityTypeNone {
-		t.Errorf("Expected default sesseion affinity type:%s, got: %s", current.AffinityTypeNone, svc2.SessionAffinity)
+	if svc2.SessionAffinity != current.ServiceAffinityNone {
+		t.Errorf("Expected default sesseion affinity type:%s, got: %s", current.ServiceAffinityNone, svc2.SessionAffinity)
 	}
 }
 

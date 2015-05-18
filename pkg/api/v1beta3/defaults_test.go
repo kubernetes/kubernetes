@@ -159,8 +159,8 @@ func TestSetDefaultService(t *testing.T) {
 	svc := &current.Service{}
 	obj2 := roundTrip(t, runtime.Object(svc))
 	svc2 := obj2.(*current.Service)
-	if svc2.Spec.SessionAffinity != current.AffinityTypeNone {
-		t.Errorf("Expected default sesseion affinity type:%s, got: %s", current.AffinityTypeNone, svc2.Spec.SessionAffinity)
+	if svc2.Spec.SessionAffinity != current.ServiceAffinityNone {
+		t.Errorf("Expected default sesseion affinity type:%s, got: %s", current.ServiceAffinityNone, svc2.Spec.SessionAffinity)
 	}
 }
 

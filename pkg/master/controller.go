@@ -181,7 +181,7 @@ func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP n
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			PortalIP:        serviceIP.String(),
-			SessionAffinity: api.AffinityTypeNone,
+			SessionAffinity: api.ServiceAffinityNone,
 		},
 	}
 	_, err := c.ServiceRegistry.CreateService(ctx, svc)

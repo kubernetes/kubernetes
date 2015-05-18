@@ -3871,7 +3871,7 @@ func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *newer.
 	} else {
 		out.PublicIPs = nil
 	}
-	out.SessionAffinity = newer.AffinityType(in.SessionAffinity)
+	out.SessionAffinity = newer.ServiceAffinity(in.SessionAffinity)
 	return nil
 }
 
@@ -3907,7 +3907,7 @@ func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *newer.ServiceSpec, out *
 	} else {
 		out.PublicIPs = nil
 	}
-	out.SessionAffinity = AffinityType(in.SessionAffinity)
+	out.SessionAffinity = ServiceAffinity(in.SessionAffinity)
 	return nil
 }
 

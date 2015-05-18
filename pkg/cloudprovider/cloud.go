@@ -63,7 +63,7 @@ type TCPLoadBalancer interface {
 	// if so, what its IP address or hostname is.
 	GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error)
 	// CreateTCPLoadBalancer creates a new tcp load balancer. Returns the IP address or hostname of the balancer
-	CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error)
+	CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (string, error)
 	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
 	UpdateTCPLoadBalancer(name, region string, hosts []string) error
 	// DeleteTCPLoadBalancer deletes a specified load balancer.

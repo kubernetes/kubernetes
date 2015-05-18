@@ -67,7 +67,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.AffinityTypeNone,
+			SessionAffinity: api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -108,7 +108,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: ""},
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
-				SessionAffinity: api.AffinityTypeNone,
+				SessionAffinity: api.ServiceAffinityNone,
 				Ports: []api.ServicePort{{
 					Port:     6502,
 					Protocol: api.ProtocolTCP,
@@ -119,7 +119,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
-				SessionAffinity: api.AffinityTypeNone,
+				SessionAffinity: api.ServiceAffinityNone,
 				Ports: []api.ServicePort{{
 					Protocol: api.ProtocolTCP,
 				}},
@@ -161,7 +161,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 			ResourceVersion: svc.ResourceVersion},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz2"},
-			SessionAffinity: api.AffinityTypeNone,
+			SessionAffinity: api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -204,7 +204,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: ""},
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
-				SessionAffinity: api.AffinityTypeNone,
+				SessionAffinity: api.ServiceAffinityNone,
 				Ports: []api.ServicePort{{
 					Port:     6502,
 					Protocol: api.ProtocolTCP,
@@ -215,7 +215,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"ThisSelectorFailsValidation": "ok"},
-				SessionAffinity: api.AffinityTypeNone,
+				SessionAffinity: api.ServiceAffinityNone,
 				Ports: []api.ServicePort{{
 					Port:     6502,
 					Protocol: api.ProtocolTCP,
@@ -242,7 +242,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: true,
-			SessionAffinity:            api.AffinityTypeNone,
+			SessionAffinity:            api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -269,7 +269,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.AffinityTypeNone,
+			SessionAffinity: api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -291,7 +291,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: true,
-			SessionAffinity:            api.AffinityTypeNone,
+			SessionAffinity:            api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -315,7 +315,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: false,
-			SessionAffinity:            api.AffinityTypeNone,
+			SessionAffinity:            api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -351,7 +351,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: true,
-			SessionAffinity:            api.AffinityTypeNone,
+			SessionAffinity:            api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Name:     "p",
 				Port:     6502,
@@ -490,7 +490,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.AffinityTypeNone,
+			SessionAffinity: api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -511,7 +511,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.AffinityTypeNone,
+			SessionAffinity: api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -540,7 +540,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			PortalIP:        testIP,
-			SessionAffinity: api.AffinityTypeNone,
+			SessionAffinity: api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -565,7 +565,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.AffinityTypeNone,
+			SessionAffinity: api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -588,7 +588,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.AffinityTypeNone,
+			SessionAffinity: api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -613,7 +613,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.AffinityTypeNone,
+			SessionAffinity: api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -657,7 +657,7 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector:                   map[string]string{"bar": "baz"},
 			CreateExternalLoadBalancer: true,
-			SessionAffinity:            api.AffinityTypeNone,
+			SessionAffinity:            api.ServiceAffinityNone,
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,

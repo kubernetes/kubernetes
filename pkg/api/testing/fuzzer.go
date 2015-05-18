@@ -182,8 +182,8 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			protocols := []api.Protocol{api.ProtocolTCP, api.ProtocolUDP}
 			*p = protocols[c.Rand.Intn(len(protocols))]
 		},
-		func(p *api.AffinityType, c fuzz.Continue) {
-			types := []api.AffinityType{api.AffinityTypeClientIP, api.AffinityTypeNone}
+		func(p *api.ServiceAffinity, c fuzz.Continue) {
+			types := []api.ServiceAffinity{api.ServiceAffinityClientIP, api.ServiceAffinityNone}
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *api.Container, c fuzz.Continue) {
