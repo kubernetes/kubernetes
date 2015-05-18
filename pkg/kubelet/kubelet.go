@@ -675,20 +675,17 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 		glog.Errorf("Failed to start ContainerManager, system may not be properly isolated: %v", err)
 	}
 
+	err = kl.oomWatcher.Start(kl.nodeRef)
+	if err != nil {
+		kl.recorder.Eventf(kl.nodeRef, "kubeletSetupFailed", "Failed to start OOM watcher %v", err)
+		glog.Errorf("Failed to start OOM watching: %v", err)
+	}
+
 	go util.Until(kl.updateRuntimeUp, 5*time.Second, util.NeverStop)
 	go kl.syncNodeStatus()
 	// Run the system oom watcher forever.
-	go util.Until(kl.runOOMWatcher, time.Second, util.NeverStop)
 	kl.statusManager.Start()
 	kl.syncLoop(updates, kl)
-}
-
-// Watches for system OOMs.
-func (kl *Kubelet) runOOMWatcher() {
-	glog.V(5).Infof("Starting to record system OOMs")
-	if err := kl.oomWatcher.RecordSysOOMs(kl.nodeRef); err != nil {
-		glog.Errorf("failed to record system OOMs - %v", err)
-	}
 }
 
 // syncNodeStatus periodically synchronizes node status to master.
