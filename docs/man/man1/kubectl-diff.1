@@ -3,24 +3,48 @@
 
 .SH NAME
 .PP
-kubectl \- kubectl controls the Kubernetes cluster manager
+kubectl diff \- Show differences between the current configuration of a resource and a configuration file.
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl\fP [OPTIONS]
+\fBkubectl diff\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-kubectl controls the Kubernetes cluster manager.
-
-.PP
-Find more information at 
-\[la]https://github.com/GoogleCloudPlatform/kubernetes\[ra].
+Display any differences between the current configuration of a
+resource and a configuration file.
 
 
 .SH OPTIONS
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename containing the resource configuration to be compared.
+
+.PP
+\fB\-h\fP, \fB\-\-help\fP=false
+    help for diff
+
+.PP
+\fB\-\-no\-headers\fP=false
+    When using the default output, don't print headers.
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output format. One of: json|yaml|template|templatefile|wide.
+
+.PP
+\fB\-\-output\-version\fP=""
+    Output the formatted object with the given version (default api\-version).
+
+.PP
+\fB\-t\fP, \fB\-\-template\fP=""
+    Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
 \fB\-\-alsologtostderr\fP=false
     log to standard error as well as files
@@ -48,10 +72,6 @@ Find more information at
 .PP
 \fB\-\-context\fP=""
     The name of the kubeconfig context to use
-
-.PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for kubectl
 
 .PP
 \fB\-\-insecure\-skip\-tls\-verify\fP=false
@@ -122,9 +142,20 @@ Find more information at
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+$ kubectl diff \-f my\-pod.json
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBkubectl\-get(1)\fP, \fBkubectl\-describe(1)\fP, \fBkubectl\-create(1)\fP, \fBkubectl\-replace(1)\fP, \fBkubectl\-patch(1)\fP, \fBkubectl\-delete(1)\fP, \fBkubectl\-namespace(1)\fP, \fBkubectl\-logs(1)\fP, \fBkubectl\-rolling\-update(1)\fP, \fBkubectl\-scale(1)\fP, \fBkubectl\-attach(1)\fP, \fBkubectl\-exec(1)\fP, \fBkubectl\-port\-forward(1)\fP, \fBkubectl\-proxy(1)\fP, \fBkubectl\-run(1)\fP, \fBkubectl\-stop(1)\fP, \fBkubectl\-expose(1)\fP, \fBkubectl\-label(1)\fP, \fBkubectl\-config(1)\fP, \fBkubectl\-cluster\-info(1)\fP, \fBkubectl\-api\-versions(1)\fP, \fBkubectl\-version(1)\fP, \fBkubectl\-diff(1)\fP,
+\fBkubectl(1)\fP,
 
 
 .SH HISTORY
