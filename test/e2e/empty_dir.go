@@ -42,7 +42,7 @@ var _ = Describe("emptyDir", func() {
 	It("volume on tmpfs should have the correct mode", func() {
 		volumePath := "/test-volume"
 		source := &api.EmptyDirVolumeSource{
-			Medium: api.StorageTypeMemory,
+			Medium: api.StorageMediumMemory,
 		}
 		pod := testPodWithVolume(volumePath, source)
 
@@ -60,7 +60,7 @@ var _ = Describe("emptyDir", func() {
 		volumePath := "/test-volume"
 		filePath := path.Join(volumePath, "test-file")
 		source := &api.EmptyDirVolumeSource{
-			Medium: api.StorageTypeMemory,
+			Medium: api.StorageMediumMemory,
 		}
 		pod := testPodWithVolume(volumePath, source)
 

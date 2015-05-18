@@ -471,7 +471,7 @@ func convert_v1beta3_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource(in *EmptyD
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*EmptyDirVolumeSource))(in)
 	}
-	out.Medium = newer.StorageType(in.Medium)
+	out.Medium = newer.StorageMedium(in.Medium)
 	return nil
 }
 
@@ -479,7 +479,7 @@ func convert_api_EmptyDirVolumeSource_To_v1beta3_EmptyDirVolumeSource(in *newer.
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*newer.EmptyDirVolumeSource))(in)
 	}
-	out.Medium = StorageType(in.Medium)
+	out.Medium = StorageMedium(in.Medium)
 	return nil
 }
 

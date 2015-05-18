@@ -80,7 +80,7 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
-	medium := api.StorageTypeDefault
+	medium := api.StorageMediumDefault
 	if spec.VolumeSource.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.VolumeSource.EmptyDir.Medium
 	}
@@ -109,7 +109,7 @@ func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UI
 	ed := &emptyDir{
 		podUID:        podUID,
 		volName:       volName,
-		medium:        api.StorageTypeDefault, // might be changed later
+		medium:        api.StorageMediumDefault, // might be changed later
 		mounter:       mounter,
 		mountDetector: mountDetector,
 		plugin:        plugin,
@@ -140,7 +140,7 @@ const (
 type emptyDir struct {
 	podUID        types.UID
 	volName       string
-	medium        api.StorageType
+	medium        api.StorageMedium
 	mounter       mount.Interface
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
@@ -159,9 +159,9 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 		return fmt.Errorf("legacy mode: can not create new instances")
 	}
 	switch ed.medium {
-	case api.StorageTypeDefault:
+	case api.StorageMediumDefault:
 		return ed.setupDefault(dir)
-	case api.StorageTypeMemory:
+	case api.StorageMediumMemory:
 		return ed.setupTmpfs(dir)
 	default:
 		return fmt.Errorf("unknown storage medium %q", ed.medium)
@@ -231,10 +231,10 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 		return err
 	}
 	if isMnt && medium == mediumMemory {
-		ed.medium = api.StorageTypeMemory
+		ed.medium = api.StorageMediumMemory
 		return ed.teardownTmpfs(dir)
 	}
-	// assume StorageTypeDefault
+	// assume StorageMediumDefault
 	return ed.teardownDefault(dir)
 }
 

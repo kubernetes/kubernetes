@@ -354,15 +354,15 @@ type EmptyDirVolumeSource struct {
 	// this will cover the most common needs.
 	// Optional: what type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
-	Medium StorageType `json:"medium"`
+	Medium StorageMedium `json:"medium"`
 }
 
-// StorageType defines ways that storage can be allocated to a volume.
-type StorageType string
+// StorageMedium defines ways that storage can be allocated to a volume.
+type StorageMedium string
 
 const (
-	StorageTypeDefault StorageType = ""       // use whatever the default is for the node
-	StorageTypeMemory  StorageType = "Memory" // use memory (tmpfs)
+	StorageMediumDefault StorageMedium = ""       // use whatever the default is for the node
+	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
 )
 
 // Protocol defines network protocols supported for things like conatiner ports.
