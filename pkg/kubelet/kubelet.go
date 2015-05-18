@@ -1283,14 +1283,20 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metri
 	}
 
 	// Remove any orphaned volumes.
-	err = kl.cleanupOrphanedVolumes(pods, runningPods)
+	// Note that we pass all pods (including terminated pods) to the function,
+	// so that we don't remove volumes associated with terminated but not yet
+	// deleted pods.
+	err = kl.cleanupOrphanedVolumes(allPods, runningPods)
 	if err != nil {
 		glog.Errorf("Failed cleaning up orphaned volumes: %v", err)
 		return err
 	}
 
 	// Remove any orphaned pod directories.
-	err = kl.cleanupOrphanedPodDirs(pods)
+	// Note that we pass all pods (including terminated pods) to the function,
+	// so that we don't remove directories associated with terminated but not yet
+	// deleted pods.
+	err = kl.cleanupOrphanedPodDirs(allPods)
 	if err != nil {
 		glog.Errorf("Failed cleaning up orphaned pod directories: %v", err)
 		return err
