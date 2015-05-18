@@ -203,7 +203,10 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 		if err != nil {
 			return err, retry
 		}
-		// Always update the cache upon success
+		// Always update the cache upon success.
+		// NOTE: Since we update the cached service if and only if we successully
+		// processed it, a cached service being nil implies that it hasn't yet
+		// been successfully processed.
 		cachedService.service = service
 		s.cache.set(namespacedName.String(), cachedService)
 	case cache.Deleted:
@@ -554,6 +557,13 @@ func (s *ServiceController) updateLoadBalancerHosts(services []*cachedService, h
 		func() {
 			service.mu.Lock()
 			defer service.mu.Unlock()
+			// If the service is nil, that means it hasn't yet been successfully dealt
+			// with by the load balancer reconciler. We can trust the load balancer
+			// reconciler to ensure the service's load balancer is created to target
+			// the correct nodes.
+			if service.service == nil {
+				return
+			}
 			if err := s.lockedUpdateLoadBalancerHosts(service.service, hosts); err != nil {
 				glog.Errorf("External error while updating TCP load balancer: %v.", err)
 				servicesToRetry = append(servicesToRetry, service)
