@@ -4685,3 +4685,104 @@ func TestSyncPodsDoesNotDeletePodsThatRunTooLong(t *testing.T) {
 		// Get pod status.
 		"list", "inspect_container", "inspect_container", "list"})
 }
+
+func TestDeletePodDirsForDeletedPods(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	kl := testKubelet.kubelet
+	pods := []*api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "12345678",
+				Name:      "pod1",
+				Namespace: "ns",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "12345679",
+				Name:      "pod2",
+				Namespace: "ns",
+			},
+		},
+	}
+
+	kl.podManager.SetPods(pods)
+	// Sync to create pod directories.
+	err := kl.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	for i := range pods {
+		if !dirExists(kl.getPodDir(pods[i].UID)) {
+			t.Errorf("expected directory to exist for pod %d", i)
+		}
+	}
+
+	// Pod 1 has been deleted and no longer exists.
+	err = kl.SyncPods([]*api.Pod{pods[0]}, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !dirExists(kl.getPodDir(pods[0].UID)) {
+		t.Errorf("expected directory to exist for pod 0")
+	}
+	if dirExists(kl.getPodDir(pods[1].UID)) {
+		t.Errorf("expected directory to be deleted for pod 1")
+	}
+}
+
+func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
+	kl := testKubelet.kubelet
+	pods := []*api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "12345678",
+				Name:      "pod1",
+				Namespace: "ns",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "12345679",
+				Name:      "pod2",
+				Namespace: "ns",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "12345680",
+				Name:      "pod3",
+				Namespace: "ns",
+			},
+		},
+	}
+
+	kl.podManager.SetPods(pods)
+	// Sync to create pod directories.
+	err := kl.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	for i := range pods {
+		if !dirExists(kl.getPodDir(pods[i].UID)) {
+			t.Errorf("expected directory to exist for pod %d", i)
+		}
+	}
+	// Pod 1 failed, and pod 2 succeeded. None of the pod directories should be
+	// deleted.
+	kl.statusManager.SetPodStatus(pods[1], api.PodStatus{Phase: api.PodFailed})
+	kl.statusManager.SetPodStatus(pods[2], api.PodStatus{Phase: api.PodSucceeded})
+	err = kl.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	for i := range pods {
+		if !dirExists(kl.getPodDir(pods[i].UID)) {
+			t.Errorf("expected directory to exist for pod %d", i)
+		}
+	}
+}
