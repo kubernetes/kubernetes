@@ -73,5 +73,12 @@ Kubernetes installs do not configure the nodes' resolv.conf files to use the
 cluster DNS by default, because that process is inherently distro-specific.
 This should probably be implemented eventually.
 
+## Making changes
+Please observe the release process for making changes to the `kube2sky`
+image that is documented in [RELEASES.md](kube2sky/RELEASES.md). Any significant changes
+to the YAML template for `kube-dns` should result a bump of the version number
+for the `kube-dns` replication controller and well as the `version` label. This
+will permit a rolling update of `kube-dns`.
+
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns/README.md?pixel)]()
