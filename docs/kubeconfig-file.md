@@ -1,7 +1,7 @@
 # kubeconfig files
 In order to easily switch between multiple clusters, a kubeconfig file was defined.  This file contains a series of authentication mechanisms and cluster connection information associated with nicknames.  It also introduces the concept of a tuple of authentication information (user) and cluster connection information called a context that is also associated with a nickname.
 
-Multiple files are kubeconfig files are allowed.  At runtime they are loaded and merged together along with override options specified from the command line (see rules below).
+Multiple kubeconfig files are allowed.  At runtime they are loaded and merged together along with override options specified from the command line (see rules below).
 
 ## Related discussion
 https://github.com/GoogleCloudPlatform/kubernetes/issues/1755
@@ -11,7 +11,7 @@ https://github.com/GoogleCloudPlatform/kubernetes/issues/1755
 apiVersion: v1
 clusters:
 - cluster:
-    api-version: v1beta1
+    api-version: v1beta3
     server: http://cow.org:8080
   name: cow-cluster
 - cluster:
@@ -43,8 +43,6 @@ users:
     token: blue-token
 - name: green-user
   user:
-    username: admin
-    password: secret
     client-certificate: path/to/my/client/cert
     client-key: path/to/my/client/key
 ```
@@ -140,7 +138,7 @@ users:
 #### Commands for the example file
 ```
 $kubectl config set preferences.colors true
-$kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1beta1
+$kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1beta3
 $kubectl config set-cluster horse-cluster --server=https://horse.org:4443 --certificate-authority=path/to/my/cafile
 $kubectl config set-cluster pig-cluster --server=https://pig.org:443 --insecure-skip-tls-verify=true
 $kubectl config set-credentials blue-user --token=blue-token
