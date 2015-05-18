@@ -108,6 +108,7 @@ type KubeletServer struct {
 	ContainerRuntime               string
 	DockerDaemonContainer          string
 	ConfigureCBR0                  bool
+	MaxPods                        int
 
 	// Flags intended for testing
 
@@ -226,6 +227,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ContainerRuntime, "container_runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
 	fs.StringVar(&s.DockerDaemonContainer, "docker-daemon-container", s.DockerDaemonContainer, "Optional resource-only container in which to place the Docker Daemon. Empty for no container (Default: /docker-daemon).")
 	fs.BoolVar(&s.ConfigureCBR0, "configure-cbr0", s.ConfigureCBR0, "If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.")
+	fs.IntVar(&s.MaxPods, "max_pods", 100, "Number of Pods that can run on this Kubelet.")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
@@ -342,6 +344,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		Mounter:                   mounter,
 		DockerDaemonContainer:     s.DockerDaemonContainer,
 		ConfigureCBR0:             s.ConfigureCBR0,
+		MaxPods:                   s.MaxPods,
 	}
 
 	RunKubelet(&kcfg, nil)
@@ -500,6 +503,7 @@ func SimpleKubelet(client *client.Client,
 		ContainerRuntime:          "docker",
 		Mounter:                   mount.New(),
 		DockerDaemonContainer:     "/docker-daemon",
+		MaxPods:                   32,
 	}
 	return &kcfg
 }
@@ -633,6 +637,7 @@ type KubeletConfig struct {
 	Mounter                        mount.Interface
 	DockerDaemonContainer          string
 	ConfigureCBR0                  bool
+	MaxPods                        int
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -683,7 +688,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ContainerRuntime,
 		kc.Mounter,
 		kc.DockerDaemonContainer,
-		kc.ConfigureCBR0)
+		kc.ConfigureCBR0,
+		kc.MaxPods)
 
 	if err != nil {
 		return nil, nil, err

@@ -41,6 +41,13 @@ func (self *ResourceList) Memory() *resource.Quantity {
 	return &resource.Quantity{}
 }
 
+func (self *ResourceList) MaxPods() *resource.Quantity {
+	if val, ok := (*self)[ResourceMaxPods]; ok {
+		return &val
+	}
+	return &resource.Quantity{}
+}
+
 func GetContainerStatus(statuses []ContainerStatus, name string) (ContainerStatus, bool) {
 	for i := range statuses {
 		if statuses[i].Name == name {

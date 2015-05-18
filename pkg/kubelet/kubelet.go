@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
@@ -57,6 +58,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"github.com/golang/glog"
+
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
@@ -139,7 +141,8 @@ func NewMainKubelet(
 	containerRuntime string,
 	mounter mount.Interface,
 	dockerDaemonContainer string,
-	configureCBR0 bool) (*Kubelet, error) {
+	configureCBR0 bool,
+	maxPods int) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -246,6 +249,7 @@ func NewMainKubelet(
 		cgroupRoot:                     cgroupRoot,
 		mounter:                        mounter,
 		configureCBR0:                  configureCBR0,
+		maxPods:                        maxPods,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -462,6 +466,9 @@ type Kubelet struct {
 	// Whether or not kubelet should take responsibility for keeping cbr0 in
 	// the correct state.
 	configureCBR0 bool
+
+	// Number of Pods which can be run by this Kubelet
+	maxPods int
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1740,6 +1747,8 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
 		node.Status.Capacity = CapacityFromMachineInfo(info)
+		node.Status.Capacity[api.ResourceMaxPods] = *resource.NewQuantity(
+			int64(kl.maxPods), resource.DecimalSI)
 		if node.Status.NodeInfo.BootID != "" &&
 			node.Status.NodeInfo.BootID != info.BootID {
 			// TODO: This requires a transaction, either both node status is updated

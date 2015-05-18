@@ -137,19 +137,18 @@ func CheckPodsExceedingCapacity(pods []*api.Pod, capacity api.ResourceList) (fit
 // PodFitsResources calculates fit based on requested, rather than used resources
 func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	podRequest := getResourceRequest(pod)
-	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
-		// no resources requested always fits.
-		return true, nil
-	}
 	info, err := r.info.GetNodeInfo(node)
 	if err != nil {
 		return false, err
+	}
+	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
+		return int64(len(existingPods)) < info.Status.Capacity.MaxPods().Value(), nil
 	}
 	pods := []*api.Pod{}
 	copy(pods, existingPods)
 	pods = append(existingPods, pod)
 	_, exceeding := CheckPodsExceedingCapacity(pods, info.Status.Capacity)
-	if len(exceeding) > 0 {
+	if len(exceeding) > 0 || int64(len(pods)) > info.Status.Capacity.MaxPods().Value() {
 		return false, nil
 	}
 	return true, nil
