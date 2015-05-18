@@ -24,3 +24,6 @@ are ready, not on every PR.
 8. Verify it works.
 
 9. Allow the PR to be merged.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns/kube2sky/RELEASES.md?pixel)]()
