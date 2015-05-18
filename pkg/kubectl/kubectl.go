@@ -101,6 +101,7 @@ func expandResourceShortcut(resource string) string {
 		"ev":     "events",
 		"limits": "limitRanges",
 		"mi":     "minions",
+		"no":     "nodes",
 		"po":     "pods",
 		"pv":     "persistentVolumes",
 		"pvc":    "persistentVolumeClaims",
