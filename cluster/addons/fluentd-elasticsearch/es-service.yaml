@@ -2,7 +2,7 @@ apiVersion: v1beta3
 kind: Service
 metadata:
   labels:
-    name: elasticsearch-logging
+    app: elasticsearch-logging
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "Elasticsearch"
   name: elasticsearch-logging
@@ -12,4 +12,4 @@ spec:
     protocol: TCP
     targetPort: es-port
   selector:
-    name: elasticsearch-logging
+    app: elasticsearch-logging
