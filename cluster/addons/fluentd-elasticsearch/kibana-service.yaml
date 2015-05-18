@@ -3,7 +3,7 @@ apiVersion: v1beta3
 kind: Service
 metadata:
   labels:
-    name: kibana-logging
+    app: kibana-logging
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "Kibana"
   name: kibana-logging
@@ -13,4 +13,4 @@ spec:
     protocol: TCP
     targetPort: kibana-port
   selector:
-    name: kibana-logging
+    app: kibana-logging
