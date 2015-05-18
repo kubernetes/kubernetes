@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
-KUBE_ROOT=$(readlink -f $(dirname "${BASH_SOURCE}")/..)
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/init.sh"

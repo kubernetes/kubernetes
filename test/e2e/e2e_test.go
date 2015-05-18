@@ -19,9 +19,7 @@ package e2e
 import (
 	"flag"
 	"fmt"
-	"os"
 	"path"
-	goruntime "runtime"
 	"strings"
 	"testing"
 
@@ -65,32 +63,13 @@ func init() {
 }
 
 func TestE2E(t *testing.T) {
-	defer util.FlushLogs()
-
-	// Disable density test unless it's explicitly requested.
-	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = "Skipped"
-	}
-
-	gomega.RegisterFailHandler(ginkgo.Fail)
-	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
-	var r []ginkgo.Reporter
-	if *reportDir != "" {
-		r = append(r, reporters.NewJUnitReporter(path.Join(*reportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
-	}
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
-}
-
-func TestMain(m *testing.M) {
-	flag.Parse()
 	util.ReallyCrash = true
 	util.InitLogs()
-	goruntime.GOMAXPROCS(goruntime.NumCPU())
+	defer util.FlushLogs()
 
 	// TODO: possibly clean up or refactor this functionality.
 	if testContext.Provider == "" {
-		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
-		os.Exit(1)
+		glog.Fatal("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
 	}
 
 	if testContext.Provider == "aws" {
@@ -107,5 +86,16 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	os.Exit(m.Run())
+	// Disable density test unless it's explicitly requested.
+	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
+		config.GinkgoConfig.SkipString = "Skipped"
+	}
+
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
+	var r []ginkgo.Reporter
+	if *reportDir != "" {
+		r = append(r, reporters.NewJUnitReporter(path.Join(*reportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
+	}
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
