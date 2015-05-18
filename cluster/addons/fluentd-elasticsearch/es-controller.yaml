@@ -1,20 +1,21 @@
 apiVersion: v1beta3
 kind: ReplicationController
 metadata:
+  name: elasticsearch-logging-v1
+  namespace: default
   labels:
-    app: elasticsearch-logging
+    k8s-app: elasticsearch-logging
     version: v1
     kubernetes.io/cluster-service: "true"
-  name: elasticsearch-logging
 spec:
   replicas: 2
   selector:
-    app: elasticsearch-logging
+    k8s-app: elasticsearch-logging
     version: v1
   template:
     metadata:
       labels:
-        app: elasticsearch-logging
+        k8s-app: elasticsearch-logging
         version: v1
         kubernetes.io/cluster-service: "true"
     spec:
