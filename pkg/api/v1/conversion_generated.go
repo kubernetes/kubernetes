@@ -4475,8 +4475,6 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *newer.VolumeSource, out *Vo
 	return nil
 }
 
-// AUTO-GENERATED FUNCTIONS END HERE
-
 func init() {
 	err := newer.Scheme.AddGeneratedConversionFuncs(
 		convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
@@ -4705,3 +4703,5 @@ func init() {
 		panic(err)
 	}
 }
+
+// AUTO-GENERATED FUNCTIONS END HERE
