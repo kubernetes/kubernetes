@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -40,9 +39,6 @@ $ kubectl resize --replicas=3 replicationcontrollers foo
 
 // If the replication controller named foo's current size is 2, resize foo to 3.
 $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo`
-
-	retryFrequency = 100 * time.Millisecond
-	retryTimeout   = 10 * time.Second
 )
 
 func NewCmdResize(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -104,9 +100,9 @@ func RunResize(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
 	currentSize := cmdutil.GetFlagInt(cmd, "current-replicas")
 	precondition := &kubectl.ResizePrecondition{currentSize, resourceVersion}
-	retry := &kubectl.RetryParams{Interval: retryFrequency, Timeout: retryTimeout}
-
-	if err := resizer.Resize(info.Namespace, info.Name, uint(count), precondition, retry, nil); err != nil {
+	retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
+	waitForReplicas := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
+	if err := resizer.Resize(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
 		return err
 	}
 	fmt.Fprint(out, "resized\n")
