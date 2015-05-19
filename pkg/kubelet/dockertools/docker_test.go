@@ -239,12 +239,8 @@ func TestPullWithNoSecrets(t *testing.T) {
 }
 
 func TestPullWithSecrets(t *testing.T) {
-	dockercfgAuth := credentialprovider.DockerConfigEntry{
-		Username: "passed-user",
-		Password: "passed-password",
-		Email:    "passed-email",
-	}.ConvertToDockerConfigCompatible()
-	dockerCfg := map[string]credentialprovider.DockerConfigEntryWithAuth{"index.docker.io/v1/": dockercfgAuth}
+	// auth value is equivalent to: "username":"passed-user","password":"passed-password"
+	dockerCfg := map[string]map[string]string{"index.docker.io/v1/": {"email": "passed-email", "auth": "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk"}}
 	dockercfgContent, err := json.Marshal(dockerCfg)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

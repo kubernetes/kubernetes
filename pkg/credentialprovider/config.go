@@ -147,9 +147,9 @@ func readDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error
 	return
 }
 
-// DockerConfigEntryWithAuth is used solely for deserializing the Auth field
+// dockerConfigEntryWithAuth is used solely for deserializing the Auth field
 // into a dockerConfigEntry during JSON deserialization.
-type DockerConfigEntryWithAuth struct {
+type dockerConfigEntryWithAuth struct {
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
 	Email    string `json:"email,omitempty"`
@@ -157,7 +157,7 @@ type DockerConfigEntryWithAuth struct {
 }
 
 func (ident *DockerConfigEntry) UnmarshalJSON(data []byte) error {
-	var tmp DockerConfigEntryWithAuth
+	var tmp dockerConfigEntryWithAuth
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
@@ -195,8 +195,8 @@ func decodeDockerConfigFieldAuth(field string) (username, password string, err e
 	return
 }
 
-func (ident DockerConfigEntry) ConvertToDockerConfigCompatible() DockerConfigEntryWithAuth {
-	ret := DockerConfigEntryWithAuth{ident.Username, ident.Password, ident.Email, ""}
+func (ident DockerConfigEntry) ConvertToDockerConfigCompatible() dockerConfigEntryWithAuth {
+	ret := dockerConfigEntryWithAuth{ident.Username, ident.Password, ident.Email, ""}
 	ret.Auth = encodeDockerConfigFieldAuth(ident.Username, ident.Password)
 
 	return ret
