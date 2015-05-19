@@ -101,8 +101,6 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 }
 
 func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP) (*Proxier, error) {
-	// Clean up old messes.  Ignore erors.
-	iptablesDeleteOld(iptables)
 	// Set up the iptables foundations we need.
 	if err := iptablesInit(iptables); err != nil {
 		return nil, fmt.Errorf("failed to initialize iptables: %v", err)
@@ -408,7 +406,6 @@ func (proxier *Proxier) closeOnePortal(portalIP net.IP, portalPort int, protocol
 // use two chains.
 var iptablesContainerPortalChain iptables.Chain = "KUBE-PORTALS-CONTAINER"
 var iptablesHostPortalChain iptables.Chain = "KUBE-PORTALS-HOST"
-var iptablesOldPortalChain iptables.Chain = "KUBE-PROXY"
 
 // Ensure that the iptables infrastructure we use is set up.  This can safely be called periodically.
 func iptablesInit(ipt iptables.Interface) error {
@@ -428,16 +425,6 @@ func iptablesInit(ipt iptables.Interface) error {
 		return err
 	}
 	return nil
-}
-
-func iptablesDeleteOld(ipt iptables.Interface) {
-	// DEPRECATED: The iptablesOldPortalChain is from when we had a single chain
-	// for all rules.  We'll unilaterally delete it here.  We will remove this
-	// code at some future date (before 1.0).
-	ipt.DeleteRule(iptables.TableNAT, iptables.ChainPrerouting, "-j", string(iptablesOldPortalChain))
-	ipt.DeleteRule(iptables.TableNAT, iptables.ChainOutput, "-j", string(iptablesOldPortalChain))
-	ipt.FlushChain(iptables.TableNAT, iptablesOldPortalChain)
-	ipt.DeleteChain(iptables.TableNAT, iptablesOldPortalChain)
 }
 
 // Flush all of our custom iptables rules.
