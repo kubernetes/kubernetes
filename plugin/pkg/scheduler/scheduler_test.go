@@ -113,11 +113,6 @@ func TestScheduler(t *testing.T) {
 				AssumePodFunc: func(pod *api.Pod) {
 					gotAssumedPod = pod
 				},
-				ForgetPodFunc: func(pod *api.Pod) {
-					if gotAssumedPod != nil && gotAssumedPod.Name == pod.Name && gotAssumedPod.Namespace == pod.Namespace {
-						gotAssumedPod = nil
-					}
-				},
 			},
 			MinionLister: algorithm.FakeMinionLister(
 				api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
@@ -144,7 +139,7 @@ func TestScheduler(t *testing.T) {
 			}
 			close(called)
 		})
-		s.schedule()()
+		s.scheduleOne()
 		if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: assumed pod: wanted %v, got %v", i, e, a)
 		}
@@ -234,7 +229,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	// scheduledPodStore: []
 	// assumedPods: []
 
-	s.schedule()()
+	s.scheduleOne()
 	// queuedPodStore: []
 	// scheduledPodStore: [foo:8080]
 	// assumedPods: [foo:8080]
@@ -288,7 +283,7 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 		close(called)
 	})
 
-	s.schedule()()
+	s.scheduleOne()
 
 	expectBind = &api.Binding{
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
