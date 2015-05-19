@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -144,13 +145,14 @@ func validateGuestbookApp(c *client.Client, ns string) {
 
 // Returns whether received expected response from guestbook on time.
 func waitForGuestbookResponse(c *client.Client, cmd, arg, expectedResponse string, timeout time.Duration, ns string) bool {
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+	expectNoError(wait.Poll(5*time.Second, timeout, func() (bool, error) {
 		res, err := makeRequestToGuestbook(c, cmd, arg, ns)
 		if err == nil && res == expectedResponse {
-			return true
+			return true, nil
 		}
-	}
-	return false
+		return false, nil
+	}))
+	return true
 }
 
 func makeRequestToGuestbook(c *client.Client, cmd, value string, ns string) (string, error) {

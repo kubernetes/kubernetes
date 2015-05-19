@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	influxdb "github.com/influxdb/influxdb/client"
 
 	. "github.com/onsi/ginkgo"
@@ -223,15 +224,12 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 
 	expectedNodes, err := getAllNodesInCluster(c)
 	expectNoError(err)
-	startTime := time.Now()
-	for {
+
+	expectNoError(wait.Poll(sleepBetweenAttempts, testTimeout, func() (bool, error) {
 		if validatePodsAndNodes(influxdbClient, expectedPods, expectedNodes) {
-			return
+			return true, nil
 		}
-		if time.Since(startTime) >= testTimeout {
-			break
-		}
-		time.Sleep(sleepBetweenAttempts)
-	}
+		return false, nil
+	}))
 	Failf("monitoring using heapster and influxdb test failed")
 }

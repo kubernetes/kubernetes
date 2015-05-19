@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -82,7 +83,7 @@ var _ = Describe("Services", func() {
 		Expect(foundRO).To(Equal(true))
 	})
 
-	It("should serve a basic endpoint from pods", func(done Done) {
+	It("should serve a basic endpoint from pods", func() {
 		serviceName := "endpoint-test2"
 		ns := namespaces[0]
 		labels := map[string]string{
@@ -144,13 +145,9 @@ var _ = Describe("Services", func() {
 
 		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{})
 
-		// We deferred Gingko pieces that may Fail, we aren't done.
-		defer func() {
-			close(done)
-		}()
-	}, 240.0)
+	})
 
-	It("should serve multiport endpoints from pods", func(done Done) {
+	It("should serve multiport endpoints from pods", func() {
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
 		serviceName := "multi-endpoint-test"
 		ns := namespaces[0]
@@ -245,11 +242,7 @@ var _ = Describe("Services", func() {
 
 		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{})
 
-		// We deferred Gingko pieces that may Fail, we aren't done.
-		defer func() {
-			close(done)
-		}()
-	}, 240.0)
+	})
 
 	It("should be able to create a functioning external load balancer", func() {
 		if !providerIs("gce", "gke") {
@@ -328,13 +321,13 @@ var _ = Describe("Services", func() {
 
 		By("hitting the pod through the service's external load balancer")
 		var resp *http.Response
-		for t := time.Now(); time.Since(t) < podStartTimeout; time.Sleep(5 * time.Second) {
+		expectNoError(wait.Poll(5*time.Second, podStartTimeout, func() (bool, error) {
 			resp, err = http.Get(fmt.Sprintf("http://%s:%d", ip, port))
 			if err == nil {
-				break
+				return true, nil
 			}
-		}
-		Expect(err).NotTo(HaveOccurred())
+			return false, nil
+		}))
 		defer resp.Body.Close()
 
 		body, err := ioutil.ReadAll(resp.Body)
@@ -400,16 +393,21 @@ func waitForPublicIPs(c *client.Client, serviceName, namespace string) (*api.Ser
 	const timeout = 4 * time.Minute
 	var service *api.Service
 	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to have a public IP", timeout, serviceName, namespace))
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+	start := time.Now()
+	expectNoError(wait.Poll(5*time.Second, timeout, func() (bool, error) {
 		service, err := c.Services(namespace).Get(serviceName)
 		if err != nil {
 			Logf("Get service failed, ignoring for 5s: %v", err)
-			continue
+			return false, nil
 		}
 		if len(service.Spec.PublicIPs) > 0 {
-			return service, nil
+			return true, nil
 		}
 		Logf("Waiting for service %s in namespace %s to have a public IP (%v)", serviceName, namespace, time.Since(start))
+		return false, nil
+	}))
+	if len(service.Spec.PublicIPs) > 0 {
+		return service, nil
 	}
 	return service, fmt.Errorf("service %s in namespace %s doesn't have a public IP after %.2f seconds", serviceName, namespace, timeout.Seconds())
 }
@@ -481,27 +479,28 @@ func validatePortsOrFail(endpoints map[string][]int, expectedEndpoints map[strin
 
 func validateEndpointsOrFail(c *client.Client, ns, serviceName string, expectedEndpoints map[string][]int) {
 	By(fmt.Sprintf("Validating endpoints %v with on service %s/%s", expectedEndpoints, ns, serviceName))
-	for {
+
+	expectNoError(wait.Poll(time.Second, 120*time.Second, func() (bool, error) {
 		endpoints, err := c.Endpoints(ns).Get(serviceName)
 		if err == nil {
-			By(fmt.Sprintf("Found endpoints %v", endpoints))
+			Logf("Found endpoints %v", endpoints)
 
 			portsByIp := getPortsByIp(endpoints.Subsets)
 
-			By(fmt.Sprintf("Found ports by ip %v", portsByIp))
+			Logf("Found ports by ip %v", portsByIp)
 			if len(portsByIp) == len(expectedEndpoints) {
 				expectedPortsByIp := translatePodNameToIpOrFail(c, ns, expectedEndpoints)
 				validatePortsOrFail(portsByIp, expectedPortsByIp)
-				break
+				return true, nil
 			} else {
-				By(fmt.Sprintf("Unexpected number of endpoints: found %v, expected %v (ignoring for 1 second)", portsByIp, expectedEndpoints))
+				Logf("Unexpected number of endpoints: found %v, expected %v (ignoring for 1 second)", portsByIp, expectedEndpoints)
 			}
 		} else {
-			By(fmt.Sprintf("Failed to get endpoints: %v (ignoring for 1 second)", err))
+			Logf("Failed to get endpoints: %v (ignoring for 1 second)", err)
 		}
-		time.Sleep(time.Second)
-	}
-	By(fmt.Sprintf("successfully validated endpoints %v with on service %s/%s", expectedEndpoints, ns, serviceName))
+		return false, nil
+	}))
+	Logf("successfully validated endpoints %v with on service %s/%s", expectedEndpoints, ns, serviceName)
 }
 
 func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]string, containerPorts []api.ContainerPort) {

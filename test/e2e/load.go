@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -118,7 +119,7 @@ func playWithRC(c *client.Client, wg *sync.WaitGroup, ns, name string, size int)
 	defer wg.Done()
 	rcExist := false
 	// Once every 1-2 minutes perform resize of RC.
-	for start := time.Now(); time.Since(start) < simulationTime; time.Sleep(time.Duration(60+rand.Intn(60)) * time.Second) {
+	expectNoError(wait.Poll(time.Duration(60+rand.Intn(60))*time.Second, simulationTime, func() (bool, error) {
 		if !rcExist {
 			expectNoError(RunRC(c, name, ns, image, size), fmt.Sprintf("creating rc %s in namespace %s", name, ns))
 			rcExist = true
@@ -131,7 +132,8 @@ func playWithRC(c *client.Client, wg *sync.WaitGroup, ns, name string, size int)
 			expectNoError(DeleteRC(c, ns, name), fmt.Sprintf("deleting rc %s in namespace %s", name, ns))
 			rcExist = false
 		}
-	}
+		return false, nil
+	}))
 	if rcExist {
 		expectNoError(DeleteRC(c, ns, name), fmt.Sprintf("deleting rc %s in namespace %s after test completion", name, ns))
 	}
