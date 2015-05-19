@@ -555,7 +555,7 @@ func RunRC(config RCConfig) error {
 	By(fmt.Sprintf("Making sure all %d replicas of rc %s in namespace %s exist", replicas, name, ns))
 	failCount := int(25 / interval)
 	for same < failCount && current < replicas {
-		time.Sleep(time.Duration(interval*2) * time.Second)
+		time.Sleep(time.Duration(float32(interval)*1.1) * time.Second)
 
 		// Greedily read all existing entries in the queue until
 		// all pods are found submitted or the queue is empty
@@ -593,7 +593,7 @@ func RunRC(config RCConfig) error {
 	podLists.Reset()
 	foundAllPods := false
 	for same < failCount && current < replicas {
-		time.Sleep(time.Duration(interval*2) * time.Second)
+		time.Sleep(time.Duration(float32(interval)*1.1) * time.Second)
 
 		// Greedily read all existing entries in the queue until
 		// either all pods are running or the queue is empty
