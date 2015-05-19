@@ -6,7 +6,5 @@ go:
 env:
   - GOARCH=amd64
   - GOARCH=386
-install:
-  - make testdeps
 script:
   - make test

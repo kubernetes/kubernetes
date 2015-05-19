@@ -87,11 +87,9 @@ func TestExecStartDetached(t *testing.T) {
 
 func TestExecStartAndAttach(t *testing.T) {
 	var reader = strings.NewReader("send value")
-	var req http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte{1, 0, 0, 0, 0, 0, 0, 5})
 		w.Write([]byte("hello"))
-		req = *r
 	}))
 	defer server.Close()
 	client, _ := NewClient(server.URL)
@@ -106,7 +104,11 @@ func TestExecStartAndAttach(t *testing.T) {
 		RawTerminal:  true,
 		Success:      success,
 	}
-	go client.StartExec(execID, opts)
+	go func() {
+		if err := client.StartExec(execID, opts); err != nil {
+			t.Error(err)
+		}
+	}()
 	<-success
 }
 
