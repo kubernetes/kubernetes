@@ -80,13 +80,18 @@ func TestUpdate(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
 	storage := NewREST(helper)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
-	key := etcdtest.AddPrefix("podtemplates/default/foo")
+	key, err := storage.KeyFunc(test.TestContext(), "foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = etcdtest.AddPrefix(key)
 
 	fakeEtcdClient.ExpectNotFoundGet(key)
 	fakeEtcdClient.ChangeIndex = 2
 	pod := validNewPodTemplate("foo")
 	existing := validNewPodTemplate("exists")
-	obj, err := storage.Create(api.NewDefaultContext(), existing)
+	existing.Namespace = test.TestNamespace()
+	obj, err := storage.Create(test.TestContext(), existing)
 	if err != nil {
 		t.Fatalf("unable to create object: %v", err)
 	}
