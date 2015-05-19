@@ -1098,7 +1098,7 @@ type EndpointSubset struct {
 type EndpointAddress struct {
 	// The IP of this endpoint.
 	// TODO: This should allow hostname or IP, see #4447.
-	IP string `json:"IP" description:"IP address of the endpoint"`
+	IP string `json:"ip" description:"IP address of the endpoint"`
 
 	// Optional: The kubernetes object related to the entry point.
 	TargetRef *ObjectReference `json:"targetRef,omitempty" description:"reference to object providing the endpoint"`
