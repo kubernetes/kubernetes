@@ -26,8 +26,6 @@ spec:
       value: 512M
     - name: HEAP_NEWSIZE
       value: 100M
-    - name: KUBERNETES_API_PROTOCOL
-      value: http
   volumes:
     - name: data
       emptyDir: {}
