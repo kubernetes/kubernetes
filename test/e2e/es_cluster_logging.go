@@ -123,7 +123,10 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 			Logf("After %v expected status to be a float64 but got %v of type %T", time.Since(start), statusIntf, statusIntf)
 			continue
 		}
-		break
+		if int(statusCode) == 200 {
+			break
+		}
+		Logf("Got status code %v from Elasticsearch service.", statusCode)
 	}
 	Expect(err).NotTo(HaveOccurred())
 	if int(statusCode) != 200 {
