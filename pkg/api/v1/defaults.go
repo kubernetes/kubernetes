@@ -71,6 +71,9 @@ func addDefaultingFuncs() {
 			if obj.SessionAffinity == "" {
 				obj.SessionAffinity = ServiceAffinityNone
 			}
+			if obj.Type == "" {
+				obj.Type = ServiceTypeClusterIP
+			}
 			for i := range obj.Ports {
 				sp := &obj.Ports[i]
 				if sp.Protocol == "" {
