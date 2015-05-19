@@ -5,7 +5,6 @@ wide number of clouds, supporting service orchestration once the bundle of
 services has been deployed.
 
 
-
 ### Prerequisites
 
 > Note: If you're running kube-up, on ubuntu - all of the dependencies
@@ -165,7 +164,22 @@ We can add minion units like so:
     juju add-unit docker # creates unit docker/2, kubernetes/2, docker-flannel/2
 
 
+## Launch the "petstore" example app
+
+The petstore example is available as a
+[juju action](https://jujucharms.com/docs/devel/actions).
+
+    juju action do kubernetes-master/0
+
+
+Note: this example includes curl statements to exercise the app.
+
+
 ## Tear down cluster
+
+    ./kube-down.sh
+
+or
 
     juju destroy-environment --force `juju env`
 
