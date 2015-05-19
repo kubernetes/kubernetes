@@ -105,6 +105,83 @@ func providerIs(providers ...string) bool {
 
 type podCondition func(pod *api.Pod) (bool, error)
 
+// podReady returns whether pod has a condition of Ready with a status of true.
+func podReady(pod *api.Pod) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == api.PodReady && cond.Status == api.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+// logPodStates logs all pod states for debugging.
+func logPodStates(c *client.Client, ns string) {
+	podList, err := c.Pods(ns).List(labels.Everything(), fields.Everything())
+	if err != nil {
+		Logf("Error getting pods for logPodStates(...): %v", err)
+		return
+	}
+	Logf("Phase and conditions for all pods in namespace '%s':", ns)
+	for _, pod := range podList.Items {
+		Logf("- pod '%s' on '%s' has phase '%v' and conditions %v",
+			pod.ObjectMeta.Name, pod.Spec.Host, pod.Status.Phase, pod.Status.Conditions)
+	}
+}
+
+// podRunningReady checks whether pod p's phase is running and it has a ready
+// condition of status true.
+func podRunningReady(p *api.Pod) (bool, error) {
+	// Check the phase is running.
+	if p.Status.Phase != api.PodRunning {
+		return false, fmt.Errorf("want pod '%s' on '%s' to be '%v' but was '%v'",
+			p.ObjectMeta.Name, p.Spec.Host, api.PodRunning, p.Status.Phase)
+	}
+	// Check the ready condition is true.
+	if !podReady(p) {
+		return false, fmt.Errorf("pod '%s' on '%s' didn't have condition {%v %v}; conditions: %v",
+			p.ObjectMeta.Name, p.Spec.Host, api.PodReady, api.ConditionTrue, p.Status.Conditions)
+
+	}
+	return true, nil
+}
+
+// waitForPodsRunningReady waits up to timeout to ensure that all pods in
+// namespace ns are running and ready, requiring that it finds at least minPods.
+// It has separate behavior from other 'wait for' pods functions in that it re-
+// queries the list of pods on every iteration. This is useful, for example, in
+// cluster startup, because the number of pods increases while waiting.
+func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) error {
+	c, err := loadClient()
+	if err != nil {
+		return err
+	}
+	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
+		timeout, minPods, ns)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(podPoll) {
+		// We get the new list of pods in every iteration beause more pods come
+		// online during startup and we want to ensure they are also checked.
+		podList, err := c.Pods(ns).List(labels.Everything(), fields.Everything())
+		if err != nil {
+			Logf("Error getting pods in namespace '%s': %v", ns, err)
+			continue
+		}
+		nOk := 0
+		for _, pod := range podList.Items {
+			if res, err := podRunningReady(&pod); res && err == nil {
+				nOk++
+			}
+		}
+		Logf("%d / %d pods in namespace '%s' are running and ready (%v elapsed)",
+			nOk, len(podList.Items), ns, time.Since(start))
+		if nOk == len(podList.Items) && nOk >= minPods {
+			return nil
+		}
+	}
+	logPodStates(c, ns)
+	return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
+}
+
 func waitForPodCondition(c *client.Client, ns, podName, desc string, poll, timeout time.Duration, condition podCondition) error {
 	Logf("Waiting up to %v for pod %s status to be %s", timeout, podName, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
@@ -117,9 +194,10 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, poll, timeo
 		if done {
 			return err
 		}
-		Logf("Waiting for pod %s in namespace %s status to be %q (found %q) (%v)", podName, ns, desc, pod.Status.Phase, time.Since(start))
+		Logf("Waiting for pod '%s' in namespace '%s' status to be '%q' (found phase: '%q', readiness: %t) (%v)",
+			podName, ns, desc, pod.Status.Phase, podReady(pod), time.Since(start))
 	}
-	return fmt.Errorf("gave up waiting for pod %s to be %s after %v", podName, desc, timeout)
+	return fmt.Errorf("gave up waiting for pod '%s' to be '%s' after %v", podName, desc, timeout)
 }
 
 // createNS should be used by every test, note that we append a common prefix to the provided test name.
@@ -149,7 +227,7 @@ func waitForPodRunning(c *client.Client, podName string) error {
 func waitForPodNotPending(c *client.Client, ns, podName string) error {
 	return waitForPodCondition(c, ns, podName, "!pending", podPoll, podStartTimeout, func(pod *api.Pod) (bool, error) {
 		if pod.Status.Phase != api.PodPending {
-			Logf("Saw pod %s in namespace %s out of pending state (found %q)", podName, ns, pod.Status.Phase)
+			Logf("Saw pod '%s' in namespace '%s' out of pending state (found '%q')", podName, ns, pod.Status.Phase)
 			return true, nil
 		}
 		return false, nil
@@ -162,17 +240,17 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
 		ci, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, contName)
 		if !ok {
-			Logf("No Status.Info for container %s in pod %s yet", contName, podName)
+			Logf("No Status.Info for container '%s' in pod '%s' yet", contName, podName)
 		} else {
 			if ci.State.Termination != nil {
 				if ci.State.Termination.ExitCode == 0 {
 					By("Saw pod success")
 					return true, nil
 				} else {
-					return true, fmt.Errorf("pod %s terminated with failure: %+v", podName, ci.State.Termination)
+					return true, fmt.Errorf("pod '%s' terminated with failure: %+v", podName, ci.State.Termination)
 				}
 			} else {
-				Logf("Nil State.Termination for container %s in pod %s in namespace %s so far", contName, podName, namespace)
+				Logf("Nil State.Termination for container '%s' in pod '%s' in namespace '%s' so far", contName, podName, namespace)
 			}
 		}
 		return false, nil

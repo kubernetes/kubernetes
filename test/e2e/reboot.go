@@ -190,25 +190,6 @@ func rebootNode(c *client.Client, provider, name string, result chan bool) {
 	result <- true
 }
 
-// podRunningReady is the checker function passed to waitForPodCondition(...)
-// (found in util.go). It ensures that the pods' phase is running and that the
-// ready condition is true.
-func podRunningReady(p *api.Pod) (bool, error) {
-	// Check the phase is running.
-	if p.Status.Phase != api.PodRunning {
-		return false, fmt.Errorf("want pod %s on %s to be %v but was %v",
-			p.ObjectMeta.Name, p.Spec.Host, api.PodRunning, p.Status.Phase)
-	}
-	// Check the ready condition is true.
-	for _, cond := range p.Status.Conditions {
-		if cond.Type == api.PodReady && cond.Status == api.ConditionTrue {
-			return true, nil
-		}
-	}
-	return false, fmt.Errorf("pod %s on %s didn't have condition %v, %v; conditions: %v",
-		p.ObjectMeta.Name, p.Spec.Host, api.PodReady, api.ConditionTrue, p.Status.Conditions)
-}
-
 // checkPodsRunning returns whether all pods whose names are listed in podNames
 // are running.
 func checkPodsRunning(c *client.Client, podNames []string, timeout time.Duration) bool {
