@@ -8165,8 +8165,8 @@
      }
     }
    },
-   "v1beta2.PersistentVolumeAccessMode": {
-    "id": "v1beta2.PersistentVolumeAccessMode",
+   "v1beta2.AccessModeType": {
+    "id": "v1beta2.AccessModeType",
     "properties": {}
    },
    "v1beta2.Binding": {
@@ -8236,21 +8236,21 @@
      "add": {
       "type": "array",
       "items": {
-       "$ref": "v1beta2.Capability"
+       "$ref": "v1beta2.CapabilityType"
       },
       "description": "added capabilities"
      },
      "drop": {
       "type": "array",
       "items": {
-       "$ref": "v1beta2.Capability"
+       "$ref": "v1beta2.CapabilityType"
       },
       "description": "droped capabilities"
      }
     }
    },
-   "v1beta2.Capability": {
-    "id": "v1beta2.Capability",
+   "v1beta2.CapabilityType": {
+    "id": "v1beta2.CapabilityType",
     "properties": {}
    },
    "v1beta2.ComponentCondition": {
@@ -10043,7 +10043,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta2.PersistentVolumeAccessMode"
+       "$ref": "v1beta2.AccessModeType"
       },
       "description": "the desired access modes the volume should have"
      },
@@ -10063,7 +10063,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta2.PersistentVolumeAccessMode"
+       "$ref": "v1beta2.AccessModeType"
       },
       "description": "the actual access modes the volume has"
      },
@@ -10149,17 +10149,17 @@
    "v1beta2.PersistentVolumeSpec": {
     "id": "v1beta2.PersistentVolumeSpec",
     "required": [
+     "glusterfs",
      "nfs",
      "persistentDisk",
      "awsElasticBlockStore",
-     "hostPath",
-     "glusterfs"
+     "hostPath"
     ],
     "properties": {
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta2.PersistentVolumeAccessMode"
+       "$ref": "v1beta2.AccessModeType"
       },
       "description": "all ways the volume can be mounted"
      },
