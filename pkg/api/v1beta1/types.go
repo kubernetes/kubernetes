@@ -876,10 +876,6 @@ type Service struct {
 
 // LoadBalancerStatus represents the status of a load-balancer
 type LoadBalancerStatus struct {
-	// Name is an identifier for the load-balancer, which can be used
-	// when specifying LoadBalancer during Service create/update
-	Name string `json:"name,omitempty" description:"the name of the load-balancer"`
-
 	// Ingress is a list containing ingress points for the load-balancer;
 	// traffic intended for the service should be sent to these ingress points.
 	Ingress []LoadBalancerIngress `json:"ingress,omitempty" description:"load-balancer ingress points"`

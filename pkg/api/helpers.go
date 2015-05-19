@@ -142,10 +142,8 @@ func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
 	return fmt.Sprintf("%x", md5.Sum(data)), nil
 }
 
-func (l *LoadBalancerStatus) Equal(r *LoadBalancerStatus) bool {
-	if l.Name != r.Name {
-		return false
-	}
+// TODO: make method on LoadBalancerStatus?
+func LoadBalancerStatusEqual(l, r *LoadBalancerStatus) bool {
 	return ingressSliceEqual(l.Ingress, r.Ingress)
 }
 
@@ -171,9 +169,9 @@ func ingressEqual(lhs, rhs *LoadBalancerIngress) bool {
 	return true
 }
 
-func (lb *LoadBalancerStatus) DeepCopy() *LoadBalancerStatus {
+// TODO: make method on LoadBalancerStatus?
+func LoadBalancerStatusDeepCopy(lb *LoadBalancerStatus) *LoadBalancerStatus {
 	c := &LoadBalancerStatus{}
-	*c = *lb
 	c.Ingress = make([]LoadBalancerIngress, len(lb.Ingress))
 	for i := range lb.Ingress {
 		c.Ingress[i] = lb.Ingress[i]

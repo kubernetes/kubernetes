@@ -281,7 +281,6 @@ func (gce *GCECloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerS
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err == nil {
 		status := &api.LoadBalancerStatus{}
-		status.Name = fwd.IPAddress
 		status.Ingress = []api.LoadBalancerIngress{{IP: fwd.IPAddress}}
 
 		return status, true, nil
@@ -357,7 +356,6 @@ func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.I
 	}
 
 	status := &api.LoadBalancerStatus{}
-	status.Name = fwd.IPAddress
 	status.Ingress = []api.LoadBalancerIngress{{IP: fwd.IPAddress}}
 	return status, nil
 }

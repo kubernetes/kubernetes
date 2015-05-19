@@ -244,7 +244,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		if err != nil {
 			return fmt.Errorf("Error getting LB for service %s", namespacedName), retryable
 		}
-		if exists && status.Equal(&service.Status.LoadBalancer) {
+		if exists && api.LoadBalancerStatusEqual(status, &service.Status.LoadBalancer) {
 			glog.Infof("LB already exists with status %s for previously uncached service %s", status, namespacedName)
 			return nil, notRetryable
 		} else if exists {
@@ -264,13 +264,17 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 	glog.V(2).Infof("Creating LB for service %s", namespacedName)
 
 	// The load balancer doesn't exist yet, so create it.
-	previousState := service.Status.LoadBalancer.DeepCopy()
+
+	// Save the state so we can avoid a write if it doesn't change
+	previousState := api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
+
 	err := s.createExternalLoadBalancer(service)
 	if err != nil {
 		return fmt.Errorf("failed to create external load balancer for service %s: %v", namespacedName, err), retryable
 	}
 
-	if previousState.Equal(&service.Status.LoadBalancer) {
+	// Write the state if changed
+	if api.LoadBalancerStatusEqual(previousState, &service.Status.LoadBalancer) {
 		glog.Infof("Not persisting unchanged service to registry.")
 		return nil, notRetryable
 	}

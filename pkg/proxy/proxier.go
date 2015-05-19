@@ -273,7 +273,8 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			}
 			info.portalIP = serviceIP
 			info.portalPort = servicePort.Port
-			info.loadBalancerStatus = *service.Status.LoadBalancer.DeepCopy()
+			// Deep-copy in case the service instance changes
+			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.sessionAffinityType = service.Spec.SessionAffinity
 			glog.V(4).Infof("info: %+v", info)
 
@@ -308,7 +309,7 @@ func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) 
 	if !info.portalIP.Equal(net.ParseIP(service.Spec.PortalIP)) {
 		return false
 	}
-	if !info.loadBalancerStatus.Equal(&service.Status.LoadBalancer) {
+	if !api.LoadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
 		return false
 	}
 	if info.sessionAffinityType != service.Spec.SessionAffinity {

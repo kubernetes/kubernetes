@@ -97,7 +97,6 @@ func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
 // GetTCPLoadBalancer is a stub implementation of TCPLoadBalancer.GetTCPLoadBalancer.
 func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
 	status := &api.LoadBalancerStatus{}
-	status.Name = f.ExternalIP.String()
 	status.Ingress = []api.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
 
 	return status, f.Exists, f.Err
@@ -110,7 +109,6 @@ func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP
 	f.Balancers = append(f.Balancers, FakeBalancer{name, region, externalIP, ports, hosts})
 
 	status := &api.LoadBalancerStatus{}
-	status.Name = f.ExternalIP.String()
 	status.Ingress = []api.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
 
 	return status, f.Err

@@ -1435,7 +1435,6 @@ func convert_v1beta3_LoadBalancerStatus_To_api_LoadBalancerStatus(in *LoadBalanc
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LoadBalancerStatus))(in)
 	}
-	out.Name = in.Name
 	if in.Ingress != nil {
 		out.Ingress = make([]api.LoadBalancerIngress, len(in.Ingress))
 		for i := range in.Ingress {
@@ -1453,7 +1452,6 @@ func convert_api_LoadBalancerStatus_To_v1beta3_LoadBalancerStatus(in *api.LoadBa
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.LoadBalancerStatus))(in)
 	}
-	out.Name = in.Name
 	if in.Ingress != nil {
 		out.Ingress = make([]LoadBalancerIngress, len(in.Ingress))
 		for i := range in.Ingress {
