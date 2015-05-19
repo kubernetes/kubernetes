@@ -127,7 +127,7 @@ var _ = Describe("Density", func() {
 					},
 				},
 				&api.Event{},
-				time.Second*10,
+				0,
 				framework.ResourceEventHandlerFuncs{
 					AddFunc: func(obj interface{}) {
 						events = append(events, obj.(*api.Event))
