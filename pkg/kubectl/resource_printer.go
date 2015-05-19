@@ -521,7 +521,7 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 
 func printService(svc *api.Service, w io.Writer) error {
 	ips := []string{svc.Spec.PortalIP}
-	for _, publicIP := range svc.Spec.PublicIPs {
+	for _, publicIP := range svc.Spec.DeprecatedPublicIPs {
 		ips = append(ips, publicIP)
 	}
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s\n", svc.Name, formatLabels(svc.Labels),

@@ -289,10 +289,10 @@ var _ = Describe("Services", func() {
 		// currently indicated by a public IP address being added to the spec.
 		result, err = waitForPublicIPs(c, serviceName, ns)
 		Expect(err).NotTo(HaveOccurred())
-		if len(result.Spec.PublicIPs) != 1 {
-			Failf("got unexpected number (%d) of public IPs for externally load balanced service: %v", result.Spec.PublicIPs, result)
+		if len(result.Spec.DeprecatedPublicIPs) != 1 {
+			Failf("got unexpected number (%d) of public IPs for externally load balanced service: %v", result.Spec.DeprecatedPublicIPs, result)
 		}
-		ip := result.Spec.PublicIPs[0]
+		ip := result.Spec.DeprecatedPublicIPs[0]
 		port := result.Spec.Ports[0].Port
 
 		pod := &api.Pod{
@@ -389,7 +389,7 @@ var _ = Describe("Services", func() {
 			for _, serviceName := range serviceNames {
 				result, err := waitForPublicIPs(c, serviceName, namespace)
 				Expect(err).NotTo(HaveOccurred())
-				publicIPs = append(publicIPs, result.Spec.PublicIPs...) // Save 'em to check uniqueness
+				publicIPs = append(publicIPs, result.Spec.DeprecatedPublicIPs...) // Save 'em to check uniqueness
 			}
 		}
 		validateUniqueOrFail(publicIPs)
@@ -406,7 +406,7 @@ func waitForPublicIPs(c *client.Client, serviceName, namespace string) (*api.Ser
 			Logf("Get service failed, ignoring for 5s: %v", err)
 			continue
 		}
-		if len(service.Spec.PublicIPs) > 0 {
+		if len(service.Spec.DeprecatedPublicIPs) > 0 {
 			return service, nil
 		}
 		Logf("Waiting for service %s in namespace %s to have a public IP (%v)", serviceName, namespace, time.Since(start))

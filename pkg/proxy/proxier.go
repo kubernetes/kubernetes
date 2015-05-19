@@ -273,7 +273,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			}
 			info.portalIP = serviceIP
 			info.portalPort = servicePort.Port
-			info.publicIPs = service.Spec.PublicIPs
+			info.publicIPs = service.Spec.DeprecatedPublicIPs
 			info.sessionAffinityType = service.Spec.SessionAffinity
 			glog.V(4).Infof("info: %+v", info)
 
@@ -308,7 +308,7 @@ func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) 
 	if !info.portalIP.Equal(net.ParseIP(service.Spec.PortalIP)) {
 		return false
 	}
-	if !ipsEqual(info.publicIPs, service.Spec.PublicIPs) {
+	if !ipsEqual(info.publicIPs, service.Spec.DeprecatedPublicIPs) {
 		return false
 	}
 	if info.sessionAffinityType != service.Spec.SessionAffinity {
