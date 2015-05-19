@@ -31,11 +31,17 @@ Looks open enough :).
 
 You can launch prometheus easily, by simply running.
 
-`kubectl create -f cluster/addons/prometheus/prometheus-all.json`
+`kubectl create -f contrib/prometheus/prometheus-all.json`
 
-This will bind to port 9090 locally.  You can see the prometheus database at that URL.
+Then (edit the publicIP field in prometheus-service to be a public ip on one of your kubelets), 
 
-# How it works
+and run 
+
+`kubectl create -f contrib/prometheus/prometheus-service.json`
+
+Now, you can access the service `wget 10.0.1.89:9090`, and build graphs.
+
+## How it works
 
 This is a v1beta3 based, containerized prometheus ReplicationController, which scrapes endpoints which are readable on the KUBERNETES_RO service (the internal kubernetes service running in the default namespace, which is visible to all pods).
 
