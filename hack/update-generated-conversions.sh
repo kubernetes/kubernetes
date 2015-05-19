@@ -14,9 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script to fetch latest swagger spec.
-# Puts the updated spec at swagger-spec/
-
 set -o errexit
 set -o nounset
 set -o pipefail

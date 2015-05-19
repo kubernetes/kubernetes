@@ -251,12 +251,8 @@ Once all the necessary manually written conversions are added, you need to
 regenerate auto-generated ones. To regenerate them:
    - run
 ```
-   $ go run cmd/kube-conversion/conversion.go -v <version> -f <file1.txt> -n <file2.txt>
+   $ hack/update-generated-conversions.sh
 ```
-   - replace all conversion functions (convert\* functions) in the
-     `pkg/api/<version>/conversion_generated.go` with the contents of \<file1.txt\>
-   - replace arguments of `api.Scheme.AddGeneratedConversionFuncs` in the
-     `pkg/api/<version>/conversion_generated.go` with the contents of \<file2.txt\>
 
 Unsurprisingly, adding manually written conversion also requires you to add tests to
 `pkg/api/<version>/conversion_test.go`.
