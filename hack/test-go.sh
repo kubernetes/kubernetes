@@ -35,6 +35,7 @@ kube::test::find_dirs() {
           -o -wholename '*/third_party/*' \
           -o -wholename '*/Godeps/*' \
           -o -wholename '*/contrib/podex/*' \
+          -o -wholename '*/test/e2e/*' \
           -o -wholename '*/test/integration/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
