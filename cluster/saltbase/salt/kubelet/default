@@ -30,6 +30,10 @@
   {% endif -%}
 {% endif -%}
 
+{% set cloud_provider = "" -%}
+{% if grains.cloud is defined -%}
+  {% set cloud_provider = "--cloud_provider=" + grains.cloud -%}
+{% endif -%}
 
 {% set config = "--config=/etc/kubernetes/manifests" -%}
 {% set hostname_override = "" -%}
@@ -54,4 +58,4 @@
   {% set configure_cbr0 = "--configure-cbr0=" + pillar['allocate_node_cidrs'] -%}
 {% endif -%}
 
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{hostname_override}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{configure_cbr0}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{hostname_override}} {{cloud_provider}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{configure_cbr0}}"
