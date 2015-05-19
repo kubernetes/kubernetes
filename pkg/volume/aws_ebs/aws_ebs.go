@@ -62,8 +62,8 @@ func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.PersistentVolumeSource.AWSElasticBlockStore != nil || spec.VolumeSource.AWSElasticBlockStore != nil
 }
 
-func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.AccessModeType {
-	return []api.AccessModeType{
+func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 	}
 }

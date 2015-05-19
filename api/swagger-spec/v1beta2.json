@@ -10149,11 +10149,11 @@
    "v1beta2.PersistentVolumeSpec": {
     "id": "v1beta2.PersistentVolumeSpec",
     "required": [
+     "glusterfs",
      "nfs",
      "persistentDisk",
      "awsElasticBlockStore",
-     "hostPath",
-     "glusterfs"
+     "hostPath"
     ],
     "properties": {
      "accessModes": {

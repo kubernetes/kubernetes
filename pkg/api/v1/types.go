@@ -268,7 +268,7 @@ type PersistentVolumeSpec struct {
 	// Source represents the location and type of a volume to mount.
 	PersistentVolumeSource `json:",inline" description:"the actual volume backing the persistent volume"`
 	// AccessModes contains all ways the volume can be mounted
-	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"all ways the volume can be mounted"`
+	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" description:"all ways the volume can be mounted"`
 	// ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
 	// ClaimRef is expected to be non-nil when bound.
 	// claim.VolumeName is the authoritative bind between PV and PVC.
@@ -308,7 +308,7 @@ type PersistentVolumeClaimList struct {
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
 	// Contains the types of access modes required
-	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"the desired access modes the volume should have"`
+	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" description:"the desired access modes the volume should have"`
 	// Resources represents the minimum resources required
 	Resources ResourceRequirements `json:"resources,omitempty" description:"the desired resources the volume should have"`
 	// VolumeName is the binding reference to the PersistentVolume backing this claim
@@ -319,20 +319,20 @@ type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim
 	Phase PersistentVolumeClaimPhase `json:"phase,omitempty" description:"the current phase of the claim"`
 	// AccessModes contains all ways the volume backing the PVC can be mounted
-	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"the actual access modes the volume has"`
+	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" description:"the actual access modes the volume has"`
 	// Represents the actual resources of the underlying volume
 	Capacity ResourceList `json:"capacity,omitempty" description:"the actual resources the volume has"`
 }
 
-type AccessModeType string
+type PersistentVolumeAccessMode string
 
 const (
 	// can be mounted read/write mode to exactly 1 host
-	ReadWriteOnce AccessModeType = "ReadWriteOnce"
+	ReadWriteOnce PersistentVolumeAccessMode = "ReadWriteOnce"
 	// can be mounted in read-only mode to many hosts
-	ReadOnlyMany AccessModeType = "ReadOnlyMany"
+	ReadOnlyMany PersistentVolumeAccessMode = "ReadOnlyMany"
 	// can be mounted in read/write mode to many hosts
-	ReadWriteMany AccessModeType = "ReadWriteMany"
+	ReadWriteMany PersistentVolumeAccessMode = "ReadWriteMany"
 )
 
 type PersistentVolumePhase string
@@ -366,7 +366,7 @@ type HostPathVolumeSource struct {
 type EmptyDirVolumeSource struct {
 	// Optional: what type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
-	Medium StorageType `json:"medium,omitempty" description:"type of storage used to back the volume; must be an empty string (default) or Memory"`
+	Medium StorageMedium `json:"medium,omitempty" description:"type of storage used to back the volume; must be an empty string (default) or Memory"`
 }
 
 // GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod
@@ -382,12 +382,12 @@ type GlusterfsVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty" description:"glusterfs volume to be mounted with read-only permissions"`
 }
 
-// StorageType defines ways that storage can be allocated to a volume.
-type StorageType string
+// StorageMedium defines ways that storage can be allocated to a volume.
+type StorageMedium string
 
 const (
-	StorageTypeDefault StorageType = ""       // use whatever the default is for the node
-	StorageTypeMemory  StorageType = "Memory" // use memory (tmpfs)
+	StorageMediumDefault StorageMedium = ""       // use whatever the default is for the node
+	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
 )
 
 // Protocol defines network protocols supported for things like conatiner ports.
@@ -590,15 +590,15 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
-// CapabilityType represent POSIX capabilities type
-type CapabilityType string
+// Capability represent POSIX capabilities type
+type Capability string
 
 // Capabilities represent POSIX capabilities that can be added or removed to a running container.
 type Capabilities struct {
 	// Added capabilities
-	Add []CapabilityType `json:"add,omitempty" description:"added capabilities"`
+	Add []Capability `json:"add,omitempty" description:"added capabilities"`
 	// Removed capabilities
-	Drop []CapabilityType `json:"drop,omitempty" description:"droped capabilities"`
+	Drop []Capability `json:"drop,omitempty" description:"droped capabilities"`
 }
 
 // ResourceRequirements describes the compute resource requirements.
@@ -951,14 +951,14 @@ type ReplicationControllerList struct {
 }
 
 // Session Affinity Type string
-type AffinityType string
+type ServiceAffinity string
 
 const (
-	// AffinityTypeClientIP is the Client IP based.
-	AffinityTypeClientIP AffinityType = "ClientIP"
+	// ServiceAffinityClientIP is the Client IP based.
+	ServiceAffinityClientIP ServiceAffinity = "ClientIP"
 
-	// AffinityTypeNone - no session affinity.
-	AffinityTypeNone AffinityType = "None"
+	// ServiceAffinityNone - no session affinity.
+	ServiceAffinityNone ServiceAffinity = "None"
 )
 
 // ServiceStatus represents the current status of a service
@@ -987,7 +987,7 @@ type ServiceSpec struct {
 	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs (e.g. load balancers) that should be proxied to this service"`
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
-	SessionAffinity AffinityType `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`
+	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`
 }
 
 type ServicePort struct {

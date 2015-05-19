@@ -228,7 +228,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-				AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 				},
@@ -240,7 +240,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-				AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 				},
@@ -252,7 +252,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-				AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 				},
@@ -264,7 +264,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
-				AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 			}),
 		},
 		"missing-capacity": {
@@ -324,7 +324,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 		"good-claim": {
 			isExpectedFailure: false,
 			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 				},
@@ -338,7 +338,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 		"missing-namespace": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim("foo", "", api.PersistentVolumeClaimSpec{
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 				},
@@ -362,7 +362,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 		"no-resource-requests": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 				},
 			}),
@@ -370,7 +370,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 		"invalid-resource-requests": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 				},
 				Resources: api.ResourceRequirements{
@@ -3175,8 +3175,8 @@ func TestValidateSecurityContext(t *testing.T) {
 		return &api.SecurityContext{
 			Privileged: &priv,
 			Capabilities: &api.Capabilities{
-				Add:  []api.CapabilityType{"foo"},
-				Drop: []api.CapabilityType{"bar"},
+				Add:  []api.Capability{"foo"},
+				Drop: []api.Capability{"bar"},
 			},
 			SELinuxOptions: &api.SELinuxOptions{
 				User:  "user",

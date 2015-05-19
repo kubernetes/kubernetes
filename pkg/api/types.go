@@ -251,7 +251,7 @@ type PersistentVolumeSpec struct {
 	// Source represents the location and type of a volume to mount.
 	PersistentVolumeSource `json:",inline"`
 	// AccessModes contains all ways the volume can be mounted
-	AccessModes []AccessModeType `json:"accessModes,omitempty"`
+	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
 	// ClaimRef is expected to be non-nil when bound.
 	// claim.VolumeName is the authoritative bind between PV and PVC.
@@ -291,7 +291,7 @@ type PersistentVolumeClaimList struct {
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
 	// Contains the types of access modes required
-	AccessModes []AccessModeType `json:"accessModes,omitempty"`
+	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// Resources represents the minimum resources required
 	Resources ResourceRequirements `json:"resources,omitempty"`
 	// VolumeName is the binding reference to the PersistentVolume backing this claim
@@ -302,20 +302,20 @@ type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim
 	Phase PersistentVolumeClaimPhase `json:"phase,omitempty"`
 	// AccessModes contains all ways the volume backing the PVC can be mounted
-	AccessModes []AccessModeType `json:"accessModes,omitempty"`
+	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// Represents the actual resources of the underlying volume
 	Capacity ResourceList `json:"capacity,omitempty"`
 }
 
-type AccessModeType string
+type PersistentVolumeAccessMode string
 
 const (
 	// can be mounted read/write mode to exactly 1 host
-	ReadWriteOnce AccessModeType = "ReadWriteOnce"
+	ReadWriteOnce PersistentVolumeAccessMode = "ReadWriteOnce"
 	// can be mounted in read-only mode to many hosts
-	ReadOnlyMany AccessModeType = "ReadOnlyMany"
+	ReadOnlyMany PersistentVolumeAccessMode = "ReadOnlyMany"
 	// can be mounted in read/write mode to many hosts
-	ReadWriteMany AccessModeType = "ReadWriteMany"
+	ReadWriteMany PersistentVolumeAccessMode = "ReadWriteMany"
 )
 
 type PersistentVolumePhase string
@@ -354,15 +354,15 @@ type EmptyDirVolumeSource struct {
 	// this will cover the most common needs.
 	// Optional: what type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
-	Medium StorageType `json:"medium"`
+	Medium StorageMedium `json:"medium"`
 }
 
-// StorageType defines ways that storage can be allocated to a volume.
-type StorageType string
+// StorageMedium defines ways that storage can be allocated to a volume.
+type StorageMedium string
 
 const (
-	StorageTypeDefault StorageType = ""       // use whatever the default is for the node
-	StorageTypeMemory  StorageType = "Memory" // use memory (tmpfs)
+	StorageMediumDefault StorageMedium = ""       // use whatever the default is for the node
+	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
 )
 
 // Protocol defines network protocols supported for things like conatiner ports.
@@ -582,15 +582,15 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
-// CapabilityType represent POSIX capabilities type
-type CapabilityType string
+// Capability represent POSIX capabilities type
+type Capability string
 
 // Capabilities represent POSIX capabilities that can be added or removed to a running container.
 type Capabilities struct {
 	// Added capabilities
-	Add []CapabilityType `json:"add,omitempty"`
+	Add []Capability `json:"add,omitempty"`
 	// Removed capabilities
-	Drop []CapabilityType `json:"drop,omitempty"`
+	Drop []Capability `json:"drop,omitempty"`
 }
 
 // ResourceRequirements describes the compute resource requirements.
@@ -969,14 +969,14 @@ type ServiceList struct {
 }
 
 // Session Affinity Type string
-type AffinityType string
+type ServiceAffinity string
 
 const (
-	// AffinityTypeClientIP is the Client IP based.
-	AffinityTypeClientIP AffinityType = "ClientIP"
+	// ServiceAffinityClientIP is the Client IP based.
+	ServiceAffinityClientIP ServiceAffinity = "ClientIP"
 
-	// AffinityTypeNone - no session affinity.
-	AffinityTypeNone AffinityType = "None"
+	// ServiceAffinityNone - no session affinity.
+	ServiceAffinityNone ServiceAffinity = "None"
 )
 
 // ServiceStatus represents the current status of a service
@@ -1009,7 +1009,7 @@ type ServiceSpec struct {
 	PublicIPs []string `json:"publicIPs,omitempty"`
 
 	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
-	SessionAffinity AffinityType `json:"sessionAffinity,omitempty"`
+	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty"`
 }
 
 type ServicePort struct {

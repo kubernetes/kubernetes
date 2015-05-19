@@ -68,8 +68,8 @@ func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.GCEPersistentDisk != nil || spec.PersistentVolumeSource.GCEPersistentDisk != nil
 }
 
-func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.AccessModeType {
-	return []api.AccessModeType{
+func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 		api.ReadOnlyMany,
 	}

@@ -771,11 +771,11 @@ func TestBadSecurityContextConversion(t *testing.T) {
 		"mismatched caps add": {
 			c: &current.Container{
 				Capabilities: current.Capabilities{
-					Add: []current.CapabilityType{"foo"},
+					Add: []current.Capability{"foo"},
 				},
 				SecurityContext: &current.SecurityContext{
 					Capabilities: &current.Capabilities{
-						Add: []current.CapabilityType{"bar"},
+						Add: []current.Capability{"bar"},
 					},
 				},
 			},
@@ -784,11 +784,11 @@ func TestBadSecurityContextConversion(t *testing.T) {
 		"mismatched caps drop": {
 			c: &current.Container{
 				Capabilities: current.Capabilities{
-					Drop: []current.CapabilityType{"foo"},
+					Drop: []current.Capability{"foo"},
 				},
 				SecurityContext: &current.SecurityContext{
 					Capabilities: &current.Capabilities{
-						Drop: []current.CapabilityType{"bar"},
+						Drop: []current.Capability{"bar"},
 					},
 				},
 			},

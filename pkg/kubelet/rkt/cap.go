@@ -116,10 +116,10 @@ func getAllCapabilities() string {
 	return strings.Join(capabilities, ",")
 }
 
-// TODO(yifan): This assumes that api.CapabilityType has the form of
+// TODO(yifan): This assumes that api.Capability has the form of
 // "CAP_SYS_ADMIN". We need to have a formal definition for
 // capabilities.
-func getCapabilities(caps []api.CapabilityType) string {
+func getCapabilities(caps []api.Capability) string {
 	var capList []string
 	for _, cap := range caps {
 		capList = append(capList, fmt.Sprintf("%q", cap))

@@ -74,7 +74,7 @@ func addDefaultingFuncs() {
 				obj.Protocol = ProtocolTCP
 			}
 			if obj.SessionAffinity == "" {
-				obj.SessionAffinity = AffinityTypeNone
+				obj.SessionAffinity = ServiceAffinityNone
 			}
 			for i := range obj.Ports {
 				sp := &obj.Ports[i]

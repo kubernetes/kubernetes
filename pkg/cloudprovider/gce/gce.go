@@ -294,11 +294,11 @@ func isHTTPErrorCode(err error, code int) bool {
 }
 
 // translate from what K8s supports to what the cloud provider supports for session affinity.
-func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
+func translateAffinityType(affinityType api.ServiceAffinity) GCEAffinityType {
 	switch affinityType {
-	case api.AffinityTypeClientIP:
+	case api.ServiceAffinityClientIP:
 		return GCEAffinityTypeClientIP
-	case api.AffinityTypeNone:
+	case api.ServiceAffinityNone:
 		return GCEAffinityTypeNone
 	default:
 		glog.Errorf("unexpected affinity type: %v", affinityType)
@@ -309,7 +309,7 @@ func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // TODO(a-robinson): Don't just ignore specified IP addresses. Check if they're
 // owned by the project and available to be used, and use them if they are.
-func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error) {
+func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (string, error) {
 	err := gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
 	if err != nil {
 		if !isHTTPErrorCode(err, http.StatusConflict) {

@@ -149,8 +149,8 @@ func TestSetDefaultService(t *testing.T) {
 	if svc2.Protocol != current.ProtocolTCP {
 		t.Errorf("Expected default protocol :%s, got: %s", current.ProtocolTCP, svc2.Protocol)
 	}
-	if svc2.SessionAffinity != current.AffinityTypeNone {
-		t.Errorf("Expected default sesseion affinity type:%s, got: %s", current.AffinityTypeNone, svc2.SessionAffinity)
+	if svc2.SessionAffinity != current.ServiceAffinityNone {
+		t.Errorf("Expected default sesseion affinity type:%s, got: %s", current.ServiceAffinityNone, svc2.SessionAffinity)
 	}
 }
 
@@ -351,8 +351,8 @@ func TestSetDefaultSecurityContext(t *testing.T) {
 			c: current.Container{
 				Privileged: false,
 				Capabilities: current.Capabilities{
-					Add:  []current.CapabilityType{"foo"},
-					Drop: []current.CapabilityType{"bar"},
+					Add:  []current.Capability{"foo"},
+					Drop: []current.Capability{"bar"},
 				},
 				SecurityContext: &current.SecurityContext{
 					Privileged: &priv,
@@ -363,13 +363,13 @@ func TestSetDefaultSecurityContext(t *testing.T) {
 			c: current.Container{
 				Privileged: false,
 				Capabilities: current.Capabilities{
-					Add:  []current.CapabilityType{"foo"},
-					Drop: []current.CapabilityType{"bar"},
+					Add:  []current.Capability{"foo"},
+					Drop: []current.Capability{"bar"},
 				},
 				SecurityContext: &current.SecurityContext{
 					Capabilities: &current.Capabilities{
-						Add:  []current.CapabilityType{"foo"},
-						Drop: []current.CapabilityType{"bar"},
+						Add:  []current.Capability{"foo"},
+						Drop: []current.Capability{"bar"},
 					},
 				},
 			},
@@ -380,8 +380,8 @@ func TestSetDefaultSecurityContext(t *testing.T) {
 				SecurityContext: &current.SecurityContext{
 					Privileged: &priv,
 					Capabilities: &current.Capabilities{
-						Add:  []current.CapabilityType{"biz"},
-						Drop: []current.CapabilityType{"baz"},
+						Add:  []current.Capability{"biz"},
+						Drop: []current.Capability{"baz"},
 					},
 				},
 			},
@@ -389,14 +389,14 @@ func TestSetDefaultSecurityContext(t *testing.T) {
 		"upward defaulting priv": {
 			c: current.Container{
 				Capabilities: current.Capabilities{
-					Add:  []current.CapabilityType{"foo"},
-					Drop: []current.CapabilityType{"bar"},
+					Add:  []current.Capability{"foo"},
+					Drop: []current.Capability{"bar"},
 				},
 				SecurityContext: &current.SecurityContext{
 					Privileged: &privTrue,
 					Capabilities: &current.Capabilities{
-						Add:  []current.CapabilityType{"foo"},
-						Drop: []current.CapabilityType{"bar"},
+						Add:  []current.Capability{"foo"},
+						Drop: []current.Capability{"bar"},
 					},
 				},
 			},

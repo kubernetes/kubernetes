@@ -45,7 +45,7 @@ type affinityState struct {
 }
 
 type affinityPolicy struct {
-	affinityType api.AffinityType
+	affinityType api.ServiceAffinity
 	affinityMap  map[string]*affinityState // map client IP -> affinity info
 	ttlMinutes   int
 }
@@ -65,7 +65,7 @@ type balancerState struct {
 	affinity  affinityPolicy
 }
 
-func newAffinityPolicy(affinityType api.AffinityType, ttlMinutes int) *affinityPolicy {
+func newAffinityPolicy(affinityType api.ServiceAffinity, ttlMinutes int) *affinityPolicy {
 	return &affinityPolicy{
 		affinityType: affinityType,
 		affinityMap:  make(map[string]*affinityState),
@@ -80,7 +80,7 @@ func NewLoadBalancerRR() *LoadBalancerRR {
 	}
 }
 
-func (lb *LoadBalancerRR) NewService(svcPort ServicePortName, affinityType api.AffinityType, ttlMinutes int) error {
+func (lb *LoadBalancerRR) NewService(svcPort ServicePortName, affinityType api.ServiceAffinity, ttlMinutes int) error {
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 	lb.newServiceInternal(svcPort, affinityType, ttlMinutes)
@@ -88,7 +88,7 @@ func (lb *LoadBalancerRR) NewService(svcPort ServicePortName, affinityType api.A
 }
 
 // This assumes that lb.lock is already held.
-func (lb *LoadBalancerRR) newServiceInternal(svcPort ServicePortName, affinityType api.AffinityType, ttlMinutes int) *balancerState {
+func (lb *LoadBalancerRR) newServiceInternal(svcPort ServicePortName, affinityType api.ServiceAffinity, ttlMinutes int) *balancerState {
 	if ttlMinutes == 0 {
 		ttlMinutes = 180 //default to 3 hours if not specified.  Should 0 be unlimeted instead????
 	}
@@ -103,7 +103,7 @@ func (lb *LoadBalancerRR) newServiceInternal(svcPort ServicePortName, affinityTy
 // return true if this service is using some form of session affinity.
 func isSessionAffinity(affinity *affinityPolicy) bool {
 	// Should never be empty string, but checking for it to be safe.
-	if affinity.affinityType == "" || affinity.affinityType == api.AffinityTypeNone {
+	if affinity.affinityType == "" || affinity.affinityType == api.ServiceAffinityNone {
 		return false
 	}
 	return true
@@ -262,7 +262,7 @@ func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
 				// OnUpdate can be called without NewService being called externally.
 				// To be safe we will call it here.  A new service will only be created
 				// if one does not already exist.
-				state = lb.newServiceInternal(svcPort, api.AffinityTypeNone, 0)
+				state = lb.newServiceInternal(svcPort, api.ServiceAffinityNone, 0)
 				state.endpoints = slice.ShuffleStrings(newEndpoints)
 
 				// Reset the round-robin index.

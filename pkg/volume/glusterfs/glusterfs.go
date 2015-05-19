@@ -56,8 +56,8 @@ func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.Glusterfs != nil || spec.PersistentVolumeSource.Glusterfs != nil
 }
 
-func (plugin *glusterfsPlugin) GetAccessModes() []api.AccessModeType {
-	return []api.AccessModeType{
+func (plugin *glusterfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 		api.ReadOnlyMany,
 		api.ReadWriteMany,

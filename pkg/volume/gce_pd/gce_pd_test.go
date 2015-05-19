@@ -55,7 +55,7 @@ func TestGetAccessModes(t *testing.T) {
 	}
 }
 
-func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
+func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
 			return true

@@ -70,7 +70,7 @@ func TestPlugin(t *testing.T) {
 
 	spec := &api.Volume{
 		Name:         "vol1",
-		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageTypeDefault}},
+		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumDefault}},
 	}
 	mounter := mount.FakeMounter{}
 	mountDetector := fakeMountDetector{}
@@ -130,7 +130,7 @@ func TestPluginTmpfs(t *testing.T) {
 
 	spec := &api.Volume{
 		Name:         "vol1",
-		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageTypeMemory}},
+		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}},
 	}
 	mounter := mount.FakeMounter{}
 	mountDetector := fakeMountDetector{}

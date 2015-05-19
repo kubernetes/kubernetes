@@ -154,8 +154,8 @@ func fullValidSecurityContext() *api.SecurityContext {
 	return &api.SecurityContext{
 		Privileged: &priv,
 		Capabilities: &api.Capabilities{
-			Add:  []api.CapabilityType{"addCapA", "addCapB"},
-			Drop: []api.CapabilityType{"dropCapA", "dropCapB"},
+			Add:  []api.Capability{"addCapA", "addCapB"},
+			Drop: []api.Capability{"dropCapA", "dropCapB"},
 		},
 		SELinuxOptions: &api.SELinuxOptions{
 			User:  "user",

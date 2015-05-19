@@ -41,7 +41,7 @@ type serviceInfo struct {
 	socket              proxySocket
 	timeout             time.Duration
 	publicIPs           []string // TODO: make this net.IP
-	sessionAffinityType api.AffinityType
+	sessionAffinityType api.ServiceAffinity
 	stickyMaxAgeMinutes int
 }
 
@@ -208,8 +208,8 @@ func (proxier *Proxier) addServiceOnPort(service ServicePortName, protocol api.P
 		protocol:            protocol,
 		socket:              sock,
 		timeout:             timeout,
-		sessionAffinityType: api.AffinityTypeNone, // default
-		stickyMaxAgeMinutes: 180,                  // TODO: paramaterize this in the API.
+		sessionAffinityType: api.ServiceAffinityNone, // default
+		stickyMaxAgeMinutes: 180,                     // TODO: paramaterize this in the API.
 	}
 	proxier.setServiceInfo(service, si)
 
