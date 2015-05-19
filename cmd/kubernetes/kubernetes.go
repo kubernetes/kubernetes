@@ -122,7 +122,7 @@ func runScheduler(cl *client.Client) {
 func runControllerManager(cl *client.Client) {
 	const nodeSyncPeriod = 10 * time.Second
 	nodeController := nodecontroller.NewNodeController(
-		nil, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst),
+		nil, cl, 10, 5*time.Minute, nodecontroller.NewPodEvictor(util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst)),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(nodeSyncPeriod)
 
