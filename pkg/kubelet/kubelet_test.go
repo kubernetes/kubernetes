@@ -3280,9 +3280,9 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: api.ResourceList{
-				api.ResourceCPU:     *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory:  *resource.NewQuantity(1024, resource.BinarySI),
-				api.ResourceMaxPods: *resource.NewQuantity(0, resource.DecimalSI),
+				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 		},
 	}
@@ -3330,9 +3330,9 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					},
 				},
 				Capacity: api.ResourceList{
-					api.ResourceCPU:     *resource.NewMilliQuantity(3000, resource.DecimalSI),
-					api.ResourceMemory:  *resource.NewQuantity(2048, resource.BinarySI),
-					api.ResourceMaxPods: *resource.NewQuantity(0, resource.DecimalSI),
+					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
+					api.ResourceMemory: *resource.NewQuantity(2048, resource.BinarySI),
+					api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 				},
 			},
 		},
@@ -3376,9 +3376,9 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: api.ResourceList{
-				api.ResourceCPU:     *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory:  *resource.NewQuantity(1024, resource.BinarySI),
-				api.ResourceMaxPods: *resource.NewQuantity(0, resource.DecimalSI),
+				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 		},
 	}
@@ -3461,9 +3461,9 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: api.ResourceList{
-				api.ResourceCPU:     *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory:  *resource.NewQuantity(1024, resource.BinarySI),
-				api.ResourceMaxPods: *resource.NewQuantity(0, resource.DecimalSI),
+				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
 		},
 	}

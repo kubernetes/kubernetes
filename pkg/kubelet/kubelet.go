@@ -142,7 +142,7 @@ func NewMainKubelet(
 	mounter mount.Interface,
 	dockerDaemonContainer string,
 	configureCBR0 bool,
-	maxPods int) (*Kubelet, error) {
+	pods int) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -249,7 +249,7 @@ func NewMainKubelet(
 		cgroupRoot:                     cgroupRoot,
 		mounter:                        mounter,
 		configureCBR0:                  configureCBR0,
-		maxPods:                        maxPods,
+		pods:                           pods,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -468,7 +468,7 @@ type Kubelet struct {
 	configureCBR0 bool
 
 	// Number of Pods which can be run by this Kubelet
-	maxPods int
+	pods int
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1746,8 +1746,8 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
 		node.Status.Capacity = CapacityFromMachineInfo(info)
-		node.Status.Capacity[api.ResourceMaxPods] = *resource.NewQuantity(
-			int64(kl.maxPods), resource.DecimalSI)
+		node.Status.Capacity[api.ResourcePods] = *resource.NewQuantity(
+			int64(kl.pods), resource.DecimalSI)
 		if node.Status.NodeInfo.BootID != "" &&
 			node.Status.NodeInfo.BootID != info.BootID {
 			// TODO: This requires a transaction, either both node status is updated

@@ -142,7 +142,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		Spec:       api.NodeSpec{Unschedulable: false},
 		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
-				"maxpods": *resource.NewQuantity(32, resource.DecimalSI),
+				api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 			},
 			Conditions: []api.NodeCondition{goodCondition},
 		},
@@ -195,7 +195,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 			makeUnSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c *client.Client) {
 				n.Status = api.NodeStatus{
 					Capacity: api.ResourceList{
-						"maxpods": *resource.NewQuantity(32, resource.DecimalSI),
+						api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 					},
 					Conditions: []api.NodeCondition{badCondition},
 				}
@@ -212,7 +212,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 			makeSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c *client.Client) {
 				n.Status = api.NodeStatus{
 					Capacity: api.ResourceList{
-						"maxpods": *resource.NewQuantity(32, resource.DecimalSI),
+						api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 					},
 					Conditions: []api.NodeCondition{goodCondition},
 				}

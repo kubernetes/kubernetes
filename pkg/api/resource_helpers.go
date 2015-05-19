@@ -41,8 +41,8 @@ func (self *ResourceList) Memory() *resource.Quantity {
 	return &resource.Quantity{}
 }
 
-func (self *ResourceList) MaxPods() *resource.Quantity {
-	if val, ok := (*self)[ResourceMaxPods]; ok {
+func (self *ResourceList) Pods() *resource.Quantity {
+	if val, ok := (*self)[ResourcePods]; ok {
 		return &val
 	}
 	return &resource.Quantity{}
