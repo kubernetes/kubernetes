@@ -146,6 +146,9 @@ func NewMainKubelet(
 	if resyncInterval <= 0 {
 		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
 	}
+	if systemContainer != "" && cgroupRoot == "" {
+		return nil, fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
+	}
 	dockerClient = dockertools.NewInstrumentedDockerInterface(dockerClient)
 
 	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
@@ -294,7 +297,10 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
 
-	containerManager, err := newContainerManager(dockerDaemonContainer)
+	// TODO(vmarmol): Make configurable.
+	// Setup container manager, can fail if the devices hierarchy is not mounted
+	// (it is required by Docker however).
+	containerManager, err := newContainerManager(dockerDaemonContainer, "/system")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the Container Manager: %v", err)
 	}

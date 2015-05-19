@@ -35,33 +35,60 @@ import (
 )
 
 type containerManagerImpl struct {
-	// Absolute name of the desired container that Docker should be in.
-	dockerContainerName string
+	// Whether to create and use the specified containers.
+	useDockerContainer bool
+	useSystemContainer bool
 
-	// The manager of the resource-only container Docker should be in.
-	manager           fs.Manager
+	// OOM score for the Docker container.
 	dockerOomScoreAdj int
+
+	// Managers for containers.
+	dockerContainer fs.Manager
+	systemContainer fs.Manager
+	rootContainer   fs.Manager
 }
 
 var _ containerManager = &containerManagerImpl{}
 
-// Takes the absolute name that the Docker daemon should be in.
-// Empty container name disables moving the Docker daemon.
-func newContainerManager(dockerDaemonContainer string) (containerManager, error) {
+// Takes the absolute name of the specified containers.
+// Empty container name disables use of the specified container.
+func newContainerManager(dockerDaemonContainer, systemContainer string) (containerManager, error) {
+	if systemContainer == "/" {
+		return nil, fmt.Errorf("system container cannot be root (\"/\")")
+	}
+
 	return &containerManagerImpl{
-		dockerContainerName: dockerDaemonContainer,
-		manager: fs.Manager{
+		useDockerContainer: dockerDaemonContainer != "",
+		useSystemContainer: systemContainer != "",
+		dockerOomScoreAdj:  -900,
+		dockerContainer: fs.Manager{
 			Cgroups: &configs.Cgroup{
 				Name:            dockerDaemonContainer,
 				AllowAllDevices: true,
 			},
 		},
-		dockerOomScoreAdj: -900,
+		systemContainer: fs.Manager{
+			Cgroups: &configs.Cgroup{
+				Name:            systemContainer,
+				AllowAllDevices: true,
+			},
+		},
+		rootContainer: fs.Manager{
+			Cgroups: &configs.Cgroup{
+				Name: "/",
+			},
+		},
 	}, nil
 }
 
 func (cm *containerManagerImpl) Start() error {
-	if cm.dockerContainerName != "" {
+	if cm.useSystemContainer {
+		err := cm.ensureSystemContainer()
+		if err != nil {
+			return err
+		}
+	}
+	if cm.useDockerContainer {
 		go util.Until(func() {
 			err := cm.ensureDockerInContainer()
 			if err != nil {
@@ -99,10 +126,10 @@ func (cm *containerManagerImpl) ensureDockerInContainer() error {
 			errs = append(errs, fmt.Errorf("failed to find container of PID %q: %v", pid, err))
 		}
 
-		if cont != cm.dockerContainerName {
-			err = cm.manager.Apply(pid)
+		if cont != cm.dockerContainer.Cgroups.Name {
+			err = cm.dockerContainer.Apply(pid)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to move PID %q (in %q) to %q", pid, cont, cm.dockerContainerName))
+				errs = append(errs, fmt.Errorf("failed to move PID %q (in %q) to %q", pid, cont, cm.dockerContainer.Cgroups.Name))
 			}
 		}
 
@@ -124,4 +151,61 @@ func getContainer(pid int) (string, error) {
 	defer f.Close()
 
 	return cgroups.ParseCgroupFile("cpu", f)
+}
+
+// Ensures the system container is created and all non-kernel processes without
+// a container are moved to it.
+func (cm *containerManagerImpl) ensureSystemContainer() error {
+	// Move non-kernel PIDs to the system container.
+	attemptsRemaining := 10
+	var errs []error
+	for attemptsRemaining >= 0 {
+		// Only keep errors on latest attempt.
+		errs = []error{}
+		attemptsRemaining--
+
+		allPids, err := cm.rootContainer.GetPids()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("Failed to list PIDs for root: %v", err))
+			continue
+		}
+
+		// Remove kernel pids
+		pids := make([]int, 0, len(allPids))
+		for _, pid := range allPids {
+			if isKernelPid(pid) {
+				continue
+			}
+
+			pids = append(pids, pid)
+		}
+		glog.Infof("Found %d PIDs in root, %d of them are kernel related", len(allPids), len(allPids)-len(pids))
+
+		// Check if we moved all the non-kernel PIDs.
+		if len(pids) == 0 {
+			break
+		}
+
+		glog.Infof("Moving non-kernel threads: %v", pids)
+		for _, pid := range pids {
+			err := cm.systemContainer.Apply(pid)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to move PID %d into the system container %q: %v", pid, cm.systemContainer.Cgroups.Name, err))
+				continue
+			}
+		}
+
+	}
+	if attemptsRemaining < 0 {
+		errs = append(errs, fmt.Errorf("ran out of attempts to create system containers %q", cm.systemContainer.Cgroups.Name))
+	}
+
+	return errors.NewAggregate(errs)
+}
+
+// Determines whether the specified PID is a kernel PID.
+func isKernelPid(pid int) bool {
+	// Kernel threads have no associated executable.
+	_, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
+	return err != nil
 }
