@@ -673,9 +673,9 @@ func validateProbe(probe *api.Probe) errs.ValidationErrorList {
 	return allErrs
 }
 
-// accumulateUniquePorts runs an extraction function on each Port of each Container,
+// AccumulateUniqueHostPorts extracts each HostPort of each Container,
 // accumulating the results and returning an error if any ports conflict.
-func accumulateUniqueHostPorts(containers []api.Container, accumulator map[string]bool) errs.ValidationErrorList {
+func AccumulateUniqueHostPorts(containers []api.Container, accumulator *util.StringSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	for ci, ctr := range containers {
@@ -686,10 +686,10 @@ func accumulateUniqueHostPorts(containers []api.Container, accumulator map[strin
 				continue
 			}
 			str := fmt.Sprintf("%d/%s", port, ctr.Ports[pi].Protocol)
-			if accumulator[str] {
+			if accumulator.Has(str) {
 				cErrs = append(cErrs, errs.NewFieldDuplicate("port", str))
 			} else {
-				accumulator[str] = true
+				accumulator.Insert(str)
 			}
 		}
 		allErrs = append(allErrs, cErrs.PrefixIndex(ci)...)
@@ -697,11 +697,11 @@ func accumulateUniqueHostPorts(containers []api.Container, accumulator map[strin
 	return allErrs
 }
 
-// ValidateHostPorts checks for colliding Port.HostPort values across
+// checkHostPortConflicts checks for colliding Port.HostPort values across
 // a slice of containers.
-func ValidateHostPorts(containers []api.Container) errs.ValidationErrorList {
-	allPorts := map[string]bool{}
-	return accumulateUniqueHostPorts(containers, allPorts)
+func checkHostPortConflicts(containers []api.Container) errs.ValidationErrorList {
+	allPorts := util.StringSet{}
+	return AccumulateUniqueHostPorts(containers, &allPorts)
 }
 
 func validateExecAction(exec *api.ExecAction) errs.ValidationErrorList {
@@ -818,7 +818,7 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		allErrs = append(allErrs, cErrs.PrefixIndex(i)...)
 	}
 	// Check for colliding ports across all containers.
-	allErrs = append(allErrs, ValidateHostPorts(containers)...)
+	allErrs = append(allErrs, checkHostPortConflicts(containers)...)
 
 	return allErrs
 }

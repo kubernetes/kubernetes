@@ -1354,11 +1354,13 @@ func (s podsByCreationTime) Less(i, j int) bool {
 
 // checkHostPortConflicts detects pods with conflicted host ports.
 func checkHostPortConflicts(pods []*api.Pod) (fitting []*api.Pod, notFitting []*api.Pod) {
+	ports := util.StringSet{}
+
 	// Respect the pod creation order when resolving conflicts.
 	sort.Sort(podsByCreationTime(pods))
 
 	for _, pod := range pods {
-		if errs := validation.ValidateHostPorts(pod.Spec.Containers); len(errs) != 0 {
+		if errs := validation.AccumulateUniqueHostPorts(pod.Spec.Containers, &ports); len(errs) != 0 {
 			glog.Errorf("Pod %q: HostPort is already allocated, ignoring: %v", kubecontainer.GetPodFullName(pod), errs)
 			notFitting = append(notFitting, pod)
 			continue
