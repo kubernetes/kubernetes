@@ -58,7 +58,7 @@ function kube-down() {
 function detect-master() {
     local kubestatus
     # Capturing a newline, and my awk-fu was weak - pipe through tr -d
-    kubestatus=$(juju status --format=oneline kubernetes-master | awk '{print $3}' | tr -d "\n")
+    kubestatus=$(juju status --format=oneline kubernetes-master | grep kubernetes-master/0 | awk '{print $3}' | tr -d "\n")
     export KUBE_MASTER_IP=${kubestatus}
     export KUBE_MASTER=${KUBE_MASTER_IP}
     export KUBERNETES_MASTER=http://${KUBE_MASTER}:8080

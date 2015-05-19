@@ -141,6 +141,11 @@ def relation_changed():
     # Send api endpoint to minions
     notify_minions()
 
+@hooks.hook('network-relation-changed')
+def network_relation_changed():
+    relation_id = hookenv.relation_id()
+    hookenv.relation_set(relation_id, ignore_errors=True)
+
 
 def notify_minions():
     print("Notify minions.")

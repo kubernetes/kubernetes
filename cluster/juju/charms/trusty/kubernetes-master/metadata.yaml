@@ -17,3 +17,5 @@ provides:
 requires:
   etcd:
     interface: etcd
+  network:
+      interface: overlay-network

@@ -105,7 +105,7 @@ if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   config=(
     "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
   )
-elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" ]]; then
+elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" || "$KUBERNETES_PROVIDER" == "juju" ]]; then
   detect-master > /dev/null
   config=(
     "--server=http://${KUBE_MASTER_IP}:8080"

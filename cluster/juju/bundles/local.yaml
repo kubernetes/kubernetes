@@ -18,7 +18,8 @@ kubernetes-local:
         "gui-x": "0"
         "gui-y": "0"
     flannel-docker:
-      charm: cs:trusty/flannel-docker
+      charm: flannel-docker
+      branch: https://github.com/chuckbutler/flannel-docker-charm.git
       annotations:
         "gui-x": "0"
         "gui-y": "300"
@@ -35,8 +36,12 @@ kubernetes-local:
   relations:
     - - "flannel-docker:network"
       - "docker:network"
+    - - "flannel-docker:network"
+      - "kubernetes-master:network"
     - - "flannel-docker:docker-host"
       - "docker:juju-info"
+    - - "flannel-docker:docker-host"
+      - "kubernetes-master:juju-info"
     - - "flannel-docker:db"
       - "etcd:client"
     - - "kubernetes:docker-host"
