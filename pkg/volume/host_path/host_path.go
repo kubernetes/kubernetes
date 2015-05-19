@@ -35,6 +35,7 @@ type hostPathPlugin struct {
 }
 
 var _ volume.VolumePlugin = &hostPathPlugin{}
+var _ volume.RecyclableVolumePlugin = &hostPathPlugin{}
 
 const (
 	hostPathPluginName = "kubernetes.io/host-path"
@@ -98,4 +99,18 @@ func (hp *hostPath) TearDown() error {
 // TearDownAt does not make sense for host paths - probably programmer error.
 func (hp *hostPath) TearDownAt(dir string) error {
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
+}
+
+func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
+	if spec.VolumeSource.HostPath != nil {
+		return &hostPath{spec.VolumeSource.HostPath.Path}, nil
+	} else {
+		return &hostPath{spec.PersistentVolumeSource.HostPath.Path}, nil
+	}
+}
+
+// Recycler provides methods to reclaim the volume resource.
+func (hp *hostPath) Recycle() error {
+	// TODO implement "basic scrub" recycler -- busybox w/ "rm -rf" for volume
+	return nil
 }

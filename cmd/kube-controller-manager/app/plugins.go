@@ -20,6 +20,8 @@ import (
 	// This file exists to force the desired plugin implementations to be linked.
 	// This should probably be part of some configuration fed into the build for a
 	// given binary target.
+
+	//Cloud providers
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/mesos"
@@ -27,4 +29,30 @@ import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/rackspace"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/vagrant"
+
+	// Volume plugins
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/aws_ebs"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/gce_pd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/glusterfs"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/iscsi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/nfs"
 )
+
+// ProbeVolumePlugins collects all persistent volume plugins into an easy to use list.
+func ProbePersistentVolumePlugins() []volume.VolumePlugin {
+	allPlugins := []volume.VolumePlugin{}
+
+	// The list of plugins to probe is decided by the kubelet binary, not
+	// by dynamic linking or other "magic".  Plugins will be analyzed and
+	// initialized later.
+	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
+
+	return allPlugins
+}

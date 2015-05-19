@@ -311,6 +311,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 		} else {
 			fmt.Fprintf(out, "Claim:\t%s\n", "")
 		}
+		fmt.Fprintf(out, "Reclamation Policy:\t%d\n", pv.Spec.ReclamationPolicy)
 		return nil
 	})
 }

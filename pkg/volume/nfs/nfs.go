@@ -38,6 +38,8 @@ type nfsPlugin struct {
 }
 
 var _ volume.VolumePlugin = &nfsPlugin{}
+var _ volume.PersistentVolumePlugin = &nfsPlugin{}
+var _ volume.RecyclableVolumePlugin = &nfsPlugin{}
 
 const (
 	nfsPluginName = "kubernetes.io/nfs"
@@ -93,6 +95,10 @@ func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mo
 		pod:        &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
 		plugin:     plugin,
 	}, nil
+}
+
+func (plugin *nfsPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
+	return &nfs{}, nil
 }
 
 // NFS volumes represent a bare host file or directory mount of an NFS export.
@@ -189,5 +195,10 @@ func (nfsVolume *nfs) TearDownAt(dir string) error {
 		}
 	}
 
+	return nil
+}
+
+func (nfsVolume *nfs) Recycle() error {
+	// TODO implement "basic scrub" recycler -- busybox w/ "rm -rf" for volume
 	return nil
 }

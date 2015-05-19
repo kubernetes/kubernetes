@@ -26,6 +26,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
 )
 
 func TestRunStop(t *testing.T) {
@@ -98,13 +100,14 @@ func TestExampleObjects(t *testing.T) {
 				Spec: api.PersistentVolumeSpec{
 					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("5Gi"),
+						api.ResourceName(api.ResourceStorage): resource.MustParse("8Gi"),
 					},
 					PersistentVolumeSource: api.PersistentVolumeSource{
 						HostPath: &api.HostPathVolumeSource{
 							Path: "/tmp/data02",
 						},
 					},
+					ReclamationPolicy: api.RecycleOnRelease,
 				},
 			},
 		},
@@ -179,6 +182,7 @@ func TestBindingWithExamples(t *testing.T) {
 	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
 
 	pv, err := client.PersistentVolumes().Get("any")
+	pv.Spec.ReclamationPolicy = api.RecycleOnRelease
 	if err != nil {
 		t.Error("Unexpected error getting PV from client: %v", err)
 	}
@@ -192,6 +196,15 @@ func TestBindingWithExamples(t *testing.T) {
 	mockClient := &mockBinderClient{
 		volume: pv,
 		claim:  claim,
+	}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(host_path.ProbeVolumePlugins(), volume.NewFakeVolumeHost("fake", nil, nil))
+
+	recycler := &PersistentVolumeRecycler{
+		kubeClient: client,
+		client:     mockClient,
+		pluginMgr:  plugMgr,
 	}
 
 	// adds the volume to the index, making the volume available
@@ -232,6 +245,28 @@ func TestBindingWithExamples(t *testing.T) {
 	if pv.Status.Phase != api.VolumeReleased {
 		t.Errorf("Expected phase %s but got %s", api.VolumeReleased, pv.Status.Phase)
 	}
+	if pv.Spec.ClaimRef == nil {
+		t.Errorf("Expected non-nil ClaimRef: %+v", pv.Spec)
+	}
+
+	// released volumes with a ReclamationPolicy (recycle/delete) can have further processing
+	err = recycler.reclaimVolume(pv)
+	if err != nil {
+		t.Errorf("Unexpected error reclaiming volume: %+v", err)
+	}
+	if pv.Status.Phase != api.VolumeRecycled {
+		t.Errorf("Expected phase %s but got %s", api.VolumeRecycled, pv.Status.Phase)
+	}
+
+	// after the status change above, the binder picks up again
+	syncVolume(volumeIndex, mockClient, pv)
+
+	if pv.Status.Phase != api.VolumePending {
+		t.Errorf("Expected phase %s but got %s", api.VolumePending, pv.Status.Phase)
+	}
+	if pv.Spec.ClaimRef != nil {
+		t.Errorf("Expected nil ClaimRef: %+v", pv.Spec)
+	}
 }
 
 type mockBinderClient struct {
@@ -245,6 +280,11 @@ func (c *mockBinderClient) GetPersistentVolume(name string) (*api.PersistentVolu
 
 func (c *mockBinderClient) UpdatePersistentVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
 	return volume, nil
+}
+
+func (c *mockBinderClient) DeletePersistentVolume(volume *api.PersistentVolume) error {
+	c.volume = nil
+	return nil
 }
 
 func (c *mockBinderClient) UpdatePersistentVolumeStatus(volume *api.PersistentVolume) (*api.PersistentVolume, error) {

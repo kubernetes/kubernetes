@@ -280,7 +280,24 @@ type PersistentVolumeSpec struct {
 	// ClaimRef is expected to be non-nil when bound.
 	// claim.VolumeName is the authoritative bind between PV and PVC.
 	ClaimRef *ObjectReference `json:"claimRef,omitempty" description:"when bound, a reference to the bound claim"`
+	// ReclamationPolicy represents what happens to a persistent volume when released from its claim.
+	ReclamationPolicy ReclamationPolicy `json:"reclamationPolicy,omitempty" description:"reclamationPolicy is what happens to a volume when released from its claim; one of Recycle, Delete, Retain.  Default is Retain."`
 }
+
+// ReclamationPolicy describes a policy for end-of-life maintenance of persistent volumes
+type ReclamationPolicy string
+
+const (
+	// RecycleOnRelease means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim.
+	// The volume plugin must support Recycling.
+	RecycleOnRelease ReclamationPolicy = "Recycle"
+	// DeleteOnRelease means the volume will be deleted from Kubernetes on release from its claim.
+	// The volume plugin must support Deletion.
+	DeleteOnRelease ReclamationPolicy = "Delete"
+	// RetainOnRelease means the volume will left in its current phase (Released) for manual reclamation by the administrator.
+	// The default policy is Retain.
+	RetainOnRelease ReclamationPolicy = "Retain"
+)
 
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim
@@ -354,6 +371,11 @@ const (
 	// used for PersistentVolumes where the bound PersistentVolumeClaim was deleted
 	// released volumes must be recycled before becoming available again
 	VolumeReleased PersistentVolumePhase = "Released"
+	// used for PersistentVolumes that have been recycled and can be made available
+	// again to new PersistentVolumeClaims
+	VolumeRecycled PersistentVolumePhase = "Recycled"
+	// used for PersistentVolumes that have been removed from the infrastructure
+	VolumeDeleted PersistentVolumePhase = "Deleted"
 )
 
 type PersistentVolumeClaimPhase string

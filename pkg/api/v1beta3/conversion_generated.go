@@ -1265,6 +1265,7 @@ func convert_api_PersistentVolumeSpec_To_v1beta3_PersistentVolumeSpec(in *api.Pe
 	} else {
 		out.ClaimRef = nil
 	}
+	out.ReclamationPolicy = ReclamationPolicy(in.ReclamationPolicy)
 	return nil
 }
 
@@ -2168,6 +2169,7 @@ func convert_api_VolumeSource_To_v1beta3_VolumeSource(in *api.VolumeSource, out 
 	} else {
 		out.RBD = nil
 	}
+	out.ReclamationPolicy = api.ReclamationPolicy(in.ReclamationPolicy)
 	return nil
 }
 

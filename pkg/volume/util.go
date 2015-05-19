@@ -17,7 +17,12 @@ limitations under the License.
 package volume
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 func GetAccessModesAsString(modes []api.PersistentVolumeAccessMode) string {
@@ -50,4 +55,55 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 		}
 	}
 	return false
+}
+
+// podWatch provides watch semantics for a pod backed by a poller, since
+// events aren't generated for pod status updates.
+type podWatch struct {
+	result chan watch.Event
+	stop   chan bool
+}
+
+// newPodWatch makes a new podWatch.
+func newPodWatch(c client.Interface, namespace, name string, period time.Duration) *podWatch {
+	pods := make(chan watch.Event)
+	stop := make(chan bool)
+	tick := time.NewTicker(period)
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			case <-tick.C:
+				pod, err := c.Pods(namespace).Get(name)
+				if err != nil {
+					pods <- watch.Event{
+						Type: watch.Error,
+						Object: &api.Status{
+							Status:  "Failure",
+							Message: fmt.Sprintf("couldn't get pod %s/%s: %s", namespace, name, err),
+						},
+					}
+					continue
+				}
+				pods <- watch.Event{
+					Type:   watch.Modified,
+					Object: pod,
+				}
+			}
+		}
+	}()
+
+	return &podWatch{
+		result: pods,
+		stop:   stop,
+	}
+}
+
+func (w *podWatch) Stop() {
+	w.stop <- true
+}
+
+func (w *podWatch) ResultChan() <-chan watch.Event {
+	return w.result
 }
