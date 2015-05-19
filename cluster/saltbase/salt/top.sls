@@ -39,6 +39,7 @@ base:
     - cadvisor
     - kube-client-tools
     - kube-master-addons
+    - kube-admission-controls
 {% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
     - logrotate
 {% endif %}
