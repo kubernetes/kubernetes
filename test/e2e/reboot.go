@@ -24,7 +24,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -256,11 +255,11 @@ func waitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duratio
 // ready or unknown).
 func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time.Duration) bool {
 	Logf("Waiting up to %v for node %s readiness to be %t", timeout, name, wantReady)
-	expectNoError(wait.Poll(poll, timeout, func() (bool, error) {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		node, err := c.Nodes().Get(name)
 		if err != nil {
 			Logf("Couldn't get node %s", name)
-			return false, nil
+			continue
 		}
 
 		// Check the node readiness condition (logging all).
@@ -271,11 +270,10 @@ func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time
 			// matches as desired.
 			if cond.Type == api.NodeReady && (cond.Status == api.ConditionTrue) == wantReady {
 				Logf("Successfully found node %s readiness to be %t", name, wantReady)
-				return true, nil
+				return true
 			}
-
 		}
-		return false, nil
-	}))
-	return true
+	}
+	Logf("Node %s didn't reach desired readiness (%t) within %v", name, wantReady, timeout)
+	return false
 }

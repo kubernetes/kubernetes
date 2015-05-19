@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -73,14 +72,12 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
 	const graceTime = 10 * time.Minute
-	start := time.Now()
-	expectNoError(wait.Poll(5*time.Second, graceTime, func() (bool, error) {
+	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		if _, err = s.Get("elasticsearch-logging"); err == nil {
-			return true, nil
+			break
 		}
 		Logf("Attempt to check for the existence of the Elasticsearch service failed after %v", time.Since(start))
-		return false, nil
-	}))
+	}
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for the Elasticsearch pods to enter the running state.
@@ -98,8 +95,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	var statusCode float64
 	var esResponse map[string]interface{}
 	err = nil
-	start = time.Now()
-	expectNoError(wait.Poll(5*time.Second, graceTime, func() (bool, error) {
+	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		// Query against the root URL for Elasticsearch.
 		body, err := c.Get().
 			Namespace(api.NamespaceDefault).
@@ -109,26 +105,26 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 			DoRaw()
 		if err != nil {
 			Logf("After %v proxy call to elasticsearch-loigging failed: %v", time.Since(start), err)
-			return false, nil
+			continue
 		}
 		esResponse, err = bodyToJSON(body)
 		if err != nil {
 			Logf("After %v failed to convert Elasticsearch JSON response %v to map[string]interface{}: %v", time.Since(start), string(body), err)
-			return false, nil
+			continue
 		}
 		statusIntf, ok := esResponse["status"]
 		if !ok {
 			Logf("After %v Elasticsearch response has no status field: %v", time.Since(start), esResponse)
-			return false, nil
+			continue
 		}
 		statusCode, ok = statusIntf.(float64)
 		if !ok {
 			// Assume this is a string returning Failure. Retry.
 			Logf("After %v expected status to be a float64 but got %v of type %T", time.Since(start), statusIntf, statusIntf)
-			return false, nil
+			continue
 		}
-		return true, nil
-	}))
+		break
+	}
 	Expect(err).NotTo(HaveOccurred())
 	if int(statusCode) != 200 {
 		Failf("Elasticsearch cluster has a bad status: %v", statusCode)
@@ -237,8 +233,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	By("Checking all the log lines were ingested into Elasticsearch")
 	missing := 0
 	expected := nodeCount * countTo
-	start = time.Now()
-	expectNoError(wait.Poll(10*time.Second, graceTime, func() (bool, error) {
+	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(10 * time.Second) {
 		// Ask Elasticsearch to return all the log lines that were tagged with the underscore
 		// verison of the name. Ask for twice as many log lines as we expect to check for
 		// duplication bugs.
@@ -253,13 +248,13 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 			DoRaw()
 		if err != nil {
 			Logf("After %v failed to make proxy call to elasticsearch-logging: %v", time.Since(start), err)
-			return false, nil
+			continue
 		}
 
 		response, err := bodyToJSON(body)
 		if err != nil {
 			Logf("After %v failed to unmarshal response: %v", time.Since(start), err)
-			return false, nil
+			continue
 		}
 		hits, ok := response["hits"].(map[string]interface{})
 		if !ok {
@@ -268,17 +263,17 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 		totalF, ok := hits["total"].(float64)
 		if !ok {
 			Logf("After %v hits[total] not of the expected type: %T", time.Since(start), hits["total"])
-			return false, nil
+			continue
 		}
 		total := int(totalF)
 		if total < expected {
 			Logf("After %v expecting to find %d log lines but saw only %d", time.Since(start), expected, total)
-			return false, nil
+			continue
 		}
 		h, ok := hits["hits"].([]interface{})
 		if !ok {
 			Logf("After %v hits not of the expected type: %T", time.Since(start), hits["hits"])
-			return false, nil
+			continue
 		}
 		// Initialize data-structure for observing counts.
 		observed := make([][]int, nodeCount)
@@ -334,10 +329,10 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 		}
 		if missing != 0 {
 			Logf("After %v still missing %d log lines", time.Since(start), missing)
-			return false, nil
+			continue
 		}
 		Logf("After %s found all %d log lines", time.Since(start), expected)
-		return true, nil
-	}))
+		return
+	}
 	Failf("Failed to find all %d log lines", expected)
 }

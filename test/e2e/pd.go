@@ -29,8 +29,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -110,14 +108,14 @@ var _ = Describe("PD", func() {
 		expectNoError(podClient.Delete(host1Pod.Name, nil), "Failed to delete host1Pod")
 
 		By(fmt.Sprintf("deleting PD %q", diskName))
-		expectNoError(wait.Poll(5*time.Second, 180*time.Second, func() (bool, error) {
+		for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
 			if err = deletePD(diskName); err != nil {
 				Logf("Couldn't delete PD. Sleeping 5 seconds (%v)", err)
-				return false, nil
+				continue
 			}
 			Logf("Deleted PD %v", diskName)
-			return true, nil
-		}))
+			break
+		}
 		expectNoError(err, "Error deleting PD")
 
 		return
@@ -178,14 +176,13 @@ var _ = Describe("PD", func() {
 		expectNoError(podClient.Delete(host1ROPod.Name, nil), "Failed to delete host1ROPod")
 
 		By(fmt.Sprintf("deleting PD %q", diskName))
-
-		expectNoError(wait.Poll(5*time.Second, 180*time.Second, func() (bool, error) {
+		for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
 			if err = deletePD(diskName); err != nil {
 				Logf("Couldn't delete PD. Sleeping 5 seconds")
-				return false, nil
+				continue
 			}
-			return true, nil
-		}))
+			break
+		}
 		expectNoError(err, "Error deleting PD")
 	})
 })

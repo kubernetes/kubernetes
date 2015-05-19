@@ -39,7 +39,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	"golang.org/x/crypto/ssh"
 
@@ -272,33 +271,32 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
 
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
-
-	expectNoError(wait.Poll(5*time.Second, podStartTimeout, func() (bool, error) {
+	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "--api-version=v1beta3", "-l", testname, fmt.Sprintf("--namespace=%v", ns))
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
 			By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
-			return false, nil
+			continue
 		}
 		var runningPods []string
 		for _, podID := range pods {
 			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate, "--api-version=v1beta3", fmt.Sprintf("--namespace=%v", ns))
 			if running != "true" {
 				Logf("%s is created but not running", podID)
-				return false, nil
+				continue
 			}
 
 			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate, "--api-version=v1beta3", fmt.Sprintf("--namespace=%v", ns))
 			if currentImage != containerImage {
 				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
-				return false, nil
+				continue
 			}
 
 			// Call the generic validator function here.
 			// This might validate for example, that (1) getting a url works and (2) url is serving correct content.
 			if err := validator(c, podID); err != nil {
 				Logf("%s is running right image but validator function failed: %v", podID, err)
-				return false, nil
+				continue
 			}
 
 			Logf("%s is verified up and running", podID)
@@ -306,10 +304,9 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 		}
 		// If we reach here, then all our checks passed.
 		if len(runningPods) == replicas {
-			return true, nil
+			return
 		}
-		return false, nil
-	}))
+	}
 	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
 	Failf("Timed out after %v seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), testname)
 }
@@ -390,9 +387,10 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 	By(fmt.Sprintf("Trying to get logs from host %s pod %s container %s: %v",
 		podStatus.Spec.Host, podStatus.Name, containerName, err))
 	var logs []byte
+	start := time.Now()
 
 	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	expectNoError(wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	for time.Now().Sub(start) < (60 * time.Second) {
 		logs, err = c.Get().
 			Prefix("proxy").
 			Resource("nodes").
@@ -400,14 +398,16 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 			Suffix("containerLogs", ns, podStatus.Name, containerName).
 			Do().
 			Raw()
-		Logf("pod logs:%v\n", string(logs))
+		fmt.Sprintf("pod logs:%v\n", string(logs))
+		By(fmt.Sprintf("pod logs:%v\n", string(logs)))
 		if strings.Contains(string(logs), "Internal Error") {
-			Logf("Failed to get logs from host %q pod %q container %q: %v",
-				podStatus.Spec.Host, podStatus.Name, containerName, string(logs))
-			return false, nil
+			By(fmt.Sprintf("Failed to get logs from host %q pod %q container %q: %v",
+				podStatus.Spec.Host, podStatus.Name, containerName, string(logs)))
+			time.Sleep(5 * time.Second)
+			continue
 		}
-		return true, nil
-	}))
+		break
+	}
 
 	for _, m := range expectedOutput {
 		Expect(string(logs)).To(ContainSubstring(m), "%q in container output", m)
