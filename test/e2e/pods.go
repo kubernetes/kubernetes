@@ -98,21 +98,22 @@ func testHostIP(c *client.Client, pod *api.Pod) {
 	err = waitForPodRunningInNamespace(c, pod.Name, ns)
 	Expect(err).NotTo(HaveOccurred())
 	// Try to make sure we get a hostIP for each pod.
-
-	var (
-		hostIPTimeout = 2 * time.Minute
-		pods          *api.Pod
-	)
-	expectNoError(wait.Poll(5*time.Second, hostIPTimeout, func() (bool, error) {
-		pods, err = podClient.Get(pod.Name)
+	hostIPTimeout := 2 * time.Minute
+	t := time.Now()
+	for {
+		p, err := podClient.Get(pod.Name)
 		Expect(err).NotTo(HaveOccurred())
-		if pods.Status.HostIP != "" {
-			Logf("Pod %s has hostIP: %s", pods.Name, pods.Status.HostIP)
-			return true, nil
+		if p.Status.HostIP != "" {
+			Logf("Pod %s has hostIP: %s", p.Name, p.Status.HostIP)
+			break
 		}
-		Logf("Retrying to get the hostIP of pod %s", pods.Name)
-		return false, nil
-	}))
+		if time.Since(t) >= hostIPTimeout {
+			Failf("Gave up waiting for hostIP of pod %s after %v seconds",
+				p.Name, time.Since(t).Seconds())
+		}
+		Logf("Retrying to get the hostIP of pod %s", p.Name)
+		time.Sleep(5 * time.Second)
+	}
 }
 
 var _ = Describe("Pods", func() {
