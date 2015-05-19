@@ -138,6 +138,7 @@ func NewMainKubelet(
 	containerRuntime string,
 	mounter mount.Interface,
 	dockerDaemonContainer string,
+	systemContainer string,
 	configureCBR0 bool,
 	pods int) (*Kubelet, error) {
 	if rootDirectory == "" {
@@ -297,10 +298,9 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
 
-	// TODO(vmarmol): Make configurable.
 	// Setup container manager, can fail if the devices hierarchy is not mounted
 	// (it is required by Docker however).
-	containerManager, err := newContainerManager(dockerDaemonContainer, "/system")
+	containerManager, err := newContainerManager(dockerDaemonContainer, systemContainer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the Container Manager: %v", err)
 	}
