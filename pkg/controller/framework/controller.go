@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
@@ -61,7 +62,9 @@ type ProcessFunc func(obj interface{}) error
 
 // Controller is a generic controller framework.
 type Controller struct {
-	config Config
+	config         Config
+	reflector      *cache.Reflector
+	reflectorMutex sync.RWMutex
 }
 
 // New makes a new Controller from the given Config.
@@ -77,14 +80,30 @@ func New(c *Config) *Controller {
 // Run blocks; call via go.
 func (c *Controller) Run(stopCh <-chan struct{}) {
 	defer util.HandleCrash()
-	cache.NewReflector(
+	r := cache.NewReflector(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
 		c.config.Queue,
 		c.config.FullResyncPeriod,
-	).RunUntil(stopCh)
+	)
+
+	c.reflectorMutex.Lock()
+	c.reflector = r
+	c.reflectorMutex.Unlock()
+
+	r.RunUntil(stopCh)
 
 	util.Until(c.processLoop, time.Second, stopCh)
+}
+
+// Returns true once this controller has completed an initial resource listing
+func (c *Controller) HasSynced() bool {
+	c.reflectorMutex.RLock()
+	defer c.reflectorMutex.RUnlock()
+	if c.reflector == nil {
+		return false
+	}
+	return c.reflector.LastSyncResourceVersion() != ""
 }
 
 // processLoop drains the work queue.

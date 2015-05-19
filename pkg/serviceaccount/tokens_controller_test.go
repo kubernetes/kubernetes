@@ -335,6 +335,10 @@ func TestTokenCreation(t *testing.T) {
 
 		controller := NewTokensController(client, DefaultTokenControllerOptions(generator))
 
+		// Tell the token controller its stores have been synced
+		controller.serviceAccountsSynced = func() bool { return true }
+		controller.secretsSynced = func() bool { return true }
+
 		if tc.ExistingServiceAccount != nil {
 			controller.serviceAccounts.Add(tc.ExistingServiceAccount)
 		}
