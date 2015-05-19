@@ -1413,6 +1413,22 @@ func convert_api_ListOptions_To_v1_ListOptions(in *newer.ListOptions, out *ListO
 	return nil
 }
 
+func convert_v1_LocalObjectReference_To_api_LocalObjectReference(in *LocalObjectReference, out *newer.LocalObjectReference, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LocalObjectReference))(in)
+	}
+	out.Name = in.Name
+	return nil
+}
+
+func convert_api_LocalObjectReference_To_v1_LocalObjectReference(in *newer.LocalObjectReference, out *LocalObjectReference, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*newer.LocalObjectReference))(in)
+	}
+	out.Name = in.Name
+	return nil
+}
+
 func convert_v1_NFSVolumeSource_To_api_NFSVolumeSource(in *NFSVolumeSource, out *newer.NFSVolumeSource, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*NFSVolumeSource))(in)
@@ -2671,9 +2687,9 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s conver
 	out.Host = in.Host
 	out.HostNetwork = in.HostNetwork
 	if in.ImagePullSecrets != nil {
-		out.ImagePullSecrets = make([]newer.ObjectReference, len(in.ImagePullSecrets))
+		out.ImagePullSecrets = make([]newer.LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
-			if err := convert_v1_ObjectReference_To_api_ObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
+			if err := convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
 				return err
 			}
 		}
@@ -2733,9 +2749,9 @@ func convert_api_PodSpec_To_v1_PodSpec(in *newer.PodSpec, out *PodSpec, s conver
 	out.Host = in.Host
 	out.HostNetwork = in.HostNetwork
 	if in.ImagePullSecrets != nil {
-		out.ImagePullSecrets = make([]ObjectReference, len(in.ImagePullSecrets))
+		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
 		for i := range in.ImagePullSecrets {
-			if err := convert_api_ObjectReference_To_v1_ObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
+			if err := convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
 				return err
 			}
 		}
@@ -4353,6 +4369,7 @@ func init() {
 		convert_api_ListMeta_To_v1_ListMeta,
 		convert_api_ListOptions_To_v1_ListOptions,
 		convert_api_List_To_v1_List,
+		convert_api_LocalObjectReference_To_v1_LocalObjectReference,
 		convert_api_NFSVolumeSource_To_v1_NFSVolumeSource,
 		convert_api_NamespaceList_To_v1_NamespaceList,
 		convert_api_NamespaceSpec_To_v1_NamespaceSpec,
@@ -4462,6 +4479,7 @@ func init() {
 		convert_v1_ListMeta_To_api_ListMeta,
 		convert_v1_ListOptions_To_api_ListOptions,
 		convert_v1_List_To_api_List,
+		convert_v1_LocalObjectReference_To_api_LocalObjectReference,
 		convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
 		convert_v1_NamespaceList_To_api_NamespaceList,
 		convert_v1_NamespaceSpec_To_api_NamespaceSpec,

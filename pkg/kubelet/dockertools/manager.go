@@ -1230,7 +1230,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 }
 
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
-func (dm *DockerManager) createPodInfraContainer(pod *api.Pod, pullSecrets []api.Secret) (kubeletTypes.DockerID, error) {
+func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.DockerID, error) {
 	// Use host networking if specified.
 	netNamespace := ""
 	var ports []api.ContainerPort
@@ -1264,7 +1264,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod, pullSecrets []api
 		return "", err
 	}
 	if !ok {
-		if err := dm.PullImage(spec, pullSecrets); err != nil {
+		if err := dm.PullImage(spec, nil /* no pod secrets for the infra container */); err != nil {
 			if ref != nil {
 				dm.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, err)
 			}
@@ -1499,7 +1499,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	podInfraContainerID := containerChanges.InfraContainerId
 	if containerChanges.StartInfraContainer && (len(containerChanges.ContainersToStart) > 0) {
 		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
-		podInfraContainerID, err = dm.createPodInfraContainer(pod, pullSecrets)
+		podInfraContainerID, err = dm.createPodInfraContainer(pod)
 
 		// Call the networking plugin
 		if err == nil {

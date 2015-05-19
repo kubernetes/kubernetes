@@ -891,10 +891,12 @@ func validateHostNetwork(hostNetwork bool, containers []api.Container) errs.Vali
 	return allErrors
 }
 
-func validateImagePullSecrets(imagePullSecrets []api.ObjectReference) errs.ValidationErrorList {
+// validateImagePullSecrets checks to make sure the pull secrets are well formed.  Right now, we only expect name to be set (it's the only field).  If this ever changes
+// and someone decides to set those fields, we'd like to know.
+func validateImagePullSecrets(imagePullSecrets []api.LocalObjectReference) errs.ValidationErrorList {
 	allErrors := errs.ValidationErrorList{}
 	for i, currPullSecret := range imagePullSecrets {
-		strippedRef := api.ObjectReference{Name: currPullSecret.Name}
+		strippedRef := api.LocalObjectReference{Name: currPullSecret.Name}
 
 		if !reflect.DeepEqual(strippedRef, currPullSecret) {
 			allErrors = append(allErrors, errs.NewFieldInvalid(fmt.Sprintf("[%d]", i), currPullSecret, "only name may be set"))
