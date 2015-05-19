@@ -825,6 +825,10 @@ type PodSpec struct {
 	// used must be specified.
 	// Optional: Default to false.
 	HostNetwork bool `json:"hostNetwork,omitempty" description:"host networking requested for this pod"`
+	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
+	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
+	// in the case of docker, only DockerConfig type secrets are honored.
+	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" description:"list of references to secrets in the same namespace available for pulling the container images"  patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -1553,6 +1557,12 @@ type ObjectReference struct {
 	// referencing a part of an object.
 	// TODO: this design is not final and this field is subject to change in the future.
 	FieldPath string `json:"fieldPath,omitempty" description:"if referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]"`
+}
+
+// LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
+type LocalObjectReference struct {
+	//TODO: Add other useful fields.  apiVersion, kind, uid?
+	Name string `json:"name,omitempty" description:"name of the referent"`
 }
 
 type SerializedReference struct {

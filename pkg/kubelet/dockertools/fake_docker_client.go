@@ -26,6 +26,7 @@ import (
 
 	"github.com/fsouza/go-dockerclient"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -327,7 +328,7 @@ type FakeDockerPuller struct {
 }
 
 // Pull records the image pull attempt, and optionally injects an error.
-func (f *FakeDockerPuller) Pull(image string) (err error) {
+func (f *FakeDockerPuller) Pull(image string, secrets []api.Secret) (err error) {
 	f.Lock()
 	defer f.Unlock()
 	f.ImagesPulled = append(f.ImagesPulled, image)

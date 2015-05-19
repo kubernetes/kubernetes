@@ -17,6 +17,7 @@ limitations under the License.
 package dockertools
 
 import (
+	"encoding/json"
 	"fmt"
 	"hash/adler32"
 	"reflect"
@@ -220,7 +221,7 @@ func TestPullWithNoSecrets(t *testing.T) {
 			keyring: fakeKeyring,
 		}
 
-		err := dp.Pull(test.imageName)
+		err := dp.Pull(test.imageName, []api.Secret{})
 		if err != nil {
 			t.Errorf("unexpected non-nil err: %s", err)
 			continue
@@ -237,6 +238,73 @@ func TestPullWithNoSecrets(t *testing.T) {
 	}
 }
 
+func TestPullWithSecrets(t *testing.T) {
+	// auth value is equivalent to: "username":"passed-user","password":"passed-password"
+	dockerCfg := map[string]map[string]string{"index.docker.io/v1/": {"email": "passed-email", "auth": "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk"}}
+	dockercfgContent, err := json.Marshal(dockerCfg)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	tests := map[string]struct {
+		imageName           string
+		passedSecrets       []api.Secret
+		builtInDockerConfig credentialprovider.DockerConfig
+		expectedPulls       []string
+	}{
+		"no matching secrets": {
+			"ubuntu",
+			[]api.Secret{},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{}),
+			[]string{"ubuntu:latest using {}"},
+		},
+		"default keyring secrets": {
+			"ubuntu",
+			[]api.Secret{},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			[]string{`ubuntu:latest using {"username":"built-in","password":"password","email":"email"}`},
+		},
+		"default keyring secrets unused": {
+			"ubuntu",
+			[]api.Secret{},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"extraneous": {"built-in", "password", "email"}}),
+			[]string{`ubuntu:latest using {}`},
+		},
+		"builtin keyring secrets, but use passed": {
+			"ubuntu",
+			[]api.Secret{{Type: api.SecretTypeDockercfg, Data: map[string][]byte{api.DockerConfigKey: dockercfgContent}}},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
+		},
+	}
+	for _, test := range tests {
+		builtInKeyRing := &credentialprovider.BasicDockerKeyring{}
+		builtInKeyRing.Add(test.builtInDockerConfig)
+
+		fakeClient := &FakeDockerClient{}
+
+		dp := dockerPuller{
+			client:  fakeClient,
+			keyring: builtInKeyRing,
+		}
+
+		err := dp.Pull(test.imageName, test.passedSecrets)
+		if err != nil {
+			t.Errorf("unexpected non-nil err: %s", err)
+			continue
+		}
+
+		if e, a := 1, len(fakeClient.pulled); e != a {
+			t.Errorf("%s: expected 1 pulled image, got %d: %v", test.imageName, a, fakeClient.pulled)
+			continue
+		}
+
+		if e, a := test.expectedPulls, fakeClient.pulled; !reflect.DeepEqual(e, a) {
+			t.Errorf("%s: expected pull of %v, but got %v", test.imageName, e, a)
+		}
+	}
+}
+
 func TestDockerKeyringLookupFails(t *testing.T) {
 	fakeKeyring := &credentialprovider.FakeKeyring{}
 	fakeClient := &FakeDockerClient{
@@ -248,7 +316,7 @@ func TestDockerKeyringLookupFails(t *testing.T) {
 		keyring: fakeKeyring,
 	}
 
-	err := dp.Pull("host/repository/image:version")
+	err := dp.Pull("host/repository/image:version", []api.Secret{})
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}

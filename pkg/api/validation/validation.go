@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -890,6 +891,20 @@ func validateHostNetwork(hostNetwork bool, containers []api.Container) errs.Vali
 	return allErrors
 }
 
+// validateImagePullSecrets checks to make sure the pull secrets are well formed.  Right now, we only expect name to be set (it's the only field).  If this ever changes
+// and someone decides to set those fields, we'd like to know.
+func validateImagePullSecrets(imagePullSecrets []api.LocalObjectReference) errs.ValidationErrorList {
+	allErrors := errs.ValidationErrorList{}
+	for i, currPullSecret := range imagePullSecrets {
+		strippedRef := api.LocalObjectReference{Name: currPullSecret.Name}
+
+		if !reflect.DeepEqual(strippedRef, currPullSecret) {
+			allErrors = append(allErrors, errs.NewFieldInvalid(fmt.Sprintf("[%d]", i), currPullSecret, "only name may be set"))
+		}
+	}
+	return allErrors
+}
+
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -913,6 +928,7 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy).Prefix("dnsPolicy")...)
 	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, "nodeSelector")...)
 	allErrs = append(allErrs, validateHostNetwork(spec.HostNetwork, spec.Containers).Prefix("hostNetwork")...)
+	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets).Prefix("imagePullSecrets")...)
 
 	if spec.ActiveDeadlineSeconds != nil {
 		if *spec.ActiveDeadlineSeconds <= 0 {
