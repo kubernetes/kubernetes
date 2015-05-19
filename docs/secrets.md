@@ -18,7 +18,7 @@ This is an example of a simple secret, in json format:
   "kind": "Secret",
   "metadata" : {
     "name": "mysecret",
-    "namespace": "myns",
+    "namespace": "myns"
   },  
   "data": {
     "username": "dmFsdWUtMQ0K",
@@ -34,31 +34,30 @@ The values are arbitrary data, encoded using base64.
 This is an example of a pod that uses a secret, in json format:
 ```json
 {
-  "kind": "Pod",
-  "apiVersion": "v1beta3",
+ "apiVersion": "v1beta3",
+ "kind": "Pod",
   "metadata": {
-    "name": "mypod"
+    "name": "mypod",
+    "namespace": "myns"
   },
   "spec": {
-    "manifest": {
-      "containers": [{
-        "name": "c",
-        "image": "example/image",
-        "volumeMounts": [{
-          "name": "foo",
-          "mountPath": "/etc/foo",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
+    "containers": [{
+      "name": "mypod",
+      "image": "redis",
+      "volumeMounts": [{
         "name": "foo",
-        "secret": {
-          "secretName": "mysecret"
-        }
+        "mountPath": "/etc/foo",
+        "readOnly": true
       }]
-    }
+    }],
+    "volumes": [{
+      "name": "foo",
+      "secret": {
+        "secretName": "mysecret"
+      }
+    }]
   }
-}]
+}
 ```
 
 ### Restrictions
