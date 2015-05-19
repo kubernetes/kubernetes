@@ -42,6 +42,7 @@ type EtcdClient interface {
 	Get(key string, sort, recursive bool) (*etcd.Response, error)
 	Set(key, value string, ttl uint64) (*etcd.Response, error)
 	Create(key, value string, ttl uint64) (*etcd.Response, error)
+	CompareAndDelete(key string, prevValue string, prevIndex uint64) (*etcd.Response, error)
 	CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error)
 	Delete(key string, recursive bool) (*etcd.Response, error)
 	// I'd like to use directional channels here (e.g. <-chan) but this interface mimics
@@ -56,6 +57,7 @@ type EtcdGetSet interface {
 	Set(key, value string, ttl uint64) (*etcd.Response, error)
 	Create(key, value string, ttl uint64) (*etcd.Response, error)
 	Delete(key string, recursive bool) (*etcd.Response, error)
+	CompareAndDelete(key string, prevValue string, prevIndex uint64) (*etcd.Response, error)
 	CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error)
 	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
 }
