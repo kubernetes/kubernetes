@@ -34,7 +34,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -57,14 +56,6 @@ const (
 	// How often to poll pods.
 	podPoll = 5 * time.Second
 )
-
-type CloudConfig struct {
-	ProjectID  string
-	Zone       string
-	MasterName string
-
-	Provider cloudprovider.Interface
-}
 
 type TestContextType struct {
 	KubeConfig  string
@@ -311,7 +302,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 	Failf("Timed out after %v seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), testname)
 }
 
-// kubectlCmd runs the kubectl executable through the wrapper script.
+// kubectlCmd runs the kubectl executable.
 func kubectlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
 
@@ -338,7 +329,7 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	kubectlArgs := append(defaultArgs, args...)
 
 	//TODO: the "kubectl" path string might be worth externalizing into an (optional) ginko arg.
-	cmd := exec.Command(filepath.Join(testContext.RepoRoot, "cluster/kubectl.sh"), kubectlArgs...)
+	cmd := exec.Command("kubectl", kubectlArgs...)
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
 	return cmd
 }
