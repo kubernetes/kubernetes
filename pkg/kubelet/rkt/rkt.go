@@ -599,10 +599,10 @@ func (r *runtime) RunPod(pod *api.Pod) error {
 	return nil
 }
 
-// makeruntimePod constructs the container runtime pod. It will:
+// makeRuntimePod constructs the container runtime pod. It will:
 // 1, Construct the pod by the information stored in the unit file.
 // 2, Construct the pod status from pod info.
-func (r *runtime) makeruntimePod(unitName string, podInfos map[string]*podInfo) (*kubecontainer.Pod, error) {
+func (r *runtime) makeRuntimePod(unitName string, podInfos map[string]*podInfo) (*kubecontainer.Pod, error) {
 	f, err := os.Open(path.Join(systemdServiceDir, unitName))
 	if err != nil {
 		return nil, err
@@ -669,7 +669,7 @@ func (r *runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 			if !all && u.SubState != "running" {
 				continue
 			}
-			pod, err := r.makeruntimePod(u.Name, podInfos)
+			pod, err := r.makeRuntimePod(u.Name, podInfos)
 			if err != nil {
 				glog.Warningf("rkt: Cannot construct pod from unit file: %v.", err)
 				continue
