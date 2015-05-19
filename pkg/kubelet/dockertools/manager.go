@@ -32,6 +32,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/lifecycle"
@@ -1249,6 +1250,15 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 		Name:  PodInfraContainerName,
 		Image: dm.PodInfraContainerImage,
 		Ports: ports,
+
+		// The infra container should not need CPU, give it 50m to ensure this.
+		// NOTE: Re-examine in the future if this affects startup time, consider
+		// setting after startup.
+		Resources: api.ResourceRequirements{
+			Limits: api.ResourceList{
+				api.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI),
+			},
+		},
 	}
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
