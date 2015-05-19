@@ -26,13 +26,13 @@ across reboots and failures.
 ### Startup etcd for flannel and the API server to use
 Run:
 ```
-sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d kubernetes/etcd:2.0.5.1 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
+sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d gcr.io/google_containers/etcd:2.0.9 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
 ```
 
 Next, you need to set a CIDR range for flannel.  This CIDR should be chosen to be non-overlapping with any existing network you are using:
 
 ```sh
-sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host kubernetes/etcd:2.0.5.1 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
+sudo docker -H unix:///var/run/docker-bootstrap.sock run --net=host gcr.io/google_containers/etcd:2.0.9 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
 ```
 
 
@@ -108,20 +108,20 @@ systemctl start docker
 Ok, now that your networking is set up, you can startup Kubernetes, this is the same as the single-node case, we will use the "main" instance of the Docker daemon for the Kubernetes components.
 
 ```sh
-sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.14.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
+sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.17.0 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
 ```
 
 ### Also run the service proxy
 ```sh
-sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.14.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.17.0 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
 
 ### Test it out
 At this point, you should have a functioning 1-node cluster.  Let's test it out!
 
 Download the kubectl binary
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v0.14.2/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v0.14.2/bin/linux/amd64/kubectl))
+([OS X](http://storage.googleapis.com/kubernetes-release/release/v0.17.0/bin/darwin/amd64/kubectl))
+([linux](http://storage.googleapis.com/kubernetes-release/release/v0.17.0/bin/linux/amd64/kubectl))
 
 List the nodes
 
