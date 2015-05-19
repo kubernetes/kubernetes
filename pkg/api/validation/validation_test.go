@@ -785,6 +785,15 @@ func TestValidateContainers(t *testing.T) {
 			},
 			ImagePullPolicy: "IfNotPresent",
 		},
+		{
+			Name:  "same-host-port-different-protocol",
+			Image: "image",
+			Ports: []api.ContainerPort{
+				{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
+				{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
+			},
+			ImagePullPolicy: "IfNotPresent",
+		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", SecurityContext: fakeValidSecurityContext(true)},
 	}
 	if errs := validateContainers(successCase, volumes); len(errs) != 0 {
