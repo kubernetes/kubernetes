@@ -359,16 +359,17 @@ kube::golang::build_binaries_for_platform() {
   fi
 
   for test in "${tests[@]:+${tests[@]}}"; do
-      local outfile=$(kube::golang::output_filename_for_binary "${test}" \
-        "${platform}")
+    local outfile=$(kube::golang::output_filename_for_binary "${test}" \
+      "${platform}")
     # Go 1.4 added -o to control where the binary is saved, but Go 1.3 doesn't
     # have this flag. Whenever we deprecate go 1.3, update to use -o instead of
-    # calling mv.
+    # changing into the output directory.
+    pushd "$(dirname ${outfile})"
     go test -c \
       "${goflags[@]:+${goflags[@]}}" \
       -ldflags "${version_ldflags}" \
       "$(dirname ${test})"
-    mv -f "$(basename ${outfile})" "${outfile}"
+    popd
   done
 }
 
