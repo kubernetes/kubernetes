@@ -38,6 +38,13 @@ import (
 	"github.com/golang/glog"
 )
 
+// Rate limitations for binding pods to hosts.
+// TODO: expose these as cmd line flags.
+const (
+	BindPodsQps   = 15
+	BindPodsBurst = 20
+)
+
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
 type ConfigFactory struct {
 	Client *client.Client
@@ -54,6 +61,8 @@ type ConfigFactory struct {
 
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
+	// Rate limiter for binding pods
+	BindPodsRateLimiter util.RateLimiter
 
 	scheduledPodPopulator *framework.Controller
 	modeler               scheduler.SystemModeler
@@ -73,6 +82,7 @@ func NewConfigFactory(client *client.Client) *ConfigFactory {
 	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{c.PodQueue}, c.ScheduledPodLister)
 	c.modeler = modeler
 	c.PodLister = modeler.PodLister()
+	c.BindPodsRateLimiter = util.NewTokenBucketRateLimiter(BindPodsQps, BindPodsBurst)
 
 	// On add/delete to the scheduled pods, remove from the assumed pods.
 	// We construct this here instead of in CreateFromKeys because
@@ -204,8 +214,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 			glog.V(2).Infof("About to try and schedule pod %v", pod.Name)
 			return pod
 		},
-		Error:          f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
-		StopEverything: f.StopEverything,
+		Error:               f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
+		BindPodsRateLimiter: f.BindPodsRateLimiter,
+		StopEverything:      f.StopEverything,
 	}, nil
 }
 
