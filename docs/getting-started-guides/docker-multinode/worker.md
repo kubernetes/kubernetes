@@ -93,14 +93,14 @@ systemctl start docker
 Again this is similar to the above, but the ```--api_servers``` now points to the master we set up in the beginning.
 
 ```sh
-sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.14.2 /hyperkube kubelet --api_servers=http://${MASTER_IP}:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=$(hostname -i)
+sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.17.0 /hyperkube kubelet --api_servers=http://${MASTER_IP}:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=$(hostname -i)
 ```
 
 #### Run the service proxy
 The service proxy provides load-balancing between groups of containers defined by Kubernetes ```Services```
 
 ```sh
-sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.14.2 /hyperkube proxy --master=http://${MASTER_IP}:8080 --v=2
+sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.17.0 /hyperkube proxy --master=http://${MASTER_IP}:8080 --v=2
 ```
 
 
@@ -109,16 +109,17 @@ sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0
 On the master you created above, create a file named ```node.yaml``` make it's contents:
 
 ```yaml
-apiVersion: v1beta1
-externalID: ${NODE_IP}
-hostIP: ${NODE_IP}
-id: ${NODE_IP}
+apiVersion: v1beta3
 kind: Node
-resources:
+metadata:
+  name: ${NODE_IP}
+spec:
+  externalID: ${NODE_IP}
+status:
+  # Fill in appropriate values below
   capacity:
-    # Adjust these to match your node
     cpu: "1"
-    memory: 3892043776
+    memory: 3Gi
 ```
 
 Make the API call to add the node, you should do this on the master node that you created above.  Otherwise you need to add ```-s=http://${MASTER_IP}:8080``` to point ```kubectl``` at the master.
