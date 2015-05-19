@@ -218,7 +218,7 @@ spec:
 ...and we POST that to the server (as JSON). Then let's say we want to *add* a container to this Pod.
 
 ```yaml
-PATCH /v1beta1/pod
+PATCH /api/v1beta3/namespaces/default/pods/pod-name
 spec:
   containers:
     - name: log-tailer
@@ -460,26 +460,33 @@ A ```Status``` kind will be returned by the API in two cases:
 The status object is encoded as JSON and provided as the body of the response.  The status object contains fields for humans and machine consumers of the API to get more detailed information for the cause of the failure. The information in the status object supplements, but does not override, the HTTP status code's meaning. When fields in the status object have the same meaning as generally defined HTTP headers and that header is returned with the response, the header should be considered as having higher priority.
 
 **Example:**
-```JSON
->HTTP Requst:
-POST /api/v1beta1/events/ HTTP/1.1
-Authorization: Basic ...
+```
+$ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https://10.240.122.184:443/api/v1beta3/namespaces/default/pods/grafana
 
-{empty body}
+> GET /api/v1beta3/namespaces/default/pods/grafana HTTP/1.1
+> User-Agent: curl/7.26.0
+> Host: 10.240.122.184
+> Accept: */*
+> Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc
+> 
 
->HTTP Response:
-HTTP/1.1 500 Internal Server Error
-Server: nginx/1.2.1
-Content-Type: application/json
-Content-Length: 144
-
+< HTTP/1.1 404 Not Found
+< Content-Type: application/json
+< Date: Wed, 20 May 2015 18:10:42 GMT
+< Content-Length: 232
+< 
 {
   "kind": "Status",
-  "creationTimestamp": null,
-  "apiVersion": "v1beta1",
+  "apiVersion": "v1beta3",
+  "metadata": {},
   "status": "Failure",
-  "message": "empty input",
-  "code": 500
+  "message": "pods \"grafana\" not found",
+  "reason": "NotFound",
+  "details": {
+    "id": "grafana",
+    "kind": "pods"
+  },
+  "code": 404
 }
 ```
 
