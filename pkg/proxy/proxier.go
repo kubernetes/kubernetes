@@ -154,6 +154,8 @@ func (proxier *Proxier) ensurePortals() {
 
 // clean up any stale sticky session records in the hash map.
 func (proxier *Proxier) cleanupStaleStickySessions() {
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
 	for name := range proxier.serviceMap {
 		proxier.loadBalancer.CleanupStaleStickySessions(name)
 	}
