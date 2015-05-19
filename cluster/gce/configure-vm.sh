@@ -559,11 +559,8 @@ if [[ -z "${is_push}" ]]; then
   set-kube-env
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
   create-salt-pillar
-  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
-    create-salt-master-auth
-  else
-    create-salt-node-auth
-  fi
+  [[ "${KUBERNETES_MASTER}" == "true" ]] && create-salt-master-auth
+  create-salt-node-auth
   download-release
   configure-salt
   remove-docker-artifacts
