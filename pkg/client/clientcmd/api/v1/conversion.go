@@ -19,53 +19,53 @@ package v1
 import (
 	"sort"
 
-	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func init() {
-	err := newer.Scheme.AddConversionFuncs(
-		func(in *Cluster, out *newer.Cluster, s conversion.Scope) error {
+	err := api.Scheme.AddConversionFuncs(
+		func(in *Cluster, out *api.Cluster, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *newer.Cluster, out *Cluster, s conversion.Scope) error {
+		func(in *api.Cluster, out *Cluster, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *Preferences, out *newer.Preferences, s conversion.Scope) error {
+		func(in *Preferences, out *api.Preferences, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *newer.Preferences, out *Preferences, s conversion.Scope) error {
+		func(in *api.Preferences, out *Preferences, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *AuthInfo, out *newer.AuthInfo, s conversion.Scope) error {
+		func(in *AuthInfo, out *api.AuthInfo, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *newer.AuthInfo, out *AuthInfo, s conversion.Scope) error {
+		func(in *api.AuthInfo, out *AuthInfo, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *Context, out *newer.Context, s conversion.Scope) error {
+		func(in *Context, out *api.Context, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
-		func(in *newer.Context, out *Context, s conversion.Scope) error {
+		func(in *api.Context, out *Context, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)
 		},
 
-		func(in *Config, out *newer.Config, s conversion.Scope) error {
+		func(in *Config, out *api.Config, s conversion.Scope) error {
 			out.CurrentContext = in.CurrentContext
 			if err := s.Convert(&in.Preferences, &out.Preferences, 0); err != nil {
 				return err
 			}
 
-			out.Clusters = make(map[string]newer.Cluster)
+			out.Clusters = make(map[string]api.Cluster)
 			if err := s.Convert(&in.Clusters, &out.Clusters, 0); err != nil {
 				return err
 			}
-			out.AuthInfos = make(map[string]newer.AuthInfo)
+			out.AuthInfos = make(map[string]api.AuthInfo)
 			if err := s.Convert(&in.AuthInfos, &out.AuthInfos, 0); err != nil {
 				return err
 			}
-			out.Contexts = make(map[string]newer.Context)
+			out.Contexts = make(map[string]api.Context)
 			if err := s.Convert(&in.Contexts, &out.Contexts, 0); err != nil {
 				return err
 			}
@@ -75,7 +75,7 @@ func init() {
 			}
 			return nil
 		},
-		func(in *newer.Config, out *Config, s conversion.Scope) error {
+		func(in *api.Config, out *Config, s conversion.Scope) error {
 			out.CurrentContext = in.CurrentContext
 			if err := s.Convert(&in.Preferences, &out.Preferences, 0); err != nil {
 				return err
@@ -99,9 +99,9 @@ func init() {
 			}
 			return nil
 		},
-		func(in *[]NamedCluster, out *map[string]newer.Cluster, s conversion.Scope) error {
+		func(in *[]NamedCluster, out *map[string]api.Cluster, s conversion.Scope) error {
 			for _, curr := range *in {
-				newCluster := newer.NewCluster()
+				newCluster := api.NewCluster()
 				if err := s.Convert(&curr.Cluster, newCluster, 0); err != nil {
 					return err
 				}
@@ -110,7 +110,7 @@ func init() {
 
 			return nil
 		},
-		func(in *map[string]newer.Cluster, out *[]NamedCluster, s conversion.Scope) error {
+		func(in *map[string]api.Cluster, out *[]NamedCluster, s conversion.Scope) error {
 			allKeys := make([]string, 0, len(*in))
 			for key := range *in {
 				allKeys = append(allKeys, key)
@@ -130,9 +130,9 @@ func init() {
 
 			return nil
 		},
-		func(in *[]NamedAuthInfo, out *map[string]newer.AuthInfo, s conversion.Scope) error {
+		func(in *[]NamedAuthInfo, out *map[string]api.AuthInfo, s conversion.Scope) error {
 			for _, curr := range *in {
-				newAuthInfo := newer.NewAuthInfo()
+				newAuthInfo := api.NewAuthInfo()
 				if err := s.Convert(&curr.AuthInfo, newAuthInfo, 0); err != nil {
 					return err
 				}
@@ -141,7 +141,7 @@ func init() {
 
 			return nil
 		},
-		func(in *map[string]newer.AuthInfo, out *[]NamedAuthInfo, s conversion.Scope) error {
+		func(in *map[string]api.AuthInfo, out *[]NamedAuthInfo, s conversion.Scope) error {
 			allKeys := make([]string, 0, len(*in))
 			for key := range *in {
 				allKeys = append(allKeys, key)
@@ -161,9 +161,9 @@ func init() {
 
 			return nil
 		},
-		func(in *[]NamedContext, out *map[string]newer.Context, s conversion.Scope) error {
+		func(in *[]NamedContext, out *map[string]api.Context, s conversion.Scope) error {
 			for _, curr := range *in {
-				newContext := newer.NewContext()
+				newContext := api.NewContext()
 				if err := s.Convert(&curr.Context, newContext, 0); err != nil {
 					return err
 				}
@@ -172,7 +172,7 @@ func init() {
 
 			return nil
 		},
-		func(in *map[string]newer.Context, out *[]NamedContext, s conversion.Scope) error {
+		func(in *map[string]api.Context, out *[]NamedContext, s conversion.Scope) error {
 			allKeys := make([]string, 0, len(*in))
 			for key := range *in {
 				allKeys = append(allKeys, key)

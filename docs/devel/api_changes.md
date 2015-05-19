@@ -255,7 +255,7 @@ regenerate auto-generated ones. To regenerate them:
 ```
    - replace all conversion functions (convert\* functions) in the
      `pkg/api/<version>/conversion_generated.go` with the contents of \<file1.txt\>
-   - replace arguments of `newer.Scheme.AddGeneratedConversionFuncs` in the
+   - replace arguments of `api.Scheme.AddGeneratedConversionFuncs` in the
      `pkg/api/<version>/conversion_generated.go` with the contents of \<file2.txt\>
 
 Unsurprisingly, adding manually written conversion also requires you to add tests to
