@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	servicecontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator/controller"
+	portallocator_controller "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
@@ -45,6 +46,10 @@ type Controller struct {
 	// TODO: MasterCount is yucky
 	MasterCount int
 
+	ServiceNodePortRegistry service.RangeRegistry
+	ServiceNodePortInterval time.Duration
+	ServiceNodePorts        util.PortRange
+
 	PortalIPInterval time.Duration
 	EndpointInterval time.Duration
 
@@ -58,21 +63,26 @@ type Controller struct {
 	ReadOnlyServicePort       int
 	PublicReadOnlyServicePort int
 
-	runner *util.Runner
+	runnerPortals          *util.Runner
+	runnerServiceNodePorts *util.Runner
 }
 
 // Start begins the core controller loops that must exist for bootstrapping
 // a cluster.
 func (c *Controller) Start() {
-	if c.runner != nil {
+	if c.runnerPortals != nil {
 		return
 	}
 
-	repair := servicecontroller.NewRepair(c.PortalIPInterval, c.ServiceRegistry, c.PortalNet, c.ServiceIPRegistry)
+	repairPortals := servicecontroller.NewRepair(c.PortalIPInterval, c.ServiceRegistry, c.PortalNet, c.ServiceIPRegistry)
+	repairNodePorts := portallocator_controller.NewRepair(c.ServiceNodePortInterval, c.ServiceRegistry, c.ServiceNodePorts, c.ServiceNodePortRegistry)
 
 	// run all of the controllers once prior to returning from Start.
-	if err := repair.RunOnce(); err != nil {
+	if err := repairPortals.RunOnce(); err != nil {
 		glog.Errorf("Unable to perform initial IP allocation check: %v", err)
+	}
+	if err := repairNodePorts.RunOnce(); err != nil {
+		glog.Errorf("Unable to perform initial service nodePort check: %v", err)
 	}
 	if err := c.UpdateKubernetesService(); err != nil {
 		glog.Errorf("Unable to perform initial Kubernetes service initialization: %v", err)
@@ -81,8 +91,11 @@ func (c *Controller) Start() {
 		glog.Errorf("Unable to perform initial Kubernetes RO service initialization: %v", err)
 	}
 
-	c.runner = util.NewRunner(c.RunKubernetesService, c.RunKubernetesROService, repair.RunUntil)
-	c.runner.Start()
+	c.runnerPortals = util.NewRunner(c.RunKubernetesService, c.RunKubernetesROService, repairPortals.RunUntil)
+	c.runnerPortals.Start()
+
+	c.runnerServiceNodePorts = util.NewRunner(c.RunKubernetesService, c.RunKubernetesROService, repairNodePorts.RunUntil)
+	c.runnerServiceNodePorts.Start()
 }
 
 // RunKubernetesService periodically updates the kubernetes service

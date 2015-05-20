@@ -71,6 +71,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
@@ -142,13 +143,17 @@ type Config struct {
 
 	// The name of the cluster.
 	ClusterName string
+
+	// The range of ports to be assigned to services with visibility=NodePort or greater
+	ServiceNodePorts util.PortRange
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
 	// "Inputs", Copied from Config
-	portalNet    *net.IPNet
-	cacheTimeout time.Duration
+	portalNet        *net.IPNet
+	serviceNodePorts util.PortRange
+	cacheTimeout     time.Duration
 
 	mux                   apiserver.Mux
 	muxHelper             *apiserver.MuxHelper
@@ -189,11 +194,12 @@ type Master struct {
 	// registries are internal client APIs for accessing the storage layer
 	// TODO: define the internal typed interface in a way that clients can
 	// also be replaced
-	nodeRegistry      minion.Registry
-	namespaceRegistry namespace.Registry
-	serviceRegistry   service.Registry
-	endpointRegistry  endpoint.Registry
-	portalAllocator   service.RangeRegistry
+	nodeRegistry             minion.Registry
+	namespaceRegistry        namespace.Registry
+	serviceRegistry          service.Registry
+	endpointRegistry         endpoint.Registry
+	portalAllocator          service.RangeRegistry
+	serviceNodePortAllocator service.RangeRegistry
 
 	// "Outputs"
 	Handler         http.Handler
@@ -226,6 +232,15 @@ func setDefaults(c *Config) {
 			glog.Fatalf("The portal net range must be at least %d IP addresses", 8)
 		}
 		c.PortalNet = portalNet
+	}
+	if c.ServiceNodePorts.Size == 0 {
+		// TODO: Currently no way to specify an empty range (do we need to allow this?)
+		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
+		// but then that breaks the strict nestedness of visibility.
+		// Review post-v1
+		defaultServiceNodePorts := util.PortRange{Base: 30000, Size: 2767}
+		c.ServiceNodePorts = defaultServiceNodePorts
+		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ServiceNodePorts)
 	}
 	if c.MasterCount == 0 {
 		// Clearly, there will be at least one master.
@@ -261,6 +276,7 @@ func setDefaults(c *Config) {
 // Certain config fields will be set to a default value if unset,
 // including:
 //   PortalNet
+//   ServiceNodePorts
 //   MasterCount
 //   ReadOnlyPort
 //   ReadWritePort
@@ -434,6 +450,15 @@ func (m *Master) init(c *Config) {
 	})
 	m.portalAllocator = portalRangeRegistry
 
+	var serviceNodePortRegistry service.RangeRegistry
+	serviceNodePortAllocator := portallocator.NewPortAllocatorCustom(m.serviceNodePorts, func(max int, rangeSpec string) allocator.Interface {
+		mem := allocator.NewAllocationMap(max, rangeSpec)
+		etcd := etcd_allocator.NewEtcd(mem, "/ranges/servicenodeports", "servicenodeportallocation", c.EtcdHelper)
+		serviceNodePortRegistry = etcd
+		return etcd
+	})
+	m.serviceNodePortAllocator = serviceNodePortRegistry
+
 	controllerStorage := controlleretcd.NewREST(c.EtcdHelper)
 
 	// TODO: Factor out the core API registration
@@ -450,7 +475,7 @@ func (m *Master) init(c *Config) {
 		"podTemplates": podTemplateStorage,
 
 		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, portalAllocator, c.ClusterName),
+		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, portalAllocator, serviceNodePortAllocator, c.ClusterName),
 		"endpoints":              endpointsStorage,
 		"minions":                nodeStorage,
 		"minions/status":         nodeStatusStorage,
@@ -595,8 +620,12 @@ func (m *Master) NewBootstrapController() *Controller {
 		PortalNet:         m.portalNet,
 		MasterCount:       m.masterCount,
 
-		PortalIPInterval: 3 * time.Minute,
-		EndpointInterval: 10 * time.Second,
+		ServiceNodePortRegistry: m.serviceNodePortAllocator,
+		ServiceNodePorts:        m.serviceNodePorts,
+
+		ServiceNodePortInterval: 3 * time.Minute,
+		PortalIPInterval:        3 * time.Minute,
+		EndpointInterval:        10 * time.Second,
 
 		PublicIP: m.clusterIP,
 
