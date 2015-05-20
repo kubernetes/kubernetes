@@ -21,28 +21,27 @@ The kube\-proxy takes several options.
     log to standard error as well as files
 
 .PP
-\fB\-\-api\_version=\fP""
-    The API version to use when talking to the server
+\fB\-\-bind\-address\fP=0.0.0.0
+    The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)
 
 .PP
-\fB\-\-bindaddress\fP="0.0.0.0"
-    The address for the proxy server to serve on (set to 0.0.0.0 or "" for all interfaces)
+\fB\-\-healthz\-bind\-address\fP=127.0.0.1
+    The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
 
 .PP
-\fB\-\-etcd\_servers\fP=[]
-    List of etcd servers to watch (
-\[la]http://ip:port\[ra]), comma separated (optional)
+\fB\-\-healthz\-port\fP=10249
+    The port to bind the health check server. Use 0 to disable.
 
 .PP
-\fB\-\-insecure\_skip\_tls\_verify\fP=false
-    If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+\fB\-\-kubeconfig\fP=""
+    Path to kubeconfig file with authorization information (the master location is set by the master flag).
 
 .PP
 \fB\-\-log\_backtrace\_at\fP=:0
     when logging hits line file:N, emit a stack trace
 
 .PP
-\fB\-\-log\_dir\fP=""
+\fB\-\-log\_dir\fP=
     If non\-empty, write log files in this directory
 
 .PP
@@ -50,15 +49,23 @@ The kube\-proxy takes several options.
     Maximum number of seconds between log flushes
 
 .PP
-\fB\-\-logtostderr\fP=false
+\fB\-\-logtostderr\fP=true
     log to standard error instead of files
 
 .PP
 \fB\-\-master\fP=""
-    The address of the Kubernetes API server
+    The address of the Kubernetes API server (overrides any value in kubeconfig)
 
 .PP
-\fB\-\-stderrthreshold\fP=0
+\fB\-\-oom\-score\-adj\fP=\-899
+    The oom\_score\_adj value for kube\-proxy process. Values must be within the range [\-1000, 1000]
+
+.PP
+\fB\-\-resource\-container\fP="/kube\-proxy"
+    Absolute name of the resource\-only container to create and run the Kube\-proxy in (Default: /kube\-proxy).
+
+.PP
+\fB\-\-stderrthreshold\fP=2
     logs at or above this threshold go to stderr
 
 .PP
@@ -78,7 +85,7 @@ The kube\-proxy takes several options.
 .RS
 
 .nf
-/usr/bin/kube\-proxy \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001
+/usr/bin/kube\-proxy \-\-logtostderr=true \-\-v=0 \-\-master=http://127.0.0.1:8080
 
 .fi
 
@@ -86,3 +93,6 @@ The kube\-proxy takes several options.
 .PP
 October 2014, Originally compiled by Scott Collier (scollier at redhat dot com) based
  on the kubernetes source material and internal work.
+
+.PP
+[]()
