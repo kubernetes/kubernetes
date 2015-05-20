@@ -112,11 +112,78 @@ func TestMatchVolume(t *testing.T) {
 			t.Errorf("Expected match but received nil volume for scenario: %s", name)
 		}
 		if scenario.expectedMatch != "" && volume != nil && string(volume.UID) != scenario.expectedMatch {
-			t.Errorf("Expected %s but got volume %s instead", scenario.expectedMatch, volume.UID)
+			t.Errorf("Expected %s but got volume %s in scenario %s", scenario.expectedMatch, volume.UID, name)
 		}
 		if scenario.expectedMatch == "" && volume != nil {
 			t.Errorf("Unexpected match for scenario: %s", name)
 		}
+	}
+}
+
+func TestMatchingWithBoundVolumes(t *testing.T) {
+	volumeIndex := NewPersistentVolumeOrderedIndex()
+	// two similar volumes, one is bound
+	pv1 := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			UID:  "gce-pd-1",
+			Name: "gce001",
+		},
+		Spec: api.PersistentVolumeSpec{
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+			},
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany},
+			// this one we're pretending is already bound
+			ClaimRef: &api.ObjectReference{UID: "abc123"},
+		},
+	}
+
+	pv2 := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			UID:  "gce-pd-2",
+			Name: "gce002",
+		},
+		Spec: api.PersistentVolumeSpec{
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+			},
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany},
+		},
+	}
+
+	volumeIndex.Add(pv1)
+	volumeIndex.Add(pv2)
+
+	claim := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "claim01",
+			Namespace: "myns",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+				},
+			},
+		},
+	}
+
+	volume, err := volumeIndex.FindBestMatchForClaim(claim)
+	if err != nil {
+		t.Fatalf("Unexpected error matching volume by claim: %v", err)
+	}
+	if volume == nil {
+		t.Fatalf("Unexpected nil volume.  Expected %s", pv2.Name)
+	}
+	if pv2.Name != volume.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv2.Name, volume.Name)
 	}
 }
 
@@ -168,6 +235,26 @@ func createTestVolumes() []*api.PersistentVolume {
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:  "gce-pd-20",
+				Name: "gce004",
+			},
+			Spec: api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+				},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+					api.ReadOnlyMany,
+				},
+				// this one we're pretending is already bound
+				ClaimRef: &api.ObjectReference{UID: "def456"},
 			},
 		},
 		{
