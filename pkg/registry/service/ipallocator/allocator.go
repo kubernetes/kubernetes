@@ -19,10 +19,9 @@ package ipallocator
 import (
 	"errors"
 	"fmt"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
 	"math/big"
-	"math/rand"
 	"net"
-	"sync"
 )
 
 // Interface manages the allocation of IP addresses out of a range. Interface
@@ -78,35 +77,23 @@ type Range struct {
 	net *net.IPNet
 	// base is a cached version of the start IP in the CIDR range as a *big.Int
 	base *big.Int
-	// strategy is the strategy for choosing the next available IP out of the range
-	strategy allocateStrategy
 	// max is the maximum size of the usable addresses in the range
 	max int
 
-	// lock guards the following members
-	lock sync.Mutex
-	// count is the number of currently allocated elements in the range
-	count int
-	// allocated is a bit array of the allocated ips in the range
-	allocated *big.Int
+	bitmap *allocator.AllocationBitmap
 }
-
-// allocateStrategy is a search strategy in the allocation map for a valid IP.
-type allocateStrategy func(allocated *big.Int, max, count int) (int, error)
 
 // NewCIDRRange creates a Range over a net.IPNet.
 func NewCIDRRange(cidr *net.IPNet) *Range {
 	max := RangeSize(cidr)
 	base := bigForIP(cidr.IP)
-	r := Range{
-		net:      cidr,
-		strategy: randomScanStrategy,
-		base:     base.Add(base, big.NewInt(1)), // don't use the network base
-		max:      maximum(0, int(max-2)),        // don't use the network broadcast
 
-		allocated: big.NewInt(0),
-		count:     0,
+	r := Range{
+		net:  cidr,
+		base: base.Add(base, big.NewInt(1)), // don't use the network base
+		max:  maximum(0, int(max-2)),        // don't use the network broadcast,
 	}
+	r.bitmap = allocator.NewAllocationMap(r.max)
 	return &r
 }
 
@@ -119,9 +106,7 @@ func maximum(a, b int) int {
 
 // Free returns the count of IP addresses left in the range.
 func (r *Range) Free() int {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	return r.max - r.count
+	return r.bitmap.Free()
 }
 
 // Allocate attempts to reserve the provided IP. ErrNotInRange or
@@ -134,30 +119,21 @@ func (r *Range) Allocate(ip net.IP) error {
 		return ErrNotInRange
 	}
 
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	if r.allocated.Bit(offset) == 1 {
+	if r.bitmap.Allocate(offset) {
+		return nil
+	} else {
 		return ErrAllocated
 	}
-	r.allocated = r.allocated.SetBit(r.allocated, offset, 1)
-	r.count++
-	return nil
 }
 
 // AllocateNext reserves one of the IPs from the pool. ErrFull may
 // be returned if there are no addresses left.
 func (r *Range) AllocateNext() (net.IP, error) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	next, err := r.strategy(r.allocated, r.max, r.count)
-	if err != nil {
-		return nil, err
+	offset, ok := r.bitmap.AllocateNext()
+	if !ok {
+		return nil, ErrFull
 	}
-	r.count++
-	r.allocated = r.allocated.SetBit(r.allocated, next, 1)
-	return addIPOffset(r.base, next), nil
+	return addIPOffset(r.base, offset), nil
 }
 
 // Release releases the IP back to the pool. Releasing an
@@ -169,15 +145,7 @@ func (r *Range) Release(ip net.IP) error {
 		return nil
 	}
 
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	if r.allocated.Bit(offset) == 0 {
-		return nil
-	}
-
-	r.allocated = r.allocated.SetBit(r.allocated, offset, 0)
-	r.count--
+	r.bitmap.Release(offset)
 	return nil
 }
 
@@ -189,31 +157,21 @@ func (r *Range) Has(ip net.IP) bool {
 		return false
 	}
 
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	return r.allocated.Bit(offset) == 1
+	return r.bitmap.Has(offset)
 }
 
 // Snapshot saves the current state of the pool.
 func (r *Range) Snapshot() (*net.IPNet, []byte) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	return r.net, r.allocated.Bytes()
+	return r.net, r.bitmap.Snapshot()
 }
 
 // Restore restores the pool to the previously captured state. ErrMismatchedNetwork
 // is returned if the provided IPNet range doesn't exactly match the previous range.
 func (r *Range) Restore(net *net.IPNet, data []byte) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
 	if !net.IP.Equal(r.net.IP) || net.Mask.String() != r.net.Mask.String() {
 		return ErrMismatchedNetwork
 	}
-	r.allocated = big.NewInt(0).SetBytes(data)
-	r.count = countBits(r.allocated)
+	r.bitmap.Restore(data)
 	return nil
 }
 
@@ -250,68 +208,6 @@ func addIPOffset(base *big.Int, offset int) net.IP {
 // base + offset = ip. It requires ip >= base.
 func calculateIPOffset(base *big.Int, ip net.IP) int {
 	return int(big.NewInt(0).Sub(bigForIP(ip), base).Int64())
-}
-
-// randomScanStrategy chooses a random address from the provided big.Int, and then
-// scans forward looking for the next available address (it will wrap the range if
-// necessary).
-func randomScanStrategy(allocated *big.Int, max, count int) (int, error) {
-	if count >= max {
-		return 0, ErrFull
-	}
-	offset := rand.Intn(max)
-	for i := 0; i < max; i++ {
-		at := (offset + i) % max
-		if allocated.Bit(at) == 0 {
-			return at, nil
-		}
-	}
-	return 0, ErrFull
-}
-
-// countBits returns the number of set bits in n
-func countBits(n *big.Int) int {
-	var count int = 0
-	for _, b := range n.Bytes() {
-		count += int(bitCounts[b])
-	}
-	return count
-}
-
-// bitCounts is all of the bits counted for each number between 0-255
-var bitCounts = []int8{
-	0, 1, 1, 2, 1, 2, 2, 3,
-	1, 2, 2, 3, 2, 3, 3, 4,
-	1, 2, 2, 3, 2, 3, 3, 4,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	1, 2, 2, 3, 2, 3, 3, 4,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	1, 2, 2, 3, 2, 3, 3, 4,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	4, 5, 5, 6, 5, 6, 6, 7,
-	1, 2, 2, 3, 2, 3, 3, 4,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	4, 5, 5, 6, 5, 6, 6, 7,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	4, 5, 5, 6, 5, 6, 6, 7,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	4, 5, 5, 6, 5, 6, 6, 7,
-	4, 5, 5, 6, 5, 6, 6, 7,
-	5, 6, 6, 7, 6, 7, 7, 8,
 }
 
 // RangeSize returns the size of a range in valid addresses.

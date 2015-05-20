@@ -142,25 +142,11 @@ func TestAllocateSmall(t *testing.T) {
 		}
 	}
 
-	if r.count != 2 && r.Free() != 0 && r.max != 2 {
+	if r.Free() != 0 {
 		t.Fatalf("unexpected range: %v", r)
 	}
 
 	t.Logf("allocated: %v", found)
-}
-
-func TestBitCount(t *testing.T) {
-	for i, c := range bitCounts {
-		actual := 0
-		for j := 0; j < 8; j++ {
-			if ((1 << uint(j)) & i) != 0 {
-				actual++
-			}
-		}
-		if actual != int(c) {
-			t.Errorf("%d should have %d bits but recorded as %d", i, actual, c)
-		}
-	}
 }
 
 func TestRangeSize(t *testing.T) {
