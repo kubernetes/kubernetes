@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/golang/glog"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.
@@ -79,6 +80,9 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		}
 	}()
 
+	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts)
+	defer nodePortOp.Finish()
+
 	if api.IsServiceIPRequested(service) {
 		// Allocate next available.
 		ip, err := rs.portals.AllocateNext()
@@ -97,12 +101,35 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		releaseServiceIP = true
 	}
 
+	assignNodePorts := shouldAssignNodePorts(service)
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort != 0 {
+			err := nodePortOp.Allocate(servicePort.NodePort)
+			if err != nil {
+				return nil, err
+			}
+		} else if assignNodePorts {
+			nodePort, err := nodePortOp.AllocateNext()
+			if err != nil {
+				return nil, err
+			}
+			servicePort.NodePort = nodePort
+		}
+	}
+
 	out, err := rs.registry.CreateService(ctx, service)
 	if err != nil {
 		err = rest.CheckGeneratedNameError(rest.Services, err, service)
 	}
 
 	if err == nil {
+		el := nodePortOp.Commit()
+		if el != nil {
+			// these should be caught by an eventual reconciliation / restart
+			glog.Errorf("error(s) committing service node-ports changes: %v", el)
+		}
+
 		releaseServiceIP = false
 	}
 
@@ -114,10 +141,25 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	err = rs.registry.DeleteService(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
 	if api.IsServiceIPSet(service) {
 		rs.portals.Release(net.ParseIP(service.Spec.PortalIP))
 	}
-	return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(ctx, id)
+
+	for _, nodePort := range collectServiceNodePorts(service) {
+		err := rs.serviceNodePorts.Release(nodePort)
+		if err != nil {
+			// these should be caught by an eventual reconciliation / restart
+			glog.Errorf("Error releasing service %s node port %d: %v", service.Name, nodePort, err)
+		}
+	}
+
+	return &api.Status{Status: api.StatusSuccess}, nil
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
@@ -173,7 +215,62 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	if errs := validation.ValidateServiceUpdate(oldService, service); len(errs) > 0 {
 		return nil, false, errors.NewInvalid("service", service.Name, errs)
 	}
+
+	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts)
+	defer nodePortOp.Finish()
+
+	assignNodePorts := shouldAssignNodePorts(service)
+
+	oldNodePorts := collectServiceNodePorts(oldService)
+
+	newNodePorts := []int{}
+	if assignNodePorts {
+		for i := range service.Spec.Ports {
+			servicePort := &service.Spec.Ports[i]
+			nodePort := servicePort.NodePort
+			if nodePort != 0 {
+				if !contains(oldNodePorts, nodePort) {
+					err := nodePortOp.Allocate(nodePort)
+					if err != nil {
+						return nil, false, err
+					}
+				}
+			} else {
+				nodePort, err = nodePortOp.AllocateNext()
+				if err != nil {
+					return nil, false, err
+				}
+				servicePort.NodePort = nodePort
+			}
+			// Detect duplicate node ports; this should have been caught by validation, so we panic
+			if contains(newNodePorts, nodePort) {
+				panic("duplicate node port")
+			}
+			newNodePorts = append(newNodePorts, nodePort)
+		}
+	} else {
+		// Validate should have validated that nodePort == 0
+	}
+
+	// The comparison loops are O(N^2), but we don't expect N to be huge
+	// (there's a hard-limit at 2^16, because they're ports; and even 4 ports would be a lot)
+	for _, oldNodePort := range oldNodePorts {
+		if !contains(newNodePorts, oldNodePort) {
+			continue
+		}
+		nodePortOp.ReleaseDeferred(oldNodePort)
+	}
+
 	out, err := rs.registry.UpdateService(ctx, service)
+
+	if err == nil {
+		el := nodePortOp.Commit()
+		if el != nil {
+			// problems should be fixed by an eventual reconciliation / restart
+			glog.Errorf("error(s) committing NodePorts changes: %v", el)
+		}
+	}
+
 	return out, false, err
 }
 
@@ -214,4 +311,42 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 		}
 	}
 	return nil, nil, fmt.Errorf("no endpoints available for %q", id)
+}
+
+// This is O(N), but we expect haystack to be small;
+// so small that we expect a linear search to be faster
+func contains(haystack []int, needle int) bool {
+	for _, v := range haystack {
+		if v == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func collectServiceNodePorts(service *api.Service) []int {
+	servicePorts := []int{}
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		if servicePort.NodePort != 0 {
+			servicePorts = append(servicePorts, servicePort.NodePort)
+		}
+	}
+	return servicePorts
+}
+
+func shouldAssignNodePorts(service *api.Service) bool {
+	// TODO(justinsb): Switch on service.Spec.Type
+	//	switch service.Spec.Type {
+	//	case api.ServiceVisibilityLoadBalancer:
+	//		return true
+	//	case api.ServiceVisibilityNodePort:
+	//		return true
+	//	case api.ServiceVisibilityCluster:
+	//		return false
+	//	default:
+	//		glog.Errorf("Unknown visibility value: %v", service.Spec.Visibility)
+	//		return false
+	//	}
+	return false
 }
