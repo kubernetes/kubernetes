@@ -63,11 +63,21 @@ type Proxier struct {
 	mu            sync.Mutex // protects serviceMap
 	serviceMap    map[ServicePortName]*serviceInfo
 	portMapMutex  sync.Mutex
-	portMap       map[int]ServicePortName
+	portMap       map[portMapKey]ServicePortName
 	numProxyLoops int32 // use atomic ops to access this; mostly for testing
 	listenIP      net.IP
 	iptables      iptables.Interface
 	hostIP        net.IP
+}
+
+// A key for the portMap
+type portMapKey struct {
+	port     int
+	protocol api.Protocol
+}
+
+func (k *portMapKey) String() string {
+	return fmt.Sprintf("%s/%d", k.protocol, k.port)
 }
 
 var (
@@ -116,7 +126,7 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 	return &Proxier{
 		loadBalancer: loadBalancer,
 		serviceMap:   make(map[ServicePortName]*serviceInfo),
-		portMap:      make(map[int]ServicePortName),
+		portMap:      make(map[portMapKey]ServicePortName),
 		listenIP:     listenIP,
 		iptables:     iptables,
 		hostIP:       hostIP,
@@ -381,35 +391,44 @@ func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol 
 	return nil
 }
 
-func (proxier *Proxier) lockPort(port int, owner ServicePortName) error {
+// Marks a port as being owned by a particular service, or returns error if already claimed.
+// Idempotent: reclaiming with the same owner is not an error
+func (proxier *Proxier) claimPort(port int, protocol api.Protocol, owner ServicePortName) error {
 	proxier.portMapMutex.Lock()
 	defer proxier.portMapMutex.Unlock()
 
 	// TODO: We could pre-populate some reserved ports into portMap and/or blacklist some well-known ports
-	existing, found := proxier.portMap[port]
+
+	key := portMapKey{port: port, protocol: protocol}
+	existing, found := proxier.portMap[key]
 	if !found {
-		proxier.portMap[port] = owner
+		proxier.portMap[key] = owner
 		return nil
 	}
 	if existing == owner {
+		// We are idempotent
 		return nil
 	}
-	return fmt.Errorf("Port conflict detected on port %d.  %v vs %v", port, owner, existing)
+	return fmt.Errorf("Port conflict detected on port %v.  %v vs %v", key, owner, existing)
 }
 
-func (proxier *Proxier) unlockPort(port int, owner ServicePortName) error {
+// Release a claim on a port.  Returns an error if the owner does not match the claim.
+// Tolerates release on an unclaimed port, to simplify .
+func (proxier *Proxier) releasePort(port int, protocol api.Protocol, owner ServicePortName) error {
 	proxier.portMapMutex.Lock()
 	defer proxier.portMapMutex.Unlock()
 
-	existing, found := proxier.portMap[port]
+	key := portMapKey{port: port, protocol: protocol}
+	existing, found := proxier.portMap[key]
 	if !found {
 		// We tolerate this, it happens if we are cleaning up a failed allocation
+		glog.Infof("Ignoring release on unowned port: %v", key)
 		return nil
 	}
 	if existing != owner {
-		return fmt.Errorf("Port conflict detected on port %d (unowned unlock).  %v vs %v", port, owner, existing)
+		return fmt.Errorf("Port conflict detected on port %v (unowned unlock).  %v vs %v", key, owner, existing)
 	}
-	delete(proxier.portMap, port)
+	delete(proxier.portMap, key)
 	return nil
 }
 
@@ -417,7 +436,7 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyI
 	// TODO: Do we want to allow containers to access public services?  Probably yes.
 	// TODO: We could refactor this to be the same code as portal, but with IP == nil
 
-	err := proxier.lockPort(nodePort, name)
+	err := proxier.claimPort(nodePort, protocol, name)
 	if err != nil {
 		return err
 	}
@@ -500,7 +519,7 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxy
 		el = append(el, err)
 	}
 
-	if err := proxier.unlockPort(nodePort, name); err != nil {
+	if err := proxier.releasePort(nodePort, protocol, name); err != nil {
 		el = append(el, err)
 	}
 
