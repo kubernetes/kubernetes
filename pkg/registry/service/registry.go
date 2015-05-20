@@ -33,6 +33,7 @@ type Registry interface {
 	WatchServices(ctx api.Context, labels labels.Selector, fields fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
+// TODO: Move to a general location (as other components may need allocation in future; it's not service specific)
 // RangeRegistry is a registry that can retrieve or persist a RangeAllocation object.
 type RangeRegistry interface {
 	// Get returns the latest allocation, an empty object if no allocation has been made,
