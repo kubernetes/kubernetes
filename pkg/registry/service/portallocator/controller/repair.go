@@ -56,6 +56,13 @@ func (c *Repair) RunUntil(ch chan struct{}) {
 
 // RunOnce verifies the state of the portal IP allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) RunOnce() error {
+	// TODO: (per smarterclayton) if Get() or ListServices() is a weak consistency read,
+	// or if they are executed against different leaders,
+	// the ordering guarantee required to ensure no IP is allocated twice is violated.
+	// ListServices must return a ResourceVersion higher than the etcd index Get triggers,
+	// and the release code must not release services that have had IPs allocated but not yet been created
+	// See #8295
+
 	latest, err := c.alloc.Get()
 	if err != nil {
 		return fmt.Errorf("unable to refresh the port block: %v", err)
