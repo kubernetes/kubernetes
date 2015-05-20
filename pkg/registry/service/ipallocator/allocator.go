@@ -19,10 +19,10 @@ package ipallocator
 import (
 	"errors"
 	"fmt"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
 	"math/big"
-	"math/rand"
 	"net"
-	"sync"
 )
 
 // Interface manages the allocation of IP addresses out of a range. Interface
@@ -33,20 +33,11 @@ type Interface interface {
 	Release(net.IP) error
 }
 
-// Snapshottable is an Interface that can be snapshotted and restored. Snapshottable
-// should be threadsafe.
-type Snapshottable interface {
-	Interface
-	Snapshot() (*net.IPNet, []byte)
-	Restore(*net.IPNet, []byte) error
-}
-
 var (
-	ErrFull               = errors.New("range is full")
-	ErrNotInRange         = errors.New("provided IP is not in the valid range")
-	ErrAllocated          = errors.New("provided IP is already allocated")
-	ErrMismatchedNetwork  = errors.New("the provided network does not match the current range")
-	ErrAllocationDisabled = errors.New("IP addresses cannot be allocated at this time")
+	ErrFull              = errors.New("range is full")
+	ErrNotInRange        = errors.New("provided IP is not in the valid range")
+	ErrAllocated         = errors.New("provided IP is already allocated")
+	ErrMismatchedNetwork = errors.New("the provided network does not match the current range")
 )
 
 // Range is a contiguous block of IPs that can be allocated atomically.
@@ -64,50 +55,37 @@ var (
 //     |                              |
 //   r.base                     r.base + r.max
 //     |                              |
-//   first bit of r.allocated   last bit of r.allocated
-//
-// If an address is taken, the bit at offset:
-//
-//   bit offset := IP - r.base
-//
-// is set to one. r.count is always equal to the number of set bits and
-// can be recalculated at any time by counting the set bits in r.allocated.
-//
-// TODO: use RLE and compact the allocator to minimize space.
+//   offset #0 of r.allocated   last offset of r.allocated
 type Range struct {
 	net *net.IPNet
 	// base is a cached version of the start IP in the CIDR range as a *big.Int
 	base *big.Int
-	// strategy is the strategy for choosing the next available IP out of the range
-	strategy allocateStrategy
 	// max is the maximum size of the usable addresses in the range
 	max int
 
-	// lock guards the following members
-	lock sync.Mutex
-	// count is the number of currently allocated elements in the range
-	count int
-	// allocated is a bit array of the allocated ips in the range
-	allocated *big.Int
+	alloc allocator.Interface
 }
 
-// allocateStrategy is a search strategy in the allocation map for a valid IP.
-type allocateStrategy func(allocated *big.Int, max, count int) (int, error)
-
-// NewCIDRRange creates a Range over a net.IPNet.
-func NewCIDRRange(cidr *net.IPNet) *Range {
+// NewAllocatorCIDRRange creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
+func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) *Range {
 	max := RangeSize(cidr)
 	base := bigForIP(cidr.IP)
-	r := Range{
-		net:      cidr,
-		strategy: randomScanStrategy,
-		base:     base.Add(base, big.NewInt(1)), // don't use the network base
-		max:      maximum(0, int(max-2)),        // don't use the network broadcast
+	rangeSpec := cidr.String()
 
-		allocated: big.NewInt(0),
-		count:     0,
+	r := Range{
+		net:  cidr,
+		base: base.Add(base, big.NewInt(1)), // don't use the network base
+		max:  maximum(0, int(max-2)),        // don't use the network broadcast,
 	}
+	r.alloc = allocatorFactory(r.max, rangeSpec)
 	return &r
+}
+
+// Helper that wraps NewAllocatorCIDRRange, for creating a range backed by an in-memory store.
+func NewCIDRRange(cidr *net.IPNet) *Range {
+	return NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) allocator.Interface {
+		return allocator.NewAllocationMap(max, rangeSpec)
+	})
 }
 
 func maximum(a, b int) int {
@@ -119,9 +97,7 @@ func maximum(a, b int) int {
 
 // Free returns the count of IP addresses left in the range.
 func (r *Range) Free() int {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	return r.max - r.count
+	return r.alloc.Free()
 }
 
 // Allocate attempts to reserve the provided IP. ErrNotInRange or
@@ -134,30 +110,27 @@ func (r *Range) Allocate(ip net.IP) error {
 		return ErrNotInRange
 	}
 
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	if r.allocated.Bit(offset) == 1 {
+	allocated, err := r.alloc.Allocate(offset)
+	if err != nil {
+		return err
+	}
+	if !allocated {
 		return ErrAllocated
 	}
-	r.allocated = r.allocated.SetBit(r.allocated, offset, 1)
-	r.count++
 	return nil
 }
 
 // AllocateNext reserves one of the IPs from the pool. ErrFull may
 // be returned if there are no addresses left.
 func (r *Range) AllocateNext() (net.IP, error) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	next, err := r.strategy(r.allocated, r.max, r.count)
+	offset, ok, err := r.alloc.AllocateNext()
 	if err != nil {
 		return nil, err
 	}
-	r.count++
-	r.allocated = r.allocated.SetBit(r.allocated, next, 1)
-	return addIPOffset(r.base, next), nil
+	if !ok {
+		return nil, ErrFull
+	}
+	return addIPOffset(r.base, offset), nil
 }
 
 // Release releases the IP back to the pool. Releasing an
@@ -169,16 +142,7 @@ func (r *Range) Release(ip net.IP) error {
 		return nil
 	}
 
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	if r.allocated.Bit(offset) == 0 {
-		return nil
-	}
-
-	r.allocated = r.allocated.SetBit(r.allocated, offset, 0)
-	r.count--
-	return nil
+	return r.alloc.Release(offset)
 }
 
 // Has returns true if the provided IP is already allocated and a call
@@ -189,31 +153,32 @@ func (r *Range) Has(ip net.IP) bool {
 		return false
 	}
 
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	return r.allocated.Bit(offset) == 1
+	return r.alloc.Has(offset)
 }
 
 // Snapshot saves the current state of the pool.
-func (r *Range) Snapshot() (*net.IPNet, []byte) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	return r.net, r.allocated.Bytes()
+func (r *Range) Snapshot(dst *api.RangeAllocation) error {
+	snapshottable, ok := r.alloc.(allocator.Snapshottable)
+	if !ok {
+		return fmt.Errorf("not a snapshottable allocator")
+	}
+	rangeString, data := snapshottable.Snapshot()
+	dst.Range = rangeString
+	dst.Data = data
+	return nil
 }
 
 // Restore restores the pool to the previously captured state. ErrMismatchedNetwork
 // is returned if the provided IPNet range doesn't exactly match the previous range.
 func (r *Range) Restore(net *net.IPNet, data []byte) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
 	if !net.IP.Equal(r.net.IP) || net.Mask.String() != r.net.Mask.String() {
 		return ErrMismatchedNetwork
 	}
-	r.allocated = big.NewInt(0).SetBytes(data)
-	r.count = countBits(r.allocated)
+	snapshottable, ok := r.alloc.(allocator.Snapshottable)
+	if !ok {
+		return fmt.Errorf("not a snapshottable allocator")
+	}
+	snapshottable.Restore(net.String(), data)
 	return nil
 }
 
@@ -250,68 +215,6 @@ func addIPOffset(base *big.Int, offset int) net.IP {
 // base + offset = ip. It requires ip >= base.
 func calculateIPOffset(base *big.Int, ip net.IP) int {
 	return int(big.NewInt(0).Sub(bigForIP(ip), base).Int64())
-}
-
-// randomScanStrategy chooses a random address from the provided big.Int, and then
-// scans forward looking for the next available address (it will wrap the range if
-// necessary).
-func randomScanStrategy(allocated *big.Int, max, count int) (int, error) {
-	if count >= max {
-		return 0, ErrFull
-	}
-	offset := rand.Intn(max)
-	for i := 0; i < max; i++ {
-		at := (offset + i) % max
-		if allocated.Bit(at) == 0 {
-			return at, nil
-		}
-	}
-	return 0, ErrFull
-}
-
-// countBits returns the number of set bits in n
-func countBits(n *big.Int) int {
-	var count int = 0
-	for _, b := range n.Bytes() {
-		count += int(bitCounts[b])
-	}
-	return count
-}
-
-// bitCounts is all of the bits counted for each number between 0-255
-var bitCounts = []int8{
-	0, 1, 1, 2, 1, 2, 2, 3,
-	1, 2, 2, 3, 2, 3, 3, 4,
-	1, 2, 2, 3, 2, 3, 3, 4,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	1, 2, 2, 3, 2, 3, 3, 4,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	1, 2, 2, 3, 2, 3, 3, 4,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	4, 5, 5, 6, 5, 6, 6, 7,
-	1, 2, 2, 3, 2, 3, 3, 4,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	4, 5, 5, 6, 5, 6, 6, 7,
-	2, 3, 3, 4, 3, 4, 4, 5,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	4, 5, 5, 6, 5, 6, 6, 7,
-	3, 4, 4, 5, 4, 5, 5, 6,
-	4, 5, 5, 6, 5, 6, 6, 7,
-	4, 5, 5, 6, 5, 6, 6, 7,
-	5, 6, 6, 7, 6, 7, 7, 8,
 }
 
 // RangeSize returns the size of a range in valid addresses.
