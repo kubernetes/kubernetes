@@ -25,27 +25,11 @@ import (
 
 // AllocationBitmap is a contiguous block of resources that can be allocated atomically.
 //
-// The internal structure of the range is (for an IP range):
+// Each resource has an offset.  The internal structure is a bitmap, with a bit for each offset.
 //
-//   For CIDR 10.0.0.0/24
-//   254 addresses usable out of 256 total (minus base and broadcast IPs)
-//     The number of usable addresses is r.max
-//
-//   CIDR base IP          CIDR broadcast IP
-//   10.0.0.0                     10.0.0.255
-//   |                                     |
-//   0 1 2 3 4 5 ...         ... 253 254 255
-//     |                              |
-//   r.base                     r.base + r.max
-//     |                              |
-//   first bit of r.allocated   last bit of r.allocated
-//
-// If an address is taken, the bit at offset:
-//
-//   bit offset := IP - r.base
-//
-// is set to one. r.count is always equal to the number of set bits and
-// can be recalculated at any time by counting the set bits in r.allocated.
+// If a resource is taken, the bit at that offset is set to one.
+// r.count is always equal to the number of set bits and can be recalculated at any time
+// by counting the set bits in r.allocated.
 //
 // TODO: use RLE and compact the allocator to minimize space.
 type AllocationBitmap struct {

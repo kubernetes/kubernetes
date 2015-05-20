@@ -55,16 +55,7 @@ var (
 //     |                              |
 //   r.base                     r.base + r.max
 //     |                              |
-//   first bit of r.allocated   last bit of r.allocated
-//
-// If an address is taken, the bit at offset:
-//
-//   bit offset := IP - r.base
-//
-// is set to one. r.count is always equal to the number of set bits and
-// can be recalculated at any time by counting the set bits in r.allocated.
-//
-// TODO: use RLE and compact the allocator to minimize space.
+//   offset #0 of r.allocated   last offset of r.allocated
 type Range struct {
 	net *net.IPNet
 	// base is a cached version of the start IP in the CIDR range as a *big.Int
