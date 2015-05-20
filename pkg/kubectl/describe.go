@@ -17,6 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -480,6 +481,22 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 	return describeService(service, endpoints, events)
 }
 
+func buildIngressString(ingress []api.LoadBalancerIngress) string {
+	var buffer bytes.Buffer
+
+	for i := range ingress {
+		if i != 0 {
+			buffer.WriteString(", ")
+		}
+		if ingress[i].IP != "" {
+			buffer.WriteString(ingress[i].IP)
+		} else {
+			buffer.WriteString(ingress[i].Hostname)
+		}
+	}
+	return buffer.String()
+}
+
 func describeService(service *api.Service, endpoints *api.Endpoints, events *api.EventList) (string, error) {
 	if endpoints == nil {
 		endpoints = &api.Endpoints{}
@@ -489,9 +506,9 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
 		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.PortalIP)
-		if len(service.Spec.PublicIPs) > 0 {
-			list := strings.Join(service.Spec.PublicIPs, ", ")
-			fmt.Fprintf(out, "Public IPs:\t%s\n", list)
+		if len(service.Status.LoadBalancer.Ingress) > 0 {
+			list := buildIngressString(service.Status.LoadBalancer.Ingress)
+			fmt.Fprintf(out, "Ingress:\t%s\n", list)
 		}
 		for i := range service.Spec.Ports {
 			sp := &service.Spec.Ports[i]

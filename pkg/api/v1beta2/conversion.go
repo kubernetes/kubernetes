@@ -709,6 +709,10 @@ func addConversionFuncs() {
 				return err
 			}
 
+			if err := s.Convert(&in.Status.LoadBalancer, &out.LoadBalancerStatus, 0); err != nil {
+				return err
+			}
+
 			return nil
 		},
 		func(in *Service, out *api.Service, s conversion.Scope) error {
@@ -749,6 +753,10 @@ func addConversionFuncs() {
 			out.Spec.PublicIPs = in.PublicIPs
 			out.Spec.PortalIP = in.PortalIP
 			if err := s.Convert(&in.SessionAffinity, &out.Spec.SessionAffinity, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.LoadBalancerStatus, &out.Status.LoadBalancer, 0); err != nil {
 				return err
 			}
 
