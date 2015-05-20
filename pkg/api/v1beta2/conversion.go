@@ -702,7 +702,6 @@ func addConversionFuncs() {
 			if err := s.Convert(&in.Spec.Selector, &out.Selector, 0); err != nil {
 				return err
 			}
-			out.CreateExternalLoadBalancer = in.Spec.CreateExternalLoadBalancer
 			out.PublicIPs = in.Spec.PublicIPs
 			out.PortalIP = in.Spec.PortalIP
 			if err := s.Convert(&in.Spec.SessionAffinity, &out.SessionAffinity, 0); err != nil {
@@ -712,6 +711,11 @@ func addConversionFuncs() {
 			if err := s.Convert(&in.Status.LoadBalancer, &out.LoadBalancerStatus, 0); err != nil {
 				return err
 			}
+
+			if err := s.Convert(&in.Spec.Type, &out.Type, 0); err != nil {
+				return err
+			}
+			out.CreateExternalLoadBalancer = in.Spec.Type == api.ServiceTypeLoadBalancer
 
 			return nil
 		},
@@ -749,7 +753,6 @@ func addConversionFuncs() {
 			if err := s.Convert(&in.Selector, &out.Spec.Selector, 0); err != nil {
 				return err
 			}
-			out.Spec.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
 			out.Spec.PublicIPs = in.PublicIPs
 			out.Spec.PortalIP = in.PortalIP
 			if err := s.Convert(&in.SessionAffinity, &out.Spec.SessionAffinity, 0); err != nil {
@@ -757,6 +760,18 @@ func addConversionFuncs() {
 			}
 
 			if err := s.Convert(&in.LoadBalancerStatus, &out.Status.LoadBalancer, 0); err != nil {
+				return err
+			}
+
+			typeIn := in.Type
+			if typeIn == "" {
+				if in.CreateExternalLoadBalancer {
+					typeIn = ServiceTypeLoadBalancer
+				} else {
+					typeIn = ServiceTypeClusterIP
+				}
+			}
+			if err := s.Convert(&typeIn, &out.Spec.Type, 0); err != nil {
 				return err
 			}
 

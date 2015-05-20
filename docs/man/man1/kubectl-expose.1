@@ -28,7 +28,7 @@ re\-use the labels from the resource it exposes.
 
 .PP
 \fB\-\-create\-external\-load\-balancer\fP=false
-    If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default is 'false'.
+    If true, create an external load balancer for this service (trumped by \-\-type). Implementation is cloud provider dependent. Default is 'false'.
 
 .PP
 \fB\-\-dry\-run\fP=false
@@ -90,6 +90,10 @@ re\-use the labels from the resource it exposes.
 \fB\-t\fP, \fB\-\-template\fP=""
     Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
+
+.PP
+\fB\-\-type\fP=""
+    Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP' unless \-\-create\-external\-load\-balancer is specified.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

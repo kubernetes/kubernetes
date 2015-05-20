@@ -35,7 +35,7 @@ On some platforms (for example Google Compute Engine) the kubectl command can in
 to do this run:
 
 ```bash
-kubectl expose rc my-nginx --port=80 --create-external-load-balancer
+kubectl expose rc my-nginx --port=80 --type=LoadBalancer
 ```
 
 This should print the service that has been created, and map an external IP address to the service.
