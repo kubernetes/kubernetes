@@ -31,8 +31,8 @@ import (
 type RulePosition string
 
 const (
-	RulePositionFirst RulePosition = "-I"
-	RulePositionLast  RulePosition = "-A"
+	Prepend RulePosition = "-I"
+	Append  RulePosition = "-A"
 )
 
 // An injectable interface for running iptables commands.  Implementations must be goroutine-safe.
