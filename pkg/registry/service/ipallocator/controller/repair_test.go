@@ -77,7 +77,12 @@ func TestRepairEmpty(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
 	previous := ipallocator.NewCIDRRange(cidr)
 	previous.Allocate(net.ParseIP("192.168.1.10"))
-	network, data := previous.Snapshot()
+
+	var dst api.RangeAllocation
+	err := previous.Snapshot(&dst)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	registry := registrytest.NewServiceRegistry()
 	ipregistry := &mockRangeRegistry{
@@ -85,8 +90,8 @@ func TestRepairEmpty(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				ResourceVersion: "1",
 			},
-			Range: network.String(),
-			Data:  data,
+			Range: dst.Range,
+			Data:  dst.Data,
 		},
 	}
 	r := NewRepair(0, registry, cidr, ipregistry)
@@ -105,7 +110,13 @@ func TestRepairEmpty(t *testing.T) {
 func TestRepairWithExisting(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
 	previous := ipallocator.NewCIDRRange(cidr)
-	network, data := previous.Snapshot()
+
+	var dst api.RangeAllocation
+	err := previous.Snapshot(&dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	registry := registrytest.NewServiceRegistry()
 	registry.List = api.ServiceList{
 		Items: []api.Service{
@@ -135,8 +146,8 @@ func TestRepairWithExisting(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				ResourceVersion: "1",
 			},
-			Range: network.String(),
-			Data:  data,
+			Range: dst.Range,
+			Data:  dst.Data,
 		},
 	}
 	r := NewRepair(0, registry, cidr, ipregistry)

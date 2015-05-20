@@ -17,17 +17,21 @@ limitations under the License.
 package etcd
 
 import (
+	"errors"
 	"fmt"
-	"net"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	k8serr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+)
+
+var (
+	errorConcurrentModification = errors.New("concurrent modification")
 )
 
 // Etcd exposes a service.Allocator that is backed by etcd.
@@ -37,87 +41,106 @@ import (
 type Etcd struct {
 	lock sync.Mutex
 
-	alloc  ipallocator.Snapshottable
+	alloc  allocator.Snapshottable
 	helper tools.EtcdHelper
 	last   string
+
+	baseKey string
+	kind    string
 }
 
-// Etcd implements ipallocator.Interface and service.RangeRegistry
-var _ ipallocator.Interface = &Etcd{}
+// Etcd implements allocator.Interface and service.RangeRegistry
+var _ allocator.Interface = &Etcd{}
 var _ service.RangeRegistry = &Etcd{}
 
-const baseKey = "/ranges/serviceips"
-
-// NewEtcd returns a service PortalIP ipallocator that is backed by Etcd and can manage
+// NewEtcd returns an allocator that is backed by Etcd and can manage
 // persisting the snapshot state of allocation after each allocation is made.
-func NewEtcd(alloc ipallocator.Snapshottable, helper tools.EtcdHelper) *Etcd {
+func NewEtcd(alloc allocator.Snapshottable, baseKey string, kind string, helper tools.EtcdHelper) *Etcd {
 	return &Etcd{
-		alloc:  alloc,
-		helper: helper,
+		alloc:   alloc,
+		helper:  helper,
+		baseKey: baseKey,
+		kind:    kind,
 	}
 }
 
-// Allocate attempts to allocate the IP locally and then in etcd.
-func (e *Etcd) Allocate(ip net.IP) error {
+// Allocate attempts to allocate the item locally and then in etcd.
+func (e *Etcd) Allocate(offset int) (bool, error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
-	if err := e.alloc.Allocate(ip); err != nil {
-		return err
-	}
-
-	return e.tryUpdate(func() error {
-		return e.alloc.Allocate(ip)
-	})
-}
-
-// AllocateNext attempts to allocate the next IP locally and then in etcd.
-func (e *Etcd) AllocateNext() (net.IP, error) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	ip, err := e.alloc.AllocateNext()
-	if err != nil {
-		return nil, err
+	ok, err := e.alloc.Allocate(offset)
+	if !ok || err != nil {
+		return ok, err
 	}
 
 	err = e.tryUpdate(func() error {
-		if err := e.alloc.Allocate(ip); err != nil {
-			if err != ipallocator.ErrAllocated {
-				return err
-			}
-			// update the ip here
-			ip, err = e.alloc.AllocateNext()
+		ok, err := e.alloc.Allocate(offset)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errorConcurrentModification
+		}
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// AllocateNext attempts to allocate the next item locally and then in etcd.
+func (e *Etcd) AllocateNext() (int, bool, error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	offset, ok, err := e.alloc.AllocateNext()
+	if !ok || err != nil {
+		return offset, ok, err
+	}
+
+	err = e.tryUpdate(func() error {
+		ok, err := e.alloc.Allocate(offset)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			// update the offset here
+			offset, ok, err = e.alloc.AllocateNext()
 			if err != nil {
-				return err
+				return errorConcurrentModification
+			}
+			if !ok {
+
 			}
 		}
 		return nil
 	})
-	return ip, err
+	return offset, ok, err
 }
 
-// Release attempts to release the provided IP locally and then in etcd.
-func (e *Etcd) Release(ip net.IP) error {
+// Release attempts to release the provided item locally and then in etcd.
+func (e *Etcd) Release(item int) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
-	if err := e.alloc.Release(ip); err != nil {
+	if err := e.alloc.Release(item); err != nil {
 		return err
 	}
 
 	return e.tryUpdate(func() error {
-		return e.alloc.Release(ip)
+		return e.alloc.Release(item)
 	})
 }
 
 // tryUpdate performs a read-update to persist the latest snapshot state of allocation.
 func (e *Etcd) tryUpdate(fn func() error) error {
-	err := e.helper.GuaranteedUpdate(baseKey, &api.RangeAllocation{}, true,
+	err := e.helper.GuaranteedUpdate(e.baseKey, &api.RangeAllocation{}, true,
 		func(input runtime.Object) (output runtime.Object, ttl uint64, err error) {
 			existing := input.(*api.RangeAllocation)
 			if len(existing.ResourceVersion) == 0 {
-				return nil, 0, ipallocator.ErrAllocationDisabled
+				return nil, 0, fmt.Errorf("Cannot allocate resources of type %s at this time", e.kind)
 			}
 			if existing.ResourceVersion != e.last {
 				if err := service.RestoreRange(e.alloc, existing); err != nil {
@@ -128,35 +151,37 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 				}
 			}
 			e.last = existing.ResourceVersion
-			service.SnapshotRange(existing, e.alloc)
+			rangeSpec, data := e.alloc.Snapshot()
+			existing.Range = rangeSpec
+			existing.Data = data
 			return existing, 0, nil
 		},
 	)
-	return etcderr.InterpretUpdateError(err, "serviceipallocation", "")
+	return etcderr.InterpretUpdateError(err, e.kind, "")
 }
 
-// Refresh reloads the ipallocator from etcd.
-func (e *Etcd) Refresh() error {
+// Refresh reloads the RangeAllocation from etcd.
+func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
 	existing := &api.RangeAllocation{}
-	if err := e.helper.ExtractObj(baseKey, existing, false); err != nil {
+	if err := e.helper.ExtractObj(e.baseKey, existing, false); err != nil {
 		if tools.IsEtcdNotFound(err) {
-			return ipallocator.ErrAllocationDisabled
+			return nil, nil
 		}
-		return etcderr.InterpretGetError(err, "serviceipallocation", "")
+		return nil, etcderr.InterpretGetError(err, e.kind, "")
 	}
 
-	return service.RestoreRange(e.alloc, existing)
+	return existing, nil
 }
 
 // Get returns an api.RangeAllocation that represents the current state in
 // etcd. If the key does not exist, the object will have an empty ResourceVersion.
 func (e *Etcd) Get() (*api.RangeAllocation, error) {
 	existing := &api.RangeAllocation{}
-	if err := e.helper.ExtractObj(baseKey, existing, true); err != nil {
-		return nil, etcderr.InterpretGetError(err, "serviceipallocation", "")
+	if err := e.helper.ExtractObj(e.baseKey, existing, true); err != nil {
+		return nil, etcderr.InterpretGetError(err, e.kind, "")
 	}
 	return existing, nil
 }
@@ -168,27 +193,43 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 	defer e.lock.Unlock()
 
 	last := ""
-	err := e.helper.GuaranteedUpdate(baseKey, &api.RangeAllocation{}, true,
+	err := e.helper.GuaranteedUpdate(e.baseKey, &api.RangeAllocation{}, true,
 		func(input runtime.Object) (output runtime.Object, ttl uint64, err error) {
 			existing := input.(*api.RangeAllocation)
 			switch {
 			case len(snapshot.ResourceVersion) != 0 && len(existing.ResourceVersion) != 0:
 				if snapshot.ResourceVersion != existing.ResourceVersion {
-					return nil, 0, errors.NewConflict("serviceipallocation", "", fmt.Errorf("the provided resource version does not match"))
+					return nil, 0, k8serr.NewConflict(e.kind, "", fmt.Errorf("the provided resource version does not match"))
 				}
 			case len(existing.ResourceVersion) != 0:
-				return nil, 0, errors.NewConflict("serviceipallocation", "", fmt.Errorf("another caller has already initialized the resource"))
+				return nil, 0, k8serr.NewConflict(e.kind, "", fmt.Errorf("another caller has already initialized the resource"))
 			}
 			last = snapshot.ResourceVersion
 			return snapshot, 0, nil
 		},
 	)
 	if err != nil {
-		return etcderr.InterpretUpdateError(err, "serviceipallocation", "")
+		return etcderr.InterpretUpdateError(err, e.kind, "")
 	}
 	err = service.RestoreRange(e.alloc, snapshot)
 	if err == nil {
 		e.last = last
 	}
 	return err
+}
+
+// Implements allocator.Interface::Has
+func (e *Etcd) Has(item int) bool {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	return e.alloc.Has(item)
+}
+
+// Implements allocator.Interface::Free
+func (e *Etcd) Free() int {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	return e.alloc.Free()
 }

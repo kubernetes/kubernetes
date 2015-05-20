@@ -63,13 +63,14 @@ import (
 	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
 	secretetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
+	etcd_allocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/etcd"
 	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
-	etcdipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator/etcd"
 	serviceaccountetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
@@ -424,9 +425,14 @@ func (m *Master) init(c *Config) {
 	registry := etcd.NewRegistry(c.EtcdHelper, podRegistry, m.endpointRegistry)
 	m.serviceRegistry = registry
 
-	ipAllocator := ipallocator.NewCIDRRange(m.portalNet)
-	portalAllocator := etcdipallocator.NewEtcd(ipAllocator, c.EtcdHelper)
-	m.portalAllocator = portalAllocator
+	var portalRangeRegistry service.RangeRegistry
+	portalAllocator := ipallocator.NewAllocatorCIDRRange(m.portalNet, func(max int, rangeSpec string) allocator.Interface {
+		mem := allocator.NewAllocationMap(max, rangeSpec)
+		etcd := etcd_allocator.NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", c.EtcdHelper)
+		portalRangeRegistry = etcd
+		return etcd
+	})
+	m.portalAllocator = portalRangeRegistry
 
 	controllerStorage := controlleretcd.NewREST(c.EtcdHelper)
 

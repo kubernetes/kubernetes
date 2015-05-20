@@ -19,6 +19,7 @@ package ipallocator
 import (
 	"errors"
 	"fmt"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
 	"math/big"
 	"net"
@@ -32,20 +33,11 @@ type Interface interface {
 	Release(net.IP) error
 }
 
-// Snapshottable is an Interface that can be snapshotted and restored. Snapshottable
-// should be threadsafe.
-type Snapshottable interface {
-	Interface
-	Snapshot() (*net.IPNet, []byte)
-	Restore(*net.IPNet, []byte) error
-}
-
 var (
-	ErrFull               = errors.New("range is full")
-	ErrNotInRange         = errors.New("provided IP is not in the valid range")
-	ErrAllocated          = errors.New("provided IP is already allocated")
-	ErrMismatchedNetwork  = errors.New("the provided network does not match the current range")
-	ErrAllocationDisabled = errors.New("IP addresses cannot be allocated at this time")
+	ErrFull              = errors.New("range is full")
+	ErrNotInRange        = errors.New("provided IP is not in the valid range")
+	ErrAllocated         = errors.New("provided IP is already allocated")
+	ErrMismatchedNetwork = errors.New("the provided network does not match the current range")
 )
 
 // Range is a contiguous block of IPs that can be allocated atomically.
@@ -80,21 +72,29 @@ type Range struct {
 	// max is the maximum size of the usable addresses in the range
 	max int
 
-	bitmap *allocator.AllocationBitmap
+	alloc allocator.Interface
 }
 
-// NewCIDRRange creates a Range over a net.IPNet.
-func NewCIDRRange(cidr *net.IPNet) *Range {
+// NewAllocatorCIDRRange creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
+func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) *Range {
 	max := RangeSize(cidr)
 	base := bigForIP(cidr.IP)
+	rangeSpec := cidr.String()
 
 	r := Range{
 		net:  cidr,
 		base: base.Add(base, big.NewInt(1)), // don't use the network base
 		max:  maximum(0, int(max-2)),        // don't use the network broadcast,
 	}
-	r.bitmap = allocator.NewAllocationMap(r.max)
+	r.alloc = allocatorFactory(r.max, rangeSpec)
 	return &r
+}
+
+// Helper that wraps NewAllocatorCIDRRange, for creating a range backed by an in-memory store.
+func NewCIDRRange(cidr *net.IPNet) *Range {
+	return NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) allocator.Interface {
+		return allocator.NewAllocationMap(max, rangeSpec)
+	})
 }
 
 func maximum(a, b int) int {
@@ -106,7 +106,7 @@ func maximum(a, b int) int {
 
 // Free returns the count of IP addresses left in the range.
 func (r *Range) Free() int {
-	return r.bitmap.Free()
+	return r.alloc.Free()
 }
 
 // Allocate attempts to reserve the provided IP. ErrNotInRange or
@@ -119,17 +119,23 @@ func (r *Range) Allocate(ip net.IP) error {
 		return ErrNotInRange
 	}
 
-	if r.bitmap.Allocate(offset) {
-		return nil
-	} else {
+	allocated, err := r.alloc.Allocate(offset)
+	if err != nil {
+		return err
+	}
+	if !allocated {
 		return ErrAllocated
 	}
+	return nil
 }
 
 // AllocateNext reserves one of the IPs from the pool. ErrFull may
 // be returned if there are no addresses left.
 func (r *Range) AllocateNext() (net.IP, error) {
-	offset, ok := r.bitmap.AllocateNext()
+	offset, ok, err := r.alloc.AllocateNext()
+	if err != nil {
+		return nil, err
+	}
 	if !ok {
 		return nil, ErrFull
 	}
@@ -145,7 +151,7 @@ func (r *Range) Release(ip net.IP) error {
 		return nil
 	}
 
-	r.bitmap.Release(offset)
+	r.alloc.Release(offset)
 	return nil
 }
 
@@ -157,12 +163,19 @@ func (r *Range) Has(ip net.IP) bool {
 		return false
 	}
 
-	return r.bitmap.Has(offset)
+	return r.alloc.Has(offset)
 }
 
 // Snapshot saves the current state of the pool.
-func (r *Range) Snapshot() (*net.IPNet, []byte) {
-	return r.net, r.bitmap.Snapshot()
+func (r *Range) Snapshot(dst *api.RangeAllocation) error {
+	snapshottable, ok := r.alloc.(allocator.Snapshottable)
+	if !ok {
+		return fmt.Errorf("Not a snapshottable allocator")
+	}
+	rangeString, data := snapshottable.Snapshot()
+	dst.Range = rangeString
+	dst.Data = data
+	return nil
 }
 
 // Restore restores the pool to the previously captured state. ErrMismatchedNetwork
@@ -171,7 +184,11 @@ func (r *Range) Restore(net *net.IPNet, data []byte) error {
 	if !net.IP.Equal(r.net.IP) || net.Mask.String() != r.net.Mask.String() {
 		return ErrMismatchedNetwork
 	}
-	r.bitmap.Restore(data)
+	snapshottable, ok := r.alloc.(allocator.Snapshottable)
+	if !ok {
+		return fmt.Errorf("Not a snapshottable allocator")
+	}
+	snapshottable.Restore(net.String(), data)
 	return nil
 }
 

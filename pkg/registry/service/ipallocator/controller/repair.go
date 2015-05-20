@@ -111,7 +111,10 @@ func (c *Repair) RunOnce() error {
 		}
 	}
 
-	service.SnapshotRange(latest, r)
+	err = r.Snapshot(latest)
+	if err != nil {
+		return fmt.Errorf("unable to persist the updated service IP allocations: %v", err)
+	}
 
 	if err := c.alloc.CreateOrUpdate(latest); err != nil {
 		return fmt.Errorf("unable to persist the updated service IP allocations: %v", err)

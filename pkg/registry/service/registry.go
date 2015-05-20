@@ -17,13 +17,12 @@ limitations under the License.
 package service
 
 import (
-	"net"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"net"
 )
 
 // Registry is an interface for things that know how to store services.
@@ -47,17 +46,10 @@ type RangeRegistry interface {
 }
 
 // RestoreRange updates a snapshottable ipallocator from a RangeAllocation
-func RestoreRange(dst ipallocator.Snapshottable, src *api.RangeAllocation) error {
-	_, network, err := net.ParseCIDR(src.Range)
+func RestoreRange(dst allocator.Snapshottable, src *api.RangeAllocation) error {
+	_, _, err := net.ParseCIDR(src.Range)
 	if err != nil {
 		return err
 	}
-	return dst.Restore(network, src.Data)
-}
-
-// SnapshotRange updates a RangeAllocation to match a snapshottable ipallocator
-func SnapshotRange(dst *api.RangeAllocation, src ipallocator.Snapshottable) {
-	network, data := src.Snapshot()
-	dst.Range = network.String()
-	dst.Data = data
+	return dst.Restore(src.Range, src.Data)
 }
