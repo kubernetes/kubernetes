@@ -63,7 +63,7 @@ For example, if you try to create a node from the following content:
 ```json
 {
   "id": "10.1.2.3",
-  "kind": "Minion",
+  "kind": "Node",
   "apiVersion": "v1beta1",
   "resources": {
     "capacity": {
