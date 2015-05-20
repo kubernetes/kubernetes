@@ -42,9 +42,9 @@ type Etcd struct {
 	last   string
 }
 
-// Etcd implements ipallocator.Interface and service.IPRegistry
+// Etcd implements ipallocator.Interface and service.RangeRegistry
 var _ ipallocator.Interface = &Etcd{}
-var _ service.IPRegistry = &Etcd{}
+var _ service.RangeRegistry = &Etcd{}
 
 const baseKey = "/ranges/serviceips"
 

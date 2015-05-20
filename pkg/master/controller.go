@@ -39,7 +39,7 @@ import (
 type Controller struct {
 	NamespaceRegistry namespace.Registry
 	ServiceRegistry   service.Registry
-	ServiceIPRegistry service.IPRegistry
+	ServiceIPRegistry service.RangeRegistry
 	EndpointRegistry  endpoint.Registry
 	PortalNet         *net.IPNet
 	// TODO: MasterCount is yucky

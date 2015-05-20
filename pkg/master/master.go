@@ -192,7 +192,7 @@ type Master struct {
 	namespaceRegistry namespace.Registry
 	serviceRegistry   service.Registry
 	endpointRegistry  endpoint.Registry
-	portalAllocator   service.IPRegistry
+	portalAllocator   service.RangeRegistry
 
 	// "Outputs"
 	Handler         http.Handler

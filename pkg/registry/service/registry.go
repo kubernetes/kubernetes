@@ -36,8 +36,8 @@ type Registry interface {
 	WatchServices(ctx api.Context, labels labels.Selector, fields fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
-// IPRegistry is a registry that can retrieve or persist a RangeAllocation object.
-type IPRegistry interface {
+// RangeRegistry is a registry that can retrieve or persist a RangeAllocation object.
+type RangeRegistry interface {
 	// Get returns the latest allocation, an empty object if no allocation has been made,
 	// or an error if the allocation could not be retrieved.
 	Get() (*api.RangeAllocation, error)

@@ -46,12 +46,12 @@ type Repair struct {
 	interval time.Duration
 	registry service.Registry
 	network  *net.IPNet
-	alloc    service.IPRegistry
+	alloc    service.RangeRegistry
 }
 
 // NewRepair creates a controller that periodically ensures that all portalIPs are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, registry service.Registry, network *net.IPNet, alloc service.IPRegistry) *Repair {
+func NewRepair(interval time.Duration, registry service.Registry, network *net.IPNet, alloc service.RangeRegistry) *Repair {
 	return &Repair{
 		interval: interval,
 		registry: registry,
