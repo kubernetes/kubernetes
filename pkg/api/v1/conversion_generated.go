@@ -4097,6 +4097,7 @@ func convert_v1_ServicePort_To_api_ServicePort(in *ServicePort, out *api.Service
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
+	out.NodePort = in.NodePort
 	return nil
 }
 
@@ -4110,6 +4111,7 @@ func convert_api_ServicePort_To_v1_ServicePort(in *api.ServicePort, out *Service
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
+	out.NodePort = in.NodePort
 	return nil
 }
 
