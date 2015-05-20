@@ -63,14 +63,13 @@ type Controller struct {
 	ReadOnlyServicePort       int
 	PublicReadOnlyServicePort int
 
-	runnerPortals          *util.Runner
-	runnerServiceNodePorts *util.Runner
+	runner *util.Runner
 }
 
 // Start begins the core controller loops that must exist for bootstrapping
 // a cluster.
 func (c *Controller) Start() {
-	if c.runnerPortals != nil {
+	if c.runner != nil {
 		return
 	}
 
@@ -91,11 +90,8 @@ func (c *Controller) Start() {
 		glog.Errorf("Unable to perform initial Kubernetes RO service initialization: %v", err)
 	}
 
-	c.runnerPortals = util.NewRunner(c.RunKubernetesService, c.RunKubernetesROService, repairPortals.RunUntil)
-	c.runnerPortals.Start()
-
-	c.runnerServiceNodePorts = util.NewRunner(c.RunKubernetesService, c.RunKubernetesROService, repairNodePorts.RunUntil)
-	c.runnerServiceNodePorts.Start()
+	c.runner = util.NewRunner(c.RunKubernetesService, c.RunKubernetesROService, repairPortals.RunUntil, repairNodePorts.RunUntil)
+	c.runner.Start()
 }
 
 // RunKubernetesService periodically updates the kubernetes service
