@@ -444,7 +444,10 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 	name = canonicalizeInstanceName(name)
 	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, name).Do()
 	if err != nil {
-		glog.Errorf("Failed to retrieve TargetInstance resource for instance:%s", name)
+		glog.Errorf("Failed to retrieve TargetInstance resource for instance: %s", name)
+		if apiErr, ok := err.(*googleapi.Error); ok && apiErr.Code == http.StatusNotFound {
+			return nil, cloudprovider.InstanceNotFound
+		}
 		return nil, err
 	}
 	return res, nil

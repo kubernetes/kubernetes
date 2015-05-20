@@ -123,7 +123,7 @@ func runScheduler(cl *client.Client) {
 }
 
 // RunControllerManager starts a controller
-func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU, nodeMemory int64) {
+func runControllerManager(cl *client.Client, nodeMilliCPU, nodeMemory int64) {
 	nodeResources := &api.NodeResources{
 		Capacity: api.ResourceList{
 			api.ResourceCPU:    *resource.NewMilliQuantity(nodeMilliCPU, resource.DecimalSI),
@@ -133,7 +133,7 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 
 	const nodeSyncPeriod = 10 * time.Second
 	nodeController := nodecontroller.NewNodeController(
-		nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst),
+		nil, "", nodeResources, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(nodeSyncPeriod, true)
 
@@ -150,18 +150,16 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 }
 
 func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP, port int) {
-	machineList := []string{"localhost"}
-
 	runApiServer(etcdClient, addr, port, *masterServiceNamespace)
 	runScheduler(cl)
-	runControllerManager(machineList, cl, *nodeMilliCPU, *nodeMemory)
+	runControllerManager(cl, *nodeMilliCPU, *nodeMemory)
 
 	dockerClient := dockertools.ConnectToDockerOrDie(*dockerEndpoint)
 	cadvisorInterface, err := cadvisor.New(0)
 	if err != nil {
 		glog.Fatalf("Failed to create cAdvisor: %v", err)
 	}
-	kcfg := kubeletapp.SimpleKubelet(cl, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil, kubecontainer.RealOS{})
+	kcfg := kubeletapp.SimpleKubelet(cl, dockerClient, "localhost", "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil, kubecontainer.RealOS{})
 	kubeletapp.RunKubelet(kcfg, nil)
 
 }
