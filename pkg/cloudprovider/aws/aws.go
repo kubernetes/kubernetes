@@ -125,11 +125,19 @@ type awsSdkEC2 struct {
 }
 
 func stringPointerArray(orig []string) []*string {
+	if orig == nil {
+		return nil
+	}
+
 	n := make([]*string, len(orig))
-	for i, s := range orig {
-		n[i] = &s
+	for i := range orig {
+		n[i] = &orig[i]
 	}
 	return n
+}
+
+func isNilOrEmpty(s *string) bool {
+	return s == nil || *s == ""
 }
 
 // Implementation of EC2.Instances
@@ -147,13 +155,13 @@ func (self *awsSdkEC2) Instances(instanceIds []string, filter *ec2InstanceFilter
 	}
 
 	fetchedInstances := []*ec2.Instance{}
-	nextToken := ""
+	var nextToken *string
 
 	for {
 		res, err := self.ec2.DescribeInstances(&ec2.DescribeInstancesInput{
 			InstanceIDs: stringPointerArray(instanceIds),
 			Filters:     filters,
-			NextToken:   &nextToken,
+			NextToken:   nextToken,
 		})
 
 		if err != nil {
@@ -164,11 +172,10 @@ func (self *awsSdkEC2) Instances(instanceIds []string, filter *ec2InstanceFilter
 			fetchedInstances = append(fetchedInstances, reservation.Instances...)
 		}
 
-		if *res.NextToken == "" {
+		nextToken = res.NextToken
+		if isNilOrEmpty(nextToken) {
 			break
 		}
-
-		nextToken = *res.NextToken
 	}
 
 	return fetchedInstances, nil
@@ -178,7 +185,7 @@ type awsSdkMetadata struct {
 }
 
 var metadataClient = http.Client{
-	Timeout: time.Second * 1,
+	Timeout: time.Second * 10,
 }
 
 // Implements AWSMetadata.GetMetaData
@@ -250,7 +257,11 @@ func init() {
 }
 
 func getAuth() (creds *credentials.Credentials) {
-	return credentials.NewStaticCredentials("", "", "")
+	return credentials.NewChainCredentials(
+		[]credentials.Provider{
+			&credentials.EnvProvider{},
+			&credentials.EC2RoleProvider{},
+		})
 }
 
 // readAWSCloudConfig reads an instance of AWSCloudConfig from config reader.
