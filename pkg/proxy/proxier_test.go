@@ -810,3 +810,5 @@ func TestProxyUpdatePortal(t *testing.T) {
 }
 
 // TODO: Test UDP timeouts.
+
+// TODO(justinsb): Add test for nodePort conflict detection, once we have nodePort wired in
