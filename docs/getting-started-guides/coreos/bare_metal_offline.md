@@ -176,7 +176,7 @@ This is on the PXE server from the previous section:
 
     rm /etc/httpd/conf.d/welcome.conf
     cd /var/www/html/
-    wget -O kube-register  https://github.com/kelseyhightower/kube-register/releases/download/v0.0.2/kube-register-0.0.2-linux-amd64
+    wget -O kube-register  https://github.com/kelseyhightower/kube-register/releases/download/v0.0.4/kube-register-0.0.4-linux-amd64
     wget -O setup-network-environment https://github.com/kelseyhightower/setup-network-environment/releases/download/v1.0.0/setup-network-environment
     wget https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kubernetes --no-check-certificate
     wget https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-apiserver --no-check-certificate
@@ -415,7 +415,8 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             --metadata=role=node \
             --fleet-endpoint=unix:///var/run/fleet.sock \
             --healthz-port=10248 \
-            --api-endpoint=http://127.0.0.1:8080
+            --api-endpoint=http://127.0.0.1:8080 \
+            --reverse-lookup=true
             Restart=always
             RestartSec=10
       update:
