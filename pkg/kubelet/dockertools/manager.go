@@ -1406,6 +1406,12 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 			containersToKeep[containerID] = index
 			continue
 		}
+
+		// Record an event for the healthcheck failure.
+		ref, err := kubecontainer.GenerateContainerRef(pod, &container)
+		if err == nil {
+			dm.recorder.Eventf(ref, "failed", "Healthcheck failed with probe result: %v", result)
+		}
 		glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
 		containersToStart[index] = empty{}
 	}

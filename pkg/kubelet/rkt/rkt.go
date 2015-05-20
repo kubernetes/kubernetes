@@ -870,10 +870,15 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 		}
 
 		result, err := r.prober.Probe(pod, podStatus, container, string(c.ID), c.Created)
-		// TODO(vmarmol): examine this logic.
 		if err == nil && result != probe.Success {
 			glog.Infof("Pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
 			restartPod = true
+
+			// Record an event for the healthcheck failure.
+			ref, err := kubecontainer.GenerateContainerRef(pod, &container)
+			if err == nil {
+				r.recorder.Eventf(ref, "failed", "Healthcheck failed with probe result: %v", result)
+			}
 			break
 		}
 
