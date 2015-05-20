@@ -16,8 +16,10 @@ This is an example of a simple secret, in json format:
 {
   "apiVersion": "v1beta3",
   "kind": "Secret",
-  "name": "mysecret",
-  "namespace": "myns",
+  "metadata" : {
+    "name": "mysecret",
+    "namespace": "myns",
+  },  
   "data": {
     "username": "dmFsdWUtMQ0K",
     "password": "dmFsdWUtMg0KDQo="
@@ -32,9 +34,11 @@ The values are arbitrary data, encoded using base64.
 This is an example of a pod that uses a secret, in json format:
 ```json
 {
-  "apiVersion": "v1beta3",
-  "name": "mypod",
   "kind": "Pod",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "mypod"
+  },
   "spec": {
     "manifest": {
       "containers": [{
@@ -106,12 +110,14 @@ To create a pod that uses an ssh key stored as a secret, we first need to create
 
 ```json
 {
-  "apiVersion": "v1beta2",
   "kind": "Secret",
-  "id": "ssh-key-secret",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "ssh-key-secret"
+  },
   "data": {
-    "id-rsa.pub": "dmFsdWUtMQ0K",
-    "id-rsa": "dmFsdWUtMg0KDQo="
+    "id-rsa": "dmFsdWUtMg0KDQo=",
+    "id-rsa.pub": "dmFsdWUtMQ0K"
   }
 }
 ```
@@ -125,34 +131,36 @@ consumes it in a volume:
 
 ```json
 {
-  "id": "secret-test-pod",
   "kind": "Pod",
-  "apiVersion":"v1beta2",
-  "labels": {
-    "name": "secret-test"
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "secret-test-pod",
+    "labels": {
+      "name": "secret-test"
+    }
   },
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "secret-test-pod",
-      "containers": [{
+  "spec": {
+    "volumes": [
+      {
+        "name": "secret-volume",
+        "secret": {
+          "secretName": "ssh-key-secret"
+        }
+      }
+    ],
+    "containers": [
+      {
         "name": "ssh-test-container",
         "image": "mySshImage",
-        "volumeMounts": [{
-          "name": "secret-volume",
-          "mountPath": "/etc/secret-volume",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
-        "name": "secret-volume",
-        "source": {
-          "secret": {
-            "secretName": "ssh-key-secret"
+        "volumeMounts": [
+          {
+            "name": "secret-volume",
+            "readOnly": true,
+            "mountPath": "/etc/secret-volume"
           }
-        }
-      }]
-    }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -173,91 +181,109 @@ credentials.
 The secrets:
 
 ```json
-[{
-  "apiVersion": "v1beta2",
-  "kind": "Secret",
-  "id": "prod-db-secret",
-  "data": {
-    "username": "dmFsdWUtMQ0K",
-    "password": "dmFsdWUtMg0KDQo="
-  }
-},
 {
-  "apiVersion": "v1beta2",
-  "kind": "Secret",
-  "id": "test-db-secret",
-  "data": {
-    "username": "dmFsdWUtMQ0K",
-    "password": "dmFsdWUtMg0KDQo="
-  }
-}]
+  "apiVersion": "v1beta3",
+  "kind": "List",
+  "items":
+  [{
+    "kind": "Secret",
+    "apiVersion": "v1beta3",
+    "metadata": {
+      "name": "prod-db-secret"
+    },
+    "data": {
+      "password": "dmFsdWUtMg0KDQo=",
+      "username": "dmFsdWUtMQ0K"
+    }
+  },
+  {
+    "kind": "Secret",
+    "apiVersion": "v1beta3",
+    "metadata": {
+      "name": "test-db-secret"
+    },
+    "data": {
+      "password": "dmFsdWUtMg0KDQo=",
+      "username": "dmFsdWUtMQ0K"
+    }
+  }]
+}
 ```
 
 The pods:
 
 ```json
-[{
-  "id": "prod-db-client-pod",
-  "kind": "Pod",
-  "apiVersion":"v1beta2",
-  "labels": {
-    "name": "prod-db-client"
-  },
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "prod-db-pod",
-      "containers": [{
-        "name": "db-client-container",
-        "image": "myClientImage",
-        "volumeMounts": [{
+{
+  "apiVersion": "v1beta3",
+  "kind": "List",
+  "items":
+  [{
+    "kind": "Pod",
+    "apiVersion": "v1beta3",
+    "metadata": {
+      "name": "prod-db-client-pod",
+      "labels": {
+        "name": "prod-db-client"
+      }
+    },
+    "spec": {
+      "volumes": [
+        {
           "name": "secret-volume",
-          "mountPath": "/etc/secret-volume",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
-        "name": "secret-volume",
-        "source": {
           "secret": {
             "secretName": "prod-db-secret"
           }
         }
-      }]
+      ],
+      "containers": [
+        {
+          "name": "db-client-container",
+          "image": "myClientImage",
+          "volumeMounts": [
+            {
+              "name": "secret-volume",
+              "readOnly": true,
+              "mountPath": "/etc/secret-volume"
+            }
+          ]
+        }
+      ]
     }
-  }
-},
-{
-  "id": "test-db-client-pod",
-  "kind": "Pod",
-  "apiVersion":"v1beta2",
-  "labels": {
-    "name": "test-db-client"
   },
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "test-db-pod",
-      "containers": [{
-        "name": "db-client-container",
-        "image": "myClientImage",
-        "volumeMounts": [{
+  {
+    "kind": "Pod",
+    "apiVersion": "v1beta3",
+    "metadata": {
+      "name": "test-db-client-pod",
+      "labels": {
+        "name": "test-db-client"
+      }
+    },
+    "spec": {
+      "volumes": [
+        {
           "name": "secret-volume",
-          "mountPath": "/etc/secret-volume",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
-        "name": "secret-volume",
-        "source": {
           "secret": {
             "secretName": "test-db-secret"
           }
         }
-      }]
+      ],
+      "containers": [
+        {
+          "name": "db-client-container",
+          "image": "myClientImage",
+          "volumeMounts": [
+            {
+              "name": "secret-volume",
+              "readOnly": true,
+              "mountPath": "/etc/secret-volume"
+            }
+          ]
+        }
+      ]
     }
-  }
-}]
+  }]
+}
 ```
 
 Both containers will have the following files present on their filesystems:
@@ -328,3 +354,6 @@ Pod level](#use-case-two-containers).
    by impersonating the kubelet.  It is a planned feature to only send secrets to
    nodes that actually require them, to restrict the impact of a root exploit on a
    single node.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/secrets.md?pixel)]()

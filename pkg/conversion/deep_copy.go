@@ -17,52 +17,98 @@ limitations under the License.
 package conversion
 
 import (
-	"bytes"
-	"encoding/gob"
+	"fmt"
 	"reflect"
-	"sync"
 )
-
-// pool is a pool of copiers
-var pool = sync.Pool{
-	New: func() interface{} { return newGobCopier() },
-}
 
 // DeepCopy makes a deep copy of source or returns an error.
 func DeepCopy(source interface{}) (interface{}, error) {
-	v := reflect.New(reflect.TypeOf(source))
-
-	c := pool.Get().(gobCopier)
-	defer pool.Put(c)
-	if err := c.CopyInto(v.Interface(), source); err != nil {
-		return nil, err
-	}
-
-	return v.Elem().Interface(), nil
+	v, err := deepCopy(reflect.ValueOf(source))
+	return v.Interface(), err
 }
 
-// gobCopier provides a copy mechanism for objects using Gob.
-// This object is not safe for multiple threads because buffer
-// is shared.
-type gobCopier struct {
-	enc *gob.Encoder
-	dec *gob.Decoder
-}
+func deepCopy(src reflect.Value) (reflect.Value, error) {
+	switch src.Kind() {
+	case reflect.Chan, reflect.Func, reflect.UnsafePointer, reflect.Uintptr:
+		return src, fmt.Errorf("cannot deep copy kind: %s", src.Kind())
 
-func newGobCopier() gobCopier {
-	buf := &bytes.Buffer{}
-	return gobCopier{
-		enc: gob.NewEncoder(buf),
-		dec: gob.NewDecoder(buf),
-	}
-}
+	case reflect.Array:
+		dst := reflect.New(src.Type())
+		for i := 0; i < src.Len(); i++ {
+			copyVal, err := deepCopy(src.Index(i))
+			if err != nil {
+				return src, err
+			}
+			dst.Elem().Index(i).Set(copyVal)
+		}
+		return dst.Elem(), nil
 
-func (c *gobCopier) CopyInto(dst, src interface{}) error {
-	if err := c.enc.Encode(src); err != nil {
-		return err
+	case reflect.Interface:
+		if src.IsNil() {
+			return src, nil
+		}
+		return deepCopy(src.Elem())
+
+	case reflect.Map:
+		if src.IsNil() {
+			return src, nil
+		}
+		dst := reflect.MakeMap(src.Type())
+		for _, k := range src.MapKeys() {
+			copyVal, err := deepCopy(src.MapIndex(k))
+			if err != nil {
+				return src, err
+			}
+			dst.SetMapIndex(k, copyVal)
+		}
+		return dst, nil
+
+	case reflect.Ptr:
+		if src.IsNil() {
+			return src, nil
+		}
+		dst := reflect.New(src.Type().Elem())
+		copyVal, err := deepCopy(src.Elem())
+		if err != nil {
+			return src, err
+		}
+		dst.Elem().Set(copyVal)
+		return dst, nil
+
+	case reflect.Slice:
+		if src.IsNil() {
+			return src, nil
+		}
+		dst := reflect.MakeSlice(src.Type(), 0, src.Len())
+		for i := 0; i < src.Len(); i++ {
+			copyVal, err := deepCopy(src.Index(i))
+			if err != nil {
+				return src, err
+			}
+			dst = reflect.Append(dst, copyVal)
+		}
+		return dst, nil
+
+	case reflect.Struct:
+		dst := reflect.New(src.Type())
+		for i := 0; i < src.NumField(); i++ {
+			if !dst.Elem().Field(i).CanSet() {
+				// Can't set private fields. At this point, the
+				// best we can do is a shallow copy. For
+				// example, time.Time is a value type with
+				// private members that can be shallow copied.
+				return src, nil
+			}
+			copyVal, err := deepCopy(src.Field(i))
+			if err != nil {
+				return src, err
+			}
+			dst.Elem().Field(i).Set(copyVal)
+		}
+		return dst.Elem(), nil
+
+	default:
+		// Value types like numbers, booleans, and strings.
+		return src, nil
 	}
-	if err := c.dec.Decode(dst); err != nil {
-		return err
-	}
-	return nil
 }

@@ -1,19 +1,18 @@
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    containers:
-      - image: gcr.io/google_containers/liveness
-        name: liveness
-        livenessProbe:
-          httpGet:
-            path: "/healthz"
-            port: 8080
-          initialDelaySeconds: 15
-        command:
-          - /server
-    id: liveness-http
-    version: v1beta1
-id: liveness-http
+apiVersion: v1beta3
 kind: Pod
-labels:
-  test: liveness
+metadata:
+  labels:
+    test: liveness
+  name: liveness-http
+spec:
+  containers:
+  - args:
+    - /server
+    image: gcr.io/google_containers/liveness
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 8080
+      initialDelaySeconds: 15
+      timeoutSeconds: 1
+    name: liveness

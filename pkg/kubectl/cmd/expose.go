@@ -32,7 +32,8 @@ const (
 	expose_long = `Take a replicated application and expose it as Kubernetes Service.
 
 Looks up a replication controller or service by name and uses the selector for that resource as the
-selector for a new Service on the specified port.`
+selector for a new Service on the specified port. If no labels are specified, the new service will
+re-use the labels from the resource it exposes.`
 
 	expose_example = `// Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 $ kubectl expose rc nginx --port=80 --target-port=8000
@@ -86,8 +87,28 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return err
 	}
 
-	generatorName := cmdutil.GetFlagString(cmd, "generator")
+	// Get the input object
+	var mapping *meta.RESTMapping
+	mapper, typer := f.Object()
+	v, k, err := mapper.VersionAndKindForResource(res)
+	if err != nil {
+		return err
+	}
+	mapping, err = mapper.RESTMapping(k, v)
+	if err != nil {
+		return err
+	}
+	client, err := f.RESTClient(mapping)
+	if err != nil {
+		return err
+	}
+	inputObject, err := resource.NewHelper(client, mapping).Get(namespace, name)
+	if err != nil {
+		return err
+	}
 
+	// Get the generator, setup and validate all required parameters
+	generatorName := cmdutil.GetFlagString(cmd, "generator")
 	generator, found := f.Generator(generatorName)
 	if !found {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generator))
@@ -99,19 +120,9 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	} else {
 		params["name"] = cmdutil.GetFlagString(cmd, "service-name")
 	}
-	var mapping *meta.RESTMapping
 	if s, found := params["selector"]; !found || len(s) == 0 || cmdutil.GetFlagInt(cmd, "port") < 1 {
-		mapper, _ := f.Object()
-		v, k, err := mapper.VersionAndKindForResource(res)
-		if err != nil {
-			return err
-		}
-		mapping, err = mapper.RESTMapping(k, v)
-		if err != nil {
-			return err
-		}
 		if len(s) == 0 {
-			s, err := f.PodSelectorForResource(mapping, namespace, name)
+			s, err := f.PodSelectorForObject(inputObject)
 			if err != nil {
 				return err
 			}
@@ -125,7 +136,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			}
 		}
 		if cmdutil.GetFlagInt(cmd, "port") < 0 && !noPorts {
-			ports, err := f.PortsForResource(mapping, namespace, name)
+			ports, err := f.PortsForObject(inputObject)
 			if err != nil {
 				return err
 			}
@@ -141,12 +152,19 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if cmdutil.GetFlagBool(cmd, "create-external-load-balancer") {
 		params["create-external-load-balancer"] = "true"
 	}
-
+	if len(params["labels"]) == 0 {
+		labels, err := f.LabelsForObject(inputObject)
+		if err != nil {
+			return err
+		}
+		params["labels"] = kubectl.MakeLabels(labels)
+	}
 	err = kubectl.ValidateParams(names, params)
 	if err != nil {
 		return err
 	}
 
+	// Expose new object
 	object, err := generator.Generate(params)
 	if err != nil {
 		return err
@@ -162,7 +180,6 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 	// TODO: extract this flag to a central location, when such a location exists.
 	if !cmdutil.GetFlagBool(cmd, "dry-run") {
-		mapper, typer := f.Object()
 		resourceMapper := &resource.Mapper{typer, mapper, f.ClientMapperForCommand()}
 		info, err := resourceMapper.InfoForObject(object)
 		if err != nil {

@@ -30,12 +30,11 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&nfsPlugin{nil, mount.New()}}
+	return []volume.VolumePlugin{&nfsPlugin{nil}}
 }
 
 type nfsPlugin struct {
-	host    volume.VolumeHost
-	mounter mount.Interface
+	host volume.VolumeHost
 }
 
 var _ volume.VolumePlugin = &nfsPlugin{}
@@ -56,32 +55,32 @@ func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.NFS != nil
 }
 
-func (plugin *nfsPlugin) GetAccessModes() []api.AccessModeType {
-	return []api.AccessModeType{
+func (plugin *nfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 		api.ReadOnlyMany,
 		api.ReadWriteMany,
 	}
 }
 
-func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, podRef, plugin.mounter)
+func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+	return plugin.newBuilderInternal(spec, pod, mounter)
 }
 
-func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface) (volume.Builder, error) {
 	return &nfs{
 		volName:    spec.Name,
 		server:     spec.VolumeSource.NFS.Server,
 		exportPath: spec.VolumeSource.NFS.Path,
 		readOnly:   spec.VolumeSource.NFS.ReadOnly,
 		mounter:    mounter,
-		podRef:     podRef,
+		pod:        pod,
 		plugin:     plugin,
 	}, nil
 }
 
-func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID, _ mount.Interface) (volume.Cleaner, error) {
-	return plugin.newCleanerInternal(volName, podUID, plugin.mounter)
+func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+	return plugin.newCleanerInternal(volName, podUID, mounter)
 }
 
 func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
@@ -91,7 +90,7 @@ func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mo
 		exportPath: "",
 		readOnly:   false,
 		mounter:    mounter,
-		podRef:     &api.ObjectReference{UID: podUID},
+		pod:        &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
 		plugin:     plugin,
 	}, nil
 }
@@ -99,7 +98,7 @@ func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mo
 // NFS volumes represent a bare host file or directory mount of an NFS export.
 type nfs struct {
 	volName    string
-	podRef     *api.ObjectReference
+	pod        *api.Pod
 	server     string
 	exportPath string
 	readOnly   bool
@@ -158,7 +157,7 @@ func (nfsVolume *nfs) SetUpAt(dir string) error {
 
 func (nfsVolume *nfs) GetPath() string {
 	name := nfsPluginName
-	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.podRef.UID, util.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
+	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, util.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
 }
 
 func (nfsVolume *nfs) TearDown() error {

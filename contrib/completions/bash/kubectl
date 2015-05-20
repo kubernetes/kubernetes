@@ -157,14 +157,13 @@ __handle_word()
 }
 
 # call kubectl get $1,
-# use the first column in compgen
-# we could use templates, but then would need a template per resource
 __kubectl_parse_get()
 {
-    local kubectl_output out
-    if kubectl_output=$(kubectl get --no-headers "$1" 2>/dev/null); then
-        out=($(echo "${kubectl_output}" | awk '{print $1}'))
-        COMPREPLY=( $( compgen -W "${out[*]}" -- "$cur" ) )
+    local template
+    template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
+    local kubectl_out
+    if kubectl_out=$(kubectl get -o template --template="${template}" "$1" 2>/dev/null); then
+        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
 
@@ -174,16 +173,13 @@ __kubectl_get_resource()
         return 1
     fi
     __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
-    if [[ $? -eq 0 ]]; then
-        return 0
-    fi
 }
 
 # $1 is the name of the pod we want to get the list of containers inside
 __kubectl_get_containers()
 {
     local template
-    template="{{ range .desiredState.manifest.containers  }}{{ .name }} {{ end }}"
+    template="{{ range .spec.containers  }}{{ .name }} {{ end }}"
     __debug "${FUNCNAME} nouns are ${nouns[*]}"
 
     local len="${#nouns[@]}"
@@ -263,7 +259,7 @@ _kubectl_get()
     must_have_one_noun+=("resourcequota")
     must_have_one_noun+=("secret")
     must_have_one_noun+=("service")
-    must_have_one_noun+=("status")
+    must_have_one_noun+=("serviceaccount")
 }
 
 _kubectl_describe()
@@ -289,7 +285,9 @@ _kubectl_describe()
     must_have_one_noun+=("pod")
     must_have_one_noun+=("replicationcontroller")
     must_have_one_noun+=("resourcequota")
+    must_have_one_noun+=("secret")
     must_have_one_noun+=("service")
+    must_have_one_noun+=("serviceaccount")
 }
 
 _kubectl_create()
@@ -404,6 +402,8 @@ _kubectl_log()
     flags+=("--help")
     flags+=("-h")
     flags+=("--interactive")
+    flags+=("--previous")
+    flags+=("-p")
 
     must_have_one_flag=()
     must_have_one_noun=()
@@ -721,7 +721,6 @@ _kubectl_config_set-credentials()
     flags_with_completion=()
     flags_completion=()
 
-    flags+=("--auth-path=")
     flags+=("--client-certificate=")
     flags+=("--client-key=")
     flags+=("--embed-certs")
@@ -916,8 +915,6 @@ _kubectl()
 
     flags+=("--alsologtostderr")
     flags+=("--api-version=")
-    flags+=("--auth-path=")
-    two_word_flags+=("-a")
     flags+=("--certificate-authority=")
     flags+=("--client-certificate=")
     flags+=("--client-key=")

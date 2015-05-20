@@ -94,11 +94,12 @@ func runApiServer(etcdClient tools.EtcdClient, addr net.IP, port int, masterServ
 			Client: http.DefaultClient,
 			Port:   10250,
 		},
-		EnableLogsSupport:    false,
-		EnableSwaggerSupport: true,
-		EnableProfiling:      *enableProfiling,
-		APIPrefix:            "/api",
-		Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableSwaggerSupport:  true,
+		EnableProfiling:       *enableProfiling,
+		APIPrefix:             "/api",
+		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 
 		ReadWritePort:          port,
 		ReadOnlyPort:           port,
@@ -132,7 +133,8 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 
 	const nodeSyncPeriod = 10 * time.Second
 	nodeController := nodecontroller.NewNodeController(
-		nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst), 40*time.Second, 60*time.Second, 5*time.Second, "", nil, false)
+		nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst),
+		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(nodeSyncPeriod, true)
 
 	serviceController := servicecontroller.New(nil, cl, "kubernetes")
@@ -143,7 +145,7 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 	endpoints := service.NewEndpointController(cl)
 	go endpoints.Run(5, util.NeverStop)
 
-	controllerManager := controller.NewReplicationManager(cl)
+	controllerManager := controller.NewReplicationManager(cl, controller.BurstReplicas)
 	go controllerManager.Run(5, util.NeverStop)
 }
 

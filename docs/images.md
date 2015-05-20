@@ -30,3 +30,6 @@ Pull Policy is per-container, but any user of the cluster will have access to al
 ## Updating Images
 
 The default pull policy is `PullIfNotPresent` which causes the Kubelet to not pull an image if it already exists. If you would like to always force a pull you must set a pull image policy of `PullAlways` or specify a `:latest` tag on your image.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/images.md?pixel)]()

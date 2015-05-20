@@ -17,7 +17,7 @@ spec:
         - resources:
             limits:
               cpu: 1
-          image: pires/hazelcast-k8s
+          image: pires/hazelcast-k8s:0.2
           name: hazelcast
           ports: 
             - containerPort: 5701

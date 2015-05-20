@@ -39,6 +39,7 @@
     "karma-cli": "0.0.4",
     "karma-jasmine": "^0.1.5",
     "karma-junit-reporter": "^0.2.2",
+    "karma-story-reporter": "^0.3.1",
     "protractor": "^1.1.1",
     "shelljs": "^0.2.6",
     "through2": "^0.6.3",

@@ -57,7 +57,7 @@ func TestExampleObjects(t *testing.T) {
 		"claims/claim-01.yaml": {
 			expected: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceName(api.ResourceStorage): resource.MustParse("3Gi"),
@@ -69,7 +69,7 @@ func TestExampleObjects(t *testing.T) {
 		"claims/claim-02.yaml": {
 			expected: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceName(api.ResourceStorage): resource.MustParse("8Gi"),
@@ -81,7 +81,7 @@ func TestExampleObjects(t *testing.T) {
 		"volumes/local-01.yaml": {
 			expected: &api.PersistentVolume{
 				Spec: api.PersistentVolumeSpec{
-					AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Capacity: api.ResourceList{
 						api.ResourceName(api.ResourceStorage): resource.MustParse("10Gi"),
 					},
@@ -96,7 +96,7 @@ func TestExampleObjects(t *testing.T) {
 		"volumes/local-02.yaml": {
 			expected: &api.PersistentVolume{
 				Spec: api.PersistentVolumeSpec{
-					AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Capacity: api.ResourceList{
 						api.ResourceName(api.ResourceStorage): resource.MustParse("5Gi"),
 					},
@@ -185,7 +185,7 @@ func TestBindingWithExamples(t *testing.T) {
 
 	claim, error := client.PersistentVolumeClaims("ns").Get("any")
 	if error != nil {
-		t.Error("Unexpected error getting PVC from client: %v", err)
+		t.Errorf("Unexpected error getting PVC from client: %v", err)
 	}
 
 	volumeIndex := NewPersistentVolumeOrderedIndex()
@@ -194,30 +194,21 @@ func TestBindingWithExamples(t *testing.T) {
 		claim:  claim,
 	}
 
-	volumeIndex.Add(pv)
+	// adds the volume to the index, making the volume available
 	syncVolume(volumeIndex, mockClient, pv)
-
 	if pv.Status.Phase != api.VolumeAvailable {
 		t.Errorf("Expected phase %s but got %s", api.VolumeBound, pv.Status.Phase)
 	}
 
-	if pv.Spec.ClaimRef != nil {
-		t.Errorf("Expected nil ClaimRef but got %+v\n", pv.Spec.ClaimRef)
-	}
-
+	// an initial sync for a claim will bind it to an unbound volume, triggers state change
 	syncClaim(volumeIndex, mockClient, claim)
+	// state change causes another syncClaim to update statuses
+	syncClaim(volumeIndex, mockClient, claim)
+	// claim updated volume's status, causing an update and syncVolume call
+	syncVolume(volumeIndex, mockClient, pv)
 
 	if pv.Spec.ClaimRef == nil {
-		t.Errorf("Expected ClaimRef but got nil for volume: %+v\n", pv)
-	}
-
-	// first sync verifies the new bound claim, advances state, triggering update
-	syncVolume(volumeIndex, mockClient, pv)
-	// second sync verifies claim, sees missing claim status and builds it
-	syncVolume(volumeIndex, mockClient, pv)
-
-	if claim.Status.VolumeRef == nil {
-		t.Fatalf("Expected claim to be bound to volume")
+		t.Errorf("Expected ClaimRef but got nil for pv.Status.ClaimRef: %+v\n", pv)
 	}
 
 	if pv.Status.Phase != api.VolumeBound {

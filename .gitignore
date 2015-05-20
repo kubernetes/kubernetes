@@ -53,3 +53,6 @@ network_closure.sh
 
 # Web UI
 www/master/node_modules/
+
+# Karma output
+www/test_out

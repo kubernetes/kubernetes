@@ -228,3 +228,69 @@ func NewInformer(
 	}
 	return clientState, New(cfg)
 }
+
+// NewIndexerInformer returns a cache.Indexer and a controller for populating the index
+// while also providing event notifications. You should only used the returned
+// cache.Index for Get/List operations; Add/Modify/Deletes will cause the event
+// notifications to be faulty.
+//
+// Parameters:
+//  * lw is list and watch functions for the source of the resource you want to
+//    be informed of.
+//  * objType is an object of the type that you expect to receive.
+//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//    calls, even if nothing changed). Otherwise, re-list will be delayed as
+//    long as possible (until the upstream source closes the watch or times out,
+//    or you stop the controller).
+//  * h is the object you want notifications sent to.
+//
+func NewIndexerInformer(
+	lw cache.ListerWatcher,
+	objType runtime.Object,
+	resyncPeriod time.Duration,
+	h ResourceEventHandler,
+	indexers cache.Indexers,
+) (cache.Indexer, *Controller) {
+	// This will hold the client state, as we know it.
+	clientState := cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
+
+	// This will hold incoming changes. Note how we pass clientState in as a
+	// KeyLister, that way resync operations will result in the correct set
+	// of update/delete deltas.
+	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, clientState)
+
+	cfg := &Config{
+		Queue:            fifo,
+		ListerWatcher:    lw,
+		ObjectType:       objType,
+		FullResyncPeriod: resyncPeriod,
+		RetryOnError:     false,
+
+		Process: func(obj interface{}) error {
+			// from oldest to newest
+			for _, d := range obj.(cache.Deltas) {
+				switch d.Type {
+				case cache.Sync, cache.Added, cache.Updated:
+					if old, exists, err := clientState.Get(d.Object); err == nil && exists {
+						if err := clientState.Update(d.Object); err != nil {
+							return err
+						}
+						h.OnUpdate(old, d.Object)
+					} else {
+						if err := clientState.Add(d.Object); err != nil {
+							return err
+						}
+						h.OnAdd(d.Object)
+					}
+				case cache.Deleted:
+					if err := clientState.Delete(d.Object); err != nil {
+						return err
+					}
+					h.OnDelete(d.Object)
+				}
+			}
+			return nil
+		},
+	}
+	return clientState, New(cfg)
+}

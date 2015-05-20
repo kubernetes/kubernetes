@@ -108,6 +108,12 @@ const containersHtmlTemplate = `
           </div>
           <div id="usage-gauge" class="panel-body"></div>
 	</div>
+	<div class="panel panel-primary">
+          <div class="panel-heading">
+            <h3 class="panel-title">Processes</h3>
+          </div>
+          <div id="processes-top" class="panel-body"></div>
+	</div>
 	{{if .CpuAvailable}}
 	<div class="panel panel-primary">
           <div class="panel-heading">

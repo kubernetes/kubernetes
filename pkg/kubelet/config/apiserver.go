@@ -42,12 +42,3 @@ func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}
 	}
 	cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0).Run()
 }
-
-func getHostFieldLabel(apiVersion string) string {
-	switch apiVersion {
-	case "v1beta1", "v1beta2":
-		return "DesiredState.Host"
-	default:
-		return "spec.host"
-	}
-}

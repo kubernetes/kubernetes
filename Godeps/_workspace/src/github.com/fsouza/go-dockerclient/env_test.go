@@ -251,7 +251,9 @@ func TestGetList(t *testing.T) {
 func TestSetList(t *testing.T) {
 	list := []string{"a", "b", "c"}
 	var env Env
-	env.SetList("SOME", list)
+	if err := env.SetList("SOME", list); err != nil {
+		t.Error(err)
+	}
 	if got := env.GetList("SOME"); !reflect.DeepEqual(got, list) {
 		t.Errorf("Env.SetList(%v): wrong result. Got %v", list, got)
 	}

@@ -188,7 +188,7 @@ func ValidateClusterSize() {
 	}
 	stdout, err := cmd.Output()
 	if err != nil {
-		log.Fatal("Could not get nodes to validate cluster size (%s)", err)
+		log.Fatalf("Could not get nodes to validate cluster size (%s)", err)
 	}
 
 	numNodes, err := strconv.Atoi(strings.TrimSpace(string(stdout)))

@@ -24,6 +24,26 @@ is_push=$@
 readonly KNOWN_TOKENS_FILE="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
 readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 
+function ensure-basic-networking() {
+  # Deal with GCE networking bring-up race. (We rely on DNS for a lot,
+  # and it's just not worth doing a whole lot of startup work if this
+  # isn't ready yet.)
+  until getent hosts metadata.google.internal &>/dev/null; do
+    echo 'Waiting for functional DNS (trying to resolve metadata.google.internal)...'
+    sleep 3
+  done
+  until getent hosts $(hostname -f) &>/dev/null; do
+    echo 'Waiting for functional DNS (trying to resolve my own FQDN)...'
+    sleep 3
+  done
+  until getent hosts $(hostname -i) &>/dev/null; do
+    echo 'Waiting for functional DNS (trying to resolve my own IP)...'
+    sleep 3
+  done
+
+  echo "Networking functional on $(hostname) ($(hostname -i))"
+}
+
 function ensure-install-dir() {
   INSTALL_DIR="/var/cache/kubernetes-install"
   mkdir -p ${INSTALL_DIR}
@@ -58,19 +78,11 @@ for k,v in yaml.load(sys.stdin).iteritems():
   print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
 ''' < "${kube_env_yaml}")
 
-  # Infer master status from presence in node pool
-  if [[ $(hostname) = ${NODE_INSTANCE_PREFIX}* ]]; then
-    KUBERNETES_MASTER="false"
-  else
+  # Infer master status from hostname
+  if [[ $(hostname) == "${INSTANCE_PREFIX}-master" ]]; then
     KUBERNETES_MASTER="true"
-  fi
-
-  if [[ "${KUBERNETES_MASTER}" != "true" ]] && [[ -z "${MINION_IP_RANGE:-}" ]]; then
-    # This block of code should go away once the master can allocate CIDRs
-    until MINION_IP_RANGE=$(curl-metadata node-ip-range); do
-      echo 'Waiting for metadata MINION_IP_RANGE...'
-      sleep 3
-    done
+  else
+    KUBERNETES_MASTER="false"
   fi
 }
 
@@ -253,14 +265,34 @@ admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 EOF
 }
 
-# This should only happen on cluster initialization. Uses
-# KUBE_PASSWORD and KUBE_USER to generate basic_auth.csv. Uses
-# KUBE_BEARER_TOKEN, KUBELET_TOKEN, and KUBE_PROXY_TOKEN to generate
-# known_tokens.csv (KNOWN_TOKENS_FILE). After the first boot and
-# on upgrade, this file exists on the master-pd and should never
-# be touched again (except perhaps an additional service account,
-# see NB below.)
-function create-salt-auth() {
+# This should only happen on cluster initialization.
+#
+#  - Uses KUBE_PASSWORD and KUBE_USER to generate basic_auth.csv.
+#  - Uses KUBE_BEARER_TOKEN, KUBELET_TOKEN, and KUBE_PROXY_TOKEN to generate
+#    known_tokens.csv (KNOWN_TOKENS_FILE).
+#  - Uses CA_CERT, MASTER_CERT, and MASTER_KEY to populate the SSL credentials
+#    for the apiserver.
+#  - Optionally uses KUBECFG_CERT and KUBECFG_KEY to store a copy of the client
+#    cert credentials.
+#
+# After the first boot and on upgrade, these files exists on the master-pd
+# and should never be touched again (except perhaps an additional service
+# account, see NB below.)
+function create-salt-master-auth() {
+  if [[ ! -e /srv/kubernetes/ca.crt ]]; then
+    if  [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${MASTER_CERT:-}" ]] && [[ ! -z "${MASTER_KEY:-}" ]]; then
+      mkdir -p /srv/kubernetes
+      (umask 077;
+        echo "${CA_CERT}" | base64 -d > /srv/kubernetes/ca.crt;
+        echo "${MASTER_CERT}" | base64 -d > /srv/kubernetes/server.cert;
+        echo "${MASTER_KEY}" | base64 -d > /srv/kubernetes/server.key;
+        # Kubecfg cert/key are optional and included for backwards compatibility.
+        # TODO(roberthbailey): Remove these two lines once GKE no longer requires
+        # fetching clients certs from the master VM.
+        echo "${KUBECFG_CERT:-}" | base64 -d > /srv/kubernetes/kubecfg.crt;
+        echo "${KUBECFG_KEY:-}" | base64 -d > /srv/kubernetes/kubecfg.key)
+    fi
+  fi
   if [ ! -e "${BASIC_AUTH_FILE}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
     (umask 077;
@@ -273,18 +305,107 @@ function create-salt-auth() {
       echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}";
       echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${KNOWN_TOKENS_FILE}")
 
-    mkdir -p /srv/salt-overlay/salt/kubelet
-    kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
-    (umask 077;
-      echo "{\"BearerToken\": \"${KUBELET_TOKEN}\", \"Insecure\": true }" > "${kubelet_auth_file}")
+    # Generate tokens for other "service accounts".  Append to known_tokens.
+    #
+    # NB: If this list ever changes, this script actually has to
+    # change to detect the existence of this file, kill any deleted
+    # old tokens and add any new tokens (to handle the upgrade case).
+    local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
+    for account in "${service_accounts[@]}"; do
+      token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+      echo "${token},${account},${account}" >> "${KNOWN_TOKENS_FILE}"
+    done
+  fi
+}
 
+# TODO(roberthbailey): Remove the insecure kubeconfig configuration files
+# once the certs are being plumbed through for GKE.
+function create-salt-node-auth() {
+  if [[ ! -e /srv/kubernetes/ca.crt ]]; then
+    if [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
+      mkdir -p /srv/kubernetes
+      (umask 077;
+        echo "${CA_CERT}" | base64 -d > /srv/kubernetes/ca.crt;
+        echo "${KUBELET_CERT}" | base64 -d > /srv/kubernetes/kubelet.crt;
+        echo "${KUBELET_KEY}" | base64 -d > /srv/kubernetes/kubelet.key)
+    fi
+  fi
+  kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+  if [ ! -e "${kubelet_kubeconfig_file}" ]; then
+    mkdir -p /srv/salt-overlay/salt/kubelet
+    if [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
+      (umask 077;
+        cat > "${kubelet_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+  user:
+    client-certificate-data: ${KUBELET_CERT}
+    client-key-data: ${KUBELET_KEY}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${CA_CERT}
+contexts:
+- context:
+    cluster: local
+    user: kubelet
+  name: service-account-context
+current-context: service-account-context
+EOF
+)
+    else
+      (umask 077;
+      cat > "${kubelet_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+  user:
+    token: ${KUBELET_TOKEN}
+clusters:
+- name: local
+  cluster:
+     insecure-skip-tls-verify: true
+contexts:
+- context:
+    cluster: local
+    user: kubelet
+  name: service-account-context
+current-context: service-account-context
+EOF
+)
+    fi
+  fi
+
+  kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
+  if [ ! -e "${kube_proxy_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-proxy
-    kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
-    # Make a kubeconfig file with the token.
-    # TODO(etune): put apiserver certs into secret too, and reference from authfile,
-    # so that "Insecure" is not needed.
-    (umask 077;
-    cat > "${kube_proxy_kubeconfig_file}" <<EOF
+    if [[ ! -z "${CA_CERT:-}" ]]; then
+      (umask 077;
+        cat > "${kube_proxy_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kube-proxy
+  user:
+    token: ${KUBE_PROXY_TOKEN}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${CA_CERT}
+contexts:
+- context:
+    cluster: local
+    user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+)
+    else
+      (umask 077;
+      cat > "${kube_proxy_kubeconfig_file}" <<EOF
 apiVersion: v1
 kind: Config
 users:
@@ -303,17 +424,7 @@ contexts:
 current-context: service-account-context
 EOF
 )
-
-    # Generate tokens for other "service accounts".  Append to known_tokens.
-    #
-    # NB: If this list ever changes, this script actually has to
-    # change to detect the existence of this file, kill any deleted
-    # old tokens and add any new tokens (to handle the upgrade case).
-    local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
-    for account in "${service_accounts[@]}"; do
-      token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-      echo "${token},${account},${account}" >> "${KNOWN_TOKENS_FILE}"
-    done
+    fi
   fi
 }
 
@@ -386,7 +497,7 @@ function salt-node-role() {
 grains:
   roles:
     - kubernetes-pool
-  cbr-cidr: '$(echo "$MINION_IP_RANGE" | sed -e "s/'/''/g")'
+  cbr-cidr: 10.123.45.0/30
   cloud: gce
 EOF
 }
@@ -413,14 +524,8 @@ EOF
 }
 
 function salt-set-apiserver() {
-  local kube_master_fqdn
-  until kube_master_fqdn=$(getent hosts ${KUBERNETES_MASTER_NAME} | awk '{ print $2 }'); do
-    echo 'Waiting for DNS resolution of ${KUBERNETES_MASTER_NAME}...'
-    sleep 3
-  done
-
   cat <<EOF >>/etc/salt/minion.d/grains.conf
-  api_servers: '${kube_master_fqdn}'
+  api_servers: '${KUBERNETES_MASTER_NAME}'
 EOF
 }
 
@@ -449,11 +554,16 @@ function run-salt() {
 if [[ -z "${is_push}" ]]; then
   echo "== kube-up node config starting =="
   set-broken-motd
+  ensure-basic-networking
   ensure-install-dir
   set-kube-env
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
   create-salt-pillar
-  create-salt-auth
+  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
+    create-salt-master-auth
+  else
+    create-salt-node-auth
+  fi
   download-release
   configure-salt
   remove-docker-artifacts
@@ -462,6 +572,7 @@ if [[ -z "${is_push}" ]]; then
   echo "== kube-up node config done =="
 else
   echo "== kube-push node config starting =="
+  ensure-basic-networking
   ensure-install-dir
   set-kube-env
   create-salt-pillar

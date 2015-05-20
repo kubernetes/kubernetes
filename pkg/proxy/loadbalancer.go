@@ -29,7 +29,7 @@ type LoadBalancer interface {
 	// NextEndpoint returns the endpoint to handle a request for the given
 	// service-port and source address.
 	NextEndpoint(service ServicePortName, srcAddr net.Addr) (string, error)
-	NewService(service ServicePortName, sessionAffinityType api.AffinityType, stickyMaxAgeMinutes int) error
+	NewService(service ServicePortName, sessionAffinityType api.ServiceAffinity, stickyMaxAgeMinutes int) error
 	CleanupStaleStickySessions(service ServicePortName)
 }
 

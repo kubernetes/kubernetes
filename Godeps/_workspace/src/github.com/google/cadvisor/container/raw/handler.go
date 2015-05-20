@@ -177,7 +177,11 @@ func (self *rawContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	now := time.Now()
 	lowestTime := now
 	for _, cgroupPath := range self.cgroupPaths {
-		// The modified time of the cgroup directory is when the container was created.
+		// The modified time of the cgroup directory changes whenever a subcontainer is created.
+		// eg. /docker will have creation time matching the creation of latest docker container.
+		// Use clone_children as a workaround as it isn't usually modified. It is only likely changed
+		// immediately after creating a container.
+		cgroupPath = path.Join(cgroupPath, "cgroup.clone_children")
 		fi, err := os.Stat(cgroupPath)
 		if err == nil && fi.ModTime().Before(lowestTime) {
 			lowestTime = fi.ModTime()
@@ -260,6 +264,7 @@ func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 					Device:          fs.Device,
 					Limit:           fs.Capacity,
 					Usage:           fs.Capacity - fs.Free,
+					Available:       fs.Available,
 					ReadsCompleted:  fs.DiskStats.ReadsCompleted,
 					ReadsMerged:     fs.DiskStats.ReadsMerged,
 					SectorsRead:     fs.DiskStats.SectorsRead,
@@ -394,8 +399,7 @@ func (self *rawContainerHandler) ListThreads(listType container.ListType) ([]int
 }
 
 func (self *rawContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
-	// TODO(vmarmol): Implement
-	return nil, nil
+	return libcontainer.GetProcesses(self.cgroupManager)
 }
 
 func (self *rawContainerHandler) watchDirectory(dir string, containerName string) error {

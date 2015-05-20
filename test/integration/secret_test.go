@@ -30,13 +30,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
+	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
 )
-
-func init() {
-	requireEtcd()
-}
 
 func deletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {
 	if err := c.Pods(ns).Delete(name, nil); err != nil {
@@ -51,7 +47,7 @@ func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
 
 // TestSecrets tests apiserver-side behavior of creation of secret objects and their use by pods.
 func TestSecrets(t *testing.T) {
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	helper, err := framework.NewHelper()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -63,17 +59,18 @@ func TestSecrets(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		EnableIndex:       true,
-		APIPrefix:         "/api",
-		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EtcdHelper:            helper,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
 	DoTestSecrets(t, client, testapi.Version())
 }

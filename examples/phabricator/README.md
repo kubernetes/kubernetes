@@ -140,7 +140,7 @@ To automate this process and make sure that a proper host is authorized even if 
         "containers": [
           {
             "name": "authenticator",
-            "image": "fgrzadkowski/example-cloudsql-authenticator"
+            "image": "gcr.io.google_containers/cloudsql-authenticator:v1"
           }
         ]
       }
@@ -216,3 +216,6 @@ To turn down a Kubernetes cluster:
 ```shell
 $ cluster/kube-down.sh
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/phabricator/README.md?pixel)]()

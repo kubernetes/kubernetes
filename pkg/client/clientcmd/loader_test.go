@@ -177,8 +177,8 @@ func TestConflictingCurrentContext(t *testing.T) {
 func TestResolveRelativePaths(t *testing.T) {
 	pathResolutionConfig1 := clientcmdapi.Config{
 		AuthInfos: map[string]clientcmdapi.AuthInfo{
-			"relative-user-1": {ClientCertificate: "relative/client/cert", ClientKey: "../relative/client/key", AuthPath: "../../relative/auth/path"},
-			"absolute-user-1": {ClientCertificate: "/absolute/client/cert", ClientKey: "/absolute/client/key", AuthPath: "/absolute/auth/path"},
+			"relative-user-1": {ClientCertificate: "relative/client/cert", ClientKey: "../relative/client/key"},
+			"absolute-user-1": {ClientCertificate: "/absolute/client/cert", ClientKey: "/absolute/client/key"},
 		},
 		Clusters: map[string]clientcmdapi.Cluster{
 			"relative-server-1": {CertificateAuthority: "../relative/ca"},
@@ -187,8 +187,8 @@ func TestResolveRelativePaths(t *testing.T) {
 	}
 	pathResolutionConfig2 := clientcmdapi.Config{
 		AuthInfos: map[string]clientcmdapi.AuthInfo{
-			"relative-user-2": {ClientCertificate: "relative/client/cert2", ClientKey: "../relative/client/key2", AuthPath: "../../relative/auth/path2"},
-			"absolute-user-2": {ClientCertificate: "/absolute/client/cert2", ClientKey: "/absolute/client/key2", AuthPath: "/absolute/auth/path2"},
+			"relative-user-2": {ClientCertificate: "relative/client/cert2", ClientKey: "../relative/client/key2"},
+			"absolute-user-2": {ClientCertificate: "/absolute/client/cert2", ClientKey: "/absolute/client/key2"},
 		},
 		Clusters: map[string]clientcmdapi.Cluster{
 			"relative-server-2": {CertificateAuthority: "../relative/ca2"},
@@ -247,25 +247,21 @@ func TestResolveRelativePaths(t *testing.T) {
 			foundAuthInfoCount++
 			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].ClientCertificate), authInfo.ClientCertificate, t)
 			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].ClientKey), authInfo.ClientKey, t)
-			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].AuthPath), authInfo.AuthPath, t)
 		}
 		if key == "relative-user-2" {
 			foundAuthInfoCount++
 			matchStringArg(path.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].ClientCertificate), authInfo.ClientCertificate, t)
 			matchStringArg(path.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].ClientKey), authInfo.ClientKey, t)
-			matchStringArg(path.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].AuthPath), authInfo.AuthPath, t)
 		}
 		if key == "absolute-user-1" {
 			foundAuthInfoCount++
 			matchStringArg(pathResolutionConfig1.AuthInfos["absolute-user-1"].ClientCertificate, authInfo.ClientCertificate, t)
 			matchStringArg(pathResolutionConfig1.AuthInfos["absolute-user-1"].ClientKey, authInfo.ClientKey, t)
-			matchStringArg(pathResolutionConfig1.AuthInfos["absolute-user-1"].AuthPath, authInfo.AuthPath, t)
 		}
 		if key == "absolute-user-2" {
 			foundAuthInfoCount++
 			matchStringArg(pathResolutionConfig2.AuthInfos["absolute-user-2"].ClientCertificate, authInfo.ClientCertificate, t)
 			matchStringArg(pathResolutionConfig2.AuthInfos["absolute-user-2"].ClientKey, authInfo.ClientKey, t)
-			matchStringArg(pathResolutionConfig2.AuthInfos["absolute-user-2"].AuthPath, authInfo.AuthPath, t)
 		}
 	}
 	if foundAuthInfoCount != 4 {

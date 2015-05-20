@@ -94,3 +94,6 @@ kubernetes API, or to contribute directly to the kubernetes project.
 
 * Frequently asked questions are answered on this project's [wiki](https://github.com/GoogleCloudPlatform/kubernetes/wiki).
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide.md?pixel)]()

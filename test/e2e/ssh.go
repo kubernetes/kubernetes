@@ -20,10 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -46,28 +42,9 @@ var _ = Describe("SSH", func() {
 
 		// Get all nodes' external IPs.
 		By("Getting all nodes' SSH-able IP addresses")
-		nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
+		hosts, err := NodeSSHHosts(c)
 		if err != nil {
-			Failf("Error getting nodes: %v", err)
-		}
-		hosts := make([]string, 0, len(nodelist.Items))
-		for _, n := range nodelist.Items {
-			for _, addr := range n.Status.Addresses {
-				// Use the first external IP address we find on the node, and
-				// use at most one per node.
-				// NOTE: Until #7412 is fixed this will repeatedly ssh into the
-				// master node and not check any of the minions.
-				if addr.Type == api.NodeExternalIP {
-					hosts = append(hosts, addr.Address+":22")
-					break
-				}
-			}
-		}
-
-		// Fail if any node didn't have an external IP.
-		if len(hosts) != len(nodelist.Items) {
-			Failf("Only found %d external IPs on nodes, but found %d nodes. Nodelist: %v",
-				len(hosts), len(nodelist.Items), nodelist)
+			Failf("Error getting node hostnames: %v", err)
 		}
 
 		testCases := []struct {

@@ -1,24 +1,38 @@
 {
-  "apiVersion": "v1beta1",
-  "kind": "ReplicationController",
-  "id": "guestbook-controller",
-  "desiredState": {
-    "replicas": 3,
-    "replicaSelector": { "name": "guestbook" },
-    "podTemplate": {
-      "desiredState": {
-        "manifest": {
-          "version": "v1beta1",
-          "id": "guestbook-controller",
-          "containers": [{
-            "image": "kubernetes/guestbook:v2",
-            "name": "guestbook",
-            "ports": [{ "name": "http-server", "containerPort": 3000 }]
-          }]
-        }
+   "kind":"ReplicationController",
+   "apiVersion":"v1beta3",
+   "metadata":{
+      "name":"guestbook",
+      "labels":{
+         "name":"guestbook"
+      }
+   },
+   "spec":{
+      "replicas":3,
+      "selector":{
+         "name":"guestbook"
       },
-      "labels": { "name": "guestbook" }
-    }
-  },
-  "labels": { "name": "guestbook" }
+      "template":{
+         "metadata":{
+            "labels":{
+               "name":"guestbook"
+            }
+         },
+         "spec":{
+            "containers":[
+               {
+                  "image":"kubernetes/guestbook:v2",
+                  "name":"guestbook",
+                  "ports":[
+                     {
+                        "name":"http-server",
+                        "containerPort":3000,
+                        "protocol":"TCP"
+                     }
+                  ]
+               }
+            ]
+         }
+      }
+   }
 }

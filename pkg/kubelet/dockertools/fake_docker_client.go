@@ -17,14 +17,17 @@ limitations under the License.
 package dockertools
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
 	"sort"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
@@ -45,6 +48,8 @@ type FakeDockerClient struct {
 	RemovedImages       util.StringSet
 	VersionInfo         docker.Env
 	Information         docker.Env
+	ExecInspect         *docker.ExecInspect
+	execCmd             []string
 }
 
 func (f *FakeDockerClient) ClearCalls() {
@@ -264,7 +269,8 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 		if len(registry) != 0 {
 			registry = registry + "/"
 		}
-		f.pulled = append(f.pulled, fmt.Sprintf("%s%s:%s", registry, opts.Repository, opts.Tag))
+		authJson, _ := json.Marshal(auth)
+		f.pulled = append(f.pulled, fmt.Sprintf("%s%s:%s using %s", registry, opts.Repository, opts.Tag, string(authJson)))
 	}
 	return err
 }
@@ -277,12 +283,23 @@ func (f *FakeDockerClient) Info() (*docker.Env, error) {
 	return &f.Information, nil
 }
 
-func (f *FakeDockerClient) CreateExec(_ docker.CreateExecOptions) (*docker.Exec, error) {
+func (f *FakeDockerClient) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
+	f.Lock()
+	defer f.Unlock()
+	f.execCmd = opts.Cmd
+	f.called = append(f.called, "create_exec")
 	return &docker.Exec{"12345678"}, nil
 }
 
 func (f *FakeDockerClient) StartExec(_ string, _ docker.StartExecOptions) error {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, "start_exec")
 	return nil
+}
+
+func (f *FakeDockerClient) InspectExec(id string) (*docker.ExecInspect, error) {
+	return f.ExecInspect, f.popError("inspect_exec")
 }
 
 func (f *FakeDockerClient) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
@@ -311,7 +328,7 @@ type FakeDockerPuller struct {
 }
 
 // Pull records the image pull attempt, and optionally injects an error.
-func (f *FakeDockerPuller) Pull(image string) (err error) {
+func (f *FakeDockerPuller) Pull(image string, secrets []api.Secret) (err error) {
 	f.Lock()
 	defer f.Unlock()
 	f.ImagesPulled = append(f.ImagesPulled, image)

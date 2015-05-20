@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"reflect"
 
-	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
-func init() {
+func addConversionFuncs() {
 	// Add non-generated conversion functions
-	err := newer.Scheme.AddConversionFuncs(
+	err := api.Scheme.AddConversionFuncs(
 		convert_v1beta3_Container_To_api_Container,
 		convert_api_Container_To_v1beta3_Container,
 	)
@@ -36,7 +36,7 @@ func init() {
 	}
 
 	// Add field conversion funcs.
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta3", "Pod",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Pod",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -52,7 +52,7 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta3", "Node",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Node",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name":
@@ -67,7 +67,7 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta3", "ReplicationController",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "ReplicationController",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -81,7 +81,7 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta3", "Event",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Event",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "involvedObject.kind",
@@ -102,7 +102,7 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta3", "Namespace",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Namespace",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "status.phase":
@@ -115,7 +115,7 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta3", "Secret",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Secret",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "type":
@@ -128,9 +128,25 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
+	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "ServiceAccount",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
 }
 
-func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Container, s conversion.Scope) error {
+func convert_v1beta3_Container_To_api_Container(in *Container, out *api.Container, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*Container))(in)
+	}
 	out.Name = in.Name
 	out.Image = in.Image
 	if in.Command != nil {
@@ -147,7 +163,7 @@ func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Contai
 	}
 	out.WorkingDir = in.WorkingDir
 	if in.Ports != nil {
-		out.Ports = make([]newer.ContainerPort, len(in.Ports))
+		out.Ports = make([]api.ContainerPort, len(in.Ports))
 		for i := range in.Ports {
 			if err := convert_v1beta3_ContainerPort_To_api_ContainerPort(&in.Ports[i], &out.Ports[i], s); err != nil {
 				return err
@@ -155,7 +171,7 @@ func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Contai
 		}
 	}
 	if in.Env != nil {
-		out.Env = make([]newer.EnvVar, len(in.Env))
+		out.Env = make([]api.EnvVar, len(in.Env))
 		for i := range in.Env {
 			if err := convert_v1beta3_EnvVar_To_api_EnvVar(&in.Env[i], &out.Env[i], s); err != nil {
 				return err
@@ -166,7 +182,7 @@ func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Contai
 		return err
 	}
 	if in.VolumeMounts != nil {
-		out.VolumeMounts = make([]newer.VolumeMount, len(in.VolumeMounts))
+		out.VolumeMounts = make([]api.VolumeMount, len(in.VolumeMounts))
 		for i := range in.VolumeMounts {
 			if err := convert_v1beta3_VolumeMount_To_api_VolumeMount(&in.VolumeMounts[i], &out.VolumeMounts[i], s); err != nil {
 				return err
@@ -174,7 +190,7 @@ func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Contai
 		}
 	}
 	if in.LivenessProbe != nil {
-		out.LivenessProbe = new(newer.Probe)
+		out.LivenessProbe = new(api.Probe)
 		if err := convert_v1beta3_Probe_To_api_Probe(in.LivenessProbe, out.LivenessProbe, s); err != nil {
 			return err
 		}
@@ -182,7 +198,7 @@ func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Contai
 		out.LivenessProbe = nil
 	}
 	if in.ReadinessProbe != nil {
-		out.ReadinessProbe = new(newer.Probe)
+		out.ReadinessProbe = new(api.Probe)
 		if err := convert_v1beta3_Probe_To_api_Probe(in.ReadinessProbe, out.ReadinessProbe, s); err != nil {
 			return err
 		}
@@ -190,7 +206,7 @@ func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Contai
 		out.ReadinessProbe = nil
 	}
 	if in.Lifecycle != nil {
-		out.Lifecycle = new(newer.Lifecycle)
+		out.Lifecycle = new(api.Lifecycle)
 		if err := convert_v1beta3_Lifecycle_To_api_Lifecycle(in.Lifecycle, out.Lifecycle, s); err != nil {
 			return err
 		}
@@ -198,7 +214,7 @@ func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Contai
 		out.Lifecycle = nil
 	}
 	out.TerminationMessagePath = in.TerminationMessagePath
-	out.ImagePullPolicy = newer.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullPolicy = api.PullPolicy(in.ImagePullPolicy)
 	if in.SecurityContext != nil {
 		if in.SecurityContext.Capabilities != nil {
 			if !reflect.DeepEqual(in.SecurityContext.Capabilities.Add, in.Capabilities.Add) ||
@@ -212,13 +228,21 @@ func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Contai
 			}
 		}
 	}
-	if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
-		return err
+	if in.SecurityContext != nil {
+		out.SecurityContext = new(api.SecurityContext)
+		if err := convert_v1beta3_SecurityContext_To_api_SecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecurityContext = nil
 	}
 	return nil
 }
 
-func convert_api_Container_To_v1beta3_Container(in *newer.Container, out *Container, s conversion.Scope) error {
+func convert_api_Container_To_v1beta3_Container(in *api.Container, out *Container, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.Container))(in)
+	}
 	out.Name = in.Name
 	out.Image = in.Image
 	if in.Command != nil {
@@ -287,8 +311,13 @@ func convert_api_Container_To_v1beta3_Container(in *newer.Container, out *Contai
 	}
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.ImagePullPolicy = PullPolicy(in.ImagePullPolicy)
-	if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
-		return err
+	if in.SecurityContext != nil {
+		out.SecurityContext = new(SecurityContext)
+		if err := convert_api_SecurityContext_To_v1beta3_SecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecurityContext = nil
 	}
 	// now that we've converted set the container field from security context
 	if out.SecurityContext != nil && out.SecurityContext.Privileged != nil {

@@ -28,11 +28,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
 )
-
-func init() {
-	requireEtcd()
-}
 
 type stringCodec struct{}
 
@@ -56,9 +53,9 @@ func (c stringCodec) DecodeInto(data []byte, obj runtime.Object) error {
 }
 
 func TestSetObj(t *testing.T) {
-	client := newEtcdClient()
+	client := framework.NewEtcdClient()
 	helper := tools.EtcdHelper{Client: client, Codec: stringCodec{}}
-	withEtcdKey(func(key string) {
+	framework.WithEtcdKey(func(key string) {
 		fakeObject := fakeAPIObject("object")
 		if err := helper.SetObj(key, &fakeObject, nil, 0); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -74,9 +71,9 @@ func TestSetObj(t *testing.T) {
 }
 
 func TestExtractObj(t *testing.T) {
-	client := newEtcdClient()
+	client := framework.NewEtcdClient()
 	helper := tools.EtcdHelper{Client: client, Codec: stringCodec{}}
-	withEtcdKey(func(key string) {
+	framework.WithEtcdKey(func(key string) {
 		_, err := client.Set(key, "object", 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -92,9 +89,9 @@ func TestExtractObj(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	client := newEtcdClient()
+	client := framework.NewEtcdClient()
 	helper := tools.NewEtcdHelper(client, testapi.Codec(), etcdtest.PathPrefix())
-	withEtcdKey(func(key string) {
+	framework.WithEtcdKey(func(key string) {
 		key = etcdtest.AddPrefix(key)
 		resp, err := client.Set(key, runtime.EncodeOrDie(testapi.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 		if err != nil {

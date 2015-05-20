@@ -104,9 +104,10 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, t
 	for key, value := range fields {
 		details, ok := properties[key]
 		if !ok {
+			glog.Infof("unknown field: %s", key)
 			// Some properties can be missing because of
 			// https://github.com/GoogleCloudPlatform/kubernetes/issues/6842.
-			glog.V(2).Infof("couldn't find properties for %s", key)
+			glog.Info("this may be a false alarm, see https://github.com/GoogleCloudPlatform/kubernetes/issues/6842")
 			continue
 		}
 		if details.Type == nil && details.Ref == nil {

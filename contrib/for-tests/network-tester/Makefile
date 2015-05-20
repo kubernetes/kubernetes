@@ -1,6 +1,7 @@
 all: push
 
-TAG = 1.1
+# Set this to the *next* version to prevent accidentally overwriting the existing image.
+TAG = 1.4
 
 webserver: webserver.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./webserver.go

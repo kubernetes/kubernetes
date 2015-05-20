@@ -116,7 +116,9 @@ func TestListContainersParams(t *testing.T) {
 	client := newTestClient(fakeRT)
 	u, _ := url.Parse(client.getURL("/containers/json"))
 	for _, tt := range tests {
-		client.ListContainers(tt.input)
+		if _, err := client.ListContainers(tt.input); err != nil {
+			t.Error(err)
+		}
 		got := map[string][]string(fakeRT.requests[0].URL.Query())
 		if !reflect.DeepEqual(got, tt.params) {
 			t.Errorf("Expected %#v, got %#v.", tt.params, got)
@@ -230,7 +232,9 @@ func TestInspectContainer(t *testing.T) {
                },
                "Links": null,
                "PublishAllPorts": false,
-               "CgroupParent": "/mesos"
+               "CgroupParent": "/mesos",
+               "Memory": 17179869184,
+               "MemorySwap": 34359738368
              }
 }`
 	var expected Container
@@ -535,7 +539,7 @@ func TestStartContainerNilHostConfig(t *testing.T) {
 	var buf [4]byte
 	req.Body.Read(buf[:])
 	if string(buf[:]) != "null" {
-		t.Errorf("Startcontainer(%q): Wrong body. Want null. Got %s", buf[:])
+		t.Errorf("Startcontainer(%q): Wrong body. Want null. Got %s", id, buf[:])
 	}
 }
 
@@ -853,11 +857,13 @@ func TestCommitContainerParams(t *testing.T) {
 			json,
 		},
 	}
-	fakeRT := &FakeRoundTripper{message: "[]", status: http.StatusOK}
+	fakeRT := &FakeRoundTripper{message: "{}", status: http.StatusOK}
 	client := newTestClient(fakeRT)
 	u, _ := url.Parse(client.getURL("/commit"))
 	for _, tt := range tests {
-		client.CommitContainer(tt.input)
+		if _, err := client.CommitContainer(tt.input); err != nil {
+			t.Error(err)
+		}
 		got := map[string][]string(fakeRT.requests[0].URL.Query())
 		if !reflect.DeepEqual(got, tt.params) {
 			t.Errorf("Expected %#v, got %#v.", tt.params, got)
@@ -983,11 +989,9 @@ func TestAttachToContainer(t *testing.T) {
 
 func TestAttachToContainerSentinel(t *testing.T) {
 	var reader = strings.NewReader("send value")
-	var req http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte{1, 0, 0, 0, 0, 0, 0, 5})
 		w.Write([]byte("hello"))
-		req = *r
 	}))
 	defer server.Close()
 	client, _ := NewClient(server.URL)
@@ -1006,17 +1010,19 @@ func TestAttachToContainerSentinel(t *testing.T) {
 		RawTerminal:  true,
 		Success:      success,
 	}
-	go client.AttachToContainer(opts)
+	go func() {
+		if err := client.AttachToContainer(opts); err != nil {
+			t.Error(err)
+		}
+	}()
 	success <- <-success
 }
 
 func TestAttachToContainerNilStdout(t *testing.T) {
 	var reader = strings.NewReader("send value")
-	var req http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte{1, 0, 0, 0, 0, 0, 0, 5})
 		w.Write([]byte("hello"))
-		req = *r
 	}))
 	defer server.Close()
 	client, _ := NewClient(server.URL)
@@ -1041,11 +1047,9 @@ func TestAttachToContainerNilStdout(t *testing.T) {
 
 func TestAttachToContainerNilStderr(t *testing.T) {
 	var reader = strings.NewReader("send value")
-	var req http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte{1, 0, 0, 0, 0, 0, 0, 5})
 		w.Write([]byte("hello"))
-		req = *r
 	}))
 	defer server.Close()
 	client, _ := NewClient(server.URL)
@@ -1071,10 +1075,21 @@ func TestAttachToContainerRawTerminalFalse(t *testing.T) {
 	input := strings.NewReader("send value")
 	var req http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		prefix := []byte{1, 0, 0, 0, 0, 0, 0, 5}
-		w.Write(prefix)
-		w.Write([]byte("hello"))
 		req = *r
+		w.WriteHeader(http.StatusOK)
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Fatal("cannot hijack server connection")
+		}
+		conn, _, err := hj.Hijack()
+		if err != nil {
+			t.Fatal(err)
+		}
+		conn.Write([]byte{1, 0, 0, 0, 0, 0, 0, 5})
+		conn.Write([]byte("hello"))
+		conn.Write([]byte{2, 0, 0, 0, 0, 0, 0, 6})
+		conn.Write([]byte("hello!"))
+		conn.Close()
 	}))
 	defer server.Close()
 	client, _ := NewClient(server.URL)
@@ -1105,10 +1120,11 @@ func TestAttachToContainerRawTerminalFalse(t *testing.T) {
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("AttachToContainer: wrong query string. Want %#v. Got %#v.", expected, got)
 	}
-	t.Log(stderr.String())
-	t.Log(stdout.String())
 	if stdout.String() != "hello" {
-		t.Errorf("AttachToContainer: wrong content written to stdout. Want %q. Got %q.", "hello", stderr.String())
+		t.Errorf("AttachToContainer: wrong content written to stdout. Want %q. Got %q.", "hello", stdout.String())
+	}
+	if stderr.String() != "hello!" {
+		t.Errorf("AttachToContainer: wrong content written to stderr. Want %q. Got %q.", "hello!", stderr.String())
 	}
 }
 
@@ -1170,12 +1186,10 @@ func TestLogs(t *testing.T) {
 }
 
 func TestLogsNilStdoutDoesntFail(t *testing.T) {
-	var req http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		prefix := []byte{1, 0, 0, 0, 0, 0, 0, 19}
 		w.Write(prefix)
 		w.Write([]byte("something happened!"))
-		req = *r
 	}))
 	defer server.Close()
 	client, _ := NewClient(server.URL)
@@ -1194,12 +1208,10 @@ func TestLogsNilStdoutDoesntFail(t *testing.T) {
 }
 
 func TestLogsNilStderrDoesntFail(t *testing.T) {
-	var req http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		prefix := []byte{2, 0, 0, 0, 0, 0, 0, 19}
 		w.Write(prefix)
 		w.Write([]byte("something happened!"))
-		req = *r
 	}))
 	defer server.Close()
 	client, _ := NewClient(server.URL)
@@ -1267,10 +1279,8 @@ func TestLogsSpecifyingTail(t *testing.T) {
 }
 
 func TestLogsRawTerminal(t *testing.T) {
-	var req http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("something happened!"))
-		req = *r
 	}))
 	defer server.Close()
 	client, _ := NewClient(server.URL)
@@ -1530,7 +1540,7 @@ func TestTopContainer(t *testing.T) {
 	}
 	if len(processes.Processes) != 2 || len(processes.Processes[0]) != 8 ||
 		processes.Processes[0][7] != "cmd1" {
-		t.Errorf("TopContainer: Process list to include cmd1. Got %#v.", expected, processes)
+		t.Errorf("TopContainer: Process list to include cmd1. Got %#v.", processes)
 	}
 	expectedURI := "/containers/" + id + "/top"
 	if !strings.HasSuffix(fakeRT.requests[0].URL.String(), expectedURI) {
@@ -1550,10 +1560,282 @@ func TestTopContainerNotFound(t *testing.T) {
 func TestTopContainerWithPsArgs(t *testing.T) {
 	fakeRT := &FakeRoundTripper{message: "no such container", status: http.StatusNotFound}
 	client := newTestClient(fakeRT)
-	client.TopContainer("abef348", "aux")
+	expectedErr := &NoSuchContainer{ID: "abef348"}
+	if _, err := client.TopContainer("abef348", "aux"); !reflect.DeepEqual(expectedErr, err) {
+		t.Errorf("TopContainer: Expected %v. Got %v.", expectedErr, err)
+	}
 	expectedURI := "/containers/abef348/top?ps_args=aux"
 	if !strings.HasSuffix(fakeRT.requests[0].URL.String(), expectedURI) {
 		t.Errorf("TopContainer: Expected URI to have %q. Got %q.", expectedURI, fakeRT.requests[0].URL.String())
+	}
+}
+
+func TestStats(t *testing.T) {
+	jsonStats1 := `{
+       "read" : "2015-01-08T22:57:31.547920715Z",
+       "network" : {
+          "rx_dropped" : 0,
+          "rx_bytes" : 648,
+          "rx_errors" : 0,
+          "tx_packets" : 8,
+          "tx_dropped" : 0,
+          "rx_packets" : 8,
+          "tx_errors" : 0,
+          "tx_bytes" : 648
+       },
+       "memory_stats" : {
+          "stats" : {
+             "total_pgmajfault" : 0,
+             "cache" : 0,
+             "mapped_file" : 0,
+             "total_inactive_file" : 0,
+             "pgpgout" : 414,
+             "rss" : 6537216,
+             "total_mapped_file" : 0,
+             "writeback" : 0,
+             "unevictable" : 0,
+             "pgpgin" : 477,
+             "total_unevictable" : 0,
+             "pgmajfault" : 0,
+             "total_rss" : 6537216,
+             "total_rss_huge" : 6291456,
+             "total_writeback" : 0,
+             "total_inactive_anon" : 0,
+             "rss_huge" : 6291456,
+	     "hierarchical_memory_limit": 189204833,
+             "total_pgfault" : 964,
+             "total_active_file" : 0,
+             "active_anon" : 6537216,
+             "total_active_anon" : 6537216,
+             "total_pgpgout" : 414,
+             "total_cache" : 0,
+             "inactive_anon" : 0,
+             "active_file" : 0,
+             "pgfault" : 964,
+             "inactive_file" : 0,
+             "total_pgpgin" : 477
+          },
+          "max_usage" : 6651904,
+          "usage" : 6537216,
+          "failcnt" : 0,
+          "limit" : 67108864
+       },
+       "blkio_stats": {
+          "io_service_bytes_recursive": [
+             {
+                "major": 8,
+                "minor": 0,
+                "op": "Read",
+                "value": 428795731968
+             },
+             {
+                "major": 8,
+                "minor": 0,
+                "op": "Write",
+                "value": 388177920
+             }
+          ],
+          "io_serviced_recursive": [
+             {
+                "major": 8,
+                "minor": 0,
+                "op": "Read",
+                "value": 25994442
+             },
+             {
+                "major": 8,
+                "minor": 0,
+                "op": "Write",
+                "value": 1734
+             }
+          ],
+          "io_queue_recursive": [],
+          "io_service_time_recursive": [],
+          "io_wait_time_recursive": [],
+          "io_merged_recursive": [],
+          "io_time_recursive": [],
+          "sectors_recursive": []
+       },
+       "cpu_stats" : {
+          "cpu_usage" : {
+             "percpu_usage" : [
+                16970827,
+                1839451,
+                7107380,
+                10571290
+             ],
+             "usage_in_usermode" : 10000000,
+             "total_usage" : 36488948,
+             "usage_in_kernelmode" : 20000000
+          },
+          "system_cpu_usage" : 20091722000000000
+       }
+    }`
+	// 1 second later, cache is 100
+	jsonStats2 := `{
+       "read" : "2015-01-08T22:57:32.547920715Z",
+       "network" : {
+          "rx_dropped" : 0,
+          "rx_bytes" : 648,
+          "rx_errors" : 0,
+          "tx_packets" : 8,
+          "tx_dropped" : 0,
+          "rx_packets" : 8,
+          "tx_errors" : 0,
+          "tx_bytes" : 648
+       },
+       "memory_stats" : {
+          "stats" : {
+             "total_pgmajfault" : 0,
+             "cache" : 100,
+             "mapped_file" : 0,
+             "total_inactive_file" : 0,
+             "pgpgout" : 414,
+             "rss" : 6537216,
+             "total_mapped_file" : 0,
+             "writeback" : 0,
+             "unevictable" : 0,
+             "pgpgin" : 477,
+             "total_unevictable" : 0,
+             "pgmajfault" : 0,
+             "total_rss" : 6537216,
+             "total_rss_huge" : 6291456,
+             "total_writeback" : 0,
+             "total_inactive_anon" : 0,
+             "rss_huge" : 6291456,
+             "total_pgfault" : 964,
+             "total_active_file" : 0,
+             "active_anon" : 6537216,
+             "total_active_anon" : 6537216,
+             "total_pgpgout" : 414,
+             "total_cache" : 0,
+             "inactive_anon" : 0,
+             "active_file" : 0,
+             "pgfault" : 964,
+             "inactive_file" : 0,
+             "total_pgpgin" : 477
+          },
+          "max_usage" : 6651904,
+          "usage" : 6537216,
+          "failcnt" : 0,
+          "limit" : 67108864
+       },
+       "blkio_stats": {
+          "io_service_bytes_recursive": [
+             {
+                "major": 8,
+                "minor": 0,
+                "op": "Read",
+                "value": 428795731968
+             },
+             {
+                "major": 8,
+                "minor": 0,
+                "op": "Write",
+                "value": 388177920
+             }
+          ],
+          "io_serviced_recursive": [
+             {
+                "major": 8,
+                "minor": 0,
+                "op": "Read",
+                "value": 25994442
+             },
+             {
+                "major": 8,
+                "minor": 0,
+                "op": "Write",
+                "value": 1734
+             }
+          ],
+          "io_queue_recursive": [],
+          "io_service_time_recursive": [],
+          "io_wait_time_recursive": [],
+          "io_merged_recursive": [],
+          "io_time_recursive": [],
+          "sectors_recursive": []
+       },
+       "cpu_stats" : {
+          "cpu_usage" : {
+             "percpu_usage" : [
+                16970827,
+                1839451,
+                7107380,
+                10571290
+             ],
+             "usage_in_usermode" : 10000000,
+             "total_usage" : 36488948,
+             "usage_in_kernelmode" : 20000000
+          },
+          "system_cpu_usage" : 20091722000000000
+       }
+    }`
+	var expected1 Stats
+	var expected2 Stats
+	err := json.Unmarshal([]byte(jsonStats1), &expected1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = json.Unmarshal([]byte(jsonStats2), &expected2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := "4fa6e0f0"
+
+	var req http.Request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(jsonStats1))
+		w.Write([]byte(jsonStats2))
+		req = *r
+	}))
+	defer server.Close()
+	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
+	errC := make(chan error, 1)
+	statsC := make(chan *Stats)
+	go func() {
+		errC <- client.Stats(StatsOptions{id, statsC})
+		close(errC)
+	}()
+	var resultStats []*Stats
+	for {
+		stats, ok := <-statsC
+		if !ok {
+			break
+		}
+		resultStats = append(resultStats, stats)
+	}
+	err = <-errC
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resultStats) != 2 {
+		t.Fatalf("Stats: Expected 2 results. Got %d.", len(resultStats))
+	}
+	if !reflect.DeepEqual(resultStats[0], &expected1) {
+		t.Errorf("Stats: Expected:\n%+v\nGot:\n%+v", expected1, resultStats[0])
+	}
+	if !reflect.DeepEqual(resultStats[1], &expected2) {
+		t.Errorf("Stats: Expected:\n%+v\nGot:\n%+v", expected2, resultStats[1])
+	}
+	if req.Method != "GET" {
+		t.Errorf("Stats: wrong HTTP method. Want GET. Got %s.", req.Method)
+	}
+	u, _ := url.Parse(client.getURL("/containers/" + id + "/stats"))
+	if req.URL.Path != u.Path {
+		t.Errorf("Stats: wrong HTTP path. Want %q. Got %q.", u.Path, req.URL.Path)
+	}
+}
+
+func TestStatsContainerNotFound(t *testing.T) {
+	client := newTestClient(&FakeRoundTripper{message: "no such container", status: http.StatusNotFound})
+	statsC := make(chan *Stats)
+	err := client.Stats(StatsOptions{"abef348", statsC})
+	expected := &NoSuchContainer{ID: "abef348"}
+	if !reflect.DeepEqual(err, expected) {
+		t.Errorf("Stats: Wrong error returned. Want %#v. Got %#v.", expected, err)
 	}
 }
 

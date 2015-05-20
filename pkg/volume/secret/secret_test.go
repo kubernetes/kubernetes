@@ -60,7 +60,7 @@ func TestCanSupport(t *testing.T) {
 
 func TestPlugin(t *testing.T) {
 	var (
-		testPodUID     = "test_pod_uid"
+		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_secret_namespace"
 		testName       = "test_secret_name"
@@ -97,7 +97,8 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), &api.ObjectReference{UID: types.UID(testPodUID)}, volume.VolumeOptions{}, &mount.FakeMounter{})
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID}}
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -139,7 +140,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
-	cleaner, err := plugin.NewCleaner(testVolumeName, types.UID(testPodUID), mount.New())
+	cleaner, err := plugin.NewCleaner(testVolumeName, testPodUID, mount.New())
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}

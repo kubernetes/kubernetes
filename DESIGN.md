@@ -5,3 +5,6 @@ See the [user overview](docs/overview.md) for an introduction to Kubernetes and 
 See the [design overview](docs/design) for an overview of the system design.
 
 See the [API overview](docs/api.md) and [conventions](docs/api-conventions.md) for an overview of the API design.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/DESIGN.md?pixel)]()

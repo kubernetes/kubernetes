@@ -5,7 +5,7 @@
     <div class="detail">
 
       <div class="back">
-        <md-button class="md-default-theme" ng-href="/#/dashboard/services">‹ BACK</md-button>
+        <md-button class="md-default-theme" ng-href="#/dashboard/services">‹ BACK</md-button>
       </div>
 
       <div class="heading">
@@ -71,7 +71,7 @@
             <td class="name">Related Pods</td>
             <td class="value">
               <div ng-repeat="(label, value) in service.selector">
-                <a ng-href="/#/dashboard/groups/type/selector/{{label}}={{value}},type=pod">{{label}}: {{value}}</a>
+                <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=pod">{{label}}: {{value}}</a>
               </div>
             </td>
           </tr>
@@ -80,7 +80,7 @@
             <td class="name">Related Replication Controllers</td>
             <td class="value">
               <div ng-repeat="(label, value) in service.selector">
-                <a ng-href="/#/dashboard/groups/type/selector/{{label}}={{value}},type=replicationController">{{label}}: {{value}}</a>
+                <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=replicationController">{{label}}: {{value}}</a>
               </div>
             </td>
           </tr>

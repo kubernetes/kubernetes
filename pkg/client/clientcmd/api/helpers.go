@@ -96,15 +96,11 @@ func ShortenConfig(config *Config) {
 }
 
 // Flatten changes the config object into a self contained config (useful for making secrets)
-// AuthPath is not handled.
 func FlattenConfig(config *Config) error {
 	for key, authInfo := range config.AuthInfos {
 		baseDir, err := MakeAbs(path.Dir(authInfo.LocationOfOrigin), "")
 		if err != nil {
 			return err
-		}
-		if len(authInfo.AuthPath) != 0 {
-			return fmt.Errorf("auth path of %v is not empty: %v", key, authInfo.AuthPath)
 		}
 
 		if err := FlattenContent(&authInfo.ClientCertificate, &authInfo.ClientCertificateData, baseDir); err != nil {

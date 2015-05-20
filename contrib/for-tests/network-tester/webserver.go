@@ -206,9 +206,9 @@ func contactOthers(state *State) {
 	masterRO := url.URL{
 		Scheme: "http",
 		Host:   os.Getenv("KUBERNETES_RO_SERVICE_HOST") + ":" + os.Getenv("KUBERNETES_RO_SERVICE_PORT"),
-		Path:   "/api/v1beta1",
+		Path:   "/api/" + latest.Version,
 	}
-	client := &client.Client{client.NewRESTClient(&masterRO, "v1beta1", latest.Codec, true, 5, 10)}
+	client := &client.Client{client.NewRESTClient(&masterRO, latest.Version, latest.Codec, false, 5, 10)}
 
 	// Do this repeatedly, in case there's some propagation delay with getting
 	// newly started pods into the endpoints list.

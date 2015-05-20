@@ -144,7 +144,7 @@ func TestModifySecurityOption(t *testing.T) {
 	for _, tc := range testCases {
 		actual := modifySecurityOption(tc.config, tc.optName, tc.optVal)
 		if !reflect.DeepEqual(tc.expected, actual) {
-			t.Errorf("Failed to apply options correctly for tc: %S.  Expected: %v but got %v", tc.name, tc.expected, actual)
+			t.Errorf("Failed to apply options correctly for tc: %s.  Expected: %v but got %v", tc.name, tc.expected, actual)
 		}
 	}
 }
@@ -154,8 +154,8 @@ func fullValidSecurityContext() *api.SecurityContext {
 	return &api.SecurityContext{
 		Privileged: &priv,
 		Capabilities: &api.Capabilities{
-			Add:  []api.CapabilityType{"addCapA", "addCapB"},
-			Drop: []api.CapabilityType{"dropCapA", "dropCapB"},
+			Add:  []api.Capability{"addCapA", "addCapB"},
+			Drop: []api.Capability{"dropCapA", "dropCapB"},
 		},
 		SELinuxOptions: &api.SELinuxOptions{
 			User:  "user",

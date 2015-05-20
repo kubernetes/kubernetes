@@ -183,17 +183,26 @@ func (pf *PortForwarder) forward() error {
 	return nil
 }
 
-// listenOnPort delegates listener creation and waits for new connections
-// in the background.
+// listenOnPort delegates tcp4 and tcp6 listener creation and waits for connections on both of these addresses.
+// If both listener creation fail, an error is raised.
 func (pf *PortForwarder) listenOnPort(port *ForwardedPort) error {
-	listener, err := pf.getListener("tcp", "localhost", port)
+	errTcp4 := pf.listenOnPortAndAddress(port, "tcp4", "127.0.0.1")
+	errTcp6 := pf.listenOnPortAndAddress(port, "tcp6", "[::1]")
+	if errTcp4 != nil && errTcp6 != nil {
+		return fmt.Errorf("All listeners failed to create with the following errors: %s, %s", errTcp4, errTcp6)
+	}
+	return nil
+}
+
+// listenOnPortAndAddress delegates listener creation and waits for new connections
+// in the background f
+func (pf *PortForwarder) listenOnPortAndAddress(port *ForwardedPort, protocol string, address string) error {
+	listener, err := pf.getListener(protocol, address, port)
 	if err != nil {
 		return err
 	}
 	pf.listeners = append(pf.listeners, listener)
-
 	go pf.waitForConnection(listener, *port)
-
 	return nil
 }
 
@@ -213,7 +222,7 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 		return nil, fmt.Errorf("Error parsing local port: %s from %s (%s)", err, listenerAddress, host)
 	}
 	port.Local = uint16(localPortUInt)
-	glog.Infof("Forwarding from %d -> %d", localPortUInt, port.Remote)
+	glog.Infof("Forwarding from %s:%d -> %d", hostname, localPortUInt, port.Remote)
 
 	return listener, nil
 }

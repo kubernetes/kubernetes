@@ -56,8 +56,8 @@ func (vh *volumeHost) GetKubeClient() client.Interface {
 	return vh.kubelet.kubeClient
 }
 
-func (vh *volumeHost) NewWrapperBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	b, err := vh.kubelet.newVolumeBuilderFromPlugins(spec, podRef, opts, mounter)
+func (vh *volumeHost) NewWrapperBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+	b, err := vh.kubelet.newVolumeBuilderFromPlugins(spec, pod, opts, mounter)
 	if err == nil && b == nil {
 		return nil, errUnsupportedVolumeType
 	}
@@ -80,7 +80,7 @@ func (vh *volumeHost) NewWrapperCleaner(spec *volume.Spec, podUID types.UID, mou
 	return c, nil
 }
 
-func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spew.Sprintf("%#v", *spec), err)
@@ -89,7 +89,7 @@ func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, podRef *api.Ob
 		// Not found but not an error
 		return nil, nil
 	}
-	builder, err := plugin.NewBuilder(spec, podRef, opts, mounter)
+	builder, err := plugin.NewBuilder(spec, pod, opts, mounter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate volume plugin for %s: %v", spew.Sprintf("%#v", *spec), err)
 	}
@@ -102,12 +102,6 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 	for i := range pod.Spec.Volumes {
 		volSpec := &pod.Spec.Volumes[i]
 
-		podRef, err := api.GetReference(pod)
-		if err != nil {
-			glog.Errorf("Error getting object reference for pod: %v", pod, err)
-			return nil, err
-		}
-
 		rootContext, err := kl.getRootDirContext()
 		if err != nil {
 			return nil, err
@@ -115,7 +109,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (kubecontainer.VolumeMap, 
 
 		// Try to use a plugin for this volume.
 		internal := volume.NewSpecFromVolume(volSpec)
-		builder, err := kl.newVolumeBuilderFromPlugins(internal, podRef, volume.VolumeOptions{rootContext}, kl.mounter)
+		builder, err := kl.newVolumeBuilderFromPlugins(internal, pod, volume.VolumeOptions{rootContext}, kl.mounter)
 		if err != nil {
 			glog.Errorf("Could not create volume builder for pod %s: %v", pod.UID, err)
 			return nil, err

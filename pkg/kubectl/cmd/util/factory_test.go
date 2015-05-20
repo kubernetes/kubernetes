@@ -17,10 +17,14 @@ limitations under the License.
 package util
 
 import (
+	"sort"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestNewFactoryDefaultFlagBindings(t *testing.T) {
@@ -37,5 +41,115 @@ func TestNewFactoryNoFlagBindings(t *testing.T) {
 
 	if factory.flags.HasFlags() {
 		t.Errorf("Expected zero flags, but got %v", factory.flags)
+	}
+}
+
+func TestPodSelectorForObject(t *testing.T) {
+	f := NewFactory(nil)
+
+	svc := &api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test"},
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	expected := "foo=bar"
+	got, err := f.PodSelectorForObject(svc)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if expected != got {
+		t.Fatalf("Selector mismatch! Expected %s, got %s", expected, got)
+	}
+}
+
+func TestPortsForObject(t *testing.T) {
+	f := NewFactory(nil)
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Ports: []api.ContainerPort{
+						{
+							ContainerPort: 101,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	expected := []string{"101"}
+	got, err := f.PortsForObject(pod)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if len(expected) != len(got) {
+		t.Fatalf("Ports size mismatch! Expected %d, got %d", len(expected), len(got))
+	}
+
+	sort.Strings(expected)
+	sort.Strings(got)
+
+	for i, port := range got {
+		if port != expected[i] {
+			t.Fatalf("Port mismatch! Expected %s, got %s", expected[i], port)
+		}
+	}
+}
+
+func TestLabelsForObject(t *testing.T) {
+	f := NewFactory(nil)
+
+	tests := []struct {
+		name     string
+		object   runtime.Object
+		expected string
+		err      error
+	}{
+		{
+			name: "successful re-use of labels",
+			object: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"svc": "test"}},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1beta3"},
+			},
+			expected: "svc=test",
+			err:      nil,
+		},
+		{
+			name: "empty labels",
+			object: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{}},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1beta3"},
+			},
+			expected: "",
+			err:      nil,
+		},
+		{
+			name: "nil labels",
+			object: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "zen", Namespace: "test", Labels: nil},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1beta3"},
+			},
+			expected: "",
+			err:      nil,
+		},
+	}
+
+	for _, test := range tests {
+		gotLabels, err := f.LabelsForObject(test.object)
+		if err != test.err {
+			t.Fatalf("%s: Error mismatch: Expected %v, got %v", test.name, test.err, err)
+		}
+		got := kubectl.MakeLabels(gotLabels)
+		if test.expected != got {
+			t.Fatalf("%s: Labels mismatch! Expected %s, got %s", test.name, test.expected, got)
+		}
+
 	}
 }

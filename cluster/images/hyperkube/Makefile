@@ -1,8 +1,9 @@
 # build the hyperkube image.
 
-VERSION=v0.14.2
+VERSION=v0.17.0
 
 all:
+	cp ../../saltbase/salt/helpers/safe_format_and_mount .
 	curl -O https://storage.googleapis.com/kubernetes-release/release/${VERSION}/bin/linux/amd64/hyperkube
 	docker build -t gcr.io/google_containers/hyperkube:${VERSION} .
 	gcloud preview docker push gcr.io/google_containers/hyperkube:${VERSION}

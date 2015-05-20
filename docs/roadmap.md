@@ -100,3 +100,6 @@ We acknowledge that there are a great many things that are not included in our 1
 8. More support for jobs that complete (compute, batch)
 9. More platforms
 10. Easier testing
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/roadmap.md?pixel)]()

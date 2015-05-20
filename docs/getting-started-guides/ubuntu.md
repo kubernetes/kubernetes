@@ -19,7 +19,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ma
 ### **Main Steps**
 #### I. Make *kubernetes* , *etcd* and *flanneld* binaries
 
-First clone the kubernetes github repo, `$ git clone git@github.com:GoogleCloudPlatform/kubernetes.git`
+First clone the kubernetes github repo, `$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
 then `$ cd kubernetes/cluster/ubuntu`.
 
 Then run `$ ./build.sh`, this will download all the needed binaries into `./binaries`.
@@ -170,3 +170,6 @@ Please try:
    `$ KUBERNETES_PROVIDER=ubuntu ./kube-up.sh` again to start again.
     
 4. You can also customize your own settings in `/etc/default/{component_name}` after configured success. 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/ubuntu.md?pixel)]()

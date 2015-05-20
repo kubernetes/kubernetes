@@ -27,8 +27,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
 type fakeBinder struct {
@@ -59,7 +60,7 @@ type mockScheduler struct {
 	err     error
 }
 
-func (es mockScheduler) Schedule(pod *api.Pod, ml scheduler.MinionLister) (string, error) {
+func (es mockScheduler) Schedule(pod *api.Pod, ml algorithm.MinionLister) (string, error) {
 	return es.machine, es.err
 }
 
@@ -72,7 +73,7 @@ func TestScheduler(t *testing.T) {
 	table := []struct {
 		injectBindError  error
 		sendPod          *api.Pod
-		algo             scheduler.Scheduler
+		algo             algorithm.ScheduleAlgorithm
 		expectErrorPod   *api.Pod
 		expectAssumedPod *api.Pod
 		expectError      error
@@ -113,7 +114,7 @@ func TestScheduler(t *testing.T) {
 					gotAssumedPod = pod
 				},
 			},
-			MinionLister: scheduler.FakeMinionLister(
+			MinionLister: algorithm.FakeMinionLister(
 				api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 			),
 			Algorithm: item.algo,
@@ -186,16 +187,16 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	firstPod := podWithPort("foo", "", podPort)
 
 	// Create the scheduler config
-	algo := scheduler.NewGenericScheduler(
-		map[string]scheduler.FitPredicate{"PodFitsPorts": scheduler.PodFitsPorts},
-		[]scheduler.PriorityConfig{},
+	algo := NewGenericScheduler(
+		map[string]algorithm.FitPredicate{"PodFitsPorts": predicates.PodFitsPorts},
+		[]algorithm.PriorityConfig{},
 		modeler.PodLister(),
 		rand.New(rand.NewSource(time.Now().UnixNano())))
 
 	var gotBinding *api.Binding
 	c := &Config{
 		Modeler: modeler,
-		MinionLister: scheduler.FakeMinionLister(
+		MinionLister: algorithm.FakeMinionLister(
 			api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 		),
 		Algorithm: algo,

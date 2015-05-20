@@ -19,28 +19,42 @@ package util
 import (
 	"net"
 	"regexp"
+	"strings"
 )
 
 const qnameCharFmt string = "[A-Za-z0-9]"
 const qnameExtCharFmt string = "[-A-Za-z0-9_.]"
-const qnameTokenFmt string = "(" + qnameCharFmt + qnameExtCharFmt + "*)?" + qnameCharFmt
+const QualifiedNameFmt string = "(" + qnameCharFmt + qnameExtCharFmt + "*)?" + qnameCharFmt
+const QualifiedNameMaxLength int = 63
 
-const LabelValueFmt string = "(" + qnameTokenFmt + ")?"
+var qualifiedNameRegexp = regexp.MustCompile("^" + QualifiedNameFmt + "$")
+
+func IsQualifiedName(value string) bool {
+	parts := strings.Split(value, "/")
+	var name string
+	switch len(parts) {
+	case 1:
+		name = parts[0]
+	case 2:
+		var prefix string
+		prefix, name = parts[0], parts[1]
+		if prefix == "" || !IsDNS1123Subdomain(prefix) {
+			return false
+		}
+	default:
+		return false
+	}
+
+	return name != "" && len(name) <= QualifiedNameMaxLength && qualifiedNameRegexp.MatchString(name)
+}
+
+const LabelValueFmt string = "(" + QualifiedNameFmt + ")?"
 const LabelValueMaxLength int = 63
 
 var labelValueRegexp = regexp.MustCompile("^" + LabelValueFmt + "$")
 
 func IsValidLabelValue(value string) bool {
 	return (len(value) <= LabelValueMaxLength && labelValueRegexp.MatchString(value))
-}
-
-const QualifiedNameFmt string = "(" + qnameTokenFmt + "/)?" + qnameTokenFmt
-const QualifiedNameMaxLength int = 253
-
-var qualifiedNameRegexp = regexp.MustCompile("^" + QualifiedNameFmt + "$")
-
-func IsQualifiedName(value string) bool {
-	return (len(value) <= QualifiedNameMaxLength && qualifiedNameRegexp.MatchString(value))
 }
 
 const DNS1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"

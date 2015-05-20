@@ -113,3 +113,19 @@ func TestAddWhileProcessing(t *testing.T) {
 	q.ShutDown()
 	consumerWG.Wait()
 }
+
+func TestLen(t *testing.T) {
+	q := workqueue.New()
+	q.Add("foo")
+	if e, a := 1, q.Len(); e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	q.Add("bar")
+	if e, a := 2, q.Len(); e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	q.Add("foo") // should not increase the queue length.
+	if e, a := 2, q.Len(); e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+}

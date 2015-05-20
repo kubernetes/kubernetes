@@ -23,6 +23,7 @@ import (
 	// Cloud providers
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/mesos"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/openstack"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/rackspace"
@@ -37,4 +38,5 @@ import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/namespace/lifecycle"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/resourcequota"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
+	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/serviceaccount"
 )

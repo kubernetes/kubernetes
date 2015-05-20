@@ -31,12 +31,7 @@
                 "protocol": "TCP"
               }
             ],
-            "resources": {
-              "limits": {
-                "cpu": "1",
-                "memory": "500000000"
-              }
-            }
+            "resources": {}
           }
         ]
       }

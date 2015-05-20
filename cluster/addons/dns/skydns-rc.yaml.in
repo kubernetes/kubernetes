@@ -1,19 +1,21 @@
 apiVersion: v1beta3
 kind: ReplicationController
 metadata:
-  name: kube-dns
+  name: kube-dns-v1
   namespace: default
   labels:
-    k8s-app: kube-dns
+    k8s-app: kube-dns-v1
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: {{ pillar['dns_replicas'] }}
   selector:
     k8s-app: kube-dns
+    version: v1
   template:
     metadata:
       labels:
         k8s-app: kube-dns
+        version: v1
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
@@ -28,7 +30,7 @@ spec:
         - -initial-cluster-token
         - skydns-etcd
       - name: kube2sky
-        image: gcr.io/google_containers/kube2sky:1.4
+        image: gcr.io/google_containers/kube2sky:1.5
         args:
         # command = "/kube2sky"
         - -domain={{ pillar['dns_domain'] }}
@@ -54,12 +56,9 @@ spec:
         livenessProbe:
           exec:
             command:
-            - "/bin/sh"
-            - "-c"
-            # The health check succeeds by virtue of not hanging. It'd be nice
-            # to also check local services are known, but if that's broken then
-            # etcd or kube2sky has to be restarted, not skydns.
-            - "nslookup foobar 127.0.0.1 &> /dev/null; echo ok"
+            - /bin/sh
+            - -c
+            - nslookup kubernetes.default.{{ pillar['dns_domain'] }} localhost >/dev/null
           initialDelaySeconds: 30
           timeoutSeconds: 5
       dnsPolicy: Default  # Don't use cluster DNS.

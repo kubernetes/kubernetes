@@ -214,8 +214,13 @@ func ApplyOomScoreAdj(pid int, value int) error {
 		pidStr = strconv.Itoa(pid)
 	}
 
-	if err := ioutil.WriteFile(path.Join("/proc", pidStr, "oom_score_adj"), []byte(strconv.Itoa(value)), 0700); err != nil {
-		fmt.Errorf("failed to set oom_score_adj to %d: %v", value, err)
+	oom_value, err := ioutil.ReadFile(path.Join("/proc", pidStr, "oom_score_adj"))
+	if err != nil {
+		return fmt.Errorf("failed to read oom_score_adj: %v", err)
+	} else if string(oom_value) != strconv.Itoa(value) {
+		if err := ioutil.WriteFile(path.Join("/proc", pidStr, "oom_score_adj"), []byte(strconv.Itoa(value)), 0700); err != nil {
+			return fmt.Errorf("failed to set oom_score_adj to %d: %v", value, err)
+		}
 	}
 
 	return nil

@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -87,39 +88,48 @@ var _ = Describe("Events", func() {
 			Failf("Failed to get pod: %v", err)
 		}
 		fmt.Printf("%+v\n", podWithUid)
-
+		var events *api.EventList
 		// Check for scheduler event about the pod.
 		By("checking for scheduler event about the pod")
-		events, err := c.Events(api.NamespaceDefault).List(
-			labels.Everything(),
-			fields.Set{
-				"involvedObject.kind":      "Pod",
-				"involvedObject.uid":       string(podWithUid.UID),
-				"involvedObject.namespace": api.NamespaceDefault,
-				"source":                   "scheduler",
-			}.AsSelector(),
-		)
-		if err != nil {
-			Failf("Error while listing events: %v", err)
-		}
-		Expect(len(events.Items)).ToNot(BeZero(), "scheduler events from running pod")
-		fmt.Println("Saw scheduler event for our pod.")
-
+		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+			events, err := c.Events(api.NamespaceDefault).List(
+				labels.Everything(),
+				fields.Set{
+					"involvedObject.kind":      "Pod",
+					"involvedObject.uid":       string(podWithUid.UID),
+					"involvedObject.namespace": api.NamespaceDefault,
+					"source":                   "scheduler",
+				}.AsSelector(),
+			)
+			if err != nil {
+				return false, err
+			}
+			if len(events.Items) > 0 {
+				fmt.Println("Saw scheduler event for our pod.")
+				return true, nil
+			}
+			return false, nil
+		}))
 		// Check for kubelet event about the pod.
 		By("checking for kubelet event about the pod")
-		events, err = c.Events(api.NamespaceDefault).List(
-			labels.Everything(),
-			fields.Set{
-				"involvedObject.uid":       string(podWithUid.UID),
-				"involvedObject.kind":      "Pod",
-				"involvedObject.namespace": api.NamespaceDefault,
-				"source":                   "kubelet",
-			}.AsSelector(),
-		)
-		if err != nil {
-			Failf("Error while listing events: %v", err)
-		}
-		Expect(len(events.Items)).ToNot(BeZero(), "kubelet events from running pod")
-		fmt.Println("Saw kubelet event for our pod.")
+		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+			events, err = c.Events(api.NamespaceDefault).List(
+				labels.Everything(),
+				fields.Set{
+					"involvedObject.uid":       string(podWithUid.UID),
+					"involvedObject.kind":      "Pod",
+					"involvedObject.namespace": api.NamespaceDefault,
+					"source":                   "kubelet",
+				}.AsSelector(),
+			)
+			if err != nil {
+				return false, err
+			}
+			if len(events.Items) > 0 {
+				fmt.Println("Saw kubelet event for our pod.")
+				return true, nil
+			}
+			return false, nil
+		}))
 	})
 })

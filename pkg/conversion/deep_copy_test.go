@@ -108,6 +108,24 @@ func TestDeepCopyPointerSeparate(t *testing.T) {
 	}
 }
 
+func TestDeepCopyStruct(t *testing.T) {
+	type Foo struct {
+		A int
+	}
+	type Bar struct {
+		Foo
+		F *Foo
+	}
+	a := &Bar{Foo{1}, &Foo{2}}
+	b := copyOrDie(t, a).(*Bar)
+	a.A = 3
+	a.F.A = 4
+
+	if b.A != 1 || b.F.A != 2 {
+		t.Errorf("deep copy wasn't deep: %#v, %#v", a, b)
+	}
+}
+
 var result interface{}
 
 func BenchmarkDeepCopy(b *testing.B) {

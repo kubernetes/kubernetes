@@ -1,22 +1,21 @@
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    containers:
-      - image: gcr.io/google_containers/busybox
-        name: liveness
-        livenessProbe:
-          exec:
-            command:
-              - "cat"
-              - "/tmp/health"
-          initialDelaySeconds: 15
-        command:
-          - "/bin/sh"
-          - "-c"
-          - "echo ok > /tmp/health; sleep 10; echo fail > /tmp/health; sleep 600"
-    id: liveness-exec
-    version: v1beta1
-id: liveness-exec
+apiVersion: v1beta3
 kind: Pod
-labels:
-  test: liveness
+metadata:
+  labels:
+    test: liveness
+  name: liveness-exec
+spec:
+  containers:
+  - args:
+    - /bin/sh
+    - -c
+    - echo ok > /tmp/health; sleep 10; rm -rf /tmp/health; sleep 600
+    image: gcr.io/google_containers/busybox
+    livenessProbe:
+      exec:
+        command:
+        - cat
+        - /tmp/health
+      initialDelaySeconds: 15
+      timeoutSeconds: 1
+    name: liveness

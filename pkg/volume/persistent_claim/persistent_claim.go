@@ -51,24 +51,34 @@ func (plugin *persistentClaimPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.PersistentVolumeClaimVolumeSource != nil
 }
 
-func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	claim, err := plugin.host.GetKubeClient().PersistentVolumeClaims(podRef.Namespace).Get(spec.VolumeSource.PersistentVolumeClaimVolumeSource.ClaimName)
+func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+	claim, err := plugin.host.GetKubeClient().PersistentVolumeClaims(pod.Namespace).Get(spec.VolumeSource.PersistentVolumeClaimVolumeSource.ClaimName)
 	if err != nil {
 		glog.Errorf("Error finding claim: %+v\n", spec.VolumeSource.PersistentVolumeClaimVolumeSource.ClaimName)
 		return nil, err
 	}
 
-	if claim.Status.VolumeRef == nil {
+	if claim.Spec.VolumeName == "" {
 		return nil, fmt.Errorf("The claim %+v is not yet bound to a volume", claim.Name)
 	}
 
-	pv, err := plugin.host.GetKubeClient().PersistentVolumes().Get(claim.Status.VolumeRef.Name)
+	pv, err := plugin.host.GetKubeClient().PersistentVolumes().Get(claim.Spec.VolumeName)
 	if err != nil {
 		glog.Errorf("Error finding persistent volume for claim: %+v\n", claim.Name)
 		return nil, err
 	}
 
-	builder, err := plugin.host.NewWrapperBuilder(volume.NewSpecFromPersistentVolume(pv), podRef, opts, mounter)
+	if pv.Spec.ClaimRef == nil {
+		glog.Errorf("The volume is not yet bound to the claim. Expected to find the bind on volume.Spec.ClaimRef: %+v", pv)
+		return nil, err
+	}
+
+	if pv.Spec.ClaimRef.UID != claim.UID {
+		glog.Errorf("Excepted volume.Spec.ClaimRef.UID %+v but have %+v", pv.Spec.ClaimRef.UID, claim.UID)
+		return nil, err
+	}
+
+	builder, err := plugin.host.NewWrapperBuilder(volume.NewSpecFromPersistentVolume(pv), pod, opts, mounter)
 	if err != nil {
 		glog.Errorf("Error creating builder for claim: %+v\n", claim.Name)
 		return nil, err

@@ -21,39 +21,39 @@ import (
 	"reflect"
 	"testing"
 
-	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
+	versioned "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestServiceEmptySelector(t *testing.T) {
 	// Nil map should be preserved
-	svc := &current.Service{Selector: nil}
-	data, err := newer.Scheme.EncodeToVersion(svc, "v1beta2")
+	svc := &versioned.Service{Selector: nil}
+	data, err := api.Scheme.EncodeToVersion(svc, "v1beta2")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err := newer.Scheme.Decode(data)
+	obj, err := api.Scheme.Decode(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	selector := obj.(*newer.Service).Spec.Selector
+	selector := obj.(*api.Service).Spec.Selector
 	if selector != nil {
 		t.Errorf("unexpected selector: %#v", obj)
 	}
 
 	// Empty map should be preserved
-	svc2 := &current.Service{Selector: map[string]string{}}
-	data, err = newer.Scheme.EncodeToVersion(svc2, "v1beta2")
+	svc2 := &versioned.Service{Selector: map[string]string{}}
+	data, err = api.Scheme.EncodeToVersion(svc2, "v1beta2")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err = newer.Scheme.Decode(data)
+	obj, err = api.Scheme.Decode(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	selector = obj.(*newer.Service).Spec.Selector
+	selector = obj.(*api.Service).Spec.Selector
 	if selector == nil || len(selector) != 0 {
 		t.Errorf("unexpected selector: %#v", obj)
 	}
@@ -61,160 +61,160 @@ func TestServiceEmptySelector(t *testing.T) {
 
 func TestServicePorts(t *testing.T) {
 	testCases := []struct {
-		given     current.Service
-		expected  newer.Service
-		roundtrip current.Service
+		given     versioned.Service
+		expected  api.Service
+		roundtrip versioned.Service
 	}{
 		{
-			given: current.Service{
-				TypeMeta: current.TypeMeta{
+			given: versioned.Service{
+				TypeMeta: versioned.TypeMeta{
 					ID: "legacy-with-defaults",
 				},
 				Port:     111,
-				Protocol: current.ProtocolTCP,
+				Protocol: versioned.ProtocolTCP,
 			},
-			expected: newer.Service{
-				Spec: newer.ServiceSpec{Ports: []newer.ServicePort{{
+			expected: api.Service{
+				Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 					Port:     111,
-					Protocol: newer.ProtocolTCP,
+					Protocol: api.ProtocolTCP,
 				}}},
 			},
-			roundtrip: current.Service{
-				Ports: []current.ServicePort{{
+			roundtrip: versioned.Service{
+				Ports: []versioned.ServicePort{{
 					Port:     111,
-					Protocol: current.ProtocolTCP,
+					Protocol: versioned.ProtocolTCP,
 				}},
 			},
 		},
 		{
-			given: current.Service{
-				TypeMeta: current.TypeMeta{
+			given: versioned.Service{
+				TypeMeta: versioned.TypeMeta{
 					ID: "legacy-full",
 				},
 				PortName:      "p",
 				Port:          111,
-				Protocol:      current.ProtocolTCP,
+				Protocol:      versioned.ProtocolTCP,
 				ContainerPort: util.NewIntOrStringFromString("p"),
 			},
-			expected: newer.Service{
-				Spec: newer.ServiceSpec{Ports: []newer.ServicePort{{
+			expected: api.Service{
+				Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 					Name:       "p",
 					Port:       111,
-					Protocol:   newer.ProtocolTCP,
+					Protocol:   api.ProtocolTCP,
 					TargetPort: util.NewIntOrStringFromString("p"),
 				}}},
 			},
-			roundtrip: current.Service{
-				Ports: []current.ServicePort{{
+			roundtrip: versioned.Service{
+				Ports: []versioned.ServicePort{{
 					Name:          "p",
 					Port:          111,
-					Protocol:      current.ProtocolTCP,
+					Protocol:      versioned.ProtocolTCP,
 					ContainerPort: util.NewIntOrStringFromString("p"),
 				}},
 			},
 		},
 		{
-			given: current.Service{
-				TypeMeta: current.TypeMeta{
+			given: versioned.Service{
+				TypeMeta: versioned.TypeMeta{
 					ID: "both",
 				},
 				PortName:      "p",
 				Port:          111,
-				Protocol:      current.ProtocolTCP,
+				Protocol:      versioned.ProtocolTCP,
 				ContainerPort: util.NewIntOrStringFromString("p"),
-				Ports: []current.ServicePort{{
+				Ports: []versioned.ServicePort{{
 					Name:          "q",
 					Port:          222,
-					Protocol:      current.ProtocolUDP,
+					Protocol:      versioned.ProtocolUDP,
 					ContainerPort: util.NewIntOrStringFromInt(93),
 				}},
 			},
-			expected: newer.Service{
-				Spec: newer.ServiceSpec{Ports: []newer.ServicePort{{
+			expected: api.Service{
+				Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 					Name:       "q",
 					Port:       222,
-					Protocol:   newer.ProtocolUDP,
+					Protocol:   api.ProtocolUDP,
 					TargetPort: util.NewIntOrStringFromInt(93),
 				}}},
 			},
-			roundtrip: current.Service{
-				Ports: []current.ServicePort{{
+			roundtrip: versioned.Service{
+				Ports: []versioned.ServicePort{{
 					Name:          "q",
 					Port:          222,
-					Protocol:      current.ProtocolUDP,
+					Protocol:      versioned.ProtocolUDP,
 					ContainerPort: util.NewIntOrStringFromInt(93),
 				}},
 			},
 		},
 		{
-			given: current.Service{
-				TypeMeta: current.TypeMeta{
+			given: versioned.Service{
+				TypeMeta: versioned.TypeMeta{
 					ID: "one",
 				},
-				Ports: []current.ServicePort{{
+				Ports: []versioned.ServicePort{{
 					Name:          "p",
 					Port:          111,
-					Protocol:      current.ProtocolUDP,
+					Protocol:      versioned.ProtocolUDP,
 					ContainerPort: util.NewIntOrStringFromInt(93),
 				}},
 			},
-			expected: newer.Service{
-				Spec: newer.ServiceSpec{Ports: []newer.ServicePort{{
+			expected: api.Service{
+				Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 					Name:       "p",
 					Port:       111,
-					Protocol:   newer.ProtocolUDP,
+					Protocol:   api.ProtocolUDP,
 					TargetPort: util.NewIntOrStringFromInt(93),
 				}}},
 			},
-			roundtrip: current.Service{
-				Ports: []current.ServicePort{{
+			roundtrip: versioned.Service{
+				Ports: []versioned.ServicePort{{
 					Name:          "p",
 					Port:          111,
-					Protocol:      current.ProtocolUDP,
+					Protocol:      versioned.ProtocolUDP,
 					ContainerPort: util.NewIntOrStringFromInt(93),
 				}},
 			},
 		},
 		{
-			given: current.Service{
-				TypeMeta: current.TypeMeta{
+			given: versioned.Service{
+				TypeMeta: versioned.TypeMeta{
 					ID: "two",
 				},
-				Ports: []current.ServicePort{{
+				Ports: []versioned.ServicePort{{
 					Name:          "p",
 					Port:          111,
-					Protocol:      current.ProtocolUDP,
+					Protocol:      versioned.ProtocolUDP,
 					ContainerPort: util.NewIntOrStringFromInt(93),
 				}, {
 					Name:          "q",
 					Port:          222,
-					Protocol:      current.ProtocolTCP,
+					Protocol:      versioned.ProtocolTCP,
 					ContainerPort: util.NewIntOrStringFromInt(76),
 				}},
 			},
-			expected: newer.Service{
-				Spec: newer.ServiceSpec{Ports: []newer.ServicePort{{
+			expected: api.Service{
+				Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 					Name:       "p",
 					Port:       111,
-					Protocol:   newer.ProtocolUDP,
+					Protocol:   api.ProtocolUDP,
 					TargetPort: util.NewIntOrStringFromInt(93),
 				}, {
 					Name:       "q",
 					Port:       222,
-					Protocol:   newer.ProtocolTCP,
+					Protocol:   api.ProtocolTCP,
 					TargetPort: util.NewIntOrStringFromInt(76),
 				}}},
 			},
-			roundtrip: current.Service{
-				Ports: []current.ServicePort{{
+			roundtrip: versioned.Service{
+				Ports: []versioned.ServicePort{{
 					Name:          "p",
 					Port:          111,
-					Protocol:      current.ProtocolUDP,
+					Protocol:      versioned.ProtocolUDP,
 					ContainerPort: util.NewIntOrStringFromInt(93),
 				}, {
 					Name:          "q",
 					Port:          222,
-					Protocol:      current.ProtocolTCP,
+					Protocol:      versioned.ProtocolTCP,
 					ContainerPort: util.NewIntOrStringFromInt(76),
 				}},
 			},
@@ -223,8 +223,8 @@ func TestServicePorts(t *testing.T) {
 
 	for i, tc := range testCases {
 		// Convert versioned -> internal.
-		got := newer.Service{}
-		if err := newer.Scheme.Convert(&tc.given, &got); err != nil {
+		got := api.Service{}
+		if err := api.Scheme.Convert(&tc.given, &got); err != nil {
 			t.Errorf("[Case: %d] Unexpected error: %v", i, err)
 			continue
 		}
@@ -233,8 +233,8 @@ func TestServicePorts(t *testing.T) {
 		}
 
 		// Convert internal -> versioned.
-		got2 := current.Service{}
-		if err := newer.Scheme.Convert(&got, &got2); err != nil {
+		got2 := versioned.Service{}
+		if err := api.Scheme.Convert(&got, &got2); err != nil {
 			t.Errorf("[Case: %d] Unexpected error: %v", i, err)
 			continue
 		}
@@ -245,7 +245,7 @@ func TestServicePorts(t *testing.T) {
 }
 
 func TestNodeConversion(t *testing.T) {
-	version, kind, err := newer.Scheme.ObjectVersionAndKind(&current.Minion{})
+	version, kind, err := api.Scheme.ObjectVersionAndKind(&versioned.Minion{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -253,30 +253,30 @@ func TestNodeConversion(t *testing.T) {
 		t.Errorf("unexpected version and kind: %s %s", version, kind)
 	}
 
-	newer.Scheme.Log(t)
-	obj, err := current.Codec.Decode([]byte(`{"kind":"Node","apiVersion":"v1beta2"}`))
+	api.Scheme.Log(t)
+	obj, err := versioned.Codec.Decode([]byte(`{"kind":"Node","apiVersion":"v1beta2"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := obj.(*newer.Node); !ok {
+	if _, ok := obj.(*api.Node); !ok {
 		t.Errorf("unexpected type: %#v", obj)
 	}
 
-	obj, err = current.Codec.Decode([]byte(`{"kind":"NodeList","apiVersion":"v1beta2"}`))
+	obj, err = versioned.Codec.Decode([]byte(`{"kind":"NodeList","apiVersion":"v1beta2"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := obj.(*newer.NodeList); !ok {
+	if _, ok := obj.(*api.NodeList); !ok {
 		t.Errorf("unexpected type: %#v", obj)
 	}
 
-	obj = &newer.Node{}
-	if err := current.Codec.DecodeInto([]byte(`{"kind":"Node","apiVersion":"v1beta2"}`), obj); err != nil {
+	obj = &api.Node{}
+	if err := versioned.Codec.DecodeInto([]byte(`{"kind":"Node","apiVersion":"v1beta2"}`), obj); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	obj = &newer.Node{}
-	data, err := current.Codec.Encode(obj)
+	obj = &api.Node{}
+	data, err := versioned.Codec.Encode(obj)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -291,18 +291,18 @@ func TestNodeConversion(t *testing.T) {
 
 func TestPullPolicyConversion(t *testing.T) {
 	table := []struct {
-		versioned current.PullPolicy
-		internal  newer.PullPolicy
+		versioned versioned.PullPolicy
+		internal  api.PullPolicy
 	}{
 		{
-			versioned: current.PullAlways,
-			internal:  newer.PullAlways,
+			versioned: versioned.PullAlways,
+			internal:  api.PullAlways,
 		}, {
-			versioned: current.PullNever,
-			internal:  newer.PullNever,
+			versioned: versioned.PullNever,
+			internal:  api.PullNever,
 		}, {
-			versioned: current.PullIfNotPresent,
-			internal:  newer.PullIfNotPresent,
+			versioned: versioned.PullIfNotPresent,
+			internal:  api.PullIfNotPresent,
 		}, {
 			versioned: "",
 			internal:  "",
@@ -312,8 +312,8 @@ func TestPullPolicyConversion(t *testing.T) {
 		},
 	}
 	for _, item := range table {
-		var got newer.PullPolicy
-		err := newer.Scheme.Convert(&item.versioned, &got)
+		var got api.PullPolicy
+		err := api.Scheme.Convert(&item.versioned, &got)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
@@ -323,8 +323,8 @@ func TestPullPolicyConversion(t *testing.T) {
 		}
 	}
 	for _, item := range table {
-		var got current.PullPolicy
-		err := newer.Scheme.Convert(&item.internal, &got)
+		var got versioned.PullPolicy
+		err := api.Scheme.Convert(&item.internal, &got)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
@@ -335,14 +335,14 @@ func TestPullPolicyConversion(t *testing.T) {
 	}
 }
 
-func getResourceRequirements(cpu, memory resource.Quantity) current.ResourceRequirements {
-	res := current.ResourceRequirements{}
-	res.Limits = current.ResourceList{}
+func getResourceRequirements(cpu, memory resource.Quantity) versioned.ResourceRequirements {
+	res := versioned.ResourceRequirements{}
+	res.Limits = versioned.ResourceList{}
 	if cpu.Value() > 0 {
-		res.Limits[current.ResourceCPU] = util.NewIntOrStringFromInt(int(cpu.Value()))
+		res.Limits[versioned.ResourceCPU] = util.NewIntOrStringFromInt(int(cpu.Value()))
 	}
 	if memory.Value() > 0 {
-		res.Limits[current.ResourceMemory] = util.NewIntOrStringFromInt(int(memory.Value()))
+		res.Limits[versioned.ResourceMemory] = util.NewIntOrStringFromInt(int(memory.Value()))
 	}
 
 	return res
@@ -352,7 +352,7 @@ func TestContainerConversion(t *testing.T) {
 	cpuLimit := resource.MustParse("10")
 	memoryLimit := resource.MustParse("10M")
 	null := resource.Quantity{}
-	testCases := []current.Container{
+	testCases := []versioned.Container{
 		{
 			Name:      "container",
 			Resources: getResourceRequirements(cpuLimit, memoryLimit),
@@ -385,8 +385,8 @@ func TestContainerConversion(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		got := newer.Container{}
-		if err := newer.Scheme.Convert(&tc, &got); err != nil {
+		got := api.Container{}
+		if err := api.Scheme.Convert(&tc, &got); err != nil {
 			t.Errorf("[Case: %d] Unexpected error: %v", i, err)
 			continue
 		}
@@ -401,114 +401,114 @@ func TestContainerConversion(t *testing.T) {
 
 func TestEndpointsConversion(t *testing.T) {
 	testCases := []struct {
-		given    current.Endpoints
-		expected newer.Endpoints
+		given    versioned.Endpoints
+		expected api.Endpoints
 	}{
 		{
-			given: current.Endpoints{
-				TypeMeta: current.TypeMeta{
+			given: versioned.Endpoints{
+				TypeMeta: versioned.TypeMeta{
 					ID: "empty",
 				},
-				Protocol:  current.ProtocolTCP,
+				Protocol:  versioned.ProtocolTCP,
 				Endpoints: []string{},
 			},
-			expected: newer.Endpoints{
-				Subsets: []newer.EndpointSubset{},
+			expected: api.Endpoints{
+				Subsets: []api.EndpointSubset{},
 			},
 		},
 		{
-			given: current.Endpoints{
-				TypeMeta: current.TypeMeta{
+			given: versioned.Endpoints{
+				TypeMeta: versioned.TypeMeta{
 					ID: "one legacy",
 				},
-				Protocol:  current.ProtocolTCP,
+				Protocol:  versioned.ProtocolTCP,
 				Endpoints: []string{"1.2.3.4:88"},
 			},
-			expected: newer.Endpoints{
-				Subsets: []newer.EndpointSubset{{
-					Ports:     []newer.EndpointPort{{Name: "", Port: 88, Protocol: newer.ProtocolTCP}},
-					Addresses: []newer.EndpointAddress{{IP: "1.2.3.4"}},
+			expected: api.Endpoints{
+				Subsets: []api.EndpointSubset{{
+					Ports:     []api.EndpointPort{{Name: "", Port: 88, Protocol: api.ProtocolTCP}},
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				}},
 			},
 		},
 		{
-			given: current.Endpoints{
-				TypeMeta: current.TypeMeta{
+			given: versioned.Endpoints{
+				TypeMeta: versioned.TypeMeta{
 					ID: "several legacy",
 				},
-				Protocol:  current.ProtocolUDP,
+				Protocol:  versioned.ProtocolUDP,
 				Endpoints: []string{"1.2.3.4:88", "1.2.3.4:89", "1.2.3.4:90"},
 			},
-			expected: newer.Endpoints{
-				Subsets: []newer.EndpointSubset{
+			expected: api.Endpoints{
+				Subsets: []api.EndpointSubset{
 					{
-						Ports:     []newer.EndpointPort{{Name: "", Port: 88, Protocol: newer.ProtocolUDP}},
-						Addresses: []newer.EndpointAddress{{IP: "1.2.3.4"}},
+						Ports:     []api.EndpointPort{{Name: "", Port: 88, Protocol: api.ProtocolUDP}},
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 					},
 					{
-						Ports:     []newer.EndpointPort{{Name: "", Port: 89, Protocol: newer.ProtocolUDP}},
-						Addresses: []newer.EndpointAddress{{IP: "1.2.3.4"}},
+						Ports:     []api.EndpointPort{{Name: "", Port: 89, Protocol: api.ProtocolUDP}},
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 					},
 					{
-						Ports:     []newer.EndpointPort{{Name: "", Port: 90, Protocol: newer.ProtocolUDP}},
-						Addresses: []newer.EndpointAddress{{IP: "1.2.3.4"}},
+						Ports:     []api.EndpointPort{{Name: "", Port: 90, Protocol: api.ProtocolUDP}},
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 					},
 				}},
 		},
 		{
-			given: current.Endpoints{
-				TypeMeta: current.TypeMeta{
+			given: versioned.Endpoints{
+				TypeMeta: versioned.TypeMeta{
 					ID: "one subset",
 				},
-				Protocol:  current.ProtocolTCP,
+				Protocol:  versioned.ProtocolTCP,
 				Endpoints: []string{"1.2.3.4:88"},
-				Subsets: []current.EndpointSubset{{
-					Ports:     []current.EndpointPort{{Name: "", Port: 88, Protocol: current.ProtocolTCP}},
-					Addresses: []current.EndpointAddress{{IP: "1.2.3.4"}},
+				Subsets: []versioned.EndpointSubset{{
+					Ports:     []versioned.EndpointPort{{Name: "", Port: 88, Protocol: versioned.ProtocolTCP}},
+					Addresses: []versioned.EndpointAddress{{IP: "1.2.3.4"}},
 				}},
 			},
-			expected: newer.Endpoints{
-				Subsets: []newer.EndpointSubset{{
-					Ports:     []newer.EndpointPort{{Name: "", Port: 88, Protocol: newer.ProtocolTCP}},
-					Addresses: []newer.EndpointAddress{{IP: "1.2.3.4"}},
+			expected: api.Endpoints{
+				Subsets: []api.EndpointSubset{{
+					Ports:     []api.EndpointPort{{Name: "", Port: 88, Protocol: api.ProtocolTCP}},
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				}},
 			},
 		},
 		{
-			given: current.Endpoints{
-				TypeMeta: current.TypeMeta{
+			given: versioned.Endpoints{
+				TypeMeta: versioned.TypeMeta{
 					ID: "several subset",
 				},
-				Protocol:  current.ProtocolUDP,
+				Protocol:  versioned.ProtocolUDP,
 				Endpoints: []string{"1.2.3.4:88", "5.6.7.8:88", "1.2.3.4:89", "5.6.7.8:89"},
-				Subsets: []current.EndpointSubset{
+				Subsets: []versioned.EndpointSubset{
 					{
-						Ports:     []current.EndpointPort{{Name: "", Port: 88, Protocol: current.ProtocolUDP}},
-						Addresses: []current.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
+						Ports:     []versioned.EndpointPort{{Name: "", Port: 88, Protocol: versioned.ProtocolUDP}},
+						Addresses: []versioned.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
 					},
 					{
-						Ports:     []current.EndpointPort{{Name: "", Port: 89, Protocol: current.ProtocolUDP}},
-						Addresses: []current.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
+						Ports:     []versioned.EndpointPort{{Name: "", Port: 89, Protocol: versioned.ProtocolUDP}},
+						Addresses: []versioned.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
 					},
 					{
-						Ports:     []current.EndpointPort{{Name: "named", Port: 90, Protocol: current.ProtocolUDP}},
-						Addresses: []current.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
+						Ports:     []versioned.EndpointPort{{Name: "named", Port: 90, Protocol: versioned.ProtocolUDP}},
+						Addresses: []versioned.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
 					},
 				},
 			},
-			expected: newer.Endpoints{
-				Subsets: []newer.EndpointSubset{
+			expected: api.Endpoints{
+				Subsets: []api.EndpointSubset{
 					{
-						Ports:     []newer.EndpointPort{{Name: "", Port: 88, Protocol: newer.ProtocolUDP}},
-						Addresses: []newer.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
+						Ports:     []api.EndpointPort{{Name: "", Port: 88, Protocol: api.ProtocolUDP}},
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
 					},
 					{
-						Ports:     []newer.EndpointPort{{Name: "", Port: 89, Protocol: newer.ProtocolUDP}},
-						Addresses: []newer.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
+						Ports:     []api.EndpointPort{{Name: "", Port: 89, Protocol: api.ProtocolUDP}},
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
 					},
 					{
-						Ports:     []newer.EndpointPort{{Name: "named", Port: 90, Protocol: newer.ProtocolUDP}},
-						Addresses: []newer.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
+						Ports:     []api.EndpointPort{{Name: "named", Port: 90, Protocol: api.ProtocolUDP}},
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
 					},
 				}},
 		},
@@ -516,48 +516,48 @@ func TestEndpointsConversion(t *testing.T) {
 
 	for i, tc := range testCases {
 		// Convert versioned -> internal.
-		got := newer.Endpoints{}
-		if err := newer.Scheme.Convert(&tc.given, &got); err != nil {
+		got := api.Endpoints{}
+		if err := api.Scheme.Convert(&tc.given, &got); err != nil {
 			t.Errorf("[Case: %d] Unexpected error: %v", i, err)
 			continue
 		}
-		if !newer.Semantic.DeepEqual(got.Subsets, tc.expected.Subsets) {
+		if !api.Semantic.DeepEqual(got.Subsets, tc.expected.Subsets) {
 			t.Errorf("[Case: %d] Expected %#v, got %#v", i, tc.expected.Subsets, got.Subsets)
 		}
 
 		// Convert internal -> versioned.
-		got2 := current.Endpoints{}
-		if err := newer.Scheme.Convert(&got, &got2); err != nil {
+		got2 := versioned.Endpoints{}
+		if err := api.Scheme.Convert(&got, &got2); err != nil {
 			t.Errorf("[Case: %d] Unexpected error: %v", i, err)
 			continue
 		}
-		if got2.Protocol != tc.given.Protocol || !newer.Semantic.DeepEqual(got2.Endpoints, tc.given.Endpoints) {
+		if got2.Protocol != tc.given.Protocol || !api.Semantic.DeepEqual(got2.Endpoints, tc.given.Endpoints) {
 			t.Errorf("[Case: %d] Expected %#v, got %#v", i, tc.given.Endpoints, got2.Endpoints)
 		}
 	}
 }
 
 func TestSecretVolumeSourceConversion(t *testing.T) {
-	given := current.SecretVolumeSource{
-		Target: current.ObjectReference{
+	given := versioned.SecretVolumeSource{
+		Target: versioned.ObjectReference{
 			ID: "foo",
 		},
 	}
 
-	expected := newer.SecretVolumeSource{
+	expected := api.SecretVolumeSource{
 		SecretName: "foo",
 	}
 
-	got := newer.SecretVolumeSource{}
-	if err := newer.Scheme.Convert(&given, &got); err != nil {
+	got := api.SecretVolumeSource{}
+	if err := api.Scheme.Convert(&given, &got); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if got.SecretName != expected.SecretName {
 		t.Errorf("Expected %v; got %v", expected, got)
 	}
 
-	got2 := current.SecretVolumeSource{}
-	if err := newer.Scheme.Convert(&got, &got2); err != nil {
+	got2 := versioned.SecretVolumeSource{}
+	if err := api.Scheme.Convert(&got, &got2); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if got2.Target.ID != given.Target.ID {
@@ -568,42 +568,42 @@ func TestSecretVolumeSourceConversion(t *testing.T) {
 func TestBadSecurityContextConversion(t *testing.T) {
 	priv := false
 	testCases := map[string]struct {
-		c   *current.Container
+		c   *versioned.Container
 		err string
 	}{
 		// this use case must use true for the container and false for the sc.  Otherwise the defaulter
 		// will assume privileged was left undefined (since it is the default value) and copy the
 		// sc setting upwards
 		"mismatched privileged": {
-			c: &current.Container{
+			c: &versioned.Container{
 				Privileged: true,
-				SecurityContext: &current.SecurityContext{
+				SecurityContext: &versioned.SecurityContext{
 					Privileged: &priv,
 				},
 			},
 			err: "container privileged settings do not match security context settings, cannot convert",
 		},
 		"mismatched caps add": {
-			c: &current.Container{
-				Capabilities: current.Capabilities{
-					Add: []current.CapabilityType{"foo"},
+			c: &versioned.Container{
+				Capabilities: versioned.Capabilities{
+					Add: []versioned.Capability{"foo"},
 				},
-				SecurityContext: &current.SecurityContext{
-					Capabilities: &current.Capabilities{
-						Add: []current.CapabilityType{"bar"},
+				SecurityContext: &versioned.SecurityContext{
+					Capabilities: &versioned.Capabilities{
+						Add: []versioned.Capability{"bar"},
 					},
 				},
 			},
 			err: "container capability settings do not match security context settings, cannot convert",
 		},
 		"mismatched caps drop": {
-			c: &current.Container{
-				Capabilities: current.Capabilities{
-					Drop: []current.CapabilityType{"foo"},
+			c: &versioned.Container{
+				Capabilities: versioned.Capabilities{
+					Drop: []versioned.Capability{"foo"},
 				},
-				SecurityContext: &current.SecurityContext{
-					Capabilities: &current.Capabilities{
-						Drop: []current.CapabilityType{"bar"},
+				SecurityContext: &versioned.SecurityContext{
+					Capabilities: &versioned.Capabilities{
+						Drop: []versioned.Capability{"bar"},
 					},
 				},
 			},
@@ -612,8 +612,8 @@ func TestBadSecurityContextConversion(t *testing.T) {
 	}
 
 	for k, v := range testCases {
-		got := newer.Container{}
-		err := newer.Scheme.Convert(v.c, &got)
+		got := api.Container{}
+		err := api.Scheme.Convert(v.c, &got)
 		if err == nil {
 			t.Errorf("expected error for case %s but got none", k)
 		} else {

@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 )
 
-func init() {
+func addDefaultingFuncs() {
 	api.Scheme.AddDefaultingFuncs(
 		func(obj *ReplicationController) {
 			if len(obj.DesiredState.ReplicaSelector) == 0 {
@@ -74,7 +74,7 @@ func init() {
 				obj.Protocol = ProtocolTCP
 			}
 			if obj.SessionAffinity == "" {
-				obj.SessionAffinity = AffinityTypeNone
+				obj.SessionAffinity = ServiceAffinityNone
 			}
 			for i := range obj.Ports {
 				sp := &obj.Ports[i]

@@ -21,6 +21,8 @@ ZONE=${KUBE_GCE_ZONE:-us-central1-b}
 MASTER_SIZE=${MASTER_SIZE:-g1-small}
 MINION_SIZE=${MINION_SIZE:-g1-small}
 NUM_MINIONS=${NUM_MINIONS:-2}
+MASTER_DISK_TYPE=pd-standard
+MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-100GB}
 MINION_DISK_TYPE=pd-standard
 MINION_DISK_SIZE=${MINION_DISK_SIZE:-100GB}
 
@@ -69,7 +71,7 @@ EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
-ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ResourceQuota
+ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota

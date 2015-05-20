@@ -1,7 +1,7 @@
 # kubeconfig files
 In order to easily switch between multiple clusters, a kubeconfig file was defined.  This file contains a series of authentication mechanisms and cluster connection information associated with nicknames.  It also introduces the concept of a tuple of authentication information (user) and cluster connection information called a context that is also associated with a nickname.
 
-Multiple files are kubeconfig files are allowed.  At runtime they are loaded and merged together along with override options specified from the command line (see rules below).
+Multiple kubeconfig files are allowed.  At runtime they are loaded and merged together along with override options specified from the command line (see rules below).
 
 ## Related discussion
 https://github.com/GoogleCloudPlatform/kubernetes/issues/1755
@@ -11,7 +11,7 @@ https://github.com/GoogleCloudPlatform/kubernetes/issues/1755
 apiVersion: v1
 clusters:
 - cluster:
-    api-version: v1beta1
+    api-version: v1beta3
     server: http://cow.org:8080
   name: cow-cluster
 - cluster:
@@ -43,41 +43,9 @@ users:
     token: blue-token
 - name: green-user
   user:
-    username: admin
-    password: secret
     client-certificate: path/to/my/client/cert
     client-key: path/to/my/client/key
 ```
-
-## .kubernetes_auth files
-
-**WARNING**: merging auth from a mixture of kubernetes_auth file entries and kubeconfig user entries is hard to debug and should be avoided. kubernetes_auth file support exists mostly for tests and is being deprecated.
-
-The kubernetes_auth file is a legacy config file that can contain a mix of server and client auth info. It is supported in kubeconfig via `auth-path` for a user:
-```
-users:
-- name: black-user
-  user:
-    auth-path: path/to/my/existing/.kubernetes_auth_file
-```
-
-The entries in a file loaded via auth-path will be applied to both the user and cluster of the current context.
-
-### Example .kubernetes_auth file
-```
-{
-  "User": "admin",
-  "Password": "secret",
-  "CertFile": "/path/to/my/client/cert",
-  "KeyFile": "/path/to/my/client/key",
-  "CAFile": "/path/to/my/server/cafile",
-  "BearerToken": "secrettoken",
-  "Insecure": false
-}
-```
-All entries are optional. `User`, `Password`, `CertFile`, `KeyFile`, and `BearerToken` are applied to the kubectl user. `CAFile` and `Insecure` apply to the cluster. Note that it is invalid to set both `CAFile` and `Insecure`, or both `BearerToken` and `User,Password` (see loading and merging rules below).
-
-If the contents of the kubernetes_auth file conflict with entries in kubeconfig, they are ignored. E.g, if the kubeconfig cluster specifies a `certificate-authority`, and the user specifies an `auth-path` to a kubernetes_file that contains a `CAFile` entry, the former will be used and the latter ignored.
 
 ## Loading and merging rules
 The rules for loading and merging the kubeconfig files are straightforward, but there are a lot of them.  The final config is built in this order:
@@ -108,8 +76,8 @@ The rules for loading and merging the kubeconfig files are straightforward, but 
       1.  If cluster info is present and a value for the attribute is present, use it.
       1.  If you don't have a server location, error.
   1.  Determine the actual user info to use. User is built using the same rules as cluster info, EXCEPT that you can only have one authentication technique per user.
-      1. Load precedence is 1) command line flag, 2) user fields from kubeconfig, 3) kubernetes_auth file fields (if user has a `auth-path` or the `--auth-path` was provided)
-      1. The command line flags are: `auth-path`, `client-certificate`, `client-key`, `username`, `password`, and `token`.
+      1. Load precedence is 1) command line flag, 2) user fields from kubeconfig
+      1. The command line flags are: `client-certificate`, `client-key`, `username`, `password`, and `token`.
       1. If there are two conflicting techniques, fail.
   1.  For any information still missing, use default values and potentially prompt for authentication information
 
@@ -170,7 +138,7 @@ users:
 #### Commands for the example file
 ```
 $kubectl config set preferences.colors true
-$kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1beta1
+$kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1beta3
 $kubectl config set-cluster horse-cluster --server=https://horse.org:4443 --certificate-authority=path/to/my/cafile
 $kubectl config set-cluster pig-cluster --server=https://pig.org:443 --insecure-skip-tls-verify=true
 $kubectl config set-credentials blue-user --token=blue-token
@@ -179,3 +147,6 @@ $kubectl config set-context queen-anne-context --cluster=pig-cluster --user=blac
 $kubectl config set-context federal-context --cluster=horse-cluster --user=green-user --namespace=chisel-ns
 $kubectl config use-context federal-context
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubeconfig-file.md?pixel)]()

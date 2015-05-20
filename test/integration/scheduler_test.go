@@ -29,24 +29,21 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
+	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
 )
-
-func init() {
-	requireEtcd()
-}
 
 type nodeMutationFunc func(t *testing.T, n *api.Node, nodeStore cache.Store, c *client.Client)
 
@@ -56,11 +53,11 @@ type nodeStateManager struct {
 }
 
 func TestUnschedulableNodes(t *testing.T) {
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version(), etcdtest.PathPrefix())
+	helper, err := framework.NewHelper()
 	if err != nil {
 		t.Fatalf("Couldn't create etcd helper: %v", err)
 	}
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -69,14 +66,15 @@ func TestUnschedulableNodes(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		EnableIndex:       true,
-		APIPrefix:         "/api",
-		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EtcdHelper:            helper,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
@@ -143,6 +141,9 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		ObjectMeta: api.ObjectMeta{Name: "node-scheduling-test-node"},
 		Spec:       api.NodeSpec{Unschedulable: false},
 		Status: api.NodeStatus{
+			Capacity: api.ResourceList{
+				api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+			},
 			Conditions: []api.NodeCondition{goodCondition},
 		},
 	}
@@ -193,6 +194,9 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		{
 			makeUnSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c *client.Client) {
 				n.Status = api.NodeStatus{
+					Capacity: api.ResourceList{
+						api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+					},
 					Conditions: []api.NodeCondition{badCondition},
 				}
 				if _, err = c.Nodes().UpdateStatus(n); err != nil {
@@ -207,6 +211,9 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 			},
 			makeSchedulable: func(t *testing.T, n *api.Node, s cache.Store, c *client.Client) {
 				n.Status = api.NodeStatus{
+					Capacity: api.ResourceList{
+						api.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+					},
 					Conditions: []api.NodeCondition{goodCondition},
 				}
 				if _, err = c.Nodes().UpdateStatus(n); err != nil {
@@ -250,7 +257,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 			t.Errorf("Pod scheduled successfully on unschedulable nodes")
 		}
 		if err != wait.ErrWaitTimeout {
-			t.Errorf("Test %d: failed while trying to confirm the pod does not get scheduled on the node: %v", err)
+			t.Errorf("Test %d: failed while trying to confirm the pod does not get scheduled on the node: %v", i, err)
 		} else {
 			t.Logf("Test %d: Pod did not get scheduled on an unschedulable node", i)
 		}
@@ -265,7 +272,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 		// Wait until the pod is scheduled.
 		err = wait.Poll(time.Second, time.Second*10, podScheduled(restClient, myPod.Namespace, myPod.Name))
 		if err != nil {
-			t.Errorf("Test %d: failed to schedule a pod: %v", err)
+			t.Errorf("Test %d: failed to schedule a pod: %v", i, err)
 		} else {
 			t.Logf("Test %d: Pod got scheduled on a schedulable node", i)
 		}

@@ -30,7 +30,7 @@ export PORTAL_NET=192.168.3.0/24
 export FLANNEL_NET=172.16.0.0/16
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ServiceAccount,ResourceQuota
 
 # Optional: Install node monitoring.
 ENABLE_NODE_MONITORING=true
@@ -54,7 +54,7 @@ DOCKER_OPTS=""
 ENABLE_CLUSTER_DNS=true
 # DNS_SERVER_IP must be a IP in PORTAL_NET range
 DNS_SERVER_IP="192.168.3.10"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev

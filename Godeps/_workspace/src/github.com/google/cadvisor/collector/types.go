@@ -15,6 +15,7 @@
 package collector
 
 import (
+	"github.com/google/cadvisor/info/v2"
 	"time"
 )
 
@@ -26,7 +27,7 @@ type Collector interface {
 	// Returns the next time this collector should be collected from.
 	// Next collection time is always returned, even when an error occurs.
 	// A collection time of zero means no more collection.
-	Collect() (time.Time, error)
+	Collect() (time.Time, []v2.Metric, error)
 
 	// Name of this collector.
 	Name() string
@@ -41,5 +42,5 @@ type CollectorManager interface {
 	// at which a collector will be ready to collect from.
 	// Next collection time is always returned, even when an error occurs.
 	// A collection time of zero means no more collection.
-	Collect() (time.Time, error)
+	Collect() (time.Time, []v2.Metric, error)
 }

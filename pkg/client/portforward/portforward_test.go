@@ -209,7 +209,7 @@ func (s *fakeUpgradeStream) Headers() http.Header {
 	return http.Header{}
 }
 
-type TestCase struct {
+type GetListenerTestCase struct {
 	Hostname                string
 	Protocol                string
 	ShouldRaiseError        bool
@@ -218,7 +218,7 @@ type TestCase struct {
 
 func TestGetListener(t *testing.T) {
 	var pf PortForwarder
-	testCases := []TestCase{
+	testCases := []GetListenerTestCase{
 		{
 			Hostname:                "localhost",
 			Protocol:                "tcp4",
@@ -247,20 +247,12 @@ func TestGetListener(t *testing.T) {
 			Protocol:         "tcp6",
 			ShouldRaiseError: true,
 		},
-	}
-
-	// On some linux systems, ::1 does not resolve to localhost but to localhost6 or
-	// ip6-localhost. To make the test case portable, we need to do a reverse lookup on ::1 and
-	// trying to bind a port with the name.
-	names, err := net.LookupAddr("::1")
-	if err == nil && len(names) > 0 {
-		ipv6TestCase := TestCase{
-			Hostname:                names[0],
-			Protocol:                "tcp6",
-			ShouldRaiseError:        false,
-			ExpectedListenerAddress: "::1",
-		}
-		testCases = append(testCases, ipv6TestCase)
+		{
+			// IPv6 address must be put into brackets. This test reveals this.
+			Hostname:         "::1",
+			Protocol:         "tcp6",
+			ShouldRaiseError: true,
+		},
 	}
 
 	for i, testCase := range testCases {

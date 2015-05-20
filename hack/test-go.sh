@@ -35,6 +35,7 @@ kube::test::find_dirs() {
           -o -wholename '*/third_party/*' \
           -o -wholename '*/Godeps/*' \
           -o -wholename '*/contrib/podex/*' \
+          -o -wholename '*/test/e2e/*' \
           -o -wholename '*/test/integration/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
@@ -53,9 +54,9 @@ KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # Comma separated list of API Versions that should be tested.
 KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1beta1,v1beta3"}
-# Prefixes for etcd paths (standard and customized)
-ETCD_STANDARD_PREFIX="registry"
-ETCD_CUSTOM_PREFIX="kubernetes.io/registry"
+# Run tests with the standard (registry) and a custom etcd prefix
+# (kubernetes.io/registry).
+KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry,kubernetes.io/registry"}
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -100,6 +101,7 @@ shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
 eval "goflags=(${KUBE_GOFLAGS:-})"
+eval "testargs=(${KUBE_TEST_ARGS:-})"
 
 # Filter out arguments that start with "-" and move them to goflags.
 testcases=()
@@ -133,7 +135,8 @@ runTests() {
       count=0
       for i in $(seq 1 ${iterations}); do
         if go test "${goflags[@]:+${goflags[@]}}" \
-            ${KUBE_RACE} ${KUBE_TIMEOUT} "${pkg}"; then
+            ${KUBE_RACE} ${KUBE_TIMEOUT} "${pkg}" \
+            "${testargs[@]:+${testargs[@]}}"; then
           pass=$((pass + 1))
         else
           fails=$((fails + 1))
@@ -154,7 +157,8 @@ runTests() {
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running unit tests without code coverage"
     go test "${goflags[@]:+${goflags[@]}}" \
-      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}"
+      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
+     "${testargs[@]:+${testargs[@]}}"
     return 0
   fi
 
@@ -176,7 +180,8 @@ runTests() {
           -cover -covermode="${KUBE_COVERMODE}" \
           -coverprofile="${cover_report_dir}/{}/${cover_profile}" \
           "${cover_params[@]+${cover_params[@]}}" \
-          "${KUBE_GO_PACKAGE}/{}"
+          "${KUBE_GO_PACKAGE}/{}" \
+          "${testargs[@]:+${testargs[@]}}"
 
   COMBINED_COVER_PROFILE="${cover_report_dir}/combined-coverage.out"
   {
@@ -204,17 +209,31 @@ reportCoverageToCoveralls() {
   fi
 }
 
-# Convert the CSV to an array of API versions to test
+# Convert the CSVs to arrays.
 IFS=',' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
-ETCD_PREFIX=${ETCD_STANDARD_PREFIX}
-LAST_API_VERSION=""
-for apiVersion in "${apiVersions[@]}"; do
-  echo "Running tests for APIVersion: $apiVersion"
-  LAST_API_VERSION=$apiVersion
-  KUBE_API_VERSION="${apiVersion}" ETCD_PREFIX=${ETCD_STANDARD_PREFIX} runTests "$@"
+IFS=',' read -a etcdPrefixes <<< "${KUBE_TEST_ETCD_PREFIXES}"
+apiVersionsCount=${#apiVersions[@]}
+etcdPrefixesCount=${#etcdPrefixes[@]}
+for (( i=0, j=0; ; )); do
+  apiVersion=${apiVersions[i]}
+  etcdPrefix=${etcdPrefixes[j]}
+  echo "Running tests for APIVersion: $apiVersion with etcdPrefix: $etcdPrefix"
+  KUBE_API_VERSION="${apiVersion}" ETCD_PREFIX=${etcdPrefix} runTests "$@"
+  i=${i}+1
+  j=${j}+1
+  if [[ i -eq ${apiVersionsCount} ]] && [[ j -eq ${etcdPrefixesCount} ]]; then
+    # All api versions and etcd prefixes tested.
+    break
+  fi
+  if [[ i -eq ${apiVersionsCount} ]]; then
+    # Use the last api version for remaining etcd prefixes.
+    i=${i}-1
+  fi
+   if [[ j -eq ${etcdPrefixesCount} ]]; then
+     # Use the last etcd prefix for remaining api versions.
+    j=${j}-1
+  fi
 done
-echo "Using custom etcd path prefix: ${ETCD_CUSTOM_PREFIX}"
-KUBE_API_VERSION="${LAST_API_VERSION}" ETCD_PREFIX=${ETCD_CUSTOM_PREFIX} runTests "$@"
 
 # We might run the tests for multiple versions, but we want to report only
 # one of them to coveralls. Here we report coverage from the last run.

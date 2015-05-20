@@ -39,6 +39,10 @@ MINION_SCOPES=""
 POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
+# If set to Elastic IP, master instance will be associated with this IP.
+# If set to auto, a new Elastic IP will be aquired
+# Otherwise amazon-given public ip will be used (it'll change with reboot).
+MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
 
 
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
@@ -64,5 +68,12 @@ EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
+
+# Admission Controllers to invoke prior to persisting objects in cluster
+ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+
+# Optional: Enable/disable public IP assignment for minions.
+# Important Note: disable only if you have setup a NAT instance for internet access and configured appropriate routes!
+ENABLE_MINION_PUBLIC_IP=${KUBE_ENABLE_MINION_PUBLIC_IP:-true}

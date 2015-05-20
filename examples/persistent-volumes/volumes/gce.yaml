@@ -7,7 +7,7 @@ spec:
     storage: 10Gi
   accessModes:
     - ReadWriteOnce
-      ReadOnlyMany
+    - ReadOnlyMany
   gcePersistentDisk:
     pdName: "abc123"
     fsType: "ext4"

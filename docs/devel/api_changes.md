@@ -12,7 +12,7 @@ not all API changes will need all of these steps.
 
 ## Operational overview
 
-It's important to have a high level understanding of the API system used in
+It is important to have a high level understanding of the API system used in
 Kubernetes in order to navigate the rest of this document.
 
 As mentioned above, the internal representation of an API object is decoupled
@@ -24,13 +24,13 @@ a GET involves a great deal of machinery.
 The conversion process is logically a "star" with the internal form at the
 center. Every versioned API can be converted to the internal form (and
 vice-versa), but versioned APIs do not convert to other versioned APIs directly.
-This sounds like a heavy process, but in reality we don't intend to keep more
+This sounds like a heavy process, but in reality we do not intend to keep more
 than a small number of versions alive at once.  While all of the Kubernetes code
 operates on the internal structures, they are always converted to a versioned
 form before being written to storage (disk or etcd) or being sent over a wire.
 Clients should consume and operate on the versioned APIs exclusively.
 
-To demonstrate the general process, let's walk through a (hypothetical) example:
+To demonstrate the general process, here is a (hypothetical) example:
 
    1. A user POSTs a `Pod` object to `/api/v7beta1/...`
    2. The JSON is unmarshalled into a `v7beta1.Pod` structure
@@ -176,6 +176,12 @@ If your change includes new fields for which you will need default values, you
 need to add cases to `pkg/api/<version>/defaults.go`.  Of course, since you
 have added code, you have to add a test: `pkg/api/<version>/defaults_test.go`.
 
+Do use pointers to scalars when you need to distinguish between an unset value
+and an an automatic zero value.  For example,
+`PodSpec.TerminationGracePeriodSeconds` is defined as `*int64` the go type
+definition.  A zero value means 0 seconds, and a nil value asks the system to
+pick a default.
+
 Don't forget to run the tests!
 
 ### Edit conversion.go
@@ -227,18 +233,32 @@ Thus, we are auto-generating conversion functions that are much more efficient
 than the generic ones (which are based on reflections and thus are highly
 inefficient).
 
-The conversion code resides with each versioned API -
-`pkg/api/<version>/conversion.go`.  To regenerate conversion functions:
+The conversion code resides with each versioned API. There are two files:
+   - `pkg/api/<version>/conversion.go` containing manually written conversion
+     functions
+   - `pkg/api/<version>/conversion_generated.go` containing auto-generated
+     conversion functions
+
+Since auto-generated conversion functions are using manually written ones,
+those manually written should be named with a defined convention, i.e. a function
+converting type X in pkg a to type Y in pkg b, should be named:
+`convert_a_X_To_b_Y`.
+
+Also note that you can (and for efficiency reasons should) use auto-generated
+conversion functions when writing your conversion functions.
+
+Once all the necessary manually written conversions are added, you need to
+regenerate auto-generated ones. To regenerate them:
    - run
 ```
    $ go run cmd/kube-conversion/conversion.go -v <version> -f <file1.txt> -n <file2.txt>
 ```
-   - replace all conversion functions (convert\* functions) in the above file
-     with the contents of \<file1.txt\>
-   - replace arguments of `newer.Scheme.AddGeneratedConversionFuncs`
-     with the contents of \<file2.txt\>
+   - replace all conversion functions (convert\* functions) in the
+     `pkg/api/<version>/conversion_generated.go` with the contents of \<file1.txt\>
+   - replace arguments of `api.Scheme.AddGeneratedConversionFuncs` in the
+     `pkg/api/<version>/conversion_generated.go` with the contents of \<file2.txt\>
 
-Unsurprisingly, this also requires you to add tests to
+Unsurprisingly, adding manually written conversion also requires you to add tests to
 `pkg/api/<version>/conversion_test.go`.
 
 ## Update the fuzzer
@@ -318,3 +338,6 @@ the change gets in. If you are unsure, ask. Also make sure that the change gets 
 ## Adding new REST objects
 
 TODO(smarterclayton): write this.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/api_changes.md?pixel)]()

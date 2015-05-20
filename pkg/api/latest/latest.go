@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
@@ -31,7 +32,7 @@ import (
 )
 
 // Version is the string that represents the current external default version.
-const Version = "v1beta3"
+var Version string
 
 // OldestVersion is the string that represents the oldest server version supported,
 // for client code that wants to hardcode the lowest common denominator.
@@ -41,13 +42,13 @@ const OldestVersion = "v1beta1"
 // may be assumed to be least feature rich to most feature rich, and clients may
 // choose to prefer the latter items in the list over the former items when presented
 // with a set of versions to choose.
-var Versions = []string{"v1beta1", "v1beta2", "v1beta3", "v1"}
+var Versions []string
 
 // Codec is the default codec for serializing output that should use
 // the latest supported version.  Use this Codec when writing to
 // disk, a data store that is not dynamically versioned, or in tests.
 // This codec can decode any object that Kubernetes is aware of.
-var Codec = v1beta3.Codec
+var Codec runtime.Codec
 
 // accessor is the shared static metadata accessor for the API.
 var accessor = meta.NewAccessor()
@@ -65,42 +66,19 @@ var RESTMapper meta.RESTMapper
 // userResources is a group of resources mostly used by a kubectl user
 var userResources = []string{"rc", "svc", "pods", "pvc"}
 
-// InterfacesFor returns the default Codec and ResourceVersioner for a given version
-// string, or an error if the version is not known.
-func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
-	switch version {
-	case "v1beta1":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta1.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case "v1beta2":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta2.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case "v1beta3":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta3.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case "v1":
-		return &meta.VersionInterfaces{
-			Codec:            v1.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
-	}
-}
-
 func init() {
+	// Use the first API version in the list of registered versions as the latest.
+	Version = registered.RegisteredVersions[0]
+	Codec = runtime.CodecFor(api.Scheme, Version)
+	// Put the registered versions in Versions in reverse order.
+	versions := registered.RegisteredVersions
+	Versions = []string{}
+	for i := len(versions) - 1; i >= 0; i-- {
+		Versions = append(Versions, versions[i])
+	}
+
 	mapper := meta.NewDefaultRESTMapper(
-		Versions,
+		versions,
 		func(version string) (*meta.VersionInterfaces, bool) {
 			interfaces, err := InterfacesFor(version)
 			if err != nil {
@@ -109,9 +87,6 @@ func init() {
 			return interfaces, true
 		},
 	)
-	// list of versions we support on the server
-	// versions should be listed in the order of perferred versions first
-	versions := []string{"v1beta3", "v1beta2", "v1beta1", "v1"}
 
 	// versions that used mixed case URL formats
 	versionMixedCase := map[string]bool{
@@ -149,7 +124,7 @@ func init() {
 		"PodExecOptions",
 		"PodProxyOptions")
 
-	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources
+	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources.
 	for _, version := range versions {
 		for kind := range api.Scheme.KnownTypes(version) {
 			if ignoredKinds.Has(kind) {
@@ -168,4 +143,37 @@ func init() {
 		}
 	}
 	RESTMapper = mapper
+}
+
+// InterfacesFor returns the default Codec and ResourceVersioner for a given version
+// string, or an error if the version is not known.
+func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
+	switch version {
+	case "v1beta1":
+		return &meta.VersionInterfaces{
+			Codec:            v1beta1.Codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
+	case "v1beta2":
+		return &meta.VersionInterfaces{
+			Codec:            v1beta2.Codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
+	case "v1beta3":
+		return &meta.VersionInterfaces{
+			Codec:            v1beta3.Codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
+	case "v1":
+		return &meta.VersionInterfaces{
+			Codec:            v1.Codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
+	}
 }

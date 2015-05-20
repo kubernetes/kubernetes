@@ -480,7 +480,7 @@ func (lb *LoadBalancer) GetTCPLoadBalancer(name, region string) (endpoint string
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinity api.AffinityType) (string, error) {
+func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinity api.ServiceAffinity) (string, error) {
 	glog.V(4).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, externalIP, ports, hosts, affinity)
 
 	if len(ports) > 1 {
@@ -489,9 +489,9 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 
 	var persistence *vips.SessionPersistence
 	switch affinity {
-	case api.AffinityTypeNone:
+	case api.ServiceAffinityNone:
 		persistence = nil
-	case api.AffinityTypeClientIP:
+	case api.ServiceAffinityClientIP:
 		persistence = &vips.SessionPersistence{Type: "SOURCE_IP"}
 	default:
 		return "", fmt.Errorf("unsupported load balancer affinity: %v", affinity)

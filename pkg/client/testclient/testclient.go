@@ -103,8 +103,16 @@ func (c *Fake) Pods(namespace string) client.PodInterface {
 	return &FakePods{Fake: c, Namespace: namespace}
 }
 
+func (c *Fake) PodTemplates(namespace string) client.PodTemplateInterface {
+	return &FakePodTemplates{Fake: c, Namespace: namespace}
+}
+
 func (c *Fake) Services(namespace string) client.ServiceInterface {
 	return &FakeServices{Fake: c, Namespace: namespace}
+}
+
+func (c *Fake) ServiceAccounts(namespace string) client.ServiceAccountsInterface {
+	return &FakeServiceAccounts{Fake: c, Namespace: namespace}
 }
 
 func (c *Fake) Secrets(namespace string) client.SecretsInterface {

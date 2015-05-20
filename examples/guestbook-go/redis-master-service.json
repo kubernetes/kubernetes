@@ -1,8 +1,24 @@
 {
-  "apiVersion": "v1beta1",
-  "kind": "Service",
-  "id": "redis-master",
-  "port": 6379,
-  "containerPort": "redis-server",
-  "selector": { "name": "redis", "role": "master" }
+   "kind":"Service",
+   "apiVersion":"v1beta3",
+   "metadata":{
+      "name":"redis-master",
+      "labels":{
+         "name":"redis",
+         "role":"master"
+      }
+   },
+   "spec":{
+      "ports": [
+        {
+          "port":6379,
+          "targetPort":"redis-server",
+          "protocol":"TCP"
+        }
+      ],
+      "selector":{
+         "name":"redis",
+         "role":"master"
+      }
+   }
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -28,6 +29,7 @@ type Attributes interface {
 	GetOperation() string
 	GetObject() runtime.Object
 	GetKind() string
+	GetUserInfo() user.Info
 }
 
 // Interface is an abstract, pluggable interface for Admission Control decisions.

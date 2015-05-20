@@ -24,7 +24,7 @@ import (
 	"github.com/golang/glog"
 )
 
-func init() {
+func addDefaultingFuncs() {
 	api.Scheme.AddDefaultingFuncs(
 		func(obj *ReplicationController) {
 			var labels map[string]string
@@ -71,7 +71,7 @@ func init() {
 		},
 		func(obj *ServiceSpec) {
 			if obj.SessionAffinity == "" {
-				obj.SessionAffinity = AffinityTypeNone
+				obj.SessionAffinity = ServiceAffinityNone
 			}
 			for i := range obj.Ports {
 				sp := &obj.Ports[i]

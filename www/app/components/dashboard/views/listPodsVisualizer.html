@@ -6,7 +6,7 @@
 <div>
 <md-button class="md-primary" ng-click="serverView = false">By Name</md-button> |
 <md-button class="md-primary" ng-click="serverView = true">By Server</md-button>
-  <div style="float:right;"><md-button class="md-primary" ng-href="/#/dashboard/pods">View Pod Listing</md-button></div>
+  <div style="float:right;"><md-button class="md-primary" ng-href="#/dashboard/pods">View Pod Listing</md-button></div>
 </div>
     <div class="pod-group" ng-show="!serverView" ng-include="'components/dashboard/views/partials/podTilesByName.html'"></div>
     <div class="pod-group" ng-show="serverView" ng-include="'components/dashboard/views/partials/podTilesByServer.html'"></div>

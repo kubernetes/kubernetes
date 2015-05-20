@@ -12,7 +12,6 @@ monit:
     - group: root
     - mode: 644
 
-{% if "kubernetes-pool" in grains.get('roles', []) %}
 /etc/monit/conf.d/kubelet:
   file:
     - managed
@@ -28,7 +27,17 @@ monit:
     - user: root
     - group: root
     - mode: 644
-{% endif %}
+
+/etc/monit/monit_watcher.sh:
+  file.managed:
+    - source: salt://monit/monit_watcher.sh
+    - user: root
+    - group: root
+    - mode: 755
+
+crontab -l | { cat; echo "* * * * * /etc/monit/monit_watcher.sh 2>&1 | logger"; } | crontab -:
+  cmd.run:
+  - unless: crontab -l | grep "* * * * * /etc/monit/monit_watcher.sh 2>&1 | logger"
 
 monit-service:
   service:

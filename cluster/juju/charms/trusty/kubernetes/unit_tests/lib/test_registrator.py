@@ -37,12 +37,12 @@ class TestRegistrator():
     @patch('json.loads')
     @patch('httplib.HTTPConnection')
     def test_register(self, httplibmock, jsonmock):
-        result = self.r.register('foo', 80, '/v1beta1/test')
+        result = self.r.register('foo', 80, '/v1beta3/test')
 
         httplibmock.assert_called_with('foo', 80)
         requestmock = httplibmock().request
         requestmock.assert_called_with(
-                "POST", "/v1beta1/test",
+                "POST", "/v1beta3/test",
                 json.dumps(self.r.data),
                 {"Content-type": "application/json",
                  "Accept": "application/json"})

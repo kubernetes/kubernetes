@@ -2,9 +2,19 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.k8s.cassandra</groupId>
   <artifactId>kubernetes-cassandra</artifactId>
-  <version>0.0.2</version>
+  <version>0.0.3</version>
   <build>
     <sourceDirectory>src</sourceDirectory>
+    <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>2.3.2</version>
+        <configuration>
+          <source>1.7</source>
+          <target>1.7</target>
+        </configuration>
+      </plugin>
+    </plugins>
   </build>
   <dependencies>
     <dependency>

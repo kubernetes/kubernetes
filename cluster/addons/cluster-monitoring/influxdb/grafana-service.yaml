@@ -2,8 +2,8 @@ apiVersion: v1beta3
 kind: Service
 metadata: 
   labels: 
-    name: influxGrafana
     kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "Grafana"
   name: monitoring-grafana
 spec: 
   ports: 

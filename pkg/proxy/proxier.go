@@ -18,7 +18,6 @@ package proxy
 
 import (
 	"fmt"
-	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -42,236 +41,8 @@ type serviceInfo struct {
 	socket              proxySocket
 	timeout             time.Duration
 	publicIPs           []string // TODO: make this net.IP
-	sessionAffinityType api.AffinityType
+	sessionAffinityType api.ServiceAffinity
 	stickyMaxAgeMinutes int
-}
-
-// How long we wait for a connection to a backend in seconds
-var endpointDialTimeout = []time.Duration{1, 2, 4, 8}
-
-// Abstraction over TCP/UDP sockets which are proxied.
-type proxySocket interface {
-	// Addr gets the net.Addr for a proxySocket.
-	Addr() net.Addr
-	// Close stops the proxySocket from accepting incoming connections.
-	// Each implementation should comment on the impact of calling Close
-	// while sessions are active.
-	Close() error
-	// ProxyLoop proxies incoming connections for the specified service to the service endpoints.
-	ProxyLoop(service ServicePortName, info *serviceInfo, proxier *Proxier)
-}
-
-// tcpProxySocket implements proxySocket.  Close() is implemented by net.Listener.  When Close() is called,
-// no new connections are allowed but existing connections are left untouched.
-type tcpProxySocket struct {
-	net.Listener
-}
-
-func tryConnect(service ServicePortName, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
-	for _, retryTimeout := range endpointDialTimeout {
-		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr)
-		if err != nil {
-			glog.Errorf("Couldn't find an endpoint for %s: %v", service, err)
-			return nil, err
-		}
-		glog.V(3).Infof("Mapped service %q to endpoint %s", service, endpoint)
-		// TODO: This could spin up a new goroutine to make the outbound connection,
-		// and keep accepting inbound traffic.
-		outConn, err := net.DialTimeout(protocol, endpoint, retryTimeout*time.Second)
-		if err != nil {
-			if isTooManyFDsError(err) {
-				panic("Dial failed: " + err.Error())
-			}
-			glog.Errorf("Dial failed: %v", err)
-			continue
-		}
-		return outConn, nil
-	}
-	return nil, fmt.Errorf("failed to connect to an endpoint.")
-}
-
-func (tcp *tcpProxySocket) ProxyLoop(service ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
-	for {
-		if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
-			// The service port was closed or replaced.
-			return
-		}
-		// Block until a connection is made.
-		inConn, err := tcp.Accept()
-		if err != nil {
-			if isTooManyFDsError(err) {
-				panic("Accept failed: " + err.Error())
-			}
-
-			if isClosedError(err) {
-				return
-			}
-			if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
-				// Then the service port was just closed so the accept failure is to be expected.
-				return
-			}
-			glog.Errorf("Accept failed: %v", err)
-			continue
-		}
-		glog.V(2).Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
-		outConn, err := tryConnect(service, inConn.(*net.TCPConn).RemoteAddr(), "tcp", proxier)
-		if err != nil {
-			glog.Errorf("Failed to connect to balancer: %v", err)
-			inConn.Close()
-			continue
-		}
-		// Spin up an async copy loop.
-		go proxyTCP(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
-	}
-}
-
-// proxyTCP proxies data bi-directionally between in and out.
-func proxyTCP(in, out *net.TCPConn) {
-	var wg sync.WaitGroup
-	wg.Add(2)
-	glog.V(4).Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
-		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
-	go copyBytes("from backend", in, out, &wg)
-	go copyBytes("to backend", out, in, &wg)
-	wg.Wait()
-	in.Close()
-	out.Close()
-}
-
-func copyBytes(direction string, dest, src *net.TCPConn, wg *sync.WaitGroup) {
-	defer wg.Done()
-	glog.V(4).Infof("Copying %s: %s -> %s", direction, src.RemoteAddr(), dest.RemoteAddr())
-	n, err := io.Copy(dest, src)
-	if err != nil {
-		glog.Errorf("I/O error: %v", err)
-	}
-	glog.V(4).Infof("Copied %d bytes %s: %s -> %s", n, direction, src.RemoteAddr(), dest.RemoteAddr())
-	dest.CloseWrite()
-	src.CloseRead()
-}
-
-// udpProxySocket implements proxySocket.  Close() is implemented by net.UDPConn.  When Close() is called,
-// no new connections are allowed and existing connections are broken.
-// TODO: We could lame-duck this ourselves, if it becomes important.
-type udpProxySocket struct {
-	*net.UDPConn
-}
-
-func (udp *udpProxySocket) Addr() net.Addr {
-	return udp.LocalAddr()
-}
-
-// Holds all the known UDP clients that have not timed out.
-type clientCache struct {
-	mu      sync.Mutex
-	clients map[string]net.Conn // addr string -> connection
-}
-
-func newClientCache() *clientCache {
-	return &clientCache{clients: map[string]net.Conn{}}
-}
-
-func (udp *udpProxySocket) ProxyLoop(service ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
-	activeClients := newClientCache()
-	var buffer [4096]byte // 4KiB should be enough for most whole-packets
-	for {
-		if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
-			// The service port was closed or replaced.
-			break
-		}
-
-		// Block until data arrives.
-		// TODO: Accumulate a histogram of n or something, to fine tune the buffer size.
-		n, cliAddr, err := udp.ReadFrom(buffer[0:])
-		if err != nil {
-			if e, ok := err.(net.Error); ok {
-				if e.Temporary() {
-					glog.V(1).Infof("ReadFrom had a temporary failure: %v", err)
-					continue
-				}
-			}
-			glog.Errorf("ReadFrom failed, exiting ProxyLoop: %v", err)
-			break
-		}
-		// If this is a client we know already, reuse the connection and goroutine.
-		svrConn, err := udp.getBackendConn(activeClients, cliAddr, proxier, service, myInfo.timeout)
-		if err != nil {
-			continue
-		}
-		// TODO: It would be nice to let the goroutine handle this write, but we don't
-		// really want to copy the buffer.  We could do a pool of buffers or something.
-		_, err = svrConn.Write(buffer[0:n])
-		if err != nil {
-			if !logTimeout(err) {
-				glog.Errorf("Write failed: %v", err)
-				// TODO: Maybe tear down the goroutine for this client/server pair?
-			}
-			continue
-		}
-		err = svrConn.SetDeadline(time.Now().Add(myInfo.timeout))
-		if err != nil {
-			glog.Errorf("SetDeadline failed: %v", err)
-			continue
-		}
-	}
-}
-
-func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr net.Addr, proxier *Proxier, service ServicePortName, timeout time.Duration) (net.Conn, error) {
-	activeClients.mu.Lock()
-	defer activeClients.mu.Unlock()
-
-	svrConn, found := activeClients.clients[cliAddr.String()]
-	if !found {
-		// TODO: This could spin up a new goroutine to make the outbound connection,
-		// and keep accepting inbound traffic.
-		glog.V(2).Infof("New UDP connection from %s", cliAddr)
-		var err error
-		svrConn, err = tryConnect(service, cliAddr, "udp", proxier)
-		if err != nil {
-			return nil, err
-		}
-		if err = svrConn.SetDeadline(time.Now().Add(timeout)); err != nil {
-			glog.Errorf("SetDeadline failed: %v", err)
-			return nil, err
-		}
-		activeClients.clients[cliAddr.String()] = svrConn
-		go func(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, timeout time.Duration) {
-			defer util.HandleCrash()
-			udp.proxyClient(cliAddr, svrConn, activeClients, timeout)
-		}(cliAddr, svrConn, activeClients, timeout)
-	}
-	return svrConn, nil
-}
-
-// This function is expected to be called as a goroutine.
-// TODO: Track and log bytes copied, like TCP
-func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, timeout time.Duration) {
-	defer svrConn.Close()
-	var buffer [4096]byte
-	for {
-		n, err := svrConn.Read(buffer[0:])
-		if err != nil {
-			if !logTimeout(err) {
-				glog.Errorf("Read failed: %v", err)
-			}
-			break
-		}
-		err = svrConn.SetDeadline(time.Now().Add(timeout))
-		if err != nil {
-			glog.Errorf("SetDeadline failed: %v", err)
-			break
-		}
-		n, err = udp.WriteTo(buffer[0:n], cliAddr)
-		if err != nil {
-			if !logTimeout(err) {
-				glog.Errorf("WriteTo failed: %v", err)
-			}
-			break
-		}
-	}
-	activeClients.mu.Lock()
-	delete(activeClients.clients, cliAddr.String())
-	activeClients.mu.Unlock()
 }
 
 func logTimeout(err error) bool {
@@ -282,29 +53,6 @@ func logTimeout(err error) bool {
 		}
 	}
 	return false
-}
-
-func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, error) {
-	host := ip.String()
-	switch strings.ToUpper(string(protocol)) {
-	case "TCP":
-		listener, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
-		if err != nil {
-			return nil, err
-		}
-		return &tcpProxySocket{listener}, nil
-	case "UDP":
-		addr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(host, strconv.Itoa(port)))
-		if err != nil {
-			return nil, err
-		}
-		conn, err := net.ListenUDP("udp", addr)
-		if err != nil {
-			return nil, err
-		}
-		return &udpProxySocket{conn}, nil
-	}
-	return nil, fmt.Errorf("unknown protocol %q", protocol)
 }
 
 // Proxier is a simple proxy for TCP connections between a localhost:lport
@@ -319,38 +67,48 @@ type Proxier struct {
 	hostIP        net.IP
 }
 
+var (
+	// ErrProxyOnLocalhost is returned by NewProxier if the user requests a proxier on
+	// the loopback address. May be checked for by callers of NewProxier to know whether
+	// the caller provided invalid input.
+	ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
+)
+
+// IsProxyLocked returns true if the proxy could not acquire the lock on iptables.
+func IsProxyLocked(err error) bool {
+	return strings.Contains(err.Error(), "holding the xtables lock")
+}
+
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen.  Because of the iptables logic, It is assumed that there
-// is only a single Proxier active on a machine.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface) *Proxier {
+// is only a single Proxier active on a machine. An error will be returned if
+// the proxier cannot be started due to an invalid ListenIP (loopback) or
+// if iptables fails to update or acquire the initial lock. Once a proxier is
+// created, it will keep iptables up to date in the background and will not
+// terminate if a particular iptables call fails.
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
-		glog.Errorf("Can't proxy only on localhost - iptables can't do it")
-		return nil
+		return nil, ErrProxyOnLocalhost
 	}
 
 	hostIP, err := util.ChooseHostInterface()
 	if err != nil {
-		glog.Errorf("Failed to select a host interface: %v", err)
-		return nil
+		return nil, fmt.Errorf("failed to select a host interface: %v", err)
 	}
-	glog.Infof("Setting Proxy IP to %v", hostIP)
-	return CreateProxier(loadBalancer, listenIP, iptables, hostIP)
+
+	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
+	return createProxier(loadBalancer, listenIP, iptables, hostIP)
 }
 
-func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP) *Proxier {
-	glog.Infof("Initializing iptables")
-	// Clean up old messes.  Ignore erors.
-	iptablesDeleteOld(iptables)
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP) (*Proxier, error) {
 	// Set up the iptables foundations we need.
 	if err := iptablesInit(iptables); err != nil {
-		glog.Errorf("Failed to initialize iptables: %v", err)
-		return nil
+		return nil, fmt.Errorf("failed to initialize iptables: %v", err)
 	}
 	// Flush old iptables rules (since the bound ports will be invalid after a restart).
 	// When OnUpdate() is first called, the rules will be recreated.
 	if err := iptablesFlush(iptables); err != nil {
-		glog.Errorf("Failed to flush iptables: %v", err)
-		return nil
+		return nil, fmt.Errorf("failed to flush iptables: %v", err)
 	}
 	return &Proxier{
 		loadBalancer: loadBalancer,
@@ -358,7 +116,7 @@ func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		listenIP:     listenIP,
 		iptables:     iptables,
 		hostIP:       hostIP,
-	}
+	}, nil
 }
 
 // The periodic interval for checking the state of things.
@@ -370,7 +128,7 @@ func (proxier *Proxier) SyncLoop() {
 	defer t.Stop()
 	for {
 		<-t.C
-		glog.V(3).Infof("Periodic sync")
+		glog.V(6).Infof("Periodic sync")
 		if err := iptablesInit(proxier.iptables); err != nil {
 			glog.Errorf("Failed to ensure iptables: %v", err)
 		}
@@ -394,6 +152,8 @@ func (proxier *Proxier) ensurePortals() {
 
 // clean up any stale sticky session records in the hash map.
 func (proxier *Proxier) cleanupStaleStickySessions() {
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
 	for name := range proxier.serviceMap {
 		proxier.loadBalancer.CleanupStaleStickySessions(name)
 	}
@@ -448,12 +208,12 @@ func (proxier *Proxier) addServiceOnPort(service ServicePortName, protocol api.P
 		protocol:            protocol,
 		socket:              sock,
 		timeout:             timeout,
-		sessionAffinityType: api.AffinityTypeNone, // default
-		stickyMaxAgeMinutes: 180,                  // TODO: paramaterize this in the API.
+		sessionAffinityType: api.ServiceAffinityNone, // default
+		stickyMaxAgeMinutes: 180,                     // TODO: paramaterize this in the API.
 	}
 	proxier.setServiceInfo(service, si)
 
-	glog.V(1).Infof("Proxying for service %q on %s port %d", service, protocol, portNum)
+	glog.V(2).Infof("Proxying for service %q on %s port %d", service, protocol, portNum)
 	go func(service ServicePortName, proxier *Proxier) {
 		defer util.HandleCrash()
 		atomic.AddInt32(&proxier.numProxyLoops, 1)
@@ -592,7 +352,7 @@ func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol 
 		return err
 	}
 	if !existed {
-		glog.Infof("Opened iptables from-containers portal for service %q on %s %s:%d", name, protocol, portalIP, portalPort)
+		glog.V(3).Infof("Opened iptables from-containers portal for service %q on %s %s:%d", name, protocol, portalIP, portalPort)
 	}
 
 	// Handle traffic from the host.
@@ -603,7 +363,7 @@ func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol 
 		return err
 	}
 	if !existed {
-		glog.Infof("Opened iptables from-host portal for service %q on %s %s:%d", name, protocol, portalIP, portalPort)
+		glog.V(3).Infof("Opened iptables from-host portal for service %q on %s %s:%d", name, protocol, portalIP, portalPort)
 	}
 	return nil
 }
@@ -615,7 +375,7 @@ func (proxier *Proxier) closePortal(service ServicePortName, info *serviceInfo) 
 		el = append(el, proxier.closeOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
 	}
 	if len(el) == 0 {
-		glog.Infof("Closed iptables portals for service %q", service)
+		glog.V(3).Infof("Closed iptables portals for service %q", service)
 	} else {
 		glog.Errorf("Some errors closing iptables portals for service %q", service)
 	}
@@ -646,7 +406,6 @@ func (proxier *Proxier) closeOnePortal(portalIP net.IP, portalPort int, protocol
 // use two chains.
 var iptablesContainerPortalChain iptables.Chain = "KUBE-PORTALS-CONTAINER"
 var iptablesHostPortalChain iptables.Chain = "KUBE-PORTALS-HOST"
-var iptablesOldPortalChain iptables.Chain = "KUBE-PROXY"
 
 // Ensure that the iptables infrastructure we use is set up.  This can safely be called periodically.
 func iptablesInit(ipt iptables.Interface) error {
@@ -666,16 +425,6 @@ func iptablesInit(ipt iptables.Interface) error {
 		return err
 	}
 	return nil
-}
-
-func iptablesDeleteOld(ipt iptables.Interface) {
-	// DEPRECATED: The iptablesOldPortalChain is from when we had a single chain
-	// for all rules.  We'll unilaterally delete it here.  We will remove this
-	// code at some future date (before 1.0).
-	ipt.DeleteRule(iptables.TableNAT, iptables.ChainPrerouting, "-j", string(iptablesOldPortalChain))
-	ipt.DeleteRule(iptables.TableNAT, iptables.ChainOutput, "-j", string(iptablesOldPortalChain))
-	ipt.FlushChain(iptables.TableNAT, iptablesOldPortalChain)
-	ipt.DeleteChain(iptables.TableNAT, iptablesOldPortalChain)
 }
 
 // Flush all of our custom iptables rules.

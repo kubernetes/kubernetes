@@ -14,7 +14,7 @@ started](../../docs/getting-started-guides) for installation instructions for yo
 Containers consume the downward API using environment variables.  The downward API allows
 containers to be injected with the name and namespace of the pod the container is in.
 
-Use the `examples/secrets/secret-pod.yaml` file to create a Pod with a container that consumes the
+Use the `examples/downward-api/dapi-pod.yaml` file to create a Pod with a container that consumes the
 downward API.
 
 ```shell
@@ -31,3 +31,6 @@ $ kubectl log dapi-test-pod | grep POD_
 2015-04-30T20:22:18.568024817Z POD_NAME=dapi-test-pod
 2015-04-30T20:22:18.568087688Z POD_NAMESPACE=default
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/downward-api/README.md?pixel)]()
