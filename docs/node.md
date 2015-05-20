@@ -62,28 +62,24 @@ After creation, Kubernetes will check whether the node is valid or not.
 For example, if you try to create a node from the following content:
 ```json
 {
-  "id": "10.1.2.3",
-  "kind": "Minion",
-  "apiVersion": "v1beta1",
-  "resources": {
-    "capacity": {
-      "cpu": 1000,
-      "memory": 1073741824
-    },
-  },
-  "labels": {
-    "name": "my-first-k8s-node",
-  },
+  "kind": "Node",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "10.240.79.157",
+    "labels": {
+      "name": "my-first-k8s-node"
+    }
+  }
 }
 ```
 
 Kubernetes will create a `Node` object internally (the representation), and
-validate the node by health checking based on the `id` field: we assume `id`
-can be resolved. If the node is valid, i.e. all necessary services are running,
-it is eligible to run a `Pod`; otherwise, it will be ignored for any cluster
-activity, until it becomes valid. Note that Kubernetes will keep invalid node
-unless explicitly deleted by client, and it will keep checking to see if it
-becomes valid.
+validate the node by health checking based on the `metadata.name` field: we
+assume `metadata.name` can be resolved. If the node is valid, i.e. all necessary
+services are running, it is eligible to run a `Pod`; otherwise, it will be
+ignored for any cluster activity, until it becomes valid. Note that Kubernetes
+will keep invalid node unless explicitly deleted by client, and it will keep
+checking to see if it becomes valid.
 
 Currently, there are two agents that interacts with Kubernetes node interface:
 Node Controller and Kube Admin.
@@ -123,7 +119,7 @@ Admin can choose to make the node unschedulable using `kubectl`. Unscheduling th
 will not affect any existing pods on the node but it will disable creation of
 any new pods on the node. Node unschedulable example:
 ```
-kubectl update nodes 10.1.2.3 --patch='{"apiVersion": "v1beta1", "unschedulable": true}'
+kubectl update nodes 10.1.2.3 --patch='{"apiVersion": "v1beta3", "unschedulable": true}'
 ```
 
 
