@@ -1663,38 +1663,6 @@ func convert_api_ReplicationControllerList_To_v1_ReplicationControllerList(in *a
 	return nil
 }
 
-func convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *api.ReplicationControllerSpec, out *ReplicationControllerSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.ReplicationControllerSpec))(in)
-	}
-	out.Replicas = in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	if in.TemplateRef != nil {
-		out.TemplateRef = new(ObjectReference)
-		if err := convert_api_ObjectReference_To_v1_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
-			return err
-		}
-	} else {
-		out.TemplateRef = nil
-	}
-	if in.Template != nil {
-		out.Template = new(PodTemplateSpec)
-		if err := convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
-	}
-	return nil
-}
-
 func convert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStatus(in *api.ReplicationControllerStatus, out *ReplicationControllerStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ReplicationControllerStatus))(in)
@@ -3876,38 +3844,6 @@ func convert_v1_ReplicationControllerList_To_api_ReplicationControllerList(in *R
 	return nil
 }
 
-func convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *ReplicationControllerSpec, out *api.ReplicationControllerSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ReplicationControllerSpec))(in)
-	}
-	out.Replicas = in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	if in.TemplateRef != nil {
-		out.TemplateRef = new(api.ObjectReference)
-		if err := convert_v1_ObjectReference_To_api_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
-			return err
-		}
-	} else {
-		out.TemplateRef = nil
-	}
-	if in.Template != nil {
-		out.Template = new(api.PodTemplateSpec)
-		if err := convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
-	}
-	return nil
-}
-
 func convert_v1_ReplicationControllerStatus_To_api_ReplicationControllerStatus(in *ReplicationControllerStatus, out *api.ReplicationControllerStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerStatus))(in)
@@ -4535,7 +4471,6 @@ func init() {
 		convert_api_Probe_To_v1_Probe,
 		convert_api_RangeAllocation_To_v1_RangeAllocation,
 		convert_api_ReplicationControllerList_To_v1_ReplicationControllerList,
-		convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
 		convert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStatus,
 		convert_api_ReplicationController_To_v1_ReplicationController,
 		convert_api_ResourceQuotaList_To_v1_ResourceQuotaList,
@@ -4644,7 +4579,6 @@ func init() {
 		convert_v1_Probe_To_api_Probe,
 		convert_v1_RangeAllocation_To_api_RangeAllocation,
 		convert_v1_ReplicationControllerList_To_api_ReplicationControllerList,
-		convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
 		convert_v1_ReplicationControllerStatus_To_api_ReplicationControllerStatus,
 		convert_v1_ReplicationController_To_api_ReplicationController,
 		convert_v1_ResourceQuotaList_To_api_ResourceQuotaList,
