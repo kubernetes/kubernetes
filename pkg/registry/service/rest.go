@@ -153,7 +153,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 		rs.portals.Release(net.ParseIP(service.Spec.PortalIP))
 	}
 
-	for _, nodePort := range collectServiceNodePorts(service) {
+	for _, nodePort := range CollectServiceNodePorts(service) {
 		err := rs.serviceNodePorts.Release(nodePort)
 		if err != nil {
 			// these should be caught by an eventual reconciliation / restart
@@ -223,7 +223,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 
 	assignNodePorts := shouldAssignNodePorts(service)
 
-	oldNodePorts := collectServiceNodePorts(oldService)
+	oldNodePorts := CollectServiceNodePorts(oldService)
 
 	newNodePorts := []int{}
 	if assignNodePorts {
@@ -328,7 +328,7 @@ func contains(haystack []int, needle int) bool {
 	return false
 }
 
-func collectServiceNodePorts(service *api.Service) []int {
+func CollectServiceNodePorts(service *api.Service) []int {
 	servicePorts := []int{}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
@@ -340,17 +340,15 @@ func collectServiceNodePorts(service *api.Service) []int {
 }
 
 func shouldAssignNodePorts(service *api.Service) bool {
-	// TODO(justinsb): Switch on service.Spec.Type
-	//	switch service.Spec.Type {
-	//	case api.ServiceVisibilityLoadBalancer:
-	//		return true
-	//	case api.ServiceVisibilityNodePort:
-	//		return true
-	//	case api.ServiceVisibilityCluster:
-	//		return false
-	//	default:
-	//		glog.Errorf("Unknown visibility value: %v", service.Spec.Visibility)
-	//		return false
-	//	}
-	return false
+	switch service.Spec.Type {
+	case api.ServiceTypeLoadBalancer:
+		return true
+	case api.ServiceTypeNodePort:
+		return true
+	case api.ServiceTypeClusterIP:
+		return false
+	default:
+		glog.Errorf("Unknown service type: %v", service.Spec.Type)
+		return false
+	}
 }

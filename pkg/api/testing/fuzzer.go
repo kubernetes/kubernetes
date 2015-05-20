@@ -187,7 +187,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(p *api.ServiceType, c fuzz.Continue) {
-			types := []api.ServiceType{api.ServiceTypeClusterIP, api.ServiceTypeLoadBalancer}
+			types := []api.ServiceType{api.ServiceTypeClusterIP, api.ServiceTypeNodePort, api.ServiceTypeLoadBalancer}
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *api.Container, c fuzz.Continue) {

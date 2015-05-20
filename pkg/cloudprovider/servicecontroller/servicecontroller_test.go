@@ -145,7 +145,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			// Services do not have external load balancers: no calls should be made.
 			services: []*api.Service{
 				newService("s0", "111", api.ServiceTypeClusterIP),
-				newService("s1", "222", api.ServiceTypeClusterIP),
+				newService("s1", "222", api.ServiceTypeNodePort),
 			},
 			expectedUpdateCalls: nil,
 		},
@@ -174,7 +174,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			// Two services have an external load balancer and two don't: two calls.
 			services: []*api.Service{
-				newService("s0", "777", api.ServiceTypeClusterIP),
+				newService("s0", "777", api.ServiceTypeNodePort),
 				newService("s1", "888", api.ServiceTypeLoadBalancer),
 				newService("s3", "999", api.ServiceTypeLoadBalancer),
 				newService("s4", "123", api.ServiceTypeClusterIP),

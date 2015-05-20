@@ -843,6 +843,10 @@ const (
 	// cluster, via the portal IP.
 	ServiceTypeClusterIP ServiceType = "ClusterIP"
 
+	// ServiceTypeNodePort means a service will be exposed on one port of
+	// every node, in addition to 'ClusterIP' visibility.
+	ServiceTypeNodePort ServiceType = "NodePort"
+
 	// ServiceTypeLoadBalancer means a service will be exposed via an
 	// external load balancer (if the cloud provider supports it), in addition
 	// to 'NodePort' type.

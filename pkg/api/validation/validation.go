@@ -1032,7 +1032,7 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 }
 
 var supportedSessionAffinityType = util.NewStringSet(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
-var supportedServiceType = util.NewStringSet(string(api.ServiceTypeClusterIP),
+var supportedServiceType = util.NewStringSet(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
 	string(api.ServiceTypeLoadBalancer))
 
 // ValidateService tests if required fields in the service are set.
@@ -1086,6 +1086,14 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		}
 	}
 
+	if service.Spec.Type == api.ServiceTypeClusterIP {
+		for i := range service.Spec.Ports {
+			if service.Spec.Ports[i].NodePort != 0 {
+				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot specify a node port with cluster-visibility services"))
+			}
+		}
+	}
+
 	// Check for duplicate NodePorts, considering (protocol,port) pairs
 	nodePorts := make(map[api.ServicePort]bool)
 	for i := range service.Spec.Ports {
@@ -1101,11 +1109,6 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 			allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", *port, "duplicate nodePort specified"))
 		}
 		nodePorts[key] = true
-	}
-
-	// Temporary validation to prevent people creating NodePorts before we have the full infrastructure in place
-	if len(nodePorts) > 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[0], "nodePorts not (yet) enabled"))
 	}
 
 	return allErrs
@@ -1373,7 +1376,7 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 			allErrs = append(allErrs, errs.NewFieldRequired(fmt.Sprintf("metadata.annotations[%s]", api.ServiceAccountNameKey)))
 		}
 	case api.SecretTypeOpaque, "":
-		// no-op
+	// no-op
 	case api.SecretTypeDockercfg:
 		dockercfgBytes, exists := secret.Data[api.DockerConfigKey]
 		if !exists {
