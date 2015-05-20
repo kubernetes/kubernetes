@@ -6,22 +6,18 @@ include:
 calicoctl:
   file.managed:
     - name: /home/vagrant/calicoctl
-    #- source: https://github.com/Metaswitch/calico-docker/releases/download/v0.2.0/calicoctl
-    #- source_hash: sha512=ff7b6edb4728efc5c56af48a944584962d84e572453b07bbfc5160f07344d1b075a8cc23f9e81a98079b6931bd1dc5a7432bd1d41078b02c51e27fa9508597e4
-    - source: salt://calico/calicoctl
-    - source_hash: sha512=85224f630abc8090fdc1868bccda00b3078d08a49b87e6a47cb816599db992014442df9d57a8b395daf9cc478fc9d972e9542bbc307c1059419a9eeb4bcb9017
+    - source: https://github.com/Metaswitch/calico-docker/releases/download/v0.4.2/calicoctl
+    - source_hash: sha512=4fe30422bbf47fdade3ef7ba8927643cff8af578a81b4e6a101525229a583e18afbc3f7d5dee4d60b789139173a34fe15cb8c2c120014230ebd431b655a5fb1b
     - makedirs: True
     - mode: 744
 
 calico-network-plugin:
   file.managed:
     - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico
-    - source: salt://calico/calico_network_plugin.py
-    - source_hash: sha512=515454093f395535214e8891b0cbb2d4d7ae503c3626be0ce8e556f1f020a4066c7babedf855f63a0ab4aebaffe3c2631852d1e8c40b2c5be9eb9310b7cfca8b
+    - source: https://github.com/Metaswitch/calico-docker/releases/download/v0.4.2/calico_kubernetes
+    - source_hash: sha512=eb3a7b35668b4d8d180cc10f9937ed44752f7185907ef0559e0ea52eb55e837b0dca3a1a6ad75d52aa1481d2f63e3c5a09314222fa72e5d5c43c004d7283bac8
     - makedirs: True
     - mode: 744
-    - require:
-      - pip: python-etcd
 
 calico-node:
   cmd.run:
