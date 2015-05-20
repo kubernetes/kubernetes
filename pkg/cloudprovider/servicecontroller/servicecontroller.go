@@ -248,8 +248,8 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 			glog.Infof("LB already exists with status %s for previously uncached service %s", status, namespacedName)
 			return nil, notRetryable
 		} else if exists {
-			glog.Infof("Deleting old LB for previously uncached service %s whose endpoint %s doesn't match the service's desired IPs %v",
-				namespacedName, status, service.Spec.PublicIPs)
+			glog.Infof("Deleting old LB for previously uncached service %s whose endpoint %s doesn't match the service's desired status %v",
+				namespacedName, status, service.Status.LoadBalancer)
 			if err := s.ensureLBDeleted(service); err != nil {
 				return err, retryable
 			}
@@ -324,8 +324,8 @@ func (s *ServiceController) createExternalLoadBalancer(service *api.Service) err
 		return err
 	}
 	name := s.loadBalancerName(service)
-	if len(service.Spec.PublicIPs) > 0 {
-		for _, publicIP := range service.Spec.PublicIPs {
+	if len(service.Spec.DeprecatedPublicIPs) > 0 {
+		for _, publicIP := range service.Spec.DeprecatedPublicIPs {
 			// TODO: Make this actually work for multiple IPs by using different
 			// names for each. For now, we'll just create the first and break.
 			status, err := s.balancer.CreateTCPLoadBalancer(name, s.zone.Region, net.ParseIP(publicIP),
@@ -430,11 +430,11 @@ func needsUpdate(oldService *api.Service, newService *api.Service) bool {
 	if !portsEqual(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
 		return true
 	}
-	if len(oldService.Spec.PublicIPs) != len(newService.Spec.PublicIPs) {
+	if len(oldService.Spec.DeprecatedPublicIPs) != len(newService.Spec.DeprecatedPublicIPs) {
 		return true
 	}
-	for i := range oldService.Spec.PublicIPs {
-		if oldService.Spec.PublicIPs[i] != newService.Spec.PublicIPs[i] {
+	for i := range oldService.Spec.DeprecatedPublicIPs {
+		if oldService.Spec.DeprecatedPublicIPs[i] != newService.Spec.DeprecatedPublicIPs[i] {
 			return true
 		}
 	}
