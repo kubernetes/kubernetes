@@ -37,7 +37,7 @@ func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
 	return fakeEtcdClient, helper
 }
 
-func newStorage(t *testing.T) (allocator.Interface, allocator.Interface, *tools.FakeEtcdClient) {
+func newStorage(t *testing.T) (*Etcd, allocator.Interface, *tools.FakeEtcdClient) {
 	fakeEtcdClient, h := newHelper(t)
 
 	mem := allocator.NewAllocationMap(100, "rangeSpecValue")
@@ -98,29 +98,28 @@ func TestStore(t *testing.T) {
 	}
 	t.Logf("data: %#v", obj.R.Node)
 
-	// TODO: Reintroduce this test?
-	//	other := ipallocator.NewCIDRRange(cidr)
-	//
-	//	allocation := &api.RangeAllocation{}
-	//	if err := storage.(*allocator_etcd.Etcd).helper.ExtractObj(key(), allocation, false); err != nil {
-	//		t.Fatal(err)
-	//	}
-	//	if allocation.ResourceVersion != "1" {
-	//		t.Fatalf("%#v", allocation)
-	//	}
-	//	if allocation.Range != "192.168.1.0/24" {
-	//		t.Errorf("unexpected stored Range: %s", allocation.Range)
-	//	}
-	//	if err := other.Restore(cidr, allocation.Data); err != nil {
-	//		t.Fatal(err)
-	//	}
-	//	if !other.Has(net.ParseIP("192.168.1.2")) {
-	//		t.Fatalf("could not restore allocated IP: %#v", other)
-	//	}
-	//
-	//	other = ipallocator.NewCIDRRange(cidr)
-	//	otherStorage := allocator_etcd.NewEtcd(other, storage.(*allocator_etcd.Etcd).helper)
-	//	if err := otherStorage.Allocate(net.ParseIP("192.168.1.2")); err != ipallocator.ErrAllocated {
-	//		t.Fatal(err)
-	//	}
+	other := allocator.NewAllocationMap(100, "rangeSpecValue")
+
+	allocation := &api.RangeAllocation{}
+	if err := storage.helper.ExtractObj(key(), allocation, false); err != nil {
+		t.Fatal(err)
+	}
+	if allocation.ResourceVersion != "1" {
+		t.Fatalf("%#v", allocation)
+	}
+	if allocation.Range != "rangeSpecValue" {
+		t.Errorf("unexpected stored Range: %s", allocation.Range)
+	}
+	if err := other.Restore("rangeSpecValue", allocation.Data); err != nil {
+		t.Fatal(err)
+	}
+	if !other.Has(2) {
+		t.Fatalf("could not restore allocated IP: %#v", other)
+	}
+
+	other = allocator.NewAllocationMap(100, "rangeSpecValue")
+	otherStorage := NewEtcd(other, "/ranges/serviceips", "serviceipallocation", storage.helper)
+	if ok, err := otherStorage.Allocate(2); ok || err != nil {
+		t.Fatal(err)
+	}
 }

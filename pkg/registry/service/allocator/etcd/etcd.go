@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	errorConcurrentModification = errors.New("concurrent modification")
+	errorUnableToAllocate = errors.New("unable to allocate")
 )
 
 // Etcd exposes a service.Allocator that is backed by etcd.
@@ -80,11 +80,14 @@ func (e *Etcd) Allocate(offset int) (bool, error) {
 			return err
 		}
 		if !ok {
-			return errorConcurrentModification
+			return errorUnableToAllocate
 		}
 		return nil
 	})
 	if err != nil {
+		if err == errorUnableToAllocate {
+			return false, nil
+		}
 		return false, err
 	}
 	return true, nil
@@ -109,11 +112,12 @@ func (e *Etcd) AllocateNext() (int, bool, error) {
 			// update the offset here
 			offset, ok, err = e.alloc.AllocateNext()
 			if err != nil {
-				return errorConcurrentModification
+				return err
 			}
 			if !ok {
-
+				return errorUnableToAllocate
 			}
+			return nil
 		}
 		return nil
 	})
@@ -143,7 +147,7 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 				return nil, 0, fmt.Errorf("Cannot allocate resources of type %s at this time", e.kind)
 			}
 			if existing.ResourceVersion != e.last {
-				if err := service.RestoreRange(e.alloc, existing); err != nil {
+				if err := e.alloc.Restore(existing.Range, existing.Data); err != nil {
 					return nil, 0, err
 				}
 				if err := fn(); err != nil {
@@ -211,7 +215,7 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 	if err != nil {
 		return etcderr.InterpretUpdateError(err, e.kind, "")
 	}
-	err = service.RestoreRange(e.alloc, snapshot)
+	err = e.alloc.Restore(snapshot.Range, snapshot.Data)
 	if err == nil {
 		e.last = last
 	}

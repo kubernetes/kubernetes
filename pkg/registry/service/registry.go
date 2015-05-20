@@ -20,9 +20,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"net"
 )
 
 // Registry is an interface for things that know how to store services.
@@ -43,13 +41,4 @@ type RangeRegistry interface {
 	// CreateOrUpdate should create or update the provide allocation, unless a conflict
 	// has occured since the item was last created.
 	CreateOrUpdate(*api.RangeAllocation) error
-}
-
-// RestoreRange updates a snapshottable ipallocator from a RangeAllocation
-func RestoreRange(dst allocator.Snapshottable, src *api.RangeAllocation) error {
-	_, _, err := net.ParseCIDR(src.Range)
-	if err != nil {
-		return err
-	}
-	return dst.Restore(src.Range, src.Data)
 }

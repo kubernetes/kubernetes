@@ -117,30 +117,4 @@ func TestStore(t *testing.T) {
 		t.Fatalf("%s is empty: %#v", key(), obj)
 	}
 	t.Logf("data: %#v", obj.R.Node)
-
-	// TODO: Reintroduce this aspect of the test?
-	//	other := ipallocator.NewCIDRRange(cidr)
-	//
-	//	allocation := &api.RangeAllocation{}
-	//	if err := storage.(*allocator_etcd.Etcd).helper.ExtractObj(key(), allocation, false); err != nil {
-	//		t.Fatal(err)
-	//	}
-	//	if allocation.ResourceVersion != "1" {
-	//		t.Fatalf("%#v", allocation)
-	//	}
-	//	if allocation.Range != "192.168.1.0/24" {
-	//		t.Errorf("unexpected stored Range: %s", allocation.Range)
-	//	}
-	//	if err := other.Restore(cidr, allocation.Data); err != nil {
-	//		t.Fatal(err)
-	//	}
-	//	if !other.Has(net.ParseIP("192.168.1.2")) {
-	//		t.Fatalf("could not restore allocated IP: %#v", other)
-	//	}
-	//
-	//	other = ipallocator.NewCIDRRange(cidr)
-	//	otherStorage := allocator_etcd.NewEtcd(other, storage.(*allocator_etcd.Etcd).helper)
-	//	if err := otherStorage.Allocate(net.ParseIP("192.168.1.2")); err != ipallocator.ErrAllocated {
-	//		t.Fatal(err)
-	//	}
 }
