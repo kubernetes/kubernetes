@@ -398,3 +398,128 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		t.Errorf("Expected rejection for using a secret the service account does not reference")
 	}
 }
+
+func TestAllowsReferencedImagePullSecrets(t *testing.T) {
+	ns := "myns"
+
+	admit := NewServiceAccount(nil)
+	admit.LimitSecretReferences = true
+
+	// Add the default service account for the ns with a secret reference into the cache
+	admit.serviceAccounts.Add(&api.ServiceAccount{
+		ObjectMeta: api.ObjectMeta{
+			Name:      DefaultServiceAccountName,
+			Namespace: ns,
+		},
+		ImagePullSecrets: []api.LocalObjectReference{
+			{Name: "foo"},
+		},
+	})
+
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			ImagePullSecrets: []api.LocalObjectReference{{Name: "foo"}},
+		},
+	}
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE", nil)
+	err := admit.Admit(attrs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+func TestRejectsUnreferencedImagePullSecrets(t *testing.T) {
+	ns := "myns"
+
+	admit := NewServiceAccount(nil)
+	admit.LimitSecretReferences = true
+
+	// Add the default service account for the ns into the cache
+	admit.serviceAccounts.Add(&api.ServiceAccount{
+		ObjectMeta: api.ObjectMeta{
+			Name:      DefaultServiceAccountName,
+			Namespace: ns,
+		},
+	})
+
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			ImagePullSecrets: []api.LocalObjectReference{{Name: "foo"}},
+		},
+	}
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE", nil)
+	err := admit.Admit(attrs)
+	if err == nil {
+		t.Errorf("Expected rejection for using a secret the service account does not reference")
+	}
+}
+
+func TestDoNotAddImagePullSecrets(t *testing.T) {
+	ns := "myns"
+
+	admit := NewServiceAccount(nil)
+	admit.LimitSecretReferences = true
+
+	// Add the default service account for the ns with a secret reference into the cache
+	admit.serviceAccounts.Add(&api.ServiceAccount{
+		ObjectMeta: api.ObjectMeta{
+			Name:      DefaultServiceAccountName,
+			Namespace: ns,
+		},
+		ImagePullSecrets: []api.LocalObjectReference{
+			{Name: "foo"},
+			{Name: "bar"},
+		},
+	})
+
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			ImagePullSecrets: []api.LocalObjectReference{{Name: "foo"}},
+		},
+	}
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE", nil)
+	err := admit.Admit(attrs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if len(pod.Spec.ImagePullSecrets) != 1 || pod.Spec.ImagePullSecrets[0].Name != "foo" {
+		t.Errorf("unexpected image pull secrets: %v", pod.Spec.ImagePullSecrets)
+	}
+}
+
+func TestAddImagePullSecrets(t *testing.T) {
+	ns := "myns"
+
+	admit := NewServiceAccount(nil)
+	admit.LimitSecretReferences = true
+
+	sa := &api.ServiceAccount{
+		ObjectMeta: api.ObjectMeta{
+			Name:      DefaultServiceAccountName,
+			Namespace: ns,
+		},
+		ImagePullSecrets: []api.LocalObjectReference{
+			{Name: "foo"},
+			{Name: "bar"},
+		},
+	}
+	// Add the default service account for the ns with a secret reference into the cache
+	admit.serviceAccounts.Add(sa)
+
+	pod := &api.Pod{}
+	attrs := admission.NewAttributesRecord(pod, "Pod", ns, string(api.ResourcePods), "CREATE", nil)
+	err := admit.Admit(attrs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if len(pod.Spec.ImagePullSecrets) != 2 || !reflect.DeepEqual(sa.ImagePullSecrets, pod.Spec.ImagePullSecrets) {
+		t.Errorf("expected %v, got %v", sa.ImagePullSecrets, pod.Spec.ImagePullSecrets)
+	}
+
+	pod.Spec.ImagePullSecrets[1] = api.LocalObjectReference{Name: "baz"}
+	if reflect.DeepEqual(sa.ImagePullSecrets, pod.Spec.ImagePullSecrets) {
+		t.Errorf("accidentally mutated the ServiceAccount.ImagePullSecrets: %v", sa.ImagePullSecrets)
+	}
+}
