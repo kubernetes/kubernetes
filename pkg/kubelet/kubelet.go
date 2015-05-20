@@ -1788,9 +1788,10 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	}()
 
 	currentTime := util.Now()
-	var newCondition api.NodeCondition
+	var newNodeReadyCondition api.NodeCondition
+	var oldNodeReadyConditionStatus api.ConditionStatus
 	if containerRuntimeUp && networkConfigured {
-		newCondition = api.NodeCondition{
+		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
 			Reason:            "kubelet is posting ready status",
@@ -1804,7 +1805,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		if !networkConfigured {
 			reasons = append(reasons, "network not configured correctly")
 		}
-		newCondition = api.NodeCondition{
+		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionFalse,
 			Reason:            strings.Join(reasons, ","),
@@ -1815,20 +1816,27 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	updated := false
 	for i := range node.Status.Conditions {
 		if node.Status.Conditions[i].Type == api.NodeReady {
-			newCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
-			if node.Status.Conditions[i].Status != api.ConditionTrue {
-				kl.recordNodeStatusEvent("NodeReady")
+			oldNodeReadyConditionStatus = node.Status.Conditions[i].Status
+			if oldNodeReadyConditionStatus == newNodeReadyCondition.Status {
+				newNodeReadyCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
+			} else {
+				newNodeReadyCondition.LastTransitionTime = currentTime
 			}
-			node.Status.Conditions[i] = newCondition
+			node.Status.Conditions[i] = newNodeReadyCondition
 			updated = true
 		}
 	}
 	if !updated {
-		newCondition.LastTransitionTime = currentTime
-		node.Status.Conditions = append(node.Status.Conditions, newCondition)
-		kl.recordNodeStatusEvent("NodeReady")
+		newNodeReadyCondition.LastTransitionTime = currentTime
+		node.Status.Conditions = append(node.Status.Conditions, newNodeReadyCondition)
 	}
-
+	if !updated || oldNodeReadyConditionStatus != newNodeReadyCondition.Status {
+		if newNodeReadyCondition.Status == api.ConditionTrue {
+			kl.recordNodeStatusEvent("NodeReady")
+		} else {
+			kl.recordNodeStatusEvent("NodeNotReady")
+		}
+	}
 	if oldNodeUnschedulable != node.Spec.Unschedulable {
 		if node.Spec.Unschedulable {
 			kl.recordNodeStatusEvent("NodeNotSchedulable")
