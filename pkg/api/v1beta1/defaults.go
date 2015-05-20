@@ -76,6 +76,15 @@ func addDefaultingFuncs() {
 			if obj.SessionAffinity == "" {
 				obj.SessionAffinity = ServiceAffinityNone
 			}
+			if obj.Type == "" {
+				if obj.CreateExternalLoadBalancer {
+					obj.Type = ServiceTypeLoadBalancer
+				} else {
+					obj.Type = ServiceTypeClusterIP
+				}
+			} else if obj.Type == ServiceTypeLoadBalancer {
+				obj.CreateExternalLoadBalancer = true
+			}
 			for i := range obj.Ports {
 				sp := &obj.Ports[i]
 				if sp.Protocol == "" {

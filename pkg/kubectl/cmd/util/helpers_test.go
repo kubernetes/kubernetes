@@ -141,6 +141,7 @@ func TestMerge(t *testing.T) {
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
+					Type:            api.ServiceTypeClusterIP,
 				},
 			},
 		},
@@ -157,6 +158,7 @@ func TestMerge(t *testing.T) {
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
+					Type:            api.ServiceTypeClusterIP,
 					Selector: map[string]string{
 						"version": "v2",
 					},

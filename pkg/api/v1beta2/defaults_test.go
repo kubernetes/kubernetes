@@ -150,7 +150,20 @@ func TestSetDefaultService(t *testing.T) {
 		t.Errorf("Expected default protocol :%s, got: %s", versioned.ProtocolTCP, svc2.Protocol)
 	}
 	if svc2.SessionAffinity != versioned.ServiceAffinityNone {
-		t.Errorf("Expected default sesseion affinity type:%s, got: %s", versioned.ServiceAffinityNone, svc2.SessionAffinity)
+		t.Errorf("Expected default session affinity type:%s, got: %s", versioned.ServiceAffinityNone, svc2.SessionAffinity)
+	}
+	if svc2.Type != versioned.ServiceTypeClusterIP {
+		t.Errorf("Expected default type:%s, got: %s", versioned.ServiceTypeClusterIP, svc2.Type)
+	}
+}
+
+func TestSetDefaultServiceWithLoadbalancer(t *testing.T) {
+	svc := &versioned.Service{}
+	svc.CreateExternalLoadBalancer = true
+	obj2 := roundTrip(t, runtime.Object(svc))
+	svc2 := obj2.(*versioned.Service)
+	if svc2.Type != versioned.ServiceTypeLoadBalancer {
+		t.Errorf("Expected default type:%s, got: %s", versioned.ServiceTypeLoadBalancer, svc2.Type)
 	}
 }
 
