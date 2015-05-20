@@ -200,12 +200,17 @@ var _ = Describe("Networking", func() {
 
 		By("Waiting for connectivity to be verified")
 		const maxAttempts = 60
+		stopBy := time.Now().Add(2 * time.Minute)
 		passed := false
 
 		//once response OK, evaluate response body for pass/fail.
 		var body []byte
 
 		for i := 0; i < maxAttempts && !passed; i++ {
+			if time.Now().After(stopBy) {
+				Logf("Timeout exceeded")
+				break
+			}
 			time.Sleep(2 * time.Second)
 			Logf("About to make a proxy status call")
 			start := time.Now()
@@ -226,10 +231,8 @@ var _ = Describe("Networking", func() {
 			case "pass":
 				Logf("Passed on attempt %v. Cleaning up.", i)
 				passed = true
-				break
 			case "running":
 				Logf("Attempt %v/%v: test still running", i, maxAttempts)
-				break
 			case "fail":
 				if body, err = c.Get().
 					Namespace(namespace.Name).Prefix("proxy").
@@ -240,7 +243,8 @@ var _ = Describe("Networking", func() {
 				} else {
 					Failf("Failed on attempt %v. Cleaning up. Details:\n%s", i, string(body))
 				}
-				break
+			default:
+				Logf("Unexpected response: %q", body)
 			}
 		}
 
