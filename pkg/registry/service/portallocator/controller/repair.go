@@ -34,7 +34,7 @@ type Repair struct {
 	alloc     service.RangeRegistry
 }
 
-// NewRepair creates a controller that periodically ensures that all portalIPs are uniquely allocated across the cluster
+// NewRepair creates a controller that periodically ensures that all ports are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
 func NewRepair(interval time.Duration, registry service.Registry, portRange util.PortRange, alloc service.RangeRegistry) *Repair {
 	return &Repair{
@@ -54,13 +54,13 @@ func (c *Repair) RunUntil(ch chan struct{}) {
 	}, c.interval, ch)
 }
 
-// RunOnce verifies the state of the portal IP allocations and returns an error if an unrecoverable problem occurs.
+// RunOnce verifies the state of the port allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) RunOnce() error {
 	// TODO: (per smarterclayton) if Get() or ListServices() is a weak consistency read,
 	// or if they are executed against different leaders,
-	// the ordering guarantee required to ensure no IP is allocated twice is violated.
+	// the ordering guarantee required to ensure no port is allocated twice is violated.
 	// ListServices must return a ResourceVersion higher than the etcd index Get triggers,
-	// and the release code must not release services that have had IPs allocated but not yet been created
+	// and the release code must not release services that have had ports allocated but not yet been created
 	// See #8295
 
 	latest, err := c.alloc.Get()
@@ -88,11 +88,11 @@ func (c *Repair) RunOnce() error {
 			case nil:
 			case portallocator.ErrAllocated:
 				// TODO: send event
-				// portal IP is broken, reallocate
+				// port is broken, reallocate
 				util.HandleError(fmt.Errorf("the port %d for service %s/%s was assigned to multiple services; please recreate", port, svc.Name, svc.Namespace))
 			case portallocator.ErrNotInRange:
 				// TODO: send event
-				// portal IP is broken, reallocate
+				// port is broken, reallocate
 				util.HandleError(fmt.Errorf("the port %d for service %s/%s is not within the port range %v; please recreate", port, svc.Name, svc.Namespace, c.portRange))
 			case portallocator.ErrFull:
 				// TODO: send event

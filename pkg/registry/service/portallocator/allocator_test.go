@@ -100,13 +100,13 @@ func TestSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewPortAllocator(*pr)
-	ip := []int{}
+	ports := []int{}
 	for i := 0; i < 10; i++ {
-		n, err := r.AllocateNext()
+		port, err := r.AllocateNext()
 		if err != nil {
 			t.Fatal(err)
 		}
-		ip = append(ip, n)
+		ports = append(ports, port)
 	}
 
 	var dst api.RangeAllocation
@@ -137,7 +137,7 @@ func TestSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, n := range ip {
+	for _, n := range ports {
 		if !other.Has(n) {
 			t.Errorf("restored range does not have %s", n)
 		}

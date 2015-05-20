@@ -24,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-// Interface manages the allocation of IP addresses out of a range. Interface
+// Interface manages the allocation of ports out of a range. Interface
 // should be threadsafe.
 type Interface interface {
 	Allocate(int) error
@@ -67,15 +67,15 @@ func NewPortAllocator(pr util.PortRange) *PortAllocator {
 	})
 }
 
-// Free returns the count of IP addresses left in the range.
+// Free returns the count of port left in the range.
 func (r *PortAllocator) Free() int {
 	return r.alloc.Free()
 }
 
-// Allocate attempts to reserve the provided IP. ErrNotInRange or
-// ErrAllocated will be returned if the IP is not valid for this range
+// Allocate attempts to reserve the provided port. ErrNotInRange or
+// ErrAllocated will be returned if the port is not valid for this range
 // or has already been reserved.  ErrFull will be returned if there
-// are no addresses left.
+// are no ports left.
 func (r *PortAllocator) Allocate(port int) error {
 	ok, offset := r.contains(port)
 	if !ok {
@@ -93,7 +93,7 @@ func (r *PortAllocator) Allocate(port int) error {
 }
 
 // AllocateNext reserves one of the ports from the pool. ErrFull may
-// be returned if there are no addresses left.
+// be returned if there are no ports left.
 func (r *PortAllocator) AllocateNext() (int, error) {
 	offset, ok, err := r.alloc.AllocateNext()
 	if err != nil {
@@ -143,7 +143,7 @@ func (r *PortAllocator) Snapshot(dst *api.RangeAllocation) error {
 }
 
 // Restore restores the pool to the previously captured state. ErrMismatchedNetwork
-// is returned if the provided IPNet range doesn't exactly match the previous range.
+// is returned if the provided port range doesn't exactly match the previous range.
 func (r *PortAllocator) Restore(pr util.PortRange, data []byte) error {
 	if pr.String() != r.portRange.String() {
 		return ErrMismatchedNetwork
@@ -156,8 +156,8 @@ func (r *PortAllocator) Restore(pr util.PortRange, data []byte) error {
 	return nil
 }
 
-// contains returns true and the offset if the ip is in the range, and false
-// and nil otherwise. The first and last addresses of the CIDR are omitted.
+// contains returns true and the offset if the port is in the range, and false
+// and nil otherwise.
 func (r *PortAllocator) contains(port int) (bool, int) {
 	if !r.portRange.Contains(port) {
 		return false, 0
