@@ -151,8 +151,7 @@ func (r *Range) Release(ip net.IP) error {
 		return nil
 	}
 
-	r.alloc.Release(offset)
-	return nil
+	return r.alloc.Release(offset)
 }
 
 // Has returns true if the provided IP is already allocated and a call

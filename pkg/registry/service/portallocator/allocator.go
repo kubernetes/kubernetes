@@ -115,8 +115,7 @@ func (r *PortAllocator) Release(port int) error {
 		return nil
 	}
 
-	r.alloc.Release(offset)
-	return nil
+	return r.alloc.Release(offset)
 }
 
 // Has returns true if the provided port is already allocated and a call
