@@ -148,9 +148,9 @@ func generateCIDRs(clusterCIDR *net.IPNet, num int) util.StringSet {
 	return res
 }
 
-// reconcilePodCIDRs looks at each node and assigns it a valid CIDR
+// reconcileNodeCIDRs looks at each node and assigns it a valid CIDR
 // if it doesn't currently have one.
-func (nc *NodeController) reconcilePodCIDRs(nodes *api.NodeList) {
+func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 	glog.V(4).Infof("Reconciling pods cidrs for %d nodes", len(nodes.Items))
 	// TODO(roberthbailey): This seems inefficient. Why re-calculate CIDRs
 	// on each sync period?
@@ -365,7 +365,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 		return err
 	}
 	if nc.allocateNodeCIDRs {
-		nc.reconcilePodCIDRs(nodes)
+		nc.reconcileNodeCIDRs(nodes)
 	}
 	for i := range nodes.Items {
 		var gracePeriod time.Duration
