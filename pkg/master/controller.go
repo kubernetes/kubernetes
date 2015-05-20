@@ -28,7 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	servicecontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator/controller"
-	portallocator_controller "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator/controller"
+	portallocatorcontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
@@ -74,7 +74,7 @@ func (c *Controller) Start() {
 	}
 
 	repairPortals := servicecontroller.NewRepair(c.PortalIPInterval, c.ServiceRegistry, c.PortalNet, c.ServiceIPRegistry)
-	repairNodePorts := portallocator_controller.NewRepair(c.ServiceNodePortInterval, c.ServiceRegistry, c.ServiceNodePorts, c.ServiceNodePortRegistry)
+	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceRegistry, c.ServiceNodePorts, c.ServiceNodePortRegistry)
 
 	// run all of the controllers once prior to returning from Start.
 	if err := repairPortals.RunOnce(); err != nil {
