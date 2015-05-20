@@ -485,10 +485,6 @@ _kubectl_exec()
     flags+=("-t")
 
     must_have_one_flag=()
-    must_have_one_flag+=("--container=")
-    must_have_one_flag+=("-c")
-    must_have_one_flag+=("--pod=")
-    must_have_one_flag+=("-p")
     must_have_one_noun=()
 }
 
