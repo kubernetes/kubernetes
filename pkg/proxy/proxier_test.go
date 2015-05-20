@@ -92,7 +92,7 @@ func (fake *fakeIptables) FlushChain(table iptables.Table, chain iptables.Chain)
 	return nil
 }
 
-func (fake *fakeIptables) EnsureRule(table iptables.Table, chain iptables.Chain, args ...string) (bool, error) {
+func (fake *fakeIptables) EnsureRule(position iptables.RulePosition, table iptables.Table, chain iptables.Chain, args ...string) (bool, error) {
 	return false, nil
 }
 
@@ -810,3 +810,5 @@ func TestProxyUpdatePortal(t *testing.T) {
 }
 
 // TODO: Test UDP timeouts.
+
+// TODO(justinsb): Add test for nodePort conflict detection, once we have nodePort wired in
