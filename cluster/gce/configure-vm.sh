@@ -496,6 +496,7 @@ project-id = ${PROJECT_ID}
 EOF
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   cloud_config: /etc/gce.conf
+  advertise_address: '${KUBERNETES_MASTER_NAME}'
 EOF
   fi
 }
