@@ -423,10 +423,10 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyI
 	}
 
 	// Handle traffic from containers.
-	args := proxier.iptablesContainerPublicArgs(nodePort, protocol, proxyIP, proxyPort, name)
-	existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesContainerPublicChain, args...)
+	args := proxier.iptablesContainerNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
+	existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesContainerNodePortChain, args...)
 	if err != nil {
-		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesContainerPublicChain, name)
+		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesContainerNodePortChain, name)
 		return err
 	}
 	if !existed {
@@ -434,10 +434,10 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyI
 	}
 
 	// Handle traffic from the host.
-	args = proxier.iptablesHostPublicArgs(nodePort, protocol, proxyIP, proxyPort, name)
-	existed, err = proxier.iptables.EnsureRule(iptables.TableNAT, iptablesHostPublicChain, args...)
+	args = proxier.iptablesHostNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
+	existed, err = proxier.iptables.EnsureRule(iptables.TableNAT, iptablesHostNodePortChain, args...)
 	if err != nil {
-		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesHostPublicChain, name)
+		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesHostNodePortChain, name)
 		return err
 	}
 	if !existed {
@@ -487,16 +487,16 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxy
 	el := []error{}
 
 	// Handle traffic from containers.
-	args := proxier.iptablesContainerPublicArgs(nodePort, protocol, proxyIP, proxyPort, name)
-	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesContainerPublicChain, args...); err != nil {
-		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesContainerPublicChain, name)
+	args := proxier.iptablesContainerNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
+	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesContainerNodePortChain, args...); err != nil {
+		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesContainerNodePortChain, name)
 		el = append(el, err)
 	}
 
 	// Handle traffic from the host.
-	args = proxier.iptablesHostPublicArgs(nodePort, protocol, proxyIP, proxyPort, name)
-	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesHostPublicChain, args...); err != nil {
-		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesHostPublicChain, name)
+	args = proxier.iptablesHostNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
+	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesHostNodePortChain, args...); err != nil {
+		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesHostNodePortChain, name)
 		el = append(el, err)
 	}
 
@@ -512,47 +512,65 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxy
 var iptablesContainerPortalChain iptables.Chain = "KUBE-PORTALS-CONTAINER"
 var iptablesHostPortalChain iptables.Chain = "KUBE-PORTALS-HOST"
 
-// Chains for public services
-var iptablesContainerPublicChain iptables.Chain = "KUBE-PUBLIC-CONTAINER"
-var iptablesHostPublicChain iptables.Chain = "KUBE-PUBLIC-HOST"
+// Chains for NodePort services
+var iptablesContainerNodePortChain iptables.Chain = "KUBE-NODEPORT-CONTAINER"
+var iptablesHostNodePortChain iptables.Chain = "KUBE-NODEPORT-HOST"
 
 // Ensure that the iptables infrastructure we use is set up.  This can safely be called periodically.
 func iptablesInit(ipt iptables.Interface) error {
 	// TODO: There is almost certainly room for optimization here.  E.g. If
 	// we knew the portal_net CIDR we could fast-track outbound packets not
 	// destined for a service. There's probably more, help wanted.
+
+	// Danger - order of these rules matters here:
+	//
+	// We match portal rules first, then NodePort rules.  For NodePort rules, we filter primarily on --dst-type LOCAL,
+	// because we want to listen on all local addresses, but don't match internet traffic with the same dst port number.
+	//
+	// There is one complication (per thockin):
+	// -m addrtype --dst-type LOCAL is what we want except that it is broken (by intent without foresight to our usecase)
+	// on at least GCE. Specifically, GCE machines have a daemon which learns what external IPs are forwarded to that
+	// machine, and configure a local route for that IP, making a match for --dst-type LOCAL when we don't want it to.
+	// Removing the route gives correct behavior until the daemon recreates it.
+	// Killing the daemon is an option, but means that any non-kubernetes use of the machine with external IP will be broken.
+	//
+	// This applies to IPs on GCE that are actually from a load-balancer; they will be categorized as LOCAL.
+	// _If_ the chains were in the wrong order, and the LB traffic had dst-port == a NodePort on some other service,
+	// the NodePort would take priority (incorrectly).
+	// This is unlikely (and would only affect outgoing traffic from the cluster to the load balancer, which seems
+	// doubly-unlikely), but we need to be careful to keep the rules in the right order.
+	args := []string{ /* portal_net matching could go here */ }
+	args = append(args, "-m", "comment", "--comment", "handle Portals; NOTE: this must be before the NodePort rules")
 	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesContainerPortalChain); err != nil {
 		return err
 	}
-
-	// TODO (comment from thockin): This is a little scary - if somehow these rules get out of order, this will consume
-	// all accesses to a given port number regardless of destIP.
-	// Should this maybe use -m addrtype --dst-type LOCAL before -j ?
-	// And I think this should be installed in the OUTPUT chain too, no? PREROUTING is from off-machine or from
-	// containers. OUTPUT is from the node itself. I think that should work.
-	// I wrote that and then I had another thought - why do we need iptables here at all?
-	// Shouldn't this be as simple as passing nodePort to addServiceOnPort() instead of 0?
-	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainPrerouting, "-j", string(iptablesContainerPortalChain)); err != nil {
+	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(iptablesContainerPortalChain))...); err != nil {
 		return err
 	}
 	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesHostPortalChain); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainOutput, "-j", string(iptablesHostPortalChain)); err != nil {
+	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(iptablesHostPortalChain))...); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesContainerPublicChain); err != nil {
+
+	// This set of rules matches broadly (addrtype & destination port), and therefore must come after the portal rules
+	args = []string{"-m", "addrtype", "--dst-type", "LOCAL"}
+	args = append(args, "-m", "comment", "--comment", "handle service NodePorts; NOTE: this must be the last rule in the chain")
+	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesContainerNodePortChain); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainPrerouting, "-j", string(iptablesContainerPublicChain)); err != nil {
+	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(iptablesContainerNodePortChain))...); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesHostPublicChain); err != nil {
+	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesHostNodePortChain); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainOutput, "-j", string(iptablesHostPublicChain)); err != nil {
+	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(iptablesHostNodePortChain))...); err != nil {
 		return err
 	}
+
+	// TODO: Verify order of rules.
 	return nil
 }
 
@@ -565,10 +583,10 @@ func iptablesFlush(ipt iptables.Interface) error {
 	if err := ipt.FlushChain(iptables.TableNAT, iptablesHostPortalChain); err != nil {
 		el = append(el, err)
 	}
-	if err := ipt.FlushChain(iptables.TableNAT, iptablesContainerPublicChain); err != nil {
+	if err := ipt.FlushChain(iptables.TableNAT, iptablesContainerNodePortChain); err != nil {
 		el = append(el, err)
 	}
-	if err := ipt.FlushChain(iptables.TableNAT, iptablesHostPublicChain); err != nil {
+	if err := ipt.FlushChain(iptables.TableNAT, iptablesHostNodePortChain); err != nil {
 		el = append(el, err)
 	}
 	if len(el) != 0 {
@@ -692,7 +710,7 @@ func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, destPort int, prot
 // Build a slice of iptables args for a from-container public-port rule.
 // See iptablesContainerPortalArgs
 // TODO: Should we just reuse iptablesContainerPortalArgs?
-func (proxier *Proxier) iptablesContainerPublicArgs(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service ServicePortName) []string {
+func (proxier *Proxier) iptablesContainerNodePortArgs(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service ServicePortName) []string {
 	args := iptablesCommonPortalArgs(nil, nodePort, protocol, service)
 
 	if proxyIP.Equal(zeroIPv4) || proxyIP.Equal(zeroIPv6) {
@@ -709,7 +727,7 @@ func (proxier *Proxier) iptablesContainerPublicArgs(nodePort int, protocol api.P
 // Build a slice of iptables args for a from-host public-port rule.
 // See iptablesHostPortalArgs
 // TODO: Should we just reuse iptablesHostPortalArgs?
-func (proxier *Proxier) iptablesHostPublicArgs(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service ServicePortName) []string {
+func (proxier *Proxier) iptablesHostNodePortArgs(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service ServicePortName) []string {
 	args := iptablesCommonPortalArgs(nil, nodePort, protocol, service)
 
 	if proxyIP.Equal(zeroIPv4) || proxyIP.Equal(zeroIPv6) {
