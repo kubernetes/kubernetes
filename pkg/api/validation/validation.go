@@ -1222,8 +1222,6 @@ func ValidateNodeUpdate(oldNode *api.Node, node *api.Node) errs.ValidationErrorL
 	oldNode.ObjectMeta = node.ObjectMeta
 	// Allow users to update capacity
 	oldNode.Status.Capacity = node.Status.Capacity
-	// Allow the controller manager to assign a CIDR to a node.
-	oldNode.Spec.PodCIDR = node.Spec.PodCIDR
 	// Allow users to unschedule node
 	oldNode.Spec.Unschedulable = node.Spec.Unschedulable
 	// Clear status

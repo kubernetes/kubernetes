@@ -34,7 +34,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
@@ -45,7 +44,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
@@ -3241,7 +3239,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"}},
+		{ObjectMeta: api.ObjectMeta{Name: "testnode"}},
 	}}).ReactFn
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
@@ -3259,7 +3257,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
+		ObjectMeta: api.ObjectMeta{Name: "testnode"},
 		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
@@ -3286,7 +3284,6 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
-			Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"}},
 		},
 	}
 
@@ -3320,7 +3317,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{
-			ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
+			ObjectMeta: api.ObjectMeta{Name: "testnode"},
 			Spec:       api.NodeSpec{},
 			Status: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -3356,7 +3353,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
+		ObjectMeta: api.ObjectMeta{Name: "testnode"},
 		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
@@ -3383,7 +3380,6 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
-			Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"}},
 		},
 	}
 
@@ -3423,7 +3419,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	fakeDocker.VersionInfo = []string{}
 
 	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"}},
+		{ObjectMeta: api.ObjectMeta{Name: "testnode"}},
 	}}).ReactFn
 	mockCadvisor := testKubelet.fakeCadvisor
 	machineInfo := &cadvisorApi.MachineInfo{
@@ -3442,7 +3438,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
+		ObjectMeta: api.ObjectMeta{Name: "testnode"},
 		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
@@ -3469,7 +3465,6 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
-			Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"}},
 		},
 	}
 
@@ -4404,62 +4399,6 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	actual := kubelet.filterOutTerminatedPods(pods)
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
-	}
-}
-
-func TestRegisterExistingNodeWithApiserver(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	kubelet.hostname = "127.0.0.1"
-	kubeClient := testKubelet.fakeKubeClient
-	kubeClient.ReactFn = func(action testclient.FakeAction) (runtime.Object, error) {
-		segments := strings.Split(action.Action, "-")
-		if len(segments) < 2 {
-			return nil, fmt.Errorf("unrecognized action, need two or three segments <verb>-<resource> or <verb>-<subresource>-<resource>: %s", action.Action)
-		}
-		verb := segments[0]
-		switch verb {
-		case "create":
-			// Return an error on create.
-			return &api.Node{}, &apierrors.StatusError{
-				ErrStatus: api.Status{Reason: api.StatusReasonAlreadyExists},
-			}
-		case "get":
-			// Return an existing (matching) node on get.
-			return &api.Node{
-				ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
-				Spec:       api.NodeSpec{ExternalID: "127.0.0.1"},
-			}, nil
-		default:
-			return nil, fmt.Errorf("no reaction implemented for %s", action.Action)
-		}
-	}
-	machineInfo := &cadvisorApi.MachineInfo{
-		MachineID:      "123",
-		SystemUUID:     "abc",
-		BootID:         "1b3",
-		NumCores:       2,
-		MemoryCapacity: 1024,
-	}
-	mockCadvisor := testKubelet.fakeCadvisor
-	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
-	versionInfo := &cadvisorApi.VersionInfo{
-		KernelVersion:      "3.16.0-0.bpo.4-amd64",
-		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
-		DockerVersion:      "1.5.0",
-	}
-	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-
-	done := make(chan struct{})
-	go func() {
-		kubelet.registerWithApiserver()
-		done <- struct{}{}
-	}()
-	select {
-	case <-time.After(5 * time.Second):
-		t.Errorf("timed out waiting for registration")
-	case <-done:
-		return
 	}
 }
 

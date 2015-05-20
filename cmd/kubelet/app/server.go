@@ -89,7 +89,6 @@ type KubeletServer struct {
 	HealthzBindAddress             util.IP
 	OOMScoreAdj                    int
 	APIServerList                  util.StringList
-	RegisterNode                   bool
 	ClusterDomain                  string
 	MasterServiceNamespace         string
 	ClusterDNS                     util.IP
@@ -156,7 +155,6 @@ func NewKubeletServer() *KubeletServer {
 		CadvisorPort:                4194,
 		HealthzPort:                 10248,
 		HealthzBindAddress:          util.IP(net.ParseIP("127.0.0.1")),
-		RegisterNode:                true, // will be ignored if no apiserver is configured
 		OOMScoreAdj:                 -900,
 		MasterServiceNamespace:      api.NamespaceDefault,
 		ImageGCHighThresholdPercent: 90,
@@ -213,7 +211,6 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.HealthzBindAddress, "healthz-bind-address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.IntVar(&s.OOMScoreAdj, "oom-score-adj", s.OOMScoreAdj, "The oom_score_adj value for kubelet process. Values must be within the range [-1000, 1000]")
 	fs.Var(&s.APIServerList, "api-servers", "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
-	fs.BoolVar(&s.RegisterNode, "register-node", s.RegisterNode, "Register the node with the apiserver (defaults to true if --api-server is set)")
 	fs.StringVar(&s.ClusterDomain, "cluster-domain", s.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.Var(&s.ClusterDNS, "cluster-dns", "IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
@@ -321,7 +318,6 @@ func (s *KubeletServer) Run(_ []string) error {
 		MinimumGCAge:                   s.MinimumGCAge,
 		MaxPerPodContainerCount:        s.MaxPerPodContainerCount,
 		MaxContainerCount:              s.MaxContainerCount,
-		RegisterNode:                   s.RegisterNode,
 		ClusterDomain:                  s.ClusterDomain,
 		ClusterDNS:                     s.ClusterDNS,
 		Runonce:                        s.RunOnce,
@@ -497,7 +493,6 @@ func SimpleKubelet(client *client.Client,
 		MinimumGCAge:            10 * time.Second,
 		MaxPerPodContainerCount: 5,
 		MaxContainerCount:       100,
-		RegisterNode:            true,
 		MasterServiceNamespace:  masterServiceNamespace,
 		VolumePlugins:           volumePlugins,
 		TLSOptions:              tlsOptions,
@@ -623,7 +618,6 @@ type KubeletConfig struct {
 	MinimumGCAge                   time.Duration
 	MaxPerPodContainerCount        int
 	MaxContainerCount              int
-	RegisterNode                   bool
 	ClusterDomain                  string
 	ClusterDNS                     util.IP
 	EnableServer                   bool
@@ -681,7 +675,6 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.RegistryBurst,
 		gcPolicy,
 		pc.SeenAllSources,
-		kc.RegisterNode,
 		kc.ClusterDomain,
 		net.IP(kc.ClusterDNS),
 		kc.MasterServiceNamespace,
