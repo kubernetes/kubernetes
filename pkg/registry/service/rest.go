@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
@@ -45,17 +46,20 @@ type REST struct {
 	machines    minion.Registry
 	endpoints   endpoint.Registry
 	portals     ipallocator.Interface
+	nodePorts   *portallocator.PortAllocator
 	clusterName string
 }
 
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, portals ipallocator.Interface,
-	clusterName string) *REST {
+	serviceNodePorts *portallocator.PortAllocator, clusterName string) *REST {
+
 	return &REST{
 		registry:    registry,
 		machines:    machines,
 		endpoints:   endpoints,
 		portals:     portals,
+		nodePorts:   serviceNodePorts,
 		clusterName: clusterName,
 	}
 }
