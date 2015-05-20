@@ -237,12 +237,12 @@ type TestUnknownType struct{}
 
 func (*TestUnknownType) IsAnAPIObject() {}
 
-func PrintCustomType(obj *TestPrintType, w io.Writer) error {
+func PrintCustomType(obj *TestPrintType, w io.Writer, withNamespace bool) error {
 	_, err := fmt.Fprintf(w, "%s", obj.Data)
 	return err
 }
 
-func ErrorPrintHandler(obj *TestPrintType, w io.Writer) error {
+func ErrorPrintHandler(obj *TestPrintType, w io.Writer, withNamespace bool) error {
 	return fmt.Errorf("ErrorPrintHandler error")
 }
 
@@ -727,7 +727,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 
 	for _, svc := range tests {
 		buff := bytes.Buffer{}
-		printService(&svc, &buff)
+		printService(&svc, &buff, false)
 		output := string(buff.Bytes())
 		ip := svc.Spec.PortalIP
 		if !strings.Contains(output, ip) {
@@ -855,6 +855,179 @@ func TestInterpretContainerStatus(t *testing.T) {
 		if msg != test.expectedMessage {
 			t.Errorf("expected: %s, got: %s", test.expectedMessage, msg)
 		}
+	}
+}
 
+func TestPrintHumanReadableWithNamespace(t *testing.T) {
+	namespaceName := "testnamespace"
+	name := "test"
+	table := []struct {
+		obj            runtime.Object
+		printNamespace bool
+	}{
+		{
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
+			},
+			printNamespace: true,
+		},
+		{
+			obj: &api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 2,
+					Template: &api.PodTemplateSpec{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{
+								"name": "foo",
+								"type": "production",
+							},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Image: "foo/bar",
+									TerminationMessagePath: api.TerminationMessagePathDefault,
+									ImagePullPolicy:        api.PullIfNotPresent,
+								},
+							},
+							RestartPolicy: api.RestartPolicyAlways,
+							DNSPolicy:     api.DNSDefault,
+							NodeSelector: map[string]string{
+								"baz": "blah",
+							},
+						},
+					},
+				},
+			},
+			printNamespace: true,
+		},
+		{
+			obj: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
+				Spec: api.ServiceSpec{
+					PortalIP: "1.2.3.4",
+					PublicIPs: []string{
+						"2.3.4.5",
+					},
+					Ports: []api.ServicePort{
+						{
+							Port:     80,
+							Protocol: "TCP",
+						},
+					},
+				},
+			},
+			printNamespace: true,
+		},
+		{
+			obj: &api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
+					Ports:     []api.EndpointPort{{Port: 8080}},
+				},
+				}},
+			printNamespace: true,
+		},
+		{
+			obj: &api.Namespace{
+				ObjectMeta: api.ObjectMeta{Name: name},
+			},
+			printNamespace: false,
+		},
+		{
+			obj: &api.Secret{
+				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
+			},
+			printNamespace: true,
+		},
+		{
+			obj: &api.ServiceAccount{
+				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
+				Secrets:    []api.ObjectReference{},
+			},
+			printNamespace: true,
+		},
+		{
+			obj: &api.Node{
+				ObjectMeta: api.ObjectMeta{Name: name},
+				Status:     api.NodeStatus{},
+			},
+			printNamespace: false,
+		},
+		{
+			obj: &api.PersistentVolume{
+				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
+				Spec:       api.PersistentVolumeSpec{},
+			},
+			printNamespace: true,
+		},
+		{
+			obj: &api.PersistentVolumeClaim{
+				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
+				Spec:       api.PersistentVolumeClaimSpec{},
+			},
+			printNamespace: true,
+		},
+		{
+			obj: &api.Event{
+				ObjectMeta:     api.ObjectMeta{Name: name, Namespace: namespaceName},
+				Source:         api.EventSource{Component: "kubelet"},
+				Message:        "Item 1",
+				FirstTimestamp: util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
+			},
+			printNamespace: false,
+		},
+		{
+			obj: &api.LimitRange{
+				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
+			},
+			printNamespace: true,
+		},
+		{
+			obj: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
+			},
+			printNamespace: true,
+		},
+		{
+			obj: &api.ComponentStatus{
+				Conditions: []api.ComponentCondition{
+					{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: ""},
+				},
+			},
+			printNamespace: false,
+		},
+	}
+
+	printer := NewHumanReadablePrinter(false, false)
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(test.obj, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing object: %#v", err)
+		}
+		matched := contains(strings.Fields(buffer.String()), fmt.Sprintf("%s/%s", namespaceName, name))
+		if matched {
+			t.Errorf("Expect printing object not to contain namespace: %v", test.obj)
+		}
+	}
+
+	printer = NewHumanReadablePrinter(false, true)
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(test.obj, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing object: %#v", err)
+		}
+		matched := contains(strings.Fields(buffer.String()), fmt.Sprintf("%s/%s", namespaceName, name))
+		if test.printNamespace && !matched {
+			t.Errorf("Expect printing object to contain namespace: %v", test.obj)
+		} else if !test.printNamespace && matched {
+			t.Errorf("Expect printing object not to contain namespace: %v", test.obj)
+		}
 	}
 }
