@@ -143,7 +143,7 @@ func TestAllocateSmall(t *testing.T) {
 		}
 	}
 
-	if r.Free() != 0 {
+	if r.Free() != 0 && r.max != 2 {
 		t.Fatalf("unexpected range: %v", r)
 	}
 

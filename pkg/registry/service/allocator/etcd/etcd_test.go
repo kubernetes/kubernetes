@@ -54,7 +54,7 @@ func key() string {
 func TestEmpty(t *testing.T) {
 	storage, _, ecli := newStorage(t)
 	ecli.ExpectNotFoundGet(key())
-	if _, err := storage.Allocate(1); fmt.Sprintf("%v", err) != "Cannot allocate resources of type serviceipallocation at this time" {
+	if _, err := storage.Allocate(1); fmt.Sprintf("%v", err) != "cannot allocate resources of type serviceipallocation at this time" {
 		t.Fatal(err)
 	}
 }
