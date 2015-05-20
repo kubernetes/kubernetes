@@ -316,6 +316,7 @@ func New(c *Config) *Master {
 
 	m := &Master{
 		portalNet:             c.PortalNet,
+		serviceNodePorts:      c.ServiceNodePorts,
 		rootWebService:        new(restful.WebService),
 		enableCoreControllers: c.EnableCoreControllers,
 		enableLogsSupport:     c.EnableLogsSupport,
