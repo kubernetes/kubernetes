@@ -144,7 +144,7 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 		func(input runtime.Object) (output runtime.Object, ttl uint64, err error) {
 			existing := input.(*api.RangeAllocation)
 			if len(existing.ResourceVersion) == 0 {
-				return nil, 0, fmt.Errorf("Cannot allocate resources of type %s at this time", e.kind)
+				return nil, 0, fmt.Errorf("cannot allocate resources of type %s at this time", e.kind)
 			}
 			if existing.ResourceVersion != e.last {
 				if err := e.alloc.Restore(existing.Range, existing.Data); err != nil {

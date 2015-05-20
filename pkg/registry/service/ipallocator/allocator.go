@@ -169,7 +169,7 @@ func (r *Range) Has(ip net.IP) bool {
 func (r *Range) Snapshot(dst *api.RangeAllocation) error {
 	snapshottable, ok := r.alloc.(allocator.Snapshottable)
 	if !ok {
-		return fmt.Errorf("Not a snapshottable allocator")
+		return fmt.Errorf("not a snapshottable allocator")
 	}
 	rangeString, data := snapshottable.Snapshot()
 	dst.Range = rangeString
@@ -185,7 +185,7 @@ func (r *Range) Restore(net *net.IPNet, data []byte) error {
 	}
 	snapshottable, ok := r.alloc.(allocator.Snapshottable)
 	if !ok {
-		return fmt.Errorf("Not a snapshottable allocator")
+		return fmt.Errorf("not a snapshottable allocator")
 	}
 	snapshottable.Restore(net.String(), data)
 	return nil

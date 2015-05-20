@@ -133,7 +133,7 @@ func (r *PortAllocator) Has(port int) bool {
 func (r *PortAllocator) Snapshot(dst *api.RangeAllocation) error {
 	snapshottable, ok := r.alloc.(allocator.Snapshottable)
 	if !ok {
-		return fmt.Errorf("Not a snapshottable allocator")
+		return fmt.Errorf("not a snapshottable allocator")
 	}
 	rangeString, data := snapshottable.Snapshot()
 	dst.Range = rangeString
@@ -149,7 +149,7 @@ func (r *PortAllocator) Restore(pr util.PortRange, data []byte) error {
 	}
 	snapshottable, ok := r.alloc.(allocator.Snapshottable)
 	if !ok {
-		return fmt.Errorf("Not a snapshottable allocator")
+		return fmt.Errorf("not a snapshottable allocator")
 	}
 	snapshottable.Restore(pr.String(), data)
 	return nil
