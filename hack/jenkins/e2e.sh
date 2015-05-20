@@ -221,6 +221,6 @@ if [[ "${E2E_TEST,,}" == "true" ]]; then
 fi
 
 ### Clean up ###
-if [[ "${E2E_DOWN,,}" == "true" ]]; then
-    go run ./hack/e2e.go ${E2E_OPT} -v --down
-fi
+#if [[ "${E2E_DOWN,,}" == "true" ]]; then
+#    go run ./hack/e2e.go ${E2E_OPT} -v --down
+#fi
