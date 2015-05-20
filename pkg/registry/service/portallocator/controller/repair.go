@@ -75,10 +75,9 @@ func (c *Repair) RunOnce() error {
 	}
 
 	r := portallocator.NewPortAllocator(c.portRange)
-	for _, svc := range list.Items {
-		ports := []int{}
-
-		// TODO(justinsb): Collect NodePorts
+	for i := range list.Items {
+		svc := &list.Items[i]
+		ports := service.CollectServiceNodePorts(svc)
 		if len(ports) == 0 {
 			continue
 		}
