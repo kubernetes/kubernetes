@@ -4,15 +4,18 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/spf13/pflag"
 )
 
 var _ = fmt.Println
 var _ = os.Stderr
 
-var tp, te, tt, t1 []string
+var tp, te, tt, t1, tr []string
 var rootPersPre, echoPre, echoPersPre, timesPersPre []string
 var flagb1, flagb2, flagb3, flagbr, flagbp bool
 var flags1, flags2a, flags2b, flags3 string
@@ -99,6 +102,7 @@ var cmdRootWithRun = &Command{
 	Short: "The root can run it's own function",
 	Long:  "The root description for help",
 	Run: func(cmd *Command, args []string) {
+		tr = args
 		rootcalled = true
 	},
 }
@@ -181,7 +185,7 @@ func initializeWithSameName() *Command {
 
 func initializeWithRootCmd() *Command {
 	cmdRootWithRun.ResetCommands()
-	tt, tp, te, rootcalled = nil, nil, nil, false
+	tt, tp, te, tr, rootcalled = nil, nil, nil, nil, false
 	flagInit()
 	cmdRootWithRun.Flags().BoolVarP(&flagbr, "boolroot", "b", false, "help message for flag boolroot")
 	cmdRootWithRun.Flags().IntVarP(&flagir, "introot", "i", 321, "help message for flag introot")
@@ -481,7 +485,7 @@ func TestChildCommandFlags(t *testing.T) {
 		t.Errorf("invalid input should generate error")
 	}
 
-	if !strings.Contains(r.Output, "invalid argument \"10E\" for -i10E") {
+	if !strings.Contains(r.Output, "invalid argument \"10E\" for i10E") {
 		t.Errorf("Wrong error message displayed, \n %s", r.Output)
 	}
 }
@@ -494,7 +498,7 @@ func TestTrailingCommandFlags(t *testing.T) {
 	}
 }
 
-func TestInvalidSubCommandFlags(t *testing.T) {
+func TestInvalidSubcommandFlags(t *testing.T) {
 	cmd := initializeWithRootCmd()
 	cmd.AddCommand(cmdTimes)
 
@@ -508,7 +512,7 @@ func TestInvalidSubCommandFlags(t *testing.T) {
 
 }
 
-func TestSubCommandArgEvaluation(t *testing.T) {
+func TestSubcommandArgEvaluation(t *testing.T) {
 	cmd := initializeWithRootCmd()
 
 	first := &Command{
@@ -777,7 +781,7 @@ func TestFlagsBeforeCommand(t *testing.T) {
 
 	// With parsing error properly reported
 	x = fullSetupTest("-i10E echo")
-	if !strings.Contains(x.Output, "invalid argument \"10E\" for -i10E") {
+	if !strings.Contains(x.Output, "invalid argument \"10E\" for i10E") {
 		t.Errorf("Wrong error message displayed, \n %s", x.Output)
 	}
 
@@ -815,6 +819,31 @@ func TestRemoveCommand(t *testing.T) {
 	x := fullTester(c, "version")
 	if x.Error == nil {
 		t.Errorf("Removed command should not have been called\n")
+		return
+	}
+}
+
+func TestCommandWithoutSubcommands(t *testing.T) {
+	c := initializeWithRootCmd()
+
+	x := simpleTester(c, "")
+	if x.Error != nil {
+		t.Errorf("Calling command without subcommands should not have error: %v", x.Error)
+		return
+	}
+}
+
+func TestCommandWithoutSubcommandsWithArg(t *testing.T) {
+	c := initializeWithRootCmd()
+	expectedArgs := []string{"arg"}
+
+	x := simpleTester(c, "arg")
+	if x.Error != nil {
+		t.Errorf("Calling command without subcommands but with arg should not have error: %v", x.Error)
+		return
+	}
+	if !reflect.DeepEqual(expectedArgs, tr) {
+		t.Errorf("Calling command without subcommands but with arg has wrong args: expected: %v, actual: %v", expectedArgs, tr)
 		return
 	}
 }
@@ -884,5 +913,30 @@ func TestPeristentPreRunPropagation(t *testing.T) {
 
 	if rootPersPre == nil || len(rootPersPre) == 0 || rootPersPre[0] != "lala" {
 		t.Error("RootCmd PersistentPreRun not called but should have been")
+	}
+}
+
+func TestGlobalNormFuncPropagation(t *testing.T) {
+	normFunc := func(f *pflag.FlagSet, name string) pflag.NormalizedName {
+		return pflag.NormalizedName(name)
+	}
+
+	rootCmd := initialize()
+	rootCmd.SetGlobalNormalizationFunc(normFunc)
+	if reflect.ValueOf(normFunc) != reflect.ValueOf(rootCmd.GlobalNormalizationFunc()) {
+		t.Error("rootCmd seems to have a wrong normalization function")
+	}
+
+	// First add the cmdEchoSub to cmdPrint
+	cmdPrint.AddCommand(cmdEchoSub)
+	if cmdPrint.GlobalNormalizationFunc() != nil && cmdEchoSub.GlobalNormalizationFunc() != nil {
+		t.Error("cmdPrint and cmdEchoSub should had no normalization functions")
+	}
+
+	// Now add cmdPrint to rootCmd
+	rootCmd.AddCommand(cmdPrint)
+	if reflect.ValueOf(cmdPrint.GlobalNormalizationFunc()).Pointer() != reflect.ValueOf(rootCmd.GlobalNormalizationFunc()).Pointer() ||
+		reflect.ValueOf(cmdEchoSub.GlobalNormalizationFunc()).Pointer() != reflect.ValueOf(rootCmd.GlobalNormalizationFunc()).Pointer() {
+		t.Error("cmdPrint and cmdEchoSub should had the normalization function of rootCmd")
 	}
 }

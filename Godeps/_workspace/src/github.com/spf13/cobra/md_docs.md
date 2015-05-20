@@ -25,7 +25,7 @@ This will generate a whole series of files, one for each command in the tree, in
 
 ## Generate markdown docs for a single command
 
-You may wish to have more control over the output, or only generate for a single command, instead of the entire command tree. If this is the case you may prefer to `GenMarkdown()` instead of `GenMarkdownTree`
+You may wish to have more control over the output, or only generate for a single command, instead of the entire command tree. If this is the case you may prefer to `GenMarkdown` instead of `GenMarkdownTree`
 
 ```go
 	out := new(bytes.Buffer)
@@ -33,3 +33,49 @@ You may wish to have more control over the output, or only generate for a single
 ```
 
 This will write the markdown doc for ONLY "cmd" into the out, buffer.
+
+## Customize the output
+
+Both `GenMarkdown` and `GenMarkdownTree` have alternate versions with callbacks to get some control of the output:
+
+```go
+func GenMarkdownTreeCustom(cmd *Command, dir string, filePrepender func(string) string, linkHandler func(string) string) {
+    //...
+}
+```
+
+```go
+func GenMarkdownCustom(cmd *Command, out *bytes.Buffer, linkHandler func(string) string) {
+    //...
+}
+```
+
+The `filePrepender` will prepend the return value given the full filepath to the rendered Markdown file. A common use case is to add front matter to use the generated documentation with [Hugo](http://gohugo.io/):
+
+```go
+const fmTemplate = `---
+date: %s
+title: "%s"
+slug: %s
+url: %s
+---
+`
+
+filePrepender := func(filename string) string {
+	now := time.Now().Format(time.RFC3339)
+	name := filepath.Base(filename)
+	base := strings.TrimSuffix(name, path.Ext(name))
+	url := "/commands/" + strings.ToLower(base) + "/"
+	return fmt.Sprintf(fmTemplate, now, strings.Replace(base, "_", " ", -1), base, url)
+}
+```
+
+The `linkHandler` can be used to customize the rendered internal links to the commands, given a filename:
+
+```go
+linkHandler := func(name string) string {
+	base := strings.TrimSuffix(name, path.Ext(name))
+	return "/commands/" + strings.ToLower(base) + "/"
+}
+```
+ 
