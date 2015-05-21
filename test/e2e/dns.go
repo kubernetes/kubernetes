@@ -77,6 +77,10 @@ var _ = Describe("DNS", func() {
 			"kubernetes-ro.default.cluster.local",
 			"google.com",
 		}
+		// Added due to #8512. This is critical for GCE and GKE deployments.
+		if providerIs("gce", "gke") {
+			namesToResolve = append(namesToResolve, "metadata")
+		}
 
 		probeCmd := "for i in `seq 1 600`; do "
 		for _, name := range namesToResolve {
