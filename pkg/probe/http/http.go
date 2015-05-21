@@ -17,6 +17,7 @@ limitations under the License.
 package http
 
 import (
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -34,7 +35,7 @@ func New() HTTPProber {
 }
 
 type HTTPProber interface {
-	Probe(host string, port int, path string, timeout time.Duration) (probe.Result, error)
+	Probe(host string, port int, path string, timeout time.Duration) (probe.Result, string, error)
 }
 
 type httpProber struct {
@@ -42,7 +43,7 @@ type httpProber struct {
 }
 
 // Probe returns a ProbeRunner capable of running an http check.
-func (pr httpProber) Probe(host string, port int, path string, timeout time.Duration) (probe.Result, error) {
+func (pr httpProber) Probe(host string, port int, path string, timeout time.Duration) (probe.Result, string, error) {
 	return DoHTTPProbe(formatURL(host, port, path), &http.Client{Timeout: timeout, Transport: pr.transport})
 }
 
@@ -54,18 +55,23 @@ type HTTPGetInterface interface {
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(url string, client HTTPGetInterface) (probe.Result, error) {
+func DoHTTPProbe(url string, client HTTPGetInterface) (probe.Result, string, error) {
 	res, err := client.Get(url)
 	if err != nil {
-		glog.V(1).Infof("HTTP probe error: %v", err)
-		return probe.Failure, nil
+		// Convert errors into failures to catch timeouts.
+		return probe.Failure, err.Error(), nil
 	}
 	defer res.Body.Close()
-	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
-		return probe.Success, nil
+	b, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return probe.Failure, "", err
 	}
-	glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
-	return probe.Failure, nil
+	body := string(b)
+	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
+		return probe.Success, body, nil
+	}
+	glog.V(4).Infof("Probe failed for %s, Response: %v", url, *res)
+	return probe.Failure, body, nil
 }
 
 // formatURL formats a URL from args.  For testability.
