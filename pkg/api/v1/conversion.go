@@ -18,12 +18,17 @@ package v1
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
 func addConversionFuncs() {
-	err := api.Scheme.AddConversionFuncs()
+	err := api.Scheme.AddConversionFuncs(
+		convert_api_StatusDetails_To_v1_StatusDetails,
+		convert_v1_StatusDetails_To_api_StatusDetails,
+	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
@@ -109,4 +114,64 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
+}
+
+func convert_v1_StatusDetails_To_api_StatusDetails(in *StatusDetails, out *api.StatusDetails, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*StatusDetails))(in)
+	}
+	out.ID = in.Name
+	out.Kind = in.Kind
+	if in.Causes != nil {
+		out.Causes = make([]api.StatusCause, len(in.Causes))
+		for i := range in.Causes {
+			if err := convert_v1_StatusCause_To_api_StatusCause(&in.Causes[i], &out.Causes[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Causes = nil
+	}
+	out.RetryAfterSeconds = in.RetryAfterSeconds
+	return nil
+}
+
+func convert_api_StatusDetails_To_v1_StatusDetails(in *api.StatusDetails, out *StatusDetails, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.StatusDetails))(in)
+	}
+	out.Name = in.ID
+	out.Kind = in.Kind
+	if in.Causes != nil {
+		out.Causes = make([]StatusCause, len(in.Causes))
+		for i := range in.Causes {
+			if err := convert_api_StatusCause_To_v1_StatusCause(&in.Causes[i], &out.Causes[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Causes = nil
+	}
+	out.RetryAfterSeconds = in.RetryAfterSeconds
+	return nil
+}
+
+func convert_v1_StatusCause_To_api_StatusCause(in *StatusCause, out *api.StatusCause, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*StatusCause))(in)
+	}
+	out.Type = api.CauseType(in.Type)
+	out.Message = in.Message
+	out.Field = in.Field
+	return nil
+}
+
+func convert_api_StatusCause_To_v1_StatusCause(in *api.StatusCause, out *StatusCause, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.StatusCause))(in)
+	}
+	out.Type = CauseType(in.Type)
+	out.Message = in.Message
+	out.Field = in.Field
+	return nil
 }

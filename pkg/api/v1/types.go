@@ -1415,9 +1415,9 @@ type Status struct {
 // and should assume that any attribute may be empty, invalid, or under
 // defined.
 type StatusDetails struct {
-	// The ID attribute of the resource associated with the status StatusReason
-	// (when there is a single ID which can be described).
-	ID string `json:"id,omitempty" description:"the ID attribute of the resource associated with the status StatusReason (when there is a single ID which can be described)"`
+	// The name attribute of the resource associated with the status StatusReason
+	// (when there is a single name which can be described).
+	Name string `json:"name,omitempty" description:"the name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)"`
 	// The kind attribute of the resource associated with the status StatusReason.
 	// On some operations may differ from the requested resource Kind.
 	Kind string `json:"kind,omitempty" description:"the kind attribute of the resource associated with the status StatusReason; on some operations may differ from the requested resource Kind"`
