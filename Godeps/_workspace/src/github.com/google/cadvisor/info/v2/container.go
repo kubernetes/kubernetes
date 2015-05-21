@@ -171,15 +171,16 @@ type RequestOptions struct {
 }
 
 type ProcessInfo struct {
-	User          string `json:"user"`
-	Pid           int    `json:"pid"`
-	Ppid          int    `json:"parent_pid"`
-	StartTime     string `json:"start_time"`
-	PercentCpu    string `json:"percent_cpu"`
-	PercentMemory string `json:"percent_mem"`
-	RSS           string `json:"rss"`
-	VirtualSize   string `json:"virtual_size"`
-	Status        string `json:"status"`
-	RunningTime   string `json:"running_time"`
-	Cmd           string `json:"cmd"`
+	User          string  `json:"user"`
+	Pid           int     `json:"pid"`
+	Ppid          int     `json:"parent_pid"`
+	StartTime     string  `json:"start_time"`
+	PercentCpu    float32 `json:"percent_cpu"`
+	PercentMemory float32 `json:"percent_mem"`
+	RSS           uint64  `json:"rss"`
+	VirtualSize   uint64  `json:"virtual_size"`
+	Status        string  `json:"status"`
+	RunningTime   string  `json:"running_time"`
+	CgroupPath    string  `json:"cgroup_path"`
+	Cmd           string  `json:"cmd"`
 }

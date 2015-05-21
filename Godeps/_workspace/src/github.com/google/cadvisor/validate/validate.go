@@ -313,6 +313,13 @@ func HandleRequest(w http.ResponseWriter, containerManager manager.Manager) erro
 
 	ioSchedulerValidation, desc := validateIoScheduler(containerManager)
 	out += fmt.Sprintf(OutputFormat, "Block device setup", ioSchedulerValidation, desc)
+
+	// Output debug info.
+	debugInfo := containerManager.DebugInfo()
+	for category, lines := range debugInfo {
+		out += fmt.Sprintf(OutputFormat, category, "", strings.Join(lines, "\n\t"))
+	}
+
 	_, err = w.Write([]byte(out))
 	return err
 }

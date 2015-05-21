@@ -31,6 +31,10 @@ func (self *mockContainerHandlerFactory) String() string {
 	return self.Name
 }
 
+func (self *mockContainerHandlerFactory) DebugInfo() map[string][]string {
+	return map[string][]string{}
+}
+
 func (self *mockContainerHandlerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	return self.CanHandleValue, self.CanAcceptValue, nil
 }

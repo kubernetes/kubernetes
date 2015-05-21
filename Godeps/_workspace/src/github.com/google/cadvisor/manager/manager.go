@@ -107,6 +107,9 @@ type Manager interface {
 
 	// Get details about interesting docker images.
 	DockerImages() ([]DockerImage, error)
+
+	// Returns debugging information. Map of lines per category.
+	DebugInfo() map[string][]string
 }
 
 // New takes a memory storage and returns a new manager.
@@ -1130,4 +1133,39 @@ func (m *manager) DockerInfo() (DockerStatus, error) {
 		}
 	}
 	return out, nil
+}
+
+func (m *manager) DebugInfo() map[string][]string {
+	debugInfo := container.DebugInfo()
+
+	// Get unique containers.
+	var conts map[*containerData]struct{}
+	func() {
+		m.containersLock.RLock()
+		defer m.containersLock.RUnlock()
+
+		conts = make(map[*containerData]struct{}, len(m.containers))
+		for _, c := range m.containers {
+			conts[c] = struct{}{}
+		}
+	}()
+
+	// List containers.
+	lines := make([]string, 0, len(conts))
+	for cont := range conts {
+		lines = append(lines, cont.info.Name)
+		if cont.info.Namespace != "" {
+			lines = append(lines, fmt.Sprintf("\tNamespace: %s", cont.info.Namespace))
+		}
+
+		if len(cont.info.Aliases) != 0 {
+			lines = append(lines, "\tAliases:")
+			for _, alias := range cont.info.Aliases {
+				lines = append(lines, fmt.Sprintf("\t\t%s", alias))
+			}
+		}
+	}
+
+	debugInfo["Managed containers"] = lines
+	return debugInfo
 }

@@ -25,10 +25,9 @@ function humanize(num, size, units) {
 
 // Following the IEC naming convention
 function humanizeIEC(num) {
-        var ret = humanize(num, 1024, ["TiB", "GiB", "MiB", "KiB", "Bytes"]);
+        var ret = humanize(num, 1024, ["TiB", "GiB", "MiB", "KiB", "B"]);
 	return ret[0].toFixed(2) + " " + ret[1];
 }
-
 // Following the Metric naming convention
 function humanizeMetric(num) {
         var ret = humanize(num, 1000, ["TB", "GB", "MB", "KB", "Bytes"]);
@@ -36,7 +35,7 @@ function humanizeMetric(num) {
 }
 
 // Draw a table.
-function drawTable(seriesTitles, titleTypes, data, elementId) {
+function drawTable(seriesTitles, titleTypes, data, elementId, numPages, sortIndex) {
 	var dataTable = new google.visualization.DataTable();
 	for (var i = 0; i < seriesTitles.length; i++) {
 		dataTable.addColumn(titleTypes[i], seriesTitles[i]);
@@ -46,10 +45,19 @@ function drawTable(seriesTitles, titleTypes, data, elementId) {
 		window.charts[elementId] = new google.visualization.Table(document.getElementById(elementId));
 	}
 
+	var cssClassNames = {
+		'headerRow': '',
+		'tableRow': 'table-row',
+		'oddTableRow': 'table-row'
+	};
 	var opts = {
 		alternatingRowStyle: true,
 		page: 'enable',
-		pageSize: 25,
+		pageSize: numPages,
+		allowHtml: true,
+		sortColumn: sortIndex,
+		sortAscending: false,
+		cssClassNames: cssClassNames,
 	};
 	window.charts[elementId].draw(dataTable, opts);
 }
@@ -167,8 +175,12 @@ function getMachineInfo(rootDir, callback) {
 
 // Get ps info.
 function getProcessInfo(rootDir, containerName, callback) {
-	$.getJSON(rootDir + "api/v2.0/ps" + containerName, function(data) {
+	$.getJSON(rootDir + "api/v2.0/ps" + containerName)
+	.done(function(data) {
 		callback(data);
+	})
+	.fail(function(jqhxr, textStatus, error) {
+		callback([]);
 	});
 }
 
@@ -426,26 +438,72 @@ function drawFileSystemUsage(machineInfo, stats) {
 	}
 }
 
-function drawProcesses(processInfo) {
+function drawImages(images) {
+	if (images == null || images.length == 0) {
+		return;
+	}
+	window.charts = {};
+	var titles = ["Repository", "Tags", "ID", "Virtual Size", "Creation Time"];
+	var titleTypes = ['string', 'string', 'string', 'number', 'number'];
+	var sortIndex = 0;
+	var data = [];
+	for (var i = 0; i < images.length; i++) {
+		var elements = [];
+		var tags = [];
+		var repos = images[i].repo_tags[0].split(":");
+		repos.splice(-1,1)
+		for (var j = 0; j < images[i].repo_tags.length; j++) {
+			var splits = images[i].repo_tags[j].split(":")
+			if (splits.length > 1) {
+				tags.push(splits[splits.length - 1])
+			}
+		}
+		elements.push(repos.join(":"));
+		elements.push(tags.join(", "));
+		elements.push(images[i].id.substr(0,24));
+		elements.push({v: images[i].virtual_size, f: humanizeIEC(images[i].virtual_size)});
+		var d = new Date(images[i].created * 1000);
+		elements.push({v: images[i].created, f: d.toLocaleString()});
+		data.push(elements);
+	}
+	drawTable(titles, titleTypes, data, "docker-images", 30, sortIndex);
+}
+
+function drawProcesses(isRoot, rootDir, processInfo) {
+	if (processInfo.length == 0) {
+		$("#processes-top").text("No processes found");
+		return;
+	}
 	var titles = ["User", "PID", "PPID", "Start Time", "CPU %", "MEM %", "RSS", "Virtual Size", "Status", "Running Time", "Command"];
-	var titleTypes = ['string', 'number', 'number', 'string', 'string', 'string', 'string', 'string', 'string', 'string', 'string'];
+	var titleTypes = ['string', 'number', 'number', 'string', 'number', 'number', 'number', 'number', 'string', 'string', 'string'];
+	var sortIndex = 4
+	if (isRoot) {
+		titles.push("Cgroup");
+		titleTypes.push('string');
+	}
 	var data = []
-	for (var i = 1; i < processInfo.length; i++) {
+	for (var i = 0; i < processInfo.length; i++) {
 		var elements = [];
 		elements.push(processInfo[i].user);
 		elements.push(processInfo[i].pid);
 		elements.push(processInfo[i].parent_pid);
 		elements.push(processInfo[i].start_time);
-		elements.push(processInfo[i].percent_cpu);
-		elements.push(processInfo[i].percent_mem);
-		elements.push(processInfo[i].rss);
-		elements.push(processInfo[i].virtual_size);
+		elements.push({ v:processInfo[i].percent_cpu, f:processInfo[i].percent_cpu.toFixed(2)});
+		elements.push({ v:processInfo[i].percent_mem, f:processInfo[i].percent_mem.toFixed(2)});
+		elements.push({ v:processInfo[i].rss, f:humanizeIEC(processInfo[i].rss)});
+		elements.push({ v:processInfo[i].virtual_size, f:humanizeIEC(processInfo[i].virtual_size)});
 		elements.push(processInfo[i].status);
 		elements.push(processInfo[i].running_time);
 		elements.push(processInfo[i].cmd);
+		if (isRoot) {
+			var cgroup = processInfo[i].cgroup_path
+			// Use the raw cgroup link as it works for all containers.
+			var cgroupLink = '<a href="' + rootDir + 'containers/' + cgroup +'">' + cgroup.substr(0,30) + ' </a>';
+			elements.push({v:cgroup, f:cgroupLink});
+		}
 		data.push(elements);
 	}
-	drawTable(titles, titleTypes, data, "processes-top");
+	drawTable(titles, titleTypes, data, "processes-top", 25, sortIndex);
 }
 
 // Draw the filesystem usage nodes.
@@ -561,7 +619,7 @@ function drawCharts(machineInfo, containerInfo) {
 }
 
 // Executed when the page finishes loading.
-function startPage(containerName, hasCpu, hasMemory, rootDir) {
+function startPage(containerName, hasCpu, hasMemory, rootDir, isRoot) {
 	// Don't fetch data if we don't have any resource.
 	if (!hasCpu && !hasMemory) {
 		return;
@@ -573,11 +631,11 @@ function startPage(containerName, hasCpu, hasMemory, rootDir) {
 
 	// Draw process information at start and refresh every 60s.
 	getProcessInfo(rootDir, containerName, function(processInfo) {
-		drawProcesses(processInfo)
+		drawProcesses(isRoot, rootDir, processInfo)
 	});
 	setInterval(function() {
 		getProcessInfo(rootDir, containerName, function(processInfo) {
-			drawProcesses(processInfo)
+			drawProcesses(isRoot, rootDir, processInfo)
 		});
 	}, 60000);
 

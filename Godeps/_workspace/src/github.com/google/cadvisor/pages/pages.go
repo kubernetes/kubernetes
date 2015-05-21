@@ -37,6 +37,11 @@ type link struct {
 	Link string
 }
 
+type keyVal struct {
+	Key   string
+	Value string
+}
+
 type pageData struct {
 	DisplayName        string
 	ContainerName      string
@@ -52,6 +57,9 @@ type pageData struct {
 	NetworkAvailable   bool
 	FsAvailable        bool
 	Root               string
+	DockerStatus       []keyVal
+	DockerDriverStatus []keyVal
+	DockerImages       []manager.DockerImage
 }
 
 func init() {

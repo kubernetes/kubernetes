@@ -149,6 +149,10 @@ func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	return true, canAccept, nil
 }
 
+func (self *dockerFactory) DebugInfo() map[string][]string {
+	return map[string][]string{}
+}
+
 func parseDockerVersion(full_version_string string) ([]int, error) {
 	version_regexp_string := "(\\d+)\\.(\\d+)\\.(\\d+)"
 	version_re := regexp.MustCompile(version_regexp_string)
