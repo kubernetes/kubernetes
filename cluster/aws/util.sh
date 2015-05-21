@@ -552,6 +552,7 @@ function kube-up {
       echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
       echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
+      grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
       grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
       grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"

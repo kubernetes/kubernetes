@@ -55,9 +55,6 @@ if [[ -n "${DOCKER_ROOT}" ]]; then
 EOF
 fi
 
+install-salt
 
-# Install Salt
-#
-# We specify -X to avoid a race condition that can cause minion failure to
-# install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-curl -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -X
+service salt-minion start
