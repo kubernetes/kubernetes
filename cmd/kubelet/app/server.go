@@ -112,6 +112,7 @@ type KubeletServer struct {
 	ResourceContainer              string
 	CgroupRoot                     string
 	ContainerRuntime               string
+	ContainerRuntimeConfigFile     string
 	DockerDaemonContainer          string
 	SystemContainer                string
 	ConfigureCBR0                  bool
@@ -239,6 +240,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CgroupRoot, "cgroup_root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
 	fs.StringVar(&s.ContainerRuntime, "container_runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.")
 	fs.StringVar(&s.SystemContainer, "system-container", s.SystemContainer, "Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
+	fs.StringVar(&s.ContainerRuntimeConfigFile, "container_runtime_config", s.ContainerRuntimeConfigFile, "The container runtime config file to use.")
+	fs.StringVar(&s.DockerDaemonContainer, "docker-daemon-container", s.DockerDaemonContainer, "Optional resource-only container in which to place the Docker Daemon. Empty for no container (Default: /docker-daemon).")
 	fs.BoolVar(&s.ConfigureCBR0, "configure-cbr0", s.ConfigureCBR0, "If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.")
 	fs.IntVar(&s.MaxPods, "max-pods", 40, "Number of Pods that can run on this Kubelet.")
 	fs.StringVar(&s.DockerExecHandlerName, "docker-exec-handler", s.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.")
@@ -354,17 +357,18 @@ func (s *KubeletServer) Run(_ []string) error {
 		ImageGCPolicy:                  imageGCPolicy,
 		DiskSpacePolicy:                diskSpacePolicy,
 		Cloud:                          cloud,
-		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
-		ResourceContainer:         s.ResourceContainer,
-		CgroupRoot:                s.CgroupRoot,
-		ContainerRuntime:          s.ContainerRuntime,
-		Mounter:                   mounter,
-		DockerDaemonContainer:     s.DockerDaemonContainer,
-		SystemContainer:           s.SystemContainer,
-		ConfigureCBR0:             s.ConfigureCBR0,
-		PodCIDR:                   s.PodCIDR,
-		MaxPods:                   s.MaxPods,
-		DockerExecHandler:         dockerExecHandler,
+		NodeStatusUpdateFrequency:  s.NodeStatusUpdateFrequency,
+		ResourceContainer:          s.ResourceContainer,
+		CgroupRoot:                 s.CgroupRoot,
+		ContainerRuntime:           s.ContainerRuntime,
+		ContainerRuntimeConfigFile: s.ContainerRuntimeConfigFile,
+		Mounter:                    mounter,
+		DockerDaemonContainer:      s.DockerDaemonContainer,
+		SystemContainer:            s.SystemContainer,
+		ConfigureCBR0:              s.ConfigureCBR0,
+		PodCIDR:                    s.PodCIDR,
+		MaxPods:                    s.MaxPods,
+		DockerExecHandler:          dockerExecHandler,
 	}
 
 	if err := RunKubelet(&kcfg, nil); err != nil {
@@ -712,6 +716,7 @@ type KubeletConfig struct {
 	OSInterface                    kubecontainer.OSInterface
 	CgroupRoot                     string
 	ContainerRuntime               string
+	ContainerRuntimeConfigFile     string
 	Mounter                        mount.Interface
 	DockerDaemonContainer          string
 	SystemContainer                string
@@ -770,6 +775,7 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.OSInterface,
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
+		kc.ContainerRuntimeConfigFile,
 		kc.Mounter,
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,

@@ -144,6 +144,7 @@ func NewMainKubelet(
 	osInterface kubecontainer.OSInterface,
 	cgroupRoot string,
 	containerRuntime string,
+	containerRuntimeConfigFile string,
 	mounter mount.Interface,
 	dockerDaemonContainer string,
 	systemContainer string,
@@ -151,6 +152,7 @@ func NewMainKubelet(
 	podCIDR string,
 	pods int,
 	dockerExecHandler dockertools.ExecHandler) (*Kubelet, error) {
+
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -297,6 +299,7 @@ func NewMainKubelet(
 		conf := &rkt.Config{InsecureSkipVerify: true}
 		rktRuntime, err := rkt.New(
 			conf,
+			containerRuntimeConfigFile,
 			klet,
 			recorder,
 			containerRefManager,
