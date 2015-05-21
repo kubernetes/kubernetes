@@ -48,7 +48,7 @@ var (
 	argEtcdMutationTimeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
 	argEtcdServer          = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
 	argKubecfgFile         = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes service")
-	argKubeMasterUrl       = flag.String("kube_master_url", "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}", "Url to reach kubernetes master. Env variables in this flag will be expanded.")
+	argKubeMasterUrl       = flag.String("kube_master_url", "", "Url to reach kubernetes master. Env variables in this flag will be expanded.")
 )
 
 const (
@@ -179,14 +179,43 @@ func getKubeMasterUrl() (string, error) {
 	return parsedUrl.String(), nil
 }
 
+func getDefaultMasterUrl(use_ro_port bool) (string, error) {
+	if use_ro_port {
+		masterHost := os.Getenv("KUBERNETES_RO_SERVICE_HOST")
+		if masterHost == "" {
+			return "", fmt.Errorf("KUBERNETES_RO_SERVICE_HOST is not defined")
+		}
+		masterPort := os.Getenv("KUBERNETES_RO_SERVICE_PORT")
+		if masterPort == "" {
+			return "", fmt.Errorf("KUBERNETES_RO_SERVICE_PORT is not defined")
+		}
+		return fmt.Sprintf("http://%s:%s", masterHost, masterPort), nil;
+	} else {
+		masterHost := os.Getenv("KUBERNETES_SERVICE_HOST")
+		if masterHost == "" {
+			return "", fmt.Errorf("KUBERNETES_SERVICE_HOST is not defined")
+		}
+		masterPort := os.Getenv("KUBERNETES_SERVICE_PORT")
+		if masterPort == "" {
+			return "", fmt.Errorf("KUBERNETES_SERVICE_PORT is not defined")
+		}
+		return fmt.Sprintf("https://%s:%s", masterHost, masterPort), nil;
+
+	}
+}
+
 // TODO: evaluate using pkg/client/clientcmd
 func newKubeClient() (*kclient.Client, error) {
 	var config *kclient.Config
 	masterUrl, err := getKubeMasterUrl()
+	use_ro_port := *argKubecfgFile == ""
+	if err != nil {
+		masterUrl, err = getDefaultMasterUrl(use_ro_port)
+	}
 	if err != nil {
 		return nil, err
 	}
-	if *argKubecfgFile == "" {
+	if use_ro_port {
 		config = &kclient.Config{
 			Host:    masterUrl,
 			Version: "v1beta3",
