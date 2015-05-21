@@ -1716,22 +1716,11 @@ func (kl *Kubelet) updateNodeStatus() error {
 	return fmt.Errorf("Update node status exceeds retry count")
 }
 
-func (kl *Kubelet) recordNodeOnlineEvent() {
+func (kl *Kubelet) recordNodeStatusEvent(event string) {
+	glog.V(2).Infof("Recording %s event message for node %s", event, kl.hostname)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	kl.recorder.Eventf(kl.nodeRef, "online", "Node %s is now online", kl.hostname)
-}
-
-func (kl *Kubelet) recordNodeSchedulableEvent() {
-	// TODO: This requires a transaction, either both node status is updated
-	// and event is recorded or neither should happen, see issue #6055.
-	kl.recorder.Eventf(kl.nodeRef, "schedulable", "Node %s is now schedulable", kl.hostname)
-}
-
-func (kl *Kubelet) recordNodeUnschedulableEvent() {
-	// TODO: This requires a transaction, either both node status is updated
-	// and event is recorded or neither should happen, see issue #6055.
-	kl.recorder.Eventf(kl.nodeRef, "unschedulable", "Node %s is now unschedulable", kl.hostname)
+	kl.recorder.Eventf(kl.nodeRef, event, "Node %s status is now: %s", kl.hostname, event)
 }
 
 // Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
@@ -1798,9 +1787,10 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	}()
 
 	currentTime := util.Now()
-	var newCondition api.NodeCondition
+	var newNodeReadyCondition api.NodeCondition
+	var oldNodeReadyConditionStatus api.ConditionStatus
 	if containerRuntimeUp && networkConfigured {
-		newCondition = api.NodeCondition{
+		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
 			Reason:            "kubelet is posting ready status",
@@ -1814,7 +1804,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		if !networkConfigured {
 			reasons = append(reasons, "network not configured correctly")
 		}
-		newCondition = api.NodeCondition{
+		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionFalse,
 			Reason:            strings.Join(reasons, ","),
@@ -1825,25 +1815,32 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	updated := false
 	for i := range node.Status.Conditions {
 		if node.Status.Conditions[i].Type == api.NodeReady {
-			newCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
-			if node.Status.Conditions[i].Status != api.ConditionTrue {
-				kl.recordNodeOnlineEvent()
+			oldNodeReadyConditionStatus = node.Status.Conditions[i].Status
+			if oldNodeReadyConditionStatus == newNodeReadyCondition.Status {
+				newNodeReadyCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
+			} else {
+				newNodeReadyCondition.LastTransitionTime = currentTime
 			}
-			node.Status.Conditions[i] = newCondition
+			node.Status.Conditions[i] = newNodeReadyCondition
 			updated = true
 		}
 	}
 	if !updated {
-		newCondition.LastTransitionTime = currentTime
-		node.Status.Conditions = append(node.Status.Conditions, newCondition)
-		kl.recordNodeOnlineEvent()
+		newNodeReadyCondition.LastTransitionTime = currentTime
+		node.Status.Conditions = append(node.Status.Conditions, newNodeReadyCondition)
 	}
-
+	if !updated || oldNodeReadyConditionStatus != newNodeReadyCondition.Status {
+		if newNodeReadyCondition.Status == api.ConditionTrue {
+			kl.recordNodeStatusEvent("NodeReady")
+		} else {
+			kl.recordNodeStatusEvent("NodeNotReady")
+		}
+	}
 	if oldNodeUnschedulable != node.Spec.Unschedulable {
 		if node.Spec.Unschedulable {
-			kl.recordNodeUnschedulableEvent()
+			kl.recordNodeStatusEvent("NodeNotSchedulable")
 		} else {
-			kl.recordNodeSchedulableEvent()
+			kl.recordNodeStatusEvent("NodeSchedulable")
 		}
 		oldNodeUnschedulable = node.Spec.Unschedulable
 	}

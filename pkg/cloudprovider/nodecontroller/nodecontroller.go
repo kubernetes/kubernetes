@@ -424,7 +424,7 @@ func (nc *NodeController) recordNodeEvent(node *api.Node, event string) {
 	glog.V(2).Infof("Recording %s event message for node %s", event, node.Name)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	nc.recorder.Eventf(ref, event, "Node %s is now %s", node.Name, event)
+	nc.recorder.Eventf(ref, event, "Node %s status is now: %s", node.Name, event)
 }
 
 // For a given node checks its conditions and tries to update it. Returns grace period to which given node
@@ -611,15 +611,9 @@ func (nc *NodeController) monitorNodeStatus() error {
 				}
 			}
 
-			// Report node events.
-			if readyCondition.Status == api.ConditionTrue && lastReadyCondition.Status != api.ConditionTrue {
-				nc.recordNodeEvent(node, "ready")
-			}
-			if readyCondition.Status == api.ConditionFalse && lastReadyCondition.Status != api.ConditionFalse {
-				nc.recordNodeEvent(node, "not_ready")
-			}
-			if readyCondition.Status == api.ConditionUnknown && lastReadyCondition.Status != api.ConditionUnknown {
-				nc.recordNodeEvent(node, "unknown")
+			// Report node event.
+			if readyCondition.Status != api.ConditionTrue && lastReadyCondition.Status == api.ConditionTrue {
+				nc.recordNodeEvent(node, "NodeNotReady")
 			}
 		}
 	}
