@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
@@ -33,9 +32,6 @@ import (
 )
 
 const (
-	ServiceAccountUsernamePrefix    = "system:serviceaccount"
-	ServiceAccountUsernameSeparator = ":"
-
 	Issuer = "kubernetes/serviceaccount"
 
 	SubjectClaim            = "sub"
@@ -76,26 +72,6 @@ func ReadPublicKey(file string) (*rsa.PublicKey, error) {
 	return jwt.ParseRSAPublicKeyFromPEM(data)
 }
 
-// MakeUsername generates a username from the given namespace and ServiceAccount name.
-// The resulting username can be passed to SplitUsername to extract the original namespace and ServiceAccount name.
-func MakeUsername(namespace, name string) string {
-	return strings.Join([]string{ServiceAccountUsernamePrefix, namespace, name}, ServiceAccountUsernameSeparator)
-}
-
-// SplitUsername returns the namespace and ServiceAccount name embedded in the given username,
-// or an error if the username is not a valid name produced by MakeUsername
-func SplitUsername(username string) (string, string, error) {
-	if !strings.HasPrefix(username, ServiceAccountUsernamePrefix+ServiceAccountUsernameSeparator) {
-		return "", "", fmt.Errorf("Username must be in the form %s", MakeUsername("namespace", "name"))
-	}
-	username = strings.TrimPrefix(username, ServiceAccountUsernamePrefix+ServiceAccountUsernameSeparator)
-	parts := strings.Split(username, ServiceAccountUsernameSeparator)
-	if len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
-		return "", "", fmt.Errorf("Username must be in the form %s", MakeUsername("namespace", "name"))
-	}
-	return parts[0], parts[1], nil
-}
-
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.
 // privateKey is a PEM-encoded byte array of a private RSA key.
 // JWTTokenAuthenticator()
@@ -113,7 +89,7 @@ func (j *jwtTokenGenerator) GenerateToken(serviceAccount api.ServiceAccount, sec
 	// Identify the issuer
 	token.Claims[IssuerClaim] = Issuer
 
-	// Username: `serviceaccount:<namespace>:<serviceaccount>`
+	// Username
 	token.Claims[SubjectClaim] = MakeUsername(serviceAccount.Namespace, serviceAccount.Name)
 
 	// Persist enough structured info for the authenticator to be able to look up the service account and secret
@@ -202,6 +178,11 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 			return nil, false, errors.New("serviceAccountUID claim is missing")
 		}
 
+		subjectNamespace, subjectName, err := SplitUsername(sub)
+		if err != nil || subjectNamespace != namespace || subjectName != serviceAccountName {
+			return nil, false, errors.New("sub claim is invalid")
+		}
+
 		if j.lookup {
 			// Make sure token hasn't been invalidated by deletion of the secret
 			secret, err := j.getter.GetSecret(namespace, secretName)
@@ -226,11 +207,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 			}
 		}
 
-		return &user.DefaultInfo{
-			Name:   sub,
-			UID:    serviceAccountUID,
-			Groups: []string{},
-		}, true, nil
+		return UserInfo(namespace, serviceAccountName, serviceAccountUID), true, nil
 	}
 
 	return nil, false, validationError

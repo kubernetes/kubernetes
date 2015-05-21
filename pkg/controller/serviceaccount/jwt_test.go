@@ -20,6 +20,7 @@ import (
 	"crypto/rsa"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -162,6 +163,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		ExpectedOK       bool
 		ExpectedUserName string
 		ExpectedUserUID  string
+		ExpectedGroups   []string
 	}{
 		"no keys": {
 			Client:      nil,
@@ -182,6 +184,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			ExpectedOK:       true,
 			ExpectedUserName: expectedUserName,
 			ExpectedUserUID:  expectedUserUID,
+			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
 		},
 		"rotated keys": {
 			Client:           nil,
@@ -190,6 +193,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			ExpectedOK:       true,
 			ExpectedUserName: expectedUserName,
 			ExpectedUserUID:  expectedUserUID,
+			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
 		},
 		"valid lookup": {
 			Client:           testclient.NewSimpleFake(serviceAccount, secret),
@@ -198,6 +202,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			ExpectedOK:       true,
 			ExpectedUserName: expectedUserName,
 			ExpectedUserUID:  expectedUserUID,
+			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
 		},
 		"invalid secret lookup": {
 			Client:      testclient.NewSimpleFake(serviceAccount),
@@ -238,6 +243,10 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		}
 		if user.GetUID() != tc.ExpectedUserUID {
 			t.Errorf("%s: Expected userUID=%v, got %v", k, tc.ExpectedUserUID, user.GetUID())
+			continue
+		}
+		if !reflect.DeepEqual(user.GetGroups(), tc.ExpectedGroups) {
+			t.Errorf("%s: Expected groups=%v, got %v", k, tc.ExpectedGroups, user.GetGroups())
 			continue
 		}
 	}
