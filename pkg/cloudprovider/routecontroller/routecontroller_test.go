@@ -168,9 +168,22 @@ func TestReconcile(t *testing.T) {
 		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
 			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
 		}
-		time.Sleep(10 * time.Millisecond)
-		if finalRoutes, err := routes.ListRoutes(""); err != nil || !routeListEqual(finalRoutes, testCase.expectedRoutes) {
-			t.Errorf("%d. rc.reconcile() = %v, routes:\n%v\nexpected: nil, routes:\n%v\n", i, err, flatten(finalRoutes), flatten(testCase.expectedRoutes))
+		var finalRoutes []*cloudprovider.Route
+		var err error
+		timeoutChan := time.After(50 * time.Millisecond)
+		tick := time.NewTicker(10 * time.Millisecond)
+		defer tick.Stop()
+	poll:
+		for {
+			select {
+			case <-tick.C:
+				if finalRoutes, err = routes.ListRoutes(""); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
+					break poll
+				}
+			case <-timeoutChan:
+				t.Errorf("%d. rc.reconcile() = %v, routes:\n%v\nexpected: nil, routes:\n%v\n", i, err, flatten(finalRoutes), flatten(testCase.expectedRoutes))
+				break poll
+			}
 		}
 	}
 }

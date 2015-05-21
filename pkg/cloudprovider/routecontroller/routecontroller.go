@@ -62,6 +62,8 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
 	}
+	// TODO (cjcullen): use pkg/controller/framework.NewInformer to watch this
+	// and reduce the number of lists needed.
 	nodeList, err := rc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)

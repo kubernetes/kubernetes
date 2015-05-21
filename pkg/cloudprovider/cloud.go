@@ -87,14 +87,21 @@ type Instances interface {
 
 // Route is a representation of an advanced routing rule.
 type Route struct {
-	Name            string
-	TargetInstance  string
+	// Name is the name of the routing rule in the cloud-provider.
+	Name string
+	// TargetInstance is the name of the instance as specified in routing rules
+	// for the cloud-provider (in gce: the Instance Name).
+	TargetInstance string
+	// Destination CIDR is the CIDR format IP range that this routing rule
+	// applies to.
 	DestinationCIDR string
-	Description     string
+	// Description is a free-form string. It can be useful for tagging Routes.
+	Description string
 }
 
 // Routes is an abstract, pluggable interface for advanced routing rules.
 type Routes interface {
+	// List all routes that match the filter
 	ListRoutes(filter string) ([]*Route, error)
 	// Create the described route
 	CreateRoute(route *Route) error
