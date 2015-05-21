@@ -55,6 +55,9 @@ const (
 )
 
 var _ = Describe("Reboot", func() {
+
+	var c *client.Client = nil
+
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
