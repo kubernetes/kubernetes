@@ -1054,8 +1054,8 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 }
 
 // Kill all running containers in a pod (includes the pod infra container).
-func (kl *Kubelet) killPod(pod kubecontainer.Pod) error {
-	return kl.containerRuntime.KillPod(pod)
+func (kl *Kubelet) killPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
+	return kl.containerRuntime.KillPod(pod, runningPod)
 }
 
 type empty struct{}
@@ -1101,7 +1101,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	// Kill pods we can't run.
 	err := canRunPod(pod)
 	if err != nil {
-		kl.killPod(runningPod)
+		kl.killPod(pod, runningPod)
 		return err
 	}
 
@@ -1416,7 +1416,7 @@ func (kl *Kubelet) killUnwantedPods(desiredPods map[types.UID]empty,
 			}()
 			glog.V(1).Infof("Killing unwanted pod %q", pod.Name)
 			// Stop the containers.
-			err = kl.killPod(*pod)
+			err = kl.killPod(nil, *pod)
 			if err != nil {
 				glog.Errorf("Failed killing the pod %q: %v", pod.Name, err)
 				return

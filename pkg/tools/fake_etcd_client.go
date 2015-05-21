@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -53,6 +54,8 @@ type FakeEtcdClient struct {
 	TestIndex   bool
 	ChangeIndex uint64
 	LastSetTTL  uint64
+	// Will avoid setting the expires header on objects to make comparison easier
+	HideExpires bool
 	Machines    []string
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
@@ -184,6 +187,11 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 		prevResult := f.Data[key]
 		createdIndex := prevResult.R.Node.CreatedIndex
 		f.t.Logf("updating %v, index %v -> %v (ttl: %d)", key, createdIndex, i, ttl)
+		var expires *time.Time
+		if !f.HideExpires && ttl > 0 {
+			now := time.Now()
+			expires = &now
+		}
 		result := EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
@@ -191,6 +199,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 					CreatedIndex:  createdIndex,
 					ModifiedIndex: i,
 					TTL:           int64(ttl),
+					Expiration:    expires,
 				},
 			},
 		}

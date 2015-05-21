@@ -128,6 +128,7 @@ func TestHelperCreate(t *testing.T) {
 		return true
 	}
 
+	grace := int64(30)
 	tests := []struct {
 		Resp     *http.Response
 		RespFunc client.HTTPClientFunc
@@ -172,8 +173,9 @@ func TestHelperCreate(t *testing.T) {
 			ExpectObject: &api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 			Resp: &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Status{Status: api.StatusSuccess})},
@@ -381,6 +383,7 @@ func TestHelperUpdate(t *testing.T) {
 		return true
 	}
 
+	grace := int64(30)
 	tests := []struct {
 		Resp      *http.Response
 		RespFunc  client.HTTPClientFunc
@@ -418,8 +421,9 @@ func TestHelperUpdate(t *testing.T) {
 			ExpectObject: &api.Pod{
 				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 			Overwrite: true,

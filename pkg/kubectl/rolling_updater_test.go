@@ -628,6 +628,7 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 
 func TestUpdateWithRetries(t *testing.T) {
 	codec := testapi.Codec()
+	grace := int64(30)
 	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "rc",
 			Labels: map[string]string{
@@ -645,8 +646,9 @@ func TestUpdateWithRetries(t *testing.T) {
 					},
 				},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 		},

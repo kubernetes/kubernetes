@@ -163,6 +163,7 @@ func TestReadContainerManifestFromFile(t *testing.T) {
 
 func TestReadPodsFromFile(t *testing.T) {
 	hostname := "random-test-hostname"
+	grace := int64(30)
 	var testCases = []struct {
 		desc     string
 		pod      runtime.Object
@@ -192,9 +193,10 @@ func TestReadPodsFromFile(t *testing.T) {
 					SelfLink:  getSelfLink("test-"+hostname, "mynamespace"),
 				},
 				Spec: api.PodSpec{
-					NodeName:      hostname,
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					NodeName:                      hostname,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 					Containers: []api.Container{{
 						Name:  "image",
 						Image: "test/image",
@@ -227,9 +229,10 @@ func TestReadPodsFromFile(t *testing.T) {
 					SelfLink:  getSelfLink("12345-"+hostname, kubelet.NamespaceDefault),
 				},
 				Spec: api.PodSpec{
-					NodeName:      hostname,
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					NodeName:                      hostname,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 					Containers: []api.Container{{
 						Name:  "image",
 						Image: "test/image",

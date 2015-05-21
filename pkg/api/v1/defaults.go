@@ -98,6 +98,10 @@ func addDefaultingFuncs() {
 			if obj.HostNetwork {
 				defaultHostNetworkPorts(&obj.Containers)
 			}
+			if obj.TerminationGracePeriodSeconds == nil {
+				period := int64(DefaultTerminationGracePeriodSeconds)
+				obj.TerminationGracePeriodSeconds = &period
+			}
 		},
 		func(obj *Probe) {
 			if obj.TimeoutSeconds == 0 {
