@@ -177,9 +177,9 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 		if !ok {
 			return fmt.Errorf("Service %s not in cache even though the watcher thought it was. Ignoring the deletion.", key), notRetryable
 		}
-		namespacedName = types.NamespacedName{service.Namespace, service.Name}
 		service = cachedService.service
 		delta.Object = cachedService.service
+		namespacedName = types.NamespacedName{service.Namespace, service.Name}
 	} else {
 		namespacedName.Namespace = service.Namespace
 		namespacedName.Name = service.Name
