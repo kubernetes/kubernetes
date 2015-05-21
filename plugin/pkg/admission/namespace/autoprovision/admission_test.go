@@ -41,7 +41,7 @@ func TestAdmission(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", "CREATE", nil))
+	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
@@ -72,7 +72,7 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", "CREATE", nil))
+	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
@@ -85,10 +85,7 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 func TestIgnoreAdmission(t *testing.T) {
 	namespace := "test"
 	mockClient := &testclient.Fake{}
-	handler := &provision{
-		client: mockClient,
-		store:  cache.NewStore(cache.MetaNamespaceKeyFunc),
-	}
+	handler := admission.NewChainHandler(createProvision(mockClient, nil))
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
@@ -96,7 +93,7 @@ func TestIgnoreAdmission(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", "UPDATE", nil))
+	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", admission.Update, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
@@ -123,7 +120,7 @@ func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", "CREATE", nil))
+	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespace, "pods", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}

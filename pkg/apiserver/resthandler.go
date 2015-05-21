@@ -142,7 +142,7 @@ func getRequestOptions(req *restful.Request, scope RequestScope, kind string, su
 }
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
-func ConnectResource(connecter rest.Connecter, scope RequestScope, connectOptionsKind string, subpath bool, subpathKey string) restful.RouteFunction {
+func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, connectOptionsKind, restPath string, subpath bool, subpathKey string) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 		namespace, name, err := scope.Namer.Name(req)
@@ -156,6 +156,19 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, connectOption
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
+		}
+		if admit.Handles(admission.Connect) {
+			connectRequest := &rest.ConnectRequest{
+				Name:         name,
+				Options:      opts,
+				ResourcePath: restPath,
+			}
+			userInfo, _ := api.UserFrom(ctx)
+			err = admit.Admit(admission.NewAttributesRecord(connectRequest, scope.Kind, namespace, scope.Resource, admission.Connect, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 		handler, err := connecter.Connect(ctx, name, opts)
 		if err != nil {
@@ -293,11 +306,13 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			return
 		}
 
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "CREATE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Create) {
+			userInfo, _ := api.UserFrom(ctx)
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, admission.Create, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
@@ -361,11 +376,13 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		ctx = api.WithNamespace(ctx, namespace)
 
 		// PATCH requires same permission as UPDATE
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Update) {
+			userInfo, _ := api.UserFrom(ctx)
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, admission.Update, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		versionedObj, err := converter.ConvertToVersion(obj, scope.APIVersion)
@@ -459,11 +476,13 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Update) {
+			userInfo, _ := api.UserFrom(ctx)
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, admission.Update, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		wasCreated := false
@@ -521,11 +540,13 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			}
 		}
 
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, scope.Resource, "DELETE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Delete) {
+			userInfo, _ := api.UserFrom(ctx)
+			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, scope.Resource, admission.Delete, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {

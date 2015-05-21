@@ -42,6 +42,7 @@ func init() {
 // It rejects all incoming requests in a namespace context if the namespace does not exist.
 // It is useful in deployments that want to enforce pre-declaration of a Namespace resource.
 type exists struct {
+	*admission.Handler
 	client client.Interface
 	store  cache.Store
 }
@@ -75,6 +76,7 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	return admission.NewForbidden(a, fmt.Errorf("Namespace %s does not exist", a.GetNamespace()))
 }
 
+// NewExists creates a new namespace exists admission control handler
 func NewExists(c client.Interface) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
@@ -92,7 +94,8 @@ func NewExists(c client.Interface) admission.Interface {
 	)
 	reflector.Run()
 	return &exists{
-		client: c,
-		store:  store,
+		client:  c,
+		store:   store,
+		Handler: admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 	}
 }

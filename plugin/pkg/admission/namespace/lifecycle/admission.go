@@ -41,14 +41,12 @@ func init() {
 // lifecycle is an implementation of admission.Interface.
 // It enforces life-cycle constraints around a Namespace depending on its Phase
 type lifecycle struct {
+	*admission.Handler
 	client client.Interface
 	store  cache.Store
 }
 
 func (l *lifecycle) Admit(a admission.Attributes) (err error) {
-	if a.GetOperation() != "CREATE" {
-		return nil
-	}
 	defaultVersion, kind, err := latest.RESTMapper.VersionAndKindForResource(a.GetResource())
 	if err != nil {
 		return admission.NewForbidden(a, err)
@@ -80,6 +78,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 	return admission.NewForbidden(a, fmt.Errorf("Namespace %s is terminating", a.GetNamespace()))
 }
 
+// NewLifecycle creates a new namespace lifecycle admission control handler
 func NewLifecycle(c client.Interface) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
@@ -97,7 +96,8 @@ func NewLifecycle(c client.Interface) admission.Interface {
 	)
 	reflector.Run()
 	return &lifecycle{
-		client: c,
-		store:  store,
+		Handler: admission.NewHandler(admission.Create),
+		client:  c,
+		store:   store,
 	}
 }

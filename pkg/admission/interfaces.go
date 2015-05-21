@@ -26,7 +26,7 @@ import (
 type Attributes interface {
 	GetNamespace() string
 	GetResource() string
-	GetOperation() string
+	GetOperation() Operation
 	GetObject() runtime.Object
 	GetKind() string
 	GetUserInfo() user.Info
@@ -36,4 +36,19 @@ type Attributes interface {
 type Interface interface {
 	// Admit makes an admission decision based on the request attributes
 	Admit(a Attributes) (err error)
+
+	// Handles returns true if this admission controller can handle the given operation
+	// where operation can be one of CREATE, UPDATE, DELETE, or CONNECT
+	Handles(operation Operation) bool
 }
+
+// Operation is the type of resource operation being checked for admission control
+type Operation string
+
+// Operation constants
+const (
+	Create  Operation = "CREATE"
+	Update  Operation = "UPDATE"
+	Delete  Operation = "DELETE"
+	Connect Operation = "CONNECT"
+)
