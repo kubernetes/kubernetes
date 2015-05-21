@@ -1700,7 +1700,7 @@ app.controller('ListServicesCtrl', [
   '$scope',
   '$interval',
   '$routeParams',
-  'k8sApi',
+  'k8sv1Beta3Api',
   '$rootScope',
   '$location',
   function($scope, $interval, $routeParams, k8sApi, $rootScope, $location) {
@@ -1712,7 +1712,7 @@ app.controller('ListServicesCtrl', [
       {name: 'Labels', field: 'labels'},
       {name: 'Selector', field: 'selector'},
       {name: 'IP', field: 'ip'},
-      {name: 'Port', field: 'port'}
+      {name: 'Ports', field: 'port'}
     ];
 
     $scope.custom = {
@@ -1760,41 +1760,36 @@ app.controller('ListServicesCtrl', [
         if (data.items.constructor === Array) {
           data.items.forEach(function(service) {
 
-            var _name = '', _uses = '', _component = '', _provider = '';
+            var _labels = '';
 
-            if (service.labels !== null && typeof service.labels === 'object') {
-              Object.keys(service.labels)
-                  .forEach(function(key) {
-                    if (key == 'name') {
-                      _name += ',' + service.labels[key];
-                    }
-                    if (key == 'component') {
-                      _component += ',' + service.labels[key];
-                    }
-                    if (key == 'provider') {
-                      _provider += ',' + service.labels[key];
-                    }
-                  });
+            if (service.metadata.labels) {
+              _labels = _.map(service.metadata.labels, function(v, k) { return k + '=' + v }).join(', ');
             }
 
             var _selectors = '';
 
-            if (service.selector !== null && typeof service.selector === 'object') {
-              Object.keys(service.selector)
-                  .forEach(function(key) {
-                    if (key == 'name') {
-                      _selectors += ',' + service.selector[key];
-                    }
-                  });
+            if (service.spec.selector) {
+              _selectors = _.map(service.spec.selector, function(v, k) { return k + '=' + v }).join(', ');
+            }
+
+            var _ports = '';
+
+            if (service.spec.ports) {
+              _ports = _.map(service.spec.ports, function(p) {
+                var n = '';
+                if(p.name)
+                  n = p.name + ': ';
+                 n = n + p.port;
+                return n;
+               }).join(', ');
             }
 
             $scope.content.push({
-              name: service.id,
-              ip: service.portalIP,
-              port: service.port,
-              selector: addLabel(_fixComma(_selectors), 'name='),
-              labels: addLabel(_fixComma(_name), 'name=') + ' ' + addLabel(_fixComma(_component), 'component=') + ' ' +
-                          addLabel(_fixComma(_provider), 'provider=')
+              name: service.metadata.name,
+              ip: service.spec.portalIP,
+              port: _ports,
+              selector: _selectors,
+              labels: _labels
             });
           });
         }
@@ -1933,7 +1928,7 @@ ServiceController.prototype.handleError = function(data, status, headers, config
 app.controller('ServiceCtrl', [
   '$scope',
   '$routeParams',
-  'k8sApi',
+  'k8sv1Beta3Api',
   '$location',
   function($scope, $routeParams, k8sApi, $location) {
     $scope.controller = new ServiceController();
@@ -1942,6 +1937,8 @@ app.controller('ServiceCtrl', [
     $scope.controller.getData($routeParams.serviceId);
 
     $scope.doTheBack = function() { window.history.back(); };
+    $scope.go = function(d) { $location.path('/dashboard/services/' + d.metadata.name); }
+    $scope.getSelectorUrlFragment = function(sel){ return _.map(sel, function(v, k) { return k + '=' + v }).join(','); };
 
   }
 ]);
