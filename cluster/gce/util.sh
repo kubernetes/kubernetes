@@ -383,6 +383,16 @@ function create-firewall-rule {
 # $4: The kube-env metadata.
 function create-node-template {
   detect-project
+
+  # First, ensure the template doesn't exist.
+  # TODO(mbforbes): To make this really robust, we need to parse the output and
+  #                 add retries. Just relying on a non-zero exit code doesn't
+  #                 distinguish an ephemeral failed call from a "not-exists".
+  if gcloud compute instance-templates describe "$1"; then
+    echo "Instance template ${1} already exists; continuing." >&2
+    return
+  fi
+
   local attempt=0
   while true; do
     if ! gcloud compute instance-templates create "$1" \
@@ -398,10 +408,10 @@ function create-node-template {
       --can-ip-forward \
       --metadata-from-file "$3" "$4"; then
         if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to create instance template $1 ${color_norm}"
+          echo -e "${color_red}Failed to create instance template $1 ${color_norm}" >&2
           exit 2
         fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create instance template $1. Retrying.${color_norm}"
+        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create instance template $1. Retrying.${color_norm}" >&2
         attempt=$(($attempt+1))
     else
         break
@@ -624,6 +634,7 @@ function kube-up {
 
   echo "Creating minions."
 
+  # TODO(mbforbes): Refactor setting scope flags.
   local -a scope_flags=()
   if (( "${#MINION_SCOPES[@]}" > 0 )); then
     scope_flags=("--scopes" "${MINION_SCOPES[@]}")

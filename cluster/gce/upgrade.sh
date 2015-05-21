@@ -66,9 +66,10 @@ function usage() {
 function upgrade-master() {
   echo "== Upgrading master to '${SERVER_BINARY_TAR_URL}'. Do not interrupt, deleting master instance. =="
 
-  detect-master
   get-password
-  set-master-htpasswd
+  get-bearer-token
+
+  detect-master
 
   # Delete the master instance. Note that the master-pd is created
   # with auto-delete=no, so it should not be deleted.
@@ -111,13 +112,58 @@ function prepare-upgrade() {
   fi
 }
 
+# Reads kube-env metadata from master and extracts value from provided key.
+#
+# Assumed vars:
+#   MASTER_NAME
+#   ZONE
+#
+# Args:
+# $1 env key to use
+function get-env-val() {
+  # TODO(mbforbes): Make this more reliable with retries.
+  gcloud compute ssh --zone ${ZONE} ${MASTER_NAME} --command \
+    "curl --fail --silent -H 'Metadata-Flavor: Google' \
+      'http://metadata/computeMetadata/v1/instance/attributes/kube-env'" 2>/dev/null \
+    | grep ${1} | cut -d : -f 2 | cut -d \' -f 2
+}
+
+# $1 veresion
 function upgrade-nodes() {
-  echo "== Upgrading nodes to ${SERVER_BINARY_TAR_URL}. =="
+  local version=${1}
+  local sanitized_version=$(echo ${version} | sed s/"\."/-/g)
+  echo "== Upgrading nodes to ${version}. =="
 
   detect-minion-names
-  get-password
-  set-master-htpasswd
-  kube-update-nodes upgrade
+
+  # TODO(mbforbes): Refactor setting scope flags.
+  local -a scope_flags=()
+  if (( "${#MINION_SCOPES[@]}" > 0 )); then
+    scope_flags=("--scopes" "${MINION_SCOPES[@]}")
+  else
+    scope_flags=("--no-scopes")
+  fi
+
+  # Get required node tokens.
+  KUBELET_TOKEN=$(get-env-val "KUBELET_TOKEN")
+  KUBE_PROXY_TOKEN=$(get-env-val "KUBE_PROXY_TOKEN")
+
+  # TODO(mbforbes): How do we ensure kube-env is written in a ${version}-
+  #                 compatible way?
+  write-node-env
+  # TODO(mbforbes): Get configure-vm script from ${version}. (Must plumb this
+  #                 through all create-node-instance-template implementations).
+  create-node-instance-template ${sanitized_version}
+
+  # Do the actual upgrade.
+  gcloud preview rolling-updates start \
+      --group "${NODE_INSTANCE_PREFIX}-group" \
+      --max-num-concurrent-instances 1 \
+      --max-num-failed-instances 0 \
+      --project "${PROJECT}" \
+      --zone "${ZONE}" \
+      --template "${NODE_INSTANCE_PREFIX}-template-${sanitized_version}"
+
   echo "== Done =="
 }
 
@@ -192,7 +238,12 @@ if [[ "${master_upgrade}" == "true" ]]; then
 fi
 
 if [[ "${node_upgrade}" == "true" ]]; then
-  upgrade-nodes
+  if [[ "${local_binaries}" == "true" ]]; then
+    echo "Upgrading nodes to local binaries is not yet supported." >&2
+  else
+    upgrade-nodes ${binary_version}
+  fi
 fi
 
+echo "== Validating cluster post-upgrade =="
 "${KUBE_ROOT}/cluster/validate-cluster.sh"
