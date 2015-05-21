@@ -318,10 +318,13 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, controller
 		}
 		rm.expectations.ExpectDeletions(controller, diff)
 		glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", controller.Namespace, controller.Name, controller.Spec.Replicas, diff)
-		// Sort the pods in the order such that not-ready < ready, unscheduled
-		// < scheduled, and pending < running. This ensures that we delete pods
-		// in the earlier stages whenever possible.
-		sort.Sort(activePods(filteredPods))
+		// No need to sort pods if we are about to delete all of them
+		if controller.Spec.Replicas != 0 {
+			// Sort the pods in the order such that not-ready < ready, unscheduled
+			// < scheduled, and pending < running. This ensures that we delete pods
+			// in the earlier stages whenever possible.
+			sort.Sort(activePods(filteredPods))
+		}
 
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
