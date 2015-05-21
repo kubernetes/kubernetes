@@ -86,7 +86,7 @@ KUBE_CONTROLLER_MANAGER_ARGS=""
 ```
 
 
-* Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1,if not ,you will get the error like "connection refused"
+* Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1, if not, you will get the error like "connection refused"
 ```
 ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
 ```
