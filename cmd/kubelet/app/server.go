@@ -148,7 +148,7 @@ func NewKubeletServer() *KubeletServer {
 		RegistryBurst:               10,
 		EnableDebuggingHandlers:     true,
 		MinimumGCAge:                1 * time.Minute,
-		MaxPerPodContainerCount:     5,
+		MaxPerPodContainerCount:     2,
 		MaxContainerCount:           100,
 		AuthPath:                    util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
 		KubeConfig:                  util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
@@ -201,7 +201,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.RunOnce, "runonce", s.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api_servers, and --enable-server")
 	fs.BoolVar(&s.EnableDebuggingHandlers, "enable-debugging-handlers", s.EnableDebuggingHandlers, "Enables server endpoints for log collection and local running of containers and commands")
 	fs.DurationVar(&s.MinimumGCAge, "minimum-container-ttl-duration", s.MinimumGCAge, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
-	fs.IntVar(&s.MaxPerPodContainerCount, "maximum-dead-containers-per-container", s.MaxPerPodContainerCount, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
+	fs.IntVar(&s.MaxPerPodContainerCount, "maximum-dead-containers-per-container", s.MaxPerPodContainerCount, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 2.")
 	fs.IntVar(&s.MaxContainerCount, "maximum-dead-containers", s.MaxContainerCount, "Maximum number of old instances of a containers to retain globally.  Each container takes up some disk space.  Default: 100.")
 	fs.Var(&s.AuthPath, "auth-path", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.MarkDeprecated("auth-path", "will be removed in a future version")
@@ -491,7 +491,7 @@ func SimpleKubelet(client *client.Client,
 		FileCheckFrequency:      1 * time.Second,
 		SyncFrequency:           3 * time.Second,
 		MinimumGCAge:            10 * time.Second,
-		MaxPerPodContainerCount: 5,
+		MaxPerPodContainerCount: 2,
 		MaxContainerCount:       100,
 		MasterServiceNamespace:  masterServiceNamespace,
 		VolumePlugins:           volumePlugins,
