@@ -88,7 +88,7 @@ redis-slave-controller-gziey   10.2.1.4       slave           brendanburns/redis
 
 ## Scaling
 
-Two single-core minions are certainly not enough for a production system of today, and, as you can see, there is one _unassigned_ pod. Let's resize the cluster by adding a couple of bigger nodes.
+Two single-core minions are certainly not enough for a production system of today, and, as you can see, there is one _unassigned_ pod. Let's scale the cluster by adding a couple of bigger nodes.
 
 You will need to open another terminal window on your machine and go to the same working directory (e.g. `~/Workspace/weave-demos/coreos-azure`).
 
@@ -96,9 +96,9 @@ First, lets set the size of new VMs:
 ```
 export AZ_VM_SIZE=Large
 ```
-Now, run resize script with state file of the previous deployment and number of minions to add:
+Now, run scale script with state file of the previous deployment and number of minions to add:
 ```
-./resize-kubernetes-cluster.js ./output/kubernetes_1c1496016083b4_deployment.yml 2
+./scale-kubernetes-cluster.js ./output/kubernetes_1c1496016083b4_deployment.yml 2
 ...
 azure_wrapper/info: Saved SSH config, you can use it like so: `ssh -F  ./output/kubernetes_8f984af944f572_ssh_conf <hostname>`
 azure_wrapper/info: The hosts in this deployment are:
@@ -124,7 +124,7 @@ kube-03             environment=production   Ready
 kube-04             environment=production   Ready
 ```
 
-You can see that two more minions joined happily. Let's resize the number of Guestbook instances now.
+You can see that two more minions joined happily. Let's scale the number of Guestbook instances now.
 
 First, double-check how many replication controllers there are:
 
@@ -134,12 +134,12 @@ CONTROLLER               CONTAINER(S)  IMAGE(S)                                 
 frontend-controller      php-redis     kubernetes/example-guestbook-php-redis   name=frontend    3
 redis-slave-controller   slave         brendanburns/redis-slave                 name=redisslave  2
 ```
-As there are 4 minions, let's resize proportionally:
+As there are 4 minions, let's scale proportionally:
 ```
-core@kube-00 ~ $ kubectl resize --replicas=4 rc redis-slave-controller
-resized
-core@kube-00 ~ $ kubectl resize --replicas=4 rc frontend-controller
-resized
+core@kube-00 ~ $ kubectl scale --replicas=4 rc redis-slave-controller
+scaled
+core@kube-00 ~ $ kubectl scale --replicas=4 rc frontend-controller
+scaled
 ```
 Check what you have now:
 ```
@@ -182,7 +182,7 @@ If you don't wish care about the Azure bill, you can tear down the cluster. It's
 ./destroy-cluster.js ./output/kubernetes_8f984af944f572_deployment.yml 
 ```
 
-> Note: make sure to use the _latest state file_, as after resizing there is a new one.
+> Note: make sure to use the _latest state file_, as after scaling there is a new one.
 
 By the way, with the scripts shown, you can deploy multiple clusters, if you like :)
 

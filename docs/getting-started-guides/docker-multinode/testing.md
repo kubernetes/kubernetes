@@ -46,7 +46,7 @@ Note that you will need run this curl command on your boot2docker VM if you are 
 Now try to scale up the nginx you created before:
 
 ```sh
-kubectl resize rc nginx --replicas=3
+kubectl scale rc nginx --replicas=3
 ```
 
 And list the pods

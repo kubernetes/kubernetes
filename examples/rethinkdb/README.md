@@ -49,8 +49,8 @@ check out again:
 ```shell
 $kubectl get po
 POD                         IP        CONTAINER(S)   IMAGE(S)                     HOST                      LABELS                       STATUS    CREATED      MESSAGE
-rethinkdb-rc-1.16.0-6odi0                                                         kubernetes-minion-s59e/   db=rethinkdb,role=replicas   Pending   11 seconds   
-                                      rethinkdb      antmanler/rethinkdb:1.16.0   
+rethinkdb-rc-1.16.0-6odi0                                                         kubernetes-minion-s59e/   db=rethinkdb,role=replicas   Pending   11 seconds
+                                      rethinkdb      antmanler/rethinkdb:1.16.0
 ```
 
 **Done!**
@@ -61,20 +61,20 @@ rethinkdb-rc-1.16.0-6odi0                                                       
 Scale
 -----
 
-You can scale up you cluster using `kubectl resize`, and new pod will join to exsits cluster automatically, for example
+You can scale up you cluster using `kubectl scale`, and new pod will join to exsits cluster automatically, for example
 
 
 ```shell
-$kubectl resize rc rethinkdb-rc-1.16.0 --replicas=3
-resized
+$kubectl scale rc rethinkdb-rc-1.16.0 --replicas=3
+scaled
 $kubectl get po
 POD                         IP           CONTAINER(S)   IMAGE(S)                     HOST                                   LABELS                       STATUS    CREATED          MESSAGE
-rethinkdb-rc-1.16.0-6odi0   10.244.3.3                                               kubernetes-minion-s59e/104.197.79.42   db=rethinkdb,role=replicas   Running   About a minute   
-                                         rethinkdb      antmanler/rethinkdb:1.16.0                                                                       Running   About a minute   
-rethinkdb-rc-1.16.0-e3mxv                                                            kubernetes-minion-d7ub/                db=rethinkdb,role=replicas   Pending   6 seconds        
-                                         rethinkdb      antmanler/rethinkdb:1.16.0                                                                                 
-rethinkdb-rc-1.16.0-manu6                                                            kubernetes-minion-cybz/                db=rethinkdb,role=replicas   Pending   6 seconds   
-                                         rethinkdb      antmanler/rethinkdb:1.16.0       
+rethinkdb-rc-1.16.0-6odi0   10.244.3.3                                               kubernetes-minion-s59e/104.197.79.42   db=rethinkdb,role=replicas   Running   About a minute
+                                         rethinkdb      antmanler/rethinkdb:1.16.0                                                                       Running   About a minute
+rethinkdb-rc-1.16.0-e3mxv                                                            kubernetes-minion-d7ub/                db=rethinkdb,role=replicas   Pending   6 seconds
+                                         rethinkdb      antmanler/rethinkdb:1.16.0
+rethinkdb-rc-1.16.0-manu6                                                            kubernetes-minion-cybz/                db=rethinkdb,role=replicas   Pending   6 seconds
+                                         rethinkdb      antmanler/rethinkdb:1.16.0
 ```
 
 Admin
@@ -93,7 +93,7 @@ find the service
 $kubectl get se
 NAME               LABELS        SELECTOR                  IP(S)            PORT(S)
 rethinkdb-admin    db=influxdb   db=rethinkdb,role=admin   10.0.131.19      8080/TCP
-                                                           104.197.19.120   
+                                                           104.197.19.120
 rethinkdb-driver   db=influxdb   db=rethinkdb              10.0.27.114      28015/TCP
 ```
 

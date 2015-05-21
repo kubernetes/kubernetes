@@ -143,7 +143,7 @@ func TestUpdate(t *testing.T) {
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 3 gets for each resize
+				// 3 gets for each scale
 				{newRc(1, 1), nil},
 				{newRc(1, 1), nil},
 				{newRc(1, 1), nil},
@@ -165,7 +165,7 @@ Update succeeded. Deleting foo-v1
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 3 gets for each resize
+				// 3 gets for each scale
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
@@ -196,7 +196,7 @@ Update succeeded. Deleting foo-v1
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 3 gets for each resize
+				// 3 gets for each scale
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
@@ -211,7 +211,7 @@ Update succeeded. Deleting foo-v1
 				{oldRc(0), nil},
 				{oldRc(0), nil},
 				{oldRc(0), nil},
-				// final resize on newRc
+				// final scale on newRc
 				{newRc(7, 7), nil},
 				{newRc(7, 7), nil},
 				{newRc(7, 7), nil},
@@ -222,7 +222,7 @@ Update succeeded. Deleting foo-v1
 			`Creating foo-v2
 Updating foo-v1 replicas: 1, foo-v2 replicas: 1
 Updating foo-v1 replicas: 0, foo-v2 replicas: 2
-Resizing foo-v2 replicas: 2 -> 7
+Scaling foo-v2 replicas: 2 -> 7
 Update succeeded. Deleting foo-v1
 `,
 		}, {
@@ -298,7 +298,7 @@ Update succeeded. Deleting foo-v1
 	responses := []fakeResponse{
 		// Existing newRc
 		{rcExisting, nil},
-		// 3 gets for each resize
+		// 3 gets for each scale
 		{newRc(2, 2), nil},
 		{newRc(2, 2), nil},
 		{newRc(2, 2), nil},

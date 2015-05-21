@@ -26,17 +26,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 )
 
-// ResizePrecondition describes a condition that must be true for the resize to take place
+// ScalePrecondition describes a condition that must be true for the scale to take place
 // If CurrentSize == -1, it is ignored.
 // If CurrentResourceVersion is the empty string, it is ignored.
 // Otherwise they must equal the values in the replication controller for it to be valid.
-type ResizePrecondition struct {
+type ScalePrecondition struct {
 	Size            int
 	ResourceVersion string
 }
 
 // A PreconditionError is returned when a replication controller fails to match
-// the resize preconditions passed to kubectl.
+// the scale preconditions passed to kubectl.
 type PreconditionError struct {
 	Precondition  string
 	ExpectedValue string
@@ -47,29 +47,29 @@ func (pe PreconditionError) Error() string {
 	return fmt.Sprintf("Expected %s to be %s, was %s", pe.Precondition, pe.ExpectedValue, pe.ActualValue)
 }
 
-type ControllerResizeErrorType int
+type ControllerScaleErrorType int
 
 const (
-	ControllerResizeGetFailure ControllerResizeErrorType = iota
-	ControllerResizeUpdateFailure
+	ControllerScaleGetFailure ControllerScaleErrorType = iota
+	ControllerScaleUpdateFailure
 )
 
-// A ControllerResizeError is returned when a the resize request passes
-// preconditions but fails to actually resize the controller.
-type ControllerResizeError struct {
-	FailureType     ControllerResizeErrorType
+// A ControllerScaleError is returned when a scale request passes
+// preconditions but fails to actually scale the controller.
+type ControllerScaleError struct {
+	FailureType     ControllerScaleErrorType
 	ResourceVersion string
 	ActualError     error
 }
 
-func (c ControllerResizeError) Error() string {
+func (c ControllerScaleError) Error() string {
 	return fmt.Sprintf(
-		"Resizing the controller failed with: %s; Current resource version %s",
+		"Scaling the controller failed with: %s; Current resource version %s",
 		c.ActualError, c.ResourceVersion)
 }
 
 // Validate ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
-func (precondition *ResizePrecondition) Validate(controller *api.ReplicationController) error {
+func (precondition *ScalePrecondition) Validate(controller *api.ReplicationController) error {
 	if precondition.Size != -1 && controller.Spec.Replicas != precondition.Size {
 		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(controller.Spec.Replicas)}
 	}
@@ -79,29 +79,29 @@ func (precondition *ResizePrecondition) Validate(controller *api.ReplicationCont
 	return nil
 }
 
-type Resizer interface {
-	// Resize resizes the named resource after checking preconditions. It optionally
+type Scaler interface {
+	// Scale scales the named resource after checking preconditions. It optionally
 	// retries in the event of resource version mismatch (if retry is not nil),
 	// and optionally waits until the status of the resource matches newSize (if wait is not nil)
-	Resize(namespace, name string, newSize uint, preconditions *ResizePrecondition, retry, wait *RetryParams) error
-	// ResizeSimple does a simple one-shot attempt at resizing - not useful on it's own, but
-	// a necessary building block for Resize
-	ResizeSimple(namespace, name string, preconditions *ResizePrecondition, newSize uint) (string, error)
+	Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, wait *RetryParams) error
+	// ScaleSimple does a simple one-shot attempt at scaling - not useful on it's own, but
+	// a necessary building block for Scale
+	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error)
 }
 
-func ResizerFor(kind string, c ResizerClient) (Resizer, error) {
+func ScalerFor(kind string, c ScalerClient) (Scaler, error) {
 	switch kind {
 	case "ReplicationController":
-		return &ReplicationControllerResizer{c}, nil
+		return &ReplicationControllerScaler{c}, nil
 	}
-	return nil, fmt.Errorf("no resizer has been implemented for %q", kind)
+	return nil, fmt.Errorf("no scaler has been implemented for %q", kind)
 }
 
-type ReplicationControllerResizer struct {
-	c ResizerClient
+type ReplicationControllerScaler struct {
+	c ScalerClient
 }
 
-// RetryParams encapsulates the retry parameters used by kubectl's resizer.
+// RetryParams encapsulates the retry parameters used by kubectl's scaler.
 type RetryParams struct {
 	Interval, Timeout time.Duration
 }
@@ -110,15 +110,15 @@ func NewRetryParams(interval, timeout time.Duration) *RetryParams {
 	return &RetryParams{interval, timeout}
 }
 
-// ResizeCondition is a closure around Resize that facilitates retries via util.wait
-func ResizeCondition(r Resizer, precondition *ResizePrecondition, namespace, name string, count uint) wait.ConditionFunc {
+// ScaleCondition is a closure around Scale that facilitates retries via util.wait
+func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name string, count uint) wait.ConditionFunc {
 	return func() (bool, error) {
-		_, err := r.ResizeSimple(namespace, name, precondition, count)
-		switch e, _ := err.(ControllerResizeError); err.(type) {
+		_, err := r.ScaleSimple(namespace, name, precondition, count)
+		switch e, _ := err.(ControllerScaleError); err.(type) {
 		case nil:
 			return true, nil
-		case ControllerResizeError:
-			if e.FailureType == ControllerResizeUpdateFailure {
+		case ControllerScaleError:
+			if e.FailureType == ControllerScaleUpdateFailure {
 				return false, nil
 			}
 		}
@@ -126,10 +126,10 @@ func ResizeCondition(r Resizer, precondition *ResizePrecondition, namespace, nam
 	}
 }
 
-func (resizer *ReplicationControllerResizer) ResizeSimple(namespace, name string, preconditions *ResizePrecondition, newSize uint) (string, error) {
-	controller, err := resizer.c.GetReplicationController(namespace, name)
+func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
+	controller, err := scaler.c.GetReplicationController(namespace, name)
 	if err != nil {
-		return "", ControllerResizeError{ControllerResizeGetFailure, "Unknown", err}
+		return "", ControllerScaleError{ControllerScaleGetFailure, "Unknown", err}
 	}
 	if preconditions != nil {
 		if err := preconditions.Validate(controller); err != nil {
@@ -138,60 +138,60 @@ func (resizer *ReplicationControllerResizer) ResizeSimple(namespace, name string
 	}
 	controller.Spec.Replicas = int(newSize)
 	// TODO: do retry on 409 errors here?
-	if _, err := resizer.c.UpdateReplicationController(namespace, controller); err != nil {
-		return "", ControllerResizeError{ControllerResizeUpdateFailure, controller.ResourceVersion, err}
+	if _, err := scaler.c.UpdateReplicationController(namespace, controller); err != nil {
+		return "", ControllerScaleError{ControllerScaleUpdateFailure, controller.ResourceVersion, err}
 	}
 	// TODO: do a better job of printing objects here.
-	return "resized", nil
+	return "scaled", nil
 }
 
-// Resize updates a ReplicationController to a new size, with optional precondition check (if preconditions is not nil),
+// Scale updates a ReplicationController to a new size, with optional precondition check (if preconditions is not nil),
 // optional retries (if retry is not nil), and then optionally waits for it's replica count to reach the new value
 // (if wait is not nil).
-func (resizer *ReplicationControllerResizer) Resize(namespace, name string, newSize uint, preconditions *ResizePrecondition, retry, waitForReplicas *RetryParams) error {
+func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams) error {
 	if preconditions == nil {
-		preconditions = &ResizePrecondition{-1, ""}
+		preconditions = &ScalePrecondition{-1, ""}
 	}
 	if retry == nil {
 		// Make it try only once, immediately
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
-	cond := ResizeCondition(resizer, preconditions, namespace, name, newSize)
+	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize)
 	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
 		rc := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: name}}
 		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			resizer.c.ControllerHasDesiredReplicas(rc))
+			scaler.c.ControllerHasDesiredReplicas(rc))
 	}
 	return nil
 }
 
-// ResizerClient abstracts access to ReplicationControllers.
-type ResizerClient interface {
+// ScalerClient abstracts access to ReplicationControllers.
+type ScalerClient interface {
 	GetReplicationController(namespace, name string) (*api.ReplicationController, error)
 	UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
 	ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc
 }
 
-func NewResizerClient(c client.Interface) ResizerClient {
-	return &realResizerClient{c}
+func NewScalerClient(c client.Interface) ScalerClient {
+	return &realScalerClient{c}
 }
 
-// realResizerClient is a ResizerClient which uses a Kube client.
-type realResizerClient struct {
+// realScalerClient is a ScalerClient which uses a Kube client.
+type realScalerClient struct {
 	client client.Interface
 }
 
-func (c *realResizerClient) GetReplicationController(namespace, name string) (*api.ReplicationController, error) {
+func (c *realScalerClient) GetReplicationController(namespace, name string) (*api.ReplicationController, error) {
 	return c.client.ReplicationControllers(namespace).Get(name)
 }
 
-func (c *realResizerClient) UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+func (c *realScalerClient) UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
 	return c.client.ReplicationControllers(namespace).Update(rc)
 }
 
-func (c *realResizerClient) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
+func (c *realScalerClient) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
 	return client.ControllerHasDesiredReplicas(c.client, rc)
 }

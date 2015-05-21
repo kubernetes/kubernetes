@@ -243,10 +243,10 @@ myNginx   nginx              name=my-nginx   3
 
 We did not start any services, hence there are none listed. But we see three replicas displayed properly.
 Check the [guestbook](../../examples/guestbook/README.md) application to learn how to create a service.
-You can already play with resizing the replicas with:
+You can already play with scaling the replicas with:
 
 ```sh
-$ ./cluster/kubectl.sh resize rc my-nginx --replicas=2
+$ ./cluster/kubectl.sh scale rc my-nginx --replicas=2
 $ ./cluster/kubectl.sh get pods
 NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
 7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Running

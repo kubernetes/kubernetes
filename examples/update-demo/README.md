@@ -47,12 +47,12 @@ $ ./cluster/kubectl.sh create -f examples/update-demo/nautilus-rc.yaml
 
 After pulling the image from the Docker Hub to your worker nodes (which may take a minute or so) you'll see a couple of squares in the UI detailing the pods that are running along with the image that they are serving up.  A cute little nautilus.
 
-### Step Three: Try resizing the controller
+### Step Three: Try scaling the controller
 
 Now we will increase the number of replicas from two to four:
 
 ```bash
-$ ./cluster/kubectl.sh resize rc update-demo-nautilus --replicas=4
+$ ./cluster/kubectl.sh scale rc update-demo-nautilus --replicas=4
 ```
 
 If you go back to the [demo website](http://localhost:8001/static/index.html) you should eventually see four boxes, one for each pod.
@@ -66,7 +66,7 @@ $ ./cluster/kubectl.sh rolling-update update-demo-nautilus --update-period=10s -
 The rolling-update command in kubectl will do 2 things:
 
 1. Create a new replication controller with a pod template that uses the new image (`gcr.io/google_containers/update-demo:kitten`)
-2. Resize the old and new replication controllers until the new controller replaces the old. This will kill the current pods one at a time, spinnning up new ones to replace them.
+2. Scale the old and new replication controllers until the new controller replaces the old. This will kill the current pods one at a time, spinnning up new ones to replace them.
 
 Watch the [demo website](http://localhost:8001/static/index.html), it will update one pod every 10 seconds until all of the pods have the new image.
 

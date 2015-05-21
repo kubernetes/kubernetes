@@ -76,15 +76,15 @@ Here is the service description:
 ```yaml
 apiVersion: v1beta3
 kind: Service
-metadata: 
-  labels: 
+metadata:
+  labels:
     name: cassandra
   name: cassandra
-spec: 
+spec:
   ports:
     - port: 9042
       targetPort: 9042
-  selector: 
+  selector:
     name: cassandra
 ```
 
@@ -125,7 +125,7 @@ subsets:
 You can see that the _Service_ has found the pod we created in step one.
 
 ### Adding replicated nodes
-Of course, a single node cluster isn't particularly interesting.  The real power of Kubernetes and Cassandra lies in easily building a replicated, resizable Cassandra cluster.
+Of course, a single node cluster isn't particularly interesting.  The real power of Kubernetes and Cassandra lies in easily building a replicated, scalable Cassandra cluster.
 
 In Kubernetes a _Replication Controller_ is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
 
@@ -134,26 +134,26 @@ Replication Controllers will "adopt" existing pods that match their selector que
 ```yaml
 apiVersion: v1beta3
 kind: ReplicationController
-metadata: 
-  labels: 
+metadata:
+  labels:
     name: cassandra
   name: cassandra
-spec: 
+spec:
   replicas: 1
-  selector: 
+  selector:
     name: cassandra
-  template: 
-    metadata: 
-      labels: 
+  template:
+    metadata:
+      labels:
         name: cassandra
-    spec: 
-      containers: 
-        - command: 
+    spec:
+      containers:
+        - command:
             - /run.sh
           resources:
             limits:
               cpu: 1
-          env: 
+          env:
             - name: MAX_HEAP_SIZE
               key: MAX_HEAP_SIZE
               value: 512M
@@ -162,15 +162,15 @@ spec:
               value: 100M
           image: "kubernetes/cassandra:v2"
           name: cassandra
-          ports: 
+          ports:
             - containerPort: 9042
               name: cql
             - containerPort: 9160
               name: thrift
-          volumeMounts: 
+          volumeMounts:
             - mountPath: /cassandra_data
               name: data
-      volumes: 
+      volumes:
         - name: data
           emptyDir: {}
 ```
@@ -185,9 +185,9 @@ $ kubectl create -f cassandra-controller.yaml
 
 Now this is actually not that interesting, since we haven't actually done anything new.  Now it will get interesting.
 
-Let's resize our cluster to 2:
+Let's scale our cluster to 2:
 ```sh
-$ kubectl resize rc cassandra --replicas=2
+$ kubectl scale rc cassandra --replicas=2
 ```
 
 Now if you list the pods in your cluster, you should see two cassandra pods:
@@ -195,10 +195,10 @@ Now if you list the pods in your cluster, you should see two cassandra pods:
 ```sh
 $ kubectl get pods
 POD                 IP              CONTAINER(S)   IMAGE(S)                 HOST                                    LABELS           STATUS    CREATED      MESSAGE
-cassandra           10.244.3.3                                              kubernetes-minion-sft2/104.197.42.181   name=cassandra   Running   7 minutes        
-                                    cassandra      kubernetes/cassandra:v2                                                           Running   7 minutes        
-cassandra-gnhk8     10.244.0.5                                              kubernetes-minion-dqz3/104.197.2.71     name=cassandra   Running   About a minute   
-                                    cassandra      kubernetes/cassandra:v2                                                           Running   51 seconds       
+cassandra           10.244.3.3                                              kubernetes-minion-sft2/104.197.42.181   name=cassandra   Running   7 minutes
+                                    cassandra      kubernetes/cassandra:v2                                                           Running   7 minutes
+cassandra-gnhk8     10.244.0.5                                              kubernetes-minion-dqz3/104.197.2.71     name=cassandra   Running   About a minute
+                                    cassandra      kubernetes/cassandra:v2                                                           Running   51 seconds
 
 ```
 
@@ -218,9 +218,9 @@ UN  10.244.0.5  74.09 KB   256     100.0%            86feda0f-f070-4a5b-bda1-2ee
 UN  10.244.3.3  51.28 KB   256     100.0%            dafe3154-1d67-42e1-ac1d-78e7e80dce2b  rack1
 ```
 
-Now let's resize our cluster to 4 nodes:
+Now let's scale our cluster to 4 nodes:
 ```sh
-$ kubectl resize rc cassandra --replicas=4
+$ kubectl scale rc cassandra --replicas=4
 ```
 
 Examining the status again:
@@ -251,13 +251,13 @@ kubectl create -f cassandra-service.yaml
 kubectl create -f cassandra-controller.yaml
 
 # scale up to 2 nodes
-kubectl resize rc cassandra --replicas=2
+kubectl scale rc cassandra --replicas=2
 
 # validate the cluster
 docker exec <container-id> nodetool status
 
 # scale up to 4 nodes
-kubectl resize rc cassandra --replicas=4
+kubectl scale rc cassandra --replicas=4
 ```
 
 ### Seed Provider Source

@@ -792,14 +792,14 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	return nil
 }
 
-func ResizeRC(c *client.Client, ns, name string, size uint) error {
-	By(fmt.Sprintf("Resizing replication controller %s in namespace %s to %d", name, ns, size))
-	resizer, err := kubectl.ResizerFor("ReplicationController", kubectl.NewResizerClient(c))
+func ScaleRC(c *client.Client, ns, name string, size uint) error {
+	By(fmt.Sprintf("Scaling replication controller %s in namespace %s to %d", name, ns, size))
+	scaler, err := kubectl.ScalerFor("ReplicationController", kubectl.NewScalerClient(c))
 	if err != nil {
 		return err
 	}
 	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
-	if err = resizer.Resize(ns, name, size, nil, nil, waitForReplicas); err != nil {
+	if err = scaler.Scale(ns, name, size, nil, nil, waitForReplicas); err != nil {
 		return err
 	}
 	return waitForRCPodsRunning(c, ns, name)

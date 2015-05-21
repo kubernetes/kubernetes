@@ -227,7 +227,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		return cmdutil.UsageError(cmd, "%s must specify a matching key with non-equal value in Selector for %s",
 			filename, oldName)
 	}
-	// TODO: handle resizes during rolling update
+	// TODO: handle scales during rolling update
 	if newRc.Spec.Replicas == 0 {
 		newRc.Spec.Replicas = oldRc.Spec.Replicas
 	}

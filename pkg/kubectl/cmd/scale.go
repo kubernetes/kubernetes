@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -28,38 +29,46 @@ import (
 )
 
 const (
-	resize_long = `Set a new size for a Replication Controller.
+	scale_long = `Set a new size for a Replication Controller.
 
-Resize also allows users to specify one or more preconditions for the resize action.
+Scale also allows users to specify one or more preconditions for the scale action.
 If --current-replicas or --resource-version is specified, it is validated before the
-resize is attempted, and it is guaranteed that the precondition holds true when the
-resize is sent to the server.`
-	resize_example = `// Resize replication controller named 'foo' to 3.
-$ kubectl resize --replicas=3 replicationcontrollers foo
+scale is attempted, and it is guaranteed that the precondition holds true when the
+scale is sent to the server.`
+	scale_example = `// Scale replication controller named 'foo' to 3.
+$ kubectl scale --replicas=3 replicationcontrollers foo
 
-// If the replication controller named foo's current size is 2, resize foo to 3.
-$ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo`
+// If the replication controller named foo's current size is 2, scale foo to 3.
+$ kubectl scale --current-replicas=2 --replicas=3 replicationcontrollers foo`
 )
 
-func NewCmdResize(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+// NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
+func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "resize [--resource-version=version] [--current-replicas=count] --replicas=COUNT RESOURCE ID",
+		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT RESOURCE ID",
+		// resize is deprecated
+		Aliases: []string{"resize"},
 		Short:   "Set a new size for a Replication Controller.",
-		Long:    resize_long,
-		Example: resize_example,
+		Long:    scale_long,
+		Example: scale_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunResize(f, out, cmd, args)
+			err := RunScale(f, out, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmd.Flags().String("resource-version", "", "Precondition for resource version. Requires that the current resource version match this value in order to resize.")
-	cmd.Flags().Int("current-replicas", -1, "Precondition for current size. Requires that the current size of the replication controller match this value in order to resize.")
+	cmd.Flags().String("resource-version", "", "Precondition for resource version. Requires that the current resource version match this value in order to scale.")
+	cmd.Flags().Int("current-replicas", -1, "Precondition for current size. Requires that the current size of the replication controller match this value in order to scale.")
 	cmd.Flags().Int("replicas", -1, "The new desired number of replicas. Required.")
 	cmd.MarkFlagRequired("replicas")
 	return cmd
 }
 
-func RunResize(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+// RunScale executes the scaling
+func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+	if os.Args[1] == "resize" {
+		printDeprecationWarning("scale", "resize")
+	}
+
 	count := cmdutil.GetFlagInt(cmd, "replicas")
 	if count < 0 {
 		return cmdutil.UsageError(cmd, "--replicas=COUNT RESOURCE ID")
@@ -95,19 +104,19 @@ func RunResize(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 	info := infos[0]
 
-	resizer, err := f.Resizer(mapping)
+	scaler, err := f.Scaler(mapping)
 	if err != nil {
 		return err
 	}
 
 	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
 	currentSize := cmdutil.GetFlagInt(cmd, "current-replicas")
-	precondition := &kubectl.ResizePrecondition{currentSize, resourceVersion}
+	precondition := &kubectl.ScalePrecondition{currentSize, resourceVersion}
 	retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
 	waitForReplicas := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
-	if err := resizer.Resize(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
+	if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
 		return err
 	}
-	fmt.Fprint(out, "resized\n")
+	fmt.Fprint(out, "scaled\n")
 	return nil
 }

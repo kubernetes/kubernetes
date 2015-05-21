@@ -56,15 +56,15 @@ We create it as follows:
 kubectl create -f examples/redis/redis-sentinel-controller.yaml
 ```
 
-### Resize our replicated pods
+### Scale our replicated pods
 Initially creating those pods didn't actually do anything, since we only asked for one sentinel and one redis server, and they already existed, nothing changed.  Now we will add more replicas:
 
 ```sh
-kubectl resize rc redis --replicas=3
+kubectl scale rc redis --replicas=3
 ```
 
 ```sh
-kubectl resize rc redis-sentinel --replicas=3
+kubectl scale rc redis-sentinel --replicas=3
 ```
 
 This will create two additional replicas of the redis server and two additional replicas of the redis sentinel.
@@ -86,7 +86,7 @@ Now let's take a close look at what happens after this pod is deleted.  There ar
   3. The redis sentinels themselves, realize that the master has disappeared from the cluster, and begin the election procedure for selecting a new master.  They perform this election and selection, and chose one of the existing redis server replicas to be the new master.
 
 ### Conclusion
-At this point we now have a reliable, scalable Redis installation.  By resizing the replication controller for redis servers, we can increase or decrease the number of read-slaves in our cluster.  Likewise, if failures occur, the redis-sentinels will perform master election and select a new master. 
+At this point we now have a reliable, scalable Redis installation.  By scaling the replication controller for redis servers, we can increase or decrease the number of read-slaves in our cluster.  Likewise, if failures occur, the redis-sentinels will perform master election and select a new master.
 
 ### tl; dr
 For those of you who are impatient, here is the summary of commands we ran in this tutorial
@@ -104,9 +104,9 @@ kubectl create -f examples/redis/redis-controller.yaml
 # Create a replication controller for redis sentinels
 kubectl create -f examples/redis/redis-sentinel-controller.yaml
 
-# Resize both replication controllers
-kubectl resize rc redis --replicas=3
-kubectl resize rc redis-sentinel --replicas=3
+# Scale both replication controllers
+kubectl scale rc redis --replicas=3
+kubectl scale rc redis-sentinel --replicas=3
 
 # Delete the original master pod
 kubectl delete pods redis-master

@@ -41,37 +41,37 @@ func (c *ErrorReplicationControllerClient) ReplicationControllers(namespace stri
 	return &ErrorReplicationControllers{testclient.FakeReplicationControllers{Fake: &c.Fake, Namespace: namespace}}
 }
 
-func TestReplicationControllerResizeRetry(t *testing.T) {
+func TestReplicationControllerScaleRetry(t *testing.T) {
 	fake := &ErrorReplicationControllerClient{Fake: testclient.Fake{}}
-	resizer := ReplicationControllerResizer{NewResizerClient(fake)}
-	preconditions := ResizePrecondition{-1, ""}
+	scaler := ReplicationControllerScaler{NewScalerClient(fake)}
+	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
 	namespace := "default"
 
-	resizeFunc := ResizeCondition(&resizer, &preconditions, namespace, name, count)
-	pass, err := resizeFunc()
+	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	pass, err := scaleFunc()
 	if pass != false {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
 	if err != nil {
 		t.Errorf("Did not expect an error on update failure, got %v", err)
 	}
-	preconditions = ResizePrecondition{3, ""}
-	resizeFunc = ResizeCondition(&resizer, &preconditions, namespace, name, count)
-	pass, err = resizeFunc()
+	preconditions = ScalePrecondition{3, ""}
+	scaleFunc = ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	pass, err = scaleFunc()
 	if err == nil {
 		t.Errorf("Expected error on precondition failure")
 	}
 }
 
-func TestReplicationControllerResize(t *testing.T) {
+func TestReplicationControllerScale(t *testing.T) {
 	fake := &testclient.Fake{}
-	resizer := ReplicationControllerResizer{NewResizerClient(fake)}
-	preconditions := ResizePrecondition{-1, ""}
+	scaler := ReplicationControllerScaler{NewScalerClient(fake)}
+	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
-	resizer.Resize("default", name, count, &preconditions, nil, nil)
+	scaler.Scale("default", name, count, &preconditions, nil, nil)
 
 	if len(fake.Actions) != 2 {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
@@ -84,17 +84,17 @@ func TestReplicationControllerResize(t *testing.T) {
 	}
 }
 
-func TestReplicationControllerResizeFailsPreconditions(t *testing.T) {
+func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 	fake := testclient.NewSimpleFake(&api.ReplicationController{
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 10,
 		},
 	})
-	resizer := ReplicationControllerResizer{NewResizerClient(fake)}
-	preconditions := ResizePrecondition{2, ""}
+	scaler := ReplicationControllerScaler{NewScalerClient(fake)}
+	preconditions := ScalePrecondition{2, ""}
 	count := uint(3)
 	name := "foo"
-	resizer.Resize("default", name, count, &preconditions, nil, nil)
+	scaler.Scale("default", name, count, &preconditions, nil, nil)
 
 	if len(fake.Actions) != 1 {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
@@ -106,18 +106,18 @@ func TestReplicationControllerResizeFailsPreconditions(t *testing.T) {
 
 func TestPreconditionValidate(t *testing.T) {
 	tests := []struct {
-		preconditions ResizePrecondition
+		preconditions ScalePrecondition
 		controller    api.ReplicationController
 		expectError   bool
 		test          string
 	}{
 		{
-			preconditions: ResizePrecondition{-1, ""},
+			preconditions: ScalePrecondition{-1, ""},
 			expectError:   false,
 			test:          "defaults",
 		},
 		{
-			preconditions: ResizePrecondition{-1, ""},
+			preconditions: ScalePrecondition{-1, ""},
 			controller: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
@@ -130,7 +130,7 @@ func TestPreconditionValidate(t *testing.T) {
 			test:        "defaults 2",
 		},
 		{
-			preconditions: ResizePrecondition{0, ""},
+			preconditions: ScalePrecondition{0, ""},
 			controller: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
@@ -143,7 +143,7 @@ func TestPreconditionValidate(t *testing.T) {
 			test:        "size matches",
 		},
 		{
-			preconditions: ResizePrecondition{-1, "foo"},
+			preconditions: ScalePrecondition{-1, "foo"},
 			controller: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
@@ -156,7 +156,7 @@ func TestPreconditionValidate(t *testing.T) {
 			test:        "resource version matches",
 		},
 		{
-			preconditions: ResizePrecondition{10, "foo"},
+			preconditions: ScalePrecondition{10, "foo"},
 			controller: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
@@ -169,7 +169,7 @@ func TestPreconditionValidate(t *testing.T) {
 			test:        "both match",
 		},
 		{
-			preconditions: ResizePrecondition{10, "foo"},
+			preconditions: ScalePrecondition{10, "foo"},
 			controller: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
@@ -182,7 +182,7 @@ func TestPreconditionValidate(t *testing.T) {
 			test:        "size different",
 		},
 		{
-			preconditions: ResizePrecondition{10, "foo"},
+			preconditions: ScalePrecondition{10, "foo"},
 			controller: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "bar",
@@ -195,7 +195,7 @@ func TestPreconditionValidate(t *testing.T) {
 			test:        "version different",
 		},
 		{
-			preconditions: ResizePrecondition{10, "foo"},
+			preconditions: ScalePrecondition{10, "foo"},
 			controller: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "bar",

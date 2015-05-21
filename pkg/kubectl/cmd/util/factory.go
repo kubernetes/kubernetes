@@ -65,8 +65,8 @@ type Factory struct {
 	Describer func(mapping *meta.RESTMapping) (kubectl.Describer, error)
 	// Returns a Printer for formatting objects of the given type or an error.
 	Printer func(mapping *meta.RESTMapping, noHeaders, withNamespace bool) (kubectl.ResourcePrinter, error)
-	// Returns a Resizer for changing the size of the specified RESTMapping type or an error
-	Resizer func(mapping *meta.RESTMapping) (kubectl.Resizer, error)
+	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
+	Scaler func(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 	// Returns a Reaper for gracefully shutting down resources.
 	Reaper func(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 	// PodSelectorForObject returns the pod selector associated with the provided object
@@ -187,12 +187,12 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		LabelsForObject: func(object runtime.Object) (map[string]string, error) {
 			return meta.NewAccessor().Labels(object)
 		},
-		Resizer: func(mapping *meta.RESTMapping) (kubectl.Resizer, error) {
+		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ResizerFor(mapping.Kind, kubectl.NewResizerClient(client))
+			return kubectl.ScalerFor(mapping.Kind, kubectl.NewScalerClient(client))
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)

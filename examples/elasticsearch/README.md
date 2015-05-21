@@ -143,19 +143,19 @@ Let's see what we've got:
 $ kubectl get pods,rc,services,secrets --namespace=mytunes
 
 POD              IP            CONTAINER(S)   IMAGE(S)                       HOST                                     LABELS          STATUS    CREATED      MESSAGE
-music-db-0fwsu   10.244.2.48                                                 kubernetes-minion-m49b/104.197.35.221    name=music-db   Running   6 minutes    
-                               es             kubernetes/elasticsearch:1.0                                                            Running   29 seconds   
-music-db-5pc2e   10.244.0.24                                                 kubernetes-minion-3c8c/146.148.41.184    name=music-db   Running   6 minutes    
-                               es             kubernetes/elasticsearch:1.0                                                            Running   6 minutes    
-music-db-bjqmv   10.244.3.31                                                 kubernetes-minion-zey5/104.154.59.10     name=music-db   Running   6 minutes    
-                               es             kubernetes/elasticsearch:1.0                                                            Running   19 seconds   
-music-db-swtrs   10.244.1.37                                                 kubernetes-minion-f9dw/130.211.159.230   name=music-db   Running   6 minutes    
-                               es             kubernetes/elasticsearch:1.0                                                            Running   6 minutes    
+music-db-0fwsu   10.244.2.48                                                 kubernetes-minion-m49b/104.197.35.221    name=music-db   Running   6 minutes
+                               es             kubernetes/elasticsearch:1.0                                                            Running   29 seconds
+music-db-5pc2e   10.244.0.24                                                 kubernetes-minion-3c8c/146.148.41.184    name=music-db   Running   6 minutes
+                               es             kubernetes/elasticsearch:1.0                                                            Running   6 minutes
+music-db-bjqmv   10.244.3.31                                                 kubernetes-minion-zey5/104.154.59.10     name=music-db   Running   6 minutes
+                               es             kubernetes/elasticsearch:1.0                                                            Running   19 seconds
+music-db-swtrs   10.244.1.37                                                 kubernetes-minion-f9dw/130.211.159.230   name=music-db   Running   6 minutes
+                               es             kubernetes/elasticsearch:1.0                                                            Running   6 minutes
 CONTROLLER   CONTAINER(S)   IMAGE(S)                       SELECTOR        REPLICAS
 music-db     es             kubernetes/elasticsearch:1.0   name=music-db   4
 NAME           LABELS          SELECTOR        IP(S)            PORT(S)
 music-server   name=music-db   name=music-db   10.0.138.61      9200/TCP
-                                               104.197.12.157   
+                                               104.197.12.157
 NAME               TYPE      DATA
 apiserver-secret   Opaque    2
 ```
@@ -235,30 +235,30 @@ $ curl 104.197.12.157:9200/_nodes?pretty=true
 ```
 Let's ramp up the number of Elasticsearch nodes from 4 to 10:
 ```
-$ kubectl resize --replicas=10 replicationcontrollers music-db --namespace=mytunes
-resized
+$ kubectl scale --replicas=10 replicationcontrollers music-db --namespace=mytunes
+scaled
 $ kubectl get pods --namespace=mytunes
 POD              IP            CONTAINER(S)   IMAGE(S)                       HOST                                     LABELS          STATUS    CREATED      MESSAGE
-music-db-0fwsu   10.244.2.48                                                 kubernetes-minion-m49b/104.197.35.221    name=music-db   Running   33 minutes   
-                               es             kubernetes/elasticsearch:1.0                                                            Running   26 minutes   
-music-db-2erje   10.244.2.50                                                 kubernetes-minion-m49b/104.197.35.221    name=music-db   Running   48 seconds   
-                               es             kubernetes/elasticsearch:1.0                                                            Running   46 seconds   
-music-db-5pc2e   10.244.0.24                                                 kubernetes-minion-3c8c/146.148.41.184    name=music-db   Running   33 minutes   
-                               es             kubernetes/elasticsearch:1.0                                                            Running   32 minutes   
-music-db-8rkvp   10.244.3.33                                                 kubernetes-minion-zey5/104.154.59.10     name=music-db   Running   48 seconds   
-                               es             kubernetes/elasticsearch:1.0                                                            Running   46 seconds   
-music-db-bjqmv   10.244.3.31                                                 kubernetes-minion-zey5/104.154.59.10     name=music-db   Running   33 minutes   
-                               es             kubernetes/elasticsearch:1.0                                                            Running   26 minutes   
-music-db-efc46   10.244.2.49                                                 kubernetes-minion-m49b/104.197.35.221    name=music-db   Running   48 seconds   
-                               es             kubernetes/elasticsearch:1.0                                                            Running   46 seconds   
-music-db-fhqyg   10.244.0.25                                                 kubernetes-minion-3c8c/146.148.41.184    name=music-db   Running   48 seconds   
-                               es             kubernetes/elasticsearch:1.0                                                            Running   47 seconds   
-music-db-guxe4   10.244.3.32                                                 kubernetes-minion-zey5/104.154.59.10     name=music-db   Running   48 seconds   
-                               es             kubernetes/elasticsearch:1.0                                                            Running   46 seconds   
-music-db-pbiq1   10.244.1.38                                                 kubernetes-minion-f9dw/130.211.159.230   name=music-db   Running   48 seconds   
-                               es             kubernetes/elasticsearch:1.0                                                            Running   47 seconds   
-music-db-swtrs   10.244.1.37                                                 kubernetes-minion-f9dw/130.211.159.230   name=music-db   Running   33 minutes   
-                               es             kubernetes/elasticsearch:1.0                                                            Running   32 minutes 
+music-db-0fwsu   10.244.2.48                                                 kubernetes-minion-m49b/104.197.35.221    name=music-db   Running   33 minutes
+                               es             kubernetes/elasticsearch:1.0                                                            Running   26 minutes
+music-db-2erje   10.244.2.50                                                 kubernetes-minion-m49b/104.197.35.221    name=music-db   Running   48 seconds
+                               es             kubernetes/elasticsearch:1.0                                                            Running   46 seconds
+music-db-5pc2e   10.244.0.24                                                 kubernetes-minion-3c8c/146.148.41.184    name=music-db   Running   33 minutes
+                               es             kubernetes/elasticsearch:1.0                                                            Running   32 minutes
+music-db-8rkvp   10.244.3.33                                                 kubernetes-minion-zey5/104.154.59.10     name=music-db   Running   48 seconds
+                               es             kubernetes/elasticsearch:1.0                                                            Running   46 seconds
+music-db-bjqmv   10.244.3.31                                                 kubernetes-minion-zey5/104.154.59.10     name=music-db   Running   33 minutes
+                               es             kubernetes/elasticsearch:1.0                                                            Running   26 minutes
+music-db-efc46   10.244.2.49                                                 kubernetes-minion-m49b/104.197.35.221    name=music-db   Running   48 seconds
+                               es             kubernetes/elasticsearch:1.0                                                            Running   46 seconds
+music-db-fhqyg   10.244.0.25                                                 kubernetes-minion-3c8c/146.148.41.184    name=music-db   Running   48 seconds
+                               es             kubernetes/elasticsearch:1.0                                                            Running   47 seconds
+music-db-guxe4   10.244.3.32                                                 kubernetes-minion-zey5/104.154.59.10     name=music-db   Running   48 seconds
+                               es             kubernetes/elasticsearch:1.0                                                            Running   46 seconds
+music-db-pbiq1   10.244.1.38                                                 kubernetes-minion-f9dw/130.211.159.230   name=music-db   Running   48 seconds
+                               es             kubernetes/elasticsearch:1.0                                                            Running   47 seconds
+music-db-swtrs   10.244.1.37                                                 kubernetes-minion-f9dw/130.211.159.230   name=music-db   Running   33 minutes
+                               es             kubernetes/elasticsearch:1.0                                                            Running   32 minutes
 
 ```
 Let's check to make sure that these 10 nodes are part of the same Elasticsearch cluster:
