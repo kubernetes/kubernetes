@@ -39,7 +39,7 @@ import (
 // AUTO-GENERATED FUNCTIONS START HERE
 EOF
 
-	go run cmd/kube-conversion/conversion.go -v ${version} -f - >>  $TMPFILE
+	GOPATH=$(godep path):$GOPATH go run cmd/kube-conversion/conversion.go -v ${version} -f - >>  $TMPFILE
 
 	cat >> $TMPFILE <<EOF
 // AUTO-GENERATED FUNCTIONS END HERE
