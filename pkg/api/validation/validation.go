@@ -342,10 +342,14 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validatePersistentClaimVolumeSource(source.PersistentVolumeClaimVolumeSource).Prefix("persistentVolumeClaim")...)
 	}
-
+	if source.RBD != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateRBD(source.RBD).Prefix("rbd")...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
+
 	return allErrs
 }
 
@@ -451,6 +455,20 @@ func validateGlusterfs(glusterfs *api.GlusterfsVolumeSource) errs.ValidationErro
 	return allErrs
 }
 
+func validateRBD(rbd *api.RBDVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(rbd.CephMonitors) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("monitors"))
+	}
+	if rbd.RBDImage == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("image"))
+	}
+	if rbd.FSType == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("fsType"))
+	}
+	return allErrs
+}
+
 func ValidatePersistentVolumeName(name string, prefix bool) (bool, string) {
 	return nameIsDNSSubdomain(name, prefix)
 }
@@ -495,6 +513,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	if pv.Spec.NFS != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateNFS(pv.Spec.NFS).Prefix("nfs")...)
+	}
+	if pv.Spec.RBD != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateRBD(pv.Spec.RBD).Prefix("rbd")...)
 	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.PersistentVolumeSource, "exactly 1 volume type is required"))

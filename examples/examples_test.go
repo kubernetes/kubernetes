@@ -178,6 +178,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"pod":         &api.Pod{},
 			"replication": &api.ReplicationController{},
 		},
+		"../examples/rbd/v1beta3": {
+			"rbd":             &api.Pod{},
+			"rbd-with-secret": &api.Pod{},
+		},
 	}
 
 	for path, expected := range cases {

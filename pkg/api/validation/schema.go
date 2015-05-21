@@ -151,6 +151,7 @@ func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, 
 			return NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName)
 		}
 		var arrType string
+		glog.Infof("field detail %v", fieldDetails)
 		if fieldDetails.Items.Ref == nil && fieldDetails.Items.Type == nil {
 			return NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName)
 		}

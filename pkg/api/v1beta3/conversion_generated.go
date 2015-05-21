@@ -1184,6 +1184,14 @@ func convert_api_PersistentVolumeSource_To_v1beta3_PersistentVolumeSource(in *ap
 	} else {
 		out.NFS = nil
 	}
+	if in.RBD != nil {
+		out.RBD = new(RBDVolumeSource)
+		if err := convert_api_RBDVolumeSource_To_v1beta3_RBDVolumeSource(in.RBD, out.RBD, s); err != nil {
+			return err
+		}
+	} else {
+		out.RBD = nil
+	}
 	return nil
 }
 
@@ -1508,6 +1516,35 @@ func convert_api_Probe_To_v1beta3_Probe(in *api.Probe, out *Probe, s conversion.
 	}
 	out.InitialDelaySeconds = in.InitialDelaySeconds
 	out.TimeoutSeconds = in.TimeoutSeconds
+	return nil
+}
+
+func convert_api_RBDVolumeSource_To_v1beta3_RBDVolumeSource(in *api.RBDVolumeSource, out *RBDVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.RBDVolumeSource))(in)
+	}
+	if in.CephMonitors != nil {
+		out.CephMonitors = make([]string, len(in.CephMonitors))
+		for i := range in.CephMonitors {
+			out.CephMonitors[i] = in.CephMonitors[i]
+		}
+	} else {
+		out.CephMonitors = nil
+	}
+	out.RBDImage = in.RBDImage
+	out.FSType = in.FSType
+	out.RBDPool = in.RBDPool
+	out.RadosUser = in.RadosUser
+	out.Keyring = in.Keyring
+	if in.SecretRef != nil {
+		out.SecretRef = new(LocalObjectReference)
+		if err := convert_api_LocalObjectReference_To_v1beta3_LocalObjectReference(in.SecretRef, out.SecretRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
@@ -2171,6 +2208,14 @@ func convert_api_VolumeSource_To_v1beta3_VolumeSource(in *api.VolumeSource, out 
 		}
 	} else {
 		out.PersistentVolumeClaimVolumeSource = nil
+	}
+	if in.RBD != nil {
+		out.RBD = new(RBDVolumeSource)
+		if err := convert_api_RBDVolumeSource_To_v1beta3_RBDVolumeSource(in.RBD, out.RBD, s); err != nil {
+			return err
+		}
+	} else {
+		out.RBD = nil
 	}
 	return nil
 }
@@ -3334,6 +3379,14 @@ func convert_v1beta3_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Pe
 	} else {
 		out.NFS = nil
 	}
+	if in.RBD != nil {
+		out.RBD = new(api.RBDVolumeSource)
+		if err := convert_v1beta3_RBDVolumeSource_To_api_RBDVolumeSource(in.RBD, out.RBD, s); err != nil {
+			return err
+		}
+	} else {
+		out.RBD = nil
+	}
 	return nil
 }
 
@@ -3658,6 +3711,35 @@ func convert_v1beta3_Probe_To_api_Probe(in *Probe, out *api.Probe, s conversion.
 	}
 	out.InitialDelaySeconds = in.InitialDelaySeconds
 	out.TimeoutSeconds = in.TimeoutSeconds
+	return nil
+}
+
+func convert_v1beta3_RBDVolumeSource_To_api_RBDVolumeSource(in *RBDVolumeSource, out *api.RBDVolumeSource, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*RBDVolumeSource))(in)
+	}
+	if in.CephMonitors != nil {
+		out.CephMonitors = make([]string, len(in.CephMonitors))
+		for i := range in.CephMonitors {
+			out.CephMonitors[i] = in.CephMonitors[i]
+		}
+	} else {
+		out.CephMonitors = nil
+	}
+	out.RBDImage = in.RBDImage
+	out.FSType = in.FSType
+	out.RBDPool = in.RBDPool
+	out.RadosUser = in.RadosUser
+	out.Keyring = in.Keyring
+	if in.SecretRef != nil {
+		out.SecretRef = new(api.LocalObjectReference)
+		if err := convert_v1beta3_LocalObjectReference_To_api_LocalObjectReference(in.SecretRef, out.SecretRef, s); err != nil {
+			return err
+		}
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
@@ -4322,6 +4404,14 @@ func convert_v1beta3_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api
 	} else {
 		out.PersistentVolumeClaimVolumeSource = nil
 	}
+	if in.RBD != nil {
+		out.RBD = new(api.RBDVolumeSource)
+		if err := convert_v1beta3_RBDVolumeSource_To_api_RBDVolumeSource(in.RBD, out.RBD, s); err != nil {
+			return err
+		}
+	} else {
+		out.RBD = nil
+	}
 	return nil
 }
 
@@ -4406,6 +4496,7 @@ func init() {
 		convert_api_PodTemplate_To_v1beta3_PodTemplate,
 		convert_api_Pod_To_v1beta3_Pod,
 		convert_api_Probe_To_v1beta3_Probe,
+		convert_api_RBDVolumeSource_To_v1beta3_RBDVolumeSource,
 		convert_api_RangeAllocation_To_v1beta3_RangeAllocation,
 		convert_api_ReplicationControllerList_To_v1beta3_ReplicationControllerList,
 		convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec,
@@ -4516,6 +4607,7 @@ func init() {
 		convert_v1beta3_PodTemplate_To_api_PodTemplate,
 		convert_v1beta3_Pod_To_api_Pod,
 		convert_v1beta3_Probe_To_api_Probe,
+		convert_v1beta3_RBDVolumeSource_To_api_RBDVolumeSource,
 		convert_v1beta3_RangeAllocation_To_api_RangeAllocation,
 		convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList,
 		convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec,

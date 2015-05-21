@@ -205,6 +205,8 @@ type VolumeSource struct {
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs"`
 	// PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace
 	PersistentVolumeClaimVolumeSource *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
+	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
+	RBD *RBDVolumeSource `json:"rbd"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -224,6 +226,8 @@ type PersistentVolumeSource struct {
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
 	NFS *NFSVolumeSource `json:"nfs"`
+	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
+	RBD *RBDVolumeSource `json:"rbd"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -479,6 +483,30 @@ type GlusterfsVolumeSource struct {
 
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the Glusterfs to be mounted with read-only permissions
+	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// RBDVolumeSource represents a Rados Block Device Mount that lasts the lifetime of a pod
+type RBDVolumeSource struct {
+	// Required: CephMonitors is a collection of Ceph monitors
+	CephMonitors []string `json:"monitors"`
+	// Required: RBDImage is the rados image name
+	RBDImage string `json:"image"`
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType string `json:"fsType,omitempty"`
+	// Optional: RadosPool is the rados pool name,default is rbd
+	RBDPool string `json:"pool"`
+	// Optional: RBDUser is the rados user name, default is admin
+	RadosUser string `json:"user"`
+	// Optional: Keyring is the path to key ring for RBDUser, default is /etc/ceph/keyring
+	Keyring string `json:"keyring"`
+	// Optional: SecretRef is name of the authentication secret for RBDUser, default is empty.
+	SecretRef *LocalObjectReference `json:"secretRef"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
