@@ -1592,7 +1592,7 @@ func www_app_assets_css_app_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37661, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37661, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3391,7 +3391,7 @@ app.controller('ListMinionsCtrl', [
 app.controller('ListPodsCtrl', [
   '$scope',
   '$routeParams',
-  'k8sApi',
+  'k8sv1Beta3Api',
   'lodash',
   '$location',
   function($scope, $routeParams, k8sApi, lodash, $location) {
@@ -3434,7 +3434,7 @@ app.controller('ListPodsCtrl', [
       $scope.loading = false;
     };
 
-    function getPodName(pod) { return _.has(pod.labels, 'name') ? pod.labels.name : pod.id; }
+    function getPodName(pod) { return _.has(pod.metadata.labels, 'name') ? pod.metadata.labels.name : pod.metadata.name; }
 
     $scope.content = [];
 
@@ -3454,34 +3454,34 @@ app.controller('ListPodsCtrl', [
         data.items.forEach(function(pod) {
           var _containers = '', _images = '', _labels = '', _uses = '';
 
-          if (pod.desiredState.manifest) {
-            Object.keys(pod.desiredState.manifest.containers)
+          if (pod.spec) {
+            Object.keys(pod.spec.containers)
                 .forEach(function(key) {
-                  _containers += ', ' + pod.desiredState.manifest.containers[key].name;
-                  _images += ', ' + pod.desiredState.manifest.containers[key].image;
+                  _containers += ', ' + pod.spec.containers[key].name;
+                  _images += ', ' + pod.spec.containers[key].image;
                 });
           }
 
-          if (pod.labels) {
-            Object.keys(pod.labels)
+          if (pod.metadata.labels) {
+            Object.keys(pod.metadata.labels)
                 .forEach(function(key) {
                   if (key == 'name') {
-                    _labels += ', ' + pod.labels[key];
+                    _labels += ', ' + pod.metadata.labels[key];
                   }
                   if (key == 'uses') {
-                    _uses += ', ' + pod.labels[key];
+                    _uses += ', ' + pod.metadata.labels[key];
                   }
                 });
             }
 
           $scope.content.push({
-            pod: pod.id,
-            ip: pod.currentState.podIP,
+            pod: pod.metadata.name,
+            ip: pod.status.podIP,
             containers: _fixComma(_containers),
             images: _fixComma(_images),
-            host: pod.currentState.host,
+            host: pod.spec.host,
             labels: _fixComma(_labels) + ':' + _fixComma(_uses),
-            status: pod.currentState.status
+            status: pod.status.phase
           });
 
         });
@@ -3491,8 +3491,8 @@ app.controller('ListPodsCtrl', [
 
     $scope.getPodRestarts = function(pod) {
       var r = null;
-      var container = _.first(pod.desiredState.manifest.containers);
-      if (container) r = pod.currentState.info[container.name].restartCount;
+      var container = _.first(pod.spec.containers);
+      if (container) r = pod.status.containerStatuses[container.name].restartCount;
       return r;
     };
 
@@ -3500,7 +3500,7 @@ app.controller('ListPodsCtrl', [
 
     $scope.podStatusClass = function(pod) {
 
-      var s = pod.currentState.status.toLowerCase();
+      var s = pod.status.phase.toLowerCase();
 
       if (s == 'running' || s == 'succeeded')
         return null;
@@ -3772,7 +3772,7 @@ app.controller('PodCtrl', [
   '$scope',
   '$interval',
   '$routeParams',
-  'k8sApi',
+  'k8sv1Beta3Api',
   '$rootScope',
   function($scope, $interval, $routeParams, k8sApi, $rootScope) {
     'use strict';
@@ -4681,7 +4681,7 @@ func www_app_assets_js_app_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 93570, mode: os.FileMode(420), modTime: time.Unix(1432767440, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 93554, mode: os.FileMode(420), modTime: time.Unix(1432768978, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4723,7 +4723,7 @@ func www_app_assets_js_base_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(420), modTime: time.Unix(1432767440, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(420), modTime: time.Unix(1432768977, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4740,7 +4740,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_18px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4761,7 +4761,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_24px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4778,7 +4778,7 @@ func www_app_components_dashboard_img_icons_ic_close_18px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4795,7 +4795,7 @@ func www_app_components_dashboard_img_icons_ic_close_24px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4877,7 +4877,7 @@ func www_app_components_dashboard_manifest_json() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(420), modTime: time.Unix(1432767443, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4894,7 +4894,7 @@ func www_app_components_dashboard_pages_footer_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1432767443, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4937,7 +4937,7 @@ func www_app_components_dashboard_pages_header_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(420), modTime: time.Unix(1432767443, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4961,7 +4961,7 @@ func www_app_components_dashboard_pages_home_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4978,7 +4978,7 @@ func www_app_components_dashboard_protractor_smoke_spec_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/protractor/smoke.spec.js", size: 2616, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/protractor/smoke.spec.js", size: 2616, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4995,7 +4995,7 @@ func www_app_components_dashboard_test_controllers_header_spec_js() (*asset, err
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/test/controllers/header.spec.js", size: 1293, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/test/controllers/header.spec.js", size: 1293, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5046,7 +5046,7 @@ func www_app_components_dashboard_views_groups_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5070,7 +5070,7 @@ func www_app_components_dashboard_views_listevents_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5094,7 +5094,7 @@ func www_app_components_dashboard_views_listminions_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5118,7 +5118,7 @@ func www_app_components_dashboard_views_listpods_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5194,7 +5194,7 @@ func www_app_components_dashboard_views_listpodscards_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5228,7 +5228,7 @@ func www_app_components_dashboard_views_listpodsvisualizer_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5252,7 +5252,7 @@ func www_app_components_dashboard_views_listreplicationcontrollers_html() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5276,7 +5276,7 @@ func www_app_components_dashboard_views_listservices_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5382,7 +5382,7 @@ func www_app_components_dashboard_views_node_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 2307, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 2307, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5408,7 +5408,7 @@ func www_app_components_dashboard_views_partials_cadvisor_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 443, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 443, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5445,7 +5445,7 @@ func www_app_components_dashboard_views_partials_groupbox_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5504,7 +5504,7 @@ func www_app_components_dashboard_views_partials_groupitem_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2213, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2213, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5554,7 +5554,7 @@ func www_app_components_dashboard_views_partials_podtilesbyname_html() (*asset, 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5604,7 +5604,7 @@ func www_app_components_dashboard_views_partials_podtilesbyserver_html() (*asset
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5619,47 +5619,44 @@ var _www_app_components_dashboard_views_pod_html = []byte(`<div dashboard-header
       </div>
 
       <div class="heading">
-        <span class="label">Pod:</span>
-        <span>{{pod.id}}</span>
+        <span class="label">Name:</span>
+        <span>{{pod.metadata.name}}</span>
       </div>
 
 
-      <table>
+      <table class="align-top">
         <tbody>
           <tr>
             <td class="name">Status</td>
             <td class="value">
-              {{pod.currentState.status}} on <a ng-href="#/dashboard/groups/host/selector/host={{pod.currentState.host}}">{{pod.currentState.host}}</a>
+              {{pod.status.phase}} on <a ng-href="#/dashboard/groups/host/selector/host={{pod.spec.host}}">{{pod.spec.host}}</a>
             </td>
           </tr>
 
           <tr>
             <td class="name">Created</td>
             <td class="value">
-              {{pod.creationTimestamp | date:'medium'}}
-            </td>
-          </tr>
-
-          <tr>
-            <td class="name">Pod Networking</td>
-            <td class="value">
-              {{pod.currentState.podIP}}
-              <span ng-repeat="container in pod.desiredState.manifest.containers">
-                    <span ng-repeat="port in container.ports">
-                     : {{port.containerPort}}
-                   </span>
-              </span>
+              {{pod.metadata.creationTimestamp | date:'medium'}}
             </td>
           </tr>
 
           <tr>
             <td class="name">Host Networking</td>
             <td class="value">
-              {{pod.currentState.hostIP}}
-              <span ng-repeat="container in pod.desiredState.manifest.containers">
-                  <span ng-repeat="port in container.ports">
-                    :{{port.hostPort}}
+              {{pod.spec.host}}/{{pod.status.hostIP}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Pod Networking</td>
+            <td class="value">
+              {{pod.status.podIP}}
+              <span ng-repeat="container in pod.spec.containers">
+                <span ng-repeat="port in container.ports">
+                  <span ng-show="port.containerPort">
+                    {{port.name}}: {{port.containerPort}}{{$last ? '' : ', '}}
                   </span>
+               </span>
               </span>
             </td>
           </tr>
@@ -5667,7 +5664,7 @@ var _www_app_components_dashboard_views_pod_html = []byte(`<div dashboard-header
           <tr>
             <td class="name">Labels</td>
             <td class="value">
-              <div ng-repeat="(label, value) in pod.labels">
+              <div ng-repeat="(label, value) in pod.metadata.labels">
                 {{label}}: {{value}}
               </div>
             </td>
@@ -5681,14 +5678,37 @@ var _www_app_components_dashboard_views_pod_html = []byte(`<div dashboard-header
                 <tr>
                   <td>Name</td>
                   <td>Image</td>
+                  <td>Ready</td>
                   <td>Restarts</td>
+                  <td>State</td>
                 </tr>
-                <tr ng-repeat="container in pod.desiredState.manifest.containers">
+                <tr ng-repeat="container in pod.status.containerStatuses">
                   <td>{{container.name}}</td>
                   <td>{{container.image}}</td>
-                  <td>{{pod.currentState.info[container.name].restartCount}}</td>
+                  <td>{{container.ready}}</td>
+                  <td>{{container.restartCount}}</td>
+                  <td>
+                    <div ng-show="container.state.running">
+                      <div class="run-state">Running</div>
+                      <div class="run-messages">Started: {{container.state.running.startedAt | date:'medium'}}</div>
+                    </div>
+                    <div ng-show="container.state.waiting">
+                      <div class="run-state">Wating</div>
+                      <div class="run-messages" ng-show="container.state.waiting.reason">Reason: {{container.state.waiting.reason}}</div>
+                    </div>
+                    <div ng-show="container.state.termination">
+                      <div class="run-state">Terminated</div>
+                      <div class="run-messages" ng-show="container.state.termination.reason">Reason: {{container.state.termination.reason}}</div>
+                      <div class="run-messages" ng-show="container.state.termination.message">Message: {{container.state.termination.message}}</div>
+                      <div class="run-messages">Exit Code: {{container.state.termination.exitCode}}</div>
+                      <div class="run-messages" ng-show="container.state.termination.signal">Signal: {{container.state.termination.signal}}</div>
+                      <div class="run-messages">Started: {{container.state.termination.startedAt | date:'medium'}}</div>
+                      <div class="run-messages">Finished: {{container.state.termination.finishedAt | date:'medium'}}</div>
+                    </div>
+                  </td>
                 </tr>
               </table>
+
 
             </td>
           </tr>
@@ -5715,7 +5735,7 @@ func www_app_components_dashboard_views_pod_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 2646, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 4149, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5814,7 +5834,7 @@ func www_app_components_dashboard_views_replication_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 2165, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 2165, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5928,7 +5948,7 @@ func www_app_components_dashboard_views_service_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 2477, mode: os.FileMode(420), modTime: time.Unix(1432767444, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 2477, mode: os.FileMode(420), modTime: time.Unix(1432768981, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
