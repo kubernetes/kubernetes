@@ -3,6 +3,15 @@
 ## are going to deploy.
 
 write_files:
+  - path: /opt/bin/curl-retry.sh
+    permissions: '0755'
+    owner: root
+    content: |
+      #!/bin/sh -x
+      until curl $@
+      do sleep 1
+      done
+
   - path: /opt/bin/register_minion.sh
     permissions: '0755'
     owner: root
@@ -134,18 +143,18 @@ coreos:
         Before=weave-helper.service
         Before=docker.service
         Description=Install Weave
-        Documentation=http://weaveworks.github.io/weave/
+        Documentation=http://docs.weave.works/
         Requires=network-online.target
         [Service]
         Type=oneshot
         RemainAfterExit=yes
         ExecStartPre=/bin/mkdir -p /opt/bin/
-        ExecStartPre=/usr/bin/curl \
+        ExecStartPre=/opt/bin/curl-retry.sh \
           --silent \
           --location \
           https://github.com/weaveworks/weave/releases/download/latest_release/weave \
           --output /opt/bin/weave
-        ExecStartPre=/usr/bin/curl \
+        ExecStartPre=/opt/bin/curl-retry.sh \
           --silent \
           --location \
           https://raw.github.com/errordeveloper/weave-demos/master/poseidon/weave-helper \
@@ -164,11 +173,12 @@ coreos:
         After=install-weave.service
         After=docker.service
         Description=Weave Network Router
-        Documentation=http://weaveworks.github.io/weave/
+        Documentation=http://docs.weave.works/
         Requires=docker.service
         Requires=install-weave.service
         [Service]
         ExecStart=/opt/bin/weave-helper
+        Restart=always
         [Install]
         WantedBy=weave-network.target
 
@@ -179,7 +189,7 @@ coreos:
         After=install-weave.service
         After=docker.service
         Description=Weave Network Router
-        Documentation=http://weaveworks.github.io/weave/
+        Documentation=http://docs.weave.works/
         Requires=docker.service
         Requires=install-weave.service
         [Service]
@@ -189,6 +199,7 @@ coreos:
         ExecStartPre=/opt/bin/weave launch $WEAVE_PEERS
         ExecStart=/usr/bin/docker attach weave
         Restart=on-failure
+        Restart=always
         ExecStop=/opt/bin/weave stop
         [Install]
         WantedBy=weave-network.target
@@ -201,8 +212,6 @@ coreos:
         After=install-weave.service
         Before=weave.service
         Before=docker.service
-        Description=Docker Application Container Engine
-        Documentation=http://docs.docker.io
         Requires=network.target
         Requires=install-weave.service
         [Service]
@@ -226,15 +235,18 @@ coreos:
         Before=kubelet.service
         Before=proxy.service
         Description=Download Kubernetes Binaries
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=http://kubernetes.io/
         Requires=network-online.target
         [Service]
-        Environment=KUBE_RELEASE_TARBALL=https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.15.0/kubernetes.tar.gz
+        Environment=KUBE_RELEASE_TARBALL=https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.17.0/kubernetes.tar.gz
         ExecStartPre=/bin/mkdir -p /opt/
-        ExecStart=/bin/bash -c "curl --silent --location $KUBE_RELEASE_TARBALL | tar xzv -C /tmp/"
+        ExecStart=/opt/bin/curl-retry.sh --silent --location $KUBE_RELEASE_TARBALL --output /tmp/kubernetes.tgz
+        ExecStart=/bin/tar xzvf /tmp/kubernetes.tgz -C /tmp/
         ExecStart=/bin/tar xzvf /tmp/kubernetes/server/kubernetes-server-linux-amd64.tar.gz -C /opt
+        ExecStartPost=/bin/chmod o+rx -R /opt/kubernetes
         ExecStartPost=/bin/ln -s /opt/kubernetes/server/bin/kubectl /opt/bin/
         ExecStartPost=/bin/mv /tmp/kubernetes/examples/guestbook /home/core/guestbook-example
+        ExecStartPost=/bin/chown core. -R /home/core/guestbook-example
         ExecStartPost=/bin/rm -rf /tmp/kubernetes
         ExecStartPost=/bin/sed 's/\("createExternalLoadBalancer":\) true/\1 false/' -i /home/core/guestbook-example/frontend-service.json
         RemainAfterExit=yes
@@ -252,7 +264,7 @@ coreos:
         Before=scheduler.service
         ConditionFileIsExecutable=/opt/kubernetes/server/bin/kube-apiserver
         Description=Kubernetes API Server
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=http://kubernetes.io/
         Wants=download-kubernetes.service
         ConditionHost=kube-00
         [Service]
@@ -276,7 +288,7 @@ coreos:
         After=download-kubernetes.service
         ConditionFileIsExecutable=/opt/kubernetes/server/bin/kube-scheduler
         Description=Kubernetes Scheduler
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=http://kubernetes.io/
         Wants=apiserver.service
         ConditionHost=kube-00
         [Service]
@@ -296,7 +308,7 @@ coreos:
         After=apiserver.service
         ConditionFileIsExecutable=/opt/kubernetes/server/bin/kube-controller-manager
         Description=Kubernetes Controller Manager
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=http://kubernetes.io/
         Wants=apiserver.service
         Wants=download-kubernetes.service
         ConditionHost=kube-00
@@ -317,7 +329,7 @@ coreos:
         After=download-kubernetes.service
         ConditionFileIsExecutable=/opt/kubernetes/server/bin/kubelet
         Description=Kubernetes Kubelet
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=http://kubernetes.io/
         Wants=download-kubernetes.service
         ConditionHost=!kube-00
         [Service]
@@ -343,7 +355,7 @@ coreos:
         After=download-kubernetes.service
         ConditionFileIsExecutable=/opt/kubernetes/server/bin/kube-proxy
         Description=Kubernetes Proxy
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=http://kubernetes.io/
         Wants=download-kubernetes.service
         ConditionHost=!kube-00
         [Service]
@@ -365,7 +377,7 @@ coreos:
         ConditionFileIsExecutable=/opt/kubernetes/server/bin/kubectl
         ConditionFileIsExecutable=/opt/bin/register_minion.sh
         Description=Kubernetes Create Minion
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=http://kubernetes.io/
         Wants=download-kubernetes.service
         ConditionHost=!kube-00
         [Service]
