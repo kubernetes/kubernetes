@@ -26,9 +26,8 @@ import (
 )
 
 const (
-	shortInterval = time.Millisecond * 100
-	interval      = time.Second * 3
-	timeout       = time.Minute * 5
+	Interval = time.Millisecond * 100
+	Timeout  = time.Second * 20
 )
 
 // A Reaper handles terminating an object as gracefully as possible.
@@ -52,7 +51,7 @@ func IsNoSuchReaperError(err error) bool {
 func ReaperFor(kind string, c client.Interface) (Reaper, error) {
 	switch kind {
 	case "ReplicationController":
-		return &ReplicationControllerReaper{c, interval, timeout}, nil
+		return &ReplicationControllerReaper{c, Interval, Timeout}, nil
 	case "Pod":
 		return &PodReaper{c}, nil
 	case "Service":
@@ -83,8 +82,8 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, gracePer
 	if err != nil {
 		return "", err
 	}
-	retry := &RetryParams{shortInterval, reaper.timeout}
-	waitForReplicas := &RetryParams{reaper.pollInterval, reaper.timeout}
+	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
+	waitForReplicas := NewRetryParams(reaper.pollInterval, reaper.timeout)
 	if err = resizer.Resize(namespace, name, 0, nil, retry, waitForReplicas); err != nil {
 		return "", err
 	}
