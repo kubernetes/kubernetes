@@ -31,8 +31,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var c *client.Client = nil
-
 func LaunchNetTestPodPerNode(nodes *api.NodeList, name string, c *client.Client, ns string) []string {
 	podNames := []string{}
 
