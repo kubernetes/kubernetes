@@ -136,6 +136,16 @@
 			"Comment": "v2-27-g97e243d",
 			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
 		},
+                {
+			"ImportPath": "github.com/coreos/rkt/common",
+			"Comment": "v0.5.5",
+			"Rev": "40ced98c320c056e343fe9c3eaeb90a4ff248936"
+		},
+		{
+			"ImportPath": "github.com/coreos/rkt/pkg/keystore",
+			"Comment": "v0.5.5",
+			"Rev": "40ced98c320c056e343fe9c3eaeb90a4ff248936"
+		},
 		{
 			"ImportPath": "github.com/cpuguy83/go-md2man",
 			"Comment": "v1.0.2-5-g2831f11",
@@ -522,6 +532,14 @@
 			"ImportPath": "github.com/xyproto/simpleredis",
 			"Comment": "v1.0-13-g5292687",
 			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
+		},
+                {
+			"ImportPath": "golang.org/x/crypto/cast5",
+			"Rev": "c84e1f8e3a7e322d497cd16c0e8a13c7e127baf3"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/openpgp",
+			"Rev": "c84e1f8e3a7e322d497cd16c0e8a13c7e127baf3"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh",
