@@ -46,6 +46,9 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from %q: %v", source, err)
 	}
+	if kind == "" {
+		return nil, fmt.Errorf("kind not set in %q", source)
+	}
 	mapping, err := m.RESTMapping(kind, version)
 	if err != nil {
 		return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
