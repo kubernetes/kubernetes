@@ -184,7 +184,7 @@ NAME   IMAGE(S)   HOST   LABELS   STATUS
 $ cluster/kubectl.sh get services
 NAME   LABELS   SELECTOR   IP   PORT
 
-$ cluster/kubectl.sh get replicationControllers
+$ cluster/kubectl.sh get replicationcontrollers
 NAME   IMAGE(S   SELECTOR   REPLICAS
 ```
 
@@ -224,7 +224,7 @@ kubernetes-minion-1:
     fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b
 ```
 
-Going back to listing the pods, services and replicationControllers, you now have:
+Going back to listing the pods, services and replicationcontrollers, you now have:
 
 ```
 $ cluster/kubectl.sh get pods
@@ -236,7 +236,7 @@ NAME                                   IMAGE(S)            HOST                 
 $ cluster/kubectl.sh get services
 NAME   LABELS   SELECTOR   IP   PORT
 
-$ cluster/kubectl.sh get replicationControllers
+$ cluster/kubectl.sh get replicationcontrollers
 NAME      IMAGE(S            SELECTOR       REPLICAS
 myNginx   nginx              name=my-nginx   3
 ```

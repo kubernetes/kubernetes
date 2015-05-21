@@ -89,7 +89,7 @@ No pods will be available before starting a container:
     kubectl get pods
     POD  CONTAINER(S)   IMAGE(S)   HOST  LABELS  STATUS
 
-    kubectl get replicationControllers
+    kubectl get replicationcontrollers
     CONTROLLER  CONTAINER(S)  IMAGE(S)  SELECTOR  REPLICAS
 
 We'll follow the aws-coreos example. Create a pod manifest: `pod.json`

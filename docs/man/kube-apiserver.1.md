@@ -9,7 +9,7 @@ kube-apiserver \- Provides the API for kubernetes orchestration.
 
 # DESCRIPTION
 
-The **kubernetes** API server validates and configures data for 3 types of objects: pods, services, and replicationControllers. Beyond just servicing REST operations, the API Server does two other things as well: 1. Schedules pods to worker nodes. Right now the scheduler is very simple. 2. Synchronize pod information (where they are, what ports they are exposing) with the service configuration.
+The **kubernetes** API server validates and configures data for 3 types of objects: pods, services, and replicationcontrollers. Beyond just servicing REST operations, the API Server does two other things as well: 1. Schedules pods to worker nodes. Right now the scheduler is very simple. 2. Synchronize pod information (where they are, what ports they are exposing) with the service configuration.
 
 The the kube-apiserver several options.
 
