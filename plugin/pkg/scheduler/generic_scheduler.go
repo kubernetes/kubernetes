@@ -40,7 +40,7 @@ var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
 // implementation of the error interface
 func (f *FitError) Error() string {
-	output := fmt.Sprintf("failed to find fit for pod: %v", f.Pod)
+	output := fmt.Sprintf("failed to find fit for pod, ")
 	for node, predicateList := range f.FailedPredicates {
 		output = output + fmt.Sprintf("Node %s: %s", node, strings.Join(predicateList.List(), ","))
 	}
