@@ -102,10 +102,10 @@ the `kubernetes` DNS name, which resolves to a Service IP which in turn
 will be routed to an apiserver.
 
 The recommended way to authenticate to the apiserver is with a
-[service account](../docs/service_accounts.md).  By default, a pod
+[service account](service_accounts.md) credential.  By default, a pod
 is associated with a service account, and a credential (token) for that
 service account is placed into the filesystem tree of each container in that pod,
-at `/var/run/secrets/kubernetes.io/serviceaccount`.
+at `/var/run/secrets/kubernetes.io/serviceaccount/token`.
 
 From within a pod the recommended ways to connect to API are:
   - run a kubectl proxy as one of the containers in the pod, or as a background
@@ -115,6 +115,7 @@ From within a pod the recommended ways to connect to API are:
     in a pod](../examples/kubectl-container/).
   - use the Go client library, and create a client using the `client.NewInContainer()` factory.
     This handles locating and authenticating to the apiserver.
+In each case, the credentials of the pod are used to communicate securely with the apiserver.
 
 
 ## <a name="otherservices"></a>Accessing services running on the cluster

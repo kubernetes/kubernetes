@@ -68,7 +68,7 @@ This can be used to preload certain images for speed or as an alternative to aut
 
 All pods will have read access to any pre-pulled images.
 
-### Specifying ImagePullKeys on a Pod
+### Specifying ImagePullSecrets on a Pod
 Kubernetes supports specifying registry keys on a pod.
 
 First, create a `.dockercfg`, such as running `docker login <registry.domain>`.
