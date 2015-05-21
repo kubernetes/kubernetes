@@ -365,7 +365,7 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 		Image: dockertools.PodInfraContainerImage,
 		Ports: ports,
 	}
-	return dockertools.HashContainer(container)
+	return kubecontainer.HashContainer(container)
 }
 
 func TestSyncPodsDoesNothing(t *testing.T) {
@@ -395,7 +395,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>_<random>
-			Names: []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&container), 16) + "_foo_new_12345678_0"},
+			Names: []string{"/k8s_bar." + strconv.FormatUint(kubecontainer.HashContainer(&container), 16) + "_foo_new_12345678_0"},
 			ID:    "1234",
 		},
 		{
@@ -3895,12 +3895,12 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 	exitedAPIContainers := []docker.APIContainers{
 		{
 			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
-			Names: []string{"/k8s_succeeded." + strconv.FormatUint(dockertools.HashContainer(&containers[0]), 16) + "_foo_new_12345678_0"},
+			Names: []string{"/k8s_succeeded." + strconv.FormatUint(kubecontainer.HashContainer(&containers[0]), 16) + "_foo_new_12345678_0"},
 			ID:    "1234",
 		},
 		{
 			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
-			Names: []string{"/k8s_failed." + strconv.FormatUint(dockertools.HashContainer(&containers[1]), 16) + "_foo_new_12345678_0"},
+			Names: []string{"/k8s_failed." + strconv.FormatUint(kubecontainer.HashContainer(&containers[1]), 16) + "_foo_new_12345678_0"},
 			ID:    "5678",
 		},
 	}
@@ -4037,12 +4037,12 @@ func TestGetPodStatusWithLastTermination(t *testing.T) {
 	exitedAPIContainers := []docker.APIContainers{
 		{
 			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
-			Names: []string{"/k8s_succeeded." + strconv.FormatUint(dockertools.HashContainer(&containers[0]), 16) + "_foo_new_12345678_0"},
+			Names: []string{"/k8s_succeeded." + strconv.FormatUint(kubecontainer.HashContainer(&containers[0]), 16) + "_foo_new_12345678_0"},
 			ID:    "1234",
 		},
 		{
 			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
-			Names: []string{"/k8s_failed." + strconv.FormatUint(dockertools.HashContainer(&containers[1]), 16) + "_foo_new_12345678_0"},
+			Names: []string{"/k8s_failed." + strconv.FormatUint(kubecontainer.HashContainer(&containers[1]), 16) + "_foo_new_12345678_0"},
 			ID:    "5678",
 		},
 	}
@@ -4319,7 +4319,7 @@ func TestGetRestartCount(t *testing.T) {
 	}
 
 	// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
-	names := []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&containers[0]), 16) + "_foo_new_12345678_0"}
+	names := []string{"/k8s_bar." + strconv.FormatUint(kubecontainer.HashContainer(&containers[0]), 16) + "_foo_new_12345678_0"}
 	currTime := time.Now()
 	containerMap := map[string]*docker.Container{
 		"1234": {

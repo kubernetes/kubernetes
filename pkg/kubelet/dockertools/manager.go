@@ -824,7 +824,7 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 		Image: dm.PodInfraContainerImage,
 		Ports: ports,
 	}
-	return podInfraContainer.Hash != HashContainer(expectedPodInfraContainer), nil
+	return podInfraContainer.Hash != kubecontainer.HashContainer(expectedPodInfraContainer), nil
 }
 
 type dockerVersion docker.APIVersion
@@ -1355,7 +1355,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 	}
 
 	for index, container := range pod.Spec.Containers {
-		expectedHash := HashContainer(&container)
+		expectedHash := kubecontainer.HashContainer(&container)
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {
