@@ -173,12 +173,12 @@ func TestTCPLoadBalancer(t *testing.T) {
 		t.Fatalf("TCPLoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 	}
 
-	exists, err := lb.TCPLoadBalancerExists("noexist", "region")
+	_, exists, err := lb.GetTCPLoadBalancer("noexist", "region")
 	if err != nil {
-		t.Fatalf("TCPLoadBalancerExists(\"noexist\") returned error: %s", err)
+		t.Fatalf("GetTCPLoadBalancer(\"noexist\") returned error: %s", err)
 	}
 	if exists {
-		t.Fatalf("TCPLoadBalancerExists(\"noexist\") returned true")
+		t.Fatalf("GetTCPLoadBalancer(\"noexist\") returned exists")
 	}
 }
 

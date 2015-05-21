@@ -133,7 +133,7 @@ func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
 func (in instrumentedDockerInterface) Info() (*docker.Env, error) {
 	start := time.Now()
 	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("version").Observe(metrics.SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("info").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.Info()
 }
@@ -152,4 +152,12 @@ func (in instrumentedDockerInterface) StartExec(startExec string, opts docker.St
 		metrics.DockerOperationsLatency.WithLabelValues("start_exec").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.StartExec(startExec, opts)
+}
+
+func (in instrumentedDockerInterface) InspectExec(id string) (*docker.ExecInspect, error) {
+	start := time.Now()
+	defer func() {
+		metrics.DockerOperationsLatency.WithLabelValues("inspect_exec").Observe(metrics.SinceInMicroseconds(start))
+	}()
+	return in.client.InspectExec(id)
 }

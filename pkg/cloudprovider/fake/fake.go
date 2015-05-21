@@ -94,14 +94,14 @@ func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
 	return f, true
 }
 
-// TCPLoadBalancerExists is a stub implementation of TCPLoadBalancer.TCPLoadBalancerExists.
-func (f *FakeCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
-	return f.Exists, f.Err
+// GetTCPLoadBalancer is a stub implementation of TCPLoadBalancer.GetTCPLoadBalancer.
+func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error) {
+	return f.ExternalIP.String(), f.Exists, f.Err
 }
 
 // CreateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error) {
+func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (string, error) {
 	f.addCall("create")
 	f.Balancers = append(f.Balancers, FakeBalancer{name, region, externalIP, ports, hosts})
 	return f.ExternalIP.String(), f.Err
@@ -158,4 +158,14 @@ func (f *FakeCloud) GetZone() (cloudprovider.Zone, error) {
 func (f *FakeCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	f.addCall("get-node-resources")
 	return f.NodeResources, f.Err
+}
+
+func (f *FakeCloud) Configure(name string, spec *api.NodeSpec) error {
+	f.addCall("configure")
+	return f.Err
+}
+
+func (f *FakeCloud) Release(name string) error {
+	f.addCall("release")
+	return f.Err
 }

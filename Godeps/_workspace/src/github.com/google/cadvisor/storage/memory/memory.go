@@ -57,7 +57,7 @@ func (self *containerStorage) RecentStats(start, end time.Time, maxStats int) ([
 func newContainerStore(ref info.ContainerReference, maxAge time.Duration) *containerStorage {
 	return &containerStorage{
 		ref:         ref,
-		recentStats: utils.NewTimedStore(maxAge),
+		recentStats: utils.NewTimedStore(maxAge, -1),
 		maxAge:      maxAge,
 	}
 }

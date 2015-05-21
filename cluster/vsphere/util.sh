@@ -344,7 +344,7 @@ function kube-up {
 
   printf "Waiting for ${KUBE_MASTER} to become available..."
   until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
-          --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/api/v1beta1/pods"; do
+          --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/healthz"; do
       printf "."
       sleep 2
   done

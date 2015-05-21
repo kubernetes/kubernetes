@@ -134,17 +134,19 @@ func FullContainerName(dockerId string) string {
 }
 
 // Docker handles all containers under /docker
-func (self *dockerFactory) CanHandle(name string) (bool, error) {
+func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
+	// docker factory accepts all containers it can handle.
+	canAccept := true
 	// Check if the container is known to docker and it is active.
 	id := ContainerNameToDockerId(name)
 
 	// We assume that if Inspect fails then the container is not known to docker.
 	ctnr, err := self.client.InspectContainer(id)
 	if err != nil || !ctnr.State.Running {
-		return false, fmt.Errorf("error inspecting container: %v", err)
+		return false, canAccept, fmt.Errorf("error inspecting container: %v", err)
 	}
 
-	return true, nil
+	return true, canAccept, nil
 }
 
 func parseDockerVersion(full_version_string string) ([]int, error) {

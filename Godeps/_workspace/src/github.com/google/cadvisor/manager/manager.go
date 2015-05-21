@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/golang/glog"
+	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/docker"
 	"github.com/google/cadvisor/container/raw"
@@ -42,11 +44,14 @@ import (
 var globalHousekeepingInterval = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
 var logCadvisorUsage = flag.Bool("log_cadvisor_usage", false, "Whether to log the usage of the cAdvisor container")
 var enableLoadReader = flag.Bool("enable_load_reader", false, "Whether to enable cpu load reader")
+var eventStorageAgeLimit = flag.String("event_storage_age_limit", "default=24h", "Max length of time for which to store events (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is a duration. Default is applied to all non-specified event types")
+var eventStorageEventLimit = flag.String("event_storage_event_limit", "default=100000", "Max number of events to store (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is an integer. Default is applied to all non-specified event types")
 
 // The Manager interface defines operations for starting a manager and getting
 // container and machine information.
 type Manager interface {
-	// Start the manager.
+	// Start the manager. Calling other manager methods before this returns
+	// may produce undefined behavior.
 	Start() error
 
 	// Stops the manager.
@@ -73,6 +78,9 @@ type Manager interface {
 	// Get info for all requested containers based on the request options.
 	GetRequestedContainersInfo(containerName string, options v2.RequestOptions) (map[string]*info.ContainerInfo, error)
 
+	// Returns true if the named container exists.
+	Exists(containerName string) bool
+
 	// Get information about the machine.
 	GetMachineInfo() (*info.MachineInfo, error)
 
@@ -83,6 +91,9 @@ type Manager interface {
 	// Returns information for all global filesystems if label is empty.
 	GetFsInfo(label string) ([]v2.FsInfo, error)
 
+	// Get ps output for a container.
+	GetProcessList(containerName string, options v2.RequestOptions) ([]v2.ProcessInfo, error)
+
 	// Get events streamed through passedChannel that fit the request.
 	WatchForEvents(request *events.Request) (*events.EventChannel, error)
 
@@ -90,6 +101,12 @@ type Manager interface {
 	GetPastEvents(request *events.Request) ([]*info.Event, error)
 
 	CloseEventChannel(watch_id int)
+
+	// Get status information about docker.
+	DockerInfo() (DockerStatus, error)
+
+	// Get details about interesting docker images.
+	DockerImages() ([]DockerImage, error)
 }
 
 // New takes a memory storage and returns a new manager.
@@ -133,20 +150,7 @@ func New(memoryStorage *memory.InMemoryStorage, sysfs sysfs.SysFs) (Manager, err
 	newManager.versionInfo = *versionInfo
 	glog.Infof("Version: %+v", newManager.versionInfo)
 
-	newManager.eventHandler = events.NewEventManager()
-
-	// Register Docker container factory.
-	err = docker.Register(newManager, fsInfo)
-	if err != nil {
-		glog.Errorf("Docker container factory registration failed: %v.", err)
-	}
-
-	// Register the raw driver.
-	err = raw.Register(newManager, fsInfo)
-	if err != nil {
-		glog.Errorf("Registration of the raw container factory failed: %v", err)
-	}
-
+	newManager.eventHandler = events.NewEventManager(parseEventsStoragePolicy())
 	return newManager, nil
 }
 
@@ -176,6 +180,20 @@ type manager struct {
 
 // Start the container manager.
 func (self *manager) Start() error {
+	// Register Docker container factory.
+	err := docker.Register(self, self.fsInfo)
+	if err != nil {
+		glog.Errorf("Docker container factory registration failed: %v.", err)
+	}
+
+	// Register the raw driver.
+	err = raw.Register(self, self.fsInfo)
+	if err != nil {
+		glog.Errorf("Registration of the raw container factory failed: %v", err)
+	}
+
+	self.DockerInfo()
+	self.DockerImages()
 
 	if *enableLoadReader {
 		// Create cpu load reader.
@@ -194,7 +212,7 @@ func (self *manager) Start() error {
 	}
 
 	// Watch for OOMs.
-	err := self.watchForNewOoms()
+	err = self.watchForNewOoms()
 	if err != nil {
 		glog.Errorf("Failed to start OOM watcher, will not get OOM events: %v", err)
 	}
@@ -602,6 +620,7 @@ func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 			Mountpoint: mountpoint,
 			Capacity:   fs.Limit,
 			Usage:      fs.Usage,
+			Available:  fs.Available,
 			Labels:     labels,
 		}
 		fsInfo = append(fsInfo, fi)
@@ -618,14 +637,60 @@ func (m *manager) GetVersionInfo() (*info.VersionInfo, error) {
 	return &m.versionInfo, nil
 }
 
+func (m *manager) Exists(containerName string) bool {
+	m.containersLock.Lock()
+	defer m.containersLock.Unlock()
+
+	namespacedName := namespacedContainerName{
+		Name: containerName,
+	}
+
+	_, ok := m.containers[namespacedName]
+	if ok {
+		return true
+	}
+	return false
+}
+
+func (m *manager) GetProcessList(containerName string, options v2.RequestOptions) ([]v2.ProcessInfo, error) {
+	// override recursive. Only support single container listing.
+	options.Recursive = false
+	conts, err := m.getRequestedContainers(containerName, options)
+	if err != nil {
+		return nil, err
+	}
+	if len(conts) != 1 {
+		return nil, fmt.Errorf("Expected the request to match only one container")
+	}
+	// TODO(rjnagal): handle count? Only if we can do count by type (eg. top 5 cpu users)
+	ps := []v2.ProcessInfo{}
+	for _, cont := range conts {
+		ps, err = cont.GetProcessList()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ps, nil
+}
+
 // Create a container.
 func (m *manager) createContainer(containerName string) error {
-	handler, err := container.NewContainerHandler(containerName)
+	handler, accept, err := container.NewContainerHandler(containerName)
+	if err != nil {
+		return err
+	}
+	if !accept {
+		// ignoring this container.
+		glog.V(4).Infof("ignoring container %q", containerName)
+		return nil
+	}
+	// TODO(vmarmol): Register collectors.
+	collectorManager, err := collector.NewCollectorManager()
 	if err != nil {
 		return err
 	}
 	logUsage := *logCadvisorUsage && containerName == m.cadvisorContainer
-	cont, err := newContainerData(containerName, m.memoryStorage, handler, m.loadReader, logUsage)
+	cont, err := newContainerData(containerName, m.memoryStorage, handler, m.loadReader, logUsage, collectorManager)
 	if err != nil {
 		return err
 	}
@@ -659,33 +724,26 @@ func (m *manager) createContainer(containerName string) error {
 	if alreadyExists {
 		return nil
 	}
-	glog.V(2).Infof("Added container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
+	glog.V(3).Infof("Added container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
 
 	contSpec, err := cont.handler.GetSpec()
 	if err != nil {
 		return err
 	}
 
-	if contSpec.CreationTime.After(m.startupTime) {
-		contRef, err := cont.handler.ContainerReference()
-		if err != nil {
-			return err
-		}
+	contRef, err := cont.handler.ContainerReference()
+	if err != nil {
+		return err
+	}
 
-		newEvent := &info.Event{
-			ContainerName: contRef.Name,
-			Timestamp:     contSpec.CreationTime,
-			EventType:     info.EventContainerCreation,
-			EventData: info.EventData{
-				Created: &info.CreatedEventData{
-					Spec: contSpec,
-				},
-			},
-		}
-		err = m.eventHandler.AddEvent(newEvent)
-		if err != nil {
-			return err
-		}
+	newEvent := &info.Event{
+		ContainerName: contRef.Name,
+		Timestamp:     contSpec.CreationTime,
+		EventType:     info.EventContainerCreation,
+	}
+	err = m.eventHandler.AddEvent(newEvent)
+	if err != nil {
+		return err
 	}
 
 	// Start the container's housekeeping.
@@ -721,7 +779,7 @@ func (m *manager) destroyContainer(containerName string) error {
 			Name:      alias,
 		})
 	}
-	glog.V(2).Infof("Destroyed container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
+	glog.V(3).Infof("Destroyed container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
 
 	contRef, err := cont.handler.ContainerReference()
 	if err != nil {
@@ -924,4 +982,152 @@ func (self *manager) GetPastEvents(request *events.Request) ([]*info.Event, erro
 // called by the api when a client is no longer listening to the channel
 func (self *manager) CloseEventChannel(watch_id int) {
 	self.eventHandler.StopWatch(watch_id)
+}
+
+// Parses the events StoragePolicy from the flags.
+func parseEventsStoragePolicy() events.StoragePolicy {
+	policy := events.DefaultStoragePolicy()
+
+	// Parse max age.
+	parts := strings.Split(*eventStorageAgeLimit, ",")
+	for _, part := range parts {
+		items := strings.Split(part, "=")
+		if len(items) != 2 {
+			glog.Warningf("Unknown event storage policy %q when parsing max age", part)
+			continue
+		}
+		dur, err := time.ParseDuration(items[1])
+		if err != nil {
+			glog.Warningf("Unable to parse event max age duration %q: %v", items[1], err)
+			continue
+		}
+		if items[0] == "default" {
+			policy.DefaultMaxAge = dur
+			continue
+		}
+		policy.PerTypeMaxAge[info.EventType(items[0])] = dur
+	}
+
+	// Parse max number.
+	parts = strings.Split(*eventStorageEventLimit, ",")
+	for _, part := range parts {
+		items := strings.Split(part, "=")
+		if len(items) != 2 {
+			glog.Warningf("Unknown event storage policy %q when parsing max event limit", part)
+			continue
+		}
+		val, err := strconv.Atoi(items[1])
+		if err != nil {
+			glog.Warningf("Unable to parse integer from %q: %v", items[1], err)
+			continue
+		}
+		if items[0] == "default" {
+			policy.DefaultMaxNumEvents = val
+			continue
+		}
+		policy.PerTypeMaxNumEvents[info.EventType(items[0])] = val
+	}
+
+	return policy
+}
+
+type DockerStatus struct {
+	Version       string            `json:"version"`
+	KernelVersion string            `json:"kernel_version"`
+	OS            string            `json:"os"`
+	Hostname      string            `json:"hostname"`
+	RootDir       string            `json:"root_dir"`
+	Driver        string            `json:"driver"`
+	DriverStatus  map[string]string `json:"driver_status"`
+	ExecDriver    string            `json:"exec_driver"`
+	NumImages     int               `json:"num_images"`
+	NumContainers int               `json:"num_containers"`
+}
+
+type DockerImage struct {
+	ID          string   `json:"id"`
+	RepoTags    []string `json:"repo_tags"` // repository name and tags.
+	Created     int64    `json:"created"`   // unix time since creation.
+	VirtualSize int64    `json:"virtual_size"`
+	Size        int64    `json:"size"`
+}
+
+func (m *manager) DockerImages() ([]DockerImage, error) {
+	images, err := docker.DockerImages()
+	if err != nil {
+		return nil, err
+	}
+	out := []DockerImage{}
+	const unknownTag = "<none>:<none>"
+	for _, image := range images {
+		if len(image.RepoTags) == 1 && image.RepoTags[0] == unknownTag {
+			// images with repo or tags are uninteresting.
+			continue
+		}
+		di := DockerImage{
+			ID:          image.ID,
+			RepoTags:    image.RepoTags,
+			Created:     image.Created,
+			VirtualSize: image.VirtualSize,
+			Size:        image.Size,
+		}
+		out = append(out, di)
+	}
+	return out, nil
+}
+
+func (m *manager) DockerInfo() (DockerStatus, error) {
+	info, err := docker.DockerInfo()
+	if err != nil {
+		return DockerStatus{}, err
+	}
+	out := DockerStatus{}
+	out.Version = m.versionInfo.DockerVersion
+	if val, ok := info["KernelVersion"]; ok {
+		out.KernelVersion = val
+	}
+	if val, ok := info["OperatingSystem"]; ok {
+		out.OS = val
+	}
+	if val, ok := info["Name"]; ok {
+		out.Hostname = val
+	}
+	if val, ok := info["DockerRootDir"]; ok {
+		out.RootDir = val
+	}
+	if val, ok := info["Driver"]; ok {
+		out.Driver = val
+	}
+	if val, ok := info["ExecutionDriver"]; ok {
+		out.ExecDriver = val
+	}
+	if val, ok := info["Images"]; ok {
+		n, err := strconv.Atoi(val)
+		if err == nil {
+			out.NumImages = n
+		}
+	}
+	if val, ok := info["Containers"]; ok {
+		n, err := strconv.Atoi(val)
+		if err == nil {
+			out.NumContainers = n
+		}
+	}
+	// cut, trim, cut - Example format:
+	// DriverStatus=[["Root Dir","/var/lib/docker/aufs"],["Backing Filesystem","extfs"],["Dirperm1 Supported","false"]]
+	if val, ok := info["DriverStatus"]; ok {
+		out.DriverStatus = make(map[string]string)
+		val = strings.TrimPrefix(val, "[[")
+		val = strings.TrimSuffix(val, "]]")
+		vals := strings.Split(val, "],[")
+		for _, v := range vals {
+			kv := strings.Split(v, "\",\"")
+			if len(kv) != 2 {
+				continue
+			} else {
+				out.DriverStatus[strings.Trim(kv[0], "\"")] = strings.Trim(kv[1], "\"")
+			}
+		}
+	}
+	return out, nil
 }

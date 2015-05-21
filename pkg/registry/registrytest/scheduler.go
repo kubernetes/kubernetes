@@ -18,7 +18,7 @@ package registrytest
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 type Scheduler struct {
@@ -27,7 +27,7 @@ type Scheduler struct {
 	Machine string
 }
 
-func (s *Scheduler) Schedule(pod *api.Pod, lister scheduler.MinionLister) (string, error) {
+func (s *Scheduler) Schedule(pod *api.Pod, lister algorithm.MinionLister) (string, error) {
 	s.Pod = pod
 	return s.Machine, s.Err
 }

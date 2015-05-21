@@ -35,3 +35,6 @@ Now the pod serves `index.html` from the NFS server:
 
     $ curl http://<the container IP address>/
     Hello World!
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/nfs/README.md?pixel)]()

@@ -26,7 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -105,15 +104,11 @@ func RunResize(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
 	currentSize := cmdutil.GetFlagInt(cmd, "current-replicas")
 	precondition := &kubectl.ResizePrecondition{currentSize, resourceVersion}
-	cond := kubectl.ResizeCondition(resizer, precondition, info.Namespace, info.Name, uint(count))
+	retry := &kubectl.RetryParams{Interval: retryFrequency, Timeout: retryTimeout}
 
-	msg := "resized"
-	if err = wait.Poll(retryFrequency, retryTimeout, cond); err != nil {
-		msg = fmt.Sprintf("Failed to resize controller in spite of retrying for %s", retryTimeout)
-		if err != nil {
-			return err
-		}
+	if err := resizer.Resize(info.Namespace, info.Name, uint(count), precondition, retry, nil); err != nil {
+		return err
 	}
-	fmt.Fprintf(out, "%s\n", msg)
+	fmt.Fprint(out, "resized\n")
 	return nil
 }

@@ -199,28 +199,27 @@ func getEventRequest(r *http.Request) (*events.Request, bool, error) {
 			query.IncludeSubcontainers = newBool
 		}
 	}
-	if val, ok := urlMap["oom_events"]; ok {
+	eventTypes := map[string]info.EventType{
+		"oom_events":      info.EventOom,
+		"oom_kill_events": info.EventOomKill,
+		"creation_events": info.EventContainerCreation,
+		"deletion_events": info.EventContainerDeletion,
+	}
+	allEventTypes := false
+	if val, ok := urlMap["all_events"]; ok {
 		newBool, err := strconv.ParseBool(val[0])
 		if err == nil {
-			query.EventType[info.EventOom] = newBool
+			allEventTypes = newBool
 		}
 	}
-	if val, ok := urlMap["oom_kill_events"]; ok {
-		newBool, err := strconv.ParseBool(val[0])
-		if err == nil {
-			query.EventType[info.EventOomKill] = newBool
-		}
-	}
-	if val, ok := urlMap["creation_events"]; ok {
-		newBool, err := strconv.ParseBool(val[0])
-		if err == nil {
-			query.EventType[info.EventContainerCreation] = newBool
-		}
-	}
-	if val, ok := urlMap["deletion_events"]; ok {
-		newBool, err := strconv.ParseBool(val[0])
-		if err == nil {
-			query.EventType[info.EventContainerDeletion] = newBool
+	for opt, eventType := range eventTypes {
+		if allEventTypes {
+			query.EventType[eventType] = true
+		} else if val, ok := urlMap[opt]; ok {
+			newBool, err := strconv.ParseBool(val[0])
+			if err == nil {
+				query.EventType[eventType] = newBool
+			}
 		}
 	}
 	if val, ok := urlMap["max_events"]; ok {

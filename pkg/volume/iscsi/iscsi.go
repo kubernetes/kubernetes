@@ -65,16 +65,16 @@ func (plugin *ISCSIPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *ISCSIPlugin) GetAccessModes() []api.AccessModeType {
-	return []api.AccessModeType{
+func (plugin *ISCSIPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 		api.ReadOnlyMany,
 	}
 }
 
-func (plugin *ISCSIPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *ISCSIPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, podRef.UID, &ISCSIUtil{}, mounter)
+	return plugin.newBuilderInternal(spec, pod.UID, &ISCSIUtil{}, mounter)
 }
 
 func (plugin *ISCSIPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {

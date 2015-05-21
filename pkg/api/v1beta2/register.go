@@ -18,6 +18,7 @@ package v1beta2
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -31,6 +32,19 @@ var Codec = runtime.CodecFor(api.Scheme, "v1beta2")
 const Dependency = true
 
 func init() {
+	// Check if v1beta2 is in the list of supported API versions.
+	if !registered.IsRegisteredAPIVersion("v1beta2") {
+		return
+	}
+
+	// Register the API.
+	addKnownTypes()
+	addConversionFuncs()
+	addDefaultingFuncs()
+}
+
+// Adds the list of known types to api.Scheme.
+func addKnownTypes() {
 	api.Scheme.AddKnownTypes("v1beta2",
 		&Pod{},
 		&PodStatusResult{},
@@ -59,6 +73,8 @@ func init() {
 		&NamespaceList{},
 		&Secret{},
 		&SecretList{},
+		&ServiceAccount{},
+		&ServiceAccountList{},
 		&PersistentVolume{},
 		&PersistentVolumeList{},
 		&PersistentVolumeClaim{},
@@ -70,6 +86,8 @@ func init() {
 		&PodProxyOptions{},
 		&ComponentStatus{},
 		&ComponentStatusList{},
+		&SerializedReference{},
+		&RangeAllocation{},
 	)
 	// Future names are supported
 	api.Scheme.AddKnownTypeWithName("v1beta2", "Node", &Minion{})
@@ -103,6 +121,8 @@ func (*Namespace) IsAnAPIObject()                 {}
 func (*NamespaceList) IsAnAPIObject()             {}
 func (*Secret) IsAnAPIObject()                    {}
 func (*SecretList) IsAnAPIObject()                {}
+func (*ServiceAccount) IsAnAPIObject()            {}
+func (*ServiceAccountList) IsAnAPIObject()        {}
 func (*PersistentVolume) IsAnAPIObject()          {}
 func (*PersistentVolumeList) IsAnAPIObject()      {}
 func (*PersistentVolumeClaim) IsAnAPIObject()     {}
@@ -114,3 +134,5 @@ func (*PodExecOptions) IsAnAPIObject()            {}
 func (*PodProxyOptions) IsAnAPIObject()           {}
 func (*ComponentStatus) IsAnAPIObject()           {}
 func (*ComponentStatusList) IsAnAPIObject()       {}
+func (*SerializedReference) IsAnAPIObject()       {}
+func (*RangeAllocation) IsAnAPIObject()           {}

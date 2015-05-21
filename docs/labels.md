@@ -32,10 +32,10 @@ These are just examples; you are free to develop your own conventions.
 
 ## Syntax and character set
 
-As already mentioned, well formed _labels_ are key value pairs. Valid label keys have two segments - prefix and name - separated by a slash (`/`).  The name segment is required and must be a DNS label: 63 characters or less, all lowercase, beginning and ending with an alphanumeric character (`[a-z0-9A-Z]`), with dashes (`-`) and alphanumerics between.  The prefix and slash are optional.  If specified, the prefix must be a DNS subdomain (a series of DNS labels separated by dots (`.`), not longer than 253 characters in total.
-If the prefix is omitted, the label key is presumed to be private to the user. System components which use labels must specify a prefix.  The `kubernetes.io` prefix is reserved for kubernetes core components.
+_Labels_ are key value pairs. Valid label keys have two segments: an optional prefix and name, separated by a slash (`/`).  The name segment is required and must be 63 characters or less, beginning and ending with an alphanumeric character (`[a-z0-9A-Z]`) with dashes (`-`), underscores (`_`), dots (`.`), and alphanumerics between.  The prefix is optional.  If specified, the prefix must be a DNS subdomain: a series of DNS labels separated by dots (`.`), not longer than 253 characters in total, followed by a slash (`/`).
+If the prefix is omitted, the label key is presumed to be private to the user. System components which use labels must specify a prefix.  The `kubernetes.io/` prefix is reserved for kubernetes core components.
 
-Valid label values must be shorter than 64 characters, accepted characters are (`[-A-Za-z0-9_.]`) but the first character must be  (`[A-Za-z0-9]`).
+Valid label values must be 63 characters or less and must be empty or begin and end with an alphanumeric character (`[a-z0-9A-Z]`) with dashes (`-`), underscores (`_`), dots (`.`), and alphanumerics between.
 
 ## Label selectors
 
@@ -89,7 +89,7 @@ Kubernetes also currently supports two objects that use label selectors to keep 
 
 The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector. For management convenience and consistency, `services` and `replicationControllers` may themselves have labels and would generally carry the labels their corresponding pods have in common.
 
-Sets identified by labels could be overlapping (think Venn diagrams). For instance, a service might target all pods with `"tier": "frontend"` and  `"environment" : "prod"`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a `replicationController` (with `replicas` set to 9) for the bulk of the replicas with labels `"tier" : "frontend"` and `"environment" : "prod"` and `"track" : "stable"` and another `replicationController` (with `replicas` set to 1) for the canary with labels `"tier" : "frontend"` and  `"environment" : "prod"` and `"track" : canary`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the `replicationControllers` separately to test things out, monitor the results, etc.
+Sets identified by labels could be overlapping (think Venn diagrams). For instance, a service might target all pods with `"tier": "frontend"` and  `"environment" : "prod"`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a `replicationController` (with `replicas` set to 9) for the bulk of the replicas with labels `"tier" : "frontend"` and `"environment" : "prod"` and `"track" : "stable"` and another `replicationController` (with `replicas` set to 1) for the canary with labels `"tier" : "frontend"` and  `"environment" : "prod"` and `"track" : "canary"`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the `replicationControllers` separately to test things out, monitor the results, etc.
 
 Note that the superset described in the previous example is also heterogeneous. In long-lived, highly available, horizontally scaled, distributed, continuously evolving service applications, heterogeneity is inevitable, due to canaries, incremental rollouts, live reconfiguration, simultaneous updates and auto-scaling, hardware upgrades, and so on.
 
@@ -99,3 +99,6 @@ Pods (and other objects) may belong to multiple sets simultaneously, which enabl
 ## Future developments
 
 Concerning API: we may extend such filtering to DELETE operations in the future.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/labels.md?pixel)]()

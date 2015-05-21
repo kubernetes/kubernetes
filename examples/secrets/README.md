@@ -44,3 +44,6 @@ volume:
 $ kubectl log secret-test-pod
 2015-04-29T21:17:24.712206409Z content of file "/etc/secret-volume/data-1": value-1
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/secrets/README.md?pixel)]()

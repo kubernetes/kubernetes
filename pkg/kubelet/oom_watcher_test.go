@@ -54,9 +54,11 @@ func TestBasic(t *testing.T) {
 	mockCadvisor := &cadvisor.Fake{}
 	node := &api.ObjectReference{}
 	oomWatcher := NewOOMWatcher(mockCadvisor, fakeRecorder)
-	go func() {
-		oomWatcher.RecordSysOOMs(node)
-	}()
+	err := oomWatcher.Start(node)
+	if err != nil {
+		t.Errorf("Should not have failed: %v", err)
+	}
+
 	// TODO: Improve this test once cadvisor exports events.EventChannel as an interface
 	// and thereby allow using a mock version of cadvisor.
 }

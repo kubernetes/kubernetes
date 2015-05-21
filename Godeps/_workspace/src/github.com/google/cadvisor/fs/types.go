@@ -24,6 +24,7 @@ type Fs struct {
 	DeviceInfo
 	Capacity  uint64
 	Free      uint64
+	Available uint64
 	DiskStats DiskStats
 }
 

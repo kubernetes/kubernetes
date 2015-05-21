@@ -12,6 +12,7 @@ if ARGV.first == "up" && ENV['USING_KUBE_SCRIPTS'] != 'true'
 Calling 'vagrant up' directly is not supported.  Instead, please run the following:
 
   export KUBERNETES_PROVIDER=vagrant
+  export VAGRANT_DEFAULT_PROVIDER=providername
   ./cluster/kube-up.sh
 END
 end
@@ -62,6 +63,12 @@ $kube_provider_boxes = {
       :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-20_chef-provisionerless.box'
     }
   },
+  :libvirt => {
+    'fedora' => {
+      :box_name => 'kube-fedora20',
+      :box_url => 'http://citozin.com/opscode_fedora-20_chef-provisionerless_libvirt.box'
+    }
+  },
   :vmware_desktop => {
     'fedora' => {
       :box_name => 'kube-fedora20',
@@ -70,14 +77,22 @@ $kube_provider_boxes = {
   }
 }
 
-# This stuff is cargo-culted from http://www.stefanwrobel.com/how-to-make-vagrant-performance-not-suck
-# Give access to half of all cpu cores on the host. We divide by 2 as we assume
-# that users are running with hyperthreads.
+# Give access to all physical cpu cores
+# Previously cargo-culted from here:
+# http://www.stefanwrobel.com/how-to-make-vagrant-performance-not-suck
+# Rewritten to actually determine the number of hardware cores instead of assuming
+# that the host has hyperthreading enabled.
 host = RbConfig::CONFIG['host_os']
 if host =~ /darwin/
-  $vm_cpus = (`sysctl -n hw.ncpu`.to_i/2.0).ceil
+  $vm_cpus = `sysctl -n hw.physicalcpu`.to_i
 elsif host =~ /linux/
-  $vm_cpus = (`nproc`.to_i/2.0).ceil
+  #This should work on most processors, however it will fail on ones without the core id field.
+  #So far i have only seen this on a raspberry pi. which you probably don't want to run vagrant on anyhow...
+  #But just in case we'll default to the result of nproc if we get 0 just to be safe.
+  $vm_cpus = `cat /proc/cpuinfo | grep 'core id' | uniq | wc -l`.to_i
+  if $vm_cpus < 1
+      $vm_cpus = `nproc`.to_i
+  end
 else # sorry Windows folks, I can't help you
   $vm_cpus = 2
 end
@@ -121,6 +136,15 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       setvmboxandurl(override, :vmware_desktop)
       v.vmx['memsize'] = vm_mem
       v.vmx['numvcpus'] = $vm_cpus
+    end
+
+    # configure libvirt provider
+    config.vm.provider :libvirt do |v, override|
+      setvmboxandurl(override, :libvirt)
+      v.memory = vm_mem
+      v.cpus = $vm_cpus
+      v.nested = true
+      v.volume_cache = 'none'
     end
 
     # Then try VMWare Workstation

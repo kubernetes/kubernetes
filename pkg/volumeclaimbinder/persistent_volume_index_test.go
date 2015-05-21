@@ -41,7 +41,7 @@ func TestMatchVolume(t *testing.T) {
 					Namespace: "myns",
 				},
 				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.AccessModeType{api.ReadOnlyMany, api.ReadWriteOnce},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceName(api.ResourceStorage): resource.MustParse("8G"),
@@ -58,7 +58,7 @@ func TestMatchVolume(t *testing.T) {
 					Namespace: "myns",
 				},
 				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.AccessModeType{api.ReadOnlyMany, api.ReadWriteOnce, api.ReadWriteMany},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce, api.ReadWriteMany},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
@@ -75,7 +75,7 @@ func TestMatchVolume(t *testing.T) {
 					Namespace: "myns",
 				},
 				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.AccessModeType{api.ReadOnlyMany, api.ReadWriteOnce},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
@@ -92,7 +92,7 @@ func TestMatchVolume(t *testing.T) {
 					Namespace: "myns",
 				},
 				Spec: api.PersistentVolumeClaimSpec{
-					AccessModes: []api.AccessModeType{api.ReadOnlyMany, api.ReadWriteOnce},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceName(api.ResourceStorage): resource.MustParse("999G"),
@@ -126,7 +126,7 @@ func TestSort(t *testing.T) {
 		volList.Add(pv)
 	}
 
-	volumes, err := volList.ListByAccessModes([]api.AccessModeType{api.ReadWriteOnce, api.ReadOnlyMany})
+	volumes, err := volList.ListByAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany})
 	if err != nil {
 		t.Error("Unexpected error retrieving volumes by access modes:", err)
 	}
@@ -137,7 +137,7 @@ func TestSort(t *testing.T) {
 		}
 	}
 
-	volumes, err = volList.ListByAccessModes([]api.AccessModeType{api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany})
+	volumes, err = volList.ListByAccessModes([]api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany, api.ReadWriteMany})
 	if err != nil {
 		t.Error("Unexpected error retrieving volumes by access modes:", err)
 	}
@@ -164,7 +164,7 @@ func createTestVolumes() []*api.PersistentVolume {
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
 				},
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 				},
@@ -182,7 +182,7 @@ func createTestVolumes() []*api.PersistentVolume {
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					Glusterfs: &api.GlusterfsVolumeSource{},
 				},
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 					api.ReadWriteMany,
@@ -201,7 +201,7 @@ func createTestVolumes() []*api.PersistentVolume {
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
 				},
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 				},
@@ -221,7 +221,7 @@ func createTestVolumes() []*api.PersistentVolume {
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					Glusterfs: &api.GlusterfsVolumeSource{},
 				},
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 					api.ReadWriteMany,
@@ -240,7 +240,7 @@ func createTestVolumes() []*api.PersistentVolume {
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
 				},
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 				},
@@ -258,7 +258,7 @@ func createTestVolumes() []*api.PersistentVolume {
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					Glusterfs: &api.GlusterfsVolumeSource{},
 				},
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 					api.ReadWriteMany,

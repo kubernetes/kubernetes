@@ -68,12 +68,17 @@ type ContainerManifest struct {
 	// a termination signal and the time when the processes are forcibly halted with a kill signal.
 	// Set this value longer than the expected cleanup time for your process.
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" description:"optional duration in seconds the pod needs to terminate gracefully; may be decreased in delete request; value must be non-negative integer; the value zero indicates delete immediately; if this value is not set, the default grace period will be used instead; the grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal; set this value longer than the expected cleanup time for your process"`
+	ActiveDeadlineSeconds         *int64 `json:"activeDeadlineSeconds,omitempty" description:"optional duration in seconds the pod may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers; value must be a positive integer`
 	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
 	// Uses the host's network namespace. If this option is set, the ports that will be
 	// used must be specified.
 	// Optional: Default to false.
 	HostNetwork bool `json:"hostNetwork,omitempty" description:"host networking requested for this pod"`
+	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
+	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
+	// in the case of docker, only DockerConfig type secrets are honored.
+	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" description:"list of references to secrets in the same namespace available for pulling the container images"`
 }
 
 // ContainerManifestList is used to communicate container manifests to kubelet.
@@ -145,6 +150,8 @@ type PersistentVolumeSource struct {
 	HostPath *HostPathVolumeSource `json:"hostPath" description:"a HostPath provisioned by a developer or tester; for develment use only"`
 	// Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs" description:"Glusterfs volume resource provisioned by an admin"`
+	// NFS represents an NFS mount on the host
+	NFS *NFSVolumeSource `json:"nfs" description:"NFS volume resource provisioned by an admin"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -171,9 +178,9 @@ type PersistentVolumeSpec struct {
 	// Source represents the location and type of a volume to mount.
 	PersistentVolumeSource `json:",inline" description:"the actual volume backing the persistent volume"`
 	// AccessModes contains all ways the volume can be mounted
-	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"all ways the volume can be mounted"`
-	// holds the binding reference to a PersistentVolumeClaim
-	ClaimRef *ObjectReference `json:"claimRef,omitempty" description:"the binding reference to a persistent volume claim"`
+	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" description:"all ways the volume can be mounted"`
+	// ClaimRef is a non-binding reference to the claim bound to this volume
+	ClaimRef *ObjectReference `json:"claimRef,omitempty" description:"when bound, a reference to the bound claim"`
 }
 
 type PersistentVolumeStatus struct {
@@ -191,7 +198,7 @@ type PersistentVolumeClaim struct {
 	TypeMeta `json:",inline"`
 
 	// Spec defines the volume requested by a pod author
-	Spec PersistentVolumeClaimSpec `json:"spec,omitempty" description: "the desired characteristics of a volume"`
+	Spec PersistentVolumeClaimSpec `json:"spec,omitempty" description:"the desired characteristics of a volume"`
 
 	// Status represents the current information about a claim
 	Status PersistentVolumeClaimStatus `json:"status,omitempty" description:"the current status of a persistent volume claim; read-only"`
@@ -199,38 +206,38 @@ type PersistentVolumeClaim struct {
 
 type PersistentVolumeClaimList struct {
 	TypeMeta `json:",inline"`
-	Items    []PersistentVolumeClaim `json:"items,omitempty" description: "a list of persistent volume claims"`
+	Items    []PersistentVolumeClaim `json:"items,omitempty" description:"a list of persistent volume claims"`
 }
 
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
 	// Contains the types of access modes required
-	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"the desired access modes the volume should have"`
+	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" description:"the desired access modes the volume should have"`
 	// Resources represents the minimum resources required
 	Resources ResourceRequirements `json:"resources,omitempty" description:"the desired resources the volume should have"`
+	// VolumeName is the binding reference to the PersistentVolume backing this claim
+	VolumeName string `json:"volumeName,omitempty" description:"the binding reference to the persistent volume backing this claim"`
 }
 
 type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim
 	Phase PersistentVolumeClaimPhase `json:"phase,omitempty" description:"the current phase of the claim"`
 	// AccessModes contains all ways the volume backing the PVC can be mounted
-	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"the actual access modes the volume has"`
+	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" description:"the actual access modes the volume has"`
 	// Represents the actual resources of the underlying volume
 	Capacity ResourceList `json:"capacity,omitempty" description:"the actual resources the volume has"`
-	// VolumeRef is a reference to the PersistentVolume bound to the PersistentVolumeClaim
-	VolumeRef *ObjectReference `json:"volumeRef,omitempty" description:"a reference to the backing persistent volume, when bound"`
 }
 
-type AccessModeType string
+type PersistentVolumeAccessMode string
 
 const (
 	// can be mounted read/write mode to exactly 1 host
-	ReadWriteOnce AccessModeType = "ReadWriteOnce"
+	ReadWriteOnce PersistentVolumeAccessMode = "ReadWriteOnce"
 	// can be mounted in read-only mode to many hosts
-	ReadOnlyMany AccessModeType = "ReadOnlyMany"
+	ReadOnlyMany PersistentVolumeAccessMode = "ReadOnlyMany"
 	// can be mounted in read/write mode to many hosts
-	ReadWriteMany AccessModeType = "ReadWriteMany"
+	ReadWriteMany PersistentVolumeAccessMode = "ReadWriteMany"
 )
 
 type PersistentVolumePhase string
@@ -264,15 +271,15 @@ type HostPathVolumeSource struct {
 type EmptyDirVolumeSource struct {
 	// Optional: what type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
-	Medium StorageType `json:"medium" description:"type of storage used to back the volume; must be an empty string (default) or Memory"`
+	Medium StorageMedium `json:"medium" description:"type of storage used to back the volume; must be an empty string (default) or Memory"`
 }
 
-// StorageType defines ways that storage can be allocated to a volume.
-type StorageType string
+// StorageMedium defines ways that storage can be allocated to a volume.
+type StorageMedium string
 
 const (
-	StorageTypeDefault StorageType = ""       // use whatever the default is for the node
-	StorageTypeMemory  StorageType = "Memory" // use memory (tmpfs)
+	StorageMediumDefault StorageMedium = ""       // use whatever the default is for the node
+	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
 )
 
 // Protocol defines network protocols supported for things like conatiner ports.
@@ -478,15 +485,15 @@ const (
 	PullIfNotPresent PullPolicy = "PullIfNotPresent"
 )
 
-// CapabilityType represent POSIX capabilities type
-type CapabilityType string
+// Capability represent POSIX capabilities type
+type Capability string
 
 // Capabilities represent POSIX capabilities that can be added or removed to a running container.
 type Capabilities struct {
 	// Added capabilities
-	Add []CapabilityType `json:"add,omitempty" description:"added capabilities"`
+	Add []Capability `json:"add,omitempty" description:"added capabilities"`
 	// Removed capabilities
-	Drop []CapabilityType `json:"drop,omitempty" description:"droped capabilities"`
+	Drop []Capability `json:"drop,omitempty" description:"droped capabilities"`
 }
 
 type ResourceRequirements struct {
@@ -525,12 +532,14 @@ type Container struct {
 	Lifecycle      *Lifecycle     `json:"lifecycle,omitempty" description:"actions that the management system should take in response to container lifecycle events; cannot be updated"`
 	// Optional: Defaults to /dev/termination-log
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" description:"path at which the file to which the container's termination message will be written is mounted into the container's filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log; cannot be updated"`
-	// Optional: Default to false.
-	Privileged bool `json:"privileged,omitempty" description:"whether or not the container is granted privileged status; defaults to false; cannot be updated"`
+	// Deprecated - see SecurityContext.  Optional: Default to false.
+	Privileged bool `json:"privileged,omitempty" description:"whether or not the container is granted privileged status; defaults to false; cannot be updated; deprecated; See SecurityContext"`
 	// Optional: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy" description:"image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"`
-	// Optional: Capabilities for container.
-	Capabilities Capabilities `json:"capabilities,omitempty" description:"capabilities for container; cannot be updated"`
+	// Deprecated - see SecurityContext.  Optional: Capabilities for container.
+	Capabilities Capabilities `json:"capabilities,omitempty" description:"capabilities for container; cannot be updated; deprecated; See SecurityContext"`
+	// Optional: SecurityContext defines the security options the pod should be run with
+	SecurityContext *SecurityContext `json:"securityContext,omitempty" description:"security options the pod should run with"`
 }
 
 // Handler defines a specific action that should be taken
@@ -569,7 +578,7 @@ type TypeMeta struct {
 	SelfLink          string    `json:"selfLink,omitempty" description:"URL for the object; populated by the system, read-only"`
 	ResourceVersion   uint64    `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"`
 	APIVersion        string    `json:"apiVersion,omitempty" description:"version of the schema the object should have"`
-	Namespace         string    `json:"namespace,omitempty" description:"namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"`
+	Namespace         string    `json:"namespace,omitempty" description:"namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"`
 
 	// DeletionTimestamp is the time after which this resource will be deleted. This
 	// field is set by the server when a graceful deletion is requested by the user, and is not
@@ -751,6 +760,8 @@ type Pod struct {
 	Labels       map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize pods; may match selectors of replication controllers and services"`
 	DesiredState PodState          `json:"desiredState,omitempty" description:"specification of the desired state of the pod"`
 	CurrentState PodState          `json:"currentState,omitempty" description:"current state of the pod; populated by the system, read-only"`
+	// ServiceAccount is the name of the ServiceAccount to use to run this pod
+	ServiceAccount string `json:"serviceAccount,omitempty" description:"the name of the ServiceAccount to use to run this pod"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"selector which must match a node's labels for the pod to be scheduled on that node"`
 }
@@ -778,21 +789,22 @@ type ReplicationController struct {
 
 // PodTemplate holds the information used for creating pods.
 type PodTemplate struct {
-	DesiredState PodState          `json:"desiredState,omitempty" description:"specification of the desired state of pods created from this template"`
-	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"a selector which must be true for the pod to fit on a node"`
-	Labels       map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize the pods created from the template; must match the selector of the replication controller to which the template belongs; may match selectors of services"`
-	Annotations  map[string]string `json:"annotations,omitempty" description:"map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about pods created from the template"`
+	DesiredState   PodState          `json:"desiredState,omitempty" description:"specification of the desired state of pods created from this template"`
+	ServiceAccount string            `json:"serviceAccount,omitempty" description:"the name of the ServiceAccount to use to run this pod"`
+	NodeSelector   map[string]string `json:"nodeSelector,omitempty" description:"a selector which must be true for the pod to fit on a node"`
+	Labels         map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize the pods created from the template; must match the selector of the replication controller to which the template belongs; may match selectors of services"`
+	Annotations    map[string]string `json:"annotations,omitempty" description:"map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about pods created from the template"`
 }
 
 // Session Affinity Type string
-type AffinityType string
+type ServiceAffinity string
 
 const (
-	// AffinityTypeClientIP is the Client IP based.
-	AffinityTypeClientIP AffinityType = "ClientIP"
+	// ServiceAffinityClientIP is the Client IP based.
+	ServiceAffinityClientIP ServiceAffinity = "ClientIP"
 
-	// AffinityTypeNone - no session affinity.
-	AffinityTypeNone AffinityType = "None"
+	// ServiceAffinityNone - no session affinity.
+	ServiceAffinityNone ServiceAffinity = "None"
 )
 
 const (
@@ -848,7 +860,7 @@ type Service struct {
 	ProxyPort int `json:"proxyPort,omitempty" description:"if non-zero, a pre-allocated host port used for this service by the proxy on each node; assigned by the master and ignored on input"`
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
-	SessionAffinity AffinityType `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`
+	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`
 
 	// Optional: Ports to expose on the service.  If this field is
 	// specified, the legacy fields (Port, PortName, Protocol, and
@@ -878,6 +890,24 @@ type ServicePort struct {
 	// of Port is used (an identity map) - note this is a different default
 	// than Service.ContainerPort.
 	ContainerPort util.IntOrString `json:"containerPort" description:"the port to access on the containers belonging to pods targeted by the service; defaults to the service port"`
+}
+
+// ServiceAccount binds together:
+// * a name, understood by users, and perhaps by peripheral systems, for an identity
+// * a principal that can be authenticated and authorized
+// * a set of secrets
+type ServiceAccount struct {
+	TypeMeta `json:",inline"`
+
+	// Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount
+	Secrets []ObjectReference `json:"secrets" description:"list of secrets that can be used by pods running as this service account" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+// ServiceAccountList is a list of ServiceAccount objects
+type ServiceAccountList struct {
+	TypeMeta `json:",inline"`
+
+	Items []ServiceAccount `json:"items" description:"list of ServiceAccounts"`
 }
 
 // EndpointObjectReference is a reference to an object exposing the endpoint
@@ -1186,6 +1216,9 @@ type PodLogOptions struct {
 
 	// If true, follow the logs for the pod
 	Follow bool `json:"follow,omitempty" description:"follow the log stream of the pod; defaults to false"`
+
+	//  If true, return previous terminated container logs
+	Previous bool `json:"previous,omitempty" description:"return previous terminated container logs; defaults to false"`
 }
 
 // PodExecOptions is the query options to a Pod's remote exec call
@@ -1207,8 +1240,8 @@ type PodExecOptions struct {
 	// Container in which to execute the command.
 	Container string `json:"container,omitempty" description:"the container in which to execute the command. Defaults to only container if there is only one container in the pod."`
 
-	// Command is the remote command to execute
-	Command string `json:"command" description:"the command to execute"`
+	// Command is the remote command to execute; argv array; not executed within a shell.
+	Command []string `json:"command" description:"the command to execute; argv array; not executed within a shell"`
 }
 
 // PodProxyOptions is the query options to a Pod's proxy call
@@ -1380,6 +1413,17 @@ type ObjectReference struct {
 	FieldPath string `json:"fieldPath,omitempty" description:"if referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]"`
 }
 
+// LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
+type LocalObjectReference struct {
+	//TODO: Add other useful fields.  apiVersion, kind, uid?
+	Name string `json:"name,omitempty" description:"name of the referent"`
+}
+
+type SerializedReference struct {
+	TypeMeta  `json:",inline"`
+	Reference ObjectReference `json:"reference,omitempty" description:"the reference to an object in the system"`
+}
+
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
@@ -1471,6 +1515,10 @@ type PodSpec struct {
 	// used must be specified.
 	// Optional: Default to false.
 	HostNetwork bool `json:"hostNetwork,omitempty" description:"host networking requested for this pod"`
+	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
+	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
+	// in the case of docker, only DockerConfig type secrets are honored.
+	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" description:"list of references to secrets in the same namespace available for pulling the container images"`
 }
 
 // List holds a list of objects, which may not be known by the server.
@@ -1591,10 +1639,11 @@ type NFSVolumeSource struct {
 type Secret struct {
 	TypeMeta `json:",inline"`
 
-	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.
+	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN
+	// or leading dot followed by valid DNS_SUBDOMAIN.
 	// The serialized form of the secret data is a base64 encoded string,
 	// representing the arbitrary (possibly non-string) data value here.
-	Data map[string][]byte `json:"data,omitempty" description:"data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"`
+	Data map[string][]byte `json:"data,omitempty" description:"data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string as described in https://tools.ietf.org/html/rfc4648#section-4"`
 
 	// Used to facilitate programmatic handling of secret data.
 	Type SecretType `json:"type,omitempty" description:"type facilitates programmatic handling of secret data"`
@@ -1605,7 +1654,34 @@ const MaxSecretSize = 1 * 1024 * 1024
 type SecretType string
 
 const (
-	SecretTypeOpaque SecretType = "Opaque" // Default; arbitrary user-defined data
+	// SecretTypeOpaque is the default; arbitrary user-defined data
+	SecretTypeOpaque SecretType = "Opaque"
+
+	// SecretTypeServiceAccountToken contains a token that identifies a service account to the API
+	//
+	// Required fields:
+	// - Secret.Annotations["kubernetes.io/service-account.name"] - the name of the ServiceAccount the token identifies
+	// - Secret.Annotations["kubernetes.io/service-account.uid"] - the UID of the ServiceAccount the token identifies
+	// - Secret.Data["token"] - a token that identifies the service account to the API
+	SecretTypeServiceAccountToken SecretType = "kubernetes.io/service-account-token"
+
+	// ServiceAccountNameKey is the key of the required annotation for SecretTypeServiceAccountToken secrets
+	ServiceAccountNameKey = "kubernetes.io/service-account.name"
+	// ServiceAccountUIDKey is the key of the required annotation for SecretTypeServiceAccountToken secrets
+	ServiceAccountUIDKey = "kubernetes.io/service-account.uid"
+	// ServiceAccountTokenKey is the key of the required data for SecretTypeServiceAccountToken secrets
+	ServiceAccountTokenKey = "token"
+	// ServiceAccountKubeconfigKey is the key of the optional kubeconfig data for SecretTypeServiceAccountToken secrets
+	ServiceAccountKubeconfigKey = "kubernetes.kubeconfig"
+
+	// SecretTypeDockercfg contains a dockercfg file that follows the same format rules as ~/.dockercfg
+	//
+	// Required fields:
+	// - Secret.Data[".dockercfg"] - a serialized ~/.dockercfg file
+	SecretTypeDockercfg SecretType = "kubernetes.io/dockercfg"
+
+	// DockerConfigKey is the key of the required data for SecretTypeDockercfg secrets
+	DockerConfigKey = ".dockercfg"
 )
 
 type SecretList struct {
@@ -1654,4 +1730,48 @@ type ComponentStatusList struct {
 	TypeMeta `json:",inline"`
 
 	Items []ComponentStatus `json:"items" description:"list of component status objects"`
+}
+
+// SecurityContext holds security configuration that will be applied to a container.  SecurityContext
+// contains duplication of some existing fields from the Container resource.  These duplicate fields
+// will be populated based on the Container configuration if they are not set.  Defining them on
+// both the Container AND the SecurityContext will result in an error.
+type SecurityContext struct {
+	// Capabilities are the capabilities to add/drop when running the container
+	// Must match Container.Capabilities or be unset.  Will be defaulted to Container.Capabilities if left unset
+	Capabilities *Capabilities `json:"capabilities,omitempty" description:"the linux capabilites that should be added or removed"`
+
+	// Run the container in privileged mode
+	// Must match Container.Privileged or be unset.  Will be defaulted to Container.Privileged if left unset
+	Privileged *bool `json:"privileged,omitempty" description:"run the container in privileged mode"`
+
+	// SELinuxOptions are the labels to be applied to the container
+	// and volumes
+	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" description:"options that control the SELinux labels applied"`
+
+	// RunAsUser is the UID to run the entrypoint of the container process.
+	RunAsUser *int64 `json:"runAsUser,omitempty" description:"the user id that runs the first process in the container"`
+}
+
+// SELinuxOptions are the labels to be applied to the container.
+type SELinuxOptions struct {
+	// SELinux user label
+	User string `json:"user,omitempty" description:"the user label to apply to the container"`
+
+	// SELinux role label
+	Role string `json:"role,omitempty" description:"the role label to apply to the container"`
+
+	// SELinux type label
+	Type string `json:"type,omitempty" description:"the type label to apply to the container"`
+
+	// SELinux level label.
+	Level string `json:"level,omitempty" description:"the level label to apply to the container"`
+}
+
+// RangeAllocation is not a public type
+type RangeAllocation struct {
+	TypeMeta `json:",inline"`
+
+	Range string `json:"range" description:"a range string that identifies the range represented by 'data'; required"`
+	Data  []byte `json:"data" description:"a bit array containing all allocated addresses in the previous segment"`
 }

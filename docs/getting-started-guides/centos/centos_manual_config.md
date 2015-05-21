@@ -99,7 +99,7 @@ KUBELET_PORT="--kubelet_port=10250"
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
 
-# Add you own!
+# Add your own!
 KUBE_API_ARGS=""
 ```
 
@@ -162,3 +162,6 @@ centos-minion          <none>            Ready
 **The cluster should be running! Launch a test pod.**
 
 You should have a functional cluster, check out [101](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/walkthrough/README.md)!
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/centos/centos_manual_config.md?pixel)]()

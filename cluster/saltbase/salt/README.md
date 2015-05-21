@@ -32,3 +32,6 @@ Config                                              | GCE   | Vagrant | AWS | Az
 [static-routes](static-routes/) (vsphere only)      |       |         |     |
 [base](base.sls)                                    | M n   | M n     | M n | M n
 [kube-client-tools](kube-client-tools.sls)          | M     | M       | M   | M
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/saltbase/salt/README.md?pixel)]()

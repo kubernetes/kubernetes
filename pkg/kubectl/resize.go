@@ -101,8 +101,13 @@ type ReplicationControllerResizer struct {
 	c ResizerClient
 }
 
+// RetryParams encapsulates the retry parameters used by kubectl's resizer.
 type RetryParams struct {
-	interval, timeout time.Duration
+	Interval, Timeout time.Duration
+}
+
+func NewRetryParams(interval, timeout time.Duration) *RetryParams {
+	return &RetryParams{interval, timeout}
 }
 
 // ResizeCondition is a closure around Resize that facilitates retries via util.wait
@@ -149,18 +154,16 @@ func (resizer *ReplicationControllerResizer) Resize(namespace, name string, newS
 	}
 	if retry == nil {
 		// Make it try only once, immediately
-		retry = &RetryParams{interval: time.Millisecond, timeout: time.Millisecond}
+		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
 	cond := ResizeCondition(resizer, preconditions, namespace, name, newSize)
-	if err := wait.Poll(retry.interval, retry.timeout, cond); err != nil {
+	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
 		rc := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: name}}
-		if err := wait.Poll(waitForReplicas.interval, waitForReplicas.timeout,
-			resizer.c.ControllerHasDesiredReplicas(rc)); err != nil {
-			return err
-		}
+		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
+			resizer.c.ControllerHasDesiredReplicas(rc))
 	}
 	return nil
 }

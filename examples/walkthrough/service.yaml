@@ -1,13 +1,16 @@
+apiVersion: v1beta3
 kind: Service
-apiVersion: v1beta1
-id: nginx-example
-# the port that this service should serve on
-port: 8000
-# just like the selector in the replication controller,
-# but this time it identifies the set of pods to load balance
-# traffic to.
-selector:
-  name: nginx
-# the container on each pod to connect to, can be a name
-# (e.g. 'www') or a number (e.g. 80)
-containerPort: 80
+metadata:
+  name: nginx-example
+spec:
+  ports:
+    - port: 8000 # the port that this service should serve on
+      # the container on each pod to connect to, can be a name
+      # (e.g. 'www') or a number (e.g. 80)
+      targetPort: 80
+      protocol: TCP
+  # just like the selector in the replication controller,
+  # but this time it identifies the set of pods to load balance
+  # traffic to.
+  selector:
+    name: nginx

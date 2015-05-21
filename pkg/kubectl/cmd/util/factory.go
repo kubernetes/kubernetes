@@ -48,8 +48,9 @@ const (
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
 // commands are decoupled from the factory).
 type Factory struct {
-	clients *clientCache
-	flags   *pflag.FlagSet
+	clients    *clientCache
+	flags      *pflag.FlagSet
+	generators map[string]kubectl.Generator
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
@@ -68,15 +69,18 @@ type Factory struct {
 	Resizer func(mapping *meta.RESTMapping) (kubectl.Resizer, error)
 	// Returns a Reaper for gracefully shutting down resources.
 	Reaper func(mapping *meta.RESTMapping) (kubectl.Reaper, error)
-	// PodSelectorForResource returns the pod selector associated with the provided resource name
-	// or an error.
-	PodSelectorForResource func(mapping *meta.RESTMapping, namespace, name string) (string, error)
-	// PortForResource returns the ports associated with the provided resource name or an error
-	PortsForResource func(mapping *meta.RESTMapping, namespace, name string) ([]string, error)
+	// PodSelectorForObject returns the pod selector associated with the provided object
+	PodSelectorForObject func(object runtime.Object) (string, error)
+	// PortsForObject returns the ports associated with the provided object
+	PortsForObject func(object runtime.Object) ([]string, error)
+	// LabelsForObject returns the labels associated with the provided object
+	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func() (validation.Schema, error)
 	// Returns the default namespace to use in cases where no other namespace is specified
 	DefaultNamespace func() (string, error)
+	// Returns the generator for the provided generator name
+	Generator func(name string) (kubectl.Generator, bool)
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -87,6 +91,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+
+	generators := map[string]kubectl.Generator{
+		"run-container/v1": kubectl.BasicReplicationController{},
+		"service/v1":       kubectl.ServiceGenerator{},
+	}
 
 	clientConfig := optionalClientConfig
 	if optionalClientConfig == nil {
@@ -99,8 +108,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 
 	return &Factory{
-		clients: clients,
-		flags:   flags,
+		clients:    clients,
+		flags:      flags,
+		generators: generators,
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
@@ -136,63 +146,46 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
 			return kubectl.NewHumanReadablePrinter(noHeaders), nil
 		},
-		PodSelectorForResource: func(mapping *meta.RESTMapping, namespace, name string) (string, error) {
+		PodSelectorForObject: func(object runtime.Object) (string, error) {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
-			client, err := clients.ClientForVersion("")
-			if err != nil {
-				return "", err
-			}
-			switch mapping.Kind {
-			case "ReplicationController":
-				rc, err := client.ReplicationControllers(namespace).Get(name)
-				if err != nil {
-					return "", err
-				}
-				return kubectl.MakeLabels(rc.Spec.Selector), nil
-			case "Pod":
-				pod, err := client.Pods(namespace).Get(name)
-				if err != nil {
-					return "", err
-				}
-				if len(pod.Labels) == 0 {
+			switch t := object.(type) {
+			case *api.ReplicationController:
+				return kubectl.MakeLabels(t.Spec.Selector), nil
+			case *api.Pod:
+				if len(t.Labels) == 0 {
 					return "", fmt.Errorf("the pod has no labels and cannot be exposed")
 				}
-				return kubectl.MakeLabels(pod.Labels), nil
-			case "Service":
-				svc, err := client.Services(namespace).Get(name)
+				return kubectl.MakeLabels(t.Labels), nil
+			case *api.Service:
+				if t.Spec.Selector == nil {
+					return "", fmt.Errorf("the service has no pod selector set")
+				}
+				return kubectl.MakeLabels(t.Spec.Selector), nil
+			default:
+				kind, err := meta.NewAccessor().Kind(object)
 				if err != nil {
 					return "", err
 				}
-				if svc.Spec.Selector == nil {
-					return "", fmt.Errorf("the service has no pod selector set")
-				}
-				return kubectl.MakeLabels(svc.Spec.Selector), nil
-			default:
-				return "", fmt.Errorf("it is not possible to get a pod selector from %s", mapping.Kind)
+				return "", fmt.Errorf("it is not possible to get a pod selector from %s", kind)
 			}
 		},
-		PortsForResource: func(mapping *meta.RESTMapping, namespace, name string) ([]string, error) {
+		PortsForObject: func(object runtime.Object) ([]string, error) {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
-			client, err := clients.ClientForVersion("")
-			if err != nil {
-				return nil, err
-			}
-			switch mapping.Kind {
-			case "ReplicationController":
-				rc, err := client.ReplicationControllers(namespace).Get(name)
-				if err != nil {
-					return nil, err
-				}
-				return getPorts(rc.Spec.Template.Spec), nil
-			case "Pod":
-				pod, err := client.Pods(namespace).Get(name)
-				if err != nil {
-					return nil, err
-				}
-				return getPorts(pod.Spec), nil
+			switch t := object.(type) {
+			case *api.ReplicationController:
+				return getPorts(t.Spec.Template.Spec), nil
+			case *api.Pod:
+				return getPorts(t.Spec), nil
 			default:
-				return nil, fmt.Errorf("it is not possible to get ports from %s", mapping.Kind)
+				kind, err := meta.NewAccessor().Kind(object)
+				if err != nil {
+					return nil, err
+				}
+				return nil, fmt.Errorf("it is not possible to get ports from %s", kind)
 			}
+		},
+		LabelsForObject: func(object runtime.Object) (map[string]string, error) {
+			return meta.NewAccessor().Labels(object)
 		},
 		Resizer: func(mapping *meta.RESTMapping) (kubectl.Resizer, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)
@@ -220,6 +213,10 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		DefaultNamespace: func() (string, error) {
 			return clientConfig.Namespace()
+		},
+		Generator: func(name string) (kubectl.Generator, bool) {
+			generator, ok := generators[name]
+			return generator, ok
 		},
 	}
 }
@@ -325,7 +322,6 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	overrides := &clientcmd.ConfigOverrides{}
 	flagNames := clientcmd.RecommendedConfigOverrideFlags("")
 	// short flagnames are disabled by default.  These are here for compatibility with existing scripts
-	flagNames.AuthOverrideFlags.AuthPath.ShortName = "a"
 	flagNames.ClusterOverrideFlags.APIServer.ShortName = "s"
 
 	clientcmd.BindOverrideFlags(overrides, flags, flagNames)

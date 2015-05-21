@@ -171,6 +171,10 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	t := &testFactory{
 		Validator: validation.NullSchema{},
 	}
+	generators := map[string]kubectl.Generator{
+		"run-container/v1": kubectl.BasicReplicationController{},
+		"service/v1":       kubectl.ServiceGenerator{},
+	}
 	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return latest.RESTMapper, api.Scheme
@@ -199,6 +203,10 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		},
 		ClientConfig: func() (*client.Config, error) {
 			return t.ClientConfig, t.Err
+		},
+		Generator: func(name string) (kubectl.Generator, bool) {
+			generator, ok := generators[name]
+			return generator, ok
 		},
 	}, t, testapi.Codec()
 }

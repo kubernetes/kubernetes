@@ -328,8 +328,11 @@ If you need more granular control, you can set the amount of memory for the mast
 
 ```sh
 export KUBERNETES_MASTER_MEMORY=1536
-export KUBERNETES_MASTER_MINION=2048
+export KUBERNETES_MINION_MEMORY=2048
 ```
 
 #### I ran vagrant suspend and nothing works!
 ```vagrant suspend``` seems to mess up the network.  It's not supported at this time.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/developer-guides/vagrant.md?pixel)]()

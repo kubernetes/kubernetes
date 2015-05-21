@@ -11,7 +11,7 @@ spec:
     resources:
       limits:
         cpu: "1"      
-    image: kubernetes/cassandra:v2
+    image: gcr.io/google_containers/cassandra:v3
     name: cassandra
     ports:
     - name: cql
@@ -26,10 +26,6 @@ spec:
       value: 512M
     - name: HEAP_NEWSIZE
       value: 100M
-    - name: KUBERNETES_API_PROTOCOL
-      value: http
   volumes:
     - name: data
       emptyDir: {}
-
-    

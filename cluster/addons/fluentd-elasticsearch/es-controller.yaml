@@ -1,22 +1,26 @@
 apiVersion: v1beta3
 kind: ReplicationController
 metadata:
+  name: elasticsearch-logging-v1
+  namespace: default
   labels:
-    name: elasticsearch-logging
+    k8s-app: elasticsearch-logging
+    version: v1
     kubernetes.io/cluster-service: "true"
-  name: elasticsearch-logging
 spec:
-  replicas: 1
+  replicas: 2
   selector:
-    name: elasticsearch-logging
+    k8s-app: elasticsearch-logging
+    version: v1
   template:
     metadata:
       labels:
-        name: elasticsearch-logging
+        k8s-app: elasticsearch-logging
+        version: v1
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
-      - image: gcr.io/google_containers/elasticsearch:1.0
+      - image: gcr.io/google_containers/elasticsearch:1.3
         name: elasticsearch-logging
         ports:
         - containerPort: 9200
@@ -26,8 +30,14 @@ spec:
           name: es-transport-port
           protocol: TCP
         volumeMounts:
-        - mountPath: /data
-          name: es-persistent-storage
+        - name: token-system-logging
+          mountPath: /etc/token-system-logging
+          readOnly: true
+        - name: es-persistent-storage
+          mountPath: /data
       volumes:
+      - name: token-system-logging
+        secret:
+          secretName: token-system-logging
       - name: es-persistent-storage
         emptyDir: {}

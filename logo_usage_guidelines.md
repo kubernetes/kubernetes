@@ -13,3 +13,6 @@ Use of the Kubernetes logo or other Google brands in ways not expressly covered 
 [PNG format](https://github.com/GoogleCloudPlatform/kubernetes/raw/master/logo.png)
 
 [PDF format](https://github.com/GoogleCloudPlatform/kubernetes/raw/master/logo.pdf)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/logo_usage_guidelines.md?pixel)]()

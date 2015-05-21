@@ -28,6 +28,25 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
+//TODO:
+// Storage interfaces need to be separated into two groups; those that operate
+// on collections and those that operate on individually named items.
+// Collection interfaces:
+// (Method: Current -> Proposed)
+//    GET: Lister -> CollectionGetter
+//    WATCH: Watcher -> CollectionWatcher
+//    CREATE: Creater -> CollectionCreater
+//    DELETE: (n/a) -> CollectionDeleter
+//    UPDATE: (n/a) -> CollectionUpdater
+//
+// Single item interfaces:
+// (Method: Current -> Proposed)
+//    GET: Getter -> NamedGetter
+//    WATCH: (n/a) -> NamedWatcher
+//    CREATE: (n/a) -> NamedCreater
+//    DELETE: Deleter -> NamedDeleter
+//    UPDATE: Update -> NamedUpdater
+
 // Storage is a generic interface for RESTful storage services.
 // Resources which are exported to the RESTful API of apiserver need to implement this interface. It is expected
 // that objects may implement any of the below interfaces.
@@ -115,6 +134,18 @@ type Creater interface {
 
 	// Create creates a new version of a resource.
 	Create(ctx api.Context, obj runtime.Object) (runtime.Object, error)
+}
+
+// NamedCreater is an object that can create an instance of a RESTful object using a name parameter.
+type NamedCreater interface {
+	// New returns an empty object that can be used with Create after request data has been put into it.
+	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
+	New() runtime.Object
+
+	// Create creates a new version of a resource. It expects a name parameter from the path.
+	// This is needed for create operations on subresources which include the name of the parent
+	// resource in the path.
+	Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error)
 }
 
 // Updater is an object that can update an instance of a RESTful object.

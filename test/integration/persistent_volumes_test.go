@@ -88,7 +88,7 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 	for {
 		event := <-watch.ResultChan()
 		claim := event.Object.(*api.PersistentVolumeClaim)
-		if claim.Status.VolumeRef != nil {
+		if claim.Spec.VolumeName != "" {
 			boundCount++
 		}
 		if boundCount == expectedBoundCount {
@@ -102,10 +102,10 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 
-		if (claim.Name == "claim01" || claim.Name == "claim02") && claim.Status.VolumeRef == nil {
+		if (claim.Name == "claim01" || claim.Name == "claim02") && claim.Spec.VolumeName == "" {
 			t.Errorf("Expected claim to be bound: %+v", claim)
 		}
-		if claim.Name == "claim03" && claim.Status.VolumeRef != nil {
+		if claim.Name == "claim03" && claim.Spec.VolumeName != "" {
 			t.Errorf("Expected claim03 to be unbound: %v", claim)
 		}
 	}
@@ -119,7 +119,7 @@ func createTestClaims() []*api.PersistentVolumeClaim {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: api.PersistentVolumeClaimSpec{
-				AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				Resources: api.ResourceRequirements{
 					Requests: api.ResourceList{
 						api.ResourceName(api.ResourceStorage): resource.MustParse("500G"),
@@ -133,7 +133,7 @@ func createTestClaims() []*api.PersistentVolumeClaim {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: api.PersistentVolumeClaimSpec{
-				AccessModes: []api.AccessModeType{api.ReadOnlyMany, api.ReadWriteOnce},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce},
 				Resources: api.ResourceRequirements{
 					Requests: api.ResourceList{
 						api.ResourceName(api.ResourceStorage): resource.MustParse("8G"),
@@ -147,7 +147,7 @@ func createTestClaims() []*api.PersistentVolumeClaim {
 				Namespace: api.NamespaceDefault,
 			},
 			Spec: api.PersistentVolumeClaimSpec{
-				AccessModes: []api.AccessModeType{api.ReadOnlyMany, api.ReadWriteOnce, api.ReadWriteMany},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany, api.ReadWriteOnce, api.ReadWriteMany},
 				Resources: api.ResourceRequirements{
 					Requests: api.ResourceList{
 						api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
@@ -175,7 +175,7 @@ func createTestVolumes() []*api.PersistentVolume {
 						FSType: "foo",
 					},
 				},
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 				},
@@ -196,7 +196,7 @@ func createTestVolumes() []*api.PersistentVolume {
 						Path:          "theloveyoutakeisequaltotheloveyoumake",
 					},
 				},
-				AccessModes: []api.AccessModeType{
+				AccessModes: []api.PersistentVolumeAccessMode{
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 					api.ReadWriteMany,

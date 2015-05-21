@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -199,5 +200,42 @@ func TestEmbeddedObject(t *testing.T) {
 	}
 	if a := decodedViaJSON; a.Object.Object != nil || a.EmptyObject.Object != nil {
 		t.Errorf("Expected embedded objects to be nil: %#v", a)
+	}
+}
+
+// TestDeepCopyOfEmbeddedObject checks to make sure that EmbeddedObject's can be passed through DeepCopy with fidelity
+func TestDeepCopyOfEmbeddedObject(t *testing.T) {
+	s := runtime.NewScheme()
+	s.AddKnownTypes("", &EmbeddedTest{})
+	s.AddKnownTypeWithName("v1test", "EmbeddedTest", &EmbeddedTestExternal{})
+
+	original := &EmbeddedTest{
+		ID: "outer",
+		Object: runtime.EmbeddedObject{
+			&EmbeddedTest{
+				ID: "inner",
+			},
+		},
+	}
+
+	originalData, err := s.EncodeToVersion(original, "v1test")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	t.Logf("originalRole = %v\n", string(originalData))
+
+	copyOfOriginal, err := conversion.DeepCopy(original)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	copiedData, err := s.EncodeToVersion(copyOfOriginal.(runtime.Object), "v1test")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	t.Logf("copyOfRole   = %v\n", string(copiedData))
+
+	if !reflect.DeepEqual(original, copyOfOriginal) {
+		t.Errorf("expected \n%v\n, got \n%v", string(originalData), string(copiedData))
 	}
 }

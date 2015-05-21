@@ -23,37 +23,34 @@ You can verify that it worked by re-running `kubectl get nodes` and checking tha
 Take whatever pod config file you want to run, and add a nodeSelector section to it, like this. For example, if this is my pod config:
 
 <pre>
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    containers:
-      - image: nginx
-        name: nginx
-    id: nginx
-    version: v1beta1
-id: nginx
+apiVersion: v1beta3
 kind: Pod
-labels:
-  env: test
+metadata:
+  labels:
+    env: test
+  name: nginx
+spec:
+  containers:
+  - image: nginx
+    name: nginx
 </pre>
 
 Then add a nodeSelector like so:
 
 <pre>
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    containers:
-      - image: nginx
-        name: nginx
-    id: nginx
-    version: v1beta1
-id: nginx
+apiVersion: v1beta3
 kind: Pod
-labels:
-  env: test
-<b>nodeSelector:
-  disktype: ssd</b>
+metadata:
+  labels:
+    env: test
+  name: nginx
+spec:
+  containers:
+  - image: nginx
+    imagePullPolicy: IfNotPresent
+    name: nginx
+  <b>nodeSelector:
+    disktype: ssd</b>
 </pre>
 
 When you then run `kubectl create -f pod.yaml`, the pod will get scheduled on the node that you attached the label to! You can verify that it worked by running `kubectl get pods` and looking at the "host" that the pod was assigned to.
@@ -61,3 +58,6 @@ When you then run `kubectl create -f pod.yaml`, the pod will get scheduled on th
 ### Conclusion
 
 While this example only covered one node, you can attach labels to as many nodes as you want. Then when you schedule a pod with a nodeSelector, it can be scheduled on any of the nodes that satisfy that nodeSelector. Be careful that it will match at least one node, however, because if it doesn't the pod won't be scheduled at all.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/node-selection/README.md?pixel)]()

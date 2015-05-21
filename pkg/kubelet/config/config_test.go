@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
@@ -62,7 +63,14 @@ func CreateValidPod(name, namespace, source string) *api.Pod {
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers: []api.Container{
+				{
+					Name:            "ctr",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
+				},
+			},
 		},
 	}
 }

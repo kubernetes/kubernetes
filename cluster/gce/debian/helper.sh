@@ -26,10 +26,12 @@ function build-kube-env {
 ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
 INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
 NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
+CLUSTER_IP_RANGE: $(yaml-quote ${CLUSTER_IP_RANGE:-10.244.0.0/16})
 SERVER_BINARY_TAR_URL: $(yaml-quote ${SERVER_BINARY_TAR_URL})
 SALT_TAR_URL: $(yaml-quote ${SALT_TAR_URL})
 PORTAL_NET: $(yaml-quote ${PORTAL_NET})
-ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-false})
+ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
+ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
 ENABLE_NODE_MONITORING: $(yaml-quote ${ENABLE_NODE_MONITORING:-false})
 ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
 ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
@@ -39,21 +41,33 @@ ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
 DNS_REPLICAS: $(yaml-quote ${DNS_REPLICAS:-})
 DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
-KUBE_USER: $(yaml-quote ${KUBE_USER})
-KUBE_PASSWORD: $(yaml-quote ${KUBE_PASSWORD})
-KUBE_BEARER_TOKEN: $(yaml-quote ${KUBE_BEARER_TOKEN})
 KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
 KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
+CA_CERT: $(yaml-quote ${CA_CERT_BASE64})
 EOF
 
-  if [[ "${master}" != "true" ]]; then
+  if [[ "${master}" == "true" ]]; then
+    # Master-only env vars.
+    cat >>$file <<EOF
+KUBE_USER: $(yaml-quote ${KUBE_USER})
+KUBE_PASSWORD: $(yaml-quote ${KUBE_PASSWORD})
+KUBE_BEARER_TOKEN: $(yaml-quote ${KUBE_BEARER_TOKEN})
+MASTER_CERT: $(yaml-quote ${MASTER_CERT_BASE64:-})
+MASTER_KEY: $(yaml-quote ${MASTER_KEY_BASE64:-})
+KUBECFG_CERT: $(yaml-quote ${KUBECFG_CERT_BASE64:-})
+KUBECFG_KEY: $(yaml-quote ${KUBECFG_KEY_BASE64:-})
+EOF
+  else
+    # Node-only env vars.
     cat >>$file <<EOF
 KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
 ZONE: $(yaml-quote ${ZONE})
 EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS})
 ENABLE_DOCKER_REGISTRY_CACHE: $(yaml-quote ${ENABLE_DOCKER_REGISTRY_CACHE:-false})
+KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
+KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
 EOF
   fi
 }

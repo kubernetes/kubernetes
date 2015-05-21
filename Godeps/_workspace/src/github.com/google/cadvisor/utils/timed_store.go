@@ -19,10 +19,26 @@ import (
 	"time"
 )
 
-// A time-based buffer for ContainerStats. Holds information for a specific time period.
+type timedStoreDataSlice []timedStoreData
+
+func (t timedStoreDataSlice) Less(i, j int) bool {
+	return t[i].timestamp.Before(t[j].timestamp)
+}
+
+func (t timedStoreDataSlice) Len() int {
+	return len(t)
+}
+
+func (t timedStoreDataSlice) Swap(i, j int) {
+	t[i], t[j] = t[j], t[i]
+}
+
+// A time-based buffer for ContainerStats.
+// Holds information for a specific time period and/or a max number of items.
 type TimedStore struct {
-	buffer []timedStoreData
-	age    time.Duration
+	buffer   timedStoreDataSlice
+	age      time.Duration
+	maxItems int
 }
 
 type timedStoreData struct {
@@ -31,16 +47,32 @@ type timedStoreData struct {
 }
 
 // Returns a new thread-compatible TimedStore.
-func NewTimedStore(age time.Duration) *TimedStore {
+// A maxItems value of -1 means no limit.
+func NewTimedStore(age time.Duration, maxItems int) *TimedStore {
 	return &TimedStore{
-		buffer: make([]timedStoreData, 0),
-		age:    age,
+		buffer:   make(timedStoreDataSlice, 0),
+		age:      age,
+		maxItems: maxItems,
 	}
 }
 
 // Adds an element to the start of the buffer (removing one from the end if necessary).
 func (self *TimedStore) Add(timestamp time.Time, item interface{}) {
-	// Remove any elements before the eviction time.
+	// Remove any elements if over our max size.
+	if self.maxItems >= 0 && (len(self.buffer)+1) > self.maxItems {
+		startIndex := len(self.buffer) + 1 - self.maxItems
+		self.buffer = self.buffer[startIndex:]
+	}
+	// Add the new element first and sort. We can then remove an expired element, if required.
+	copied := item
+	self.buffer = append(self.buffer, timedStoreData{
+		timestamp: timestamp,
+		data:      copied,
+	})
+
+	sort.Sort(self.buffer)
+	// Remove any elements before eviction time.
+	// TODO(rjnagal): This is assuming that the added entry has timestamp close to now.
 	evictTime := timestamp.Add(-self.age)
 	index := sort.Search(len(self.buffer), func(index int) bool {
 		return self.buffer[index].timestamp.After(evictTime)
@@ -49,11 +81,6 @@ func (self *TimedStore) Add(timestamp time.Time, item interface{}) {
 		self.buffer = self.buffer[index:]
 	}
 
-	copied := item
-	self.buffer = append(self.buffer, timedStoreData{
-		timestamp: timestamp,
-		data:      copied,
-	})
 }
 
 // Returns up to maxResult elements in the specified time period (inclusive).
@@ -69,9 +96,6 @@ func (self *TimedStore) InTimeRange(start, end time.Time, maxResults int) []inte
 	if !start.IsZero() && !end.IsZero() {
 		maxResults = -1
 	}
-
-	// NOTE: Since we store the elments in descending timestamp order "start" will
-	// be a higher index than "end".
 
 	var startIndex int
 	if start.IsZero() {

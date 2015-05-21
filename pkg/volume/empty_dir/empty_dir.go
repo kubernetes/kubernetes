@@ -71,21 +71,21 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, podRef, mounter, &realMountDetector{mounter}, opts)
+func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+	return plugin.newBuilderInternal(spec, pod, mounter, &realMountDetector{mounter}, opts)
 }
 
-func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
-	medium := api.StorageTypeDefault
+	medium := api.StorageMediumDefault
 	if spec.VolumeSource.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.VolumeSource.EmptyDir.Medium
 	}
 	return &emptyDir{
-		podUID:        podRef.UID,
+		podUID:        pod.UID,
 		volName:       spec.Name,
 		medium:        medium,
 		mounter:       mounter,
@@ -109,7 +109,7 @@ func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UI
 	ed := &emptyDir{
 		podUID:        podUID,
 		volName:       volName,
-		medium:        api.StorageTypeDefault, // might be changed later
+		medium:        api.StorageMediumDefault, // might be changed later
 		mounter:       mounter,
 		mountDetector: mountDetector,
 		plugin:        plugin,
@@ -140,7 +140,7 @@ const (
 type emptyDir struct {
 	podUID        types.UID
 	volName       string
-	medium        api.StorageType
+	medium        api.StorageMedium
 	mounter       mount.Interface
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
@@ -159,9 +159,9 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 		return fmt.Errorf("legacy mode: can not create new instances")
 	}
 	switch ed.medium {
-	case api.StorageTypeDefault:
+	case api.StorageMediumDefault:
 		return ed.setupDefault(dir)
-	case api.StorageTypeMemory:
+	case api.StorageMediumMemory:
 		return ed.setupTmpfs(dir)
 	default:
 		return fmt.Errorf("unknown storage medium %q", ed.medium)
@@ -231,10 +231,10 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 		return err
 	}
 	if isMnt && medium == mediumMemory {
-		ed.medium = api.StorageTypeMemory
+		ed.medium = api.StorageMediumMemory
 		return ed.teardownTmpfs(dir)
 	}
-	// assume StorageTypeDefault
+	// assume StorageMediumDefault
 	return ed.teardownDefault(dir)
 }
 

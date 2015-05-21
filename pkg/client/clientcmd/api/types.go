@@ -17,7 +17,6 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -26,7 +25,11 @@ import (
 
 // Config holds the information needed to build connect to remote kubernetes clusters as a given user
 type Config struct {
-	api.TypeMeta `json:",inline"`
+	// Legacy field from pkg/api/types.go TypeMeta.
+	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
+	Kind string `json:"kind,omitempty"`
+	// Version of the schema for this config object.
+	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
 	Preferences Preferences `json:"preferences"`
 	// Clusters is a map of referencable names to cluster configs
@@ -69,8 +72,6 @@ type Cluster struct {
 type AuthInfo struct {
 	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
 	LocationOfOrigin string
-	// AuthPath is the path to a kubernetes auth file (~/.kubernetes_auth).  If you provide an AuthPath, the other options specified are ignored
-	AuthPath string `json:"auth-path,omitempty"`
 	// ClientCertificate is the path to a client cert file for TLS.
 	ClientCertificate string `json:"client-certificate,omitempty"`
 	// ClientCertificateData contains PEM-encoded data from a client cert file for TLS. Overrides ClientCertificate

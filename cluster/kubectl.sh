@@ -100,16 +100,23 @@ elif [[ ! -x "${KUBECTL_PATH}" ]]; then
 fi
 kubectl="${KUBECTL_PATH:-${kubectl}}"
 
-# GKE stores it's kubeconfig in a separate location.
 if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
   config=(
-    "--kubeconfig=${HOME}/.config/gcloud/kubernetes/kubeconfig"
     "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
+  )
+elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" || "$KUBERNETES_PROVIDER" == "juju" ]]; then
+  detect-master > /dev/null
+  config=(
+    "--server=http://${KUBE_MASTER_IP}:8080"
   )
 fi
 
-echo "current-context: \"$(${kubectl} "${config[@]:+${config[@]}}" config view -o template --template='{{index . "current-context"}}')\"" >&2
 
-echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
+if false; then
+  # disable these debugging messages by default
+  echo "current-context: \"$(${kubectl} "${config[@]:+${config[@]}}" config view -o template --template='{{index . "current-context"}}')\"" >&2
+  echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
+fi
+
 "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}"

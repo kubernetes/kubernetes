@@ -77,36 +77,6 @@ var (
 
 type fakeKubeletClient struct{}
 
-func (fakeKubeletClient) GetPodStatus(host, podNamespace, podName string) (api.PodStatusResult, error) {
-	glog.V(3).Infof("Trying to get container info for %v/%v/%v", host, podNamespace, podName)
-	// This is a horrible hack to get around the fact that we can't provide
-	// different port numbers per kubelet...
-	var c client.PodInfoGetter
-	switch host {
-	case "localhost":
-		c = &client.HTTPKubeletClient{
-			Client: http.DefaultClient,
-			Port:   10250,
-		}
-	case "127.0.0.1":
-		c = &client.HTTPKubeletClient{
-			Client: http.DefaultClient,
-			Port:   10251,
-		}
-	default:
-		glog.Fatalf("Can't get info for: '%v', '%v - %v'", host, podNamespace, podName)
-	}
-	r, err := c.GetPodStatus("127.0.0.1", podNamespace, podName)
-	if err != nil {
-		return r, err
-	}
-	r.Status.PodIP = "1.2.3.4"
-	for i := range r.Status.ContainerStatuses {
-		r.Status.ContainerStatuses[i].Ready = true
-	}
-	return r, nil
-}
-
 func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
 }
@@ -185,17 +155,18 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     fakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableProfiling:   true,
-		APIPrefix:         "/api",
-		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:  admit.NewAlwaysAdmit(),
-		ReadWritePort:     portNumber,
-		ReadOnlyPort:      portNumber,
-		PublicAddress:     publicAddress,
-		CacheTimeout:      2 * time.Second,
+		EtcdHelper:            helper,
+		KubeletClient:         fakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableProfiling:       true,
+		APIPrefix:             "/api",
+		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		ReadWritePort:         portNumber,
+		ReadOnlyPort:          portNumber,
+		PublicAddress:         publicAddress,
+		CacheTimeout:          2 * time.Second,
 	})
 	handler.delegate = m.Handler
 
@@ -214,7 +185,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
 	go endpoints.Run(3, util.NeverStop)
 
-	controllerManager := replicationControllerPkg.NewReplicationManager(cl)
+	controllerManager := replicationControllerPkg.NewReplicationManager(cl, replicationControllerPkg.BurstReplicas)
 
 	// TODO: Write an integration test for the replication controllers watch.
 	go controllerManager.Run(3, util.NeverStop)
@@ -225,7 +196,8 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 			api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 		}}
 
-	nodeController := nodecontroller.NewNodeController(nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewFakeRateLimiter(), 40*time.Second, 60*time.Second, 5*time.Second, "")
+	nodeController := nodecontroller.NewNodeController(nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewFakeRateLimiter(),
+		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
 	nodeController.Run(5*time.Second, true)
 	cadvisorInterface := new(cadvisor.Fake)
 
@@ -263,8 +235,7 @@ func makeTempDirOrDie(prefix string, baseDir string) string {
 
 // podsOnMinions returns true when all of the selected pods exist on a minion.
 func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.Selector) wait.ConditionFunc {
-	podInfo := fakeKubeletClient{}
-	// wait for minions to indicate they have info about the desired pods
+	// Wait until all pods are running on the node.
 	return func() (bool, error) {
 		pods, err := c.Pods(podNamespace).List(labelSelector, fields.Everything())
 		if err != nil {
@@ -272,14 +243,14 @@ func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.S
 			return false, nil
 		}
 		for i := range pods.Items {
-			host, id, namespace := pods.Items[i].Spec.Host, pods.Items[i].Name, pods.Items[i].Namespace
-			glog.Infof("Check whether pod %s.%s exists on node %q", id, namespace, host)
-			if len(host) == 0 {
-				glog.Infof("Pod %s.%s is not bound to a host yet", id, namespace)
+			pod := pods.Items[i]
+			podString := fmt.Sprintf("%q/%q", pod.Namespace, pod.Name)
+			glog.Infof("Check whether pod %q exists on node %q", podString, pod.Spec.Host)
+			if len(pod.Spec.Host) == 0 {
+				glog.Infof("Pod %q is not bound to a host yet", podString)
 				return false, nil
 			}
-			if _, err := podInfo.GetPodStatus(host, namespace, id); err != nil {
-				glog.Infof("GetPodStatus error: %v", err)
+			if pod.Status.Phase != api.PodRunning {
 				return false, nil
 			}
 		}
@@ -347,6 +318,7 @@ func podRunning(c *client.Client, podNamespace string, podName string) wait.Cond
 	}
 }
 
+// runStaticPodTest is disabled until #6651 is resolved.
 func runStaticPodTest(c *client.Client, configFilePath string) {
 	var testCases = []struct {
 		desc         string
@@ -975,7 +947,7 @@ func main() {
 
 	firstManifestURL := ServeCachedManifestFile(testPodSpecFile)
 	secondManifestURL := ServeCachedManifestFile(testManifestFile)
-	apiServerURL, configFilePath := startComponents(firstManifestURL, secondManifestURL, apiVersion)
+	apiServerURL, _ := startComponents(firstManifestURL, secondManifestURL, apiVersion)
 
 	// Ok. we're good to go.
 	glog.Infof("API Server started on %s", apiServerURL)
@@ -995,9 +967,6 @@ func main() {
 		func(c *client.Client) {
 			runSelfLinkTestOnNamespace(c, api.NamespaceDefault)
 			runSelfLinkTestOnNamespace(c, "other")
-		},
-		func(c *client.Client) {
-			runStaticPodTest(c, configFilePath)
 		},
 	}
 
@@ -1042,12 +1011,10 @@ func main() {
 	//              1 pod infra container + 2 containers from the URL on first Kubelet +
 	//              1 pod infra container + 2 containers from the URL on second Kubelet +
 	//              1 pod infra container + 1 container from the service test.
-	// In addition, runStaticPodTest creates 2 pod infra containers +
-	//                                       2 pod containers from the file (1 for manifest and 1 for spec)
-	// The total number of container created is 13
+	// The total number of container created is 9
 
-	if len(createdConts) != 16 {
-		glog.Fatalf("Expected 16 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
+	if len(createdConts) != 12 {
+		glog.Fatalf("Expected 12 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK - found created containers: %#v", createdConts.List())
 

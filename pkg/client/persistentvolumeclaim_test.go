@@ -41,7 +41,7 @@ func TestPersistentVolumeClaimCreate(t *testing.T) {
 			Name: "abc",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.AccessModeType{
+			AccessModes: []api.PersistentVolumeAccessMode{
 				api.ReadWriteOnce,
 				api.ReadOnlyMany,
 			},
@@ -75,7 +75,7 @@ func TestPersistentVolumeClaimGet(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.AccessModeType{
+			AccessModes: []api.PersistentVolumeAccessMode{
 				api.ReadWriteOnce,
 				api.ReadOnlyMany,
 			},
@@ -130,7 +130,7 @@ func TestPersistentVolumeClaimUpdate(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.AccessModeType{
+			AccessModes: []api.PersistentVolumeAccessMode{
 				api.ReadWriteOnce,
 				api.ReadOnlyMany,
 			},
@@ -157,7 +157,7 @@ func TestPersistentVolumeClaimStatusUpdate(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.AccessModeType{
+			AccessModes: []api.PersistentVolumeAccessMode{
 				api.ReadWriteOnce,
 				api.ReadOnlyMany,
 			},

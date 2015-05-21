@@ -74,7 +74,7 @@ However you can't view the nginx start page on localhost. To verify that nginx i
 You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:
 
 ```
-cluster/kubectl.sh create -f docs/getting-started-guides/pod.json
+cluster/kubectl.sh create -f examples/pod.yaml
 ```
 
 Congratulations!
@@ -110,3 +110,6 @@ One or more of the kubernetes daemons might've crashed. Tail the logs of each in
 
 #### The pods fail to connect to the services by host names
 The local-up-cluster.sh script doesn't start a DNS service. Similar situation can be found [here](https://github.com/GoogleCloudPlatform/kubernetes/issues/6667). You can start a manually. Related documents can be found [here](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/addons/dns#how-do-i-configure-it)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/locally.md?pixel)]()

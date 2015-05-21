@@ -74,6 +74,11 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = validation.ValidatePodTemplate(t)
+	case *api.Endpoints:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = validation.ValidateEndpoints(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -135,14 +140,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-master-service":    &api.Service{},
 			"redis-slave-service":     &api.Service{},
 		},
-		"../examples/guestbook-go/v1beta3": {
-			"guestbook-controller":    &api.ReplicationController{},
-			"redis-slave-controller":  &api.ReplicationController{},
-			"redis-master-controller": &api.ReplicationController{},
-			"guestbook-service":       &api.Service{},
-			"redis-master-service":    &api.Service{},
-			"redis-slave-service":     &api.Service{},
-		},
 		"../examples/walkthrough": {
 			"pod1": &api.Pod{},
 			"pod2": &api.Pod{},
@@ -159,20 +156,23 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"local-01": &api.PersistentVolume{},
 			"local-02": &api.PersistentVolume{},
 			"gce":      &api.PersistentVolume{},
+			"nfs":      &api.PersistentVolume{},
 		},
 		"../examples/persistent-volumes/claims": {
 			"claim-01": &api.PersistentVolumeClaim{},
 			"claim-02": &api.PersistentVolumeClaim{},
 			"claim-03": &api.PersistentVolumeClaim{},
 		},
-		"../examples/iscsi/v1beta1": {
+		"../examples/iscsi": {
 			"iscsi": &api.Pod{},
 		},
-		"../examples/iscsi/v1beta3": {
-			"iscsi": &api.Pod{},
+		"../examples/glusterfs": {
+			"glusterfs-pod":       &api.Pod{},
+			"glusterfs-endpoints": &api.Endpoints{},
 		},
-		"../examples/glusterfs/v1beta3": {
-			"glusterfs": &api.Pod{},
+		"../examples/liveness": {
+			"exec-liveness": &api.Pod{},
+			"http-liveness": &api.Pod{},
 		},
 		"../examples": {
 			"pod":         &api.Pod{},

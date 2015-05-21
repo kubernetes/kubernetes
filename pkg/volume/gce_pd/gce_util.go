@@ -42,19 +42,34 @@ func (util *GCEDiskUtil) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath 
 	if err := gce.(*gce_cloud.GCECloud).AttachDisk(pd.pdName, pd.readOnly); err != nil {
 		return err
 	}
-	devicePath := path.Join("/dev/disk/by-id/", "google-"+pd.pdName)
+
+	devicePaths := []string{
+		path.Join("/dev/disk/by-id/", "google-"+pd.pdName),
+		path.Join("/dev/disk/by-id/", "scsi-0Google_PersistentDisk_"+pd.pdName),
+	}
+
 	if pd.partition != "" {
-		devicePath = devicePath + "-part" + pd.partition
+		for i, path := range devicePaths {
+			devicePaths[i] = path + "-part" + pd.partition
+		}
 	}
 	//TODO(jonesdl) There should probably be better method than busy-waiting here.
 	numTries := 0
+	devicePath := ""
+	// Wait for the disk device to be created
 	for {
-		_, err := os.Stat(devicePath)
-		if err == nil {
-			break
+		for _, path := range devicePaths {
+			_, err := os.Stat(path)
+			if err == nil {
+				devicePath = path
+				break
+			}
+			if err != nil && !os.IsNotExist(err) {
+				return err
+			}
 		}
-		if err != nil && !os.IsNotExist(err) {
-			return err
+		if devicePath != "" {
+			break
 		}
 		numTries++
 		if numTries == 10 {

@@ -40,6 +40,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/serviceaccount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volumeclaimbinder"
 
@@ -61,7 +62,6 @@ type CMServer struct {
 	ResourceQuotaSyncPeriod time.Duration
 	NamespaceSyncPeriod     time.Duration
 	PVClaimBinderSyncPeriod time.Duration
-	EnablePVCClaimBinder    bool
 	RegisterRetryCount      int
 	MachineList             util.StringList
 	SyncNodeList            bool
@@ -73,13 +73,16 @@ type CMServer struct {
 	PodEvictionTimeout      time.Duration
 	DeletingPodsQps         float32
 	DeletingPodsBurst       int
+	ServiceAccountKeyFile   string
 
 	// TODO: Discover these by pinging the host machines, and rip out these params.
 	NodeMilliCPU int64
 	NodeMemory   resource.Quantity
 
-	ClusterName     string
-	EnableProfiling bool
+	ClusterName       string
+	ClusterCIDR       util.IPNet
+	AllocateNodeCIDRs bool
+	EnableProfiling   bool
 
 	Master     string
 	Kubeconfig string
@@ -121,7 +124,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.ResourceQuotaSyncPeriod, "resource-quota-sync-period", s.ResourceQuotaSyncPeriod, "The period for syncing quota usage status in the system")
 	fs.DurationVar(&s.NamespaceSyncPeriod, "namespace-sync-period", s.NamespaceSyncPeriod, "The period for syncing namespace life-cycle updates")
 	fs.DurationVar(&s.PVClaimBinderSyncPeriod, "pvclaimbinder-sync-period", s.PVClaimBinderSyncPeriod, "The period for syncing persistent volumes and persistent volume claims")
-	fs.BoolVar(&s.EnablePVCClaimBinder, "enable-alpha-pvclaimbinder", s.EnablePVCClaimBinder, "Optionally enable persistent volume claim binding.  This feature is experimental and expected to change.")
 	fs.DurationVar(&s.PodEvictionTimeout, "pod-eviction-timeout", s.PodEvictionTimeout, "The grace peroid for deleting pods on failed nodes.")
 	fs.Float32Var(&s.DeletingPodsQps, "deleting-pods-qps", 0.1, "Number of nodes per second on which pods are deleted in case of node failure.")
 	fs.IntVar(&s.DeletingPodsBurst, "deleting-pods-burst", 10, "Number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.")
@@ -139,12 +141,14 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 		"Amount of time which we allow starting Node to be unresponsive before marking it unhealty.")
 	fs.DurationVar(&s.NodeMonitorPeriod, "node-monitor-period", 5*time.Second,
 		"The period for syncing NodeStatus in NodeController.")
+	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA key used to sign service account tokens.")
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	// TODO: in the meantime, use resource.QuantityFlag() instead of these
 	fs.Int64Var(&s.NodeMilliCPU, "node-milli-cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
 	fs.Var(resource.NewQuantityFlagValue(&s.NodeMemory), "node-memory", "The amount of memory (in bytes) provisioned on each node")
-	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.Var(&s.ClusterCIDR, "cluster-cidr", "CIDR Range for Pods in cluster.")
+	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 }
@@ -209,7 +213,7 @@ func (s *CMServer) Run(_ []string) error {
 	endpoints := service.NewEndpointController(kubeClient)
 	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
-	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient)
+	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient, replicationControllerPkg.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
 
 	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
@@ -226,7 +230,7 @@ func (s *CMServer) Run(_ []string) error {
 
 	nodeController := nodecontroller.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources,
 		kubeClient, s.RegisterRetryCount, s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
-		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, s.ClusterName)
+		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, (*net.IPNet)(&s.ClusterCIDR), s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList)
 
 	serviceController := servicecontroller.New(cloud, kubeClient, s.ClusterName)
@@ -240,10 +244,27 @@ func (s *CMServer) Run(_ []string) error {
 	namespaceManager := namespace.NewNamespaceManager(kubeClient, s.NamespaceSyncPeriod)
 	namespaceManager.Run()
 
-	if s.EnablePVCClaimBinder {
-		pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
-		pvclaimBinder.Run()
+	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
+	pvclaimBinder.Run()
+
+	if len(s.ServiceAccountKeyFile) > 0 {
+		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
+		if err != nil {
+			glog.Errorf("Error reading key for service account token controller: %v", err)
+		} else {
+			serviceaccount.NewTokensController(
+				kubeClient,
+				serviceaccount.DefaultTokenControllerOptions(
+					serviceaccount.JWTTokenGenerator(privateKey),
+				),
+			).Run()
+		}
 	}
+
+	serviceaccount.NewServiceAccountsController(
+		kubeClient,
+		serviceaccount.DefaultServiceAccountsControllerOptions(),
+	).Run()
 
 	select {}
 	return nil

@@ -28,7 +28,4 @@ limitations under the License.
 // reading. Currently, conversion writes JSON output, and interprets both JSON
 // and YAML input.
 //
-// In the future, we plan to more explicitly separate the above two mechanisms, and
-// add more serialization options, such as gob.
-//
 package conversion

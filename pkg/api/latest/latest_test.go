@@ -98,7 +98,7 @@ func TestRESTMapper(t *testing.T) {
 
 		interfaces, _ := InterfacesFor(version)
 		if mapping.Codec != interfaces.Codec {
-			t.Errorf("unexpected codec: %#v", mapping)
+			t.Errorf("unexpected codec: %#v, expected: %#v", mapping, interfaces)
 		}
 
 		rc := &internal.ReplicationController{ObjectMeta: internal.ObjectMeta{Name: "foo"}}

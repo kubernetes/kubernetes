@@ -126,3 +126,6 @@ Look in `api/examples/` for more examples
 ```
 cluster/kube-down.sh
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/azure.md?pixel)]()

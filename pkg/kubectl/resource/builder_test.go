@@ -18,6 +18,7 @@ package resource
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -145,6 +146,15 @@ func streamYAMLTestData() (io.Reader, *api.PodList, *api.ServiceList) {
 		w.Write(JSONToYAMLOrDie([]byte(runtime.EncodeOrDie(latest.Codec, svc))))
 	}()
 	return r, pods, svc
+}
+
+func streamTestObject(obj runtime.Object) io.Reader {
+	r, w := io.Pipe()
+	go func() {
+		defer w.Close()
+		w.Write([]byte(runtime.EncodeOrDie(latest.Codec, obj)))
+	}()
+	return r
 }
 
 type testVisitor struct {
@@ -597,6 +607,36 @@ func TestMultipleObject(t *testing.T) {
 	}
 }
 
+func TestContinueOnErrorVisitor(t *testing.T) {
+	r, _, _ := streamTestData()
+	req := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		ContinueOnError().
+		NamespaceParam("test").Stream(r, "STDIN").Flatten().
+		Do()
+	count := 0
+	testErr := fmt.Errorf("test error")
+	err := req.Visit(func(_ *Info) error {
+		count++
+		if count > 1 {
+			return testErr
+		}
+		return nil
+	})
+	if err == nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 3 {
+		t.Fatalf("did not visit all infos: %d", count)
+	}
+	agg, ok := err.(errors.Aggregate)
+	if !ok {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(agg.Errors()) != 2 || agg.Errors()[0] != testErr || agg.Errors()[1] != testErr {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestSingularObject(t *testing.T) {
 	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		NamespaceParam("test").DefaultNamespace().
@@ -614,6 +654,31 @@ func TestSingularObject(t *testing.T) {
 	}
 	if rc.Name != "redis-master" || rc.Namespace != "test" {
 		t.Errorf("unexpected controller: %#v", rc)
+	}
+}
+
+func TestSingularRootScopedObject(t *testing.T) {
+	node := &api.Node{ObjectMeta: api.ObjectMeta{Name: "test"}, Spec: api.NodeSpec{ExternalID: "test"}}
+	r := streamTestObject(node)
+	infos, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
+		NamespaceParam("test").DefaultNamespace().
+		Stream(r, "STDIN").
+		Flatten().
+		Do().Infos()
+
+	if err != nil || len(infos) != 1 {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if infos[0].Namespace != "" {
+		t.Errorf("namespace should be empty: %#v", infos[0])
+	}
+	n, ok := infos[0].Object.(*api.Node)
+	if !ok {
+		t.Fatalf("unexpected object: %#v", infos[0].Object)
+	}
+	if n.Name != "test" || n.Namespace != "" {
+		t.Errorf("unexpected object: %#v", n)
 	}
 }
 

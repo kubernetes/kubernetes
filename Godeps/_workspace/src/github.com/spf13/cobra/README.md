@@ -348,6 +348,76 @@ Like help the function and template are over ridable through public methods.
 
     command.SetUsageTemplate(s string)
 
+## PreRun or PostRun Hooks
+
+It is possible to run functions before or after the main `Run` function of your command. The `PersistentPreRun` and `PreRun` functions will be executed before `Run`. `PersistendPostRun` and `PostRun` will be executed after `Run`.  The `Persistent*Run` functions will be inherrited by children if they do not declare their own.  These function are run in the following order:
+
+- `PersistentPreRun`
+- `PreRun`
+- `Run`
+- `PostRun`
+- `PersistenPostRun`
+
+And example of two commands which use all of these features is below.  When the subcommand in executed it will run the root command's `PersistentPreRun` but not the root command's `PersistentPostRun`
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/spf13/cobra"
+)
+
+func main() {
+
+	var rootCmd = &cobra.Command{
+		Use:   "root [sub]",
+		Short: "My root command",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Inside rootCmd PersistentPreRun with args: %v\n", args)
+		},
+		PreRun: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Inside rootCmd PreRun with args: %v\n", args)
+		},
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Inside rootCmd Run with args: %v\n", args)
+		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Inside rootCmd PostRun with args: %v\n", args)
+		},
+		PersistentPostRun: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Inside rootCmd PersistentPostRun with args: %v\n", args)
+		},
+	}
+
+	var subCmd = &cobra.Command{
+		Use:   "sub [no options!]",
+		Short: "My sub command",
+		PreRun: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Inside subCmd PreRun with args: %v\n", args)
+		},
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Inside subCmd Run with args: %v\n", args)
+		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Inside subCmd PostRun with args: %v\n", args)
+		},
+		PersistentPostRun: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Inside subCmd PersistentPostRun with args: %v\n", args)
+		},
+	}
+
+	rootCmd.AddCommand(subCmd)
+
+	rootCmd.SetArgs([]string{""})
+	_ = rootCmd.Execute()
+	fmt.Print("\n")
+	rootCmd.SetArgs([]string{"sub", "arg1", "arg2"})
+	_ = rootCmd.Execute()
+}
+```
+
 ## Generating markdown formatted documentation for your command
 
 Cobra can generate a markdown formatted document based on the subcommands, flags, etc. A simple example of how to do this for your command can be found in [Markdown Docs](md_docs.md)

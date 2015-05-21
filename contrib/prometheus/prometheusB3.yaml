@@ -1,0 +1,83 @@
+apiVersion: v1beta3
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    name: kube-prometheus
+  name: kube-prometheus
+spec:
+  containers:
+  - capabilities: {}
+    env:
+    - name: DATABASE_URL
+      value: sqlite3:/promdash/file.sqlite3 #see volume comment below.
+    image: prom/promdash
+    imagePullPolicy: IfNotPresent
+    name: kube-promdash
+    ports:
+    - containerPort: 3000
+      hostPort: 3000
+      protocol: TCP
+    resources: {}
+    securityContext:
+      capabilities: {}
+      privileged: false
+    terminationMessagePath: /dev/termination-log
+    volumeMounts:
+    - mountPath: /promdash
+      name: promdashdb
+  - args:
+    - -t
+    - KUBERNETES_RO
+    - -d
+    - /var/prometheus/
+    capabilities: {}
+    image: jayunit100/kube-prometheus
+    imagePullPolicy: IfNotPresent
+    name: kube-prometheus
+    ports:
+    - containerPort: 9090
+      hostPort: 9090
+      protocol: TCP
+    resources: {}
+    securityContext:
+      capabilities: {}
+      privileged: false
+    terminationMessagePath: /dev/termination-log 
+    volumeMounts:
+    - mountPath: /var/prometheus/
+      name: data
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+  volumes:
+  # There are many ways to create these volumes.
+  # for example, gcePersistentDisk:, glusterfs:, and so on...
+  # for the shared data volume (which we may not need going forward)
+  # we just use the undefined shared volume type.
+  - awsElasticBlockStore: null
+    emptyDir:
+      medium: ""
+    gcePersistentDisk: null
+    gitRepo: null
+    glusterfs: null
+    hostPath: null
+    iscsi: null
+    name: data
+    nfs: null
+    secret: null
+  # Again, many ways to create the promdash mount.  We are just using local
+  # disk for now.  Later maybe just replace with pure RDBMS rather than file
+  # based sqlite db.  The reason we have a volume is so that its persistent between
+  # pod restarts.
+  - awsElasticBlockStore: null
+    emptyDir: null
+    gcePersistentDisk: null
+    gitRepo: null
+    glusterfs: null
+    hostPath:
+      path: /mnt/promdash
+    iscsi: null
+    name: promdashdb
+    nfs: null
+    secret: null
+status: {}

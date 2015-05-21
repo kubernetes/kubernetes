@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
 type Version interface {
@@ -32,6 +33,13 @@ type Version interface {
 	Compare(other string) (int, error)
 	// String returns a string that represents the version.
 	String() string
+}
+
+// ImageSpec is an internal representation of an image.  Currently, it wraps the
+// value of a Container's Image field, but in the future it will include more detailed
+// information about the different image types.
+type ImageSpec struct {
+	Image string
 }
 
 // Runtime interface defines the interfaces that should be implemented
@@ -44,12 +52,33 @@ type Runtime interface {
 	// exited and dead containers (used for garbage collection).
 	GetPods(all bool) ([]*Pod, error)
 	// Syncs the running pod into the desired pod.
-	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus) error
+	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error
 	// KillPod kills all the containers of a pod.
 	KillPod(pod Pod) error
 	// GetPodStatus retrieves the status of the pod, including the information of
 	// all containers in the pod.
 	GetPodStatus(*api.Pod) (*api.PodStatus, error)
+	// PullImage pulls an image from the network to local storage using the supplied
+	// secrets if necessary.
+	PullImage(image ImageSpec, pullSecrets []api.Secret) error
+	// IsImagePresent checks whether the container image is already in the local storage.
+	IsImagePresent(image ImageSpec) (bool, error)
+	// Gets all images currently on the machine.
+	ListImages() ([]Image, error)
+	// Removes the specified image.
+	RemoveImage(image ImageSpec) error
+	// TODO(vmarmol): Unify pod and containerID args.
+	// GetContainerLogs returns logs of a specific container. By
+	// default, it returns a snapshot of the container log. Set 'follow' to true to
+	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
+	// "100" or "all") to tail the log.
+	GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error)
+	// ContainerCommandRunner encapsulates the command runner interfaces for testability.
+	ContainerCommandRunner
+}
+
+// CommandRunner encapsulates the command runner interfaces for testability.
+type ContainerCommandRunner interface {
 	// TODO(vmarmol): Merge RunInContainer and ExecInContainer.
 	// Runs the command in the container of the specified pod using nsinit.
 	// TODO(yifan): Use strong type for containerID.
@@ -61,20 +90,6 @@ type Runtime interface {
 	ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
 	// Forward the specified port from the specified pod to the stream.
 	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
-	// PullImage pulls an image from the network to local storage.
-	PullImage(image string) error
-	// IsImagePresent checks whether the container image is already in the local storage.
-	IsImagePresent(image string) (bool, error)
-	// Gets all images currently on the machine.
-	ListImages() ([]Image, error)
-	// Removes the specified image.
-	RemoveImage(image string) error
-	// TODO(vmarmol): Unify pod and containerID args.
-	// GetContainerLogs returns logs of a specific container. By
-	// default, it returns a snapshot of the container log. Set 'follow' to true to
-	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
-	// "100" or "all") to tail the log.
-	GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error)
 }
 
 // Customizable hooks injected into container runtimes.
@@ -170,14 +185,43 @@ type Image struct {
 	Size int64
 }
 
+type EnvVar struct {
+	Name  string
+	Value string
+}
+
+type Mount struct {
+	// Name of the volume mount.
+	Name string
+	// Path of the mount within the container.
+	ContainerPath string
+	// Path of the mount on the host.
+	HostPath string
+	// Whether the mount is read-only.
+	ReadOnly bool
+}
+
+type PortMapping struct {
+	// Name of the port mapping
+	Name string
+	// Protocol of the port mapping.
+	Protocol api.Protocol
+	// The port number within the container.
+	ContainerPort int
+	// The port number on the host.
+	HostPort int
+	// The host IP.
+	HostIP string
+}
+
 // RunContainerOptions specify the options which are necessary for running containers
 type RunContainerOptions struct {
-	// The environment variables, they are in the form of 'key=value'.
-	Envs []string
-	// The mounts for the containers, they are in the form of:
-	// 'hostPath:containerPath', or
-	// 'hostPath:containerPath:ro', if the path read only.
-	Binds []string
+	// The environment variables list.
+	Envs []EnvVar
+	// The mounts for the containers.
+	Mounts []Mount
+	// The port mappings for the containers.
+	PortMappings []PortMapping
 	// If the container has specified the TerminationMessagePath, then
 	// this directory will be used to create and mount the log file to
 	// container.TerminationMessagePath
@@ -186,16 +230,11 @@ type RunContainerOptions struct {
 	DNS []string
 	// The list of DNS search domains.
 	DNSSearch []string
-	// Docker namespace identifiers(currently we have 'NetMode' and 'IpcMode'.
-	// These are for docker to attach a container in a pod to the pod infra
-	// container's namespace.
-	// TODO(yifan): Remove these after we pushed the pod infra container logic
-	// into docker's container runtime.
-	NetMode string
-	IpcMode string
 	// The parent cgroup to pass to Docker
 	CgroupParent string
 }
+
+type VolumeMap map[string]volume.Volume
 
 type Pods []*Pod
 

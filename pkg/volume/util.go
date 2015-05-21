@@ -20,7 +20,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func GetAccessModesAsString(modes []api.AccessModeType) string {
+func GetAccessModesAsString(modes []api.PersistentVolumeAccessMode) string {
 	modesAsString := ""
 
 	if contains(modes, api.ReadWriteOnce) {
@@ -43,7 +43,7 @@ func appendAccessMode(modes *string, mode string) {
 	*modes += mode
 }
 
-func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
+func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
 			return true

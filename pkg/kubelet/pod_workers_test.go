@@ -17,6 +17,8 @@ limitations under the License.
 package kubelet
 
 import (
+	"reflect"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -27,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/fsouza/go-dockerclient"
 )
 
 func newPod(uid, name string) *api.Pod {
@@ -145,5 +148,229 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 	podWorkers.ForgetNonExistingPodWorkers(map[types.UID]empty{})
 	if len(podWorkers.podUpdates) != 0 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
+	}
+}
+
+type simpleFakeKubelet struct {
+	pod        *api.Pod
+	mirrorPod  *api.Pod
+	runningPod kubecontainer.Pod
+
+	wg sync.WaitGroup
+}
+
+func (kl *simpleFakeKubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
+	kl.pod, kl.mirrorPod, kl.runningPod = pod, mirrorPod, runningPod
+	return nil
+}
+
+func (kl *simpleFakeKubelet) syncPodWithWaitGroup(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
+	kl.pod, kl.mirrorPod, kl.runningPod = pod, mirrorPod, runningPod
+	kl.wg.Done()
+	return nil
+}
+
+// byContainerName sort the containers in a running pod by their names.
+type byContainerName kubecontainer.Pod
+
+func (b byContainerName) Len() int { return len(b.Containers) }
+
+func (b byContainerName) Swap(i, j int) {
+	b.Containers[i], b.Containers[j] = b.Containers[j], b.Containers[i]
+}
+
+func (b byContainerName) Less(i, j int) bool {
+	return b.Containers[i].Name < b.Containers[j].Name
+}
+
+// TestFakePodWorkers verifies that the fakePodWorkers behaves the same way as the real podWorkers
+// for their invocation of the syncPodFn.
+func TestFakePodWorkers(t *testing.T) {
+	// Create components for pod workers.
+	fakeDocker := &dockertools.FakeDockerClient{}
+	fakeRecorder := &record.FakeRecorder{}
+	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+	dockerManager := dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, nil, nil, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, newKubeletRuntimeHooks(fakeRecorder))
+	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(dockerManager)
+
+	kubeletForRealWorkers := &simpleFakeKubelet{}
+	kubeletForFakeWorkers := &simpleFakeKubelet{}
+
+	realPodWorkers := newPodWorkers(fakeRuntimeCache, kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder)
+	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeRuntimeCache, t}
+
+	tests := []struct {
+		pod                    *api.Pod
+		mirrorPod              *api.Pod
+		containerList          []docker.APIContainers
+		containersInRunningPod int
+	}{
+		{
+			&api.Pod{},
+			&api.Pod{},
+			[]docker.APIContainers{},
+			0,
+		},
+
+		{
+			&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "fooContainer",
+						},
+					},
+				},
+			},
+			&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "12345678",
+					Name:      "fooMirror",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "fooContainerMirror",
+						},
+					},
+				},
+			},
+			[]docker.APIContainers{
+				{
+					// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>_<random>
+					Names: []string{"/k8s_bar.hash123_foo_new_12345678_0"},
+					ID:    "1234",
+				},
+				{
+					// pod infra container
+					Names: []string{"/k8s_POD.hash123_foo_new_12345678_0"},
+					ID:    "9876",
+				},
+			},
+			2,
+		},
+
+		{
+			&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "98765",
+					Name:      "bar",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "fooContainer",
+						},
+					},
+				},
+			},
+			&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "98765",
+					Name:      "fooMirror",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "fooContainerMirror",
+						},
+					},
+				},
+			},
+			[]docker.APIContainers{
+				{
+					// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>_<random>
+					Names: []string{"/k8s_bar.hash123_bar_new_98765_0"},
+					ID:    "1234",
+				},
+				{
+					// pod infra container
+					Names: []string{"/k8s_POD.hash123_foo_new_12345678_0"},
+					ID:    "9876",
+				},
+			},
+			1,
+		},
+
+		// Empty running pod.
+		{
+			&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "98765",
+					Name:      "baz",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "bazContainer",
+						},
+					},
+				},
+			},
+			&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "98765",
+					Name:      "bazMirror",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "bazContainerMirror",
+						},
+					},
+				},
+			},
+			[]docker.APIContainers{
+				{
+					// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>_<random>
+					Names: []string{"/k8s_bar.hash123_bar_new_12345678_0"},
+					ID:    "1234",
+				},
+				{
+					// pod infra container
+					Names: []string{"/k8s_POD.hash123_foo_new_12345678_0"},
+					ID:    "9876",
+				},
+			},
+			0,
+		},
+	}
+
+	for i, tt := range tests {
+		kubeletForRealWorkers.wg.Add(1)
+
+		fakeDocker.ContainerList = tt.containerList
+		realPodWorkers.UpdatePod(tt.pod, tt.mirrorPod, func() {})
+		fakePodWorkers.UpdatePod(tt.pod, tt.mirrorPod, func() {})
+
+		kubeletForRealWorkers.wg.Wait()
+
+		if !reflect.DeepEqual(kubeletForRealWorkers.pod, kubeletForFakeWorkers.pod) {
+			t.Errorf("%d: Expected: %#v, Actual: %#v", i, kubeletForRealWorkers.pod, kubeletForFakeWorkers.pod)
+		}
+
+		if !reflect.DeepEqual(kubeletForRealWorkers.mirrorPod, kubeletForFakeWorkers.mirrorPod) {
+			t.Errorf("%d: Expected: %#v, Actual: %#v", i, kubeletForRealWorkers.mirrorPod, kubeletForFakeWorkers.mirrorPod)
+		}
+
+		if tt.containersInRunningPod != len(kubeletForFakeWorkers.runningPod.Containers) {
+			t.Errorf("%d: Expected: %#v, Actual: %#v", i, tt.containersInRunningPod, len(kubeletForFakeWorkers.runningPod.Containers))
+		}
+
+		sort.Sort(byContainerName(kubeletForRealWorkers.runningPod))
+		sort.Sort(byContainerName(kubeletForFakeWorkers.runningPod))
+		if !reflect.DeepEqual(kubeletForRealWorkers.runningPod, kubeletForFakeWorkers.runningPod) {
+			t.Errorf("%d: Expected: %#v, Actual: %#v", i, kubeletForRealWorkers.runningPod, kubeletForFakeWorkers.runningPod)
+		}
 	}
 }

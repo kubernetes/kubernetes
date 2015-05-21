@@ -20,6 +20,7 @@
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
+DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
@@ -45,6 +46,7 @@ API_HOST=${API_HOST:-127.0.0.1}
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
+CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 
 # For the common local scenario, fail fast if server is already running.
@@ -94,20 +96,48 @@ case "$(uname -m)" in
 esac
 
 GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
+KUBELET_CIDFILE=/tmp/kubelet.cid
+
+cleanup_dockerized_kubelet()
+{
+  if [[ -e $KUBELET_CIDFILE ]]; then 
+    docker kill $(<$KUBELET_CIDFILE) > /dev/null
+    rm -f $KUBELET_CIDFILE
+  fi
+}
 
 cleanup()
 {
-    echo "Cleaning up..."
-    [[ -n "${APISERVER_PID-}" ]] && sudo kill "${APISERVER_PID}"
-    [[ -n "${CTLRMGR_PID-}" ]] && sudo kill "${CTLRMGR_PID}"
-    [[ -n "${KUBELET_PID-}" ]] && sudo kill "${KUBELET_PID}"
-    [[ -n "${PROXY_PID-}" ]] && sudo kill "${PROXY_PID}"
-    [[ -n "${SCHEDULER_PID-}" ]] && sudo kill "${SCHEDULER_PID}"
+  echo "Cleaning up..."
+  # Check if the API server is still running
+  [[ -n "${APISERVER_PID-}" ]] && APISERVER_PIDS=$(pgrep -P ${APISERVER_PID} ; ps -o pid= -p ${APISERVER_PID})
+  [[ -n "${APISERVER_PIDS-}" ]] && sudo kill ${APISERVER_PIDS}
 
-    [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
-    [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
+  # Check if the controller-manager is still running
+  [[ -n "${CTLRMGR_PID-}" ]] && CTLRMGR_PIDS=$(pgrep -P ${CTLRMGR_PID} ; ps -o pid= -p ${CTLRMGR_PID})
+  [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill ${CTLRMGR_PIDS}
 
-    exit 0
+  if [[ -n "$DOCKERIZE_KUBELET" ]]; then
+    cleanup_dockerized_kubelet
+  else
+    # Check if the kubelet is still running
+    [[ -n "${KUBELET_PID-}" ]] && KUBELET_PIDS=$(pgrep -P ${KUBELET_PID} ; ps -o pid= -p ${KUBELET_PID})
+    [[ -n "${KUBELET_PIDS-}" ]] && sudo kill ${KUBELET_PIDS}
+  fi
+
+  # Check if the proxy is still running
+  [[ -n "${PROXY_PID-}" ]] && PROXY_PIDS=$(pgrep -P ${PROXY_PID} ; ps -o pid= -p ${PROXY_PID})
+  [[ -n "${PROXY_PIDS-}" ]] && sudo kill ${PROXY_PIDS}
+
+  # Check if the scheduler is still running
+  [[ -n "${SCHEDULER_PID-}" ]] && SCHEDULER_PIDS=$(pgrep -P ${SCHEDULER_PID} ; ps -o pid= -p ${SCHEDULER_PID})
+  [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill ${SCHEDULER_PIDS}
+
+  # Check if the etcd is still running
+  [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
+  [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
+
+  exit 0
 }
 
 trap cleanup EXIT
@@ -115,12 +145,22 @@ trap cleanup EXIT
 echo "Starting etcd"
 kube::etcd::start
 
+SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
+SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-"/tmp/kube-serviceaccount.key"}
+# Generate ServiceAccount key if needed
+if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
+  mkdir -p "$(dirname ${SERVICE_ACCOUNT_KEY})"
+  openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+fi
+
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 
 APISERVER_LOG=/tmp/kube-apiserver.log
 sudo -E "${GO_OUT}/kube-apiserver" \
   --v=${LOG_LEVEL} \
+  --service_account_key_file="${SERVICE_ACCOUNT_KEY}" \
+  --service_account_lookup="${SERVICE_ACCOUNT_LOOKUP}" \
   --admission_control="${ADMISSION_CONTROL}" \
   --address="${API_HOST}" \
   --port="${API_PORT}" \
@@ -138,19 +178,40 @@ CTLRMGR_LOG=/tmp/kube-controller-manager.log
 sudo -E "${GO_OUT}/kube-controller-manager" \
   --v=${LOG_LEVEL} \
   --machines="127.0.0.1" \
+  --service_account_private_key_file="${SERVICE_ACCOUNT_KEY}" \
   --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
 CTLRMGR_PID=$!
 
 KUBELET_LOG=/tmp/kubelet.log
-sudo -E "${GO_OUT}/kubelet" \
-  --v=${LOG_LEVEL} \
-  --chaos_chance="${CHAOS_CHANCE}" \
-  --hostname_override="127.0.0.1" \
-  --address="127.0.0.1" \
-  --api_servers="${API_HOST}:${API_PORT}" \
-  --auth_path="${KUBE_ROOT}/hack/.test-cmd-auth" \
-  --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
-KUBELET_PID=$!
+if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
+  sudo -E "${GO_OUT}/kubelet" \
+    --v=${LOG_LEVEL} \
+    --chaos_chance="${CHAOS_CHANCE}" \
+    --container_runtime="${CONTAINER_RUNTIME}" \
+    --hostname_override="127.0.0.1" \
+    --address="127.0.0.1" \
+    --api_servers="${API_HOST}:${API_PORT}" \
+    --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
+  KUBELET_PID=$!
+else
+  # Docker won't run a container with a cidfile (container id file)
+  # unless that file does not already exist; clean up an existing
+  # dockerized kubelet that might be running.
+  cleanup_dockerized_kubelet
+
+  docker run \
+    --volume=/:/rootfs:ro \
+    --volume=/var/run:/var/run:rw \
+    --volume=/sys:/sys:ro \
+    --volume=/var/lib/docker/:/var/lib/docker:ro \
+    --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+    --net=host \
+    --privileged=true \
+    -i \
+    --cidfile=$KUBELET_CIDFILE \
+    gcr.io/google_containers/kubelet \
+    /kubelet --v=3 --containerized --chaos-chance="${CHAOS_CHANCE}" --hostname-override="127.0.0.1" --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT" --resource-container="" &> $KUBELET_LOG &
+fi
 
 PROXY_LOG=/tmp/kube-proxy.log
 sudo -E "${GO_OUT}/kube-proxy" \
@@ -170,9 +231,9 @@ Local Kubernetes cluster is running. Press Ctrl-C to shut it down.
 Logs:
   ${APISERVER_LOG}
   ${CTLRMGR_LOG}
-  ${KUBELET_LOG}
   ${PROXY_LOG}
   ${SCHEDULER_LOG}
+  ${KUBELET_LOG}
 
 To start using your cluster, open up another terminal/tab and run:
 

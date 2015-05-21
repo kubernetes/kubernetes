@@ -22,8 +22,10 @@ import (
 	"strings"
 	"sync"
 
-	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
 	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
 
 	"github.com/golang/glog"
@@ -34,7 +36,7 @@ type PluginFactoryArgs struct {
 	algorithm.PodLister
 	algorithm.ServiceLister
 	NodeLister algorithm.MinionLister
-	NodeInfo   algorithm.NodeInfo
+	NodeInfo   predicates.NodeInfo
 }
 
 // A FitPredicateFactory produces a FitPredicate from the given args.
@@ -95,7 +97,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 	if policy.Argument != nil {
 		if policy.Argument.ServiceAffinity != nil {
 			predicateFactory = func(args PluginFactoryArgs) algorithm.FitPredicate {
-				return algorithm.NewServiceAffinityPredicate(
+				return predicates.NewServiceAffinityPredicate(
 					args.PodLister,
 					args.ServiceLister,
 					args.NodeInfo,
@@ -104,7 +106,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 			}
 		} else if policy.Argument.LabelsPresence != nil {
 			predicateFactory = func(args PluginFactoryArgs) algorithm.FitPredicate {
-				return algorithm.NewNodeLabelPredicate(
+				return predicates.NewNodeLabelPredicate(
 					args.NodeInfo,
 					policy.Argument.LabelsPresence.Labels,
 					policy.Argument.LabelsPresence.Presence,
@@ -162,7 +164,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 		if policy.Argument.ServiceAntiAffinity != nil {
 			pcf = &PriorityConfigFactory{
 				Function: func(args PluginFactoryArgs) algorithm.PriorityFunction {
-					return algorithm.NewServiceAntiAffinityPriority(
+					return priorities.NewServiceAntiAffinityPriority(
 						args.ServiceLister,
 						policy.Argument.ServiceAntiAffinity.Label,
 					)
@@ -172,7 +174,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 		} else if policy.Argument.LabelPreference != nil {
 			pcf = &PriorityConfigFactory{
 				Function: func(args PluginFactoryArgs) algorithm.PriorityFunction {
-					return algorithm.NewNodeLabelPriority(
+					return priorities.NewNodeLabelPriority(
 						policy.Argument.LabelPreference.Label,
 						policy.Argument.LabelPreference.Presence,
 					)

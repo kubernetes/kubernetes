@@ -10,3 +10,6 @@ There are multiple guides on running Kubernetes with [CoreOS](http://coreos.com)
 * [Yet another multi-node cluster using cloud-config and Vagrant](https://github.com/AntonioMeireles/kubernetes-vagrant-coreos-cluster/blob/master/README.md) (similar to the one above but with an increased, more *aggressive* focus on features and flexibility)
 * [Multi-node cluster with Vagrant and fleet units using a small OS X App](https://github.com/rimusz/coreos-osx-gui-kubernetes-cluster/blob/master/README.md)
 * [Resizable multi-node cluster on Azure with Weave](coreos/azure/README.md)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos.md?pixel)]()

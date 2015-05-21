@@ -187,6 +187,28 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	}
 }
 
+func TestConverter_GeneratedConversionOverriden(t *testing.T) {
+	type A struct{}
+	type B struct{}
+	c := NewConverter()
+	if err := c.RegisterConversionFunc(func(in *A, out *B, s Scope) error {
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if err := c.RegisterGeneratedConversionFunc(func(in *A, out *B, s Scope) error {
+		return fmt.Errorf("generated function should be overriden")
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	a := A{}
+	b := B{}
+	if err := c.Convert(&a, &b, 0, nil); err != nil {
+		t.Errorf("%v", err)
+	}
+}
+
 func TestConverter_MapsStringArrays(t *testing.T) {
 	type A struct {
 		Foo   string

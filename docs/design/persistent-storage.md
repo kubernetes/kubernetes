@@ -212,3 +212,6 @@ cluster/kubectl.sh delete pvc myclaim-1
 The ```PersistentVolumeClaimBinder``` will reconcile this by removing the claim reference from the PV and change the PVs status to 'Released'.   
 
 Admins can script the recycling of released volumes.  Future dynamic provisioners will understand how a volume should be recycled.  
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/persistent-storage.md?pixel)]()

@@ -30,7 +30,6 @@ function cleanup()
     [[ -n ${APISERVER_PID-} ]] && kill ${APISERVER_PID} 1>&2 2>/dev/null
     [[ -n ${CTLRMGR_PID-} ]] && kill ${CTLRMGR_PID} 1>&2 2>/dev/null
     [[ -n ${KUBELET_PID-} ]] && kill ${KUBELET_PID} 1>&2 2>/dev/null
-    [[ -n ${PROXY_PID-} ]] && kill ${PROXY_PID} 1>&2 2>/dev/null
 
     kube::etcd::cleanup
     rm -rf "${KUBE_TEMP}"
@@ -78,7 +77,6 @@ kube::log::status "Starting kubelet in masterful mode"
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
   --api_servers="${API_HOST}:${API_PORT}" \
-  --auth_path="${KUBE_ROOT}/hack/.test-cmd-auth" \
   --port="$KUBELET_PORT" \
   --healthz_port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
 KUBELET_PID=$!
@@ -546,8 +544,6 @@ __EOF__
   kubectl delete service frontend{,-2,-3} "${kube_flags[@]}"
 
   ### Perform a rolling update with --image
-  # Pre-condition status.Replicas is 3, otherwise the rcmanager could update it and interfere with the rolling update
-  kube::test::get_object_assert 'rc frontend' "{{$rc_status_replicas_field}}" '3'
   # Command
   kubectl rolling-update frontend --image=kubernetes/pause --update-period=10ns --poll-interval=10ms "${kube_flags[@]}"
   # Post-condition: current image IS kubernetes/pause

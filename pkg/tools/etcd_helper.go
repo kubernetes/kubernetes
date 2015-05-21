@@ -25,10 +25,11 @@ import (
 	"path"
 	"reflect"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -55,12 +56,44 @@ var (
 				"because two concurrent threads can miss the cache and generate the same entry twice.",
 		},
 	)
+	cacheGetLatency = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Name: "etcd_request_cache_get_latencies_summary",
+			Help: "Latency in microseconds of getting an object from etcd cache",
+		},
+	)
+	cacheAddLatency = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Name: "etcd_request_cache_add_latencies_summary",
+			Help: "Latency in microseconds of adding an object to etcd cache",
+		},
+	)
+	etcdRequestLatenciesSummary = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Name: "etcd_request_latencies_summary",
+			Help: "Etcd request latency summary in microseconds for each operation and object type.",
+		},
+		[]string{"operation", "type"},
+	)
 )
+
+const maxEtcdCacheEntries int = 50000
 
 func init() {
 	prometheus.MustRegister(cacheHitCounter)
 	prometheus.MustRegister(cacheMissCounter)
 	prometheus.MustRegister(cacheEntryCounter)
+	prometheus.MustRegister(cacheAddLatency)
+	prometheus.MustRegister(cacheGetLatency)
+	prometheus.MustRegister(etcdRequestLatenciesSummary)
+}
+
+func getTypeName(obj interface{}) string {
+	return reflect.TypeOf(obj).String()
+}
+
+func recordEtcdRequestLatency(verb, resource string, startTime time.Time) {
+	etcdRequestLatenciesSummary.WithLabelValues(verb, resource).Observe(float64(time.Since(startTime) / time.Microsecond))
 }
 
 // EtcdHelper offers common object marshalling/unmarshalling operations on an etcd client.
@@ -79,8 +112,7 @@ type EtcdHelper struct {
 	// support multi-object transaction that will result in many objects with the same index.
 	// Number of entries stored in the cache is controlled by maxEtcdCacheEntries constant.
 	// TODO: Measure how much this cache helps after the conversion code is optimized.
-	cache map[uint64]runtime.Object
-	mutex *sync.RWMutex
+	cache util.Cache
 }
 
 // NewEtcdHelper creates a helper that works against objects that use the internal
@@ -91,8 +123,7 @@ func NewEtcdHelper(client EtcdGetSet, codec runtime.Codec, prefix string) EtcdHe
 		Codec:      codec,
 		Versioner:  APIObjectVersioner{},
 		PathPrefix: prefix,
-		cache:      make(map[uint64]runtime.Object),
-		mutex:      new(sync.RWMutex),
+		cache:      util.NewCache(maxEtcdCacheEntries),
 	}
 }
 
@@ -190,16 +221,13 @@ type etcdCache interface {
 	addToCache(index uint64, obj runtime.Object)
 }
 
-const maxEtcdCacheEntries int = 50000
-
 func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
-	var obj runtime.Object
-	func() {
-		h.mutex.RLock()
-		defer h.mutex.RUnlock()
-		obj = h.cache[index]
+	startTime := time.Now()
+	defer func() {
+		cacheGetLatency.Observe(float64(time.Since(startTime) / time.Microsecond))
 	}()
-	if obj != nil {
+	obj, found := h.cache.Get(index)
+	if found {
 		// We should not return the object itself to avoid poluting the cache if someone
 		// modifies returned values.
 		objCopy, err := conversion.DeepCopy(obj)
@@ -215,23 +243,18 @@ func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
 }
 
 func (h *EtcdHelper) addToCache(index uint64, obj runtime.Object) {
+	startTime := time.Now()
+	defer func() {
+		cacheAddLatency.Observe(float64(time.Since(startTime) / time.Microsecond))
+	}()
 	objCopy, err := conversion.DeepCopy(obj)
 	if err != nil {
 		glog.Errorf("Error during DeepCopy of cached object: %q", err)
 		return
 	}
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-	if _, found := h.cache[index]; !found {
+	isOverwrite := h.cache.Add(index, objCopy)
+	if !isOverwrite {
 		cacheEntryCounter.Inc()
-	}
-	h.cache[index] = objCopy.(runtime.Object)
-	if len(h.cache) > maxEtcdCacheEntries {
-		var randomKey uint64
-		for randomKey = range h.cache {
-			break
-		}
-		delete(h.cache, randomKey)
 	}
 }
 
@@ -243,7 +266,9 @@ func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
 		return err
 	}
 	key = h.PrefixEtcdKey(key)
+	startTime := time.Now()
 	nodes, index, err := h.listEtcdNode(key)
+	recordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
 	if err != nil {
 		return err
 	}
@@ -266,7 +291,9 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 		return err
 	}
 	key = h.PrefixEtcdKey(key)
+	startTime := time.Now()
 	response, err := h.Client.Get(key, false, false)
+	recordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
 	if err != nil {
 		if IsEtcdNotFound(err) {
 			return nil
@@ -298,7 +325,9 @@ func (h *EtcdHelper) ExtractObj(key string, objPtr runtime.Object, ignoreNotFoun
 }
 
 func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) (body string, modifiedIndex uint64, err error) {
+	startTime := time.Now()
 	response, err := h.Client.Get(key, false, false)
+	recordEtcdRequestLatency("get", getTypeName(objPtr), startTime)
 
 	if err != nil && !IsEtcdNotFound(err) {
 		return "", 0, err
@@ -352,7 +381,9 @@ func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) 
 		}
 	}
 
+	startTime := time.Now()
 	response, err := h.Client.Create(key, string(data), ttl)
+	recordEtcdRequestLatency("create", getTypeName(obj), startTime)
 	if err != nil {
 		return err
 	}
@@ -368,7 +399,9 @@ func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) 
 // Delete removes the specified key.
 func (h *EtcdHelper) Delete(key string, recursive bool) error {
 	key = h.PrefixEtcdKey(key)
+	startTime := time.Now()
 	_, err := h.Client.Delete(key, recursive)
+	recordEtcdRequestLatency("delete", "UNKNOWN", startTime)
 	return err
 }
 
@@ -379,7 +412,9 @@ func (h *EtcdHelper) DeleteObj(key string, out runtime.Object) error {
 		panic("unable to convert output object to pointer")
 	}
 
+	startTime := time.Now()
 	response, err := h.Client.Delete(key, false)
+	recordEtcdRequestLatency("delete", getTypeName(out), startTime)
 	if !IsEtcdNotFound(err) {
 		// if the object that existed prior to the delete is returned by etcd, update out.
 		if err != nil || response.PrevNode != nil {
@@ -404,7 +439,9 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 	if h.Versioner != nil {
 		if version, err := h.Versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 			create = false
+			startTime := time.Now()
 			response, err = h.Client.CompareAndSwap(key, string(data), ttl, "", version)
+			recordEtcdRequestLatency("compareAndSwap", getTypeName(obj), startTime)
 			if err != nil {
 				return err
 			}
@@ -412,7 +449,9 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 	}
 	if create {
 		// Create will fail if a key already exists.
+		startTime := time.Now()
 		response, err = h.Client.Create(key, string(data), ttl)
+		recordEtcdRequestLatency("create", getTypeName(obj), startTime)
 	}
 
 	if err != nil {
@@ -480,7 +519,9 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 
 		// First time this key has been used, try creating new value.
 		if index == 0 {
+			startTime := time.Now()
 			response, err := h.Client.Create(key, string(data), ttl)
+			recordEtcdRequestLatency("create", getTypeName(ptrToType), startTime)
 			if IsEtcdNodeExist(err) {
 				continue
 			}
@@ -492,7 +533,9 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 			return nil
 		}
 
+		startTime := time.Now()
 		response, err := h.Client.CompareAndSwap(key, string(data), ttl, origBody, index)
+		recordEtcdRequestLatency("compareAndSwap", getTypeName(ptrToType), startTime)
 		if IsEtcdTestFailed(err) {
 			continue
 		}
@@ -508,6 +551,72 @@ func (h *EtcdHelper) PrefixEtcdKey(key string) string {
 	return path.Join("/", h.PathPrefix, key)
 }
 
+// Copies the key-value pairs from their old location to a new location based
+// on this helper's etcd prefix. All old keys without the prefix are then deleted.
+func (h *EtcdHelper) MigrateKeys(oldPathPrefix string) error {
+	// Check to see if a migration is necessary, i.e. is the oldPrefix different
+	// from the newPrefix?
+	if h.PathPrefix == oldPathPrefix {
+		return nil
+	}
+
+	// Get the root node
+	response, err := h.Client.Get(oldPathPrefix, false, true)
+	if err != nil {
+		glog.Infof("Couldn't get the existing etcd root node.")
+		return err
+	}
+
+	// Perform the migration
+	if err = h.migrateChildren(response.Node, oldPathPrefix); err != nil {
+		glog.Infof("Error performing the migration.")
+		return err
+	}
+
+	// Delete the old top-level entry recursively
+	// Quick sanity check: Did the process at least create a new top-level entry?
+	if _, err = h.Client.Get(h.PathPrefix, false, false); err != nil {
+		glog.Infof("Couldn't get the new etcd root node.")
+		return err
+	} else {
+		if _, err = h.Client.Delete(oldPathPrefix, true); err != nil {
+			glog.Infof("Couldn't delete the old etcd root node.")
+			return err
+		}
+	}
+	return nil
+}
+
+// This recurses through the etcd registry. Each key-value pair is copied with
+// to a new pair with a prefixed key.
+func (h *EtcdHelper) migrateChildren(parent *etcd.Node, oldPathPrefix string) error {
+	for _, child := range parent.Nodes {
+		if child.Dir && len(child.Nodes) > 0 {
+			// Descend into this directory
+			h.migrateChildren(child, oldPathPrefix)
+
+			// All children have been migrated, so this directory has
+			// already been automatically added.
+			continue
+		}
+
+		// Check if already prefixed (maybe we got interrupted in last attempt)
+		if strings.HasPrefix(child.Key, h.PathPrefix) {
+			// Skip this iteration
+			continue
+		}
+
+		// Create new entry
+		newKey := path.Join("/", h.PathPrefix, strings.TrimPrefix(child.Key, oldPathPrefix))
+		if _, err := h.Client.Create(newKey, child.Value, 0); err != nil {
+			// Assuming etcd is still available, this is due to the key
+			// already existing, in which case we can skip.
+			continue
+		}
+	}
+	return nil
+}
+
 // GetEtcdVersion performs a version check against the provided Etcd server,
 // returning the string response, and error (if any).
 func GetEtcdVersion(host string) (string, error) {
@@ -517,7 +626,7 @@ func GetEtcdVersion(host string) (string, error) {
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Unsuccessful response from server: %v", err)
+		return "", fmt.Errorf("unsuccessful response from etcd server %q: %v", host, err)
 	}
 	versionBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {

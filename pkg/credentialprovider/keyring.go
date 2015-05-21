@@ -17,12 +17,16 @@ limitations under the License.
 package credentialprovider
 
 import (
+	"encoding/json"
 	"net/url"
 	"sort"
 	"strings"
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // DockerKeyring tracks a set of docker registry credentials, maintaining a
@@ -33,13 +37,13 @@ import (
 //   most specific match for a given image
 // - iterating a map does not yield predictable results
 type DockerKeyring interface {
-	Lookup(image string) (docker.AuthConfiguration, bool)
+	Lookup(image string) ([]docker.AuthConfiguration, bool)
 }
 
 // BasicDockerKeyring is a trivial map-backed implementation of DockerKeyring
 type BasicDockerKeyring struct {
 	index []string
-	creds map[string]docker.AuthConfiguration
+	creds map[string][]docker.AuthConfiguration
 }
 
 // lazyDockerKeyring is an implementation of DockerKeyring that lazily
@@ -51,9 +55,10 @@ type lazyDockerKeyring struct {
 func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 	if dk.index == nil {
 		dk.index = make([]string, 0)
-		dk.creds = make(map[string]docker.AuthConfiguration)
+		dk.creds = make(map[string][]docker.AuthConfiguration)
 	}
 	for loc, ident := range cfg {
+
 		creds := docker.AuthConfiguration{
 			Username: ident.Username,
 			Password: ident.Password,
@@ -73,14 +78,18 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 		// See ResolveAuthConfig in docker/registry/auth.go.
 		if parsed.Host != "" {
 			// NOTE: foo.bar.com comes through as Path.
-			dk.creds[parsed.Host] = creds
+			dk.creds[parsed.Host] = append(dk.creds[parsed.Host], creds)
 			dk.index = append(dk.index, parsed.Host)
 		}
-		if parsed.Path != "/" {
-			dk.creds[parsed.Host+parsed.Path] = creds
-			dk.index = append(dk.index, parsed.Host+parsed.Path)
+		if (len(parsed.Path) > 0) && (parsed.Path != "/") {
+			key := parsed.Host + parsed.Path
+			dk.creds[key] = append(dk.creds[key], creds)
+			dk.index = append(dk.index, key)
 		}
 	}
+
+	eliminateDupes := util.NewStringSet(dk.index...)
+	dk.index = eliminateDupes.List()
 
 	// Update the index used to identify which credentials to use for a given
 	// image. The index is reverse-sorted so more specific paths are matched
@@ -109,11 +118,12 @@ func isDefaultRegistryMatch(image string) bool {
 	return !strings.ContainsAny(parts[0], ".:")
 }
 
-// Lookup implements the DockerKeyring method for fetching credentials
-// based on image name.
-func (dk *BasicDockerKeyring) Lookup(image string) (docker.AuthConfiguration, bool) {
-	// range over the index as iterating over a map does not provide
-	// a predictable ordering
+// Lookup implements the DockerKeyring method for fetching credentials based on image name.
+// Multiple credentials may be returned if there are multiple potentially valid credentials
+// available.  This allows for rotation.
+func (dk *BasicDockerKeyring) Lookup(image string) ([]docker.AuthConfiguration, bool) {
+	// range over the index as iterating over a map does not provide a predictable ordering
+	ret := []docker.AuthConfiguration{}
 	for _, k := range dk.index {
 		// NOTE: prefix is a sufficient check because while scheme is allowed,
 		// it is stripped as part of 'Add'
@@ -121,7 +131,11 @@ func (dk *BasicDockerKeyring) Lookup(image string) (docker.AuthConfiguration, bo
 			continue
 		}
 
-		return dk.creds[k], true
+		ret = append(ret, dk.creds[k]...)
+	}
+
+	if len(ret) > 0 {
+		return ret, true
 	}
 
 	// Use credentials for the default registry if provided, and appropriate
@@ -129,12 +143,12 @@ func (dk *BasicDockerKeyring) Lookup(image string) (docker.AuthConfiguration, bo
 		return auth, true
 	}
 
-	return docker.AuthConfiguration{}, false
+	return []docker.AuthConfiguration{}, false
 }
 
 // Lookup implements the DockerKeyring method for fetching credentials
 // based on image name.
-func (dk *lazyDockerKeyring) Lookup(image string) (docker.AuthConfiguration, bool) {
+func (dk *lazyDockerKeyring) Lookup(image string) ([]docker.AuthConfiguration, bool) {
 	keyring := &BasicDockerKeyring{}
 
 	for _, p := range dk.Providers {
@@ -145,10 +159,57 @@ func (dk *lazyDockerKeyring) Lookup(image string) (docker.AuthConfiguration, boo
 }
 
 type FakeKeyring struct {
-	auth docker.AuthConfiguration
+	auth []docker.AuthConfiguration
 	ok   bool
 }
 
-func (f *FakeKeyring) Lookup(image string) (docker.AuthConfiguration, bool) {
+func (f *FakeKeyring) Lookup(image string) ([]docker.AuthConfiguration, bool) {
 	return f.auth, f.ok
+}
+
+// unionDockerKeyring delegates to a set of keyrings.
+type unionDockerKeyring struct {
+	keyrings []DockerKeyring
+}
+
+func (k *unionDockerKeyring) Lookup(image string) ([]docker.AuthConfiguration, bool) {
+	authConfigs := []docker.AuthConfiguration{}
+
+	for _, subKeyring := range k.keyrings {
+		if subKeyring == nil {
+			continue
+		}
+
+		currAuthResults, _ := subKeyring.Lookup(image)
+		authConfigs = append(authConfigs, currAuthResults...)
+	}
+
+	return authConfigs, (len(authConfigs) > 0)
+}
+
+// MakeDockerKeyring inspects the passedSecrets to see if they contain any DockerConfig secrets.  If they do,
+// then a DockerKeyring is built based on every hit and unioned with the defaultKeyring.
+// If they do not, then the default keyring is returned
+func MakeDockerKeyring(passedSecrets []api.Secret, defaultKeyring DockerKeyring) (DockerKeyring, error) {
+	passedCredentials := []DockerConfig{}
+	for _, passedSecret := range passedSecrets {
+		if dockercfgBytes, dockercfgExists := passedSecret.Data[api.DockerConfigKey]; (passedSecret.Type == api.SecretTypeDockercfg) && dockercfgExists && (len(dockercfgBytes) > 0) {
+			dockercfg := DockerConfig{}
+			if err := json.Unmarshal(dockercfgBytes, &dockercfg); err != nil {
+				return nil, err
+			}
+
+			passedCredentials = append(passedCredentials, dockercfg)
+		}
+	}
+
+	if len(passedCredentials) > 0 {
+		basicKeyring := &BasicDockerKeyring{}
+		for _, currCredentials := range passedCredentials {
+			basicKeyring.Add(currCredentials)
+		}
+		return &unionDockerKeyring{[]DockerKeyring{basicKeyring, defaultKeyring}}, nil
+	}
+
+	return defaultKeyring, nil
 }

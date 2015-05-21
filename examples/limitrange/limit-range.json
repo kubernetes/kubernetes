@@ -1,34 +1,36 @@
 {
-  "id": "limits",
+  "apiVersion": "v1beta3",
   "kind": "LimitRange",
-  "apiVersion": "v1beta1",
+  "metadata": {
+    "name": "limits"
+  },
   "spec": {
     "limits": [
     {
       "type": "Pod",
       "max": {
-        "memory": "1073741824",
+        "memory": "1Gi",
         "cpu": "2"
       },
       "min": {
-        "memory": "5242880",
-        "cpu": "0.25"
+        "memory": "6Mi",
+        "cpu": "250m"
       }
     },
     {
       "type": "Container",
       "max": {
-        "memory": "1073741824",
+        "memory": "1Gi",
         "cpu": "2"
       },
       "min": {
-        "memory": "5242880",
-        "cpu": "0.25"
+        "memory": "6Mi",
+        "cpu": "250m"
       },
       "default": {
-        "memory": "5242880",
-        "cpu": "0.25"
-      }      
+        "memory": "6Mi",
+        "cpu": "250m"
+      }       
     }
     ]
   }

@@ -250,12 +250,12 @@ var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP(S)", "PORT(S)"}
 var endpointColumns = []string{"NAME", "ENDPOINTS"}
 var nodeColumns = []string{"NAME", "LABELS", "STATUS"}
-var statusColumns = []string{"STATUS"}
 var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME"}
 var resourceQuotaColumns = []string{"NAME"}
 var namespaceColumns = []string{"NAME", "LABELS", "STATUS"}
 var secretColumns = []string{"NAME", "TYPE", "DATA"}
+var serviceAccountColumns = []string{"NAME", "SECRETS"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
@@ -274,7 +274,6 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(endpointColumns, printEndpointsList)
 	h.Handler(nodeColumns, printNode)
 	h.Handler(nodeColumns, printNodeList)
-	h.Handler(statusColumns, printStatus)
 	h.Handler(eventColumns, printEvent)
 	h.Handler(eventColumns, printEventList)
 	h.Handler(limitRangeColumns, printLimitRange)
@@ -285,6 +284,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(namespaceColumns, printNamespaceList)
 	h.Handler(secretColumns, printSecret)
 	h.Handler(secretColumns, printSecretList)
+	h.Handler(serviceAccountColumns, printServiceAccount)
+	h.Handler(serviceAccountColumns, printServiceAccountList)
 	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaim)
 	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaimList)
 	h.Handler(persistentVolumeColumns, printPersistentVolume)
@@ -363,7 +364,7 @@ func interpretContainerStatus(status *api.ContainerStatus) (string, string, stri
 		if state != nil {
 			message = fmt.Sprintf("exit code %d", state.ExitCode)
 			if state.Reason != "" {
-				message = fmt.Sprintf("%s, reason: %s", state.Reason)
+				message = fmt.Sprintf("%s, reason: %s", message, state.Reason)
 			}
 		}
 		return message
@@ -379,7 +380,11 @@ func interpretContainerStatus(status *api.ContainerStatus) (string, string, stri
 		if message != "" {
 			message = "last termination: " + message
 		}
-		return "Running", translateTimestamp(state.Running.StartedAt), message, nil
+		stateMsg := "Running"
+		if !status.Ready {
+			stateMsg = stateMsg + " *not ready*"
+		}
+		return stateMsg, translateTimestamp(state.Running.StartedAt), message, nil
 	} else if state.Termination != nil {
 		return "Terminated", translateTimestamp(state.Termination.StartedAt), getTermMsg(state.Termination), nil
 	}
@@ -598,6 +603,21 @@ func printSecretList(list *api.SecretList, w io.Writer) error {
 	return nil
 }
 
+func printServiceAccount(item *api.ServiceAccount, w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%s\t%d\n", item.Name, len(item.Secrets))
+	return err
+}
+
+func printServiceAccountList(list *api.ServiceAccountList, w io.Writer) error {
+	for _, item := range list.Items {
+		if err := printServiceAccount(&item, w); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func printNode(node *api.Node, w io.Writer) error {
 	conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
 	NodeAllConditions := []api.NodeConditionType{api.NodeReady}
@@ -637,9 +657,9 @@ func printNodeList(list *api.NodeList, w io.Writer) error {
 func printPersistentVolume(pv *api.PersistentVolume, w io.Writer) error {
 	claimRefUID := ""
 	if pv.Spec.ClaimRef != nil {
+		claimRefUID += pv.Spec.ClaimRef.Namespace
+		claimRefUID += "/"
 		claimRefUID += pv.Spec.ClaimRef.Name
-		claimRefUID += " / "
-		claimRefUID += string(pv.Spec.ClaimRef.UID)
 	}
 
 	modesStr := volume.GetAccessModesAsString(pv.Spec.AccessModes)
@@ -661,11 +681,7 @@ func printPersistentVolumeList(list *api.PersistentVolumeList, w io.Writer) erro
 }
 
 func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer) error {
-	volumeRefUID := ""
-	if pvc.Status.VolumeRef != nil {
-		volumeRefUID = string(pvc.Status.VolumeRef.UID)
-	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", pvc.Name, pvc.Labels, pvc.Status.Phase, volumeRefUID)
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", pvc.Name, pvc.Labels, pvc.Status.Phase, pvc.Spec.VolumeName)
 	return err
 }
 
@@ -676,11 +692,6 @@ func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, w io.Wr
 		}
 	}
 	return nil
-}
-
-func printStatus(status *api.Status, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%v\n", status.Status)
-	return err
 }
 
 func printEvent(event *api.Event, w io.Writer) error {

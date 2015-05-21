@@ -24,13 +24,14 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/validation"
 
@@ -64,9 +65,10 @@ func NewConfigFactory(client *client.Client) *ConfigFactory {
 		Client:             client,
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
 		ScheduledPodLister: &cache.StoreToPodLister{},
-		NodeLister:         &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		ServiceLister:      &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		StopEverything:     make(chan struct{}),
+		// Only nodes in the "Ready" condition with status == "True" are schedulable
+		NodeLister:     &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ServiceLister:  &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		StopEverything: make(chan struct{}),
 	}
 	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{c.PodQueue}, c.ScheduledPodLister)
 	c.modeler = modeler
@@ -150,8 +152,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	pluginArgs := PluginFactoryArgs{
 		PodLister:     f.PodLister,
 		ServiceLister: f.ServiceLister,
-		NodeLister:    f.NodeLister,
-		NodeInfo:      f.NodeLister,
+		// All fit predicates only need to consider schedulable nodes.
+		NodeLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
+		NodeInfo:   f.NodeLister,
 	}
 	predicateFuncs, err := getFitPredicateFunctions(predicateKeys, pluginArgs)
 	if err != nil {
@@ -180,7 +183,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	algo := algorithm.NewGenericScheduler(predicateFuncs, priorityConfigs, f.PodLister, r)
+	algo := scheduler.NewGenericScheduler(predicateFuncs, priorityConfigs, f.PodLister, r)
 
 	podBackoff := podBackoff{
 		perPodBackoff: map[string]*backoffEntry{},
@@ -191,8 +194,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	}
 
 	return &scheduler.Config{
-		Modeler:      f.modeler,
-		MinionLister: f.NodeLister,
+		Modeler: f.modeler,
+		// The scheduler only needs to consider schedulable nodes.
+		MinionLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
 		Algorithm:    algo,
 		Binder:       &binder{f.Client},
 		NextPod: func() *api.Pod {
@@ -241,7 +245,11 @@ func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
 	return func(pod *api.Pod, err error) {
-		glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
+		if err == scheduler.ErrNoNodesAvailable {
+			glog.V(4).Infof("Unable to schedule %v %v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
+		} else {
+			glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
+		}
 		backoff.gc()
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
@@ -254,7 +262,9 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 			pod = &api.Pod{}
 			err := factory.Client.Get().Namespace(podNamespace).Resource("pods").Name(podID).Do().Into(pod)
 			if err != nil {
-				glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
+				if !errors.IsNotFound(err) {
+					glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
+				}
 				return
 			}
 			if pod.Spec.Host == "" {

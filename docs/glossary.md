@@ -53,3 +53,6 @@ occurrences of same-Name objects.  See [identifiers](identifiers.md).
 : A directory, possibly with some data in it, which is accessible to a Container as part of its filesystem.  Kubernetes
 Volumes build upon [Docker Volumes](https://docs.docker.com/userguide/dockervolumes/), adding provisioning of the Volume
 directory and/or device.  See [volumes](volumes.md).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/glossary.md?pixel)]()

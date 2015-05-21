@@ -23,14 +23,15 @@ source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
 if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
-  echo "Starting cluster using os distro: ${OS_DISTRIBUTION}" >&2
   source "${KUBE_ROOT}/cluster/gce/${OS_DISTRIBUTION}/helper.sh"
 else
-  echo "Cannot start cluster using os distro: ${OS_DISTRIBUTION}" >&2
-  return
+  echo "Cannot operate on cluster using os distro: ${OS_DISTRIBUTION}" >&2
+  exit 1
 fi
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
+
+ALLOCATE_NODE_CIDRS=true
 
 KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
@@ -132,6 +133,41 @@ function detect-project () {
   fi
 }
 
+function sha1sum-file() {
+  if which shasum >/dev/null 2>&1; then
+    shasum -a1 "$1" | awk '{ print $1 }'
+  else
+    sha1sum "$1" | awk '{ print $1 }'
+  fi
+}
+
+function already-staged() {
+  local -r file=$1
+  local -r newsum=$2
+
+  [[ -e "${file}.sha1" ]] || return 1
+
+  local oldsum
+  oldsum=$(cat "${file}.sha1")
+
+  [[ "${oldsum}" == "${newsum}" ]]
+}
+
+# Copy a release tar, if we don't already think it's staged in GCS
+function copy-if-not-staged() {
+  local -r staging_path=$1
+  local -r gs_url=$2
+  local -r tar=$3
+  local -r hash=$4
+
+  if already-staged "${tar}" "${hash}"; then
+    echo "+++ $(basename ${tar}) already staged ('rm ${tar}.sha1' to force)"
+  else
+    echo "${server_hash}" > "${tar}.sha1"
+    gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
+    gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha1" >/dev/null 2>&1
+  fi
+}
 
 # Take the local tar files and upload them to Google Storage.  They will then be
 # downloaded by the master as part of the start up script for the master.
@@ -153,6 +189,7 @@ function upload-server-tars() {
   else
     project_hash=$(echo -n "$PROJECT" | md5sum | awk '{ print $1 }')
   fi
+
   # This requires 1 million projects before the probability of collision is 50%
   # that's probably good enough for now :P
   project_hash=${project_hash:0:10}
@@ -167,13 +204,16 @@ function upload-server-tars() {
 
   local -r staging_path="${staging_bucket}/devel"
 
+  local server_hash
+  local salt_hash
+  server_hash=$(sha1sum-file "${SERVER_BINARY_TAR}")
+  salt_hash=$(sha1sum-file "${SALT_TAR}")
+
   echo "+++ Staging server tars to Google Storage: ${staging_path}"
   local server_binary_gs_url="${staging_path}/${SERVER_BINARY_TAR##*/}"
-  gsutil -q -h "Cache-Control:private, max-age=0" cp "${SERVER_BINARY_TAR}" "${server_binary_gs_url}"
-  gsutil acl ch -g all:R "${server_binary_gs_url}" >/dev/null 2>&1
   local salt_gs_url="${staging_path}/${SALT_TAR##*/}"
-  gsutil -q -h "Cache-Control:private, max-age=0" cp "${SALT_TAR}" "${salt_gs_url}"
-  gsutil acl ch -g all:R "${salt_gs_url}" >/dev/null 2>&1
+  copy-if-not-staged "${staging_path}" "${server_binary_gs_url}" "${SERVER_BINARY_TAR}" "${server_hash}"
+  copy-if-not-staged "${staging_path}" "${salt_gs_url}" "${SALT_TAR}" "${salt_hash}"
 
   # Convert from gs:// URL to an https:// URL
   SERVER_BINARY_TAR_URL="${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}"
@@ -336,31 +376,6 @@ function create-firewall-rule {
   done
 }
 
-# Robustly try to create a route.
-# $1: The name of the route.
-# $2: IP range.
-function create-route {
-  detect-project
-  local attempt=0
-  while true; do
-    if ! gcloud compute routes create "$1" \
-      --project "${PROJECT}" \
-      --destination-range "$2" \
-      --network "${NETWORK}" \
-      --next-hop-instance "$1" \
-      --next-hop-instance-zone "${ZONE}"; then
-        if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to create route $1 ${color_norm}"
-          exit 2
-        fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create route $1. Retrying.${color_norm}"
-        attempt=$(($attempt+1))
-    else
-        break
-    fi
-  done
-}
-
 # Robustly try to create an instance template.
 # $1: The name of the instance template.
 # $2: The scopes flag.
@@ -464,6 +479,64 @@ function write-node-env {
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
 }
 
+# Create certificate pairs for the cluster.
+# $1: The public IP for the master.
+#
+# These are used for static cert distribution (e.g. static clustering) at
+# cluster creation time. This will be obsoleted once we implement dynamic
+# clustering.
+#
+# The following certificate pairs are created:
+#
+#  - ca (the cluster's certificate authority)
+#  - server
+#  - kubelet
+#  - kubecfg (for kubectl)
+#
+# TODO(roberthbailey): Replace easyrsa with a simple Go program to generate
+# the certs that we need.
+#
+# Assumed vars
+#   KUBE_TEMP
+#
+# Vars set:
+#   CERT_DIR
+#   CA_CERT_BASE64
+#   MASTER_CERT_BASE64
+#   MASTER_KEY_BASE64
+#   KUBELET_CERT_BASE64
+#   KUBELET_KEY_BASE64
+#   KUBECFG_CERT_BASE64
+#   KUBECFG_KEY_BASE64
+function create-certs {
+  local cert_ip
+  cert_ip="${1}"
+
+  # Note: This was heavily cribbed from make-ca-cert.sh
+  (cd "${KUBE_TEMP}"
+    curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
+    tar xzf easy-rsa.tar.gz > /dev/null 2>&1
+    cd easy-rsa-master/easyrsa3
+    ./easyrsa init-pki > /dev/null 2>&1
+    ./easyrsa --batch "--req-cn=${cert_ip}@$(date +%s)" build-ca nopass > /dev/null 2>&1
+    ./easyrsa --subject-alt-name=IP:"${cert_ip}" build-server-full "${MASTER_NAME}" nopass > /dev/null 2>&1
+    ./easyrsa build-client-full kubelet nopass > /dev/null 2>&1
+    ./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1) || {
+    # If there was an error in the subshell, just die.
+    # TODO(roberthbailey): add better error handling here
+    echo "=== Failed to generate certificates: Aborting ==="
+    exit 2
+  }
+  CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
+  CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
+  MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')
+  MASTER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | base64 | tr -d '\r\n')
+  KUBELET_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubelet.crt" | base64 | tr -d '\r\n')
+  KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
+  KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
+  KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
+}
+
 # Instantiate a kubernetes cluster
 #
 # Assumed vars
@@ -515,7 +588,8 @@ function kube-up {
   gcloud compute disks create "${MASTER_NAME}-pd" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
-    --size "10GB"
+    --type "${MASTER_DISK_TYPE}" \
+    --size "${MASTER_DISK_SIZE}"
 
   # Generate a bearer token for this cluster. We push this separately
   # from the other cluster variables so that the client (this
@@ -533,7 +607,9 @@ function kube-up {
     --project "${PROJECT}" \
     --region "${REGION}" -q --format yaml | awk '/^address:/ { print $2 }')
 
-  create-master-instance $MASTER_RESERVED_IP &
+  create-certs "${MASTER_RESERVED_IP}"
+
+  create-master-instance "${MASTER_RESERVED_IP}" &
 
   # Create a single firewall rule for all minions.
   create-firewall-rule "${MINION_TAG}-all" "${CLUSTER_IP_RANGE}" "${MINION_TAG}" &
@@ -569,23 +645,6 @@ function kube-up {
   # to gcloud's deficiency.
   wait-for-minions-to-run
   detect-minion-names
-
-  # Create the routes and set IP ranges to instance metadata, 5 instances at a time.
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    create-route "${MINION_NAMES[$i]}" "${MINION_IP_RANGES[$i]}" &
-    add-instance-metadata "${MINION_NAMES[$i]}" "node-ip-range=${MINION_IP_RANGES[$i]}" &
-
-    if [ $i -ne 0 ] && [ $((i%5)) -eq 0 ]; then
-      echo Waiting for a batch of routes at $i...
-      wait-for-jobs
-    fi
-
-  done
-  create-route "${MASTER_NAME}" "${MASTER_IP_RANGE}"
-
-  # Wait for last batch of jobs.
-  wait-for-jobs
-
   detect-master
 
   echo "Waiting for cluster initialization."
@@ -595,7 +654,8 @@ function kube-up {
   echo "  up."
   echo
 
-  until curl --insecure -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
+  until curl --cacert "${CERT_DIR}/pki/ca.crt" \
+          -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
           --max-time 5 --fail --output /dev/null --silent \
           "https://${KUBE_MASTER_IP}/api/v1beta3/pods"; do
       printf "."
@@ -604,20 +664,12 @@ function kube-up {
 
   echo "Kubernetes cluster created."
 
-  # TODO use token instead of basic auth
-  export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
-  export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
-  export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
+  export KUBE_CERT="${CERT_DIR}/pki/issued/kubecfg.crt"
+  export KUBE_KEY="${CERT_DIR}/pki/private/kubecfg.key"
+  export CA_CERT="${CERT_DIR}/pki/ca.crt"
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
-
-  # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
-  # config file.  Distribute the same way the htpasswd is done.
   (
    umask 077
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.crt" >"${KUBE_CERT}" 2>/dev/null
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.key" >"${KUBE_KEY}" 2>/dev/null
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/ca.crt" >"${CA_CERT}" 2>/dev/null
-
    create-kubeconfig
   )
 
@@ -644,16 +696,33 @@ function kube-down {
   detect-project
 
   echo "Bringing down cluster"
+  set +e  # Do not stop on error
 
-  gcloud preview managed-instance-groups --zone "${ZONE}" delete \
+  # The gcloud APIs don't return machine parsable error codes/retry information. Therefore the best we can
+  # do is parse the output and special case particular responses we are interested in.
+  deleteCmdOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" delete \
     --project "${PROJECT}" \
     --quiet \
-    "${NODE_INSTANCE_PREFIX}-group" || true
+    "${NODE_INSTANCE_PREFIX}-group")
+  if [[ "$deleteCmdOutput" != ""  ]]; then
+    # Managed instance group deletion is done asyncronously, we must wait for it to complete, or subsequent steps fail
+    deleteCmdOperationId=$(echo $deleteCmdOutput | grep "Operation:" | sed "s/.*Operation:[[:space:]]*\([^[:space:]]*\).*/\1/g")
+    if [[ "$deleteCmdOperationId" != ""  ]]; then
+      deleteCmdStatus="PENDING"
+      while [[ "$deleteCmdStatus" != "DONE" ]]
+      do
+        sleep 5
+        deleteCmdOperationOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" get-operation $deleteCmdOperationId)
+        deleteCmdStatus=$(echo $deleteCmdOperationOutput | grep -i "status:" | sed "s/.*status:[[:space:]]*\([^[:space:]]*\).*/\1/g")
+        echo "Waiting for MIG deletion to complete. Current status: " $deleteCmdStatus
+      done
+    fi
+  fi
 
   gcloud compute instance-templates delete \
     --project "${PROJECT}" \
     --quiet \
-    "${NODE_INSTANCE_PREFIX}-template" || true
+    "${NODE_INSTANCE_PREFIX}-template"
 
   # First delete the master (if it exists).
   gcloud compute instances delete \
@@ -661,14 +730,14 @@ function kube-down {
     --quiet \
     --delete-disks all \
     --zone "${ZONE}" \
-    "${MASTER_NAME}" || true
+    "${MASTER_NAME}"
 
   # Delete the master pd (possibly leaked by kube-up if master create failed)
   gcloud compute disks delete \
     --project "${PROJECT}" \
     --quiet \
     --zone "${ZONE}" \
-    "${MASTER_NAME}"-pd || true
+    "${MASTER_NAME}"-pd
 
   # Find out what minions are running.
   local -a minions
@@ -684,7 +753,7 @@ function kube-down {
       --quiet \
       --delete-disks boot \
       --zone "${ZONE}" \
-      "${minions[@]::10}" || true
+      "${minions[@]::10}"
     minions=( "${minions[@]:10}" )
   done
 
@@ -692,13 +761,13 @@ function kube-down {
   gcloud compute firewall-rules delete  \
     --project "${PROJECT}" \
     --quiet \
-    "${MASTER_NAME}-https" || true
+    "${MASTER_NAME}-https"
 
   # Delete firewall rule for minions.
   gcloud compute firewall-rules delete  \
     --project "${PROJECT}" \
     --quiet \
-    "${MINION_TAG}-all" || true
+    "${MINION_TAG}-all"
 
   # Delete routes.
   local -a routes
@@ -710,7 +779,7 @@ function kube-down {
     gcloud compute routes delete \
       --project "${PROJECT}" \
       --quiet \
-      "${routes[@]::10}" || true
+      "${routes[@]::10}"
     routes=( "${routes[@]:10}" )
   done
 
@@ -720,10 +789,11 @@ function kube-down {
     --project "${PROJECT}" \
     --region "${REGION}" \
     --quiet \
-    "${MASTER_NAME}-ip" || true
+    "${MASTER_NAME}-ip"
 
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
   clear-kubeconfig
+  set -e
 }
 
 # Update a kubernetes cluster with latest source

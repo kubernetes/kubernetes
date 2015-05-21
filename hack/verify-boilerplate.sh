@@ -46,6 +46,9 @@ files_need_boilerplate+=($(${boiler} "go" "${files[@]}"))
 files=($(find_files "sh"))
 files_need_boilerplate+=($(${boiler} "sh" "${files[@]}"))
 
+files=($(find_files "py"))
+files_need_boilerplate+=($(${boiler} "py" "${files[@]}"))
+
 if [[ ${#files_need_boilerplate[@]} -gt 0 ]]; then
   for file in "${files_need_boilerplate[@]}"; do
     echo "Boilerplate header is wrong for: ${file}"

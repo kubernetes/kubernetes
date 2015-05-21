@@ -1,36 +1,34 @@
-apiVersion: v1beta1
-namespace: rethinkdb
+apiVersion: v1beta3
 kind: ReplicationController
-id: rethinkdb-rc-1.16.0
-labels:
-  db: rethinkdb
-desiredState:
+metadata:
+  labels:
+    db: rethinkdb
+  name: rethinkdb-rc-1.16.0
+  namespace: rethinkdb
+spec:
   replicas: 1
-  replicaSelector:
+  selector:
     db: rethinkdb
     role: replicas
-  podTemplate:
-    labels:
-      db: rethinkdb
-      role: replicas
-    desiredState:
-      manifest:
-        version: v1beta1
-        id: rethinkdb
-        containers:
-          - name: rethinkdb
-            image: antmanler/rethinkdb:1.16.0
-            ports:
-              - name: admin-port
-                containerPort: 8080
-              - name: driver-port
-                containerPort: 28015
-              - name: cluster-port
-                containerPort: 29015
-            volumeMounts:
-                - name: rethinkdb-storage
-                  mountPath: /data/rethinkdb_data
-        volumes:
-          - name: rethinkdb-storage
-            source:
-              emptyDir: {}
+  template:
+    metadata:
+      labels:
+        db: rethinkdb
+        role: replicas
+    spec:
+      containers:
+      - image: antmanler/rethinkdb:1.16.0
+        name: rethinkdb
+        ports:
+        - containerPort: 8080
+          name: admin-port
+        - containerPort: 28015
+          name: driver-port
+        - containerPort: 29015
+          name: cluster-port
+        volumeMounts:
+        - mountPath: /data/rethinkdb_data
+          name: rethinkdb-storage
+      volumes:
+      - name: rethinkdb-storage
+        emptyDir: {}

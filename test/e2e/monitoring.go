@@ -68,9 +68,8 @@ var (
 		"monitoring-influx-grafana-controller": false,
 	}
 	expectedServices = map[string]bool{
-		influxdbService:       false,
-		"monitoring-heapster": false,
-		"monitoring-grafana":  false,
+		influxdbService:      false,
+		"monitoring-grafana": false,
 	}
 )
 
@@ -209,7 +208,7 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 	if !ok {
 		Failf("failed to get master http client")
 	}
-	proxyUrl := fmt.Sprintf("%s/api/v1beta3/proxy/namespaces/default/services/%s/", getMasterHost(), influxdbService)
+	proxyUrl := fmt.Sprintf("%s/api/v1beta3/proxy/namespaces/default/services/%s:api/", getMasterHost(), influxdbService)
 	config := &influxdb.ClientConfig{
 		Host: proxyUrl,
 		// TODO(vishh): Infer username and pw from the Pod spec.

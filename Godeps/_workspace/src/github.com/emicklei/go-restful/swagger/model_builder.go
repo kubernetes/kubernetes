@@ -197,9 +197,13 @@ func (b modelBuilder) buildStructTypeProperty(field reflect.StructField, jsonNam
 			if required {
 				model.Required = append(model.Required, k)
 			}
-			// Add the model type to the global model list
-			if v.Ref != nil {
-				b.Models[*v.Ref] = sub.Models[*v.Ref]
+		}
+		// add all new referenced models
+		for key, sub := range sub.Models {
+			if key != subKey {
+				if _, ok := b.Models[key]; !ok {
+					b.Models[key] = sub
+				}
 			}
 		}
 		// empty name signals skip property
@@ -245,7 +249,12 @@ func (b modelBuilder) buildPointerTypeProperty(field reflect.StructField, jsonNa
 		b.addModel(fieldType.Elem().Elem(), elemName)
 	} else {
 		// non-array, pointer type
-		var pType = fieldType.String()[1:] // no star, include pkg path
+		var pType = b.jsonSchemaType(fieldType.String()[1:]) // no star, include pkg path
+		if b.isPrimitiveType(fieldType.String()[1:]) {
+			prop.Type = &pType
+			prop.Format = b.jsonSchemaFormat(fieldType.String()[1:])
+			return jsonName, prop
+		}
 		prop.Ref = &pType
 		elemName := ""
 		if fieldType.Elem().Name() == "" {
@@ -328,14 +337,15 @@ func (b modelBuilder) jsonSchemaType(modelName string) string {
 
 func (b modelBuilder) jsonSchemaFormat(modelName string) string {
 	schemaMap := map[string]string{
-		"int":       "int32",
-		"int32":     "int32",
-		"int64":     "int64",
-		"byte":      "byte",
-		"uint8":     "byte",
-		"float64":   "double",
-		"float32":   "float",
-		"time.Time": "date-time",
+		"int":        "int32",
+		"int32":      "int32",
+		"int64":      "int64",
+		"byte":       "byte",
+		"uint8":      "byte",
+		"float64":    "double",
+		"float32":    "float",
+		"time.Time":  "date-time",
+		"*time.Time": "date-time",
 	}
 	mapped, ok := schemaMap[modelName]
 	if !ok {

@@ -17,6 +17,7 @@ limitations under the License.
 package dockertools
 
 import (
+	"encoding/json"
 	"fmt"
 	"hash/adler32"
 	"reflect"
@@ -198,18 +199,18 @@ func TestParseImageName(t *testing.T) {
 	}
 }
 
-func TestPull(t *testing.T) {
+func TestPullWithNoSecrets(t *testing.T) {
 	tests := []struct {
 		imageName     string
 		expectedImage string
 	}{
-		{"ubuntu", "ubuntu:latest"},
-		{"ubuntu:2342", "ubuntu:2342"},
-		{"ubuntu:latest", "ubuntu:latest"},
-		{"foo/bar:445566", "foo/bar:445566"},
-		{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar:latest"},
-		{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar:5342"},
-		{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar:latest"},
+		{"ubuntu", "ubuntu:latest using {}"},
+		{"ubuntu:2342", "ubuntu:2342 using {}"},
+		{"ubuntu:latest", "ubuntu:latest using {}"},
+		{"foo/bar:445566", "foo/bar:445566 using {}"},
+		{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar:latest using {}"},
+		{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar:5342 using {}"},
+		{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar:latest using {}"},
 	}
 	for _, test := range tests {
 		fakeKeyring := &credentialprovider.FakeKeyring{}
@@ -220,7 +221,7 @@ func TestPull(t *testing.T) {
 			keyring: fakeKeyring,
 		}
 
-		err := dp.Pull(test.imageName)
+		err := dp.Pull(test.imageName, []api.Secret{})
 		if err != nil {
 			t.Errorf("unexpected non-nil err: %s", err)
 			continue
@@ -237,6 +238,73 @@ func TestPull(t *testing.T) {
 	}
 }
 
+func TestPullWithSecrets(t *testing.T) {
+	// auth value is equivalent to: "username":"passed-user","password":"passed-password"
+	dockerCfg := map[string]map[string]string{"index.docker.io/v1/": {"email": "passed-email", "auth": "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk"}}
+	dockercfgContent, err := json.Marshal(dockerCfg)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	tests := map[string]struct {
+		imageName           string
+		passedSecrets       []api.Secret
+		builtInDockerConfig credentialprovider.DockerConfig
+		expectedPulls       []string
+	}{
+		"no matching secrets": {
+			"ubuntu",
+			[]api.Secret{},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{}),
+			[]string{"ubuntu:latest using {}"},
+		},
+		"default keyring secrets": {
+			"ubuntu",
+			[]api.Secret{},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			[]string{`ubuntu:latest using {"username":"built-in","password":"password","email":"email"}`},
+		},
+		"default keyring secrets unused": {
+			"ubuntu",
+			[]api.Secret{},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"extraneous": {"built-in", "password", "email"}}),
+			[]string{`ubuntu:latest using {}`},
+		},
+		"builtin keyring secrets, but use passed": {
+			"ubuntu",
+			[]api.Secret{{Type: api.SecretTypeDockercfg, Data: map[string][]byte{api.DockerConfigKey: dockercfgContent}}},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email"}}),
+			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
+		},
+	}
+	for _, test := range tests {
+		builtInKeyRing := &credentialprovider.BasicDockerKeyring{}
+		builtInKeyRing.Add(test.builtInDockerConfig)
+
+		fakeClient := &FakeDockerClient{}
+
+		dp := dockerPuller{
+			client:  fakeClient,
+			keyring: builtInKeyRing,
+		}
+
+		err := dp.Pull(test.imageName, test.passedSecrets)
+		if err != nil {
+			t.Errorf("unexpected non-nil err: %s", err)
+			continue
+		}
+
+		if e, a := 1, len(fakeClient.pulled); e != a {
+			t.Errorf("%s: expected 1 pulled image, got %d: %v", test.imageName, a, fakeClient.pulled)
+			continue
+		}
+
+		if e, a := test.expectedPulls, fakeClient.pulled; !reflect.DeepEqual(e, a) {
+			t.Errorf("%s: expected pull of %v, but got %v", test.imageName, e, a)
+		}
+	}
+}
+
 func TestDockerKeyringLookupFails(t *testing.T) {
 	fakeKeyring := &credentialprovider.FakeKeyring{}
 	fakeClient := &FakeDockerClient{
@@ -248,7 +316,7 @@ func TestDockerKeyringLookupFails(t *testing.T) {
 		keyring: fakeKeyring,
 	}
 
-	err := dp.Pull("host/repository/image:version")
+	err := dp.Pull("host/repository/image:version", []api.Secret{})
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -259,7 +327,6 @@ func TestDockerKeyringLookupFails(t *testing.T) {
 }
 
 func TestDockerKeyringLookup(t *testing.T) {
-	empty := docker.AuthConfiguration{}
 
 	ada := docker.AuthConfiguration{
 		Username: "ada",
@@ -289,27 +356,27 @@ func TestDockerKeyringLookup(t *testing.T) {
 
 	tests := []struct {
 		image string
-		match docker.AuthConfiguration
+		match []docker.AuthConfiguration
 		ok    bool
 	}{
 		// direct match
-		{"bar.example.com", ada, true},
+		{"bar.example.com", []docker.AuthConfiguration{ada}, true},
 
 		// direct match deeper than other possible matches
-		{"bar.example.com/pong", grace, true},
+		{"bar.example.com/pong", []docker.AuthConfiguration{grace, ada}, true},
 
 		// no direct match, deeper path ignored
-		{"bar.example.com/ping", ada, true},
+		{"bar.example.com/ping", []docker.AuthConfiguration{ada}, true},
 
 		// match first part of path token
-		{"bar.example.com/pongz", grace, true},
+		{"bar.example.com/pongz", []docker.AuthConfiguration{grace, ada}, true},
 
 		// match regardless of sub-path
-		{"bar.example.com/pong/pang", grace, true},
+		{"bar.example.com/pong/pang", []docker.AuthConfiguration{grace, ada}, true},
 
 		// no host match
-		{"example.com", empty, false},
-		{"foo.example.com", empty, false},
+		{"example.com", []docker.AuthConfiguration{}, false},
+		{"foo.example.com", []docker.AuthConfiguration{}, false},
 	}
 
 	for i, tt := range tests {
@@ -345,15 +412,15 @@ func TestIssue3797(t *testing.T) {
 
 	tests := []struct {
 		image string
-		match docker.AuthConfiguration
+		match []docker.AuthConfiguration
 		ok    bool
 	}{
 		// direct match
-		{"quay.io", rex, true},
+		{"quay.io", []docker.AuthConfiguration{rex}, true},
 
 		// partial matches
-		{"quay.io/foo", rex, true},
-		{"quay.io/foo/bar", rex, true},
+		{"quay.io/foo", []docker.AuthConfiguration{rex}, true},
+		{"quay.io/foo/bar", []docker.AuthConfiguration{rex}, true},
 	}
 
 	for i, tt := range tests {
@@ -573,34 +640,32 @@ func TestFindContainersByPod(t *testing.T) {
 }
 
 func TestMakePortsAndBindings(t *testing.T) {
-	container := api.Container{
-		Ports: []api.ContainerPort{
-			{
-				ContainerPort: 80,
-				HostPort:      8080,
-				HostIP:        "127.0.0.1",
-			},
-			{
-				ContainerPort: 443,
-				HostPort:      443,
-				Protocol:      "tcp",
-			},
-			{
-				ContainerPort: 444,
-				HostPort:      444,
-				Protocol:      "udp",
-			},
-			{
-				ContainerPort: 445,
-				HostPort:      445,
-				Protocol:      "foobar",
-			},
+	ports := []kubecontainer.PortMapping{
+		{
+			ContainerPort: 80,
+			HostPort:      8080,
+			HostIP:        "127.0.0.1",
+		},
+		{
+			ContainerPort: 443,
+			HostPort:      443,
+			Protocol:      "tcp",
+		},
+		{
+			ContainerPort: 444,
+			HostPort:      444,
+			Protocol:      "udp",
+		},
+		{
+			ContainerPort: 445,
+			HostPort:      445,
+			Protocol:      "foobar",
 		},
 	}
-	exposedPorts, bindings := makePortsAndBindings(&container)
-	if len(container.Ports) != len(exposedPorts) ||
-		len(container.Ports) != len(bindings) {
-		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", container, exposedPorts, bindings)
+	exposedPorts, bindings := makePortsAndBindings(ports)
+	if len(ports) != len(exposedPorts) ||
+		len(ports) != len(bindings) {
+		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", ports, exposedPorts, bindings)
 	}
 	for key, value := range bindings {
 		switch value[0].HostPort {

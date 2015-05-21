@@ -52,13 +52,13 @@ func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.HostPath != nil || spec.PersistentVolumeSource.HostPath != nil
 }
 
-func (plugin *hostPathPlugin) GetAccessModes() []api.AccessModeType {
-	return []api.AccessModeType{
+func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 	}
 }
 
-func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
+func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
 	if spec.VolumeSource.HostPath != nil {
 		return &hostPath{spec.VolumeSource.HostPath.Path}, nil
 	} else {

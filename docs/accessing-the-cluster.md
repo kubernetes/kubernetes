@@ -1,46 +1,94 @@
 # Accessing the Cluster
 
-## Using the Kubernetes proxy to access the cluster
-Information about the cluster can be accessed by using a proxy URL and by providing the keys to the cluster.
-For example, for a cluster that has cluster-level logging enabled using Elasticsearch you can fetch information about
-the Elasticsearch logging cluster.
+ * [Using the Kubernetes proxy](#proxy)
+ * [Requesting redirects](#redirect)
 
-First, you will need to obtain the keys (username and password) for your cluster:
+## <a name="proxy"></a>Using the Kubernetes proxy to access the cluster
+Information about the cluster can be accessed by using a proxy URL and the cluster authentication keys.
+For example, if a cluster has cluster-level logging enabled (using Elasticsearch), you can retrieve information about the Elasticsearch logging on that cluster through a proxy URL.
 
+### Retrieving the authentcation keys and proxy URLs
+Use `kubectl` commands to retrieve the access information.
+
+To retrieve the authentication keys for your clusters, run the following command:
 ```
-$ cat ~/.kube/kubernetes-satnam2_kubernetes/kubernetes_auth
-{
-  "User": "admin",
-  "Password": "4mty0Vl9nNFfwLJz",
-  "CAFile": "/Users/satnam/.kube/kubernetes-satnam2_kubernetes/kubernetes.ca.crt",
-  "CertFile": "/Users/satnam/.kube/kubernetes-satnam2_kubernetes/kubecfg.crt",
-  "KeyFile": "/Users/satnam/.kube/kubernetes-satnam2_kubernetes/kubecfg.key"
-}
-```
+$ kubectl config view
 
-To access a service endpoint `/alpha/beta/gamma/` via the proxy service for your service `myservice` you need to specify an HTTPS address
-for the Kubernetes master followed by `/api/v1beta1/proxy/services/myservice/alpha/beta/gamma/`. Currently it is important to
-specify the trailing `/`.
-
-Here is a list of representative cluster-level system services:
-```
-$ kubectl get services --selector="kubernetes.io/cluster-service=true"
-NAME                    LABELS                                                          SELECTOR                     IP                  PORT
-elasticsearch-logging   kubernetes.io/cluster-service=true,name=elasticsearch-logging   name=elasticsearch-logging   10.0.251.46         9200
-kibana-logging          kubernetes.io/cluster-service=true,name=kibana-logging          name=kibana-logging          10.0.118.199        5601
-kube-dns                k8s-app=kube-dns,kubernetes.io/cluster-service=true             k8s-app=kube-dns             10.0.0.10           53
-monitoring-grafana      kubernetes.io/cluster-service=true,name=grafana                 name=influxGrafana           10.0.15.119         80
-monitoring-heapster     kubernetes.io/cluster-service=true,name=heapster                name=heapster                10.0.101.222        80
-monitoring-influxdb     kubernetes.io/cluster-service=true,name=influxdb                name=influxGrafana           10.0.155.212        80
+  ...
+  users:
+  - name: kubernetes_logging
+    user:
+      client-certificate-data: REDACTED
+      client-key-data: REDACTED
+      token: cvIH2BYtNS85QG0KSLHgl5Oba4YNQOrx
+  - name: kubernetes_logging-basic-auth
+    user:
+      password: 4mty0Vl9nNFfwLJz
+      username: admin
 ```
 
-Using this information you can now issue the following `curl` command to get status information about
-the Elasticsearch logging service.
+To retrieve the address of the Kubernetes master cluster and the proxy URLs for services, run the following command:
 ```
-$ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta1/proxy/services/elasticsearch-logging/
+$ kubectl cluster-info
+
+  Kubernetes master is running at https://104.197.5.247
+  elasticsearch-logging is running at https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging
+  kibana-logging is running at https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/kibana-logging
+  kube-dns is running at https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/kube-dns
+  grafana is running at https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/monitoring-grafana
+  heapster is running at https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/monitoring-heapster
+```
+
+**Note**: Currently, adding trailing forward slashes '.../' to proxy URLs is required, for example: `https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/`.
+
+#### Manually constructing proxy URLs
+As mentioned above, you use the `kubectl cluster-info` command to retrieve the service's proxy URL. To create proxy URLs that include service endpoints, suffixes, and parameters, you simply append to the service's proxy URL:  
+`http://`*`kubernetes_master_address`*`/`*`service_path`*`/`*`service_name`*`/`*`service_endpoint-suffix-parameter`*
+##### Examples
+ * To access the Elasticsearch service endpoint `_search?q=user:kimchy`, you would use:   `http://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/_search?q=user:kimchy`
+
+ * To access the Elasticsearch cluster health information `_cluster/health?pretty=true`, you would use:   `https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/_cluster/health?pretty=true`
+  ```
+  {
+	 "cluster_name" : "kubernetes_logging",
+	 "status" : "yellow",
+	 "timed_out" : false,
+	 "number_of_nodes" : 1,
+	 "number_of_data_nodes" : 1,
+	 "active_primary_shards" : 5,
+	 "active_shards" : 5,
+	 "relocating_shards" : 0,
+	 "initializing_shards" : 0,
+	 "unassigned_shards" : 5
+  }
+  ```
+
+### Accessing cluster information
+You can run `curl` commands or use a web browser to access the information about cluster services. Depending on how secure the information is, you can choose to use basic authentication or token authentication (bearer and insecure). 
+
+#### Using `curl` commands
+Run `curl` commands using the following formats:
+
+ * Basic authentication: `$ curl -k -u` *`username`*`:`*`password`* *`proxy_URL`*`/`
+ * Token authentication: 
+     * Bearer tokens: `curl --insecure -H "Authorization: Bearer` *`access_token`*`"` *`proxy_URL`*`/`
+	 * Insecure: `curl --insecure -H "Authorization: Bearer` *`access_token`*`"` *`proxy_URL`*`/`
+
+**Note**: Currently, adding a trailing forward slash '.../' to each proxy URL is required.
+
+For example, to get status information about the Elasticsearch logging service, you would run one of the following commands:
+
+ * Basic authentication:
+`$ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/`
+
+ * Token authentication:
+`$ curl -k -H "Authorization: Bearer cvIH2BYtNS85QG0KSLHgl5Oba4YNQOrx" https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/`
+
+The result for either authentication method:
+```
 {
   "status" : 200,
-  "name" : "Senator Robert Kelly",
+  "name" : "Alaris",
   "cluster_name" : "kubernetes_logging",
   "version" : {
     "number" : "1.4.4",
@@ -53,45 +101,29 @@ $ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta1/proxy/serv
 }
 ```
 
-You can provide a suffix and parameters:
+#### Using web browsers
+In a web browser, navigate to the proxy URL and then enter your username and password when prompted. For example, you would copy and paste the following proxy URL into the address bar of your browser:
 ```
-$ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta1/proxy/services/elasticsearch-logging/_cluster/health?pretty=true
-{
-  "cluster_name" : "kubernetes_logging",
-  "status" : "yellow",
-  "timed_out" : false,
-  "number_of_nodes" : 1,
-  "number_of_data_nodes" : 1,
-  "active_primary_shards" : 5,
-  "active_shards" : 5,
-  "relocating_shards" : 0,
-  "initializing_shards" : 0,
-  "unassigned_shards" : 5
-}
+https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/
 ```
 
-You can also visit the endpoint of a service via the proxy URL e.g.
-```
-https://104.197.5.247/api/v1beta1/proxy/services/kibana-logging/
-```
-The first time you access the cluster using a proxy address from a browser you will be prompted
-for a username and password which can also be found in the `User` and `Password` fields of the `kubernetes_auth`
-file.
+## <a name="redirect"></a>Requesting redirects
+Use a `redirect` request so that the server returns an HTTP redirect response and identifies the specific node and service that
+can handle the request. 
 
-## Redirect
-A `redirect` request on a service will return a HTTP redirect response which identifies a specific node that
-can handle the request. Since the hostname that is returned is usually only accessible from inside the cluster
-this feature is useful only for code running inside the cluster. Subsequent `redirect` calls to the same
-resource may return different results e.g. when the service picks different replica nodes to serve the request.
-This feature can be useful to short circuit calls to the proxy server by obtaining the address of a node on the
-cluster which can be used for further requests which do not involve the proxy server.
+**Note**: Since the hostname or address that is returned is usually only accessible from inside the cluster,
+sending `redirect` requests is useful only for code running inside the cluster. Also, keep in mind that any subsequent `redirect` requests to the same
+server might return different results (because another node at that point in time can better serve the request).
 
-For example, the query below is run on
-a GCE virtual machine `oban` that is running in the same project and GCE default network as the Kubernetes
-cluster. The `-L` flag tells curl to follow the redirect information returned by the redirect call.
+**Tip**: Use a redirect request to reduce calls to the proxy server by first obtaining the address of a node on the
+cluster and then using that returned address for all subsequent requests.
 
+##### Example
+To request a redirect and then verify the address that gets returned, let's run a query on `oban` (Google Compute Engine virtual machine). Note that `oban` is running in the same project and default network (Google Compute Engine) as the Kubernetes cluster. 
+
+To request a redirect for the Elasticsearch service, we can run the following `curl` command:
 ```
-satnam@oban:~$ curl -L -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta1/redirect/services/elasticsearch-logging/
+user@oban:~$ curl -L -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging/
 {
   "status" : 200,
   "name" : "Skin",
@@ -106,11 +138,11 @@ satnam@oban:~$ curl -L -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1
   "tagline" : "You Know, for Search"
 }
 ```
+**Note**: We use the `-L` flag in the request so that `curl` follows the returned redirect address and retrieves the Elasticsearch service information.
 
-We can examine the actual redirect header:
-
+If we examine the actual redirect header (instead run the same `curl` command with `-v`), we see that the request to `https://104.197.5.247/api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging/` is redirected to `http://10.244.2.7:9200`:
 ```
-satnam@oban:~$ curl -v -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta1/redirect/services/elasticsearch-logging/
+user@oban:~$ curl -v -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging/
 * About to connect() to 104.197.5.247 port 443 (#0)
 *   Trying 104.197.5.247...
 * connected
@@ -136,7 +168,7 @@ satnam@oban:~$ curl -v -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1
 * 	 issuer: CN=104.197.5.247@1425498024
 * 	 SSL certificate verify result: unable to get local issuer certificate (20), continuing anyway.
 * Server auth using Basic with user 'admin'
-> GET /api/v1beta1/redirect/services/elasticsearch-logging/ HTTP/1.1
+> GET /api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging HTTP/1.1
 > Authorization: Basic YWRtaW46M210eTBWbDluTkZmd0xKeg==
 > User-Agent: curl/7.26.0
 > Host: 104.197.5.247
@@ -155,22 +187,21 @@ satnam@oban:~$ curl -v -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1
 * Connection #0 to host 104.197.5.247 left intact
 * Closing connection #0
 * SSLv3, TLS alert, Client hello (1):
-
 ```
 
-This shows that the request to `https://104.197.5.247/api/v1beta1/redirect/services/elasticsearch-logging/` is redirected to `http://10.244.2.7:9200`.
-If we examine the pods on the cluster we can see that `http://10.244.2.7` is the address of a pod that is running the Elasticsearch service.
-
-
+We can also run the `kubectl get pods` command to view a list of the pods on the cluster and verify that `http://10.244.2.7` is where the Elasticsearch service is running:
 ```
 $ kubectl get pods
 POD                                          IP                  CONTAINER(S)            IMAGE(S)                            HOST                                                                  LABELS                                                                      STATUS              CREATED
-elasticsearch-logging-controller-gziey       10.244.2.7          elasticsearch-logging   kubernetes/elasticsearch:1.0        kubernetes-minion-hqhv.c.kubernetes-satnam2.internal/104.154.33.252   kubernetes.io/cluster-service=true,name=elasticsearch-logging               Running             5 hours
-kibana-logging-controller-ls6k1              10.244.1.9          kibana-logging          kubernetes/kibana:1.1               kubernetes-minion-h5kt.c.kubernetes-satnam2.internal/146.148.80.37    kubernetes.io/cluster-service=true,name=kibana-logging                      Running             5 hours
-kube-dns-oh43e                               10.244.1.10         etcd                    quay.io/coreos/etcd:v2.0.3          kubernetes-minion-h5kt.c.kubernetes-satnam2.internal/146.148.80.37    k8s-app=kube-dns,kubernetes.io/cluster-service=true,name=kube-dns           Running             5 hours
+elasticsearch-logging-controller-gziey       10.244.2.7          elasticsearch-logging   kubernetes/elasticsearch:1.0        kubernetes-minion-hqhv.c.kubernetes-user2.internal/104.154.33.252   kubernetes.io/cluster-service=true,name=elasticsearch-logging               Running             5 hours
+kibana-logging-controller-ls6k1              10.244.1.9          kibana-logging          kubernetes/kibana:1.1               kubernetes-minion-h5kt.c.kubernetes-user2.internal/146.148.80.37    kubernetes.io/cluster-service=true,name=kibana-logging                      Running             5 hours
+kube-dns-oh43e                               10.244.1.10         etcd                    quay.io/coreos/etcd:v2.0.3          kubernetes-minion-h5kt.c.kubernetes-user2.internal/146.148.80.37    k8s-app=kube-dns,kubernetes.io/cluster-service=true,name=kube-dns           Running             5 hours
                                                                  kube2sky                kubernetes/kube2sky:1.0
                                                                  skydns                  kubernetes/skydns:2014-12-23-001
-monitoring-heapster-controller-fplln         10.244.0.4          heapster                kubernetes/heapster:v0.8            kubernetes-minion-2il2.c.kubernetes-satnam2.internal/130.211.155.16   kubernetes.io/cluster-service=true,name=heapster,uses=monitoring-influxdb   Running             5 hours
-monitoring-influx-grafana-controller-0133o   10.244.3.4          influxdb                kubernetes/heapster_influxdb:v0.3   kubernetes-minion-kmin.c.kubernetes-satnam2.internal/130.211.173.22   kubernetes.io/cluster-service=true,name=influxGrafana                       Running             5 hours
+monitoring-heapster-controller-fplln         10.244.0.4          heapster                kubernetes/heapster:v0.8            kubernetes-minion-2il2.c.kubernetes-user2.internal/130.211.155.16   kubernetes.io/cluster-service=true,name=heapster,uses=monitoring-influxdb   Running             5 hours
+monitoring-influx-grafana-controller-0133o   10.244.3.4          influxdb                kubernetes/heapster_influxdb:v0.3   kubernetes-minion-kmin.c.kubernetes-user2.internal/130.211.173.22   kubernetes.io/cluster-service=true,name=influxGrafana                       Running             5 hours
                                                                  grafana                 kubernetes/heapster_grafana:v0.4
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/accessing-the-cluster.md?pixel)]()

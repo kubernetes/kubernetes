@@ -55,7 +55,7 @@ func TestGetAccessModes(t *testing.T) {
 	}
 }
 
-func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
+func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
 			return true
@@ -186,7 +186,8 @@ func TestPluginLegacy(t *testing.T) {
 	}
 
 	spec := &api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}
-	if _, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""}, nil); err == nil {
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	if _, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{""}, nil); err == nil {
 		t.Errorf("Expected failiure")
 	}
 

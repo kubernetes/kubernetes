@@ -43,3 +43,6 @@ See [here](docker-multinode/worker.md) for detailed instructions.
 Once your cluster has been created you can [test it out](docker-multinode/testing.md)
 
 For more complete applications, please look in the [examples directory](../../examples)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode.md?pixel)]()

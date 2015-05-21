@@ -17,10 +17,12 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"path"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -29,23 +31,22 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
 )
 
-const cIdentifierErrorMsg string = "must match regex " + util.CIdentifierFmt
-const isNegativeErrorMsg string = "value must not be negative"
+const cIdentifierErrorMsg string = `must be a C identifier (matching regex ` + util.CIdentifierFmt + `): e.g. "my_name" or "MyName"`
+const isNegativeErrorMsg string = `must be non-negative`
 
 func intervalErrorMsg(lo, hi int) string {
-	return fmt.Sprintf("must be greater than %d and less than %d", lo, hi)
+	return fmt.Sprintf(`must be greater than %d and less than %d`, lo, hi)
 }
 
-var labelValueErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.LabelValueMaxLength, util.LabelValueFmt)
-var qualifiedNameErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.QualifiedNameMaxLength, util.QualifiedNameFmt)
-var dnsSubdomainErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS1123SubdomainMaxLength, util.DNS1123SubdomainFmt)
-var dns1123LabelErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS1123LabelMaxLength, util.DNS1123LabelFmt)
-var dns952LabelErrorMsg string = fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS952LabelMaxLength, util.DNS952LabelFmt)
+var labelValueErrorMsg string = fmt.Sprintf(`must have at most %d characters, matching regex %s: e.g. "MyValue" or ""`, util.LabelValueMaxLength, util.LabelValueFmt)
+var qualifiedNameErrorMsg string = fmt.Sprintf(`must be a qualified name (at most %d characters, matching regex %s), with an optional DNS subdomain prefix (at most %d characters, matching regex %s) and slash (/): e.g. "MyName" or "example.com/MyName"`, util.QualifiedNameMaxLength, util.QualifiedNameFmt, util.DNS1123SubdomainMaxLength, util.DNS1123SubdomainFmt)
+var dnsSubdomainErrorMsg string = fmt.Sprintf(`must be a DNS subdomain (at most %d characters, matching regex %s): e.g. "example.com"`, util.DNS1123SubdomainMaxLength, util.DNS1123SubdomainFmt)
+var dns1123LabelErrorMsg string = fmt.Sprintf(`must be a DNS label (at most %d characters, matching regex %s): e.g. "my-name"`, util.DNS1123LabelMaxLength, util.DNS1123LabelFmt)
+var dns952LabelErrorMsg string = fmt.Sprintf(`must be a DNS 952 label (at most %d characters, matching regex %s): e.g. "my-name"`, util.DNS952LabelMaxLength, util.DNS952LabelFmt)
 var pdPartitionErrorMsg string = intervalErrorMsg(0, 255)
 var portRangeErrorMsg string = intervalErrorMsg(0, 65536)
 
@@ -128,7 +129,7 @@ func ValidateNodeName(name string, prefix bool) (bool, string) {
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateNamespaceName(name string, prefix bool) (bool, string) {
-	return nameIsDNSSubdomain(name, prefix)
+	return nameIsDNSLabel(name, prefix)
 }
 
 // ValidateLimitRangeName can be used to check whether the given limit range name is valid.
@@ -153,6 +154,13 @@ func ValidateSecretName(name string, prefix bool) (bool, string) {
 	return nameIsDNSSubdomain(name, prefix)
 }
 
+// ValidateServiceAccountName can be used to check whether the given service account name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateServiceAccountName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
 // ValidateEndpointsName can be used to check whether the given endpoints name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
@@ -169,6 +177,17 @@ func nameIsDNSSubdomain(name string, prefix bool) (bool, string) {
 		return true, ""
 	}
 	return false, dnsSubdomainErrorMsg
+}
+
+// nameIsDNSLabel is a ValidateNameFunc for names that must be a DNS 1123 label.
+func nameIsDNSLabel(name string, prefix bool) (bool, string) {
+	if prefix {
+		name = maskTrailingDash(name)
+	}
+	if util.IsDNS1123Label(name) {
+		return true, ""
+	}
+	return false, dns1123LabelErrorMsg
 }
 
 // nameIsDNS952Label is a ValidateNameFunc for names that must be a DNS 952 label.
@@ -205,8 +224,8 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 	if requiresNamespace {
 		if len(meta.Namespace) == 0 {
 			allErrs = append(allErrs, errs.NewFieldRequired("namespace"))
-		} else if !util.IsDNS1123Subdomain(meta.Namespace) {
-			allErrs = append(allErrs, errs.NewFieldInvalid("namespace", meta.Namespace, dnsSubdomainErrorMsg))
+		} else if ok, _ := ValidateNamespaceName(meta.Namespace, false); !ok {
+			allErrs = append(allErrs, errs.NewFieldInvalid("namespace", meta.Namespace, dns1123LabelErrorMsg))
 		}
 	} else {
 		if len(meta.Namespace) != 0 {
@@ -440,12 +459,20 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName).Prefix("metadata")...)
 
+	if len(pv.Spec.AccessModes) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.AccessModes"))
+	}
+
 	if len(pv.Spec.Capacity) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.Capacity"))
 	}
 
 	if _, ok := pv.Spec.Capacity[api.ResourceStorage]; !ok || len(pv.Spec.Capacity) > 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.Capacity, fmt.Sprintf("only %s is expected", api.ResourceStorage)))
+	}
+
+	for _, qty := range pv.Spec.Capacity {
+		allErrs = append(allErrs, validateBasicResource(qty)...)
 	}
 
 	numVolumes := 0
@@ -464,6 +491,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	if pv.Spec.Glusterfs != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateGlusterfs(pv.Spec.Glusterfs).Prefix("glusterfs")...)
+	}
+	if pv.Spec.NFS != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateNFS(pv.Spec.NFS).Prefix("nfs")...)
 	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.PersistentVolumeSource, "exactly 1 volume type is required"))
@@ -495,7 +526,7 @@ func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *api.PersistentVolume) er
 func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) errs.ValidationErrorList {
 	allErrs := ValidateObjectMeta(&pvc.ObjectMeta, true, ValidatePersistentVolumeName)
 	if len(pvc.Spec.AccessModes) == 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.AccessModes", pvc.Spec.AccessModes, "at least 1 AccessModeType is required"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.AccessModes", pvc.Spec.AccessModes, "at least 1 PersistentVolumeAccessMode is required"))
 	}
 	if _, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; !ok {
 		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.Resources.Requests", pvc.Spec.Resources.Requests, "No Storage size specified"))
@@ -506,16 +537,6 @@ func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) errs.Validati
 func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = ValidatePersistentVolumeClaim(newPvc)
-	if oldPvc.Status.VolumeRef != nil {
-		oldModesAsString := volume.GetAccessModesAsString(oldPvc.Spec.AccessModes)
-		newModesAsString := volume.GetAccessModesAsString(newPvc.Spec.AccessModes)
-		if oldModesAsString != newModesAsString {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.AccessModes", oldPvc.Spec.AccessModes, "field is immutable"))
-		}
-		if !reflect.DeepEqual(oldPvc.Spec.Resources, newPvc.Spec.Resources) {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Resources", oldPvc.Spec.Resources, "field is immutable"))
-		}
-	}
 	newPvc.Status = oldPvc.Status
 	return allErrs
 }
@@ -525,6 +546,12 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *api.PersistentVol
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldPvc.ObjectMeta, &newPvc.ObjectMeta).Prefix("metadata")...)
 	if newPvc.ResourceVersion == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("resourceVersion"))
+	}
+	if len(newPvc.Spec.AccessModes) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.AccessModes"))
+	}
+	for _, qty := range newPvc.Status.Capacity {
+		allErrs = append(allErrs, validateBasicResource(qty)...)
 	}
 	newPvc.Spec = oldPvc.Spec
 	return allErrs
@@ -776,15 +803,12 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 	allNames := util.StringSet{}
 	for i, ctr := range containers {
 		cErrs := errs.ValidationErrorList{}
-		capabilities := capabilities.Get()
 		if len(ctr.Name) == 0 {
 			cErrs = append(cErrs, errs.NewFieldRequired("name"))
 		} else if !util.IsDNS1123Label(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldInvalid("name", ctr.Name, dns1123LabelErrorMsg))
 		} else if allNames.Has(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldDuplicate("name", ctr.Name))
-		} else if ctr.Privileged && !capabilities.AllowPrivileged {
-			cErrs = append(cErrs, errs.NewFieldForbidden("privileged", ctr.Privileged))
 		} else {
 			allNames.Insert(ctr.Name)
 		}
@@ -801,6 +825,7 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		cErrs = append(cErrs, validateVolumeMounts(ctr.VolumeMounts, volumes).Prefix("volumeMounts")...)
 		cErrs = append(cErrs, validatePullPolicy(&ctr).Prefix("pullPolicy")...)
 		cErrs = append(cErrs, ValidateResourceRequirements(&ctr.Resources).Prefix("resources")...)
+		cErrs = append(cErrs, ValidateSecurityContext(ctr.SecurityContext).Prefix("securityContext")...)
 		allErrs = append(allErrs, cErrs.PrefixIndex(i)...)
 	}
 	// Check for colliding ports across all containers.
@@ -877,6 +902,20 @@ func validateHostNetwork(hostNetwork bool, containers []api.Container) errs.Vali
 	return allErrors
 }
 
+// validateImagePullSecrets checks to make sure the pull secrets are well formed.  Right now, we only expect name to be set (it's the only field).  If this ever changes
+// and someone decides to set those fields, we'd like to know.
+func validateImagePullSecrets(imagePullSecrets []api.LocalObjectReference) errs.ValidationErrorList {
+	allErrors := errs.ValidationErrorList{}
+	for i, currPullSecret := range imagePullSecrets {
+		strippedRef := api.LocalObjectReference{Name: currPullSecret.Name}
+
+		if !reflect.DeepEqual(strippedRef, currPullSecret) {
+			allErrors = append(allErrors, errs.NewFieldInvalid(fmt.Sprintf("[%d]", i), currPullSecret, "only name may be set"))
+		}
+	}
+	return allErrors
+}
+
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -900,6 +939,13 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy).Prefix("dnsPolicy")...)
 	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, "nodeSelector")...)
 	allErrs = append(allErrs, validateHostNetwork(spec.HostNetwork, spec.Containers).Prefix("hostNetwork")...)
+	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets).Prefix("imagePullSecrets")...)
+
+	if spec.ActiveDeadlineSeconds != nil {
+		if *spec.ActiveDeadlineSeconds <= 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("activeDeadlineSeconds", spec.ActiveDeadlineSeconds, "activeDeadlineSeconds must be a positive integer greater than 0"))
+		}
+	}
 	return allErrs
 }
 
@@ -966,7 +1012,7 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 	return allErrs
 }
 
-var supportedSessionAffinityType = util.NewStringSet(string(api.AffinityTypeClientIP), string(api.AffinityTypeNone))
+var supportedSessionAffinityType = util.NewStringSet(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
 
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
@@ -978,7 +1024,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	}
 	allPortNames := util.StringSet{}
 	for i := range service.Spec.Ports {
-		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], i, &allPortNames).PrefixIndex(i).Prefix("spec.ports")...)
+		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, &allPortNames).PrefixIndex(i).Prefix("spec.ports")...)
 	}
 
 	if service.Spec.Selector != nil {
@@ -1016,18 +1062,19 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	return allErrs
 }
 
-func validateServicePort(sp *api.ServicePort, index int, allNames *util.StringSet) errs.ValidationErrorList {
+func validateServicePort(sp *api.ServicePort, requireName bool, allNames *util.StringSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	if len(sp.Name) == 0 {
-		// Allow empty names if they are the first port (mostly for compat).
-		if index != 0 {
-			allErrs = append(allErrs, errs.NewFieldRequired("name"))
+	if requireName && sp.Name == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("name"))
+	} else if sp.Name != "" {
+		if !util.IsDNS1123Label(sp.Name) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("name", sp.Name, dns1123LabelErrorMsg))
+		} else if allNames.Has(sp.Name) {
+			allErrs = append(allErrs, errs.NewFieldDuplicate("name", sp.Name))
+		} else {
+			allNames.Insert(sp.Name)
 		}
-	} else if !util.IsDNS1123Label(sp.Name) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", sp.Name, dns1123LabelErrorMsg))
-	} else if allNames.Has(sp.Name) {
-		allErrs = append(allErrs, errs.NewFieldDuplicate("name", sp.Name))
 	}
 
 	if !util.IsValidPortNum(sp.Port) {
@@ -1224,6 +1271,31 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 	return allErrs
 }
 
+// ValidateServiceAccount tests if required fields in the ServiceAccount are set.
+func ValidateServiceAccount(serviceAccount *api.ServiceAccount) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&serviceAccount.ObjectMeta, true, ValidateServiceAccountName).Prefix("metadata")...)
+	return allErrs
+}
+
+// ValidateServiceAccountUpdate tests if required fields in the ServiceAccount are set.
+func ValidateServiceAccountUpdate(oldServiceAccount, newServiceAccount *api.ServiceAccount) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldServiceAccount.ObjectMeta, &newServiceAccount.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateServiceAccount(newServiceAccount)...)
+	return allErrs
+}
+
+const SecretKeyFmt string = "\\.?" + util.DNS1123LabelFmt + "(\\." + util.DNS1123LabelFmt + ")*"
+
+var secretKeyRegexp = regexp.MustCompile("^" + SecretKeyFmt + "$")
+
+// IsSecretKey tests for a string that conforms to the definition of a
+// subdomain in DNS (RFC 1123), except that a leading dot is allowed
+func IsSecretKey(value string) bool {
+	return len(value) <= util.DNS1123SubdomainMaxLength && secretKeyRegexp.MatchString(value)
+}
+
 // ValidateSecret tests if required fields in the Secret are set.
 func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -1231,8 +1303,8 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 
 	totalSize := 0
 	for key, value := range secret.Data {
-		if !util.IsDNS1123Subdomain(key) {
-			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%s]", key), key, dnsSubdomainErrorMsg))
+		if !IsSecretKey(key) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%s]", key), key, fmt.Sprintf("must have at most %d characters and match regex %s", util.DNS1123SubdomainMaxLength, SecretKeyFmt)))
 		}
 
 		totalSize += len(value)
@@ -1243,8 +1315,26 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 	}
 
 	switch secret.Type {
+	case api.SecretTypeServiceAccountToken:
+		// Only require Annotations[kubernetes.io/service-account.name]
+		// Additional fields (like Annotations[kubernetes.io/service-account.uid] and Data[token]) might be contributed later by a controller loop
+		if value := secret.Annotations[api.ServiceAccountNameKey]; len(value) == 0 {
+			allErrs = append(allErrs, errs.NewFieldRequired(fmt.Sprintf("metadata.annotations[%s]", api.ServiceAccountNameKey)))
+		}
 	case api.SecretTypeOpaque, "":
 		// no-op
+	case api.SecretTypeDockercfg:
+		dockercfgBytes, exists := secret.Data[api.DockerConfigKey]
+		if !exists {
+			allErrs = append(allErrs, errs.NewFieldRequired(fmt.Sprintf("data[%s]", api.DockerConfigKey)))
+			break
+		}
+
+		// make sure that the content is well-formed json.
+		if err := json.Unmarshal(dockercfgBytes, &map[string]interface{}{}); err != nil {
+			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%s]", api.DockerConfigKey), "<secret contents redacted>", err.Error()))
+		}
+
 	default:
 		// no-op
 	}
@@ -1479,5 +1569,27 @@ func ValidateEndpointsUpdate(oldEndpoints, newEndpoints *api.Endpoints) errs.Val
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldEndpoints.ObjectMeta, &newEndpoints.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets).Prefix("subsets")...)
+	return allErrs
+}
+
+// ValidateSecurityContext ensure the security context contains valid settings
+func ValidateSecurityContext(sc *api.SecurityContext) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	//this should only be true for testing since SecurityContext is defaulted by the api
+	if sc == nil {
+		return allErrs
+	}
+
+	if sc.Privileged != nil {
+		if *sc.Privileged && !capabilities.Get().AllowPrivileged {
+			allErrs = append(allErrs, errs.NewFieldForbidden("privileged", sc.Privileged))
+		}
+	}
+
+	if sc.RunAsUser != nil {
+		if *sc.RunAsUser < 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("runAsUser", *sc.RunAsUser, "runAsUser cannot be negative"))
+		}
+	}
 	return allErrs
 }

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"sync"
 )
 
 // HealthzChecker is a named healthz check.
@@ -28,9 +29,13 @@ type HealthzChecker interface {
 	Check(req *http.Request) error
 }
 
+var defaultHealthz = sync.Once{}
+
 // DefaultHealthz installs the default healthz check to the http.DefaultServeMux.
 func DefaultHealthz(checks ...HealthzChecker) {
-	InstallHandler(http.DefaultServeMux, checks...)
+	defaultHealthz.Do(func() {
+		InstallHandler(http.DefaultServeMux, checks...)
+	})
 }
 
 // PingHealthz returns true automatically when checked

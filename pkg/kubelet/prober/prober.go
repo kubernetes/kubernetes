@@ -18,7 +18,6 @@ package prober
 
 import (
 	"fmt"
-	"io"
 	"strconv"
 	"time"
 
@@ -42,19 +41,12 @@ type Prober interface {
 	Probe(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error)
 }
 
-type ContainerCommandRunner interface {
-	RunInContainer(containerID string, cmd []string) ([]byte, error)
-	ExecInContainer(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
-	PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error
-}
-
 // Prober helps to check the liveness/readiness of a container.
 type prober struct {
-	exec execprobe.ExecProber
-	http httprobe.HTTPProber
-	tcp  tcprobe.TCPProber
-	// TODO(vmarmol): Remove when we remove the circular dependency to DockerManager.
-	Runner ContainerCommandRunner
+	exec   execprobe.ExecProber
+	http   httprobe.HTTPProber
+	tcp    tcprobe.TCPProber
+	runner kubecontainer.ContainerCommandRunner
 
 	readinessManager *kubecontainer.ReadinessManager
 	refManager       *kubecontainer.RefManager
@@ -64,7 +56,7 @@ type prober struct {
 // NewProber creates a Prober, it takes a command runner and
 // several container info managers.
 func New(
-	runner ContainerCommandRunner,
+	runner kubecontainer.ContainerCommandRunner,
 	readinessManager *kubecontainer.ReadinessManager,
 	refManager *kubecontainer.RefManager,
 	recorder record.EventRecorder) Prober {
@@ -73,7 +65,7 @@ func New(
 		exec:   execprobe.New(),
 		http:   httprobe.New(),
 		tcp:    tcprobe.New(),
-		Runner: runner,
+		runner: runner,
 
 		readinessManager: readinessManager,
 		refManager:       refManager,
@@ -256,7 +248,7 @@ type execInContainer struct {
 
 func (p *prober) newExecInContainer(pod *api.Pod, container api.Container, containerID string, cmd []string) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
-		return p.Runner.RunInContainer(containerID, cmd)
+		return p.runner.RunInContainer(containerID, cmd)
 	}}
 }
 

@@ -18,22 +18,17 @@ package cmd
 
 import (
 	"bytes"
-	"crypto/md5"
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"time"
+
+	"github.com/golang/glog"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -81,6 +76,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("image", "", "Image to upgrade the controller to.  Can not be used with --filename/-f")
 	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
 	cmd.Flags().Bool("dry-run", false, "If true, print out the changes that would be made, but don't actually make them.")
+	cmd.Flags().Bool("rollback", false, "If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout")
 	cmdutil.AddPrinterFlags(cmd)
 	return cmd
 }
@@ -129,19 +125,34 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		return err
 	}
 
+	updaterClient := kubectl.NewRollingUpdaterClient(client)
+
+	var newRc *api.ReplicationController
 	// fetch rc
 	oldRc, err := client.ReplicationControllers(cmdNamespace).Get(oldName)
 	if err != nil {
-		return err
+		if !errors.IsNotFound(err) || len(image) == 0 || len(args) > 1 {
+			return err
+		}
+		// We're in the middle of a rename, look for an RC with a source annotation of oldName
+		newRc, err := kubectl.FindSourceController(updaterClient, cmdNamespace, oldName)
+		if err != nil {
+			return err
+		}
+		return kubectl.Rename(kubectl.NewRollingUpdaterClient(client), newRc, oldName)
 	}
 
-	keepOldName := false
+	var keepOldName bool
 
 	mapper, typer := f.Object()
-	var newRc *api.ReplicationController
 
 	if len(filename) != 0 {
+		schema, err := f.Validator()
+		if err != nil {
+			return err
+		}
 		obj, err := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+			Schema(schema).
 			NamespaceParam(cmdNamespace).RequireNamespace().
 			FilenameParam(filename).
 			Do().
@@ -152,6 +163,10 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		var ok bool
 		newRc, ok = obj.(*api.ReplicationController)
 		if !ok {
+			if _, kind, err := typer.ObjectVersionAndKind(obj); err == nil {
+				return cmdutil.UsageError(cmd, "%s contains a %s not a ReplicationController", filename, kind)
+			}
+			glog.V(4).Infof("Object %#v is not a ReplicationController", obj)
 			return cmdutil.UsageError(cmd, "%s does not specify a valid ReplicationController", filename)
 		}
 	}
@@ -159,68 +174,36 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	// than the old rc. This selector is the hash of the rc, which will differ because the new rc has a
 	// different image.
 	if len(image) != 0 {
-		var newName string
-		var err error
-
-		if len(args) >= 2 {
-			newName = args[1]
+		keepOldName = len(args) == 1
+		newName := findNewName(args, oldRc)
+		if newRc, err = kubectl.LoadExistingNextReplicationController(client, cmdNamespace, newName); err != nil {
+			return err
+		}
+		if newRc != nil {
+			fmt.Fprintf(out, "Found existing update in progress (%s), resuming.\n", newRc.Name)
 		} else {
-			newName, _ = kubectl.GetNextControllerAnnotation(oldRc)
-		}
-
-		if len(newName) > 0 {
-			newRc, err = client.ReplicationControllers(cmdNamespace).Get(newName)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-			fmt.Fprint(out, "Found existing update in progress (%s), resuming.\n", newName)
-		}
-		if newRc == nil {
-			// load the old RC into the "new" RC
-			if newRc, err = client.ReplicationControllers(cmdNamespace).Get(oldName); err != nil {
-				return err
-			}
-
-			if len(newRc.Spec.Template.Spec.Containers) > 1 {
-				// TODO: support multi-container image update.
-				return errors.New("Image update is not supported for multi-container pods")
-			}
-			if len(newRc.Spec.Template.Spec.Containers) == 0 {
-				return cmdutil.UsageError(cmd, "Pod has no containers! (%v)", newRc)
-			}
-			newRc.Spec.Template.Spec.Containers[0].Image = image
-
-			newHash, err := hashObject(newRc, client.Codec)
+			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, cmdNamespace, oldName, newName, image, deploymentKey)
 			if err != nil {
 				return err
 			}
-
-			if len(newName) == 0 {
-				keepOldName = true
-				newName = fmt.Sprintf("%s-%s", newRc.Name, newHash)
-			}
-			newRc.Name = newName
-
-			newRc.Spec.Selector[deploymentKey] = newHash
-			newRc.Spec.Template.Labels[deploymentKey] = newHash
-			// Clear resource version after hashing so that identical updates get different hashes.
-			newRc.ResourceVersion = ""
-
-			kubectl.SetNextControllerAnnotation(oldRc, newName)
-			if _, found := oldRc.Spec.Selector[deploymentKey]; !found {
-				if oldRc, err = addDeploymentKeyToReplicationController(oldRc, client, deploymentKey, cmdNamespace, out); err != nil {
-					return err
-				}
-			}
+		}
+		// Update the existing replication controller with pointers to the 'next' controller
+		// and adding the <deploymentKey> label if necessary to distinguish it from the 'next' controller.
+		oldHash, err := api.HashObject(oldRc, client.Codec)
+		if err != nil {
+			return err
+		}
+		oldRc, err = kubectl.UpdateExistingReplicationController(client, oldRc, cmdNamespace, newRc.Name, deploymentKey, oldHash, out)
+		if err != nil {
+			return err
 		}
 	}
-	newName := newRc.Name
-	if oldName == newName {
+	if oldName == newRc.Name {
 		return cmdutil.UsageError(cmd, "%s cannot have the same name as the existing ReplicationController %s",
 			filename, oldName)
 	}
 
-	updater := kubectl.NewRollingUpdater(newRc.Namespace, kubectl.NewRollingUpdaterClient(client))
+	updater := kubectl.NewRollingUpdater(newRc.Namespace, updaterClient)
 
 	// To successfully pull off a rolling update the new and old rc have to differ
 	// by at least one selector. Every new pod should have the selector and every
@@ -256,7 +239,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	if keepOldName {
 		updateCleanupPolicy = kubectl.RenameRollingUpdateCleanupPolicy
 	}
-	err = updater.Update(&kubectl.RollingUpdaterConfig{
+	config := &kubectl.RollingUpdaterConfig{
 		Out:           out,
 		OldRc:         oldRc,
 		NewRc:         newRc,
@@ -264,7 +247,12 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		Interval:      interval,
 		Timeout:       timeout,
 		CleanupPolicy: updateCleanupPolicy,
-	})
+	}
+	if cmdutil.GetFlagBool(cmd, "rollback") {
+		kubectl.AbortRollingUpdate(config)
+		client.ReplicationControllers(config.NewRc.Namespace).Update(config.NewRc)
+	}
+	err = updater.Update(config)
 	if err != nil {
 		return err
 	}
@@ -272,94 +260,18 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	if keepOldName {
 		fmt.Fprintf(out, "%s\n", oldName)
 	} else {
-		fmt.Fprintf(out, "%s\n", newName)
+		fmt.Fprintf(out, "%s\n", newRc.Name)
 	}
 	return nil
 }
 
-func hashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
-	data, err := codec.Encode(obj)
-	if err != nil {
-		return "", err
+func findNewName(args []string, oldRc *api.ReplicationController) string {
+	if len(args) >= 2 {
+		return args[1]
 	}
-	return fmt.Sprintf("%x", md5.Sum(data)), nil
-}
-
-const MaxRetries = 3
-
-func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, client *client.Client, deploymentKey, namespace string, out io.Writer) (*api.ReplicationController, error) {
-	oldHash, err := hashObject(oldRc, client.Codec)
-	if err != nil {
-		return nil, err
+	if oldRc != nil {
+		newName, _ := kubectl.GetNextControllerAnnotation(oldRc)
+		return newName
 	}
-	// First, update the template label.  This ensures that any newly created pods will have the new label
-	if oldRc.Spec.Template.Labels == nil {
-		oldRc.Spec.Template.Labels = map[string]string{}
-	}
-	oldRc.Spec.Template.Labels[deploymentKey] = oldHash
-	if oldRc, err = client.ReplicationControllers(namespace).Update(oldRc); err != nil {
-		return nil, err
-	}
-
-	// Update all pods managed by the rc to have the new hash label, so they are correctly adopted
-	// TODO: extract the code from the label command and re-use it here.
-	podList, err := client.Pods(namespace).List(labels.SelectorFromSet(oldRc.Spec.Selector), fields.Everything())
-	if err != nil {
-		return nil, err
-	}
-	for ix := range podList.Items {
-		pod := &podList.Items[ix]
-		if pod.Labels == nil {
-			pod.Labels = map[string]string{
-				deploymentKey: oldHash,
-			}
-		} else {
-			pod.Labels[deploymentKey] = oldHash
-		}
-		err = nil
-		delay := 3
-		for i := 0; i < MaxRetries; i++ {
-			_, err = client.Pods(namespace).Update(pod)
-			if err != nil {
-				fmt.Fprint(out, "Error updating pod (%v), retrying after %d seconds", err, delay)
-				time.Sleep(time.Second * time.Duration(delay))
-				delay *= delay
-			} else {
-				break
-			}
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if oldRc.Spec.Selector == nil {
-		oldRc.Spec.Selector = map[string]string{}
-	}
-	// Copy the old selector, so that we can scrub out any orphaned pods
-	selectorCopy := map[string]string{}
-	for k, v := range oldRc.Spec.Selector {
-		selectorCopy[k] = v
-	}
-	oldRc.Spec.Selector[deploymentKey] = oldHash
-
-	// Update the selector of the rc so it manages all the pods we updated above
-	if oldRc, err = client.ReplicationControllers(namespace).Update(oldRc); err != nil {
-		return nil, err
-	}
-
-	// Clean up any orphaned pods that don't have the new label, this can happen if the rc manager
-	// doesn't see the update to its pod template and creates a new pod with the old labels after
-	// we've finished re-adopting existing pods to the rc.
-	podList, err = client.Pods(namespace).List(labels.SelectorFromSet(selectorCopy), fields.Everything())
-	for ix := range podList.Items {
-		pod := &podList.Items[ix]
-		if value, found := pod.Labels[deploymentKey]; !found || value != oldHash {
-			if err := client.Pods(namespace).Delete(pod.Name, nil); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	return oldRc, nil
+	return ""
 }

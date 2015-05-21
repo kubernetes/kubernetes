@@ -29,6 +29,11 @@ type Mock struct {
 
 var _ Interface = new(Mock)
 
+func (c *Mock) Start() error {
+	args := c.Called()
+	return args.Error(1)
+}
+
 // ContainerInfo is a mock implementation of Interface.ContainerInfo.
 func (c *Mock) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	args := c.Called(name, req)
@@ -58,6 +63,11 @@ func (c *Mock) VersionInfo() (*cadvisorApi.VersionInfo, error) {
 }
 
 func (c *Mock) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
+	args := c.Called()
+	return args.Get(0).(cadvisorApiV2.FsInfo), args.Error(1)
+}
+
+func (c *Mock) RootFsInfo() (cadvisorApiV2.FsInfo, error) {
 	args := c.Called()
 	return args.Get(0).(cadvisorApiV2.FsInfo), args.Error(1)
 }

@@ -1,28 +1,28 @@
-id: redis
+apiVersion: v1beta3
 kind: ReplicationController
-apiVersion: v1beta1
-desiredState:
+metadata:
+  name: redis
+spec:
   replicas: 1
-  replicaSelector:
+  selector:
     name: redis
-  podTemplate:
-    desiredState:
-      manifest:
-        version: v1beta1
-        id: redis
-        containers:
-          - name: redis
-            image: kubernetes/redis:v1
-            cpu: 1000
-            ports:
-              - containerPort: 6379
-            volumeMounts:
-              - name: data
-                mountPath: /redis-master-data
-        volumes:
-          - name: data
-            source:
-              emptyDir: {}
-    labels:
-      name: redis
+  template:
+    metadata:
+      labels:
+        name: redis
+    spec:
+      containers:
+      - name: redis
+        image: kubernetes/redis:v1
+        ports:
+        - containerPort: 6379
+        resources:
+          limits:
+            cpu: "1"
+        volumeMounts:
+        - mountPath: /redis-master-data
+          name: data
+      volumes:
+        - name: data
+          emptyDir: {}
 

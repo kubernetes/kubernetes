@@ -232,3 +232,6 @@ rabbitmq-controller-pjzb3   10.246.2.16         rabbitmq            library/rabb
 
 Now you know on which host Flower is running (in this case, 10.245.1.4), you can open your browser and enter the address (e.g. `http://10.245.1.4:5555`. If you click on the tab called "Tasks", you should see an ever-growing list of tasks called "celery_conf.add" which the run\_tasks.py script is dispatching.
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/celery-rabbitmq/README.md?pixel)]()

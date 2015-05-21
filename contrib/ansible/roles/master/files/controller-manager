@@ -3,5 +3,5 @@
 
 # defaults from config and apiserver should be adequate
 
-# Add you own!
+# Add your own!
 KUBE_CONTROLLER_MANAGER_ARGS=""

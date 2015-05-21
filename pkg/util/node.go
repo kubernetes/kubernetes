@@ -24,13 +24,13 @@ import (
 )
 
 func GetHostname(hostnameOverride string) string {
-	hostname := []byte(hostnameOverride)
+	hostname := hostnameOverride
 	if string(hostname) == "" {
-		fqdn, err := exec.Command("uname", "-n").Output()
+		nodename, err := exec.Command("uname", "-n").Output()
 		if err != nil {
 			glog.Fatalf("Couldn't determine hostname: %v", err)
 		}
-		hostname = fqdn
+		hostname = string(nodename)
 	}
-	return strings.ToLower(strings.TrimSpace(string(hostname)))
+	return strings.ToLower(strings.TrimSpace(hostname))
 }

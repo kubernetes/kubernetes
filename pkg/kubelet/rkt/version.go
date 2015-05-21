@@ -21,9 +21,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/golang/glog"
 )
 
 type rktVersion []int
@@ -76,35 +73,6 @@ func (r rktVersion) String() string {
 		version = append(version, fmt.Sprintf("%d", v))
 	}
 	return strings.Join(version, ".")
-}
-
-// Version invokes 'rkt version' to get the version information of the rkt
-// runtime on the machine.
-// The return values are an int array containers the version number.
-//
-// Example:
-// rkt:0.3.2+git --> []int{0, 3, 2}.
-//
-func (r *Runtime) Version() (kubecontainer.Version, error) {
-	output, err := r.runCommand("version")
-	if err != nil {
-		return nil, err
-	}
-
-	// Example output for 'rkt version':
-	// rkt version 0.3.2+git
-	// appc version 0.3.0+git
-	for _, line := range output {
-		tuples := strings.Split(strings.TrimSpace(line), " ")
-		if len(tuples) != 3 {
-			glog.Warningf("rkt: cannot parse the output: %q.", line)
-			continue
-		}
-		if tuples[0] == "rkt" {
-			return parseVersion(tuples[2])
-		}
-	}
-	return nil, fmt.Errorf("rkt: cannot determine the version")
 }
 
 type systemdVersion int

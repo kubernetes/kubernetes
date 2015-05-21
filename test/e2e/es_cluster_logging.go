@@ -134,7 +134,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	if !ok {
 		Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
 	}
-	if clusterName != "kubernetes_logging" {
+	if clusterName != "kubernetes-logging" {
 		Failf("Connected to wrong cluster %q (expecting kubernetes_logging)", clusterName)
 	}
 

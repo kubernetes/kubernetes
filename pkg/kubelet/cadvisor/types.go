@@ -24,6 +24,7 @@ import (
 
 // Interface is an abstract interface for testability.  It abstracts the interface to cAdvisor.
 type Interface interface {
+	Start() error
 	DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error)
 	ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	SubcontainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error)
@@ -33,6 +34,9 @@ type Interface interface {
 
 	// Returns usage information about the filesystem holding Docker images.
 	DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error)
+
+	// Returns usage information about the root filesystem.
+	RootFsInfo() (cadvisorApiV2.FsInfo, error)
 
 	// Get events streamed through passedChannel that fit the request.
 	WatchEvents(request *events.Request) (*events.EventChannel, error)

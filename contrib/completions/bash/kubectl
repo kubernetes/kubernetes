@@ -4,7 +4,7 @@
 __debug()
 {
     if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
-        echo "$*" >> ${BASH_COMP_DEBUG_FILE}
+        echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
     fi
 }
 
@@ -73,6 +73,13 @@ __handle_reply()
     if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
         declare -F __custom_func >/dev/null && __custom_func
     fi
+}
+
+# The arguments should be in the form "ext1|ext2|extn"
+__handle_filename_extension_flag()
+{
+    local ext="$1"
+    _filedir "@(${ext})"
 }
 
 __handle_flag()
@@ -150,14 +157,13 @@ __handle_word()
 }
 
 # call kubectl get $1,
-# use the first column in compgen
-# we could use templates, but then would need a template per resource
 __kubectl_parse_get()
 {
-    local kubectl_output out
-    if kubectl_output=$(kubectl get --no-headers "$1" 2>/dev/null); then
-        out=($(echo "${kubectl_output}" | awk '{print $1}'))
-        COMPREPLY=( $( compgen -W "${out[*]}" -- "$cur" ) )
+    local template
+    template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
+    local kubectl_out
+    if kubectl_out=$(kubectl get -o template --template="${template}" "$1" 2>/dev/null); then
+        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
 
@@ -167,16 +173,13 @@ __kubectl_get_resource()
         return 1
     fi
     __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
-    if [[ $? -eq 0 ]]; then
-        return 0
-    fi
 }
 
 # $1 is the name of the pod we want to get the list of containers inside
 __kubectl_get_containers()
 {
     local template
-    template="{{ range .desiredState.manifest.containers  }}{{ .name }} {{ end }}"
+    template="{{ range .spec.containers  }}{{ .name }} {{ end }}"
     __debug "${FUNCNAME} nouns are ${nouns[*]}"
 
     local len="${#nouns[@]}"
@@ -256,7 +259,7 @@ _kubectl_get()
     must_have_one_noun+=("resourcequota")
     must_have_one_noun+=("secret")
     must_have_one_noun+=("service")
-    must_have_one_noun+=("status")
+    must_have_one_noun+=("serviceaccount")
 }
 
 _kubectl_describe()
@@ -282,7 +285,9 @@ _kubectl_describe()
     must_have_one_noun+=("pod")
     must_have_one_noun+=("replicationcontroller")
     must_have_one_noun+=("resourcequota")
+    must_have_one_noun+=("secret")
     must_have_one_noun+=("service")
+    must_have_one_noun+=("serviceaccount")
 }
 
 _kubectl_create()
@@ -297,10 +302,10 @@ _kubectl_create()
 
     flags+=("--filename=")
     flags_with_completion+=("--filename")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     two_word_flags+=("-f")
     flags_with_completion+=("-f")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--help")
     flags+=("-h")
 
@@ -322,10 +327,10 @@ _kubectl_update()
 
     flags+=("--filename=")
     flags_with_completion+=("--filename")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     two_word_flags+=("-f")
     flags_with_completion+=("-f")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--help")
     flags+=("-h")
     flags+=("--patch=")
@@ -351,10 +356,10 @@ _kubectl_delete()
     flags+=("--cascade")
     flags+=("--filename=")
     flags_with_completion+=("--filename")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     two_word_flags+=("-f")
     flags_with_completion+=("-f")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--grace-period=")
     flags+=("--help")
     flags+=("-h")
@@ -397,6 +402,8 @@ _kubectl_log()
     flags+=("--help")
     flags+=("-h")
     flags+=("--interactive")
+    flags+=("--previous")
+    flags+=("-p")
 
     must_have_one_flag=()
     must_have_one_noun=()
@@ -424,6 +431,7 @@ _kubectl_rolling-update()
     two_word_flags+=("-o")
     flags+=("--output-version=")
     flags+=("--poll-interval=")
+    flags+=("--rollback")
     flags+=("--template=")
     two_word_flags+=("-t")
     flags+=("--timeout=")
@@ -575,10 +583,10 @@ _kubectl_stop()
     flags+=("--all")
     flags+=("--filename=")
     flags_with_completion+=("--filename")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     two_word_flags+=("-f")
     flags_with_completion+=("-f")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--grace-period=")
     flags+=("--help")
     flags+=("-h")
@@ -713,7 +721,6 @@ _kubectl_config_set-credentials()
     flags_with_completion=()
     flags_completion=()
 
-    flags+=("--auth-path=")
     flags+=("--client-certificate=")
     flags+=("--client-key=")
     flags+=("--embed-certs")
@@ -908,8 +915,6 @@ _kubectl()
 
     flags+=("--alsologtostderr")
     flags+=("--api-version=")
-    flags+=("--auth-path=")
-    two_word_flags+=("-a")
     flags+=("--certificate-authority=")
     flags+=("--client-certificate=")
     flags+=("--client-key=")
@@ -942,10 +947,9 @@ _kubectl()
 
 __start_kubectl()
 {
-    local cur prev words cword split
+    local cur prev words cword
     _init_completion -s || return
 
-    local completions_func
     local c=0
     local flags=()
     local two_word_flags=()

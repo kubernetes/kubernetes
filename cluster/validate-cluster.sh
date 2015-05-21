@@ -30,13 +30,23 @@ trap 'rm -rf "${MINIONS_FILE}"' EXIT
 # Make several attempts to deal with slow cluster birth.
 attempt=0
 while true; do
-  "${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o template -t $'{{range.items}}{{.metadata.name}}\n{{end}}' --api-version=v1beta3 > "${MINIONS_FILE}"
-  found=$(grep -c . "${MINIONS_FILE}") || true
-  if [[ ${found} == "${NUM_MINIONS}" ]]; then
+  # The "kubectl get nodes" output is three columns like this:
+  #
+  #     NAME                     LABELS    STATUS
+  #     kubernetes-minion-03nb   <none>    Ready
+  #
+  # Echo the output, strip the first line, then gather 2 counts:
+  #  - Total number of nodes.
+  #  - Number of "ready" nodes.
+  "${KUBE_ROOT}/cluster/kubectl.sh" get nodes > "${MINIONS_FILE}" || true
+  found=$(cat "${MINIONS_FILE}" | sed '1d' | grep -c .) || true
+  ready=$(cat "${MINIONS_FILE}" | sed '1d' | awk '{print $NF}' | grep -c '^Ready') || true
+
+  if (( ${found} == "${NUM_MINIONS}" )) && (( ${ready} == "${NUM_MINIONS}")); then
     break
   else
     if (( attempt > 5 )); then
-      echo -e "${color_red}Detected ${found} nodes out of ${NUM_MINIONS}. Your cluster may not be working. ${color_norm}"
+      echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${NUM_MINIONS}. Your cluster may not be working. ${color_norm}"
       cat -n "${MINIONS_FILE}"
       exit 2
     fi
@@ -57,13 +67,13 @@ while true; do
   #     controller-manager   Healthy   ok        nil
   #
   # Parse the output to capture the value of the second column("HEALTH"), then use grep to
-  # count the number of times it doesn't match "success".
-  # Because of the header, the actual unsuccessful count is 1 minus the count.
+  # count the number of times it doesn't match "Healthy".
   non_success_count=$(echo "${kubectl_output}" | \
+    sed '1d' |
     sed -n 's/^[[:alnum:][:punct:]]/&/p' | \
     grep --invert-match -c '^[[:alnum:][:punct:]]\{1,\}[[:space:]]\{1,\}Healthy') || true
 
-  if ((non_success_count > 1)); then
+  if ((non_success_count > 0)); then
     if ((attempt < 5)); then
       echo -e "${color_yellow}Cluster not working yet.${color_norm}"
       attempt=$((attempt+1))

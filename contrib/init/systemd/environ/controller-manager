@@ -6,5 +6,5 @@
 # Comma separated list of minions
 KUBELET_ADDRESSES="--machines=127.0.0.1"
 
-# Add you own!
+# Add your own!
 KUBE_CONTROLLER_MANAGER_ARGS=""

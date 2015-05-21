@@ -175,3 +175,6 @@ IPs.
 The early design of the networking model and its rationale, and some future
 plans are described in more detail in the [networking design
 document](design/networking.md).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/networking.md?pixel)]()

@@ -55,7 +55,7 @@ func expectElements(t *testing.T, actual []interface{}, expected []int) {
 }
 
 func TestAdd(t *testing.T) {
-	sb := NewTimedStore(5 * time.Second)
+	sb := NewTimedStore(5*time.Second, 100)
 
 	// Add 1.
 	sb.Add(createTime(0), 0)
@@ -84,7 +84,7 @@ func TestAdd(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	sb := NewTimedStore(5 * time.Second)
+	sb := NewTimedStore(5*time.Second, -1)
 	sb.Add(createTime(1), 1)
 	sb.Add(createTime(2), 2)
 	sb.Add(createTime(3), 3)
@@ -97,7 +97,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestInTimeRange(t *testing.T) {
-	sb := NewTimedStore(5 * time.Second)
+	sb := NewTimedStore(5*time.Second, -1)
 	assert := assert.New(t)
 
 	var empty time.Time
@@ -174,7 +174,7 @@ func TestInTimeRange(t *testing.T) {
 }
 
 func TestInTimeRangeWithLimit(t *testing.T) {
-	sb := NewTimedStore(5 * time.Second)
+	sb := NewTimedStore(5*time.Second, -1)
 	sb.Add(createTime(1), 1)
 	sb.Add(createTime(2), 2)
 	sb.Add(createTime(3), 3)
@@ -189,4 +189,33 @@ func TestInTimeRangeWithLimit(t *testing.T) {
 	expectElements(t, sb.InTimeRange(empty, empty, 2), []int{3, 4})
 	expectElements(t, sb.InTimeRange(empty, empty, 1), []int{4})
 	assert.Empty(t, sb.InTimeRange(empty, empty, 0))
+}
+
+func TestLimitedSize(t *testing.T) {
+	sb := NewTimedStore(time.Hour, 5)
+
+	// Add 1.
+	sb.Add(createTime(0), 0)
+	expectSize(t, sb, 1)
+	expectAllElements(t, sb, []int{0})
+
+	// Fill the buffer.
+	for i := 1; i <= 5; i++ {
+		expectSize(t, sb, i)
+		sb.Add(createTime(i), i)
+	}
+	expectSize(t, sb, 5)
+	expectAllElements(t, sb, []int{1, 2, 3, 4, 5})
+
+	// Add more than is available in the buffer
+	sb.Add(createTime(6), 6)
+	expectSize(t, sb, 5)
+	expectAllElements(t, sb, []int{2, 3, 4, 5, 6})
+
+	// Replace all elements.
+	for i := 7; i <= 10; i++ {
+		sb.Add(createTime(i), i)
+	}
+	expectSize(t, sb, 5)
+	expectAllElements(t, sb, []int{6, 7, 8, 9, 10})
 }

@@ -77,9 +77,9 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 type SyncPodType int
 
 const (
-	SyncPodCreate SyncPodType = iota
+	SyncPodSync SyncPodType = iota
 	SyncPodUpdate
-	SyncPodSync
+	SyncPodCreate
 )
 
 func (sp SyncPodType) String() string {

@@ -1,8 +1,0 @@
-apiVersion: v1beta3
-kind: Pod
-metadata:
-  name: www
-spec:
-  containers:
-    - name: nginx
-      image: nginx

@@ -68,6 +68,9 @@ type dockerContainerHandler struct {
 
 	// Time at which this container was created.
 	creationTime time.Time
+
+	// Metadata labels associated with the container.
+	labels map[string]string
 }
 
 func newDockerContainerHandler(
@@ -115,6 +118,7 @@ func newDockerContainerHandler(
 	// Add the name and bare ID as aliases of the container.
 	handler.aliases = append(handler.aliases, strings.TrimPrefix(ctnr.Name, "/"))
 	handler.aliases = append(handler.aliases, id)
+	handler.labels = ctnr.Config.Labels
 
 	return handler, nil
 }
@@ -184,6 +188,7 @@ func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	if self.usesAufsDriver {
 		spec.HasFilesystem = true
 	}
+	spec.Labels = self.labels
 
 	return spec, err
 }
@@ -320,8 +325,7 @@ func (self *dockerContainerHandler) ListThreads(listType container.ListType) ([]
 }
 
 func (self *dockerContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
-	// TODO(vmarmol): Implement.
-	return nil, nil
+	return containerLibcontainer.GetProcesses(self.cgroupManager)
 }
 
 func (self *dockerContainerHandler) WatchSubcontainers(events chan container.SubcontainerEvent) error {
@@ -335,4 +339,28 @@ func (self *dockerContainerHandler) StopWatchingSubcontainers() error {
 
 func (self *dockerContainerHandler) Exists() bool {
 	return containerLibcontainer.Exists(*dockerRootDir, *dockerRunDir, self.id)
+}
+
+func DockerInfo() (map[string]string, error) {
+	client, err := docker.NewClient(*ArgDockerEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("unable to communicate with docker daemon: %v", err)
+	}
+	info, err := client.Info()
+	if err != nil {
+		return nil, err
+	}
+	return info.Map(), nil
+}
+
+func DockerImages() ([]docker.APIImages, error) {
+	client, err := docker.NewClient(*ArgDockerEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("unable to communicate with docker daemon: %v", err)
+	}
+	images, err := client.ListImages(docker.ListImagesOptions{All: false})
+	if err != nil {
+		return nil, err
+	}
+	return images, nil
 }

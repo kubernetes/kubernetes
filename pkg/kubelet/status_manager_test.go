@@ -20,10 +20,13 @@ import (
 	"math/rand"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 var testPod *api.Pod = &api.Pod{
@@ -87,6 +90,32 @@ func TestNewStatus(t *testing.T) {
 	syncer := newTestStatusManager()
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	verifyUpdates(t, syncer, 1)
+
+	status, _ := syncer.GetPodStatus(kubecontainer.GetPodFullName(testPod))
+	if status.StartTime.IsZero() {
+		t.Errorf("SetPodStatus did not set a proper start time value")
+	}
+}
+
+func TestNewStatusPreservesPodStartTime(t *testing.T) {
+	syncer := newTestStatusManager()
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Status: api.PodStatus{},
+	}
+	now := util.Now()
+	startTime := util.NewTime(now.Time.Add(-1 * time.Minute))
+	pod.Status.StartTime = &startTime
+	syncer.SetPodStatus(pod, getRandomPodStatus())
+
+	status, _ := syncer.GetPodStatus(kubecontainer.GetPodFullName(pod))
+	if !status.StartTime.Time.Equal(startTime.Time) {
+		t.Errorf("Unexpected start time, expected %v, actual %v", startTime, status.StartTime)
+	}
 }
 
 func TestChangedStatus(t *testing.T) {
@@ -94,6 +123,23 @@ func TestChangedStatus(t *testing.T) {
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	verifyUpdates(t, syncer, 2)
+}
+
+func TestChangedStatusKeepsStartTime(t *testing.T) {
+	syncer := newTestStatusManager()
+	now := util.Now()
+	firstStatus := getRandomPodStatus()
+	firstStatus.StartTime = &now
+	syncer.SetPodStatus(testPod, firstStatus)
+	syncer.SetPodStatus(testPod, getRandomPodStatus())
+	verifyUpdates(t, syncer, 2)
+	finalStatus, _ := syncer.GetPodStatus(kubecontainer.GetPodFullName(testPod))
+	if finalStatus.StartTime.IsZero() {
+		t.Errorf("StartTime should not be zero")
+	}
+	if !finalStatus.StartTime.Time.Equal(now.Time) {
+		t.Errorf("Expected %v, but got %v", now.Time, finalStatus.StartTime.Time)
+	}
 }
 
 func TestUnchangedStatus(t *testing.T) {

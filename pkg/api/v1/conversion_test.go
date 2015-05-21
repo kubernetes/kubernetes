@@ -19,29 +19,29 @@ package v1_test
 import (
 	"testing"
 
-	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	versioned "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 )
 
 func TestNodeConversion(t *testing.T) {
-	obj, err := current.Codec.Decode([]byte(`{"kind":"Minion","apiVersion":"v1"}`))
+	obj, err := versioned.Codec.Decode([]byte(`{"kind":"Minion","apiVersion":"v1"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := obj.(*newer.Node); !ok {
+	if _, ok := obj.(*api.Node); !ok {
 		t.Errorf("unexpected type: %#v", obj)
 	}
 
-	obj, err = current.Codec.Decode([]byte(`{"kind":"MinionList","apiVersion":"v1"}`))
+	obj, err = versioned.Codec.Decode([]byte(`{"kind":"MinionList","apiVersion":"v1"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := obj.(*newer.NodeList); !ok {
+	if _, ok := obj.(*api.NodeList); !ok {
 		t.Errorf("unexpected type: %#v", obj)
 	}
 
-	obj = &newer.Node{}
-	if err := current.Codec.DecodeInto([]byte(`{"kind":"Minion","apiVersion":"v1"}`), obj); err != nil {
+	obj = &api.Node{}
+	if err := versioned.Codec.DecodeInto([]byte(`{"kind":"Minion","apiVersion":"v1"}`), obj); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -38,7 +38,7 @@ it is assumed that the rollout is nearly completed, and ```foo-next``` is rename
 ### Aborting a rollout
 Abort is assumed to want to reverse a rollout in progress.
 
-```kubectl rolling-update rc foo [foo-v2] --abort```
+```kubectl rolling-update rc foo [foo-v2] --rollback```
 
 This is really just semantic sugar for:
 
@@ -89,3 +89,6 @@ then ```foo-next``` is synthesized using the pattern ```<controller-name>-<hash-
    * Otherwise, ```foo-next``` and ```foo``` both exist
       * Set ```desired-replicas``` annotation on ```foo``` to match the annotation on ```foo-next```
       * Goto Rollout with ```foo``` and ```foo-next``` trading places.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/simple-rolling-update.md?pixel)]()
