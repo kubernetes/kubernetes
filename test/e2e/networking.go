@@ -133,7 +133,8 @@ var _ = Describe("Networking", func() {
 	})
 
 	//Now we can proceed with the test.
-	It("should function for intra-pod communication", func() {
+	It("should function for intra-pod communication", func(done Done) {
+		defer close(done)
 
 		if testContext.Provider == "vagrant" {
 			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
@@ -200,17 +201,12 @@ var _ = Describe("Networking", func() {
 
 		By("Waiting for connectivity to be verified")
 		const maxAttempts = 60
-		stopBy := time.Now().Add(2 * time.Minute)
 		passed := false
 
 		//once response OK, evaluate response body for pass/fail.
 		var body []byte
 
 		for i := 0; i < maxAttempts && !passed; i++ {
-			if time.Now().After(stopBy) {
-				Logf("Timeout exceeded")
-				break
-			}
 			time.Sleep(2 * time.Second)
 			Logf("About to make a proxy status call")
 			start := time.Now()
@@ -262,6 +258,6 @@ var _ = Describe("Networking", func() {
 			}
 		}
 		Expect(string(body)).To(Equal("pass"))
-	})
+	}, 120)
 
 })
