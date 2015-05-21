@@ -9,7 +9,7 @@ kube-controller-manager \- Enforces kubernetes services.
 
 # DESCRIPTION
 
-The **kubernetes** controller manager is really a service that is layered on top of the simple pod API. To enforce this layering, the logic for the replicationController is actually broken out into another server. This server watches etcd for changes to replicationController objects and then uses the public Kubernetes API to implement the replication algorithm.
+The **kubernetes** controller manager is really a service that is layered on top of the simple pod API. To enforce this layering, the logic for the replicationcontroller is actually broken out into another server. This server watches etcd for changes to replicationcontroller objects and then uses the public Kubernetes API to implement the replication algorithm.
 
 The kube-controller-manager has several options.
 
