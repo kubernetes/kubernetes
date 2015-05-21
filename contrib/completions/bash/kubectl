@@ -537,9 +537,9 @@ _kubectl_proxy()
     must_have_one_noun=()
 }
 
-_kubectl_run-container()
+_kubectl_run()
 {
-    last_command="kubectl_run-container"
+    last_command="kubectl_run"
     commands=()
 
     flags=()
@@ -901,7 +901,7 @@ _kubectl()
     commands+=("exec")
     commands+=("port-forward")
     commands+=("proxy")
-    commands+=("run-container")
+    commands+=("run")
     commands+=("stop")
     commands+=("expose")
     commands+=("label")

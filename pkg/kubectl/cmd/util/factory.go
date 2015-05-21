@@ -93,8 +93,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	generators := map[string]kubectl.Generator{
-		"run-container/v1": kubectl.BasicReplicationController{},
-		"service/v1":       kubectl.ServiceGenerator{},
+		"run/v1":     kubectl.BasicReplicationController{},
+		"service/v1": kubectl.ServiceGenerator{},
 	}
 
 	clientConfig := optionalClientConfig

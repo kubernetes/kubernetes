@@ -46,7 +46,7 @@ The `kubectl.sh` line below spins up two containers running
 [Nginx](http://nginx.org/en/) running on port 80:
 
 ```bash
-cluster/kubectl.sh run-container my-nginx --image=nginx --replicas=2 --port=80
+cluster/kubectl.sh run my-nginx --image=nginx --replicas=2 --port=80
 ```
 
 To stop the containers:

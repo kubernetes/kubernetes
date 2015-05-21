@@ -22,7 +22,7 @@ kubectl_port-forward.md
 kubectl_proxy.md
 kubectl_resize.md
 kubectl_rolling-update.md
-kubectl_run-container.md
+kubectl_run.md
 kubectl_stop.md
 kubectl_update.md
 kubectl_version.md

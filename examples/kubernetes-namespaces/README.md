@@ -184,7 +184,7 @@ At this point, all requests we make to the Kubernetes cluster from the command l
 Let's create some content.
 
 ```shell
-$ cluster/kubectl.sh run-container snowflake --image=kubernetes/serve_hostname --replicas=2
+$ cluster/kubectl.sh run snowflake --image=kubernetes/serve_hostname --replicas=2
 ```
 
 We have just created a replication controller whose replica size is 2 that is running the pod called snowflake with a basic container that just serves the hostname.
@@ -192,14 +192,14 @@ We have just created a replication controller whose replica size is 2 that is ru
 ```shell
 cluster/kubectl.sh get rc
 CONTROLLER          CONTAINER(S)        IMAGE(S)                    SELECTOR                  REPLICAS
-snowflake           snowflake           kubernetes/serve_hostname   run-container=snowflake   2
+snowflake           snowflake           kubernetes/serve_hostname   run=snowflake   2
 
 $ cluster/kubectl.sh get pods
 POD               IP           CONTAINER(S)   IMAGE(S)                    HOST                                   LABELS                    STATUS    CREATED         MESSAGE
-snowflake-mbrfi   10.244.2.4                                              kubernetes-minion-ilqx/104.197.8.214   run-container=snowflake   Running   About an hour   
-                               snowflake      kubernetes/serve_hostname                                                                    Running   About an hour   
-snowflake-p78ev   10.244.2.5                                              kubernetes-minion-ilqx/104.197.8.214   run-container=snowflake   Running   About an hour   
-                               snowflake      kubernetes/serve_hostname                                                                    Running   About an hour   
+snowflake-mbrfi   10.244.2.4                                              kubernetes-minion-ilqx/104.197.8.214   run=snowflake             Running   About an hour
+                               snowflake      kubernetes/serve_hostname                                                                    Running   About an hour
+snowflake-p78ev   10.244.2.5                                              kubernetes-minion-ilqx/104.197.8.214   run=snowflake             Running   About an hour
+                               snowflake      kubernetes/serve_hostname                                                                    Running   About an hour
 ```
 
 And this is great, developers are able to do what they want, and they do not have to worry about affecting content in the production namespace.
@@ -223,23 +223,23 @@ POD                 IP                  CONTAINER(S)        IMAGE(S)            
 Production likes to run cattle, so let's create some cattle pods.
 
 ```shell
-$ cluster/kubectl.sh run-container cattle --image=kubernetes/serve_hostname --replicas=5
+$ cluster/kubectl.sh run cattle --image=kubernetes/serve_hostname --replicas=5
 
 $ cluster/kubectl.sh get rc
 CONTROLLER          CONTAINER(S)        IMAGE(S)                    SELECTOR               REPLICAS
-cattle              cattle              kubernetes/serve_hostname   run-container=cattle   5
+cattle              cattle              kubernetes/serve_hostname   run=cattle             5
 
 $ cluster/kubectl.sh get pods
 POD            IP           CONTAINER(S)   IMAGE(S)                    HOST                                    LABELS                 STATUS    CREATED         MESSAGE
-cattle-1kyvj   10.244.0.4                                              kubernetes-minion-7s1y/23.236.54.97     run-container=cattle   Running   About an hour   
-                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour   
-cattle-kobrk   10.244.1.4                                              kubernetes-minion-cfs6/104.154.61.231   run-container=cattle   Running   About an hour   
-                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour   
-cattle-l1v9t   10.244.0.5                                              kubernetes-minion-7s1y/23.236.54.97     run-container=cattle   Running   About an hour   
-                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour   
-cattle-ne2sj   10.244.3.7                                              kubernetes-minion-x8gx/104.154.47.83    run-container=cattle   Running   About an hour   
-                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour   
-cattle-qrk4x   10.244.0.6                                              kubernetes-minion-7s1y/23.236.54.97     run-container=cattle   Running   About an hour   
+cattle-1kyvj   10.244.0.4                                              kubernetes-minion-7s1y/23.236.54.97     run=cattle             Running   About an hour
+                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour
+cattle-kobrk   10.244.1.4                                              kubernetes-minion-cfs6/104.154.61.231   run=cattle             Running   About an hour
+                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour
+cattle-l1v9t   10.244.0.5                                              kubernetes-minion-7s1y/23.236.54.97     run=cattle             Running   About an hour
+                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour
+cattle-ne2sj   10.244.3.7                                              kubernetes-minion-x8gx/104.154.47.83    run=cattle             Running   About an hour
+                            cattle         kubernetes/serve_hostname                                                                  Running   About an hour
+cattle-qrk4x   10.244.0.6                                              kubernetes-minion-7s1y/23.236.54.97     run=cattle             Running   About an hour
                             cattle         kubernetes/serve_hostname  
 ```
 

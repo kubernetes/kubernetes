@@ -173,8 +173,8 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Validator: validation.NullSchema{},
 	}
 	generators := map[string]kubectl.Generator{
-		"run-container/v1": kubectl.BasicReplicationController{},
-		"service/v1":       kubectl.ServiceGenerator{},
+		"run/v1":     kubectl.BasicReplicationController{},
+		"service/v1": kubectl.ServiceGenerator{},
 	}
 	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
@@ -245,7 +245,7 @@ func ExamplePrintReplicationController() {
 		Codec:  codec,
 		Client: nil,
 	}
-	cmd := NewCmdRunContainer(f, os.Stdout)
+	cmd := NewCmdRun(f, os.Stdout)
 	ctrl := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name:   "foo",

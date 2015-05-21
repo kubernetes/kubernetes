@@ -191,7 +191,7 @@ NAME   IMAGE(S   SELECTOR   REPLICAS
 Start a container running nginx with a replication controller and three replicas
 
 ```
-$ cluster/kubectl.sh run-container my-nginx --image=nginx --replicas=3 --port=80
+$ cluster/kubectl.sh run my-nginx --image=nginx --replicas=3 --port=80
 ```
 
 When listing the pods, you will see that three containers have been started and are in Waiting state:
