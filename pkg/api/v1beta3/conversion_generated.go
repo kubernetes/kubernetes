@@ -1413,6 +1413,58 @@ func convert_api_ListOptions_To_v1beta3_ListOptions(in *api.ListOptions, out *Li
 	return nil
 }
 
+func convert_v1beta3_LoadBalancerIngress_To_api_LoadBalancerIngress(in *LoadBalancerIngress, out *api.LoadBalancerIngress, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LoadBalancerIngress))(in)
+	}
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func convert_api_LoadBalancerIngress_To_v1beta3_LoadBalancerIngress(in *api.LoadBalancerIngress, out *LoadBalancerIngress, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.LoadBalancerIngress))(in)
+	}
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func convert_v1beta3_LoadBalancerStatus_To_api_LoadBalancerStatus(in *LoadBalancerStatus, out *api.LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LoadBalancerStatus))(in)
+	}
+	if in.Ingress != nil {
+		out.Ingress = make([]api.LoadBalancerIngress, len(in.Ingress))
+		for i := range in.Ingress {
+			if err := convert_v1beta3_LoadBalancerIngress_To_api_LoadBalancerIngress(&in.Ingress[i], &out.Ingress[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
+	}
+	return nil
+}
+
+func convert_api_LoadBalancerStatus_To_v1beta3_LoadBalancerStatus(in *api.LoadBalancerStatus, out *LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.LoadBalancerStatus))(in)
+	}
+	if in.Ingress != nil {
+		out.Ingress = make([]LoadBalancerIngress, len(in.Ingress))
+		for i := range in.Ingress {
+			if err := convert_api_LoadBalancerIngress_To_v1beta3_LoadBalancerIngress(&in.Ingress[i], &out.Ingress[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
+	}
+	return nil
+}
+
 func convert_v1beta3_LocalObjectReference_To_api_LocalObjectReference(in *LocalObjectReference, out *api.LocalObjectReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*LocalObjectReference))(in)
@@ -3859,6 +3911,7 @@ func convert_v1beta3_ServicePort_To_api_ServicePort(in *ServicePort, out *api.Se
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
+	out.NodePort = in.NodePort
 	return nil
 }
 
@@ -3872,78 +3925,7 @@ func convert_api_ServicePort_To_v1beta3_ServicePort(in *api.ServicePort, out *Se
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
-	return nil
-}
-
-func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ServiceSpec))(in)
-	}
-	if in.Ports != nil {
-		out.Ports = make([]api.ServicePort, len(in.Ports))
-		for i := range in.Ports {
-			if err := convert_v1beta3_ServicePort_To_api_ServicePort(&in.Ports[i], &out.Ports[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Ports = nil
-	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	out.PortalIP = in.PortalIP
-	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
-		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
-		}
-	} else {
-		out.PublicIPs = nil
-	}
-	out.SessionAffinity = api.ServiceAffinity(in.SessionAffinity)
-	return nil
-}
-
-func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.ServiceSpec))(in)
-	}
-	if in.Ports != nil {
-		out.Ports = make([]ServicePort, len(in.Ports))
-		for i := range in.Ports {
-			if err := convert_api_ServicePort_To_v1beta3_ServicePort(&in.Ports[i], &out.Ports[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Ports = nil
-	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	out.PortalIP = in.PortalIP
-	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
-		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
-		}
-	} else {
-		out.PublicIPs = nil
-	}
-	out.SessionAffinity = ServiceAffinity(in.SessionAffinity)
+	out.NodePort = in.NodePort
 	return nil
 }
 
@@ -3951,12 +3933,18 @@ func convert_v1beta3_ServiceStatus_To_api_ServiceStatus(in *ServiceStatus, out *
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceStatus))(in)
 	}
+	if err := convert_v1beta3_LoadBalancerStatus_To_api_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func convert_api_ServiceStatus_To_v1beta3_ServiceStatus(in *api.ServiceStatus, out *ServiceStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ServiceStatus))(in)
+	}
+	if err := convert_api_LoadBalancerStatus_To_v1beta3_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -4367,6 +4355,8 @@ func init() {
 		convert_api_ListMeta_To_v1beta3_ListMeta,
 		convert_api_ListOptions_To_v1beta3_ListOptions,
 		convert_api_List_To_v1beta3_List,
+		convert_api_LoadBalancerIngress_To_v1beta3_LoadBalancerIngress,
+		convert_api_LoadBalancerStatus_To_v1beta3_LoadBalancerStatus,
 		convert_api_LocalObjectReference_To_v1beta3_LocalObjectReference,
 		convert_api_NFSVolumeSource_To_v1beta3_NFSVolumeSource,
 		convert_api_NamespaceList_To_v1beta3_NamespaceList,
@@ -4426,7 +4416,6 @@ func init() {
 		convert_api_ServiceAccount_To_v1beta3_ServiceAccount,
 		convert_api_ServiceList_To_v1beta3_ServiceList,
 		convert_api_ServicePort_To_v1beta3_ServicePort,
-		convert_api_ServiceSpec_To_v1beta3_ServiceSpec,
 		convert_api_ServiceStatus_To_v1beta3_ServiceStatus,
 		convert_api_Service_To_v1beta3_Service,
 		convert_api_StatusCause_To_v1beta3_StatusCause,
@@ -4477,6 +4466,8 @@ func init() {
 		convert_v1beta3_ListMeta_To_api_ListMeta,
 		convert_v1beta3_ListOptions_To_api_ListOptions,
 		convert_v1beta3_List_To_api_List,
+		convert_v1beta3_LoadBalancerIngress_To_api_LoadBalancerIngress,
+		convert_v1beta3_LoadBalancerStatus_To_api_LoadBalancerStatus,
 		convert_v1beta3_LocalObjectReference_To_api_LocalObjectReference,
 		convert_v1beta3_NFSVolumeSource_To_api_NFSVolumeSource,
 		convert_v1beta3_NamespaceList_To_api_NamespaceList,
@@ -4536,7 +4527,6 @@ func init() {
 		convert_v1beta3_ServiceAccount_To_api_ServiceAccount,
 		convert_v1beta3_ServiceList_To_api_ServiceList,
 		convert_v1beta3_ServicePort_To_api_ServicePort,
-		convert_v1beta3_ServiceSpec_To_api_ServiceSpec,
 		convert_v1beta3_ServiceStatus_To_api_ServiceStatus,
 		convert_v1beta3_Service_To_api_Service,
 		convert_v1beta3_StatusCause_To_api_StatusCause,

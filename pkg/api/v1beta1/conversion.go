@@ -774,18 +774,27 @@ func addConversionFuncs() {
 					Port:          in.Spec.Ports[i].Port,
 					Protocol:      Protocol(in.Spec.Ports[i].Protocol),
 					ContainerPort: in.Spec.Ports[i].TargetPort,
+					NodePort:      in.Spec.Ports[i].NodePort,
 				})
 			}
 
 			if err := s.Convert(&in.Spec.Selector, &out.Selector, 0); err != nil {
 				return err
 			}
-			out.CreateExternalLoadBalancer = in.Spec.CreateExternalLoadBalancer
-			out.PublicIPs = in.Spec.PublicIPs
+			out.PublicIPs = in.Spec.DeprecatedPublicIPs
 			out.PortalIP = in.Spec.PortalIP
 			if err := s.Convert(&in.Spec.SessionAffinity, &out.SessionAffinity, 0); err != nil {
 				return err
 			}
+
+			if err := s.Convert(&in.Status.LoadBalancer, &out.LoadBalancerStatus, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.Spec.Type, &out.Type, 0); err != nil {
+				return err
+			}
+			out.CreateExternalLoadBalancer = in.Spec.Type == api.ServiceTypeLoadBalancer
 
 			return nil
 		},
@@ -816,6 +825,7 @@ func addConversionFuncs() {
 						Port:       in.Ports[i].Port,
 						Protocol:   api.Protocol(in.Ports[i].Protocol),
 						TargetPort: in.Ports[i].ContainerPort,
+						NodePort:   in.Ports[i].NodePort,
 					})
 				}
 			}
@@ -823,10 +833,25 @@ func addConversionFuncs() {
 			if err := s.Convert(&in.Selector, &out.Spec.Selector, 0); err != nil {
 				return err
 			}
-			out.Spec.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-			out.Spec.PublicIPs = in.PublicIPs
+			out.Spec.DeprecatedPublicIPs = in.PublicIPs
 			out.Spec.PortalIP = in.PortalIP
 			if err := s.Convert(&in.SessionAffinity, &out.Spec.SessionAffinity, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.LoadBalancerStatus, &out.Status.LoadBalancer, 0); err != nil {
+				return err
+			}
+
+			typeIn := in.Type
+			if typeIn == "" {
+				if in.CreateExternalLoadBalancer {
+					typeIn = ServiceTypeLoadBalancer
+				} else {
+					typeIn = ServiceTypeClusterIP
+				}
+			}
+			if err := s.Convert(&typeIn, &out.Spec.Type, 0); err != nil {
 				return err
 			}
 

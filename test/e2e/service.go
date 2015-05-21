@@ -29,6 +29,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -253,7 +255,7 @@ var _ = Describe("Services", func() {
 
 	It("should be able to create a functioning external load balancer", func() {
 		if !providerIs("gce", "gke") {
-			By(fmt.Sprintf("Skipping service external load balancer test; uses createExternalLoadBalancer, a (gce|gke) feature"))
+			By(fmt.Sprintf("Skipping service external load balancer test; uses ServiceTypeLoadBalancer, a (gce|gke) feature"))
 			return
 		}
 
@@ -272,7 +274,7 @@ var _ = Describe("Services", func() {
 					Port:       80,
 					TargetPort: util.NewIntOrStringFromInt(80),
 				}},
-				CreateExternalLoadBalancer: true,
+				Type: api.ServiceTypeLoadBalancer,
 			},
 		}
 
@@ -289,10 +291,14 @@ var _ = Describe("Services", func() {
 		// currently indicated by a public IP address being added to the spec.
 		result, err = waitForPublicIPs(c, serviceName, ns)
 		Expect(err).NotTo(HaveOccurred())
-		if len(result.Spec.PublicIPs) != 1 {
-			Failf("got unexpected number (%d) of public IPs for externally load balanced service: %v", result.Spec.PublicIPs, result)
+		if len(result.Status.LoadBalancer.Ingress) != 1 {
+			Failf("got unexpected number (%v) of ingress points for externally load balanced service: %v", result.Status.LoadBalancer.Ingress, result)
 		}
-		ip := result.Spec.PublicIPs[0]
+		ingress := result.Status.LoadBalancer.Ingress[0]
+		ip := ingress.IP
+		if ip == "" {
+			ip = ingress.Hostname
+		}
 		port := result.Spec.Ports[0].Port
 
 		pod := &api.Pod{
@@ -347,9 +353,106 @@ var _ = Describe("Services", func() {
 		}
 	})
 
+	It("should be able to create a functioning NodePort service", func() {
+		serviceName := "nodeportservice-test"
+		ns := namespaces[0]
+		labels := map[string]string{
+			"testid": "nodeportservice-test",
+		}
+		service := &api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name: serviceName,
+			},
+			Spec: api.ServiceSpec{
+				Selector: labels,
+				Ports: []api.ServicePort{{
+					Port:       80,
+					TargetPort: util.NewIntOrStringFromInt(80),
+				}},
+				Type: api.ServiceTypeNodePort,
+			},
+		}
+
+		By("creating service " + serviceName + " with visibility=NodePort in namespace " + ns)
+		result, err := c.Services(ns).Create(service)
+		Expect(err).NotTo(HaveOccurred())
+		defer func(ns, serviceName string) { // clean up when we're done
+			By("deleting service " + serviceName + " in namespace " + ns)
+			err := c.Services(ns).Delete(serviceName)
+			Expect(err).NotTo(HaveOccurred())
+		}(ns, serviceName)
+
+		if len(result.Spec.Ports) != 1 {
+			Failf("got unexpected number (%d) of Ports for NodePort service: %v", len(result.Spec.Ports), result)
+		}
+
+		nodePort := result.Spec.Ports[0].NodePort
+		if nodePort == 0 {
+			Failf("got unexpected nodePort (%d) on Ports[0] for NodePort service: %v", nodePort, result)
+		}
+
+		publicIps, err := getMinionPublicIps(c)
+		Expect(err).NotTo(HaveOccurred())
+		if len(publicIps) == 0 {
+			Failf("got unexpected number (%d) of public IPs", len(publicIps))
+		}
+		ip := publicIps[0]
+
+		pod := &api.Pod{
+			TypeMeta: api.TypeMeta{
+				Kind:       "Pod",
+				APIVersion: latest.Version,
+			},
+			ObjectMeta: api.ObjectMeta{
+				Name:   "publicservice-test-" + string(util.NewUUID()),
+				Labels: labels,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "webserver",
+						Image: "gcr.io/google_containers/test-webserver",
+					},
+				},
+			},
+		}
+
+		By("creating pod to be part of service " + serviceName)
+		podClient := c.Pods(ns)
+		defer func() {
+			By("deleting pod " + pod.Name)
+			defer GinkgoRecover()
+			podClient.Delete(pod.Name, nil)
+		}()
+		if _, err := podClient.Create(pod); err != nil {
+			Failf("Failed to create pod %s: %v", pod.Name, err)
+		}
+		expectNoError(waitForPodRunningInNamespace(c, pod.Name, ns))
+
+		By("hitting the pod through the service's external IPs")
+		var resp *http.Response
+		for t := time.Now(); time.Since(t) < podStartTimeout; time.Sleep(5 * time.Second) {
+			resp, err = http.Get(fmt.Sprintf("http://%s:%d", ip, nodePort))
+			if err == nil {
+				break
+			}
+		}
+		Expect(err).NotTo(HaveOccurred())
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		Expect(err).NotTo(HaveOccurred())
+		if resp.StatusCode != 200 {
+			Failf("received non-success return status %q trying to access pod through public port; got body: %s", resp.Status, string(body))
+		}
+		if !strings.Contains(string(body), "test-webserver") {
+			Failf("received response body without expected substring 'test-webserver': %s", string(body))
+		}
+	})
+
 	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
 		if !providerIs("gce", "gke") {
-			By(fmt.Sprintf("Skipping service namespace collision test; uses createExternalLoadBalancer, a (gce|gke) feature"))
+			By(fmt.Sprintf("Skipping service namespace collision test; uses ServiceTypeLoadBalancer, a (gce|gke) feature"))
 			return
 		}
 
@@ -366,11 +469,11 @@ var _ = Describe("Services", func() {
 					Port:       80,
 					TargetPort: util.NewIntOrStringFromInt(80),
 				}},
-				CreateExternalLoadBalancer: true,
+				Type: api.ServiceTypeLoadBalancer,
 			},
 		}
 
-		publicIPs := []string{}
+		ingressPoints := []string{}
 		for _, namespace := range namespaces {
 			for _, serviceName := range serviceNames {
 				service.ObjectMeta.Name = serviceName
@@ -389,10 +492,16 @@ var _ = Describe("Services", func() {
 			for _, serviceName := range serviceNames {
 				result, err := waitForPublicIPs(c, serviceName, namespace)
 				Expect(err).NotTo(HaveOccurred())
-				publicIPs = append(publicIPs, result.Spec.PublicIPs...) // Save 'em to check uniqueness
+				for i := range result.Status.LoadBalancer.Ingress {
+					ingress := result.Status.LoadBalancer.Ingress[i].IP
+					if ingress == "" {
+						ingress = result.Status.LoadBalancer.Ingress[i].Hostname
+					}
+					ingressPoints = append(ingressPoints, ingress) // Save 'em to check uniqueness
+				}
 			}
 		}
-		validateUniqueOrFail(publicIPs)
+		validateUniqueOrFail(ingressPoints)
 	})
 })
 
@@ -406,12 +515,12 @@ func waitForPublicIPs(c *client.Client, serviceName, namespace string) (*api.Ser
 			Logf("Get service failed, ignoring for 5s: %v", err)
 			continue
 		}
-		if len(service.Spec.PublicIPs) > 0 {
+		if len(service.Status.LoadBalancer.Ingress) > 0 {
 			return service, nil
 		}
-		Logf("Waiting for service %s in namespace %s to have a public IP (%v)", serviceName, namespace, time.Since(start))
+		Logf("Waiting for service %s in namespace %s to have an ingress point (%v)", serviceName, namespace, time.Since(start))
 	}
-	return service, fmt.Errorf("service %s in namespace %s doesn't have a public IP after %.2f seconds", serviceName, namespace, timeout.Seconds())
+	return service, fmt.Errorf("service %s in namespace %s doesn't have an ingress point after %.2f seconds", serviceName, namespace, timeout.Seconds())
 }
 
 func validateUniqueOrFail(s []string) {
@@ -523,4 +632,31 @@ func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]s
 	}
 	_, err := c.Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
+}
+
+func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []string {
+	ips := []string{}
+	for i := range nodes.Items {
+		item := &nodes.Items[i]
+		for j := range item.Status.Addresses {
+			nodeAddress := &item.Status.Addresses[j]
+			if nodeAddress.Type == addressType {
+				ips = append(ips, nodeAddress.Address)
+			}
+		}
+	}
+	return ips
+}
+
+func getMinionPublicIps(c *client.Client) ([]string, error) {
+	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	ips := collectAddresses(nodes, api.NodeExternalIP)
+	if len(ips) == 0 {
+		ips = collectAddresses(nodes, api.NodeLegacyHostIP)
+	}
+	return ips, nil
 }
