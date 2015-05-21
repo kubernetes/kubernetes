@@ -99,4 +99,16 @@ else
 fi
 echo "${reset}"
 
+echo -ne "Checking for conversions that need updating... "
+if ! hack/verify-generated-conversions.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Some conversions functions need regeneration."
+  echo "To regenerate conversions, run:"
+  echo "  hack/update-generated-conversions.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
 exit $exit_code
