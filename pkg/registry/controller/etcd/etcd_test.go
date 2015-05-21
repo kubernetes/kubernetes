@@ -722,7 +722,7 @@ func TestDelete(t *testing.T) {
 		// If the controller is still around after trying to delete either the delete
 		// failed, or we're deleting it gracefully.
 		if fakeClient.Data[key].R.Node != nil {
-			return true
+			return fakeClient.Data[key].R.Node.TTL != 0
 		}
 		return false
 	}

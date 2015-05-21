@@ -131,6 +131,10 @@ type ObjectMeta struct {
 	// will send a hard termination signal to the container.
 	DeletionTimestamp *util.Time `json:"deletionTimestamp,omitempty" description:"RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"`
 
+	// DeletionGracePeriodSeconds records the graceful deletion value set when graceful deletion
+	// was requested. Represents the most recent grace period, and may only be shortened once set.
+	DeletionGracePeriodSeconds *int64 `json:"deletionGracePeriodSeconds,omitempty" description:"number of seconds allowed for this object to gracefully terminate before it will be removed from the system; only set when deletionTimestamp is also set, read-only; may only be shortened"`
+
 	// Labels are key value pairs that may be used to scope and select individual resources.
 	// TODO: replace map[string]string with labels.LabelSet type
 	Labels map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"`
@@ -838,6 +842,8 @@ const (
 	// DNSDefault indicates that the pod should use the default (as
 	// determined by kubelet) DNS settings.
 	DNSDefault DNSPolicy = "Default"
+
+	DefaultTerminationGracePeriodSeconds = 30
 )
 
 // PodSpec is a description of a pod
@@ -852,7 +858,7 @@ type PodSpec struct {
 	// The grace period is the duration in seconds after the processes running in the pod are sent
 	// a termination signal and the time when the processes are forcibly halted with a kill signal.
 	// Set this value longer than the expected cleanup time for your process.
-	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" description:"optional duration in seconds the pod needs to terminate gracefully; may be decreased in delete request; value must be non-negative integer; the value zero indicates delete immediately; if this value is not set, the default grace period will be used instead; the grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal; set this value longer than the expected cleanup time for your process"`
+	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" description:"optional duration in seconds the pod needs to terminate gracefully; may be decreased in delete request; value must be non-negative integer; the value zero indicates delete immediately; if this value is not set, the default grace period will be used instead; the grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal; set this value longer than the expected cleanup time for your process; defaults to 30 seconds"`
 	ActiveDeadlineSeconds         *int64 `json:"activeDeadlineSeconds,omitempty" description:"optional duration in seconds the pod may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers; value must be a positive integer`
 	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
