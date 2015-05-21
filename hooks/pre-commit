@@ -92,7 +92,7 @@ if ! hack/verify-gendocs.sh > /dev/null; then
   echo "${red}ERROR!"
   echo "Some docs are out of sync between CLI and markdown."
   echo "To regenerate docs, run:"
-  echo "  hack/run-gendocs.sh > docs/kubectl.md"
+  echo "  hack/run-gendocs.sh"
   exit_code=1
 else
   echo "${green}OK"
