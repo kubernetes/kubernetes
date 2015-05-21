@@ -75,7 +75,24 @@ function setClusterInfo() {
 
 # Verify ssh prereqs
 function verify-prereqs {
-   # Expect at least one identity to be available.
+  local rc
+
+  rc=0
+  ssh-add -L 1> /dev/null 2> /dev/null || rc="$?"
+  # "Could not open a connection to your authentication agent."
+  if [[ "${rc}" -eq 2 ]]; then
+    eval "$(ssh-agent)" > /dev/null
+    trap-add "kill ${SSH_AGENT_PID}" EXIT
+  fi
+
+  rc=0
+  ssh-add -L 1> /dev/null 2> /dev/null || rc="$?"
+  # "The agent has no identities."
+  if [[ "${rc}" -eq 1 ]]; then
+    # Try adding one of the default identities, with or without passphrase.
+    ssh-add || true
+  fi 
+  # Expect at least one identity to be available.
   if ! ssh-add -L 1> /dev/null 2> /dev/null; then
     echo "Could not find or add an SSH identity."
     echo "Please start ssh-agent, add your identity, and retry."
