@@ -845,9 +845,9 @@ type Service struct {
 	// An external load balancer should be set up via the cloud-provider
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`
 
-	// PublicIPs are used by external load balancers, or can be set by
+	// Deprecated. PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
-	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs (e.g. load balancers) that should be proxied to this service"`
+	PublicIPs []string `json:"publicIPs,omitempty" description:"deprecated. externally visible IPs (e.g. load balancers) that should be proxied to this service"`
 
 	// PortalIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can

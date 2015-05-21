@@ -105,7 +105,7 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 		service.Spec.CreateExternalLoadBalancer = true
 	}
 	if len(params["public-ip"]) != 0 {
-		service.Spec.PublicIPs = []string{params["public-ip"]}
+		service.Spec.DeprecatedPublicIPs = []string{params["public-ip"]}
 	}
 	return &service, nil
 }

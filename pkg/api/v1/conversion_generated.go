@@ -4085,13 +4085,13 @@ func convert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.Service
 	}
 	out.PortalIP = in.PortalIP
 	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
-		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
+	if in.DeprecatedPublicIPs != nil {
+		out.DeprecatedPublicIPs = make([]string, len(in.DeprecatedPublicIPs))
+		for i := range in.DeprecatedPublicIPs {
+			out.DeprecatedPublicIPs[i] = in.DeprecatedPublicIPs[i]
 		}
 	} else {
-		out.PublicIPs = nil
+		out.DeprecatedPublicIPs = nil
 	}
 	out.SessionAffinity = api.ServiceAffinity(in.SessionAffinity)
 	return nil
@@ -4121,13 +4121,13 @@ func convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *Service
 	}
 	out.PortalIP = in.PortalIP
 	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
-		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
+	if in.DeprecatedPublicIPs != nil {
+		out.DeprecatedPublicIPs = make([]string, len(in.DeprecatedPublicIPs))
+		for i := range in.DeprecatedPublicIPs {
+			out.DeprecatedPublicIPs[i] = in.DeprecatedPublicIPs[i]
 		}
 	} else {
-		out.PublicIPs = nil
+		out.DeprecatedPublicIPs = nil
 	}
 	out.SessionAffinity = ServiceAffinity(in.SessionAffinity)
 	return nil

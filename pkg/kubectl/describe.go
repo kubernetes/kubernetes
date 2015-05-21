@@ -489,8 +489,8 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
 		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.PortalIP)
-		if len(service.Spec.PublicIPs) > 0 {
-			list := strings.Join(service.Spec.PublicIPs, ", ")
+		if len(service.Spec.DeprecatedPublicIPs) > 0 {
+			list := strings.Join(service.Spec.DeprecatedPublicIPs, ", ")
 			fmt.Fprintf(out, "Public IPs:\t%s\n", list)
 		}
 		for i := range service.Spec.Ports {

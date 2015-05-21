@@ -781,7 +781,7 @@ func addConversionFuncs() {
 				return err
 			}
 			out.CreateExternalLoadBalancer = in.Spec.CreateExternalLoadBalancer
-			out.PublicIPs = in.Spec.PublicIPs
+			out.PublicIPs = in.Spec.DeprecatedPublicIPs
 			out.PortalIP = in.Spec.PortalIP
 			if err := s.Convert(&in.Spec.SessionAffinity, &out.SessionAffinity, 0); err != nil {
 				return err
@@ -824,7 +824,7 @@ func addConversionFuncs() {
 				return err
 			}
 			out.Spec.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-			out.Spec.PublicIPs = in.PublicIPs
+			out.Spec.DeprecatedPublicIPs = in.PublicIPs
 			out.Spec.PortalIP = in.PortalIP
 			if err := s.Convert(&in.SessionAffinity, &out.Spec.SessionAffinity, 0); err != nil {
 				return err
