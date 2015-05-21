@@ -207,9 +207,12 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 
 	// recycled volumes can be made available again to new claims
 	case api.VolumeRecycled:
-		if volume.Spec.ClaimRef == nil {
-			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
-		} else {
+		// this phase will get processed twice:
+		// 1. on phase change to VolumeRecycled by some process external to this binder
+		//      remove pv.Spec.ClaimRef
+		// 2. on bind removal
+		//      advance to next phase
+		if volume.Spec.ClaimRef != nil {
 			// this is the last bind between persistent volume and claim.
 			// The claim has already been deleted by the user at this point
 			oldClaimRef := volume.Spec.ClaimRef
@@ -220,11 +223,12 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 				volume.Spec.ClaimRef = oldClaimRef
 				return fmt.Errorf("Unexpected error saving PersistentVolume: %+v", err)
 			}
+		} else {
 			// send the newly recycled volume back through the top of the processing loop
 			nextPhase = api.VolumePending
 		}
 
-		// recycled volumes can be made available again to new claims
+	// volumes are removed by processes external to this binder and must be removed from the cluster
 	case api.VolumeDeleted:
 		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume)
@@ -242,6 +246,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 
 		// a change in state will trigger another update through this controller.
 		// each pass through this controller evaluates current phase and decides whether or not to change to the next phase
+		glog.V(5).Infof("PersistentVolume[%s] changing phase from %s to %s\n", volume.Name, currentPhase, nextPhase)
 		volume, err := binderClient.UpdatePersistentVolumeStatus(volume)
 		if err != nil {
 			// Rollback to previous phase
