@@ -685,22 +685,23 @@ func validateProbe(probe *api.Probe) errs.ValidationErrorList {
 	return allErrs
 }
 
-// AccumulateUniquePorts runs an extraction function on each Port of each Container,
+// AccumulateUniqueHostPorts extracts each HostPort of each Container,
 // accumulating the results and returning an error if any ports conflict.
-func AccumulateUniquePorts(containers []api.Container, accumulator map[int]bool, extract func(*api.ContainerPort) int) errs.ValidationErrorList {
+func AccumulateUniqueHostPorts(containers []api.Container, accumulator *util.StringSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	for ci, ctr := range containers {
 		cErrs := errs.ValidationErrorList{}
 		for pi := range ctr.Ports {
-			port := extract(&ctr.Ports[pi])
+			port := ctr.Ports[pi].HostPort
 			if port == 0 {
 				continue
 			}
-			if accumulator[port] {
-				cErrs = append(cErrs, errs.NewFieldDuplicate("port", port))
+			str := fmt.Sprintf("%d/%s", port, ctr.Ports[pi].Protocol)
+			if accumulator.Has(str) {
+				cErrs = append(cErrs, errs.NewFieldDuplicate("port", str))
 			} else {
-				accumulator[port] = true
+				accumulator.Insert(str)
 			}
 		}
 		allErrs = append(allErrs, cErrs.PrefixIndex(ci)...)
@@ -711,8 +712,8 @@ func AccumulateUniquePorts(containers []api.Container, accumulator map[int]bool,
 // checkHostPortConflicts checks for colliding Port.HostPort values across
 // a slice of containers.
 func checkHostPortConflicts(containers []api.Container) errs.ValidationErrorList {
-	allPorts := map[int]bool{}
-	return AccumulateUniquePorts(containers, allPorts, func(p *api.ContainerPort) int { return p.HostPort })
+	allPorts := util.StringSet{}
+	return AccumulateUniqueHostPorts(containers, &allPorts)
 }
 
 func validateExecAction(exec *api.ExecAction) errs.ValidationErrorList {
@@ -829,10 +830,6 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		allErrs = append(allErrs, cErrs.PrefixIndex(i)...)
 	}
 	// Check for colliding ports across all containers.
-	// TODO(thockin): This really is dependent on the network config of the host (IP per pod?)
-	// and the config of the new manifest.  But we have not specced that out yet, so we'll just
-	// make some assumptions for now.  As of now, pods share a network namespace, which means that
-	// every Port.HostPort across the whole pod must be unique.
 	allErrs = append(allErrs, checkHostPortConflicts(containers)...)
 
 	return allErrs
