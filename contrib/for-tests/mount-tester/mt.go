@@ -22,13 +22,16 @@ import (
 	"io/ioutil"
 	"os"
 	"syscall"
+
+	"github.com/GoogleCloudPlatform/kubernetes/test/e2e"
 )
 
 var (
-	fsTypePath           = ""
-	fileModePath         = ""
-	readFileContentPath  = ""
-	readWriteNewFilePath = ""
+	fsTypePath                = ""
+	fileModePath              = ""
+	readFileContentPath       = ""
+	readWriteNewFilePath      = ""
+	readFileInLoopContentPath = ""
 )
 
 func init() {
@@ -36,6 +39,7 @@ func init() {
 	flag.StringVar(&fileModePath, "file_mode", "", "Path to print the filemode of")
 	flag.StringVar(&readFileContentPath, "file_content", "", "Path to read the file content from")
 	flag.StringVar(&readWriteNewFilePath, "rw_new_file", "", "Path to write to and read from")
+	flag.StringVar(&readFileInLoopContentPath, "file_content_in_loop", "", "Path to read the file content in loop from")
 }
 
 // This program performs some tests on the filesystem as dictated by the
@@ -64,6 +68,11 @@ func main() {
 	}
 
 	err = readFileContent(readFileContentPath)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	err = readFileContentInLoop(readFileInLoopContentPath)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -142,4 +151,17 @@ func readWriteNewFile(path string) error {
 	}
 
 	return readFileContent(path)
+}
+
+func readFileContentInLoop(path string) error {
+	if path == "" {
+		return nil
+	}
+	var content []byte
+	//Expected content "mount-tester new file\n", length (22), retry during 240 second
+	content, _ = e2e.TestFileContent(path, 22, 240)
+
+	fmt.Printf("content of file %q: %v\n", path, string(content))
+
+	return nil
 }

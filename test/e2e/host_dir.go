@@ -28,9 +28,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("emptyDir", func() {
+var _ = Describe("HostDir", func() {
 	var (
-		c         *client.Client
+		c         *client.Client = nil
 		namespace *api.Namespace
 	)
 
@@ -40,8 +40,9 @@ var _ = Describe("emptyDir", func() {
 		expectNoError(err)
 
 		By("Building a namespace api object")
-		namespace, err = createTestingNS("empty-dir-test", c)
+		namespace, err = createTestingNS("hostdir-test", c)
 		Expect(err).NotTo(HaveOccurred())
+
 	})
 
 	AfterEach(func() {
@@ -49,52 +50,36 @@ var _ = Describe("emptyDir", func() {
 		if err := c.Namespaces().Delete(namespace.Name); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
-
 	})
 
-	It("volume on tmpfs should have the correct mode", func() {
-		volumePath := "/test-volume"
-		source := &api.EmptyDirVolumeSource{
-			Medium: api.StorageMediumMemory,
-		}
-		pod := testPodWithVolume(volumePath, source)
+	It("should support r/w", func() {
+		volumePath := "/home"
 
-		pod.Spec.Containers[0].Args = []string{
-			fmt.Sprintf("--fs_type=%v", volumePath),
-			fmt.Sprintf("--file_mode=%v", volumePath),
+		source := &api.HostPathVolumeSource{
+			Path: "/home",
 		}
-		testContainerOutputInNamespace("emptydir r/w on tmpfs", c, pod, 0, []string{
-			"mount type of \"/test-volume\": tmpfs",
-			"mode of file \"/test-volume\": dtrwxrwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
+		containerfilePath := path.Join(source.Path, "hostdir-test-file")
+
+		pod := testPodWithHostVolume(volumePath, source)
+		pod.Spec.Containers[0].Args = []string{
+			fmt.Sprintf("--rw_new_file=%v", containerfilePath),
+		}
+		pod.Spec.Containers[1].Args = []string{
+			fmt.Sprintf("--file_content_in_loop=%v", containerfilePath),
+		}
+		testContainerOutputInNamespace("hostdir support r/w", c, pod, 1, []string{
+			"content of file \"/home/hostdir-test-file\": mount-tester new file",
 		}, namespace.Name)
 	})
 
-	It("should support r/w on tmpfs", func() {
-		volumePath := "/test-volume"
-		filePath := path.Join(volumePath, "test-file")
-		source := &api.EmptyDirVolumeSource{
-			Medium: api.StorageMediumMemory,
-		}
-		pod := testPodWithVolume(volumePath, source)
-
-		pod.Spec.Containers[0].Args = []string{
-			fmt.Sprintf("--fs_type=%v", volumePath),
-			fmt.Sprintf("--rw_new_file=%v", filePath),
-			fmt.Sprintf("--file_mode=%v", filePath),
-		}
-		testContainerOutputInNamespace("emptydir r/w on tmpfs", c, pod, 0, []string{
-			"mount type of \"/test-volume\": tmpfs",
-			"mode of file \"/test-volume/test-file\": -rw-r--r--",
-			"content of file \"/test-volume/test-file\": mount-tester new file",
-		}, namespace.Name)
-	})
 })
 
-const containerName = "test-container"
-const volumeName = "test-volume"
+const containerName1 = "test-container-1"
+const containerName2 = "test-container-2"
+const hostdirvolumeName = "test-volume"
 
-func testPodWithVolume(path string, source *api.EmptyDirVolumeSource) *api.Pod {
-	podName := "pod-empty-dir-test"
+func testPodWithHostVolume(path string, source *api.HostPathVolumeSource) *api.Pod {
+	podName := "pod-host-dir-test"
 
 	return &api.Pod{
 		TypeMeta: api.TypeMeta{
@@ -107,11 +92,21 @@ func testPodWithVolume(path string, source *api.EmptyDirVolumeSource) *api.Pod {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:  containerName,
+					Name:  containerName1,
 					Image: "kubernetes/mounttest:0.1",
 					VolumeMounts: []api.VolumeMount{
 						{
-							Name:      volumeName,
+							Name:      hostdirvolumeName,
+							MountPath: path,
+						},
+					},
+				},
+				{
+					Name:  containerName2,
+					Image: "kubernetes/mounttest:0.1",
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      hostdirvolumeName,
 							MountPath: path,
 						},
 					},
@@ -119,9 +114,9 @@ func testPodWithVolume(path string, source *api.EmptyDirVolumeSource) *api.Pod {
 			},
 			Volumes: []api.Volume{
 				{
-					Name: volumeName,
+					Name: hostdirvolumeName,
 					VolumeSource: api.VolumeSource{
-						EmptyDir: source,
+						HostPath: source,
 					},
 				},
 			},

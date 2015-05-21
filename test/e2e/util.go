@@ -40,6 +40,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	"golang.org/x/crypto/ssh"
 
@@ -437,14 +438,14 @@ func runKubectl(args ...string) string {
 }
 
 // testContainerOutput runs testContainerOutputInNamespace with the default namespace.
-func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string) {
-	testContainerOutputInNamespace(scenarioName, c, pod, expectedOutput, api.NamespaceDefault)
+func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, containerId int, expectedOutput []string) {
+	testContainerOutputInNamespace(scenarioName, c, pod, containerId, expectedOutput, api.NamespaceDefault)
 }
 
 // testContainerOutputInNamespace runs the given pod in the given namespace and waits
 // for the first container in the podSpec to move into the 'Success' status.  It retrieves
 // the container log and searches for lines of expected output.
-func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string, ns string) {
+func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, containerId int, expectedOutput []string, ns string) {
 	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
 
 	defer c.Pods(ns).Delete(pod.Name, nil)
@@ -452,10 +453,14 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 		Failf("Failed to create pod: %v", err)
 	}
 
-	containerName := pod.Spec.Containers[0].Name
-
 	// Wait for client pod to complete.
-	expectNoError(waitForPodSuccessInNamespace(c, pod.Name, containerName, ns))
+	var containerName string
+	for id, container := range pod.Spec.Containers {
+		expectNoError(waitForPodSuccessInNamespace(c, pod.Name, container.Name, ns))
+		if id == containerId {
+			containerName = container.Name
+		}
+	}
 
 	// Grab its logs.  Get host first.
 	podStatus, err := c.Pods(ns).Get(pod.Name)
@@ -1023,4 +1028,31 @@ func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResou
 	}
 
 	return len(badMetrics), nil
+}
+
+func TestFileContent(filePath string, bytesExpected int, retryDuration int) ([]byte, error) {
+	var (
+		contentBytes []byte
+		err          error
+	)
+
+	expectNoError(wait.Poll(time.Second*2, time.Second*time.Duration(retryDuration), func() (bool, error) {
+		contentBytes, err = ioutil.ReadFile(filePath)
+		if err == nil {
+			if len(contentBytes) == bytesExpected {
+				return true, nil
+			} else {
+				Logf("Unexpected length of file: found %d, expected %d", len(contentBytes), bytesExpected)
+			}
+
+		} else {
+			Logf("Error read file %s: %v", filePath, err)
+		}
+		return false, nil
+	}))
+	if err != nil {
+		return nil, err
+	}
+	return contentBytes, nil
+
 }

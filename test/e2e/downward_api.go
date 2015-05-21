@@ -88,7 +88,7 @@ var _ = Describe("Downward API", func() {
 			},
 		}
 
-		testContainerOutputInNamespace("downward api env vars", c, pod, []string{
+		testContainerOutputInNamespace("downward api env vars", c, pod, 0, []string{
 			fmt.Sprintf("POD_NAME=%v", podName),
 			fmt.Sprintf("POD_NAMESPACE=%v", ns),
 		}, ns)
