@@ -214,9 +214,19 @@ func TestHammerController(t *testing.T) {
 		},
 	)
 
+	if controller.HasSynced() {
+		t.Errorf("Expected HasSynced() to return false before we started the controller")
+	}
+
 	// Run the controller and run it until we close stop.
 	stop := make(chan struct{})
 	go controller.Run(stop)
+
+	// Let's wait for the controller to do its initial sync
+	time.Sleep(100 * time.Millisecond)
+	if !controller.HasSynced() {
+		t.Errorf("Expected HasSynced() to return true after the initial sync")
+	}
 
 	wg := sync.WaitGroup{}
 	const threads = 3
