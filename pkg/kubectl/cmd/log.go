@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -29,13 +30,13 @@ import (
 
 const (
 	log_example = `// Returns snapshot of ruby-container logs from pod 123456-7890.
-$ kubectl log 123456-7890 ruby-container
+$ kubectl logs 123456-7890 ruby-container
 
 // Returns snapshot of previous terminated ruby-container logs from pod 123456-7890.
-$ kubectl log -p 123456-7890 ruby-container
+$ kubectl logs -p 123456-7890 ruby-container
 
 // Starts streaming of ruby-container logs from pod 123456-7890.
-$ kubectl log -f 123456-7890 ruby-container`
+$ kubectl logs -f 123456-7890 ruby-container`
 )
 
 func selectContainer(pod *api.Pod, in io.Reader, out io.Writer) string {
@@ -63,7 +64,7 @@ func selectContainer(pod *api.Pod, in io.Reader, out io.Writer) string {
 // NewCmdLog creates a new pod log command
 func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "log [-f] [-p] POD [CONTAINER]",
+		Use:     "logs [-f] [-p] POD [CONTAINER]",
 		Short:   "Print the logs for a container in a pod.",
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Example: log_example,
@@ -71,6 +72,7 @@ func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunLog(f, out, cmd, args)
 			cmdutil.CheckErr(err)
 		},
+		Aliases: []string{"log"},
 	}
 	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
 	cmd.Flags().Bool("interactive", true, "If true, prompt the user for input when required. Default true.")
@@ -80,6 +82,10 @@ func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 // RunLog retrieves a pod log
 func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+	if len(os.Args) > 1 && os.Args[1] == "log" {
+		printDeprecationWarning("logs", "log")
+	}
+
 	if len(args) == 0 {
 		return cmdutil.UsageError(cmd, "POD is required for log")
 	}

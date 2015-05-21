@@ -388,9 +388,9 @@ _kubectl_namespace()
     must_have_one_noun=()
 }
 
-_kubectl_log()
+_kubectl_logs()
 {
-    last_command="kubectl_log"
+    last_command="kubectl_logs"
     commands=()
 
     flags=()
@@ -895,7 +895,7 @@ _kubectl()
     commands+=("update")
     commands+=("delete")
     commands+=("namespace")
-    commands+=("log")
+    commands+=("logs")
     commands+=("rolling-update")
     commands+=("resize")
     commands+=("exec")
