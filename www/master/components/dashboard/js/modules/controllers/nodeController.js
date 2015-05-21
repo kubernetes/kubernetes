@@ -7,7 +7,7 @@ app.controller('NodeCtrl', [
   '$scope',
   '$interval',
   '$routeParams',
-  'k8sApi',
+  'k8sv1Beta3Api',
   '$rootScope',
   function($scope, $interval, $routeParams, k8sApi, $rootScope) {
     'use strict';
