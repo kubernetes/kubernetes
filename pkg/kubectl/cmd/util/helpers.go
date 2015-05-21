@@ -146,9 +146,13 @@ func messageForError(err error) string {
 }
 
 // fatal prints the message and then exits. If V(2) or greater, glog.Fatal
-// is invoked for extended information. The provided msg should end in a
-// newline.
+// is invoked for extended information.
 func fatal(msg string) {
+	// add newline if needed
+	if !strings.HasSuffix(msg, "\n") {
+		msg += "\n"
+	}
+
 	if glog.V(2) {
 		glog.FatalDepth(2, msg)
 	}
