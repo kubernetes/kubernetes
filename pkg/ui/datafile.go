@@ -1592,7 +1592,7 @@ func www_app_assets_css_app_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37661, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37661, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1630,7 +1630,7 @@ func www_app_assets_img_ic_arrow_drop_down_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1432326234, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1432747345, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1672,7 +1672,7 @@ func www_app_assets_img_ic_arrow_drop_up_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_up_24px.svg", size: 795, mode: os.FileMode(420), modTime: time.Unix(1432326234, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_up_24px.svg", size: 795, mode: os.FileMode(420), modTime: time.Unix(1432747345, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1689,7 +1689,7 @@ func www_app_assets_img_ic_keyboard_arrow_left_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_left_24px.svg", size: 151, mode: os.FileMode(420), modTime: time.Unix(1432326234, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_left_24px.svg", size: 151, mode: os.FileMode(420), modTime: time.Unix(1432747345, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1706,7 +1706,7 @@ func www_app_assets_img_ic_keyboard_arrow_right_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_right_24px.svg", size: 149, mode: os.FileMode(420), modTime: time.Unix(1432326234, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_right_24px.svg", size: 149, mode: os.FileMode(420), modTime: time.Unix(1432747345, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2777,6 +2777,453 @@ app.provider('k8sv1Beta3Api',
  * Module: toggle-state.js
  * Services to share toggle state functionality
  =========================================================*/
+(function() {
+  'use strict';
+
+  angular.module('kubernetesApp.components.dashboard')
+      .directive('d3MinionBarGauge', [
+        'd3DashboardService',
+        function(d3DashboardService) {
+
+          return {
+            restrict: 'E',
+            scope: {
+              data: '=',
+              thickness: '@',
+              graphWidth: '@',
+              graphHeight: '@'
+
+            },
+            link: function(scope, element, attrs) {
+
+              var draw = function(d3) {
+                var svg = d3.select("svg.chart");
+                var legendSvg = d3.select("svg.legend");
+                window.onresize = function() { return scope.$apply(); };
+
+                scope.$watch(function() { return angular.element(window)[0].innerWidth; },
+                             function() { return scope.render(scope.data); });
+
+                scope.$watch('data', function(newVals, oldVals) {
+                  return initOrUpdate(newVals, oldVals);
+
+                }, true);
+
+                function initOrUpdate(newVals, oldVals) {
+                  if (oldVals === null || oldVals === undefined) {
+                    return scope.render(newVals);
+                  } else {
+                    return update(oldVals, newVals);
+                  }
+                }
+
+                var textOffset = 10;
+                var el = null;
+                var radius = 100;
+                var oldData = [];
+
+                function init(options) {
+                  var clone = options.data;
+                  var preparedData = setData(clone);
+                  setup(preparedData, options.width, options.height);
+                }
+
+                function setup(data, w, h) {
+                  svg = d3.select(element[0]).append("svg").attr("width", "100%");
+
+                  legendSvg = d3.select(element[0]).append("svg").attr("width", "100%");
+
+                  var chart = svg.attr("class", "chart")
+                                  .attr("width", w)
+                                  .attr("height", h - 25)
+                                  .append("svg:g")
+                                  .attr("class", "concentricchart")
+                                  .attr("transform", "translate(" + ((w / 2)) + "," + h / 4 + ")");
+
+                  var legend = legendSvg.attr("class", "legend").attr("width", w);
+
+                  radius = Math.min(w, h) / 2;
+
+                  var hostName = legendSvg.append("text")
+                                     .attr("class", "hostName")
+                                     .attr("transform", "translate(" + ((w - 120) / 2) + "," + 15 + ")");
+
+                  var label_legend_area = legendSvg.append("svg:g")
+                                              .attr("class", "label_legend_area")
+                                              .attr("transform", "translate(" + ((w - 185) / 2) + "," + 35 + ")");
+
+                  var legend_group = label_legend_area.append("svg:g").attr("class", "legend_group");
+
+                  var label_group = label_legend_area.append("svg:g")
+                                        .attr("class", "label_group")
+                                        .attr("transform", "translate(" + 25 + "," + 11 + ")");
+
+                  var stats_group = label_legend_area.append("svg:g")
+                                        .attr("class", "stats_group")
+                                        .attr("transform", "translate(" + 85 + "," + 11 + ")");
+
+                  var path_group = chart.append("svg:g")
+                                       .attr("class", "path_group")
+                                       .attr("transform", "translate(0," + (h / 4) + ")");
+                  var value_group = chart.append("svg:g")
+                                        .attr("class", "value_group")
+                                        .attr("transform", "translate(" + -(w * 0.205) + "," + -(h * 0.10) + ")");
+                  generateArcs(chart, data);
+                }
+
+                function update(_oldData, _newData) {
+                  if (_newData === undefined || _newData === null) {
+                    return;
+                  }
+
+                  var clone = jQuery.extend(true, {}, _newData);
+                  var cloneOld = jQuery.extend(true, {}, _oldData);
+                  var preparedData = setData(clone);
+                  oldData = setData(cloneOld);
+                  animate(preparedData);
+                }
+
+                function animate(data) { generateArcs(null, data); }
+
+                function setData(data) {
+                  var diameter = 2 * Math.PI * radius;
+                  var localData = [];
+
+                  $.each(data[0].segments, function(ri, value) {
+
+                    function calcAngles(v) {
+                      var segmentValueSum = 200;
+                      if (v > segmentValueSum) {
+                        v = segmentValueSum;
+                      }
+
+                      var segmentValue = v;
+                      var fraction = segmentValue / segmentValueSum;
+                      var arcBatchLength = fraction * 4 * Math.PI;
+                      var arcPartition = arcBatchLength;
+                      var startAngle = Math.PI * 2;
+                      var endAngle = startAngle + arcPartition;
+
+                      return {
+                        startAngle: startAngle,
+                        endAngle: endAngle
+                      };
+                    }
+
+                    var valueData = calcAngles(value.value);
+                    data[0].segments[ri].startAngle = valueData.startAngle;
+                    data[0].segments[ri].endAngle = valueData.endAngle;
+
+                    var maxData = value.maxData;
+                    var maxTickData = calcAngles(maxData.maxValue + 0.2);
+                    data[0].segments[ri].maxTickStartAngle = maxTickData.startAngle;
+                    data[0].segments[ri].maxTickEndAngle = maxTickData.endAngle;
+
+                    var maxArcData = calcAngles(maxData.maxValue);
+                    data[0].segments[ri].maxArcStartAngle = maxArcData.startAngle;
+                    data[0].segments[ri].maxArcEndAngle = maxArcData.endAngle;
+
+                    data[0].segments[ri].index = ri;
+                  });
+                  localData.push(data[0].segments);
+                  return localData[0];
+                }
+
+                function generateArcs(_svg, data) {
+                  var chart = svg;
+                  var transitionTime = 750;
+                  $.each(data, function(index, value) {
+                    if (oldData[index] !== undefined) {
+                      data[index].previousEndAngle = oldData[index].endAngle;
+                    } else {
+                      data[index].previousEndAngle = 0;
+                    }
+                  });
+                  var thickness = parseInt(scope.thickness, 10);
+                  var ir = (parseInt(scope.graphWidth, 10) / 3);
+                  var path_group = svg.select('.path_group');
+                  var arc_group = path_group.selectAll(".arc_group").data(data);
+                  var arcEnter = arc_group.enter().append("g").attr("class", "arc_group");
+
+                  arcEnter.append("path").attr("class", "bg-circle").attr("d", getBackgroundArc(thickness, ir));
+
+                  arcEnter.append("path")
+                      .attr("class", function(d, i) { return 'max_tick_arc ' + d.maxData.maxTickClassNames; });
+
+                  arcEnter.append("path")
+                      .attr("class", function(d, i) { return 'max_bg_arc ' + d.maxData.maxClassNames; });
+
+                  arcEnter.append("path").attr("class", function(d, i) { return 'value_arc ' + d.classNames; });
+
+                  var max_tick_arc = arc_group.select(".max_tick_arc");
+
+                  max_tick_arc.transition()
+                      .attr("class", function(d, i) { return 'max_tick_arc ' + d.maxData.maxTickClassNames; })
+                      .attr("d", function(d) {
+                        var arc = maxArc(thickness, ir);
+                        arc.startAngle(d.maxTickStartAngle);
+                        arc.endAngle(d.maxTickEndAngle);
+                        return arc(d);
+                      });
+
+                  var max_bg_arc = arc_group.select(".max_bg_arc");
+
+                  max_bg_arc.transition()
+                      .attr("class", function(d, i) { return 'max_bg_arc ' + d.maxData.maxClassNames; })
+                      .attr("d", function(d) {
+                        var arc = maxArc(thickness, ir);
+                        arc.startAngle(d.maxArcStartAngle);
+                        arc.endAngle(d.maxArcEndAngle);
+                        return arc(d);
+                      });
+
+                  var value_arc = arc_group.select(".value_arc");
+
+                  value_arc.transition().ease("exp").attr("class", function(d, i) {
+                    return 'value_arc ' + d.classNames;
+                  }).duration(transitionTime).attrTween("d", function(d) { return arcTween(d, thickness, ir); });
+
+                  arc_group.exit()
+                      .select(".value_arc")
+                      .transition()
+                      .ease("exp")
+                      .duration(transitionTime)
+                      .attrTween("d", function(d) { return arcTween(d, thickness, ir); })
+                      .remove();
+
+                  drawLabels(chart, data, ir, thickness);
+                  buildLegend(chart, data);
+                }
+
+                function arcTween(b, thickness, ir) {
+                  var prev = JSON.parse(JSON.stringify(b));
+                  prev.endAngle = b.previousEndAngle;
+                  var i = d3.interpolate(prev, b);
+                  return function(t) { return getArc(thickness, ir)(i(t)); };
+                }
+
+                function maxArc(thickness, ir) {
+                  var arc = d3.svg.arc().innerRadius(function(d) {
+                    return getRadiusRing(ir, d.index);
+                  }).outerRadius(function(d) { return getRadiusRing(ir + thickness, d.index); });
+                  return arc;
+                }
+
+                function drawLabels(chart, data, ir, thickness) {
+                  svg.select('.value_group').selectAll("*").remove();
+                  var counts = data.length;
+                  var value_group = chart.select('.value_group');
+                  var valueLabels = value_group.selectAll("text.value").data(data);
+                  valueLabels.enter()
+                      .append("svg:text")
+                      .attr("class", "value")
+                      .attr(
+                           "transform", function(d) { return "translate(" + (getRadiusRing(ir, counts - 1)) + ", 0)"; })
+                      .attr("dx", function(d, i) { return 0; })
+                      .attr("dy", function(d, i) { return (thickness + 3) * i; })
+                      .attr("text-anchor", function(d) { return "start"; })
+                      .text(function(d) { return d.value; });
+                  valueLabels.transition().duration(300).attrTween(
+                      "d", function(d) { return arcTween(d, thickness, ir); });
+                  valueLabels.exit().remove();
+                }
+
+                function buildLegend(chart, data) {
+                  var svg = legendSvg;
+                  svg.select('.label_group').selectAll("*").remove();
+                  svg.select('.legend_group').selectAll("*").remove();
+                  svg.select('.stats_group').selectAll("*").remove();
+
+                  var host_name = svg.select('.hostName');
+                  var label_group = svg.select('.label_group');
+                  var stats_group = svg.select('.stats_group');
+
+                  host_name.text(data[0].hostName);
+
+                  host_name = svg.selectAll("text.hostName").data(data);
+
+                  host_name.attr("text-anchor", function(d) { return "start"; })
+                      .text(function(d) { return d.hostName; });
+                  host_name.exit().remove();
+
+                  var labels = label_group.selectAll("text.labels").data(data);
+                  labels.enter()
+                      .append("svg:text")
+                      .attr("class", "labels")
+                      .attr("dy", function(d, i) { return 19 * i; })
+                      .attr("text-anchor", function(d) { return "start"; })
+                      .text(function(d) { return d.label; });
+                  labels.exit().remove();
+
+                  var stats = stats_group.selectAll("text.stats").data(data);
+                  stats.enter()
+                      .append("svg:text")
+                      .attr("class", "stats")
+                      .attr("dy", function(d, i) { return 19 * i; })
+                      .attr("text-anchor", function(d) { return "start"; })
+                      .text(function(d) { return d.stats; });
+                  stats.exit().remove();
+
+                  var legend_group = svg.select('.legend_group');
+                  var legend = legend_group.selectAll("rect").data(data);
+                  legend.enter()
+                      .append("svg:rect")
+                      .attr("x", 2)
+                      .attr("y", function(d, i) { return 19 * i; })
+                      .attr("width", 13)
+                      .attr("height", 13)
+                      .attr("class", function(d, i) { return "rect " + d.classNames; });
+
+                  legend.exit().remove();
+                }
+
+                function getRadiusRing(ir, i) { return ir - (i * 20); }
+
+                function getArc(thickness, ir) {
+                  var arc = d3.svg.arc()
+                                .innerRadius(function(d) { return getRadiusRing(ir, d.index); })
+                                .outerRadius(function(d) { return getRadiusRing(ir + thickness, d.index); })
+                                .startAngle(function(d, i) { return d.startAngle; })
+                                .endAngle(function(d, i) { return d.endAngle; });
+                  return arc;
+                }
+
+                function getBackgroundArc(thickness, ir) {
+                  var arc = d3.svg.arc()
+                                .innerRadius(function(d) { return getRadiusRing(ir, d.index); })
+                                .outerRadius(function(d) { return getRadiusRing(ir + thickness, d.index); })
+                                .startAngle(0)
+                                .endAngle(function() { return 2 * Math.PI; });
+                  return arc;
+                }
+
+                scope.render = function(data) {
+                  if (data === undefined || data === null) {
+                    return;
+                  }
+
+                  svg.selectAll("*").remove();
+
+                  var graph = $(element[0]);
+                  var w = scope.graphWidth;
+                  var h = scope.graphHeight;
+
+                  var options = {
+                    data: data,
+                    width: w,
+                    height: h
+                  };
+
+                  init(options);
+                };
+              };
+              d3DashboardService.d3().then(draw);
+            }
+          };
+        }
+      ]);
+}());
+
+(function() {
+  'use strict';
+
+  angular.module('kubernetesApp.components.dashboard')
+      .directive(
+           'dashboardHeader',
+           function() {
+             'use strict';
+             return {
+               restrict: 'A',
+               replace: true,
+               scope: {user: '='},
+               templateUrl: "components/dashboard/pages/header.html",
+               controller: [
+                 '$scope',
+                 '$filter',
+                 '$location',
+                 'menu',
+                 '$rootScope',
+                 function($scope, $filter, $location, menu, $rootScope) {
+                  $scope.menu = menu;
+                   $scope.$watch('page', function(newValue, oldValue) {
+                     if (typeof newValue !== 'undefined') {
+                       $location.path(newValue);
+                     }
+                   });
+
+                   $scope.subpages = [
+                     {
+                       category: 'dashboard',
+                       name: 'Explore',
+                       value: '/dashboard/groups/type/selector/',
+                       id: 'groupsView'
+                     },
+                     {category: 'dashboard', name: 'Pods', value: '/dashboard/pods', id: 'podsView'},
+                     {category: 'dashboard', name: 'Nodes', value: '/dashboard/nodes', id: 'minionsView'},
+                     {
+                       category: 'dashboard',
+                       name: 'Replication Controllers',
+                       value: '/dashboard/replicationcontrollers',
+                       id: 'rcView'
+                     },
+                     {category: 'dashboard', name: 'Services', value: '/dashboard/services', id: 'servicesView'},
+                     {category: 'dashboard', name: 'Events', value: '/dashboard/events', id: 'eventsView'},
+                   ];
+                 }
+               ]
+             };
+           })
+      .directive('dashboardFooter',
+                 function() {
+                   'use strict';
+                   return {
+                     restrict: 'A',
+                     replace: true,
+                     templateUrl: "components/dashboard/pages/footer.html",
+                     controller: ['$scope', '$filter', function($scope, $filter) {}]
+                   };
+                 })
+      .directive('mdTable', function() {
+        'use strict';
+        return {
+          restrict: 'E',
+          scope: {
+            headers: '=',
+            content: '=',
+            sortable: '=',
+            filters: '=',
+            customClass: '=customClass',
+            thumbs: '=',
+            count: '=',
+            doSelect: '&onSelect'
+          },
+          transclude: true,
+          controller: ["$scope", "$filter", "$window", "$location", function($scope, $filter, $window, $location) {
+            var orderBy = $filter('orderBy');
+            $scope.currentPage = 0;
+            $scope.nbOfPages = function() { return Math.ceil($scope.content.length / $scope.count); };
+            $scope.handleSort = function(field) {
+              if ($scope.sortable.indexOf(field) > -1) {
+                return true;
+              } else {
+                return false;
+              }
+            };
+            $scope.order = function(predicate, reverse) {
+              $scope.content = orderBy($scope.content, predicate, reverse);
+              $scope.predicate = predicate;
+            };
+            $scope.order($scope.sortable[0], false);
+            $scope.getNumber = function(num) { return new Array(num); };
+            $scope.goToPage = function(page) { $scope.currentPage = page; };
+            $scope.showMore = function() { return angular.isDefined($scope.moreClick);}
+          }],
+          templateUrl: 'views/partials/md-table.tmpl.html'
+        };
+      });
+
+}());
+
 
 
 app.controller('cAdvisorController', [
@@ -2983,7 +3430,7 @@ app.controller('GroupCtrl', [
   '$route',
   '$interval',
   '$routeParams',
-  'k8sApi',
+  'k8sv1Beta3Api',
   '$rootScope',
   '$location',
   'lodash',
@@ -3080,7 +3527,7 @@ app.controller('GroupCtrl', [
         k8sApi.getPods(query).success(function(data) {
           $scope.addLabel("type", "pod", data.items);
           for (var i = 0; data.items && i < data.items.length; ++i) {
-            data.items[i].labels.host = data.items[i].currentState.host;
+            data.items[i].metadata.labels.host = data.items[i].spec.host;
             list.push(data.items[i]);
           }
           barrier();
@@ -3111,10 +3558,10 @@ app.controller('GroupCtrl', [
         return;
       }
       for (var i = 0; i < items.length; i++) {
-        if (!items[i].labels) {
-          items[i].labels = [];
+        if (!items[i].metadata.labels) {
+          items[i].metadata.labels = [];
         }
-        items[i].labels[key] = value;
+        items[i].metadata.labels[key] = value;
       }
     };
 
@@ -3124,7 +3571,7 @@ app.controller('GroupCtrl', [
         "kind": "grouping"
       };
       for (var i = 0; i < items.length; i++) {
-        key = items[i].labels[$scope.groupBy[index]];
+        key = items[i].metadata.labels[$scope.groupBy[index]];
         if (!key) {
           key = "";
         }
@@ -3173,7 +3620,7 @@ app.controller('GroupCtrl', [
     function buildGroupByOptions() {
       var g = $scope.groups;
       var options = getDefaultGroupByOptions();
-      var newOptions = _.map(g.items, function(vals) { return _.map(vals, function(v) { return _.keys(v.labels); }); });
+      var newOptions = _.map(g.items, function(vals) { return _.map(vals, function(v) { return _.keys(v.metadata.labels); }); });
       newOptions =
           _.reject(_.uniq(_.flattenDeep(newOptions)), function(o) { return o == 'name' || o == 'type' || o == ""; });
       newOptions = _.map(newOptions, function(o) {
@@ -4214,453 +4661,6 @@ angular.module('kubernetesApp.components.dashboard')
   ServiceDataService.$inject = ["$q"];
 
 })();
-
-(function() {
-  'use strict';
-
-  angular.module('kubernetesApp.components.dashboard')
-      .directive('d3MinionBarGauge', [
-        'd3DashboardService',
-        function(d3DashboardService) {
-
-          return {
-            restrict: 'E',
-            scope: {
-              data: '=',
-              thickness: '@',
-              graphWidth: '@',
-              graphHeight: '@'
-
-            },
-            link: function(scope, element, attrs) {
-
-              var draw = function(d3) {
-                var svg = d3.select("svg.chart");
-                var legendSvg = d3.select("svg.legend");
-                window.onresize = function() { return scope.$apply(); };
-
-                scope.$watch(function() { return angular.element(window)[0].innerWidth; },
-                             function() { return scope.render(scope.data); });
-
-                scope.$watch('data', function(newVals, oldVals) {
-                  return initOrUpdate(newVals, oldVals);
-
-                }, true);
-
-                function initOrUpdate(newVals, oldVals) {
-                  if (oldVals === null || oldVals === undefined) {
-                    return scope.render(newVals);
-                  } else {
-                    return update(oldVals, newVals);
-                  }
-                }
-
-                var textOffset = 10;
-                var el = null;
-                var radius = 100;
-                var oldData = [];
-
-                function init(options) {
-                  var clone = options.data;
-                  var preparedData = setData(clone);
-                  setup(preparedData, options.width, options.height);
-                }
-
-                function setup(data, w, h) {
-                  svg = d3.select(element[0]).append("svg").attr("width", "100%");
-
-                  legendSvg = d3.select(element[0]).append("svg").attr("width", "100%");
-
-                  var chart = svg.attr("class", "chart")
-                                  .attr("width", w)
-                                  .attr("height", h - 25)
-                                  .append("svg:g")
-                                  .attr("class", "concentricchart")
-                                  .attr("transform", "translate(" + ((w / 2)) + "," + h / 4 + ")");
-
-                  var legend = legendSvg.attr("class", "legend").attr("width", w);
-
-                  radius = Math.min(w, h) / 2;
-
-                  var hostName = legendSvg.append("text")
-                                     .attr("class", "hostName")
-                                     .attr("transform", "translate(" + ((w - 120) / 2) + "," + 15 + ")");
-
-                  var label_legend_area = legendSvg.append("svg:g")
-                                              .attr("class", "label_legend_area")
-                                              .attr("transform", "translate(" + ((w - 185) / 2) + "," + 35 + ")");
-
-                  var legend_group = label_legend_area.append("svg:g").attr("class", "legend_group");
-
-                  var label_group = label_legend_area.append("svg:g")
-                                        .attr("class", "label_group")
-                                        .attr("transform", "translate(" + 25 + "," + 11 + ")");
-
-                  var stats_group = label_legend_area.append("svg:g")
-                                        .attr("class", "stats_group")
-                                        .attr("transform", "translate(" + 85 + "," + 11 + ")");
-
-                  var path_group = chart.append("svg:g")
-                                       .attr("class", "path_group")
-                                       .attr("transform", "translate(0," + (h / 4) + ")");
-                  var value_group = chart.append("svg:g")
-                                        .attr("class", "value_group")
-                                        .attr("transform", "translate(" + -(w * 0.205) + "," + -(h * 0.10) + ")");
-                  generateArcs(chart, data);
-                }
-
-                function update(_oldData, _newData) {
-                  if (_newData === undefined || _newData === null) {
-                    return;
-                  }
-
-                  var clone = jQuery.extend(true, {}, _newData);
-                  var cloneOld = jQuery.extend(true, {}, _oldData);
-                  var preparedData = setData(clone);
-                  oldData = setData(cloneOld);
-                  animate(preparedData);
-                }
-
-                function animate(data) { generateArcs(null, data); }
-
-                function setData(data) {
-                  var diameter = 2 * Math.PI * radius;
-                  var localData = [];
-
-                  $.each(data[0].segments, function(ri, value) {
-
-                    function calcAngles(v) {
-                      var segmentValueSum = 200;
-                      if (v > segmentValueSum) {
-                        v = segmentValueSum;
-                      }
-
-                      var segmentValue = v;
-                      var fraction = segmentValue / segmentValueSum;
-                      var arcBatchLength = fraction * 4 * Math.PI;
-                      var arcPartition = arcBatchLength;
-                      var startAngle = Math.PI * 2;
-                      var endAngle = startAngle + arcPartition;
-
-                      return {
-                        startAngle: startAngle,
-                        endAngle: endAngle
-                      };
-                    }
-
-                    var valueData = calcAngles(value.value);
-                    data[0].segments[ri].startAngle = valueData.startAngle;
-                    data[0].segments[ri].endAngle = valueData.endAngle;
-
-                    var maxData = value.maxData;
-                    var maxTickData = calcAngles(maxData.maxValue + 0.2);
-                    data[0].segments[ri].maxTickStartAngle = maxTickData.startAngle;
-                    data[0].segments[ri].maxTickEndAngle = maxTickData.endAngle;
-
-                    var maxArcData = calcAngles(maxData.maxValue);
-                    data[0].segments[ri].maxArcStartAngle = maxArcData.startAngle;
-                    data[0].segments[ri].maxArcEndAngle = maxArcData.endAngle;
-
-                    data[0].segments[ri].index = ri;
-                  });
-                  localData.push(data[0].segments);
-                  return localData[0];
-                }
-
-                function generateArcs(_svg, data) {
-                  var chart = svg;
-                  var transitionTime = 750;
-                  $.each(data, function(index, value) {
-                    if (oldData[index] !== undefined) {
-                      data[index].previousEndAngle = oldData[index].endAngle;
-                    } else {
-                      data[index].previousEndAngle = 0;
-                    }
-                  });
-                  var thickness = parseInt(scope.thickness, 10);
-                  var ir = (parseInt(scope.graphWidth, 10) / 3);
-                  var path_group = svg.select('.path_group');
-                  var arc_group = path_group.selectAll(".arc_group").data(data);
-                  var arcEnter = arc_group.enter().append("g").attr("class", "arc_group");
-
-                  arcEnter.append("path").attr("class", "bg-circle").attr("d", getBackgroundArc(thickness, ir));
-
-                  arcEnter.append("path")
-                      .attr("class", function(d, i) { return 'max_tick_arc ' + d.maxData.maxTickClassNames; });
-
-                  arcEnter.append("path")
-                      .attr("class", function(d, i) { return 'max_bg_arc ' + d.maxData.maxClassNames; });
-
-                  arcEnter.append("path").attr("class", function(d, i) { return 'value_arc ' + d.classNames; });
-
-                  var max_tick_arc = arc_group.select(".max_tick_arc");
-
-                  max_tick_arc.transition()
-                      .attr("class", function(d, i) { return 'max_tick_arc ' + d.maxData.maxTickClassNames; })
-                      .attr("d", function(d) {
-                        var arc = maxArc(thickness, ir);
-                        arc.startAngle(d.maxTickStartAngle);
-                        arc.endAngle(d.maxTickEndAngle);
-                        return arc(d);
-                      });
-
-                  var max_bg_arc = arc_group.select(".max_bg_arc");
-
-                  max_bg_arc.transition()
-                      .attr("class", function(d, i) { return 'max_bg_arc ' + d.maxData.maxClassNames; })
-                      .attr("d", function(d) {
-                        var arc = maxArc(thickness, ir);
-                        arc.startAngle(d.maxArcStartAngle);
-                        arc.endAngle(d.maxArcEndAngle);
-                        return arc(d);
-                      });
-
-                  var value_arc = arc_group.select(".value_arc");
-
-                  value_arc.transition().ease("exp").attr("class", function(d, i) {
-                    return 'value_arc ' + d.classNames;
-                  }).duration(transitionTime).attrTween("d", function(d) { return arcTween(d, thickness, ir); });
-
-                  arc_group.exit()
-                      .select(".value_arc")
-                      .transition()
-                      .ease("exp")
-                      .duration(transitionTime)
-                      .attrTween("d", function(d) { return arcTween(d, thickness, ir); })
-                      .remove();
-
-                  drawLabels(chart, data, ir, thickness);
-                  buildLegend(chart, data);
-                }
-
-                function arcTween(b, thickness, ir) {
-                  var prev = JSON.parse(JSON.stringify(b));
-                  prev.endAngle = b.previousEndAngle;
-                  var i = d3.interpolate(prev, b);
-                  return function(t) { return getArc(thickness, ir)(i(t)); };
-                }
-
-                function maxArc(thickness, ir) {
-                  var arc = d3.svg.arc().innerRadius(function(d) {
-                    return getRadiusRing(ir, d.index);
-                  }).outerRadius(function(d) { return getRadiusRing(ir + thickness, d.index); });
-                  return arc;
-                }
-
-                function drawLabels(chart, data, ir, thickness) {
-                  svg.select('.value_group').selectAll("*").remove();
-                  var counts = data.length;
-                  var value_group = chart.select('.value_group');
-                  var valueLabels = value_group.selectAll("text.value").data(data);
-                  valueLabels.enter()
-                      .append("svg:text")
-                      .attr("class", "value")
-                      .attr(
-                           "transform", function(d) { return "translate(" + (getRadiusRing(ir, counts - 1)) + ", 0)"; })
-                      .attr("dx", function(d, i) { return 0; })
-                      .attr("dy", function(d, i) { return (thickness + 3) * i; })
-                      .attr("text-anchor", function(d) { return "start"; })
-                      .text(function(d) { return d.value; });
-                  valueLabels.transition().duration(300).attrTween(
-                      "d", function(d) { return arcTween(d, thickness, ir); });
-                  valueLabels.exit().remove();
-                }
-
-                function buildLegend(chart, data) {
-                  var svg = legendSvg;
-                  svg.select('.label_group').selectAll("*").remove();
-                  svg.select('.legend_group').selectAll("*").remove();
-                  svg.select('.stats_group').selectAll("*").remove();
-
-                  var host_name = svg.select('.hostName');
-                  var label_group = svg.select('.label_group');
-                  var stats_group = svg.select('.stats_group');
-
-                  host_name.text(data[0].hostName);
-
-                  host_name = svg.selectAll("text.hostName").data(data);
-
-                  host_name.attr("text-anchor", function(d) { return "start"; })
-                      .text(function(d) { return d.hostName; });
-                  host_name.exit().remove();
-
-                  var labels = label_group.selectAll("text.labels").data(data);
-                  labels.enter()
-                      .append("svg:text")
-                      .attr("class", "labels")
-                      .attr("dy", function(d, i) { return 19 * i; })
-                      .attr("text-anchor", function(d) { return "start"; })
-                      .text(function(d) { return d.label; });
-                  labels.exit().remove();
-
-                  var stats = stats_group.selectAll("text.stats").data(data);
-                  stats.enter()
-                      .append("svg:text")
-                      .attr("class", "stats")
-                      .attr("dy", function(d, i) { return 19 * i; })
-                      .attr("text-anchor", function(d) { return "start"; })
-                      .text(function(d) { return d.stats; });
-                  stats.exit().remove();
-
-                  var legend_group = svg.select('.legend_group');
-                  var legend = legend_group.selectAll("rect").data(data);
-                  legend.enter()
-                      .append("svg:rect")
-                      .attr("x", 2)
-                      .attr("y", function(d, i) { return 19 * i; })
-                      .attr("width", 13)
-                      .attr("height", 13)
-                      .attr("class", function(d, i) { return "rect " + d.classNames; });
-
-                  legend.exit().remove();
-                }
-
-                function getRadiusRing(ir, i) { return ir - (i * 20); }
-
-                function getArc(thickness, ir) {
-                  var arc = d3.svg.arc()
-                                .innerRadius(function(d) { return getRadiusRing(ir, d.index); })
-                                .outerRadius(function(d) { return getRadiusRing(ir + thickness, d.index); })
-                                .startAngle(function(d, i) { return d.startAngle; })
-                                .endAngle(function(d, i) { return d.endAngle; });
-                  return arc;
-                }
-
-                function getBackgroundArc(thickness, ir) {
-                  var arc = d3.svg.arc()
-                                .innerRadius(function(d) { return getRadiusRing(ir, d.index); })
-                                .outerRadius(function(d) { return getRadiusRing(ir + thickness, d.index); })
-                                .startAngle(0)
-                                .endAngle(function() { return 2 * Math.PI; });
-                  return arc;
-                }
-
-                scope.render = function(data) {
-                  if (data === undefined || data === null) {
-                    return;
-                  }
-
-                  svg.selectAll("*").remove();
-
-                  var graph = $(element[0]);
-                  var w = scope.graphWidth;
-                  var h = scope.graphHeight;
-
-                  var options = {
-                    data: data,
-                    width: w,
-                    height: h
-                  };
-
-                  init(options);
-                };
-              };
-              d3DashboardService.d3().then(draw);
-            }
-          };
-        }
-      ]);
-}());
-
-(function() {
-  'use strict';
-
-  angular.module('kubernetesApp.components.dashboard')
-      .directive(
-           'dashboardHeader',
-           function() {
-             'use strict';
-             return {
-               restrict: 'A',
-               replace: true,
-               scope: {user: '='},
-               templateUrl: "components/dashboard/pages/header.html",
-               controller: [
-                 '$scope',
-                 '$filter',
-                 '$location',
-                 'menu',
-                 '$rootScope',
-                 function($scope, $filter, $location, menu, $rootScope) {
-                  $scope.menu = menu;
-                   $scope.$watch('page', function(newValue, oldValue) {
-                     if (typeof newValue !== 'undefined') {
-                       $location.path(newValue);
-                     }
-                   });
-
-                   $scope.subpages = [
-                     {
-                       category: 'dashboard',
-                       name: 'Explore',
-                       value: '/dashboard/groups/type/selector/',
-                       id: 'groupsView'
-                     },
-                     {category: 'dashboard', name: 'Pods', value: '/dashboard/pods', id: 'podsView'},
-                     {category: 'dashboard', name: 'Nodes', value: '/dashboard/nodes', id: 'minionsView'},
-                     {
-                       category: 'dashboard',
-                       name: 'Replication Controllers',
-                       value: '/dashboard/replicationcontrollers',
-                       id: 'rcView'
-                     },
-                     {category: 'dashboard', name: 'Services', value: '/dashboard/services', id: 'servicesView'},
-                     {category: 'dashboard', name: 'Events', value: '/dashboard/events', id: 'eventsView'},
-                   ];
-                 }
-               ]
-             };
-           })
-      .directive('dashboardFooter',
-                 function() {
-                   'use strict';
-                   return {
-                     restrict: 'A',
-                     replace: true,
-                     templateUrl: "components/dashboard/pages/footer.html",
-                     controller: ['$scope', '$filter', function($scope, $filter) {}]
-                   };
-                 })
-      .directive('mdTable', function() {
-        'use strict';
-        return {
-          restrict: 'E',
-          scope: {
-            headers: '=',
-            content: '=',
-            sortable: '=',
-            filters: '=',
-            customClass: '=customClass',
-            thumbs: '=',
-            count: '=',
-            doSelect: '&onSelect'
-          },
-          transclude: true,
-          controller: ["$scope", "$filter", "$window", "$location", function($scope, $filter, $window, $location) {
-            var orderBy = $filter('orderBy');
-            $scope.currentPage = 0;
-            $scope.nbOfPages = function() { return Math.ceil($scope.content.length / $scope.count); };
-            $scope.handleSort = function(field) {
-              if ($scope.sortable.indexOf(field) > -1) {
-                return true;
-              } else {
-                return false;
-              }
-            };
-            $scope.order = function(predicate, reverse) {
-              $scope.content = orderBy($scope.content, predicate, reverse);
-              $scope.predicate = predicate;
-            };
-            $scope.order($scope.sortable[0], false);
-            $scope.getNumber = function(num) { return new Array(num); };
-            $scope.goToPage = function(page) { $scope.currentPage = page; };
-            $scope.showMore = function() { return angular.isDefined($scope.moreClick);}
-          }],
-          templateUrl: 'views/partials/md-table.tmpl.html'
-        };
-      });
-
-}());
 `)
 
 func www_app_assets_js_app_js_bytes() ([]byte, error) {
@@ -4673,7 +4673,7 @@ func www_app_assets_js_app_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 93013, mode: os.FileMode(420), modTime: time.Unix(1432327024, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 93066, mode: os.FileMode(420), modTime: time.Unix(1432747379, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4715,7 +4715,7 @@ func www_app_assets_js_base_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(420), modTime: time.Unix(1432327024, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(420), modTime: time.Unix(1432747378, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4732,7 +4732,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_18px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4753,7 +4753,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_24px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4770,7 +4770,7 @@ func www_app_components_dashboard_img_icons_ic_close_18px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4787,7 +4787,7 @@ func www_app_components_dashboard_img_icons_ic_close_24px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4869,7 +4869,7 @@ func www_app_components_dashboard_manifest_json() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4886,7 +4886,7 @@ func www_app_components_dashboard_pages_footer_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4929,7 +4929,7 @@ func www_app_components_dashboard_pages_header_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4953,7 +4953,7 @@ func www_app_components_dashboard_pages_home_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4970,7 +4970,7 @@ func www_app_components_dashboard_protractor_smoke_spec_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/protractor/smoke.spec.js", size: 2616, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/protractor/smoke.spec.js", size: 2616, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4987,7 +4987,7 @@ func www_app_components_dashboard_test_controllers_header_spec_js() (*asset, err
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/test/controllers/header.spec.js", size: 1293, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/test/controllers/header.spec.js", size: 1293, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5038,7 +5038,7 @@ func www_app_components_dashboard_views_groups_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5062,7 +5062,7 @@ func www_app_components_dashboard_views_listevents_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5086,7 +5086,7 @@ func www_app_components_dashboard_views_listminions_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5110,7 +5110,7 @@ func www_app_components_dashboard_views_listpods_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5186,7 +5186,7 @@ func www_app_components_dashboard_views_listpodscards_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5220,7 +5220,7 @@ func www_app_components_dashboard_views_listpodsvisualizer_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5244,7 +5244,7 @@ func www_app_components_dashboard_views_listreplicationcontrollers_html() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5268,7 +5268,7 @@ func www_app_components_dashboard_views_listservices_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5346,7 +5346,7 @@ func www_app_components_dashboard_views_node_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 1353, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 1353, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5372,7 +5372,7 @@ func www_app_components_dashboard_views_partials_cadvisor_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 443, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 443, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5409,7 +5409,7 @@ func www_app_components_dashboard_views_partials_groupbox_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5417,7 +5417,7 @@ func www_app_components_dashboard_views_partials_groupbox_html() (*asset, error)
 var _www_app_components_dashboard_views_partials_groupitem_html = []byte(`<div layout="row" ng-if="group.kind != 'grouping'">
   <div>
     <!-- Default box display -->
-      <div layout="row" class="group-item" ng-repeat="(groupType, data) in group | groupBy: 'labels.type'">
+      <div layout="row" class="group-item" ng-repeat="(groupType, data) in group | groupBy: 'metadata.labels.type'">
         <!-- left image -->
         <div class="icon-area">
           <div class="group-icon" style="background-color: {{getGroupColor(groupType)}}"></div>
@@ -5432,17 +5432,17 @@ var _www_app_components_dashboard_views_partials_groupitem_html = []byte(`<div l
           <div layout="row" layout-wrap>
             <div layout="row" ng-repeat="item in data">
               <!-- title -->
-              <div ng-switch on='item.labels["type"]'>
+              <div ng-switch on='item.metadata.labels["type"]'>
                 <div class="group-name">
-                  <a ng-switch-when='pod' ng-href="#/dashboard/pods/{{ item.id }}">{{ item.id }}</a>
-                  <a ng-switch-when='service' ng-href="#/dashboard/services/{{ item.id }}">{{ item.id }}</a>
-                  <a ng-switch-when='replicationController' ng-href="#/dashboard/replicationcontrollers/{{ item.id }}">{{ item.id }}</a>
-                  <div ng-switch-default>{{item.id}}</div>
+                  <a ng-switch-when='pod' ng-href="#/dashboard/pods/{{ item.metadata.name }}">{{ item.metadata.name }}</a>
+                  <a ng-switch-when='service' ng-href="#/dashboard/services/{{ item.metadata.name }}">{{ item.metadata.name }}</a>
+                  <a ng-switch-when='replicationController' ng-href="#/dashboard/replicationcontrollers/{{ item.metadata.name }}">{{ item.metadata.name }}</a>
+                  <div ng-switch-default>{{item.metadata.name}}</div>
                 </div>
               </div>
               <md-select ng-model="selectedFilter" ng-change="changeFilterBy(selectedFilter)" class="selectFilter">
                 <md-optgroup label="FILTER">
-                  <md-option ng-value="'{{key}}={{value}}'" ng-repeat="(key, value) in item.labels">{{key}}: {{value}}</md-option>
+                  <md-option ng-value="'{{key}}={{value}}'" ng-repeat="(key, value) in item.metadata.labels">{{key}}: {{value}}</md-option>
                   </md-option-group>
                 </md-optgroup>
               </md-select>
@@ -5468,7 +5468,7 @@ func www_app_components_dashboard_views_partials_groupitem_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2109, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2213, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5518,7 +5518,7 @@ func www_app_components_dashboard_views_partials_podtilesbyname_html() (*asset, 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5568,7 +5568,7 @@ func www_app_components_dashboard_views_partials_podtilesbyserver_html() (*asset
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5679,7 +5679,7 @@ func www_app_components_dashboard_views_pod_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 2646, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 2646, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5778,7 +5778,7 @@ func www_app_components_dashboard_views_replication_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 2165, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 2165, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5892,7 +5892,7 @@ func www_app_components_dashboard_views_service_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 2477, mode: os.FileMode(420), modTime: time.Unix(1432327028, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 2477, mode: os.FileMode(420), modTime: time.Unix(1432747382, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5969,7 +5969,7 @@ func www_app_index_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/index.html", size: 2315, mode: os.FileMode(420), modTime: time.Unix(1432326234, 0)}
+	info := bindata_file_info{name: "www/app/index.html", size: 2315, mode: os.FileMode(420), modTime: time.Unix(1432747345, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6156,7 +6156,7 @@ func www_app_views_partials_md_table_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 2819, mode: os.FileMode(420), modTime: time.Unix(1432326234, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 2819, mode: os.FileMode(420), modTime: time.Unix(1432747345, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
