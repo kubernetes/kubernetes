@@ -72,6 +72,8 @@ var _ = Describe("DNS", func() {
 		// TODO: Spin up a separate test service and test that dns works for that service.
 		namesToResolve := []string{
 			"kubernetes-ro.default",
+			"kubernetes-ro.default.svc",
+			"kubernetes-ro.default.svc.cluster.local",
 			"kubernetes-ro.default.cluster.local",
 			"google.com",
 		}

@@ -13,6 +13,11 @@ crashes or scheduling changes).  This maps well to DNS, which has a long
 history of clients that, on purpose or on accident, do not respect DNS TTLs
 (see previous remark about Pod IPs changing).
 
+## DNS Name format for Services
+Services get a DNS name with the format my-svc.my-namespace.svc.cluster.local
+'svc' should not be used a namespace label to avoid conflicts.
+The old format of my-svc.my-namespace.cluster.local has been deprecated. 
+
 ## How do I find the DNS server?
 The DNS server itself runs as a Kubernetes Service.  This gives it a stable IP
 address.  When you run the SkyDNS service, you want to assign a static IP to use for
@@ -35,12 +40,12 @@ example, see `cluster/gce/config-default.sh`.
 ```shell
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 ```
 
 This enables DNS with a DNS Service IP of `10.0.0.10` and a local domain of
-`kubernetes.local`, served by a single copy of SkyDNS.
+`cluster.local`, served by a single copy of SkyDNS.
 
 If you are not using a supported cluster setup, you will have to replicate some
 of this yourself.  First, each kubelet needs to run with the following flags
