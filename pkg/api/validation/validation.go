@@ -1086,6 +1086,28 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		}
 	}
 
+	// Check for duplicate NodePorts, considering (protocol,port) pairs
+	nodePorts := make(map[api.ServicePort]bool)
+	for i := range service.Spec.Ports {
+		port := &service.Spec.Ports[i]
+		if port.NodePort == 0 {
+			continue
+		}
+		var key api.ServicePort
+		key.Protocol = port.Protocol
+		key.NodePort = port.NodePort
+		_, found := nodePorts[key]
+		if found {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", *port, "duplicate nodePort specified"))
+		}
+		nodePorts[key] = true
+	}
+
+	// Temporary validation to prevent people creating NodePorts before we have the full infrastructure in place
+	if len(nodePorts) > 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[0], "nodePorts not (yet) enabled"))
+	}
+
 	return allErrs
 }
 

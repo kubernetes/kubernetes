@@ -1720,6 +1720,22 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 0,
 		},
+		{
+			name: "duplicate nodeports",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "TCP", NodePort: 1})
+			},
+			numErrs: 2, // TODO(justinsb): change to 1 when NodePorts enabled
+		},
+		{
+			name: "duplicate nodeports (different protocols)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "UDP", NodePort: 1})
+			},
+			numErrs: 1, // TODO(justinsb): change to 0 when NodePorts enabled
+		},
 	}
 
 	for _, tc := range testCases {

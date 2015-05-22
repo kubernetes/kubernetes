@@ -1102,6 +1102,10 @@ type ServicePort struct {
 	// of v1beta3 the default value is the sames as the Port field (an
 	// identity map).
 	TargetPort util.IntOrString `json:"targetPort"`
+
+	// The port on each node on which this service is exposed.
+	// Default is to auto-allocate a port if the visibility of this Service requires one.
+	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
