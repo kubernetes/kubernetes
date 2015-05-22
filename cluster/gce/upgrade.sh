@@ -40,7 +40,7 @@ source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 function usage() {
   echo "!!! EXPERIMENTAL !!!"
   echo ""
-  echo "${0} [-M|-N] -l | <release or continuous integration version>"
+  echo "${0} [-M|-N] -l | <release or continuous integration version> | [latest_stable|latest_release|latest_ci]"
   echo "  Upgrades master and nodes by default"
   echo "  -M:  Upgrade master only"
   echo "  -N:  Upgrade nodes only"
@@ -93,6 +93,26 @@ function wait-for-master() {
   done
 
   echo "== Done =="
+}
+
+# Sets binary_version variable to the version passed in as an argument, or if argument is
+# latest_stable, latest_release, or latest_ci fetches and sets the correponding version number
+#
+# Args:
+# $1 version string from command line
+function set_binary_version() {
+  if [[ "${1}" == "latest_stable" ]]; then
+    binary_version=$(gsutil cat gs://kubernetes-release/release/stable.txt)
+    echo "Using latest stable version: ${binary_version}"
+  elif [[ "${1}" == "latest_release" ]]; then
+    binary_version=$(gsutil cat gs://kubernetes-release/release/latest.txt)
+    echo "Using latest release version: ${binary_version}"
+  elif [[ "${1}" == "latest_ci" ]]; then
+    binary_version=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
+    echo "Using latest ci version: ${binary_version}"
+  else
+    binary_version=${1}
+  fi
 }
 
 # Perform common upgrade setup tasks
@@ -228,7 +248,7 @@ if [[ "${master_upgrade}" == "false" ]] && [[ "${node_upgrade}" == "false" ]]; t
 fi
 
 if [[ "${local_binaries}" == "false" ]]; then
-  binary_version=${1}
+  set_binary_version ${1}
 fi
 
 prepare-upgrade
