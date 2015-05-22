@@ -144,6 +144,7 @@ angular.module("kubernetesApp.config", [])
 .constant("ENV", {
 	"/": {
 		"k8sApiServer": "/api/v1beta2",
+		"k8sApiv1beta3Server": "/api/v1beta3",
 		"k8sDataServer": "/cluster",
 		"k8sDataPollMinIntervalSec": 10,
 		"k8sDataPollMaxIntervalSec": 120,
@@ -205,7 +206,7 @@ app.controller('TabCtrl', [
       .service('cAdvisorService', ["$http", "$q", "ENV", function($http, $q, ENV) {
         var _baseUrl = function(minionIp) {
           var minionPort = ENV['/']['cAdvisorPort'] || "8081";
-          var proxy = ENV['/']['cAdvisorProxy'] || "/api/v1beta2/proxy/nodes/";
+          var proxy = ENV['/']['cAdvisorProxy'] || "/api/v1beta3/proxy/nodes/";
 
           return proxy + minionIp + ':' + minionPort + '/api/v1.0/';
         };
@@ -434,6 +435,54 @@ app.provider('k8sApi',
       if (ENV && ENV['/'] && ENV['/']['k8sApiServer']) {
         var proxy = ENV['/']['cAdvisorProxy'] || '';
         k8sApiProvider.setUrlBase(proxy + ENV['/']['k8sApiServer']);
+      }
+    }]);
+
+app.provider('k8sv1Beta3Api',
+             function() {
+
+               var urlBase = '';
+               var _namespace = 'default';
+
+               this.setUrlBase = function(value) { urlBase = value; };
+
+               this.setNamespace = function(value) { _namespace = value; };
+               this.getNamespace = function() { return _namespace; };
+
+               var _get = function($http, baseUrl, query) {
+                 var _fullUrl = baseUrl;
+
+                 if (query !== undefined) {
+                   _fullUrl += '/' + query;
+                 }
+
+                 return $http.get(_fullUrl);
+               };
+
+               this.$get = ["$http", "$q", function($http, $q) {
+                 var api = {};
+
+                 api.getUrlBase = function() { return urlBase + '/namespaces/' + _namespace; };
+
+                 api.getPods = function(query) { return _get($http, api.getUrlBase() + '/pods', query); };
+
+                 api.getMinions = function(query) { return _get($http, urlBase + '/nodes', query); };
+
+                 api.getServices = function(query) { return _get($http, api.getUrlBase() + '/services', query); };
+
+                 api.getReplicationControllers = function(query) {
+                   return _get($http, api.getUrlBase() + '/replicationcontrollers', query)
+                 };
+
+                 api.getEvents = function(query) { return _get($http, api.getUrlBase() + '/events', query); };
+
+                 return api;
+               }];
+             })
+    .config(["k8sv1Beta3ApiProvider", "ENV", function(k8sv1Beta3ApiProvider, ENV) {
+      if (ENV && ENV['/'] && ENV['/']['k8sApiv1beta3Server']) {
+        var proxy = ENV['/']['cAdvisorProxy'] || '';
+        k8sv1Beta3ApiProvider.setUrlBase(proxy + ENV['/']['k8sApiv1beta3Server']);
       }
     }]);
 
@@ -2193,57 +2242,93 @@ angular.module('kubernetesApp.components.dashboard')
    */
   function PodDataService($q) {
     var pods = {
-      "kind": "PodList",
-      "creationTimestamp": null,
-      "selfLink": "/api/v1beta1/pods",
-      "resourceVersion": 166552,
-      "apiVersion": "v1beta1",
-      "items": [{
-        "id": "hello",
-        "uid": "0fe3644e-ab53-11e4-8ae8-061695c59fcf",
-        "creationTimestamp": "2015-02-03T03:16:36Z",
-        "selfLink": "/api/v1beta1/pods/hello?namespace=default",
-        "resourceVersion": 466,
+    "kind": "Pod",
+    "apiVersion": "v1beta3",
+    "metadata": {
+        "name": "redis-master-c0r1n",
+        "generateName": "redis-master-",
         "namespace": "default",
-        "labels": {"environment": "testing", "name": "hello"},
-        "desiredState": {
-          "manifest": {
-            "version": "v1beta2",
-            "id": "",
-            "volumes": null,
-            "containers": [{
-              "name": "hello",
-              "image": "quay.io/kelseyhightower/hello",
-              "ports": [{"hostPort": 80, "containerPort": 80, "protocol": "TCP"}],
-              "imagePullPolicy": "PullIfNotPresent"
-            }],
-            "restartPolicy": {"always": {}},
-            "dnsPolicy": "ClusterFirst"
-          }
+        "selfLink": "/api/v1beta3/namespaces/default/pods/redis-master-c0r1n",
+        "uid": "f12ddfaf-ff77-11e4-8f2d-080027213276",
+        "resourceVersion": "39",
+        "creationTimestamp": "2015-05-21T05:12:14Z",
+        "labels": {
+            "name": "redis-master"
         },
-        "currentState": {
-          "manifest": {"version": "", "id": "", "volumes": null, "containers": null, "restartPolicy": {}},
-          "status": "Running",
-          "host": "172.31.12.204",
-          "podIP": "10.244.73.2",
-          "info": {
-            "hello": {
-              "state": {"running": {"startedAt": "2015-02-03T03:16:51Z"}},
-              "restartCount": 0,
-              "image": "quay.io/kelseyhightower/hello",
-              "containerID": "docker://96ade8ff30a44c4489969eaf343a7899317671b07a9766ecd0963e9b41501256"
-            },
-            "net": {
-              "state": {"running": {"startedAt": "2015-02-03T03:16:41Z"}},
-              "restartCount": 0,
-              "podIP": "10.244.73.2",
-              "image": "kubernetes/pause:latest",
-              "containerID": "docker://93d32603cafbff7165dadb1d4527899c24246bca2f5e6770b8297fd3721b272c"
-            }
-          }
+        "annotations": {
+            "kubernetes.io/created-by": "{\"kind\":\"SerializedReference\",\"apiVersion\":\"v1beta3\",\"reference\":{\"kind\":\"ReplicationController\",\"namespace\":\"default\",\"name\":\"redis-master\",\"uid\":\"f12969e0-ff77-11e4-8f2d-080027213276\",\"apiVersion\":\"v1beta3\",\"resourceVersion\":\"26\"}}"
         }
-      }]
-    };
+    },
+    "spec": {
+        "volumes": [
+            {
+                "name": "default-token-zb4rq",
+                "secret": {
+                    "secretName": "default-token-zb4rq"
+                }
+            }
+        ],
+        "containers": [
+            {
+                "name": "master",
+                "image": "redis",
+                "ports": [
+                    {
+                        "containerPort": 6379,
+                        "protocol": "TCP"
+                    }
+                ],
+                "resources": {},
+                "volumeMounts": [
+                    {
+                        "name": "default-token-zb4rq",
+                        "readOnly": true,
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+                    }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "IfNotPresent",
+                "capabilities": {},
+                "securityContext": {
+                    "capabilities": {},
+                    "privileged": false
+                }
+            }
+        ],
+        "restartPolicy": "Always",
+        "dnsPolicy": "ClusterFirst",
+        "serviceAccount": "default",
+        "host": "127.0.0.1"
+    },
+    "status": {
+        "phase": "Running",
+        "Condition": [
+            {
+                "type": "Ready",
+                "status": "True"
+            }
+        ],
+        "hostIP": "127.0.0.1",
+        "podIP": "172.17.0.1",
+        "startTime": "2015-05-21T05:12:14Z",
+        "containerStatuses": [
+            {
+                "name": "master",
+                "state": {
+                    "running": {
+                        "startedAt": "2015-05-21T05:12:14Z"
+                    }
+                },
+                "lastState": {},
+                "ready": true,
+                "restartCount": 0,
+                "image": "redis",
+                "imageID": "docker://95af5842ddb9b03f7c6ec7601e65924cec516fcedd7e590ae31660057085cf67",
+                "containerID": "docker://ae2a1e0a91a8b1015191a0b8e2ce8c55a86fb1a9a2b1e8e3b29430c9d93c8c09"
+            }
+        ]
+    }
+};
 
     // Uses promises
     return {
@@ -2272,13 +2357,68 @@ angular.module('kubernetesApp.components.dashboard')
    */
   function ReplicationControllerDataService($q) {
     var replicationControllers = {
-      "kind": "ReplicationControllerList",
-      "creationTimestamp": null,
-      "selfLink": "/api/v1beta1/replicationControllers",
-      "resourceVersion": 166552,
-      "apiVersion": "v1beta1",
-      "items": []
-    };
+    "kind": "List",
+    "apiVersion": "v1beta3",
+    "metadata": {},
+    "items": [
+        {
+            "kind": "ReplicationController",
+            "apiVersion": "v1beta3",
+            "metadata": {
+                "name": "redis-master",
+                "namespace": "default",
+                "selfLink": "/api/v1beta3/namespaces/default/replicationcontrollers/redis-master",
+                "uid": "f12969e0-ff77-11e4-8f2d-080027213276",
+                "resourceVersion": "28",
+                "creationTimestamp": "2015-05-21T05:12:14Z",
+                "labels": {
+                    "name": "redis-master"
+                }
+            },
+            "spec": {
+                "replicas": 1,
+                "selector": {
+                    "name": "redis-master"
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "name": "redis-master"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "master",
+                                "image": "redis",
+                                "ports": [
+                                    {
+                                        "containerPort": 6379,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "resources": {},
+                                "terminationMessagePath": "/dev/termination-log",
+                                "imagePullPolicy": "IfNotPresent",
+                                "capabilities": {},
+                                "securityContext": {
+                                    "capabilities": {},
+                                    "privileged": false
+                                }
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "dnsPolicy": "ClusterFirst",
+                        "serviceAccount": ""
+                    }
+                }
+            },
+            "status": {
+                "replicas": 1
+            }
+        }
+    ]};
 
     // Uses promises
     return {
@@ -2306,44 +2446,96 @@ angular.module('kubernetesApp.components.dashboard')
    */
   function ServiceDataService($q) {
     var services = {
-      "kind": "ServiceList",
-      "creationTimestamp": null,
-      "selfLink": "/api/v1beta1/services",
-      "resourceVersion": 166552,
-      "apiVersion": "v1beta1",
-      "items": [
+    "kind": "List",
+    "apiVersion": "v1beta3",
+    "metadata": {},
+    "items": [
         {
-          "id": "kubernetes",
-          "uid": "626dd08d-ab51-11e4-8ae8-061695c59fcf",
-          "creationTimestamp": "2015-02-03T03:04:36Z",
-          "selfLink": "/api/v1beta1/services/kubernetes?namespace=default",
-          "resourceVersion": 11,
-          "namespace": "default",
-          "port": 443,
-          "protocol": "TCP",
-          "labels": {"component": "apiserver", "provider": "kubernetes"},
-          "selector": null,
-          "containerPort": 0,
-          "portalIP": "10.244.66.215",
-          "sessionAffinity": "None"
+            "kind": "Service",
+            "apiVersion": "v1beta3",
+            "metadata": {
+                "name": "kubernetes",
+                "namespace": "default",
+                "selfLink": "/api/v1beta3/namespaces/default/services/kubernetes",
+                "resourceVersion": "6",
+                "creationTimestamp": null,
+                "labels": {
+                    "component": "apiserver",
+                    "provider": "kubernetes"
+                }
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "protocol": "TCP",
+                        "port": 443,
+                        "targetPort": 443
+                    }
+                ],
+                "portalIP": "10.0.0.2",
+                "sessionAffinity": "None"
+            },
+            "status": {}
         },
         {
-          "id": "kubernetes-ro",
-          "uid": "626f9584-ab51-11e4-8ae8-061695c59fcf",
-          "creationTimestamp": "2015-02-03T03:04:36Z",
-          "selfLink": "/api/v1beta1/services/kubernetes-ro?namespace=default",
-          "resourceVersion": 12,
-          "namespace": "default",
-          "port": 80,
-          "protocol": "TCP",
-          "labels": {"component": "apiserver", "provider": "kubernetes"},
-          "selector": null,
-          "containerPort": 0,
-          "portalIP": "10.244.182.142",
-          "sessionAffinity": "None"
+            "kind": "Service",
+            "apiVersion": "v1beta3",
+            "metadata": {
+                "name": "kubernetes-ro",
+                "namespace": "default",
+                "selfLink": "/api/v1beta3/namespaces/default/services/kubernetes-ro",
+                "resourceVersion": "8",
+                "creationTimestamp": null,
+                "labels": {
+                    "component": "apiserver",
+                    "provider": "kubernetes"
+                }
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "protocol": "TCP",
+                        "port": 80,
+                        "targetPort": 80
+                    }
+                ],
+                "portalIP": "10.0.0.1",
+                "sessionAffinity": "None"
+            },
+            "status": {}
+        },
+        {
+            "kind": "Service",
+            "apiVersion": "v1beta3",
+            "metadata": {
+                "name": "redis-master",
+                "namespace": "default",
+                "selfLink": "/api/v1beta3/namespaces/default/services/redis-master",
+                "uid": "a6fde246-ff78-11e4-8f2d-080027213276",
+                "resourceVersion": "72",
+                "creationTimestamp": "2015-05-21T05:17:19Z",
+                "labels": {
+                    "name": "redis-master"
+                }
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "protocol": "TCP",
+                        "port": 6379,
+                        "targetPort": 6379
+                    }
+                ],
+                "selector": {
+                    "name": "redis-master"
+                },
+                "portalIP": "10.0.0.124",
+                "sessionAffinity": "None"
+            },
+            "status": {}
         }
-      ]
-    };
+    ]
+};
 
     // Uses promises
     return {

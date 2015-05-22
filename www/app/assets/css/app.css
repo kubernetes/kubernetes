@@ -1506,3 +1506,6 @@ md-toolbar h1 {
 .dashboard .detail .containerTable td {
   padding-right: 20px;
 }
+.dashboard .align-top tbody {
+  vertical-align: top;
+}
