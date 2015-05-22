@@ -854,18 +854,6 @@ func addConversionFuncs() {
 				return err
 			}
 
-			typeIn := in.Type
-			if typeIn == "" {
-				if in.CreateExternalLoadBalancer {
-					typeIn = ServiceTypeLoadBalancer
-				} else {
-					typeIn = ServiceTypeClusterIP
-				}
-			}
-			if err := s.Convert(&typeIn, &out.Spec.Type, 0); err != nil {
-				return err
-			}
-
 			return nil
 		},
 

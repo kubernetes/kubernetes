@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
@@ -41,22 +42,24 @@ import (
 
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
-	registry    Registry
-	machines    minion.Registry
-	endpoints   endpoint.Registry
-	portals     ipallocator.Interface
-	clusterName string
+	registry         Registry
+	machines         minion.Registry
+	endpoints        endpoint.Registry
+	portals          ipallocator.Interface
+	serviceNodePorts portallocator.Interface
+	clusterName      string
 }
 
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, portals ipallocator.Interface,
-	clusterName string) *REST {
+	serviceNodePorts portallocator.Interface, clusterName string) *REST {
 	return &REST{
-		registry:    registry,
-		machines:    machines,
-		endpoints:   endpoints,
-		portals:     portals,
-		clusterName: clusterName,
+		registry:         registry,
+		machines:         machines,
+		endpoints:        endpoints,
+		portals:          portals,
+		serviceNodePorts: serviceNodePorts,
+		clusterName:      clusterName,
 	}
 }
 
