@@ -72,9 +72,14 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 		services := r.Object.(*api.ServiceList).Items
 		for _, service := range services {
 			var link string
-			if len(service.Spec.PublicIPs) > 0 {
+			if len(service.Status.LoadBalancer.Ingress) > 0 {
+				ingress := service.Status.LoadBalancer.Ingress[0]
+				ip := ingress.IP
+				if ip == "" {
+					ip = ingress.Hostname
+				}
 				for _, port := range service.Spec.Ports {
-					link += "http://" + service.Spec.PublicIPs[0] + ":" + strconv.Itoa(port.Port) + " "
+					link += "http://" + ip + ":" + strconv.Itoa(port.Port) + " "
 				}
 			} else {
 				link = client.Host + "/api/v1beta3/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name

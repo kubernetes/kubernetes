@@ -835,6 +835,24 @@ const (
 	ServiceAffinityNone ServiceAffinity = "None"
 )
 
+// Service Type string describes ingress methods for a service
+type ServiceType string
+
+const (
+	// ServiceTypeClusterIP means a service will only be accessible inside the
+	// cluster, via the portal IP.
+	ServiceTypeClusterIP ServiceType = "ClusterIP"
+
+	// ServiceTypeNodePort means a service will be exposed on one port of
+	// every node, in addition to 'ClusterIP' type.
+	ServiceTypeNodePort ServiceType = "NodePort"
+
+	// ServiceTypeLoadBalancer means a service will be exposed via an
+	// external load balancer (if the cloud provider supports it), in addition
+	// to 'NodePort' type.
+	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
+)
+
 const (
 	// PortalIPNone - do not assign a portal IP
 	// no proxying required and no environment variables should be created for pods
@@ -873,9 +891,12 @@ type Service struct {
 	// An external load balancer should be set up via the cloud-provider
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`
 
-	// PublicIPs are used by external load balancers, or can be set by
+	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
+	Type ServiceType `json:"type,omitempty" description:"type of this service; must be ClusterIP, NodePort, or LoadBalancer; defaults to ClusterIP"`
+
+	// Deprecated. PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
-	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs (e.g. load balancers) that should be proxied to this service"`
+	PublicIPs []string `json:"publicIPs,omitempty" description:"deprecated. externally visible IPs (e.g. load balancers) that should be proxied to this service"`
 
 	// PortalIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can
@@ -896,6 +917,29 @@ type Service struct {
 	// array.  If this field is not specified, it will be populated from
 	// the legacy fields.
 	Ports []ServicePort `json:"ports" description:"ports to be exposed on the service; if this field is specified, the legacy fields (Port, PortName, Protocol, and ContainerPort) will be overwritten by the first member of this array; if this field is not specified, it will be populated from the legacy fields"`
+
+	// LoadBalancer contains the current status of the load-balancer,
+	// if one is present.
+	LoadBalancerStatus LoadBalancerStatus `json:"loadBalancerStatus,omitempty" description:"status of load-balancer"`
+}
+
+// LoadBalancerStatus represents the status of a load-balancer
+type LoadBalancerStatus struct {
+	// Ingress is a list containing ingress points for the load-balancer;
+	// traffic intended for the service should be sent to these ingress points.
+	Ingress []LoadBalancerIngress `json:"ingress,omitempty" description:"load-balancer ingress points"`
+}
+
+// LoadBalancerIngress represents the status of a load-balancer ingress point:
+// traffic intended for the service should be sent to an ingress point.
+type LoadBalancerIngress struct {
+	// IP is set for load-balancer ingress points that are IP based
+	// (typically GCE or OpenStack load-balancers)
+	IP string `json:"ip,omitempty" description:"IP address of ingress point"`
+
+	// Hostname is set for load-balancer ingress points that are DNS based
+	// (typically AWS load-balancers)
+	Hostname string `json:"hostname,omitempty" description:"hostname of ingress point"`
 }
 
 type ServicePort struct {
@@ -918,6 +962,10 @@ type ServicePort struct {
 	// of Port is used (an identity map) - note this is a different default
 	// than Service.ContainerPort.
 	ContainerPort util.IntOrString `json:"containerPort" description:"the port to access on the containers belonging to pods targeted by the service; defaults to the service port"`
+
+	// The port on each node on which this service is exposed.
+	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
+	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed"`
 }
 
 // ServiceAccount binds together:

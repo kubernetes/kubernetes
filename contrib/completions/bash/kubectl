@@ -629,6 +629,7 @@ _kubectl_expose()
     flags+=("--target-port=")
     flags+=("--template=")
     two_word_flags+=("-t")
+    flags+=("--type=")
 
     must_have_one_flag=()
     must_have_one_flag+=("--port=")

@@ -1427,6 +1427,7 @@ func makeValidService() api.Service {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"key": "val"},
 			SessionAffinity: "None",
+			Type:            api.ServiceTypeClusterIP,
 			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675}},
 		},
 	}
@@ -1523,6 +1524,13 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "missing type",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = ""
+			},
+			numErrs: 1,
+		},
+		{
 			name: "missing ports",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Ports = nil
@@ -1603,21 +1611,21 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid publicIPs localhost",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.PublicIPs = []string{"127.0.0.1"}
+				s.Spec.DeprecatedPublicIPs = []string{"127.0.0.1"}
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid publicIPs",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.PublicIPs = []string{"0.0.0.0"}
+				s.Spec.DeprecatedPublicIPs = []string{"0.0.0.0"}
 			},
 			numErrs: 1,
 		},
 		{
 			name: "valid publicIPs host",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.PublicIPs = []string{"myhost.mydomain"}
+				s.Spec.DeprecatedPublicIPs = []string{"myhost.mydomain"}
 			},
 			numErrs: 0,
 		},
@@ -1632,7 +1640,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid load balancer protocol 1",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
+				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports[0].Protocol = "UDP"
 			},
 			numErrs: 1,
@@ -1640,7 +1648,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid load balancer protocol 2",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
+				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "UDP"})
 			},
 			numErrs: 1,
@@ -1683,16 +1691,135 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "valid external load balancer",
+			name: "valid type - cluster",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
+				s.Spec.Type = api.ServiceTypeClusterIP
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid type - loadbalancer",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid type loadbalancer 2 ports",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
 		},
 		{
 			name: "valid external load balancer 2 ports",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "duplicate nodeports",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNodePort
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "TCP", NodePort: 1})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "duplicate nodeports (different protocols)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNodePort
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "UDP", NodePort: 1})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid type - cluster",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid type - nodeport",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNodePort
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid type - loadbalancer",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid type loadbalancer 2 ports",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid type loadbalancer with NodePort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid type=NodePort service with NodePort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNodePort
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid type=NodePort service without NodePort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNodePort
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid cluster service without NodePort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid cluster service with NodePort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid public service with duplicate NodePort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNodePort
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p1", Port: 1, Protocol: "TCP", NodePort: 1})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p2", Port: 2, Protocol: "TCP", NodePort: 1})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid type=LoadBalancer",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
@@ -2457,6 +2584,27 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.SessionAffinity = ""
 			},
 			numErrs: 1,
+		},
+		{
+			name: "change type",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+			},
+			numErrs: 0,
+		},
+		{
+			name: "remove type",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.Type = ""
+			},
+			numErrs: 1,
+		},
+		{
+			name: "change type -> nodeport",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.Type = api.ServiceTypeNodePort
+			},
+			numErrs: 0,
 		},
 	}
 

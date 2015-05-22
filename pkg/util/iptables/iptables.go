@@ -28,6 +28,13 @@ import (
 	"github.com/golang/glog"
 )
 
+type RulePosition string
+
+const (
+	Prepend RulePosition = "-I"
+	Append  RulePosition = "-A"
+)
+
 // An injectable interface for running iptables commands.  Implementations must be goroutine-safe.
 type Interface interface {
 	// EnsureChain checks if the specified chain exists and, if not, creates it.  If the chain existed, return true.
@@ -37,7 +44,7 @@ type Interface interface {
 	// DeleteChain deletes the specified chain.  If the chain did not exist, return error.
 	DeleteChain(table Table, chain Chain) error
 	// EnsureRule checks if the specified rule is present and, if not, creates it.  If the rule existed, return true.
-	EnsureRule(table Table, chain Chain, args ...string) (bool, error)
+	EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error)
 	// DeleteRule checks if the specified rule is present and, if so, deletes it.
 	DeleteRule(table Table, chain Chain, args ...string) error
 	// IsIpv6 returns true if this is managing ipv6 tables
@@ -126,7 +133,7 @@ func (runner *runner) DeleteChain(table Table, chain Chain) error {
 }
 
 // EnsureRule is part of Interface.
-func (runner *runner) EnsureRule(table Table, chain Chain, args ...string) (bool, error) {
+func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error) {
 	fullArgs := makeFullArgs(table, chain, args...)
 
 	runner.mu.Lock()
@@ -139,7 +146,7 @@ func (runner *runner) EnsureRule(table Table, chain Chain, args ...string) (bool
 	if exists {
 		return true, nil
 	}
-	out, err := runner.run(opAppendRule, fullArgs)
+	out, err := runner.run(operation(position), fullArgs)
 	if err != nil {
 		return false, fmt.Errorf("error appending rule: %v: %s", err, out)
 	}

@@ -552,8 +552,12 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool) error {
 	}
 
 	ips := []string{svc.Spec.PortalIP}
-	for _, publicIP := range svc.Spec.PublicIPs {
-		ips = append(ips, publicIP)
+
+	ingress := svc.Status.LoadBalancer.Ingress
+	for i := range ingress {
+		if ingress[i].IP != "" {
+			ips = append(ips, ingress[i].IP)
+		}
 	}
 
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s\n", name, formatLabels(svc.Labels),

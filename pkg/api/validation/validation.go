@@ -1032,6 +1032,8 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 }
 
 var supportedSessionAffinityType = util.NewStringSet(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
+var supportedServiceType = util.NewStringSet(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
+	string(api.ServiceTypeLoadBalancer))
 
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
@@ -1062,7 +1064,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		}
 	}
 
-	for _, ip := range service.Spec.PublicIPs {
+	for _, ip := range service.Spec.DeprecatedPublicIPs {
 		if ip == "0.0.0.0" {
 			allErrs = append(allErrs, errs.NewFieldInvalid("spec.publicIPs", ip, "is not an IP address"))
 		} else if util.IsValidIPv4(ip) && net.ParseIP(ip).IsLoopback() {
@@ -1070,12 +1072,43 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		}
 	}
 
-	if service.Spec.CreateExternalLoadBalancer {
+	if service.Spec.Type == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))
+	} else if !supportedServiceType.Has(string(service.Spec.Type)) {
+		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.type", service.Spec.Type))
+	}
+
+	if service.Spec.Type == api.ServiceTypeLoadBalancer {
 		for i := range service.Spec.Ports {
 			if service.Spec.Ports[i].Protocol != api.ProtocolTCP {
-				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot create an external load balancer with non-TCP ports"))
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].protocol", i), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP ports"))
 			}
 		}
+	}
+
+	if service.Spec.Type == api.ServiceTypeClusterIP {
+		for i := range service.Spec.Ports {
+			if service.Spec.Ports[i].NodePort != 0 {
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), service.Spec.Ports[i].NodePort, "cannot specify a node port with services of type ClusterIP"))
+			}
+		}
+	}
+
+	// Check for duplicate NodePorts, considering (protocol,port) pairs
+	nodePorts := make(map[api.ServicePort]bool)
+	for i := range service.Spec.Ports {
+		port := &service.Spec.Ports[i]
+		if port.NodePort == 0 {
+			continue
+		}
+		var key api.ServicePort
+		key.Protocol = port.Protocol
+		key.NodePort = port.NodePort
+		_, found := nodePorts[key]
+		if found {
+			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), port.NodePort, "duplicate nodePort specified"))
+		}
+		nodePorts[key] = true
 	}
 
 	return allErrs
@@ -1343,7 +1376,7 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 			allErrs = append(allErrs, errs.NewFieldRequired(fmt.Sprintf("metadata.annotations[%s]", api.ServiceAccountNameKey)))
 		}
 	case api.SecretTypeOpaque, "":
-		// no-op
+	// no-op
 	case api.SecretTypeDockercfg:
 		dockercfgBytes, exists := secret.Data[api.DockerConfigKey]
 		if !exists {

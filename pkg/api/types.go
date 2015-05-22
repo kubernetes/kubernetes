@@ -1011,8 +1011,49 @@ const (
 	ServiceAffinityNone ServiceAffinity = "None"
 )
 
+// Service Type string describes ingress methods for a service
+type ServiceType string
+
+const (
+	// ServiceTypeClusterIP means a service will only be accessible inside the
+	// cluster, via the portal IP.
+	ServiceTypeClusterIP ServiceType = "ClusterIP"
+
+	// ServiceTypeNodePort means a service will be exposed on one port of
+	// every node, in addition to 'ClusterIP' type.
+	ServiceTypeNodePort ServiceType = "NodePort"
+
+	// ServiceTypeLoadBalancer means a service will be exposed via an
+	// external load balancer (if the cloud provider supports it), in addition
+	// to 'NodePort' type.
+	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
+)
+
 // ServiceStatus represents the current status of a service
-type ServiceStatus struct{}
+type ServiceStatus struct {
+	// LoadBalancer contains the current status of the load-balancer,
+	// if one is present.
+	LoadBalancer LoadBalancerStatus `json:"loadBalancer,omitempty"`
+}
+
+// LoadBalancerStatus represents the status of a load-balancer
+type LoadBalancerStatus struct {
+	// Ingress is a list containing ingress points for the load-balancer;
+	// traffic intended for the service should be sent to these ingress points.
+	Ingress []LoadBalancerIngress `json:"ingress,omitempty" description:"load-balancer ingress points"`
+}
+
+// LoadBalancerIngress represents the status of a load-balancer ingress point:
+// traffic intended for the service should be sent to an ingress point.
+type LoadBalancerIngress struct {
+	// IP is set for load-balancer ingress points that are IP based
+	// (typically GCE or OpenStack load-balancers)
+	IP string `json:"ip,omitempty" description:"IP address of ingress point"`
+
+	// Hostname is set for load-balancer ingress points that are DNS based
+	// (typically AWS load-balancers)
+	Hostname string `json:"hostname,omitempty" description:"hostname of ingress point"`
+}
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
@@ -1031,14 +1072,13 @@ type ServiceSpec struct {
 	// None can be specified for headless services when proxying is not required
 	PortalIP string `json:"portalIP,omitempty"`
 
-	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
-	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty"`
-	// PublicIPs are used by external load balancers, or can be set by
+	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
+	Type ServiceType `json:"type,omitempty"`
+
+	// DeprecatedPublicIPs are deprecated and silently ignored.
+	// Old behaviour: PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
-	// For load balancers, the publicIP will usually be the IP address of the load balancer,
-	// but some load balancers (notably AWS ELB) use a hostname instead of an IP address.
-	// For hostnames, the user will use a CNAME record (instead of using an A record with the IP)
-	PublicIPs []string `json:"publicIPs,omitempty"`
+	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty"`
 
 	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty"`
@@ -1064,6 +1104,10 @@ type ServicePort struct {
 	// of v1beta3 the default value is the sames as the Port field (an
 	// identity map).
 	TargetPort util.IntOrString `json:"targetPort"`
+
+	// The port on each node on which this service is exposed.
+	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
+	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port

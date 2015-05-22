@@ -14,6 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package allocator
 
-// Keep CI happy; it is unhappy if a directory only contains tests
+import "testing"
+
+func TestBitCount(t *testing.T) {
+	for i, c := range bitCounts {
+		actual := 0
+		for j := 0; j < 8; j++ {
+			if ((1 << uint(j)) & i) != 0 {
+				actual++
+			}
+		}
+		if actual != int(c) {
+			t.Errorf("%d should have %d bits but recorded as %d", i, actual, c)
+		}
+	}
+}

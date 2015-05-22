@@ -46,12 +46,12 @@ type Repair struct {
 	interval time.Duration
 	registry service.Registry
 	network  *net.IPNet
-	alloc    service.IPRegistry
+	alloc    service.RangeRegistry
 }
 
 // NewRepair creates a controller that periodically ensures that all portalIPs are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, registry service.Registry, network *net.IPNet, alloc service.IPRegistry) *Repair {
+func NewRepair(interval time.Duration, registry service.Registry, network *net.IPNet, alloc service.RangeRegistry) *Repair {
 	return &Repair{
 		interval: interval,
 		registry: registry,
@@ -71,6 +71,13 @@ func (c *Repair) RunUntil(ch chan struct{}) {
 
 // RunOnce verifies the state of the portal IP allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) RunOnce() error {
+	// TODO: (per smarterclayton) if Get() or ListServices() is a weak consistency read,
+	// or if they are executed against different leaders,
+	// the ordering guarantee required to ensure no IP is allocated twice is violated.
+	// ListServices must return a ResourceVersion higher than the etcd index Get triggers,
+	// and the release code must not release services that have had IPs allocated but not yet been created
+	// See #8295
+
 	latest, err := c.alloc.Get()
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
@@ -111,7 +118,10 @@ func (c *Repair) RunOnce() error {
 		}
 	}
 
-	service.SnapshotRange(latest, r)
+	err = r.Snapshot(latest)
+	if err != nil {
+		return fmt.Errorf("unable to persist the updated service IP allocations: %v", err)
+	}
 
 	if err := c.alloc.CreateOrUpdate(latest); err != nil {
 		return fmt.Errorf("unable to persist the updated service IP allocations: %v", err)

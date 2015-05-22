@@ -63,10 +63,10 @@ func GetLoadBalancerName(service *api.Service) string {
 type TCPLoadBalancer interface {
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetTCPLoadBalancer returns whether the specified load balancer exists, and
-	// if so, what its IP address or hostname is.
-	GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error)
-	// CreateTCPLoadBalancer creates a new tcp load balancer. Returns the IP address or hostname of the balancer
-	CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (string, error)
+	// if so, what its status is.
+	GetTCPLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error)
+	// CreateTCPLoadBalancer creates a new tcp load balancer. Returns the status of the balancer
+	CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error)
 	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
 	UpdateTCPLoadBalancer(name, region string, hosts []string) error
 	// EnsureTCPLoadBalancerDeleted deletes the specified load balancer if it

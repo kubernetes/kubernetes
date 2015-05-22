@@ -46,7 +46,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream`
 
 func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "expose RESOURCE NAME --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--public-ip=ip] [--create-external-load-balancer=bool]",
+		Use:     "expose RESOURCE NAME --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--public-ip=ip] [--type=type]",
 		Short:   "Take a replicated application and expose it as Kubernetes Service",
 		Long:    expose_long,
 		Example: expose_example,
@@ -60,7 +60,8 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("protocol", "TCP", "The network protocol for the service to be created. Default is 'tcp'.")
 	cmd.Flags().Int("port", -1, "The port that the service should serve on. Required.")
 	cmd.MarkFlagRequired("port")
-	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default is 'false'.")
+	cmd.Flags().String("type", "", "Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP' unless --create-external-load-balancer is specified.")
+	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.")
 	cmd.Flags().String("selector", "", "A label selector to use for this service. If empty (the default) infer the selector from the replication controller.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without creating it.")
@@ -160,6 +161,9 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			return err
 		}
 		params["labels"] = kubectl.MakeLabels(labels)
+	}
+	if v := cmdutil.GetFlagString(cmd, "type"); v != "" {
+		params["type"] = v
 	}
 	err = kubectl.ValidateParams(names, params)
 	if err != nil {
