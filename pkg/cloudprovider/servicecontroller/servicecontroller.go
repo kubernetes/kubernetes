@@ -242,7 +242,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		// the cloud provider for what it knows about it.
 		status, exists, err := s.balancer.GetTCPLoadBalancer(s.loadBalancerName(service), s.zone.Region)
 		if err != nil {
-			return fmt.Errorf("Error getting LB for service %s", namespacedName), retryable
+			return fmt.Errorf("Error getting LB for service %s: %v", namespacedName, err), retryable
 		}
 		if exists && api.LoadBalancerStatusEqual(status, &service.Status.LoadBalancer) {
 			glog.Infof("LB already exists with status %s for previously uncached service %s", status, namespacedName)

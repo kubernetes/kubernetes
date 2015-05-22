@@ -1081,7 +1081,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	if service.Spec.Type == api.ServiceTypeLoadBalancer {
 		for i := range service.Spec.Ports {
 			if service.Spec.Ports[i].Protocol != api.ProtocolTCP {
-				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot create an external load balancer with non-TCP ports"))
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].protocol", i), service.Spec.Ports[i], "cannot create an external load balancer with non-TCP ports"))
 			}
 		}
 	}
@@ -1089,7 +1089,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	if service.Spec.Type == api.ServiceTypeClusterIP {
 		for i := range service.Spec.Ports {
 			if service.Spec.Ports[i].NodePort != 0 {
-				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot specify a node port with cluster-visibility services"))
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), service.Spec.Ports[i], "cannot specify a node port with services of type ClusterIP"))
 			}
 		}
 	}
@@ -1106,7 +1106,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		key.NodePort = port.NodePort
 		_, found := nodePorts[key]
 		if found {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", *port, "duplicate nodePort specified"))
+			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.ports[%d].nodePort", i), *port, "duplicate nodePort specified"))
 		}
 		nodePorts[key] = true
 	}
