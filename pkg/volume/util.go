@@ -59,7 +59,6 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 
 // basicVolumeScrubber is an implementation of volume.Recycler
 type basicVolumeScrubber struct {
-
 }
 
 // podWatch provides watch semantics for a pod backed by a poller, since

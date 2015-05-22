@@ -105,7 +105,7 @@ func (plugin *nfsPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error)
 	return plugin.newRecyclerFunc(spec, plugin.host)
 }
 
-func newRecycler(spec *volume.Spec, host volume.VolumeHost)(volume.Recycler, error){
+func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
 	if spec.VolumeSource.HostPath != nil {
 		return &nfsRecycler{
 			volName:    spec.Name,
@@ -225,7 +225,7 @@ type nfsRecycler struct {
 	volName    string
 	server     string
 	exportPath string
-	host volume.VolumeHost
+	host       volume.VolumeHost
 }
 
 func (r *nfsRecycler) GetPath() string {
@@ -242,7 +242,7 @@ func (r *nfsRecycler) Recycle() error {
 		2. use host.client to save to API and watch it
 		3. if pod errors or times out, return error
 		   if pod exits, return nil for success
-	 */
+	*/
 
 	return nil
 }

@@ -260,6 +260,8 @@ func TestBindingWithExamples(t *testing.T) {
 
 	// after the status change above, the binder picks up again
 	syncVolume(volumeIndex, mockClient, pv)
+	// the first change of the volume in the binder triggers another change
+	syncVolume(volumeIndex, mockClient, pv)
 
 	if pv.Status.Phase != api.VolumePending {
 		t.Errorf("Expected phase %s but got %s", api.VolumePending, pv.Status.Phase)

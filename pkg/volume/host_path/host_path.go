@@ -80,7 +80,7 @@ func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, e
 	return plugin.newRecyclerFunc(spec, plugin.host)
 }
 
-func newRecycler(spec *volume.Spec, host volume.VolumeHost)(volume.Recycler, error){
+func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
 	if spec.VolumeSource.HostPath != nil {
 		return &hostPathRecycler{spec.VolumeSource.HostPath.Path, host}, nil
 	} else {
@@ -139,7 +139,7 @@ func (hp *hostPathRecycler) Recycle() error {
 		2. use host.client to save to API and watch it
 		3. if pod errors or times out, return error
 		   if pod exits, return nil for success
-	 */
+	*/
 
 	return nil
 }
