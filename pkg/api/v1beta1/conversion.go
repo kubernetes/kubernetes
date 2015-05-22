@@ -794,6 +794,7 @@ func addConversionFuncs() {
 			if err := s.Convert(&in.Spec.Type, &out.Type, 0); err != nil {
 				return err
 			}
+			out.CreateExternalLoadBalancer = in.Spec.Type == api.ServiceTypeLoadBalancer
 
 			return nil
 		},
