@@ -22,14 +22,14 @@ KUBECTL=/usr/local/bin/kubectl
 function create-kubeconfig-secret() {
   local -r token=$1
   local -r username=$2
+  local -r server=$3
   local -r safe_username=$(tr -s ':_' '--' <<< "${username}")
 
   # Make a kubeconfig file with the token.
-  # TODO(etune): put apiserver certs into secret too, and reference from authfile,
-  # so that "Insecure" is not needed.
-  # Point the kubeconfig file at https://kubernetes:443. Pods/components that
-  # do not have DNS available will have to override the server.
-  read -r -d '' kubeconfig <<EOF
+  if [[ ! -z "${CA_CERT:-}" ]]; then
+    # If the CA cert is available, put it into the secret rather than using
+    # insecure-skip-tls-verify.
+    read -r -d '' kubeconfig <<EOF
 apiVersion: v1
 kind: Config
 users:
@@ -39,7 +39,27 @@ users:
 clusters:
 - name: local
   cluster:
-     server: "https://kubernetes:443"
+     server: ${server}
+     certificate-authority-data: ${CA_CERT}
+contexts:
+- context:
+    cluster: local
+    user: ${username}
+  name: service-account-context
+current-context: service-account-context
+EOF
+  else
+    read -r -d '' kubeconfig <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: ${username}
+  user:
+    token: ${token}
+clusters:
+- name: local
+  cluster:
+     server: ${server}
      insecure-skip-tls-verify: true
 contexts:
 - context:
@@ -48,6 +68,8 @@ contexts:
   name: service-account-context
 current-context: service-account-context
 EOF
+  fi
+
   local -r kubeconfig_base64=$(echo "${kubeconfig}" | base64 -w0)
   read -r -d '' secretyaml <<EOF
 apiVersion: v1beta3
@@ -98,6 +120,18 @@ function create-resource-from-string() {
 # managed result is of that. Start everything below that directory.
 echo "== Kubernetes addon manager started at $(date -Is) =="
 
+# Load the kube-env, which has all the environment variables we care
+# about, in a flat yaml format.
+kube_env_yaml="/var/cache/kubernetes-install/kube_env.yaml"
+if [ ! -e "${kubelet_kubeconfig_file}" ]; then
+  eval $(python -c '''
+import pipes,sys,yaml
+
+for k,v in yaml.load(sys.stdin).iteritems():
+  print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
+''' < "${kube_env_yaml}")
+fi
+
 # Generate secrets for "internal service accounts".
 # TODO(etune): move to a completely yaml/object based
 # workflow so that service accounts can be created
@@ -110,7 +144,14 @@ while read line; do
   IFS=',' read -a parts <<< "${line}"
   token=${parts[0]}
   username=${parts[1]}
-  create-kubeconfig-secret "${token}" "${username}"
+  # DNS is special, since it's necessary for cluster bootstrapping.
+  if [[ "${username}" == "system:dns" ]] && [[ ! -z "${KUBERNETES_MASTER_NAME:-}" ]]; then
+    create-kubeconfig-secret "${token}" "${username}" "https://${KUBERNETES_MASTER_NAME}"
+  else
+    # Set the server to https://kubernetes. Pods/components that
+    # do not have DNS available will have to override the server.
+    create-kubeconfig-secret "${token}" "${username}" "https://kubernetes"
+  fi
 done < /srv/kubernetes/known_tokens.csv
 
 # Create admission_control objects if defined before any other addon services. If the limits

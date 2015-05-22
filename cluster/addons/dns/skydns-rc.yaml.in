@@ -35,7 +35,6 @@ spec:
         # command = "/kube2sky"
         - -domain={{ pillar['dns_domain'] }}
         - -kubecfg_file=/etc/dns_token/kubeconfig
-        - -kube_master_url=https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}
         volumeMounts:
         - mountPath: /etc/dns_token
           name: dns-token
