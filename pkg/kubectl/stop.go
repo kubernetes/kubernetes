@@ -27,7 +27,7 @@ import (
 
 const (
 	Interval = time.Millisecond * 100
-	Timeout  = time.Second * 20
+	Timeout  = time.Minute * 5
 )
 
 // A Reaper handles terminating an object as gracefully as possible.
