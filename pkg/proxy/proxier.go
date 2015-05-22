@@ -40,8 +40,8 @@ type serviceInfo struct {
 	proxyPort           int
 	socket              proxySocket
 	timeout             time.Duration
-	publicIPs           []string // TODO: make this net.IP
 	nodePort            int
+	loadBalancerStatus  api.LoadBalancerStatus
 	sessionAffinityType api.ServiceAffinity
 	stickyMaxAgeMinutes int
 }
@@ -287,9 +287,10 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			}
 			info.portalIP = serviceIP
 			info.portalPort = servicePort.Port
-			info.publicIPs = service.Spec.PublicIPs
 			// TODO(justinsb): switch to servicePort.NodePort when that lands
 			info.nodePort = 0
+			// Deep-copy in case the service instance changes
+			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.sessionAffinityType = service.Spec.SessionAffinity
 			glog.V(4).Infof("info: %+v", info)
 
@@ -325,7 +326,7 @@ func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) 
 	if !info.portalIP.Equal(net.ParseIP(service.Spec.PortalIP)) {
 		return false
 	}
-	if !ipsEqual(info.publicIPs, service.Spec.PublicIPs) {
+	if !api.LoadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
 		return false
 	}
 	if info.sessionAffinityType != service.Spec.SessionAffinity {
@@ -351,10 +352,12 @@ func (proxier *Proxier) openPortal(service ServicePortName, info *serviceInfo) e
 	if err != nil {
 		return err
 	}
-	for _, publicIP := range info.publicIPs {
-		err = proxier.openOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
-		if err != nil {
-			return err
+	for _, ingress := range info.loadBalancerStatus.Ingress {
+		if ingress.IP != "" {
+			err = proxier.openOnePortal(net.ParseIP(ingress.IP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	if info.nodePort != 0 {
@@ -468,8 +471,10 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyI
 func (proxier *Proxier) closePortal(service ServicePortName, info *serviceInfo) error {
 	// Collect errors and report them all at the end.
 	el := proxier.closeOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
-	for _, publicIP := range info.publicIPs {
-		el = append(el, proxier.closeOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+	for _, ingress := range info.loadBalancerStatus.Ingress {
+		if ingress.IP != "" {
+			el = append(el, proxier.closeOnePortal(net.ParseIP(ingress.IP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+		}
 	}
 	if info.nodePort != 0 {
 		el = append(el, proxier.closeNodePort(info.nodePort, info.protocol, proxier.listenIP, info.proxyPort, service)...)

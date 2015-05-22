@@ -896,6 +896,29 @@ type Service struct {
 	// array.  If this field is not specified, it will be populated from
 	// the legacy fields.
 	Ports []ServicePort `json:"ports" description:"ports to be exposed on the service; if this field is specified, the legacy fields (Port, PortName, Protocol, and ContainerPort) will be overwritten by the first member of this array; if this field is not specified, it will be populated from the legacy fields"`
+
+	// LoadBalancer contains the current status of the load-balancer,
+	// if one is present.
+	LoadBalancerStatus LoadBalancerStatus `json:"loadBalancerStatus,omitempty" description:"status of load-balancer"`
+}
+
+// LoadBalancerStatus represents the status of a load-balancer
+type LoadBalancerStatus struct {
+	// Ingress is a list containing ingress points for the load-balancer;
+	// traffic intended for the service should be sent to these ingress points.
+	Ingress []LoadBalancerIngress `json:"ingress,omitempty" description:"load-balancer ingress points"`
+}
+
+// LoadBalancerIngress represents the status of a load-balancer ingress point:
+// traffic intended for the service should be sent to an ingress point.
+type LoadBalancerIngress struct {
+	// IP is set for load-balancer ingress points that are IP based
+	// (typically GCE or OpenStack load-balancers)
+	IP string `json:"ip,omitempty" description:"IP address of ingress point"`
+
+	// Hostname is set for load-balancer ingress points that are DNS based
+	// (typically AWS load-balancers)
+	Hostname string `json:"hostname,omitempty" description:"hostname of ingress point"`
 }
 
 type ServicePort struct {

@@ -646,14 +646,22 @@ func TestPrintHumanReadableService(t *testing.T) {
 		{
 			Spec: api.ServiceSpec{
 				PortalIP: "1.2.3.4",
-				PublicIPs: []string{
-					"2.3.4.5",
-					"3.4.5.6",
-				},
 				Ports: []api.ServicePort{
 					{
 						Port:     80,
 						Protocol: "TCP",
+					},
+				},
+			},
+			Status: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{
+							IP: "2.3.4.5",
+						},
+						{
+							IP: "3.4.5.6",
+						},
 					},
 				},
 			},
@@ -680,9 +688,6 @@ func TestPrintHumanReadableService(t *testing.T) {
 		{
 			Spec: api.ServiceSpec{
 				PortalIP: "1.2.3.4",
-				PublicIPs: []string{
-					"2.3.4.5",
-				},
 				Ports: []api.ServicePort{
 					{
 						Port:     80,
@@ -698,15 +703,19 @@ func TestPrintHumanReadableService(t *testing.T) {
 					},
 				},
 			},
+			Status: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{
+							IP: "2.3.4.5",
+						},
+					},
+				},
+			},
 		},
 		{
 			Spec: api.ServiceSpec{
 				PortalIP: "1.2.3.4",
-				PublicIPs: []string{
-					"2.3.4.5",
-					"4.5.6.7",
-					"5.6.7.8",
-				},
 				Ports: []api.ServicePort{
 					{
 						Port:     80,
@@ -719,6 +728,22 @@ func TestPrintHumanReadableService(t *testing.T) {
 					{
 						Port:     8000,
 						Protocol: "TCP",
+					},
+				},
+			},
+			Status: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{
+							IP: "2.3.4.5",
+						},
+						{
+							IP: "3.4.5.6",
+						},
+						{
+							IP:       "5.6.7.8",
+							Hostname: "host5678",
+						},
 					},
 				},
 			},
@@ -734,9 +759,10 @@ func TestPrintHumanReadableService(t *testing.T) {
 			t.Errorf("expected to contain portal ip %s, but doesn't: %s", ip, output)
 		}
 
-		for _, ip = range svc.Spec.PublicIPs {
+		for _, ingress := range svc.Status.LoadBalancer.Ingress {
+			ip = ingress.IP
 			if !strings.Contains(output, ip) {
-				t.Errorf("expected to contain public ip %s, but doesn't: %s", ip, output)
+				t.Errorf("expected to contain ingress ip %s, but doesn't: %s", ip, output)
 			}
 		}
 
@@ -748,8 +774,8 @@ func TestPrintHumanReadableService(t *testing.T) {
 		}
 		// Max of # ports and (# public ip + portal ip)
 		count := len(svc.Spec.Ports)
-		if len(svc.Spec.PublicIPs)+1 > count {
-			count = len(svc.Spec.PublicIPs) + 1
+		if len(svc.Status.LoadBalancer.Ingress)+1 > count {
+			count = len(svc.Status.LoadBalancer.Ingress) + 1
 		}
 		if count != strings.Count(output, "\n") {
 			t.Errorf("expected %d newlines, found %d", count, strings.Count(output, "\n"))

@@ -812,6 +812,32 @@ func convert_api_ListOptions_To_v1_ListOptions(in *api.ListOptions, out *ListOpt
 	return nil
 }
 
+func convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress(in *api.LoadBalancerIngress, out *LoadBalancerIngress, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.LoadBalancerIngress))(in)
+	}
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(in *api.LoadBalancerStatus, out *LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.LoadBalancerStatus))(in)
+	}
+	if in.Ingress != nil {
+		out.Ingress = make([]LoadBalancerIngress, len(in.Ingress))
+		for i := range in.Ingress {
+			if err := convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress(&in.Ingress[i], &out.Ingress[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
+	}
+	return nil
+}
+
 func convert_api_LocalObjectReference_To_v1_LocalObjectReference(in *api.LocalObjectReference, out *LocalObjectReference, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.LocalObjectReference))(in)
@@ -2088,6 +2114,9 @@ func convert_api_ServiceStatus_To_v1_ServiceStatus(in *api.ServiceStatus, out *S
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ServiceStatus))(in)
 	}
+	if err := convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -3035,6 +3064,32 @@ func convert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.ListOpt
 	}
 	out.Watch = in.Watch
 	out.ResourceVersion = in.ResourceVersion
+	return nil
+}
+
+func convert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress(in *LoadBalancerIngress, out *api.LoadBalancerIngress, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LoadBalancerIngress))(in)
+	}
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return nil
+}
+
+func convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus(in *LoadBalancerStatus, out *api.LoadBalancerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*LoadBalancerStatus))(in)
+	}
+	if in.Ingress != nil {
+		out.Ingress = make([]api.LoadBalancerIngress, len(in.Ingress))
+		for i := range in.Ingress {
+			if err := convert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress(&in.Ingress[i], &out.Ingress[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
+	}
 	return nil
 }
 
@@ -4314,6 +4369,9 @@ func convert_v1_ServiceStatus_To_api_ServiceStatus(in *ServiceStatus, out *api.S
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceStatus))(in)
 	}
+	if err := convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -4520,6 +4578,8 @@ func init() {
 		convert_api_ListMeta_To_v1_ListMeta,
 		convert_api_ListOptions_To_v1_ListOptions,
 		convert_api_List_To_v1_List,
+		convert_api_LoadBalancerIngress_To_v1_LoadBalancerIngress,
+		convert_api_LoadBalancerStatus_To_v1_LoadBalancerStatus,
 		convert_api_LocalObjectReference_To_v1_LocalObjectReference,
 		convert_api_NFSVolumeSource_To_v1_NFSVolumeSource,
 		convert_api_NamespaceList_To_v1_NamespaceList,
@@ -4629,6 +4689,8 @@ func init() {
 		convert_v1_ListMeta_To_api_ListMeta,
 		convert_v1_ListOptions_To_api_ListOptions,
 		convert_v1_List_To_api_List,
+		convert_v1_LoadBalancerIngress_To_api_LoadBalancerIngress,
+		convert_v1_LoadBalancerStatus_To_api_LoadBalancerStatus,
 		convert_v1_LocalObjectReference_To_api_LocalObjectReference,
 		convert_v1_NFSVolumeSource_To_api_NFSVolumeSource,
 		convert_v1_NamespaceList_To_api_NamespaceList,
