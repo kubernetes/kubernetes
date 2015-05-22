@@ -1058,9 +1058,9 @@ type ServiceSpec struct {
 	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
 	Type ServiceType `json:"type,omitempty" description:"type of this service; must be ClusterIP, NodePort, or LoadBalancer; defaults to ClusterIP"`
 
-	// PublicIPs are used by external load balancers, or can be set by
+	// Deprecated. PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
-	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs (e.g. load balancers) that should be proxied to this service"`
+	PublicIPs []string `json:"publicIPs,omitempty" description:"deprecated. externally visible IPs (e.g. load balancers) that should be proxied to this service"`
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`

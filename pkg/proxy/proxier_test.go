@@ -723,8 +723,8 @@ func TestProxyUpdatePublicIPs(t *testing.T) {
 				Port:     svcInfo.portalPort,
 				Protocol: "TCP",
 			}},
-			PortalIP:  svcInfo.portalIP.String(),
-			PublicIPs: []string{"4.3.2.1"},
+			PortalIP:            svcInfo.portalIP.String(),
+			DeprecatedPublicIPs: []string{"4.3.2.1"},
 		},
 	}})
 	// Wait for the socket to actually get free.

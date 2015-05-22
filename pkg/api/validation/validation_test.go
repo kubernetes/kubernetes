@@ -1611,21 +1611,21 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid publicIPs localhost",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.PublicIPs = []string{"127.0.0.1"}
+				s.Spec.DeprecatedPublicIPs = []string{"127.0.0.1"}
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid publicIPs",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.PublicIPs = []string{"0.0.0.0"}
+				s.Spec.DeprecatedPublicIPs = []string{"0.0.0.0"}
 			},
 			numErrs: 1,
 		},
 		{
 			name: "valid publicIPs host",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.PublicIPs = []string{"myhost.mydomain"}
+				s.Spec.DeprecatedPublicIPs = []string{"myhost.mydomain"}
 			},
 			numErrs: 0,
 		},

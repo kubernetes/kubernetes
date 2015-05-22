@@ -1071,12 +1071,10 @@ type ServiceSpec struct {
 	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
 	Type ServiceType `json:"type,omitempty"`
 
-	// PublicIPs are used by external load balancers, or can be set by
+	// DeprecatedPublicIPs are deprecated and silently ignored.
+	// Old behaviour: PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
-	// For load balancers, the publicIP will usually be the IP address of the load balancer,
-	// but some load balancers (notably AWS ELB) use a hostname instead of an IP address.
-	// For hostnames, the user will use a CNAME record (instead of using an A record with the IP)
-	PublicIPs []string `json:"publicIPs,omitempty"`
+	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty"`
 
 	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty"`
