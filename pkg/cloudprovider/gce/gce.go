@@ -195,6 +195,11 @@ func (gce *GCECloud) Zones() (cloudprovider.Zones, bool) {
 	return gce, true
 }
 
+// Routes returns an implementation of Routes for Google Compute Engine.
+func (gce *GCECloud) Routes() (cloudprovider.Routes, bool) {
+	return gce, true
+}
+
 func makeHostLink(projectID, zone, host string) string {
 	host = canonicalizeInstanceName(host)
 	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/instances/%s",
@@ -445,7 +450,10 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 	name = canonicalizeInstanceName(name)
 	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, name).Do()
 	if err != nil {
-		glog.Errorf("Failed to retrieve TargetInstance resource for instance:%s", name)
+		glog.Errorf("Failed to retrieve TargetInstance resource for instance: %s", name)
+		if apiErr, ok := err.(*googleapi.Error); ok && apiErr.Code == http.StatusNotFound {
+			return nil, cloudprovider.InstanceNotFound
+		}
 		return nil, err
 	}
 	return res, nil
@@ -556,31 +564,45 @@ func getMetadataValue(metadata *compute.Metadata, key string) (string, bool) {
 	return "", false
 }
 
-func (gce *GCECloud) Configure(name string, spec *api.NodeSpec) error {
-	instanceName := canonicalizeInstanceName(name)
+func (gce *GCECloud) ListRoutes(filter string) ([]*cloudprovider.Route, error) {
+	listCall := gce.service.Routes.List(gce.projectID)
+	if len(filter) > 0 {
+		listCall = listCall.Filter("name eq " + filter)
+	}
+	res, err := listCall.Do()
+	if err != nil {
+		return nil, err
+	}
+	var routes []*cloudprovider.Route
+	for _, r := range res.Items {
+		if path.Base(r.Network) != gce.networkName {
+			continue
+		}
+		target := path.Base(r.NextHopInstance)
+		routes = append(routes, &cloudprovider.Route{r.Name, target, r.DestRange, r.Description})
+	}
+	return routes, nil
+}
+
+func (gce *GCECloud) CreateRoute(route *cloudprovider.Route) error {
+	instanceName := canonicalizeInstanceName(route.TargetInstance)
 	insertOp, err := gce.service.Routes.Insert(gce.projectID, &compute.Route{
-		Name:            instanceName,
-		DestRange:       spec.PodCIDR,
+		Name:            route.Name,
+		DestRange:       route.DestinationCIDR,
 		NextHopInstance: fmt.Sprintf("zones/%s/instances/%s", gce.zone, instanceName),
 		Network:         fmt.Sprintf("global/networks/%s", gce.networkName),
 		Priority:        1000,
+		Description:     route.Description,
 	}).Do()
 	if err != nil {
 		return err
 	}
-	if err := gce.waitForGlobalOp(insertOp); err != nil {
-		if gapiErr, ok := err.(*googleapi.Error); ok && gapiErr.Code == http.StatusConflict {
-			// TODO (cjcullen): Make this actually check the route is correct.
-			return nil
-		}
-	}
-	return err
+	return gce.waitForGlobalOp(insertOp)
 }
 
-func (gce *GCECloud) Release(name string) error {
+func (gce *GCECloud) DeleteRoute(name string) error {
 	instanceName := canonicalizeInstanceName(name)
-	deleteCall := gce.service.Routes.Delete(gce.projectID, instanceName)
-	deleteOp, err := deleteCall.Do()
+	deleteOp, err := gce.service.Routes.Delete(gce.projectID, instanceName).Do()
 	if err != nil {
 		return err
 	}

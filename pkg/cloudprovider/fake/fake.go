@@ -17,8 +17,10 @@ limitations under the License.
 package fake_cloud
 
 import (
+	"fmt"
 	"net"
 	"regexp"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -39,7 +41,7 @@ type FakeUpdateBalancerCall struct {
 	Hosts  []string
 }
 
-// FakeCloud is a test-double implementation of Interface, TCPLoadBalancer and Instances. It is useful for testing.
+// FakeCloud is a test-double implementation of Interface, TCPLoadBalancer, Instances, and Routes. It is useful for testing.
 type FakeCloud struct {
 	Exists        bool
 	Err           error
@@ -53,6 +55,8 @@ type FakeCloud struct {
 	ExternalIP    net.IP
 	Balancers     []FakeBalancer
 	UpdateCalls   []FakeUpdateBalancerCall
+	RouteMap      map[string]*cloudprovider.Route
+	Lock          sync.Mutex
 	cloudprovider.Zone
 }
 
@@ -91,6 +95,10 @@ func (f *FakeCloud) Instances() (cloudprovider.Instances, bool) {
 }
 
 func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
+	return f, true
+}
+
+func (f *FakeCloud) Routes() (cloudprovider.Routes, bool) {
 	return f, true
 }
 
@@ -160,12 +168,39 @@ func (f *FakeCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	return f.NodeResources, f.Err
 }
 
-func (f *FakeCloud) Configure(name string, spec *api.NodeSpec) error {
-	f.addCall("configure")
-	return f.Err
+func (f *FakeCloud) ListRoutes(filter string) ([]*cloudprovider.Route, error) {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	f.addCall("list-routes")
+	var routes []*cloudprovider.Route
+	for _, route := range f.RouteMap {
+		if match, _ := regexp.MatchString(filter, route.Name); match {
+			routes = append(routes, route)
+		}
+	}
+	return routes, f.Err
 }
 
-func (f *FakeCloud) Release(name string) error {
-	f.addCall("release")
-	return f.Err
+func (f *FakeCloud) CreateRoute(route *cloudprovider.Route) error {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	f.addCall("create-route")
+	if _, exists := f.RouteMap[route.Name]; exists {
+		f.Err = fmt.Errorf("route with name %q already exists")
+		return f.Err
+	}
+	f.RouteMap[route.Name] = route
+	return nil
+}
+
+func (f *FakeCloud) DeleteRoute(name string) error {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	f.addCall("delete-route")
+	if _, exists := f.RouteMap[name]; !exists {
+		f.Err = fmt.Errorf("no route found with name %q", name)
+		return f.Err
+	}
+	delete(f.RouteMap, name)
+	return nil
 }

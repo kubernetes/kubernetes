@@ -395,14 +395,6 @@ func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
 	return rsrc, nil
 }
 
-func (i *Instances) Configure(name string, spec *api.NodeSpec) error {
-	return nil
-}
-
-func (i *Instances) Release(name string) error {
-	return nil
-}
-
 func (os *Rackspace) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
@@ -416,6 +408,11 @@ func (os *Rackspace) Zones() (cloudprovider.Zones, bool) {
 
 	return os, true
 }
+
+func (os *Rackspace) Routes() (cloudprovider.Routes, bool) {
+	return nil, false
+}
+
 func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 	glog.V(1).Infof("Current zone is %v", os.region)
 

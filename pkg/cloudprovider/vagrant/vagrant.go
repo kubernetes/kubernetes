@@ -99,6 +99,11 @@ func (v *VagrantCloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
+// Routes returns an implementation of Routes for Vagrant cloud.
+func (v *VagrantCloud) Routes() (cloudprovider.Routes, bool) {
+	return nil, false
+}
+
 // getInstanceByAddress retuns
 func (v *VagrantCloud) getInstanceByAddress(address string) (*SaltMinion, error) {
 	token, err := v.saltLogin()
@@ -238,12 +243,4 @@ func (v *VagrantCloud) List(filter string) ([]string, error) {
 
 func (v *VagrantCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	return nil, nil
-}
-
-func (v *VagrantCloud) Configure(name string, spec *api.NodeSpec) error {
-	return nil
-}
-
-func (v *VagrantCloud) Release(name string) error {
-	return nil
 }

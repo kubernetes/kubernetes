@@ -390,14 +390,6 @@ func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
 	return rsrc, nil
 }
 
-func (i *Instances) Configure(name string, spec *api.NodeSpec) error {
-	return nil
-}
-
-func (i *Instances) Release(name string) error {
-	return nil
-}
-
 func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
@@ -687,4 +679,8 @@ func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 	glog.V(1).Infof("Current zone is %v", os.region)
 
 	return cloudprovider.Zone{Region: os.region}, nil
+}
+
+func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
+	return nil, false
 }

@@ -782,8 +782,10 @@ function kube-down {
 
   # Delete routes.
   local -a routes
+  # Clean up all routes w/ names like "<cluster-name>-<node-GUID>"
+  # e.g. "kubernetes-12345678-90ab-cdef-1234-567890abcdef"
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
-              --regexp "${NODE_INSTANCE_PREFIX}-.+" | awk 'NR >= 2 { print $1 }') )
+    --regexp "${INSTANCE_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}" | awk 'NR >= 2 { print $1 }') )
   routes+=("${MASTER_NAME}")
   while (( "${#routes[@]}" > 0 )); do
     echo Deleting routes "${routes[*]::10}"
