@@ -20,6 +20,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -142,25 +143,11 @@ func TestAllocateSmall(t *testing.T) {
 		}
 	}
 
-	if r.count != 2 && r.Free() != 0 && r.max != 2 {
+	if r.Free() != 0 && r.max != 2 {
 		t.Fatalf("unexpected range: %v", r)
 	}
 
 	t.Logf("allocated: %v", found)
-}
-
-func TestBitCount(t *testing.T) {
-	for i, c := range bitCounts {
-		actual := 0
-		for j := 0; j < 8; j++ {
-			if ((1 << uint(j)) & i) != 0 {
-				actual++
-			}
-		}
-		if actual != int(c) {
-			t.Errorf("%d should have %d bits but recorded as %d", i, actual, c)
-		}
-	}
 }
 
 func TestRangeSize(t *testing.T) {
@@ -195,7 +182,17 @@ func TestSnapshot(t *testing.T) {
 		ip = append(ip, n)
 	}
 
-	network, data := r.Snapshot()
+	var dst api.RangeAllocation
+	err = r.Snapshot(&dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, network, err := net.ParseCIDR(dst.Range)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if !network.IP.Equal(cidr.IP) || network.Mask.String() != cidr.Mask.String() {
 		t.Fatalf("mismatched networks: %s : %s", network, cidr)
 	}
@@ -205,11 +202,11 @@ func TestSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	other := NewCIDRRange(otherCidr)
-	if err := r.Restore(otherCidr, data); err != ErrMismatchedNetwork {
+	if err := r.Restore(otherCidr, dst.Data); err != ErrMismatchedNetwork {
 		t.Fatal(err)
 	}
 	other = NewCIDRRange(network)
-	if err := other.Restore(network, data); err != nil {
+	if err := other.Restore(network, dst.Data); err != nil {
 		t.Fatal(err)
 	}
 
