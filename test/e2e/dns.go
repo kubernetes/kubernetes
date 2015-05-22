@@ -22,7 +22,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -38,25 +37,15 @@ var dnsServiceLableSelector = labels.Set{
 }.AsSelector()
 
 var _ = Describe("DNS", func() {
-	var c *client.Client
-	// Use this in tests.  They're unique for each test to prevent name collisions.
-	var testNamespace string
+	f := NewFramework("dns")
 
-	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		ns, err := createTestingNS("dns", c)
-		Expect(err).NotTo(HaveOccurred())
-		testNamespace = ns.Name
-	})
 	It("should provide DNS for the cluster", func() {
 		if providerIs("vagrant") {
 			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 			return
 		}
 
-		podClient := c.Pods(api.NamespaceDefault)
+		podClient := f.Client.Pods(api.NamespaceDefault)
 
 		By("Waiting for DNS Service to be Running")
 		dnsPods, err := podClient.List(dnsServiceLableSelector, fields.Everything())
@@ -66,7 +55,7 @@ var _ = Describe("DNS", func() {
 		if len(dnsPods.Items) != 1 {
 			Failf("Unexpected number of pods (%d) matches the label selector %v", len(dnsPods.Items), dnsServiceLableSelector.String())
 		}
-		expectNoError(waitForPodRunning(c, dnsPods.Items[0].Name))
+		expectNoError(waitForPodRunning(f.Client, dnsPods.Items[0].Name))
 
 		// All the names we need to be able to resolve.
 		// TODO: Spin up a separate test service and test that dns works for that service.
@@ -99,7 +88,7 @@ var _ = Describe("DNS", func() {
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name:      "dns-test-" + string(util.NewUUID()),
-				Namespace: testNamespace,
+				Namespace: f.Namespace.Name,
 			},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
@@ -138,7 +127,7 @@ var _ = Describe("DNS", func() {
 		}
 
 		By("submitting the pod to kubernetes")
-		podClient = c.Pods(testNamespace)
+		podClient = f.Client.Pods(f.Namespace.Name)
 		defer func() {
 			By("deleting the pod")
 			defer GinkgoRecover()
@@ -148,7 +137,7 @@ var _ = Describe("DNS", func() {
 			Failf("Failed to create %s pod: %v", pod.Name, err)
 		}
 
-		expectNoError(waitForPodRunningInNamespace(c, pod.Name, testNamespace))
+		expectNoError(f.WaitForPodRunning(pod.Name))
 
 		By("retrieving the pod")
 		pod, err = podClient.Get(pod.Name)
@@ -165,10 +154,10 @@ var _ = Describe("DNS", func() {
 			for _, name := range namesToResolve {
 				for _, proto := range []string{"udp", "tcp"} {
 					testCase := fmt.Sprintf("%s@%s", proto, name)
-					_, err := c.Get().
+					_, err := f.Client.Get().
 						Prefix("proxy").
 						Resource("pods").
-						Namespace(testNamespace).
+						Namespace(f.Namespace.Name).
 						Name(pod.Name).
 						Suffix("results", testCase).
 						Do().Raw()
