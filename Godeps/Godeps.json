@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.4.2",
+	"GoVersion": "go1.3.3",
 	"Packages": [
 		"./..."
 	],
@@ -47,6 +47,34 @@
 			"ImportPath": "github.com/appc/spec/schema",
 			"Comment": "v0.5.1-55-g87808a3",
 			"Rev": "87808a37061a4a2e6204ccea5fd2fc930576db94"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/aws",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/endpoints",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/protocol/ec2query",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/protocol/query/queryutil",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/protocol/xml/xmlutil",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/signer/v4",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/service/ec2",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
 		},
 		{
 			"ImportPath": "github.com/beorn7/perks/quantile",
@@ -356,14 +384,6 @@
 		{
 			"ImportPath": "github.com/miekg/dns",
 			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
-		},
-		{
-			"ImportPath": "github.com/mitchellh/goamz/aws",
-			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
-		},
-		{
-			"ImportPath": "github.com/mitchellh/goamz/ec2",
-			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
 		},
 		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
