@@ -40,7 +40,7 @@ cp flannel-${FLANNEL_VERSION}/flanneld binaries/minion
 
 # ectd
 echo "Download etcd release ..."
-ETCD_VERSION="v2.0.0"
+ETCD_VERSION="v2.0.9"
 ETCD="etcd-${ETCD_VERSION}-linux-amd64"
 if [ ! -f etcd.tar.gz ] ; then
     curl -L https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/${ETCD}.tar.gz -o etcd.tar.gz
