@@ -151,8 +151,9 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"clients. If blank, all interfaces will be used (0.0.0.0).")
 	fs.Var(&s.AdvertiseAddress, "advertise-address", ""+
 		"The IP address on which to advertise the apiserver to members of the cluster. This "+
-		"address must be reachable by the rest of the cluster. If blank, all interfaces will be "+
-		"used.")
+		"address must be reachable by the rest of the cluster. If blank, the --bind-address "+
+		"will be used. If --bind-address is unspecified, the host's default interface will "+
+		"be used.")
 	fs.Var(&s.BindAddress, "public-address-override", "DEPRECATED: see --bind-address instead")
 	fs.IntVar(&s.ReadOnlyPort, "read-only-port", s.ReadOnlyPort, ""+
 		"The port on which to serve read-only resources. If 0, don't serve read-only "+
@@ -239,6 +240,13 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersi
 // Run runs the specified APIServer.  This should never exit.
 func (s *APIServer) Run(_ []string) error {
 	s.verifyClusterIPFlags()
+
+	// If advertise-address is not specified, use bind-address. If bind-address
+	// is also unset (or 0.0.0.0), setDefaults() in pkg/master/master.go will
+	// do the right thing and use the host's default interface.
+	if s.AdvertiseAddress == nil || net.IP(s.AdvertiseAddress).IsUnspecified() {
+		s.AdvertiseAddress = s.BindAddress
+	}
 
 	if (s.EtcdConfigFile != "" && len(s.EtcdServerList) != 0) || (s.EtcdConfigFile == "" && len(s.EtcdServerList) == 0) {
 		glog.Fatalf("specify either --etcd-servers or --etcd-config")
