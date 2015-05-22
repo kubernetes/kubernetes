@@ -1285,6 +1285,14 @@ func convert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api.Per
 	} else {
 		out.RBD = nil
 	}
+	if in.ISCSI != nil {
+		out.ISCSI = new(ISCSIVolumeSource)
+		if err := convert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in.ISCSI, out.ISCSI, s); err != nil {
+			return err
+		}
+	} else {
+		out.ISCSI = nil
+	}
 	return nil
 }
 
@@ -3510,6 +3518,14 @@ func convert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Persist
 		}
 	} else {
 		out.RBD = nil
+	}
+	if in.ISCSI != nil {
+		out.ISCSI = new(api.ISCSIVolumeSource)
+		if err := convert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in.ISCSI, out.ISCSI, s); err != nil {
+			return err
+		}
+	} else {
+		out.ISCSI = nil
 	}
 	return nil
 }
