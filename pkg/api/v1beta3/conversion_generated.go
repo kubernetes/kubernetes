@@ -2013,42 +2013,6 @@ func convert_api_ServicePort_To_v1beta3_ServicePort(in *api.ServicePort, out *Se
 	return nil
 }
 
-func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.ServiceSpec))(in)
-	}
-	if in.Ports != nil {
-		out.Ports = make([]ServicePort, len(in.Ports))
-		for i := range in.Ports {
-			if err := convert_api_ServicePort_To_v1beta3_ServicePort(&in.Ports[i], &out.Ports[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Ports = nil
-	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	out.PortalIP = in.PortalIP
-	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
-		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
-		}
-	} else {
-		out.PublicIPs = nil
-	}
-	out.SessionAffinity = ServiceAffinity(in.SessionAffinity)
-	return nil
-}
-
 func convert_api_ServiceStatus_To_v1beta3_ServiceStatus(in *api.ServiceStatus, out *ServiceStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ServiceStatus))(in)
@@ -4237,42 +4201,6 @@ func convert_v1beta3_ServicePort_To_api_ServicePort(in *ServicePort, out *api.Se
 	return nil
 }
 
-func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ServiceSpec))(in)
-	}
-	if in.Ports != nil {
-		out.Ports = make([]api.ServicePort, len(in.Ports))
-		for i := range in.Ports {
-			if err := convert_v1beta3_ServicePort_To_api_ServicePort(&in.Ports[i], &out.Ports[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Ports = nil
-	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	out.PortalIP = in.PortalIP
-	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-	if in.PublicIPs != nil {
-		out.PublicIPs = make([]string, len(in.PublicIPs))
-		for i := range in.PublicIPs {
-			out.PublicIPs[i] = in.PublicIPs[i]
-		}
-	} else {
-		out.PublicIPs = nil
-	}
-	out.SessionAffinity = api.ServiceAffinity(in.SessionAffinity)
-	return nil
-}
-
 func convert_v1beta3_ServiceStatus_To_api_ServiceStatus(in *ServiceStatus, out *api.ServiceStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceStatus))(in)
@@ -4577,7 +4505,6 @@ func init() {
 		convert_api_ServiceAccount_To_v1beta3_ServiceAccount,
 		convert_api_ServiceList_To_v1beta3_ServiceList,
 		convert_api_ServicePort_To_v1beta3_ServicePort,
-		convert_api_ServiceSpec_To_v1beta3_ServiceSpec,
 		convert_api_ServiceStatus_To_v1beta3_ServiceStatus,
 		convert_api_Service_To_v1beta3_Service,
 		convert_api_StatusCause_To_v1beta3_StatusCause,
@@ -4690,7 +4617,6 @@ func init() {
 		convert_v1beta3_ServiceAccount_To_api_ServiceAccount,
 		convert_v1beta3_ServiceList_To_api_ServiceList,
 		convert_v1beta3_ServicePort_To_api_ServicePort,
-		convert_v1beta3_ServiceSpec_To_api_ServiceSpec,
 		convert_v1beta3_ServiceStatus_To_api_ServiceStatus,
 		convert_v1beta3_Service_To_api_Service,
 		convert_v1beta3_StatusCause_To_api_StatusCause,

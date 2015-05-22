@@ -12,7 +12,7 @@ selector for a new Service on the specified port. If no labels are specified, th
 re-use the labels from the resource it exposes.
 
 ```
-kubectl expose RESOURCE NAME --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--public-ip=ip] [--create-external-load-balancer=bool]
+kubectl expose RESOURCE NAME --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--public-ip=ip] [--type=type]
 ```
 
 ### Examples
@@ -32,7 +32,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
 
 ```
       --container-port="": Synonym for --target-port
-      --create-external-load-balancer=false: If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default is 'false'.
+      --create-external-load-balancer=false: If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.
       --dry-run=false: If true, only print the object that would be sent, without creating it.
       --generator="service/v1": The name of the API generator to use.  Default is 'service/v1'.
   -h, --help=false: help for expose
@@ -48,6 +48,7 @@ $ kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
       --selector="": A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
       --target-port="": Name or number for the port on the container that the service should direct traffic to. Optional.
   -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
+      --type="": Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP' unless --create-external-load-balancer is specified.
 ```
 
 ### Options inherited from parent commands

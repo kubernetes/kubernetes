@@ -233,7 +233,10 @@ func TestSetDefaultService(t *testing.T) {
 	obj2 := roundTrip(t, runtime.Object(svc))
 	svc2 := obj2.(*versioned.Service)
 	if svc2.Spec.SessionAffinity != versioned.ServiceAffinityNone {
-		t.Errorf("Expected default sesseion affinity type:%s, got: %s", versioned.ServiceAffinityNone, svc2.Spec.SessionAffinity)
+		t.Errorf("Expected default session affinity type:%s, got: %s", versioned.ServiceAffinityNone, svc2.Spec.SessionAffinity)
+	}
+	if svc2.Spec.Type != versioned.ServiceTypeClusterIP {
+		t.Errorf("Expected default type:%s, got: %s", versioned.ServiceTypeClusterIP, svc2.Spec.Type)
 	}
 }
 

@@ -1427,6 +1427,7 @@ func makeValidService() api.Service {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"key": "val"},
 			SessionAffinity: "None",
+			Type:            api.ServiceTypeClusterIP,
 			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675}},
 		},
 	}
@@ -1519,6 +1520,13 @@ func TestValidateService(t *testing.T) {
 			name: "missing session affinity",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.SessionAffinity = ""
+			},
+			numErrs: 1,
+		},
+		{
+			name: "missing type",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = ""
 			},
 			numErrs: 1,
 		},
@@ -1632,7 +1640,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid load balancer protocol 1",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
+				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports[0].Protocol = "UDP"
 			},
 			numErrs: 1,
@@ -1640,7 +1648,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid load balancer protocol 2",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
+				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "UDP"})
 			},
 			numErrs: 1,
@@ -1683,16 +1691,31 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "valid external load balancer",
+			name: "valid visbility - cluster",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
+				s.Spec.Type = api.ServiceTypeClusterIP
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid visbility - loadbalancer",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid type loadbalancer 2 ports",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
 		},
 		{
 			name: "valid external load balancer 2 ports",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.CreateExternalLoadBalancer = true
+				s.Spec.Type = api.ServiceTypeLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
@@ -2455,6 +2478,20 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "remove affinity",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
 				newSvc.Spec.SessionAffinity = ""
+			},
+			numErrs: 1,
+		},
+		{
+			name: "change type",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+			},
+			numErrs: 0,
+		},
+		{
+			name: "remove type",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.Type = ""
 			},
 			numErrs: 1,
 		},

@@ -1032,6 +1032,8 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 }
 
 var supportedSessionAffinityType = util.NewStringSet(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
+var supportedServiceType = util.NewStringSet(string(api.ServiceTypeClusterIP),
+	string(api.ServiceTypeLoadBalancer))
 
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
@@ -1070,7 +1072,13 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		}
 	}
 
-	if service.Spec.CreateExternalLoadBalancer {
+	if service.Spec.Type == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.type"))
+	} else if !supportedServiceType.Has(string(service.Spec.Type)) {
+		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.type", service.Spec.Type))
+	}
+
+	if service.Spec.Type == api.ServiceTypeLoadBalancer {
 		for i := range service.Spec.Ports {
 			if service.Spec.Ports[i].Protocol != api.ProtocolTCP {
 				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot create an external load balancer with non-TCP ports"))
