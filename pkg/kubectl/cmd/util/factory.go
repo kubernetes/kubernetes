@@ -64,7 +64,7 @@ type Factory struct {
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer func(mapping *meta.RESTMapping) (kubectl.Describer, error)
 	// Returns a Printer for formatting objects of the given type or an error.
-	Printer func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
+	Printer func(mapping *meta.RESTMapping, noHeaders, withNamespace bool) (kubectl.ResourcePrinter, error)
 	// Returns a Resizer for changing the size of the specified RESTMapping type or an error
 	Resizer func(mapping *meta.RESTMapping) (kubectl.Resizer, error)
 	// Returns a Reaper for gracefully shutting down resources.
@@ -143,8 +143,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return describer, nil
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
-			return kubectl.NewHumanReadablePrinter(noHeaders), nil
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool) (kubectl.ResourcePrinter, error) {
+			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace), nil
 		},
 		PodSelectorForObject: func(object runtime.Object) (string, error) {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
@@ -343,7 +343,7 @@ func (f *Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Wri
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(cmd, mapping)
+	printer, err := f.PrinterForMapping(cmd, mapping, false)
 	if err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func (f *Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Wri
 
 // PrinterForMapping returns a printer suitable for displaying the provided resource type.
 // Requires that printer flags have been added to cmd (see AddPrinterFlags).
-func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.ResourcePrinter, error) {
+func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
 	printer, ok, err := PrinterForCommand(cmd)
 	if err != nil {
 		return nil, err
@@ -373,7 +373,7 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		}
 		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.APIVersion)
 	} else {
-		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"))
+		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"), withNamespace)
 		if err != nil {
 			return nil, err
 		}
