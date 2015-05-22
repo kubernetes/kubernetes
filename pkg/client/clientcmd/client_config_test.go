@@ -165,12 +165,14 @@ func TestCreateMissingContext(t *testing.T) {
 	const expectedErrorContains = "Context was not found for specified context"
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "not-present", &ConfigOverrides{})
-	expectedConfig := &client.Config{Host: "http://localhost:8080"}
 
 	clientConfig, err := clientBuilder.ClientConfig()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
+
+	expectedConfig := &client.Config{Host: clientConfig.Host}
+
 	if !reflect.DeepEqual(expectedConfig, clientConfig) {
 		t.Errorf("Expected %#v, got %#v", expectedConfig, clientConfig)
 	}
