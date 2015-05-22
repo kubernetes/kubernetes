@@ -15,8 +15,10 @@
                  '$scope',
                  '$filter',
                  '$location',
+                 'menu',
                  '$rootScope',
-                 function($scope, $filter, $location, $rootScope) {
+                 function($scope, $filter, $location, menu, $rootScope) {
+                  $scope.menu = menu;
                    $scope.$watch('page', function(newValue, oldValue) {
                      if (typeof newValue !== 'undefined') {
                        $location.path(newValue);
@@ -26,12 +28,12 @@
                    $scope.subpages = [
                      {
                        category: 'dashboard',
-                       name: 'Groups',
+                       name: 'Explore',
                        value: '/dashboard/groups/type/selector/',
                        id: 'groupsView'
                      },
                      {category: 'dashboard', name: 'Pods', value: '/dashboard/pods', id: 'podsView'},
-                     {category: 'dashboard', name: 'Minions', value: '/dashboard/minions', id: 'minionsView'},
+                     {category: 'dashboard', name: 'Nodes', value: '/dashboard/nodes', id: 'minionsView'},
                      {
                        category: 'dashboard',
                        name: 'Replication Controllers',
@@ -66,8 +68,10 @@
             filters: '=',
             customClass: '=customClass',
             thumbs: '=',
-            count: '='
+            count: '=',
+            doSelect: '&onSelect'
           },
+          transclude: true,
           controller: function($scope, $filter, $window, $location) {
             var orderBy = $filter('orderBy');
             $scope.currentPage = 0;
@@ -79,13 +83,6 @@
                 return false;
               }
             };
-            $scope.go = function(d) {
-              if (d.pod) {
-                $location.path('/dashboard/pods/' + d.pod);
-              } else if (d.name) {
-                $location.path('/dashboard/services/' + d.name);
-              }
-            };
             $scope.order = function(predicate, reverse) {
               $scope.content = orderBy($scope.content, predicate, reverse);
               $scope.predicate = predicate;
@@ -93,6 +90,7 @@
             $scope.order($scope.sortable[0], false);
             $scope.getNumber = function(num) { return new Array(num); };
             $scope.goToPage = function(page) { $scope.currentPage = page; };
+            $scope.showMore = function() { return angular.isDefined($scope.moreClick);}
           },
           templateUrl: 'views/partials/md-table.tmpl.html'
         };

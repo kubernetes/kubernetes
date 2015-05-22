@@ -37,12 +37,7 @@ app.controller('ListPodsCtrl', [
     $scope.sortable = ['pod', 'ip', 'status'];
     $scope.count = 10;
 
-    $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
-
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
+    $scope.go = function(data) { $location.path('/dashboard/pods/' + data.pod); };
 
     var orderedPodNames = [];
 
@@ -55,7 +50,7 @@ app.controller('ListPodsCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getPods().success(angular.bind(this, function(data) {
         $scope.loading = false;
@@ -130,7 +125,7 @@ app.controller('ListPodsCtrl', [
       return _.indexOf(orderedPodNames, name) + 1;
     };
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);
