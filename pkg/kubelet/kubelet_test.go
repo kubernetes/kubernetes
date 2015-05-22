@@ -69,7 +69,7 @@ type TestKubelet struct {
 	fakeMirrorClient *fakeMirrorClient
 }
 
-const testKubeletHostname = "testnode"
+const testKubeletHostname = "127.0.0.1"
 
 func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeDocker := &dockertools.FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
@@ -81,7 +81,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.os = kubecontainer.FakeOS{}
 
-	kubelet.hostname = "testnode"
+	kubelet.hostname = testKubeletHostname
 	kubelet.runtimeUpThreshold = maxWaitForContainerRuntime
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
@@ -3026,7 +3026,7 @@ func TestHandleNodeSelector(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kl := testKubelet.kubelet
 	kl.nodeLister = testNodeLister{nodes: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: "testnode", Labels: map[string]string{"key": "B"}}},
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}},
 	}}
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
@@ -3241,7 +3241,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"}},
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactFn
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
@@ -3259,7 +3259,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
+		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
@@ -3320,7 +3320,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{
-			ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
+			ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 			Spec:       api.NodeSpec{},
 			Status: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -3356,7 +3356,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
+		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
@@ -3423,7 +3423,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	fakeDocker.VersionInfo = []string{}
 
 	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"}},
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
 	}}).ReactFn
 	mockCadvisor := testKubelet.fakeCadvisor
 	machineInfo := &cadvisorApi.MachineInfo{
@@ -3442,7 +3442,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
+		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
 		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
@@ -4410,7 +4410,6 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	kubelet.hostname = "127.0.0.1"
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactFn = func(action testclient.FakeAction) (runtime.Object, error) {
 		segments := strings.Split(action.Action, "-")
@@ -4427,8 +4426,8 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 		case "get":
 			// Return an existing (matching) node on get.
 			return &api.Node{
-				ObjectMeta: api.ObjectMeta{Name: "127.0.0.1"},
-				Spec:       api.NodeSpec{ExternalID: "127.0.0.1"},
+				ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+				Spec:       api.NodeSpec{ExternalID: testKubeletHostname},
 			}, nil
 		default:
 			return nil, fmt.Errorf("no reaction implemented for %s", action.Action)
