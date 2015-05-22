@@ -120,7 +120,13 @@ func playWithRC(c *client.Client, wg *sync.WaitGroup, ns, name string, size int)
 	// Once every 1-2 minutes perform resize of RC.
 	for start := time.Now(); time.Since(start) < simulationTime; time.Sleep(time.Duration(60+rand.Intn(60)) * time.Second) {
 		if !rcExist {
-			expectNoError(RunRC(c, name, ns, image, size), fmt.Sprintf("creating rc %s in namespace %s", name, ns))
+			config := RCConfig{Client: c,
+				Name:      name,
+				Namespace: ns,
+				Image:     image,
+				Replicas:  size,
+			}
+			expectNoError(RunRC(config), fmt.Sprintf("creating rc %s in namespace %s", name, ns))
 			rcExist = true
 		}
 		// Resize RC to a random size between 0.5x and 1.5x of the original size.

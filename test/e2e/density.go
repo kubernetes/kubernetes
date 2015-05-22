@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	"math"
+	"os"
 	"strconv"
 	"time"
 
@@ -45,6 +46,7 @@ var _ = Describe("Density", func() {
 	var minionCount int
 	var RCName string
 	var ns string
+	var uuid string
 
 	BeforeEach(func() {
 		var err error
@@ -57,6 +59,9 @@ var _ = Describe("Density", func() {
 		nsForTesting, err := createTestingNS("density", c)
 		ns = nsForTesting.Name
 		expectNoError(err)
+		uuid = string(util.NewUUID())
+		expectNoError(os.Mkdir(uuid, 0777))
+		expectNoError(writePerfData(c, uuid, "before"))
 	})
 
 	AfterEach(func() {
@@ -76,6 +81,8 @@ var _ = Describe("Density", func() {
 			Failf("Couldn't delete ns %s", err)
 		}
 
+		expectNoError(writePerfData(c, uuid, "after"))
+
 		// Verify latency metrics
 		// TODO: Update threshold to 1s once we reach this goal
 		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
@@ -89,16 +96,18 @@ var _ = Describe("Density", func() {
 	type Density struct {
 		skip          bool
 		podsPerMinion int
+		/* Controls how often the apiserver is polled for pods */
+		interval int
 	}
 
 	densityTests := []Density{
 		// This test should always run, even if larger densities are skipped.
-		{podsPerMinion: 3, skip: false},
-		{podsPerMinion: 30, skip: false},
+		{podsPerMinion: 3, skip: false, interval: 10},
+		{podsPerMinion: 30, skip: false, interval: 10},
 		// More than 30 pods per node is outside our v1.0 goals.
 		// We might want to enable those tests in the future.
-		{podsPerMinion: 50, skip: true},
-		{podsPerMinion: 100, skip: true},
+		{podsPerMinion: 50, skip: true, interval: 10},
+		{podsPerMinion: 100, skip: true, interval: 1},
 	}
 
 	for _, testArg := range densityTests {
@@ -112,8 +121,19 @@ var _ = Describe("Density", func() {
 		itArg := testArg
 		It(name, func() {
 			totalPods := itArg.podsPerMinion * minionCount
-			nameStr := strconv.Itoa(totalPods) + "-" + string(util.NewUUID())
-			RCName = "my-hostname-density" + nameStr
+			RCName = "density" + strconv.Itoa(totalPods) + "-" + uuid
+			fileHndl, err := os.Create(fmt.Sprintf("%s/pod_states.csv", uuid))
+			expectNoError(err)
+			defer fileHndl.Close()
+
+			config := RCConfig{Client: c,
+				Image:         "gcr.io/google_containers/pause:go",
+				Name:          RCName,
+				Namespace:     ns,
+				PollInterval:  itArg.interval,
+				PodStatusFile: fileHndl,
+				Replicas:      totalPods,
+			}
 
 			// Create a listener for events.
 			events := make([](*api.Event), 0)
@@ -139,7 +159,7 @@ var _ = Describe("Density", func() {
 
 			// Start the replication controller.
 			startTime := time.Now()
-			expectNoError(RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", totalPods))
+			expectNoError(RunRC(config))
 			e2eStartupTime := time.Now().Sub(startTime)
 			Logf("E2E startup time for %d pods: %v", totalPods, e2eStartupTime)
 
