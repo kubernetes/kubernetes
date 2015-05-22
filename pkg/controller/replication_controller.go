@@ -354,6 +354,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	obj, exists, err := rm.controllerStore.Store.GetByKey(key)
 	if !exists {
 		glog.Infof("Replication Controller has been deleted %v", key)
+		rm.expectations.DeleteExpectations(key)
 		return nil
 	}
 	if err != nil {
