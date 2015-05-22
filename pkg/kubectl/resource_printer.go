@@ -404,13 +404,17 @@ func printPod(pod *api.Pod, w io.Writer, withNamespace bool) error {
 		name = pod.Name
 	}
 
+	phase := string(pod.Status.Phase)
+	if pod.DeletionTimestamp != nil {
+		phase = "Terminating"
+	}
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 		name,
 		pod.Status.PodIP,
 		"", "",
 		podHostString(pod.Spec.NodeName, pod.Status.HostIP),
 		formatLabels(pod.Labels),
-		pod.Status.Phase,
+		phase,
 		translateTimestamp(pod.CreationTimestamp),
 		pod.Status.Message,
 	)
