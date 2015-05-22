@@ -77,6 +77,12 @@ else
   )
 fi
 
+if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
+  NODE_INSTANCE_GROUP="${NODE_INSTANCE_PREFIX}-group"
+else
+  NODE_INSTANCE_GROUP=""
+fi
+
 ginkgo_args=()
 if [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
   ginkgo_args+=("-p")
@@ -93,5 +99,7 @@ fi
   --gce-zone="${ZONE:-}" \
   --kube-master="${KUBE_MASTER:-}" \
   --repo-root="${KUBE_VERSION_ROOT}" \
+  --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
+  --num-nodes="${NUM_MINIONS:-}" \
   ${E2E_REPORT_DIR+"--report-dir=${E2E_REPORT_DIR}"} \
   "${@:-}"
