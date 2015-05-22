@@ -38,7 +38,7 @@ else
 fi
 
 # Additional parameters that are passed to ginkgo runner.
-GINKGO_TEST_ARGS=""
+GINKGO_TEST_ARGS=${GINKGO_TEST_ARGS:-""}
 
 if [[ "${PERFORMANCE:-}" == "true" ]]; then
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
