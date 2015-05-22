@@ -42,7 +42,7 @@ func podWithID(id, desiredHost string) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: id, SelfLink: testapi.SelfLink("pods", id)},
 		Spec: api.PodSpec{
-			Host: desiredHost,
+			NodeName: desiredHost,
 		},
 	}
 }

@@ -425,7 +425,7 @@ func (nc *NodeController) deletePods(nodeID string) error {
 	}
 	for _, pod := range pods.Items {
 		// Defensive check, also needed for tests.
-		if pod.Spec.Host != nodeID {
+		if pod.Spec.NodeName != nodeID {
 			continue
 		}
 		glog.V(2).Infof("Delete pod %v", pod.Name)

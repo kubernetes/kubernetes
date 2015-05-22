@@ -145,7 +145,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("foo-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						Host:          hostname,
+						NodeName:      hostname,
 						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
@@ -172,7 +172,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("111-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						Host:          hostname,
+						NodeName:      hostname,
 						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
@@ -199,7 +199,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("foo-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						Host:          hostname,
+						NodeName:      hostname,
 						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
@@ -230,7 +230,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("foo-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						Host:          hostname,
+						NodeName:      hostname,
 						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
@@ -250,7 +250,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("bar-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						Host:          hostname,
+						NodeName:      hostname,
 						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
@@ -328,7 +328,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					Namespace: "mynamespace",
 				},
 				Spec: api.PodSpec{
-					Host:       hostname,
+					NodeName:   hostname,
 					Containers: []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
 				},
 			},
@@ -343,7 +343,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("foo-"+hostname, "mynamespace"),
 					},
 					Spec: api.PodSpec{
-						Host:          hostname,
+						NodeName:      hostname,
 						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
@@ -369,7 +369,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							UID:  "111",
 						},
 						Spec: api.PodSpec{
-							Host:       hostname,
+							NodeName:   hostname,
 							Containers: []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
 						},
 					},
@@ -379,7 +379,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							UID:  "222",
 						},
 						Spec: api.PodSpec{
-							Host:       hostname,
+							NodeName:   hostname,
 							Containers: []api.Container{{Name: "2", Image: "bar", ImagePullPolicy: ""}},
 						},
 					},
@@ -396,7 +396,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("foo-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						Host:          hostname,
+						NodeName:      hostname,
 						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{
@@ -416,7 +416,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SelfLink: getSelfLink("bar-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
-						Host:          hostname,
+						NodeName:      hostname,
 						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers: []api.Container{{

@@ -267,7 +267,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 				}
 				return
 			}
-			if pod.Spec.Host == "" {
+			if pod.Spec.NodeName == "" {
 				podQueue.Add(pod)
 			}
 		}()

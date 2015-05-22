@@ -185,7 +185,7 @@ func main() {
 								Ports: []api.ContainerPort{{ContainerPort: 9376}},
 							},
 						},
-						Host: node.Name,
+						NodeName: node.Name,
 					},
 				})
 				glog.V(4).Infof("Pod create %s/%s request took %v", ns, podName, time.Since(t))

@@ -102,7 +102,7 @@ func TestClient(t *testing.T) {
 	if actual.Name != got.Name {
 		t.Errorf("expected pod %#v, got %#v", got, actual)
 	}
-	if actual.Spec.Host != "" {
+	if actual.Spec.NodeName != "" {
 		t.Errorf("expected pod to be unscheduled, got %#v", actual)
 	}
 }

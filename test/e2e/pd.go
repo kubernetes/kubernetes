@@ -263,7 +263,7 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 					},
 				},
 			},
-			Host: targetHost,
+			NodeName: targetHost,
 		},
 	}
 

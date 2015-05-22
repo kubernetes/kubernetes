@@ -147,10 +147,10 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachin
 		if !ok {
 			return nil, 0, fmt.Errorf("unexpected object: %#v", obj)
 		}
-		if pod.Spec.Host != oldMachine {
-			return nil, 0, fmt.Errorf("pod %v is already assigned to host %q", pod.Name, pod.Spec.Host)
+		if pod.Spec.NodeName != oldMachine {
+			return nil, 0, fmt.Errorf("pod %v is already assigned to node %q", pod.Name, pod.Spec.NodeName)
 		}
-		pod.Spec.Host = machine
+		pod.Spec.NodeName = machine
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}

@@ -237,8 +237,8 @@ func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.S
 		for i := range pods.Items {
 			pod := pods.Items[i]
 			podString := fmt.Sprintf("%q/%q", pod.Namespace, pod.Name)
-			glog.Infof("Check whether pod %q exists on node %q", podString, pod.Spec.Host)
-			if len(pod.Spec.Host) == 0 {
+			glog.Infof("Check whether pod %q exists on node %q", podString, pod.Spec.NodeName)
+			if len(pod.Spec.NodeName) == 0 {
 				glog.Infof("Pod %q is not bound to a host yet", podString)
 				return false, nil
 			}
