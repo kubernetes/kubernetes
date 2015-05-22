@@ -42,7 +42,9 @@ const (
 	podStartupTimeout = 10 * time.Minute
 
 	// minStartupPods is the minimum number of pods that will allow
-	// wiatForPodsRunningReady(...) to succeed. More verbosely, that function
+	// waitForPodsRunningReady(...) to succeed (i.e. WLOG if you know that
+	// "DNS", and "Prometheus" pods need to be running, you might set it to "2").
+	// More verbosely, that function
 	// checks that all pods in the cluster are both in a phase of "running" and
 	// have a condition of "ready": "true". It aims to ensure that the cluster's
 	// pods are fully healthy before beginning e2e tests. However, if there were
@@ -54,7 +56,8 @@ const (
 	// does *not* mean that the function will succeed as soon as minStartupPods
 	// are found to be running and ready; it ensures that *all* pods it finds
 	// are running and ready. This is the minimum number it must find.
-	minStartupPods = 1
+	// TODO : Add command line option for this so that the number is non trivial.
+	minStartupPods = 0
 )
 
 var (
