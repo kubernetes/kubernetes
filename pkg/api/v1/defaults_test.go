@@ -155,6 +155,79 @@ func TestSetDefaultReplicationController(t *testing.T) {
 	}
 }
 
+func newInt(val int) *int {
+	p := new(int)
+	*p = val
+	return p
+}
+
+func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
+	tests := []struct {
+		rc             versioned.ReplicationController
+		expectReplicas int
+	}{
+		{
+			rc: versioned.ReplicationController{
+				Spec: versioned.ReplicationControllerSpec{
+					Template: &versioned.PodTemplateSpec{
+						ObjectMeta: versioned.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectReplicas: 1,
+		},
+		{
+			rc: versioned.ReplicationController{
+				Spec: versioned.ReplicationControllerSpec{
+					Replicas: newInt(0),
+					Template: &versioned.PodTemplateSpec{
+						ObjectMeta: versioned.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectReplicas: 0,
+		},
+		{
+			rc: versioned.ReplicationController{
+				Spec: versioned.ReplicationControllerSpec{
+					Replicas: newInt(3),
+					Template: &versioned.PodTemplateSpec{
+						ObjectMeta: versioned.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectReplicas: 3,
+		},
+	}
+
+	for _, test := range tests {
+		rc := &test.rc
+		obj2 := roundTrip(t, runtime.Object(rc))
+		rc2, ok := obj2.(*versioned.ReplicationController)
+		if !ok {
+			t.Errorf("unexpected object: %v", rc2)
+			t.FailNow()
+		}
+		if rc2.Spec.Replicas == nil {
+			t.Errorf("unexpected nil Replicas")
+		} else if test.expectReplicas != *rc2.Spec.Replicas {
+			t.Errorf("expected: %d replicas, got: %d", test.expectReplicas, *rc2.Spec.Replicas)
+		}
+	}
+}
+
 func TestSetDefaultService(t *testing.T) {
 	svc := &versioned.Service{}
 	obj2 := roundTrip(t, runtime.Object(svc))
