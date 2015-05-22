@@ -146,7 +146,7 @@ func (pb *prober) Probe(pod *api.Pod, status api.PodStatus, container api.Contai
 				return ready, nil
 			}
 		}
-		glog.V(1).Infof("Readiness probe for %q succeeded", ctrName)
+		glog.V(3).Infof("Readiness probe for %q succeeded", ctrName)
 	}
 
 	pb.readinessManager.SetReadiness(containerID, true)
