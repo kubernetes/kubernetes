@@ -210,7 +210,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 		cachedService.service = service
 		s.cache.set(namespacedName.String(), cachedService)
 	case cache.Deleted:
-		err := s.ensureLBDeleted(service)
+		err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region)
 		if err != nil {
 			return err, retryable
 		}
@@ -233,7 +233,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		// we can recreate it cleanly.
 		if cachedService.Spec.CreateExternalLoadBalancer {
 			glog.Infof("Deleting existing load balancer for service %s that needs an updated load balancer.", namespacedName)
-			if err := s.ensureLBDeleted(cachedService); err != nil {
+			if err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(cachedService), s.zone.Region); err != nil {
 				return err, retryable
 			}
 		}
@@ -254,7 +254,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		} else if exists {
 			glog.Infof("Deleting old LB for previously uncached service %s whose endpoint %s doesn't match the service's desired IPs %v",
 				namespacedName, endpoint, service.Spec.PublicIPs)
-			if err := s.ensureLBDeleted(service); err != nil {
+			if err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region); err != nil {
 				return err, retryable
 			}
 		}
@@ -343,23 +343,6 @@ func (s *ServiceController) createExternalLoadBalancer(service *api.Service) err
 			return err
 		}
 		service.Spec.PublicIPs = []string{endpoint}
-	}
-	return nil
-}
-
-// Ensures that the load balancer associated with the given service is deleted,
-// doing the deletion if necessary. Should always be retried upon failure.
-func (s *ServiceController) ensureLBDeleted(service *api.Service) error {
-	// This is only needed because not all delete load balancer implementations
-	// are currently idempotent to the LB not existing.
-	if _, exists, err := s.balancer.GetTCPLoadBalancer(s.loadBalancerName(service), s.zone.Region); err != nil {
-		return err
-	} else if !exists {
-		return nil
-	}
-
-	if err := s.balancer.DeleteTCPLoadBalancer(s.loadBalancerName(service), s.zone.Region); err != nil {
-		return err
 	}
 	return nil
 }

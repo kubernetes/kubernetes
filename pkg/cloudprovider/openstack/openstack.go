@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"regexp"
 	"time"
 
@@ -630,31 +631,49 @@ func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []strin
 	return nil
 }
 
-func (lb *LoadBalancer) DeleteTCPLoadBalancer(name, region string) error {
-	glog.V(4).Infof("DeleteTCPLoadBalancer(%v, %v)", name, region)
+func (lb *LoadBalancer) EnsureTCPLoadBalancerDeleted(name, region string) error {
+	glog.V(4).Infof("EnsureTCPLoadBalancerDeleted(%v, %v)", name, region)
 
-	vip, err := getVipByName(lb.network, name)
-	if err != nil {
-		return err
+	// TODO(#8352): Because we look up the pool using the VIP object, if the VIP
+	// is already gone we can't attempt to delete the pool. We should instead
+	// continue even if the VIP doesn't exist and attempt to delete the pool by
+	// name.
+	vip, vipErr := getVipByName(lb.network, name)
+	if vipErr == ErrNotFound {
+		return nil
+	} else if vipErr != nil {
+		return vipErr
 	}
 
-	pool, err := pools.Get(lb.network, vip.PoolID).Extract()
-	if err != nil {
-		return err
+	// It's ok if the pool doesn't exist, as we may still need to delete the vip
+	// (although I don't believe the system should ever be in that state).
+	pool, poolErr := pools.Get(lb.network, vip.PoolID).Extract()
+	if poolErr != nil {
+		detailedErr, ok := poolErr.(*gophercloud.UnexpectedResponseCodeError)
+		if !ok || detailedErr.Actual != http.StatusNotFound {
+			return poolErr
+		}
 	}
+	poolExists := (poolErr == nil)
 
-	// Have to delete VIP before pool can be deleted
-	err = vips.Delete(lb.network, vip.ID).ExtractErr()
-	if err != nil {
+	// We have to delete the VIP before the pool can be deleted, so we can't
+	// continue on if this fails.
+	// TODO(#8352): Only do this if the VIP exists once we can delete pools by
+	// name rather than by ID.
+	err := vips.Delete(lb.network, vip.ID).ExtractErr()
+	if err != nil && err != ErrNotFound {
 		return err
 	}
 
 	// Ignore errors for everything following here
 
-	for _, monId := range pool.MonitorIDs {
-		pools.DisassociateMonitor(lb.network, pool.ID, monId)
+	if poolExists {
+		for _, monId := range pool.MonitorIDs {
+			// TODO(#8352): Delete the monitor, don't just disassociate it.
+			pools.DisassociateMonitor(lb.network, pool.ID, monId)
+		}
+		pools.Delete(lb.network, pool.ID)
 	}
-	pools.Delete(lb.network, pool.ID)
 
 	return nil
 }

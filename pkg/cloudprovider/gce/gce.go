@@ -399,8 +399,8 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 	return nil
 }
 
-// DeleteTCPLoadBalancer is an implementation of TCPLoadBalancer.DeleteTCPLoadBalancer.
-func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
+// EnsureTCPLoadBalancerDeleted is an implementation of TCPLoadBalancer.EnsureTCPLoadBalancerDeleted.
+func (gce *GCECloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	op, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
 		glog.Infof("Forwarding rule %s already deleted. Continuing to delete target pool.", name)
@@ -411,6 +411,7 @@ func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 		err = gce.waitForRegionOp(op, region)
 		if err != nil {
 			glog.Warningf("Failed waiting for Forwarding Rule %s to be deleted: got error %s.", name, err.Error())
+			return err
 		}
 	}
 	op, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()

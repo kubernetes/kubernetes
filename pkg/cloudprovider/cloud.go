@@ -66,8 +66,13 @@ type TCPLoadBalancer interface {
 	CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (string, error)
 	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
 	UpdateTCPLoadBalancer(name, region string, hosts []string) error
-	// DeleteTCPLoadBalancer deletes a specified load balancer.
-	DeleteTCPLoadBalancer(name, region string) error
+	// EnsureTCPLoadBalancerDeleted deletes the specified load balancer if it
+	// exists, returning nil if the load balancer specified either didn't exist or
+	// was successfully deleted.
+	// This construction is useful because many cloud providers' load balancers
+	// have multiple underlying components, meaning a Get could say that the LB
+	// doesn't exist even if some part of it is still laying around.
+	EnsureTCPLoadBalancerDeleted(name, region string) error
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.
