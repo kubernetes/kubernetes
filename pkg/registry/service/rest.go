@@ -265,6 +265,12 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 		nodePortOp.ReleaseDeferred(oldNodePort)
 	}
 
+	// Remove any LoadBalancerStatus now if Type != LoadBalancer;
+	// although loadbalancer delete is actually asynchronous, we don't need to expose the user to that complexity.
+	if service.Spec.Type != api.ServiceTypeLoadBalancer {
+		service.Status.LoadBalancer = api.LoadBalancerStatus{}
+	}
+
 	out, err := rs.registry.UpdateService(ctx, service)
 
 	if err == nil {

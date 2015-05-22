@@ -256,33 +256,33 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		}
 	}
 
-	if !wantsExternalLoadBalancer(service) {
-		glog.Infof("Not creating LB for service %s that doesn't want one.", namespacedName)
-		return nil, notRetryable
-	}
-
-	glog.V(2).Infof("Creating LB for service %s", namespacedName)
-
-	// The load balancer doesn't exist yet, so create it.
-
 	// Save the state so we can avoid a write if it doesn't change
 	previousState := api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 
-	err := s.createExternalLoadBalancer(service)
-	if err != nil {
-		return fmt.Errorf("failed to create external load balancer for service %s: %v", namespacedName, err), retryable
+	if !wantsExternalLoadBalancer(service) {
+		glog.Infof("Not creating LB for service %s that doesn't want one.", namespacedName)
+
+		service.Status.LoadBalancer = api.LoadBalancerStatus{}
+	} else {
+		glog.V(2).Infof("Creating LB for service %s", namespacedName)
+
+		// The load balancer doesn't exist yet, so create it.
+		err := s.createExternalLoadBalancer(service)
+		if err != nil {
+			return fmt.Errorf("failed to create external load balancer for service %s: %v", namespacedName, err), retryable
+		}
 	}
 
 	// Write the state if changed
-	if api.LoadBalancerStatusEqual(previousState, &service.Status.LoadBalancer) {
-		glog.Infof("Not persisting unchanged service to registry.")
-		return nil, notRetryable
+	// TODO: Be careful here ... what if there were other changes to the service?
+	if !api.LoadBalancerStatusEqual(previousState, &service.Status.LoadBalancer) {
+		if err := s.persistUpdate(service); err != nil {
+			return fmt.Errorf("Failed to persist updated status to apiserver, even after retries. Giving up: %v", err), notRetryable
+		}
+	} else {
+		glog.Infof("Not persisting unchanged LoadBalancerStatus to registry.")
 	}
 
-	// If creating the load balancer succeeded, persist the updated service.
-	if err = s.persistUpdate(service); err != nil {
-		return fmt.Errorf("Failed to persist updated status to apiserver, even after retries. Giving up: %v", err), notRetryable
-	}
 	return nil, notRetryable
 }
 
