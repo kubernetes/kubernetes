@@ -324,7 +324,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", nil, item.fakeNodeHandler, 10,
+		nodeController := NewNodeController(nil, item.fakeNodeHandler, 10,
 			evictionTimeout, util.NewFakeRateLimiter(), testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() util.Time { return fakeNow }
@@ -527,7 +527,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", nil, item.fakeNodeHandler, 10, 5*time.Minute, util.NewFakeRateLimiter(),
+		nodeController := NewNodeController(nil, item.fakeNodeHandler, 10, 5*time.Minute, util.NewFakeRateLimiter(),
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {

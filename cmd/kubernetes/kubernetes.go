@@ -30,7 +30,6 @@ import (
 
 	kubeletapp "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -53,13 +52,10 @@ import (
 )
 
 var (
-	addr           = flag.String("addr", "127.0.0.1", "The address to use for the apiserver.")
-	port           = flag.Int("port", 8080, "The port for the apiserver to use.")
-	dockerEndpoint = flag.String("docker-endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
-	etcdServer     = flag.String("etcd-server", "http://localhost:4001", "If non-empty, path to the set of etcd server to use")
-	// TODO: Discover these by pinging the host machines, and rip out these flags.
-	nodeMilliCPU           = flag.Int64("node-milli-cpu", 1000, "The amount of MilliCPU provisioned on each node")
-	nodeMemory             = flag.Int64("node-memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
+	addr                   = flag.String("addr", "127.0.0.1", "The address to use for the apiserver.")
+	port                   = flag.Int("port", 8080, "The port for the apiserver to use.")
+	dockerEndpoint         = flag.String("docker-endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
+	etcdServer             = flag.String("etcd-server", "http://localhost:4001", "If non-empty, path to the set of etcd server to use")
 	masterServiceNamespace = flag.String("master-service-namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
 	enableProfiling        = flag.Bool("profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
 	deletingPodsQps        = flag.Float32("deleting-pods-qps", 0.1, "")
@@ -123,19 +119,12 @@ func runScheduler(cl *client.Client) {
 }
 
 // RunControllerManager starts a controller
-func runControllerManager(cl *client.Client, nodeMilliCPU, nodeMemory int64) {
-	nodeResources := &api.NodeResources{
-		Capacity: api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(nodeMilliCPU, resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(nodeMemory, resource.BinarySI),
-		},
-	}
-
+func runControllerManager(cl *client.Client) {
 	const nodeSyncPeriod = 10 * time.Second
 	nodeController := nodecontroller.NewNodeController(
-		nil, "", nodeResources, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst),
+		nil, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
-	nodeController.Run(nodeSyncPeriod, true)
+	nodeController.Run(nodeSyncPeriod)
 
 	serviceController := servicecontroller.New(nil, cl, "kubernetes")
 	if err := serviceController.Run(nodeSyncPeriod); err != nil {
@@ -152,7 +141,7 @@ func runControllerManager(cl *client.Client, nodeMilliCPU, nodeMemory int64) {
 func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP, port int) {
 	runApiServer(etcdClient, addr, port, *masterServiceNamespace)
 	runScheduler(cl)
-	runControllerManager(cl, *nodeMilliCPU, *nodeMemory)
+	runControllerManager(cl)
 
 	dockerClient := dockertools.ConnectToDockerOrDie(*dockerEndpoint)
 	cadvisorInterface, err := cadvisor.New(0)

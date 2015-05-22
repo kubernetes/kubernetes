@@ -37,7 +37,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
@@ -189,15 +188,9 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	// TODO: Write an integration test for the replication controllers watch.
 	go controllerManager.Run(3, util.NeverStop)
 
-	nodeResources := &api.NodeResources{
-		Capacity: api.ResourceList{
-			api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-			api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-		}}
-
-	nodeController := nodecontroller.NewNodeController(nil, "", nodeResources, cl, 10, 5*time.Minute, util.NewFakeRateLimiter(),
+	nodeController := nodecontroller.NewNodeController(nil, cl, 10, 5*time.Minute, util.NewFakeRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
-	nodeController.Run(5*time.Second, true)
+	nodeController.Run(5 * time.Second)
 	cadvisorInterface := new(cadvisor.Fake)
 
 	// Kubelet (localhost)

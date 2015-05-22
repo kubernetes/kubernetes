@@ -50,8 +50,6 @@ type nodeStatusData struct {
 
 type NodeController struct {
 	cloud                   cloudprovider.Interface
-	matchRE                 string
-	staticResources         *api.NodeResources
 	kubeClient              client.Interface
 	recorder                record.EventRecorder
 	registerRetryCount      int
@@ -93,8 +91,6 @@ type NodeController struct {
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
 func NewNodeController(
 	cloud cloudprovider.Interface,
-	matchRE string,
-	staticResources *api.NodeResources,
 	kubeClient client.Interface,
 	registerRetryCount int,
 	podEvictionTimeout time.Duration,
@@ -117,8 +113,6 @@ func NewNodeController(
 	}
 	return &NodeController{
 		cloud:                   cloud,
-		matchRE:                 matchRE,
-		staticResources:         staticResources,
 		kubeClient:              kubeClient,
 		recorder:                recorder,
 		registerRetryCount:      registerRetryCount,
@@ -178,7 +172,7 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 }
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
-func (nc *NodeController) Run(period time.Duration, syncNodeList bool) {
+func (nc *NodeController) Run(period time.Duration) {
 	// Incorporate the results of node status pushed from kubelet to master.
 	go util.Forever(func() {
 		if err := nc.monitorNodeStatus(); err != nil {
