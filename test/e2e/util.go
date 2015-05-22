@@ -118,18 +118,34 @@ func podReady(pod *api.Pod) bool {
 	return false
 }
 
-// logPodStates logs all pod states for debugging.
-func logPodStates(c *client.Client, ns string) {
-	podList, err := c.Pods(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
-		Logf("Error getting pods for logPodStates(...): %v", err)
-		return
+// logPodStates logs basic info of provided pods for debugging.
+func logPodStates(pods []api.Pod) {
+	// Find maximum widths for pod, node, and phase strings for column printing.
+	maxPodW, maxNodeW, maxPhaseW := len("POD"), len("NODE"), len("PHASE")
+	for _, pod := range pods {
+		if len(pod.ObjectMeta.Name) > maxPodW {
+			maxPodW = len(pod.ObjectMeta.Name)
+		}
+		if len(pod.Spec.Host) > maxNodeW {
+			maxNodeW = len(pod.Spec.Host)
+		}
+		if len(pod.Status.Phase) > maxPhaseW {
+			maxPhaseW = len(pod.Status.Phase)
+		}
 	}
-	Logf("Phase and conditions for all pods in namespace '%s':", ns)
-	for _, pod := range podList.Items {
-		Logf("- pod '%s' on '%s' has phase '%v' and conditions %v",
-			pod.ObjectMeta.Name, pod.Spec.Host, pod.Status.Phase, pod.Status.Conditions)
+	// Increase widths by one to separate by a single space.
+	maxPodW++
+	maxNodeW++
+	maxPhaseW++
+
+	// Log pod info. * does space padding, - makes them left-aligned.
+	Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %[7]s",
+		maxPodW, "POD", maxNodeW, "NODE", maxPhaseW, "PHASE", "CONDITIONS")
+	for _, pod := range pods {
+		Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %[7]s",
+			maxPodW, pod.ObjectMeta.Name, maxNodeW, pod.Spec.Host, maxPhaseW, pod.Status.Phase, pod.Status.Conditions)
 	}
+	Logf("") // Final empty line helps for readability.
 }
 
 // podRunningReady checks whether pod p's phase is running and it has a ready
@@ -169,19 +185,21 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 			Logf("Error getting pods in namespace '%s': %v", ns, err)
 			continue
 		}
-		nOk := 0
+		nOk, badPods := 0, []api.Pod{}
 		for _, pod := range podList.Items {
 			if res, err := podRunningReady(&pod); res && err == nil {
 				nOk++
+			} else {
+				badPods = append(badPods, pod)
 			}
 		}
-		Logf("%d / %d pods in namespace '%s' are running and ready (%v elapsed)",
-			nOk, len(podList.Items), ns, time.Since(start))
+		Logf("%d / %d pods in namespace '%s' are running and ready (%d seconds elapsed)",
+			nOk, len(podList.Items), ns, int(time.Since(start).Seconds()))
 		if nOk == len(podList.Items) && nOk >= minPods {
 			return nil
 		}
+		logPodStates(badPods)
 	}
-	logPodStates(c, ns)
 	return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
 }
 
