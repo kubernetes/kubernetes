@@ -43,7 +43,7 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fragment: `{ "apiVersion": "v1beta1" }`,
+			fragment: `{ "apiVersion": "v1beta3" }`,
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
@@ -101,25 +101,6 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fragment: `{ "apiVersion": "v1beta1", "id": "baz", "desiredState": { "host": "bar" } }`,
-			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "baz",
-				},
-				Spec: api.PodSpec{
-					NodeName:      "bar",
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-			},
-		},
-		{
-			kind: "Pod",
-			obj: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-				},
-			},
 			fragment: `{ "apiVersion": "v1beta3", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`,
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -149,24 +130,6 @@ func TestMerge(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			kind: "Pod",
-			obj: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-				},
-			},
-			fragment: `{ "apiVersion": "v1beta1", "id": null}`,
-			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-			},
-		},
-		{
 			kind:      "Service",
 			obj:       &api.Service{},
 			fragment:  `{ "apiVersion": "badVersion" }`,
@@ -177,11 +140,17 @@ func TestMerge(t *testing.T) {
 			obj: &api.Service{
 				Spec: api.ServiceSpec{},
 			},
-			fragment: `{ "apiVersion": "v1beta1", "port": 0 }`,
+			fragment: `{ "apiVersion": "v1beta3", "spec": { "ports": [ { "port": 0 } ] } }`,
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
 					Type:            api.ServiceTypeClusterIP,
+					Ports: []api.ServicePort{
+						{
+							Protocol: api.ProtocolTCP,
+							Port:     0,
+						},
+					},
 				},
 			},
 		},
@@ -194,7 +163,7 @@ func TestMerge(t *testing.T) {
 					},
 				},
 			},
-			fragment: `{ "apiVersion": "v1beta1", "selector": { "version": "v2" } }`,
+			fragment: `{ "apiVersion": "v1beta3", "spec": { "selector": { "version": "v2" } } }`,
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",

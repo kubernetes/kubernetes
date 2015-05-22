@@ -264,16 +264,7 @@ func (s *APIServer) Run(_ []string) error {
 	if ok && legacyAPIFlagValue == "false" {
 		disableLegacyAPIs = true
 	}
-
-	// "api/v1beta1={true|false} allows users to enable/disable v1beta1 API.
-	// This takes preference over api/all and api/legacy, if specified.
-	disableV1beta1 := disableAllAPIs || disableLegacyAPIs
-	disableV1beta1 = !s.getRuntimeConfigValue("api/v1beta1", !disableV1beta1)
-
-	// "api/v1beta2={true|false} allows users to enable/disable v1beta2 API.
-	// This takes preference over api/all and api/legacy, if specified.
-	disableV1beta2 := disableAllAPIs || disableLegacyAPIs
-	disableV1beta2 = !s.getRuntimeConfigValue("api/v1beta2", !disableV1beta2)
+	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
 
 	// "api/v1beta3={true|false} allows users to enable/disable v1beta3 API.
 	// This takes preference over api/all and api/legacy, if specified.
@@ -369,8 +360,6 @@ func (s *APIServer) Run(_ []string) error {
 		SupportsBasicAuth:      len(s.BasicAuthFile) > 0,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
-		DisableV1Beta1:         disableV1beta1,
-		DisableV1Beta2:         disableV1beta2,
 		DisableV1Beta3:         disableV1beta3,
 		EnableV1:               enableV1,
 		MasterServiceNamespace: s.MasterServiceNamespace,

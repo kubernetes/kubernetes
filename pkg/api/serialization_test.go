@@ -27,8 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -89,12 +87,6 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 	set := util.NewStringSet(except...)
 	seed := rand.Int63()
 	fuzzInternalObject(t, "", item, seed)
-	if !set.Has("v1beta1") {
-		roundTrip(t, v1beta1.Codec, item)
-	}
-	if !set.Has("v1beta2") {
-		roundTrip(t, v1beta2.Codec, item)
-	}
 	if !set.Has("v1beta3") {
 		fuzzInternalObject(t, "v1beta3", item, seed)
 		roundTrip(t, v1beta3.Codec, item)
@@ -103,8 +95,6 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 
 func roundTripAll(t *testing.T, item runtime.Object) {
 	seed := rand.Int63()
-	roundTrip(t, v1beta1.Codec, fuzzInternalObject(t, "v1beta1", item, seed))
-	roundTrip(t, v1beta2.Codec, fuzzInternalObject(t, "v1beta2", item, seed))
 	roundTrip(t, v1beta3.Codec, fuzzInternalObject(t, "v1beta3", item, seed))
 }
 
@@ -137,10 +127,7 @@ func TestList(t *testing.T) {
 
 var nonRoundTrippableTypes = util.NewStringSet("ContainerManifest", "ContainerManifestList")
 var nonInternalRoundTrippableTypes = util.NewStringSet("List", "ListOptions", "PodExecOptions")
-var nonRoundTrippableTypesByVersion = map[string][]string{
-	"PodTemplate":     {"v1beta1", "v1beta2"},
-	"PodTemplateList": {"v1beta1", "v1beta2"},
-}
+var nonRoundTrippableTypesByVersion = map[string][]string{}
 
 func TestRoundTripTypes(t *testing.T) {
 	// api.Scheme.Log(t)

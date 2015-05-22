@@ -155,10 +155,10 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		obj2   string
 	}{
 		"handles specific version": {
-			output: "v1beta3",
-			list:   "v1beta3",
+			output: "v1",
+			list:   "v1",
 			obj1:   "unlikelyversion",
-			obj2:   "v1beta3",
+			obj2:   "v1",
 		},
 		"handles second specific version": {
 			output: "unlikelyversion",
@@ -167,14 +167,14 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 			obj2:   "v1beta3",         // version of the API response
 		},
 		"handles common version": {
-			output: "v1beta1",
-			list:   "v1beta1",
+			output: "v1beta3",
+			list:   "v1beta3",
 			obj1:   "unlikelyversion", // because test scheme defaults to unlikelyversion
-			obj2:   "v1beta1",
+			obj2:   "v1beta3",
 		},
 	}
 	for k, test := range testCases {
-		apiCodec := runtime.CodecFor(api.Scheme, "v1beta1")
+		apiCodec := runtime.CodecFor(api.Scheme, "v1beta3")
 		regularClient := &client.FakeRESTClient{
 			Codec: apiCodec,
 			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
