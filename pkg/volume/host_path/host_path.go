@@ -26,15 +26,20 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
+// Tests covering recycling should not use this func but instead
+// use their own array of plugins w/ a custom recyclerFunc as appropriate
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&hostPathPlugin{nil}}
+	return []volume.VolumePlugin{&hostPathPlugin{nil, newRecycler}}
 }
 
 type hostPathPlugin struct {
 	host volume.VolumeHost
+	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
+	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error)
 }
 
 var _ volume.VolumePlugin = &hostPathPlugin{}
+var _ volume.PersistentVolumePlugin = &hostPathPlugin{}
 var _ volume.RecyclableVolumePlugin = &hostPathPlugin{}
 
 const (
@@ -71,6 +76,18 @@ func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID, _ mou
 	return &hostPath{""}, nil
 }
 
+func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
+	return plugin.newRecyclerFunc(spec, plugin.host)
+}
+
+func newRecycler(spec *volume.Spec, host volume.VolumeHost)(volume.Recycler, error){
+	if spec.VolumeSource.HostPath != nil {
+		return &hostPathRecycler{spec.VolumeSource.HostPath.Path, host}, nil
+	} else {
+		return &hostPathRecycler{spec.PersistentVolumeSource.HostPath.Path, host}, nil
+	}
+}
+
 // HostPath volumes represent a bare host file or directory mount.
 // The direct at the specified path will be directly exposed to the container.
 type hostPath struct {
@@ -101,16 +118,28 @@ func (hp *hostPath) TearDownAt(dir string) error {
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
 }
 
-func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
-	if spec.VolumeSource.HostPath != nil {
-		return &hostPath{spec.VolumeSource.HostPath.Path}, nil
-	} else {
-		return &hostPath{spec.PersistentVolumeSource.HostPath.Path}, nil
-	}
+// hostPathRecycler scrubs a hostPath volume by running "rm -rf" on the volume in a pod
+// This recycler only works on a single host cluster and is for testing purposes only.
+type hostPathRecycler struct {
+	path string
+	host volume.VolumeHost
+}
+
+func (hp *hostPathRecycler) GetPath() string {
+	return hp.path
 }
 
 // Recycler provides methods to reclaim the volume resource.
-func (hp *hostPath) Recycle() error {
+func (hp *hostPathRecycler) Recycle() error {
+
 	// TODO implement "basic scrub" recycler -- busybox w/ "rm -rf" for volume
+
+	/*
+		1. make a pod that uses a volume like me
+		2. use host.client to save to API and watch it
+		3. if pod errors or times out, return error
+		   if pod exits, return nil for success
+	 */
+
 	return nil
 }

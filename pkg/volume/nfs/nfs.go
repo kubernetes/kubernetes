@@ -29,12 +29,16 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
+// Tests covering recycling should not use this func but instead
+// use their own array of plugins w/ a custom recyclerFunc as appropriate
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&nfsPlugin{nil}}
+	return []volume.VolumePlugin{&nfsPlugin{nil, newRecycler}}
 }
 
 type nfsPlugin struct {
 	host volume.VolumeHost
+	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
+	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error)
 }
 
 var _ volume.VolumePlugin = &nfsPlugin{}
@@ -98,7 +102,23 @@ func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mo
 }
 
 func (plugin *nfsPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
-	return &nfs{}, nil
+	return plugin.newRecyclerFunc(spec, plugin.host)
+}
+
+func newRecycler(spec *volume.Spec, host volume.VolumeHost)(volume.Recycler, error){
+	if spec.VolumeSource.HostPath != nil {
+		return &nfsRecycler{
+			volName:    spec.Name,
+			server:     spec.VolumeSource.NFS.Server,
+			exportPath: spec.VolumeSource.NFS.Path,
+		}, nil
+	} else {
+		return &nfsRecycler{
+			volName:    spec.Name,
+			server:     spec.PersistentVolumeSource.NFS.Server,
+			exportPath: spec.PersistentVolumeSource.NFS.Path,
+		}, nil
+	}
 }
 
 // NFS volumes represent a bare host file or directory mount of an NFS export.
@@ -110,6 +130,8 @@ type nfs struct {
 	readOnly   bool
 	mounter    mount.Interface
 	plugin     *nfsPlugin
+	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
+	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error)
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
@@ -198,7 +220,29 @@ func (nfsVolume *nfs) TearDownAt(dir string) error {
 	return nil
 }
 
-func (nfsVolume *nfs) Recycle() error {
+// nfsRecycler scrubs an NFS volume by running "rm -rf" on the volume in a pod.
+type nfsRecycler struct {
+	volName    string
+	server     string
+	exportPath string
+	host volume.VolumeHost
+}
+
+func (r *nfsRecycler) GetPath() string {
+	return r.exportPath
+}
+
+// Recycler provides methods to reclaim the volume resource.
+func (r *nfsRecycler) Recycle() error {
+
 	// TODO implement "basic scrub" recycler -- busybox w/ "rm -rf" for volume
+
+	/*
+		1. make a pod that uses a volume like me
+		2. use host.client to save to API and watch it
+		3. if pod errors or times out, return error
+		   if pod exits, return nil for success
+	 */
+
 	return nil
 }
