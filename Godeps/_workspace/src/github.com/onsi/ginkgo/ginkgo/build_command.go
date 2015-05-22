@@ -46,15 +46,19 @@ func (r *SpecBuilder) BuildSpecs(args []string, additionalArgs []string) {
 
 	passed := true
 	for _, suite := range suites {
-		runner := testrunner.New(suite, 1, false, r.commandFlags.Race, r.commandFlags.Cover, r.commandFlags.Tags, nil)
+		runner := testrunner.New(suite, 1, false, r.commandFlags.Race, r.commandFlags.Cover, r.commandFlags.CoverPkg, r.commandFlags.Tags, nil)
 		fmt.Printf("Compiling %s...\n", suite.PackageName)
-		err := runner.Compile()
+
+		path, _ := filepath.Abs(filepath.Join(suite.Path, fmt.Sprintf("%s.test", suite.PackageName)))
+		err := runner.CompileTo(path)
 		if err != nil {
 			fmt.Println(err.Error())
 			passed = false
 		} else {
-			fmt.Printf("    compiled %s.test\n", filepath.Join(suite.Path, suite.PackageName))
+			fmt.Printf("    compiled %s.test\n", suite.PackageName)
 		}
+
+		runner.CleanUp()
 	}
 
 	if passed {
