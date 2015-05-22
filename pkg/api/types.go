@@ -1064,6 +1064,9 @@ type ServicePort struct {
 	// of v1beta3 the default value is the sames as the Port field (an
 	// identity map).
 	TargetPort util.IntOrString `json:"targetPort"`
+
+	// TODO(justinsb): merge with NodePorts PR
+	NodePort int
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port

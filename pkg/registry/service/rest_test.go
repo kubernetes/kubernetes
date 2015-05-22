@@ -30,6 +30,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registrytest.ServiceRegistry) {
@@ -40,7 +42,12 @@ func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registryte
 	}
 	nodeRegistry := registrytest.NewMinionRegistry(machines, api.NodeResources{})
 	r := ipallocator.NewCIDRRange(makeIPNet(t))
-	storage := NewStorage(registry, nodeRegistry, endpointRegistry, r, "kubernetes")
+
+	portRange := util.PortRange{Base: 30000, Size: 1000}
+	portAllocator := portallocator.NewPortAllocator(portRange)
+
+	storage := NewStorage(registry, nodeRegistry, endpointRegistry, r, portAllocator, "kubernetes")
+
 	return storage, registry
 }
 
