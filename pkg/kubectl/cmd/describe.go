@@ -86,6 +86,9 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		}
 		return err
 	}
+	if len(infos) > 1 {
+		return fmt.Errorf("multiple resources provided: %v", args)
+	}
 	info := infos[0]
 
 	s, err := describer.Describe(info.Namespace, info.Name)

@@ -61,7 +61,7 @@ func NewCmdResize(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 func RunResize(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	count := cmdutil.GetFlagInt(cmd, "replicas")
-	if len(args) != 2 || count < 0 {
+	if count < 0 {
 		return cmdutil.UsageError(cmd, "--replicas=COUNT RESOURCE ID")
 	}
 
@@ -89,6 +89,9 @@ func RunResize(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	infos, err := r.Infos()
 	if err != nil {
 		return err
+	}
+	if len(infos) > 1 {
+		return fmt.Errorf("multiple resources provided: %v", args)
 	}
 	info := infos[0]
 
