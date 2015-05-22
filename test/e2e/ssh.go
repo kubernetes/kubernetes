@@ -27,8 +27,7 @@ import (
 )
 
 var _ = Describe("SSH", func() {
-
-	var c *client.Client = nil
+	var c *client.Client
 
 	BeforeEach(func() {
 		var err error
