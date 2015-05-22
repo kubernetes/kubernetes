@@ -127,7 +127,7 @@ type Config struct {
 
 	// PublicAddress is the IP address where members of the cluster (kubelet,
 	// kube-proxy, services, etc.) can reach the master.
-	// If nil or 0.0.0.0, the first result from net.InterfaceAddrs will be used.
+	// If nil or 0.0.0.0, the host's default interface will be used.
 	PublicAddress net.IP
 
 	// Control the interval that pod, node IP, and node heath status caches
