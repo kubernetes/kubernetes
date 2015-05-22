@@ -1002,7 +1002,7 @@ const (
 	ServiceTypeClusterIP ServiceType = "ClusterIP"
 
 	// ServiceTypeNodePort means a service will be exposed on one port of
-	// every node, in addition to 'ClusterIP' visibility.
+	// every node, in addition to 'ClusterIP' type.
 	ServiceTypeNodePort ServiceType = "NodePort"
 
 	// ServiceTypeLoadBalancer means a service will be exposed via an
@@ -1084,7 +1084,7 @@ type ServicePort struct {
 	TargetPort util.IntOrString `json:"targetPort,omitempty" description:"the port to access on the pods targeted by the service; defaults to the service port"`
 
 	// The port on each node on which this service is exposed.
-	// Default is to auto-allocate a port if the visibility of this Service requires one.
+	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
 	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed"`
 }
 

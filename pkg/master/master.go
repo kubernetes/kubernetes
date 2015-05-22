@@ -144,7 +144,7 @@ type Config struct {
 	// The name of the cluster.
 	ClusterName string
 
-	// The range of ports to be assigned to services with visibility=NodePort or greater
+	// The range of ports to be assigned to services with type=NodePort or greater
 	ServiceNodePorts util.PortRange
 }
 
@@ -236,7 +236,7 @@ func setDefaults(c *Config) {
 	if c.ServiceNodePorts.Size == 0 {
 		// TODO: Currently no way to specify an empty range (do we need to allow this?)
 		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
-		// but then that breaks the strict nestedness of visibility.
+		// but then that breaks the strict nestedness of ServiceType.
 		// Review post-v1
 		defaultServiceNodePorts := util.PortRange{Base: 30000, Size: 2767}
 		c.ServiceNodePorts = defaultServiceNodePorts
