@@ -326,7 +326,7 @@ func translateAffinityType(affinityType api.ServiceAffinity) GCEAffinityType {
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // TODO(a-robinson): Don't just ignore specified IP addresses. Check if they're
 // owned by the project and available to be used, and use them if they are.
-func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	err := gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
 	if err != nil {
 		if !isHTTPErrorCode(err, http.StatusConflict) {
@@ -341,11 +341,11 @@ func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.I
 	minPort := 65536
 	maxPort := 0
 	for i := range ports {
-		if ports[i] < minPort {
-			minPort = ports[i]
+		if ports[i].Port < minPort {
+			minPort = ports[i].Port
 		}
-		if ports[i] > maxPort {
-			maxPort = ports[i]
+		if ports[i].Port > maxPort {
+			maxPort = ports[i].Port
 		}
 	}
 	req := &compute.ForwardingRule{
