@@ -22,6 +22,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/expansion"
+
 	"github.com/golang/glog"
 )
 
@@ -89,4 +91,33 @@ func HashContainer(container *api.Container) uint64 {
 	hash := adler32.New()
 	util.DeepHashObject(hash, *container)
 	return uint64(hash.Sum32())
+}
+
+// EnvVarsToMap constructs a map of environment name to value from a slice
+// of env vars.
+func EnvVarsToMap(envs []EnvVar) map[string]string {
+	result := map[string]string{}
+	for _, env := range envs {
+		result[env.Name] = env.Value
+	}
+
+	return result
+}
+
+func ExpandContainerCommandAndArgs(container *api.Container, envs []EnvVar) (command []string, args []string) {
+	mapping := expansion.MappingFuncFor(EnvVarsToMap(envs))
+
+	if len(container.Command) != 0 {
+		for _, cmd := range container.Command {
+			command = append(command, expansion.Expand(cmd, mapping))
+		}
+	}
+
+	if len(container.Args) != 0 {
+		for _, arg := range container.Args {
+			args = append(args, expansion.Expand(arg, mapping))
+		}
+	}
+
+	return command, args
 }

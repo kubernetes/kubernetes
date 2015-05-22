@@ -207,9 +207,8 @@ The necessary changes to implement this functionality are:
 2.  Introduce `third_party/golang/expansion` package that provides:
     1.  An `Expand(string, func(string) string) string` function
     2.  A `MappingFuncFor(ObjectEventRecorder, ...map[string]string) string` function 
-3.  Add a new EnvVarSource for expansions and associated tests
-4.  Make the kubelet expand environment correctly
-5.  Make the kubelet expand command correctly
+3.  Make the kubelet expand environment correctly
+4.  Make the kubelet expand command correctly
 
 #### Event Recording
 
@@ -277,31 +276,17 @@ func Expand(input string, mapping func(string) string) string {
 }
 ```
 
-#### Expansion `EnvVarSource`
-
-In order to avoid changing the existing behavior of the `EnvVar.Value` field, there should be a new
-`EnvVarSource` that represents a variable expansion that an env var's value should come from:
-
-```go
-// EnvVarSource represents a source for the value of an EnvVar.
-type EnvVarSource struct {
-	// Other fields omitted
-
-	Expansion *EnvVarExpansion
-}
-
-type EnvVarExpansion struct {
-	// The input string to be expanded
-	Expand string
-}
-```
-
 #### Kubelet changes
 
-The Kubelet should change to:
+The Kubelet should be made to correctly expand variables references in a container's environment, 
+command, and args.  Changes will need to be made to:
 
-1.  Correctly expand environment variables with `Expansion` sources
-2.  Correctly expand references in the Command and Args
+1.  The `makeEnvironmentVariables` function in the kubelet; this is used by
+    `GenerateRunContainerOptions`, which is used by both the docker and rkt container runtimes
+2.  The docker manager `setEntrypointAndCommand` func has to be changed to perform variable
+    expansion
+3.  The rkt runtime should be made to support expansion in command and args when support for it is
+    implemented
 
 ### Examples
 

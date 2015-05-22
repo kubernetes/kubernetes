@@ -1734,6 +1734,137 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "POD_NAMESPACE", Value: "downward-api"},
 			},
 		},
+		{
+			name: "env expansion",
+			ns:   "test1",
+			container: &api.Container{
+				Env: []api.EnvVar{
+					{
+						Name:  "TEST_LITERAL",
+						Value: "test-test-test",
+					},
+					{
+						Name: "POD_NAME",
+						ValueFrom: &api.EnvVarSource{
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: "v1beta3",
+								FieldPath:  "metadata.name",
+							},
+						},
+					},
+					{
+						Name:  "OUT_OF_ORDER_TEST",
+						Value: "$(OUT_OF_ORDER_TARGET)",
+					},
+					{
+						Name:  "OUT_OF_ORDER_TARGET",
+						Value: "FOO",
+					},
+					{
+						Name: "EMPTY_VAR",
+					},
+					{
+						Name:  "EMPTY_TEST",
+						Value: "foo-$(EMPTY_VAR)",
+					},
+					{
+						Name:  "POD_NAME_TEST2",
+						Value: "test2-$(POD_NAME)",
+					},
+					{
+						Name:  "POD_NAME_TEST3",
+						Value: "$(POD_NAME_TEST2)-3",
+					},
+					{
+						Name:  "LITERAL_TEST",
+						Value: "literal-$(TEST_LITERAL)",
+					},
+					{
+						Name:  "SERVICE_VAR_TEST",
+						Value: "$(TEST_SERVICE_HOST):$(TEST_SERVICE_PORT)",
+					},
+					{
+						Name:  "TEST_UNDEFINED",
+						Value: "$(UNDEFINED_VAR)",
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			nilLister:       false,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "TEST_LITERAL",
+					Value: "test-test-test",
+				},
+				{
+					Name:  "POD_NAME",
+					Value: "dapi-test-pod-name",
+				},
+				{
+					Name:  "POD_NAME_TEST2",
+					Value: "test2-dapi-test-pod-name",
+				},
+				{
+					Name:  "POD_NAME_TEST3",
+					Value: "test2-dapi-test-pod-name-3",
+				},
+				{
+					Name:  "LITERAL_TEST",
+					Value: "literal-test-test-test",
+				},
+				{
+					Name:  "TEST_SERVICE_HOST",
+					Value: "1.2.3.3",
+				},
+				{
+					Name:  "TEST_SERVICE_PORT",
+					Value: "8083",
+				},
+				{
+					Name:  "TEST_PORT",
+					Value: "tcp://1.2.3.3:8083",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP",
+					Value: "tcp://1.2.3.3:8083",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP_PORT",
+					Value: "8083",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP_ADDR",
+					Value: "1.2.3.3",
+				},
+				{
+					Name:  "SERVICE_VAR_TEST",
+					Value: "1.2.3.3:8083",
+				},
+				{
+					Name:  "OUT_OF_ORDER_TEST",
+					Value: "$(OUT_OF_ORDER_TARGET)",
+				},
+				{
+					Name:  "OUT_OF_ORDER_TARGET",
+					Value: "FOO",
+				},
+				{
+					Name:  "TEST_UNDEFINED",
+					Value: "$(UNDEFINED_VAR)",
+				},
+				{
+					Name: "EMPTY_VAR",
+				},
+				{
+					Name:  "EMPTY_TEST",
+					Value: "foo-",
+				},
+			},
+		},
 	}
 
 	for i, tc := range testCases {
