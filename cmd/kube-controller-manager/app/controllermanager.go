@@ -148,6 +148,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Int64Var(&s.NodeMilliCPU, "node-milli-cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
 	fs.Var(resource.NewQuantityFlagValue(&s.NodeMemory), "node-memory", "The amount of memory (in bytes) provisioned on each node")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.Var(&s.ClusterCIDR, "cluster-cidr", "CIDR Range for Pods in cluster.")
 	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
