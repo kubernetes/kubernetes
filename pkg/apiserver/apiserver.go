@@ -132,6 +132,14 @@ type APIGroupVersion struct {
 	Context api.RequestContextMapper
 }
 
+// TODO: Pipe these in through the apiserver cmd line
+const (
+	// Minimum duration before timing out read/write requests
+	MinTimeoutSecs = 300
+	// Maximum duration before timing out read/write requests
+	MaxTimeoutSecs = 600
+)
+
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash. A restful WebService is created for the group and version.
