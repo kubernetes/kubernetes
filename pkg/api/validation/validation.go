@@ -579,6 +579,28 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *api.PersistentVol
 	return allErrs
 }
 
+func validateImage(image api.ContainerImage) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	numImages := 0
+	if image.DockerImage != nil {
+		numImages++
+		allErrs = append(allErrs, validateDockerImage(image.DockerImage).Prefix("dockerImage")...)
+	}
+	if numImages != 1 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("", image, "exactly 1 image is required"))
+	}
+	return allErrs
+}
+
+func validateDockerImage(dockerImage *api.DockerImage) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if dockerImage.Spec == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec"))
+	}
+	return allErrs
+}
+
 var supportedPortProtocols = util.NewStringSet(string(api.ProtocolTCP), string(api.ProtocolUDP))
 
 func validatePorts(ports []api.ContainerPort) errs.ValidationErrorList {
@@ -835,12 +857,10 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		} else {
 			allNames.Insert(ctr.Name)
 		}
-		if len(ctr.Image) == 0 {
-			cErrs = append(cErrs, errs.NewFieldRequired("image"))
-		}
 		if ctr.Lifecycle != nil {
 			cErrs = append(cErrs, validateLifecycle(ctr.Lifecycle).Prefix("lifecycle")...)
 		}
+		cErrs = append(cErrs, validateImage(ctr.Image).Prefix("image")...)
 		cErrs = append(cErrs, validateProbe(ctr.LivenessProbe).Prefix("livenessProbe")...)
 		cErrs = append(cErrs, validateProbe(ctr.ReadinessProbe).Prefix("readinessProbe")...)
 		cErrs = append(cErrs, validatePorts(ctr.Ports).Prefix("ports")...)

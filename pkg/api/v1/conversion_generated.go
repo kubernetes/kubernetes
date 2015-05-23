@@ -137,7 +137,9 @@ func convert_api_Container_To_v1_Container(in *api.Container, out *Container, s 
 		defaulting.(func(*api.Container))(in)
 	}
 	out.Name = in.Name
-	out.Image = in.Image
+	if err := convert_api_ContainerImage_To_v1_ContainerImage(&in.Image, &out.Image, s); err != nil {
+		return err
+	}
 	if in.Command != nil {
 		out.Command = make([]string, len(in.Command))
 		for i := range in.Command {
@@ -336,6 +338,14 @@ func convert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, out *D
 	} else {
 		out.GracePeriodSeconds = nil
 	}
+	return nil
+}
+
+func convert_api_DockerImage_To_v1_DockerImage(in *api.DockerImage, out *DockerImage, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.DockerImage))(in)
+	}
+	out.Spec = in.Spec
 	return nil
 }
 
@@ -2393,7 +2403,9 @@ func convert_v1_Container_To_api_Container(in *Container, out *api.Container, s 
 		defaulting.(func(*Container))(in)
 	}
 	out.Name = in.Name
-	out.Image = in.Image
+	if err := convert_v1_ContainerImage_To_api_ContainerImage(&in.Image, &out.Image, s); err != nil {
+		return err
+	}
 	if in.Command != nil {
 		out.Command = make([]string, len(in.Command))
 		for i := range in.Command {
@@ -2592,6 +2604,14 @@ func convert_v1_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *api.D
 	} else {
 		out.GracePeriodSeconds = nil
 	}
+	return nil
+}
+
+func convert_v1_DockerImage_To_api_DockerImage(in *DockerImage, out *api.DockerImage, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*DockerImage))(in)
+	}
+	out.Spec = in.Spec
 	return nil
 }
 
@@ -4553,6 +4573,7 @@ func init() {
 		convert_api_ContainerStatus_To_v1_ContainerStatus,
 		convert_api_Container_To_v1_Container,
 		convert_api_DeleteOptions_To_v1_DeleteOptions,
+		convert_api_DockerImage_To_v1_DockerImage,
 		convert_api_EmptyDirVolumeSource_To_v1_EmptyDirVolumeSource,
 		convert_api_EndpointAddress_To_v1_EndpointAddress,
 		convert_api_EndpointPort_To_v1_EndpointPort,
@@ -4664,6 +4685,7 @@ func init() {
 		convert_v1_ContainerStatus_To_api_ContainerStatus,
 		convert_v1_Container_To_api_Container,
 		convert_v1_DeleteOptions_To_api_DeleteOptions,
+		convert_v1_DockerImage_To_api_DockerImage,
 		convert_v1_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource,
 		convert_v1_EndpointAddress_To_api_EndpointAddress,
 		convert_v1_EndpointPort_To_api_EndpointPort,

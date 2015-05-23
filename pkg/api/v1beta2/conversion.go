@@ -1545,6 +1545,14 @@ func addConversionFuncs() {
 			out.SecretName = in.Target.ID
 			return nil
 		},
+		func(in *api.ContainerImage, out *string, s conversion.Scope) error {
+			*out = in.DockerImage.Spec
+			return nil
+		},
+		func(in *string, out *api.ContainerImage, s conversion.Scope) error {
+			out.DockerImage = &api.DockerImage{Spec: *in}
+			return nil
+		},
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.

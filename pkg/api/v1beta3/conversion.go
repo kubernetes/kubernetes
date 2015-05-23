@@ -150,7 +150,9 @@ func convert_v1beta3_Container_To_api_Container(in *Container, out *api.Containe
 		defaulting.(func(*Container))(in)
 	}
 	out.Name = in.Name
-	out.Image = in.Image
+	if err := convert_v1beta3_Image_To_api_ContainerImage(&in.Image, &out.Image, s); err != nil {
+		return err
+	}
 	if in.Command != nil {
 		out.Command = make([]string, len(in.Command))
 		for i := range in.Command {
@@ -246,7 +248,9 @@ func convert_api_Container_To_v1beta3_Container(in *api.Container, out *Containe
 		defaulting.(func(*api.Container))(in)
 	}
 	out.Name = in.Name
-	out.Image = in.Image
+	if err := convert_api_ContainerImage_To_v1beta3_Image(&in.Image, &out.Image, s); err != nil {
+		return err
+	}
 	if in.Command != nil {
 		out.Command = make([]string, len(in.Command))
 		for i := range in.Command {
@@ -418,5 +422,21 @@ func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *api.ServiceSpec, out *Se
 		out.PublicIPs = nil
 	}
 	out.SessionAffinity = ServiceAffinity(in.SessionAffinity)
+	return nil
+}
+
+func convert_v1beta3_Image_To_api_ContainerImage(in *string, out *api.ContainerImage, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*string))(in)
+	}
+	out.DockerImage = &api.DockerImage{Spec: *in}
+	return nil
+}
+
+func convert_api_ContainerImage_To_v1beta3_Image(in *api.ContainerImage, out *string, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ContainerImage))(in)
+	}
+	*out = in.DockerImage.Spec
 	return nil
 }
