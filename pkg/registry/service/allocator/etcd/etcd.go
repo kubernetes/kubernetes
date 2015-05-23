@@ -141,25 +141,25 @@ func (e *Etcd) Release(item int) error {
 // tryUpdate performs a read-update to persist the latest snapshot state of allocation.
 func (e *Etcd) tryUpdate(fn func() error) error {
 	err := e.helper.GuaranteedUpdate(e.baseKey, &api.RangeAllocation{}, true,
-		func(input runtime.Object) (output runtime.Object, ttl uint64, err error) {
+		tools.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
 			existing := input.(*api.RangeAllocation)
 			if len(existing.ResourceVersion) == 0 {
-				return nil, 0, fmt.Errorf("cannot allocate resources of type %s at this time", e.kind)
+				return nil, fmt.Errorf("cannot allocate resources of type %s at this time", e.kind)
 			}
 			if existing.ResourceVersion != e.last {
 				if err := e.alloc.Restore(existing.Range, existing.Data); err != nil {
-					return nil, 0, err
+					return nil, err
 				}
 				if err := fn(); err != nil {
-					return nil, 0, err
+					return nil, err
 				}
 			}
 			e.last = existing.ResourceVersion
 			rangeSpec, data := e.alloc.Snapshot()
 			existing.Range = rangeSpec
 			existing.Data = data
-			return existing, 0, nil
-		},
+			return existing, nil
+		}),
 	)
 	return etcderr.InterpretUpdateError(err, e.kind, "")
 }
@@ -198,19 +198,19 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 
 	last := ""
 	err := e.helper.GuaranteedUpdate(e.baseKey, &api.RangeAllocation{}, true,
-		func(input runtime.Object) (output runtime.Object, ttl uint64, err error) {
+		tools.SimpleUpdate(func(input runtime.Object) (output runtime.Object, err error) {
 			existing := input.(*api.RangeAllocation)
 			switch {
 			case len(snapshot.ResourceVersion) != 0 && len(existing.ResourceVersion) != 0:
 				if snapshot.ResourceVersion != existing.ResourceVersion {
-					return nil, 0, k8serr.NewConflict(e.kind, "", fmt.Errorf("the provided resource version does not match"))
+					return nil, k8serr.NewConflict(e.kind, "", fmt.Errorf("the provided resource version does not match"))
 				}
 			case len(existing.ResourceVersion) != 0:
-				return nil, 0, k8serr.NewConflict(e.kind, "", fmt.Errorf("another caller has already initialized the resource"))
+				return nil, k8serr.NewConflict(e.kind, "", fmt.Errorf("another caller has already initialized the resource"))
 			}
 			last = snapshot.ResourceVersion
-			return snapshot, 0, nil
-		},
+			return snapshot, nil
+		}),
 	)
 	if err != nil {
 		return etcderr.InterpretUpdateError(err, e.kind, "")
