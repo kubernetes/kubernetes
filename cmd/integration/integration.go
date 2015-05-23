@@ -878,10 +878,12 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 
 	// Delete a pod to free up room.
 	glog.Infof("Deleting pod %v", bar.Name)
-	err = client.Pods(api.NamespaceDefault).Delete(bar.Name, nil)
+	err = client.Pods(api.NamespaceDefault).Delete(bar.Name, api.NewDeleteOptions(1))
 	if err != nil {
 		glog.Fatalf("FAILED: couldn't delete pod %q: %v", bar.Name, err)
 	}
+
+	time.Sleep(2 * time.Second)
 
 	pod.ObjectMeta.Name = "phantom.baz"
 	baz, err := client.Pods(api.NamespaceDefault).Create(pod)

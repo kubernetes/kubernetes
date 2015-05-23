@@ -240,7 +240,7 @@ var deleteNow string = `
 {
   "kind": "DeleteOptions",
   "apiVersion": "v1beta3",
-  "gracePeriodSeconds": null%s
+  "gracePeriodSeconds": 0%s
 }
 `
 
