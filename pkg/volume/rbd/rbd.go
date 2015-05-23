@@ -53,7 +53,7 @@ func (plugin *RBDPlugin) Name() string {
 }
 
 func (plugin *RBDPlugin) CanSupport(spec *volume.Spec) bool {
-	if spec.VolumeSource.RBD == nil {
+	if spec.VolumeSource.RBD == nil && spec.PersistentVolumeSource.RBD == nil {
 		return false
 	}
 	// see if rbd is there
