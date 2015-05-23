@@ -277,7 +277,7 @@ func DoTestUnschedulableNodes(t *testing.T, restClient *client.Client, nodeStore
 			t.Logf("Test %d: Pod got scheduled on a schedulable node", i)
 		}
 
-		err = restClient.Pods(api.NamespaceDefault).Delete(myPod.Name, nil)
+		err = restClient.Pods(api.NamespaceDefault).Delete(myPod.Name, api.NewDeleteOptions(0))
 		if err != nil {
 			t.Errorf("Failed to delete pod: %v", err)
 		}
