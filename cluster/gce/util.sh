@@ -923,6 +923,15 @@ function test-setup {
     --allow tcp:80 tcp:8080 \
     --network "${NETWORK}" \
     "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
+
+  # Open up the NodePort range
+  # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
+  gcloud compute firewall-rules create \
+    --project "${PROJECT}" \
+    --target-tags "${MINION_TAG}" \
+    --allow tcp:30000-32767,udp:30000-32767 \
+    --network "${NETWORK}" \
+    "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports"
 }
 
 # Execute after running tests to perform any required clean-up. This is called
@@ -934,6 +943,10 @@ function test-teardown {
     --project "${PROJECT}" \
     --quiet \
     "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" || true
+  gcloud compute firewall-rules delete  \
+    --project "${PROJECT}" \
+    --quiet \
+    "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" || true
   "${KUBE_ROOT}/cluster/kube-down.sh"
 }
 

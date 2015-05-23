@@ -171,6 +171,13 @@ function test-setup() {
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG}" \
     --network="${NETWORK}"
+
+  "${GCLOUD}" compute firewall-rules create \
+    "${MINION_TAG}-${USER}-nodeports" \
+    --allow tcp:30000-32767,udp:30000-32767 \
+    --project "${PROJECT}" \
+    --target-tags "${MINION_TAG}" \
+    --network="${NETWORK}"
 }
 
 # Ensure that we have a password created for validating to the master.
@@ -285,8 +292,10 @@ function test-teardown() {
   MINION_TAG="k8s-${CLUSTER_NAME}-node"
 
   # First, remove anything we did with test-setup (currently, the firewall).
-  # NOTE: Keep in sync with name above in test-setup.
+  # NOTE: Keep in sync with names above in test-setup.
   "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-${USER}-http-alt" \
+    --project="${PROJECT}" || true
+  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-${USER}-nodeports" \
     --project="${PROJECT}" || true
 
   # Then actually turn down the cluster.
