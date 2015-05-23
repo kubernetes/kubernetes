@@ -44,6 +44,8 @@ type serviceInfo struct {
 	loadBalancerStatus  api.LoadBalancerStatus
 	sessionAffinityType api.ServiceAffinity
 	stickyMaxAgeMinutes int
+	// Deprecated, but required for back-compat (including e2e)
+	deprecatedPublicIPs []string
 }
 
 func logTimeout(err error) bool {
@@ -287,6 +289,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			}
 			info.portalIP = serviceIP
 			info.portalPort = servicePort.Port
+			info.deprecatedPublicIPs = service.Spec.DeprecatedPublicIPs
 			// Deep-copy in case the service instance changes
 			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.nodePort = servicePort.NodePort
@@ -324,6 +327,9 @@ func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) 
 	if !info.portalIP.Equal(net.ParseIP(service.Spec.PortalIP)) {
 		return false
 	}
+	if !ipsEqual(info.deprecatedPublicIPs, service.Spec.DeprecatedPublicIPs) {
+		return false
+	}
 	if !api.LoadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
 		return false
 	}
@@ -349,6 +355,12 @@ func (proxier *Proxier) openPortal(service ServicePortName, info *serviceInfo) e
 	err := proxier.openOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
 	if err != nil {
 		return err
+	}
+	for _, publicIP := range info.deprecatedPublicIPs {
+		err = proxier.openOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+		if err != nil {
+			return err
+		}
 	}
 	for _, ingress := range info.loadBalancerStatus.Ingress {
 		if ingress.IP != "" {
@@ -469,6 +481,9 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyI
 func (proxier *Proxier) closePortal(service ServicePortName, info *serviceInfo) error {
 	// Collect errors and report them all at the end.
 	el := proxier.closeOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+	for _, publicIP := range info.deprecatedPublicIPs {
+		el = append(el, proxier.closeOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+	}
 	for _, ingress := range info.loadBalancerStatus.Ingress {
 		if ingress.IP != "" {
 			el = append(el, proxier.closeOnePortal(net.ParseIP(ingress.IP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
