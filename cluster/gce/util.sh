@@ -36,6 +36,10 @@ ALLOCATE_NODE_CIDRS=true
 KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 
+function join_csv {
+  local IFS=','; echo "$*";
+}
+
 # Verify prereqs
 function verify-prereqs {
   local cmd
@@ -363,7 +367,7 @@ function create-firewall-rule {
       --network "${NETWORK}" \
       --source-ranges "$2" \
       --target-tags "$3" \
-      --allow tcp udp icmp esp ah sctp; then
+      --allow tcp,udp,icmp,esp,ah,sctp; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}"
           exit 2
@@ -459,7 +463,7 @@ function add-instance-metadata-from-file {
     if ! gcloud compute instances add-metadata "${instance}" \
       --project "${PROJECT}" \
       --zone "${ZONE}" \
-      --metadata-from-file $(IFS=, ; echo "${kvs[*]}"); then
+      --metadata-from-file "$(join_csv ${kvs[@]})"; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}"
           exit 2
@@ -575,7 +579,7 @@ function kube-up {
       --project "${PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "10.0.0.0/8" \
-      --allow "tcp:1-65535" "udp:1-65535" "icmp" &
+      --allow "tcp:1-65535,udp:1-65535,icmp" &
   fi
 
   if ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NETWORK}-default-ssh" &>/dev/null; then
@@ -637,7 +641,7 @@ function kube-up {
   # TODO(mbforbes): Refactor setting scope flags.
   local -a scope_flags=()
   if (( "${#MINION_SCOPES[@]}" > 0 )); then
-    scope_flags=("--scopes" "${MINION_SCOPES[@]}")
+    scope_flags=("--scopes" "$(join_csv ${MINION_SCOPES[@]})")
   else
     scope_flags=("--no-scopes")
   fi
