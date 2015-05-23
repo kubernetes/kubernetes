@@ -488,6 +488,7 @@ var _ = Describe("Services", func() {
 
 		By("changing service " + serviceName + " back to type=ClusterIP")
 		service.Spec.Type = api.ServiceTypeClusterIP
+		service.Spec.Ports[0].NodePort = 0
 		service, err = c.Services(ns).Update(service)
 		Expect(err).NotTo(HaveOccurred())
 
