@@ -136,7 +136,7 @@ _sticky sessions_. With Kubernetes you can scale out your app easily
 with session affinity. The [`meteor-service.json`](meteor-service.json) file contains
 `"sessionAffinity": "ClientIP"`, which provides this for us. See the
 [service
-documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#portals-and-service-proxies)
+documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#virtual-ips-and-service-proxies)
 for more information.
 
 As mentioned above, the mongo container uses a volume which is mapped

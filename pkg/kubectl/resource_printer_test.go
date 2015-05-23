@@ -645,7 +645,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 	tests := []api.Service{
 		{
 			Spec: api.ServiceSpec{
-				PortalIP: "1.2.3.4",
+				ClusterIP: "1.2.3.4",
 				Ports: []api.ServicePort{
 					{
 						Port:     80,
@@ -668,7 +668,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 		},
 		{
 			Spec: api.ServiceSpec{
-				PortalIP: "1.2.3.4",
+				ClusterIP: "1.2.3.4",
 				Ports: []api.ServicePort{
 					{
 						Port:     80,
@@ -687,7 +687,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 		},
 		{
 			Spec: api.ServiceSpec{
-				PortalIP: "1.2.3.4",
+				ClusterIP: "1.2.3.4",
 				Ports: []api.ServicePort{
 					{
 						Port:     80,
@@ -715,7 +715,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 		},
 		{
 			Spec: api.ServiceSpec{
-				PortalIP: "1.2.3.4",
+				ClusterIP: "1.2.3.4",
 				Ports: []api.ServicePort{
 					{
 						Port:     80,
@@ -754,9 +754,9 @@ func TestPrintHumanReadableService(t *testing.T) {
 		buff := bytes.Buffer{}
 		printService(&svc, &buff, false)
 		output := string(buff.Bytes())
-		ip := svc.Spec.PortalIP
+		ip := svc.Spec.ClusterIP
 		if !strings.Contains(output, ip) {
-			t.Errorf("expected to contain portal ip %s, but doesn't: %s", ip, output)
+			t.Errorf("expected to contain ClusterIP %s, but doesn't: %s", ip, output)
 		}
 
 		for _, ingress := range svc.Status.LoadBalancer.Ingress {
@@ -772,7 +772,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 				t.Errorf("expected to contain port: %s, but doesn't: %s", portSpec, output)
 			}
 		}
-		// Max of # ports and (# public ip + portal ip)
+		// Max of # ports and (# public ip + cluster ip)
 		count := len(svc.Spec.Ports)
 		if len(svc.Status.LoadBalancer.Ingress)+1 > count {
 			count = len(svc.Status.LoadBalancer.Ingress) + 1
@@ -932,7 +932,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			obj: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespaceName},
 				Spec: api.ServiceSpec{
-					PortalIP: "1.2.3.4",
+					ClusterIP: "1.2.3.4",
 					Ports: []api.ServicePort{
 						{
 							Port:     80,

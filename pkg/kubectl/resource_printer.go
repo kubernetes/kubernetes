@@ -553,7 +553,7 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool) error {
 		name = svc.Name
 	}
 
-	ips := []string{svc.Spec.PortalIP}
+	ips := []string{svc.Spec.ClusterIP}
 
 	ingress := svc.Status.LoadBalancer.Ingress
 	for i := range ingress {

@@ -18,13 +18,14 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 import (
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"speter.net/go/exp/math/dec/inf"
-	"time"
 )
 
 func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c *conversion.Cloner) error {
@@ -1864,7 +1865,7 @@ func deepCopy_v1_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Clo
 	} else {
 		out.Selector = nil
 	}
-	out.PortalIP = in.PortalIP
+	out.ClusterIP = in.ClusterIP
 	out.Type = in.Type
 	if in.DeprecatedPublicIPs != nil {
 		out.DeprecatedPublicIPs = make([]string, len(in.DeprecatedPublicIPs))

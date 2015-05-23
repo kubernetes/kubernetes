@@ -23,7 +23,7 @@ export nodes="vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"
 export roles=("ai" "i" "i")
 # Define minion numbers
 export NUM_MINIONS=${NUM_MINIONS:-3}
-# define the IP range used for service portal.
+# define the IP range used for service cluster IPs.
 # according to rfc 1918 ref: https://tools.ietf.org/html/rfc1918 choose a private ip range here.
 export PORTAL_NET=192.168.3.0/24
 # define the IP range used for flannel overlay network, should not conflict with above PORTAL_NET range

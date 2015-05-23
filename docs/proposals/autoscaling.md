@@ -42,7 +42,7 @@ applications will expose one or more network endpoints for clients to connect to
 balanced or situated behind a proxy - the data from those proxies and load balancers can be used to estimate client to
 server traffic for applications. This is the primary, but not sole, source of data for making decisions.
 
-Within Kubernetes a [kube proxy](http://docs.k8s.io/services.md#ips-and-portals)
+Within Kubernetes a [kube proxy](http://docs.k8s.io/services.md#ips-and-vips)
 running on each node directs service requests to the underlying implementation.  
 
 While the proxy provides internal inter-pod connections, there will be L3 and L7 proxies and load balancers that manage

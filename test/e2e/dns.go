@@ -209,7 +209,7 @@ var _ = Describe("DNS", func() {
 				Name: testServiceName,
 			},
 			Spec: api.ServiceSpec{
-				PortalIP: "None",
+				ClusterIP: "None",
 				Ports: []api.ServicePort{
 					{Port: 80},
 				},

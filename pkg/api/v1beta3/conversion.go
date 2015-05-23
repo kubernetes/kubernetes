@@ -356,7 +356,7 @@ func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.Se
 	} else {
 		out.Selector = nil
 	}
-	out.PortalIP = in.PortalIP
+	out.ClusterIP = in.PortalIP
 
 	typeIn := in.Type
 	if typeIn == "" {
@@ -404,7 +404,7 @@ func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *api.ServiceSpec, out *Se
 	} else {
 		out.Selector = nil
 	}
-	out.PortalIP = in.PortalIP
+	out.PortalIP = in.ClusterIP
 
 	if err := s.Convert(&in.Type, &out.Type, 0); err != nil {
 		return err

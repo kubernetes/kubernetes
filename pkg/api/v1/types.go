@@ -1015,7 +1015,7 @@ type ServiceType string
 
 const (
 	// ServiceTypeClusterIP means a service will only be accessible inside the
-	// cluster, via the portal IP.
+	// cluster, via the cluster IP.
 	ServiceTypeClusterIP ServiceType = "ClusterIP"
 
 	// ServiceTypeNodePort means a service will be exposed on one port of
@@ -1062,12 +1062,12 @@ type ServiceSpec struct {
 	// This service will route traffic to pods having labels matching this selector. If null, no endpoints will be automatically created. If empty, all pods will be selected.
 	Selector map[string]string `json:"selector,omitempty" description:"label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"`
 
-	// PortalIP is usually assigned by the master.  If specified by the user
+	// ClusterIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can
 	// not be changed by updates.
 	// Valid values are None, empty string (""), or a valid IP address
 	// None can be specified for headless services when proxying is not required
-	PortalIP string `json:"portalIP,omitempty description: IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise; cannot be updated; 'None' can be specified for a headless service when proxying is not required"`
+	ClusterIP string `json:"clusterIP,omitempty description: IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise; cannot be updated; 'None' can be specified for a headless service when proxying is not required"`
 
 	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
 	Type ServiceType `json:"type,omitempty" description:"type of this service; must be ClusterIP, NodePort, or LoadBalancer; defaults to ClusterIP"`
@@ -1120,9 +1120,9 @@ type Service struct {
 }
 
 const (
-	// PortalIPNone - do not assign a portal IP
+	// ClusterIPNone - do not assign a cluster IP
 	// no proxying required and no environment variables should be created for pods
-	PortalIPNone = "None"
+	ClusterIPNone = "None"
 )
 
 // ServiceList holds a list of services.

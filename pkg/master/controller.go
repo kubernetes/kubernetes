@@ -36,21 +36,22 @@ import (
 
 // Controller is the controller manager for the core bootstrap Kubernetes controller
 // loops, which manage creating the "kubernetes" and "kubernetes-ro" services, the "default"
-// namespace, and provide the IP repair check on service PortalIPs
+// namespace, and provide the IP repair check on service IPs
 type Controller struct {
 	NamespaceRegistry namespace.Registry
 	ServiceRegistry   service.Registry
-	ServiceIPRegistry service.RangeRegistry
-	EndpointRegistry  endpoint.Registry
-	PortalNet         *net.IPNet
 	// TODO: MasterCount is yucky
 	MasterCount int
 
+	ServiceClusterIPRegistry service.RangeRegistry
+	ServiceClusterIPInterval time.Duration
+	ServiceClusterIPRange    *net.IPNet
+
 	ServiceNodePortRegistry service.RangeRegistry
 	ServiceNodePortInterval time.Duration
-	ServiceNodePorts        util.PortRange
+	ServiceNodePortRange    util.PortRange
 
-	PortalIPInterval time.Duration
+	EndpointRegistry endpoint.Registry
 	EndpointInterval time.Duration
 
 	PublicIP net.IP
@@ -73,11 +74,11 @@ func (c *Controller) Start() {
 		return
 	}
 
-	repairPortals := servicecontroller.NewRepair(c.PortalIPInterval, c.ServiceRegistry, c.PortalNet, c.ServiceIPRegistry)
-	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceRegistry, c.ServiceNodePorts, c.ServiceNodePortRegistry)
+	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceRegistry, c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
+	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceRegistry, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
 
 	// run all of the controllers once prior to returning from Start.
-	if err := repairPortals.RunOnce(); err != nil {
+	if err := repairClusterIPs.RunOnce(); err != nil {
 		glog.Errorf("Unable to perform initial IP allocation check: %v", err)
 	}
 	if err := repairNodePorts.RunOnce(); err != nil {
@@ -90,7 +91,7 @@ func (c *Controller) Start() {
 		glog.Errorf("Unable to perform initial Kubernetes RO service initialization: %v", err)
 	}
 
-	c.runner = util.NewRunner(c.RunKubernetesService, c.RunKubernetesROService, repairPortals.RunUntil, repairNodePorts.RunUntil)
+	c.runner = util.NewRunner(c.RunKubernetesService, c.RunKubernetesROService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
 	c.runner.Start()
 }
 
@@ -189,7 +190,7 @@ func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP n
 			Ports: []api.ServicePort{{Port: servicePort, Protocol: api.ProtocolTCP}},
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
-			PortalIP:        serviceIP.String(),
+			ClusterIP:       serviceIP.String(),
 			SessionAffinity: api.ServiceAffinityNone,
 		},
 	}

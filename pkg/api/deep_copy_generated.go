@@ -18,6 +18,8 @@ package api
 
 // AUTO-GENERATED FUNCTIONS START HERE
 import (
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
@@ -25,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"speter.net/go/exp/math/dec/inf"
-	"time"
 )
 
 func deepCopy_api_AWSElasticBlockStoreVolumeSource(in AWSElasticBlockStoreVolumeSource, out *AWSElasticBlockStoreVolumeSource, c *conversion.Cloner) error {
@@ -1928,7 +1929,7 @@ func deepCopy_api_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Cl
 	} else {
 		out.Selector = nil
 	}
-	out.PortalIP = in.PortalIP
+	out.ClusterIP = in.ClusterIP
 	out.Type = in.Type
 	if in.DeprecatedPublicIPs != nil {
 		out.DeprecatedPublicIPs = make([]string, len(in.DeprecatedPublicIPs))

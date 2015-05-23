@@ -77,10 +77,10 @@ func TestBeforeUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "change portal IP",
+			name: "change ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Spec.PortalIP = "1.2.3.4"
-				newSvc.Spec.PortalIP = "4.3.2.1"
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "4.3.2.1"
 			},
 			expectErr: true,
 		},

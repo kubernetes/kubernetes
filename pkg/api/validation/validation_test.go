@@ -1581,9 +1581,9 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "invalid portal ip",
+			name: "invalid cluster ip",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.PortalIP = "invalid"
+				s.Spec.ClusterIP = "invalid"
 			},
 			numErrs: 1,
 		},
@@ -1676,16 +1676,16 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "valid portal ip - none ",
+			name: "valid cluster ip - none ",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.PortalIP = "None"
+				s.Spec.ClusterIP = "None"
 			},
 			numErrs: 0,
 		},
 		{
-			name: "valid portal ip - empty",
+			name: "valid cluster ip - empty",
 			tweakSvc: func(s *api.Service) {
-				s.Spec.PortalIP = ""
+				s.Spec.ClusterIP = ""
 				s.Spec.Ports[0].TargetPort = util.NewIntOrStringFromString("http")
 			},
 			numErrs: 0,
@@ -2556,18 +2556,18 @@ func TestValidateServiceUpdate(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "change portal IP",
+			name: "change cluster IP",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Spec.PortalIP = "1.2.3.4"
-				newSvc.Spec.PortalIP = "8.6.7.5"
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "8.6.7.5"
 			},
 			numErrs: 1,
 		},
 		{
-			name: "remove portal IP",
+			name: "remove cluster IP",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Spec.PortalIP = "1.2.3.4"
-				newSvc.Spec.PortalIP = ""
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = ""
 			},
 			numErrs: 1,
 		},

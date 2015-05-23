@@ -1260,7 +1260,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Protocol: "TCP",
 					Port:     8081,
 				}},
-				PortalIP: "1.2.3.1",
+				ClusterIP: "1.2.3.1",
 			},
 		},
 		{
@@ -1270,7 +1270,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Protocol: "TCP",
 					Port:     8083,
 				}},
-				PortalIP: "1.2.3.3",
+				ClusterIP: "1.2.3.3",
 			},
 		},
 		{
@@ -1280,7 +1280,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Protocol: "TCP",
 					Port:     8084,
 				}},
-				PortalIP: "1.2.3.4",
+				ClusterIP: "1.2.3.4",
 			},
 		},
 		{
@@ -1290,7 +1290,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Protocol: "TCP",
 					Port:     8085,
 				}},
-				PortalIP: "1.2.3.5",
+				ClusterIP: "1.2.3.5",
 			},
 		},
 		{
@@ -1300,7 +1300,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Protocol: "TCP",
 					Port:     8085,
 				}},
-				PortalIP: "None",
+				ClusterIP: "None",
 			},
 		},
 		{
@@ -1319,7 +1319,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Protocol: "TCP",
 					Port:     8086,
 				}},
-				PortalIP: "1.2.3.6",
+				ClusterIP: "1.2.3.6",
 			},
 		},
 		{
@@ -1329,7 +1329,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Protocol: "TCP",
 					Port:     8088,
 				}},
-				PortalIP: "1.2.3.8",
+				ClusterIP: "1.2.3.8",
 			},
 		},
 		{
@@ -1339,7 +1339,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Protocol: "TCP",
 					Port:     8088,
 				}},
-				PortalIP: "None",
+				ClusterIP: "None",
 			},
 		},
 		{
@@ -1349,7 +1349,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Protocol: "TCP",
 					Port:     8088,
 				}},
-				PortalIP: "",
+				ClusterIP: "",
 			},
 		},
 	}

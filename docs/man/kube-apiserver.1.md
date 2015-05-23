@@ -135,7 +135,7 @@ The the kube-apiserver several options.
 	DEPRECATED: see --insecure-port instead
 
 **--portal-net**=<nil>
-	A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.
+	A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.
 
 **--profiling**=true
 	Enable profiling via web interface host:port/debug/pprof/
