@@ -276,9 +276,9 @@ function upload-server-tars() {
       if ! aws s3 ls "s3://${AWS_S3_BUCKET}" > /dev/null 2>&1; then
         if (( attempt > 5 )); then
           echo
-          echo -e "Unable to confirm bucket creation." >&2
+          echo -e "${color_red}Unable to confirm bucket creation." >&2
           echo "Please ensure that s3://${AWS_S3_BUCKET} exists" >&2
-          echo -e "and run the script again. (sorry!)" >&2
+          echo -e "and run the script again. (sorry!)${color_norm}" >&2
           exit 1
         fi
       else
@@ -738,9 +738,9 @@ function kube-up {
         if [[ "${output}" != "working" ]]; then
           if (( attempt > 9 )); then
             echo
-            echo -e "Your cluster is unlikely to work correctly." >&2
+            echo -e "${color_red}Your cluster is unlikely to work correctly." >&2
             echo "Please run ./cluster/kube-down.sh and re-create the" >&2
-            echo -e "cluster. (sorry!)" >&2
+            echo -e "cluster. (sorry!)${color_norm}" >&2
             exit 1
           fi
         else
