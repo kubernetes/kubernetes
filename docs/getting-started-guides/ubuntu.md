@@ -61,7 +61,7 @@ Then the `roles ` variable defines the role of above machine in the same order, 
 
 The `NUM_MINIONS` variable defines the total number of minions.
 
-The `SERVICE_CLUSTER_IP_RANGE` variable defines the kubernetes service portal ip range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range accordin to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
+The `SERVICE_CLUSTER_IP_RANGE` variable defines the kubernetes service IP range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range accordin to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
 
      10.0.0.0        -   10.255.255.255  (10/8 prefix)
 
