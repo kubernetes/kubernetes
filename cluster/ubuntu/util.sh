@@ -377,7 +377,7 @@ function provision-master() {
   ssh $SSH_OPTS -t $MASTER "source ~/kube/util.sh; \
                             setClusterInfo; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
-                            create-kube-apiserver-opts "${PORTAL_NET}"; \
+                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
@@ -416,7 +416,7 @@ function provision-masterandminion() {
   ssh $SSH_OPTS -t $MASTER "source ~/kube/util.sh; \
                             setClusterInfo; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
-                            create-kube-apiserver-opts "${PORTAL_NET}"; \
+                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";                     

@@ -206,9 +206,10 @@ request.  To do this, set the `spec.clusterIP` field (called `portalIP` in
 v1beta3 and earlier APIs). For example, if they already have an existing DNS
 entry that they wish to replace, or legacy systems that are configured for a
 specific IP address and difficult to re-configure.  The IP address that a user
-chooses must be a valid IP address and within the portal_net CIDR range that is
-specified by flag to the API server.  If the IP address value is invalid, the
-apiserver returns a 422 HTTP status code to indicate that the value is invalid.
+chooses must be a valid IP address and within the service_cluster_ip_range CIDR
+range that is specified by flag to the API server.  If the IP address value is
+invalid, the apiserver returns a 422 HTTP status code to indicate that the
+value is invalid.
 
 ### Why not use round-robin DNS?
 
