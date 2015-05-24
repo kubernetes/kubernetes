@@ -40,6 +40,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	forked "github.com/GoogleCloudPlatform/kubernetes/third_party/forked/coreos/go-etcd/etcd"
+	systemd "github.com/coreos/go-systemd/daemon"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -455,6 +456,7 @@ func (s *APIServer) Run(_ []string) error {
 						glog.Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
 					}
 				}
+				_ = systemd.SdNotify("READY=1\n")
 				if err := secureServer.ListenAndServeTLS(s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
 				}
@@ -468,6 +470,9 @@ func (s *APIServer) Run(_ []string) error {
 		ReadTimeout:    ReadWriteTimeout,
 		WriteTimeout:   ReadWriteTimeout,
 		MaxHeaderBytes: 1 << 20,
+	}
+	if secureLocation == "" {
+		_ = systemd.SdNotify("READY=1\n")
 	}
 	glog.Infof("Serving insecurely on %s", insecureLocation)
 	glog.Fatal(http.ListenAndServe())
