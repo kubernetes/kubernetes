@@ -66,5 +66,7 @@ cp kubernetes/server/kubernetes/server/bin/kube-apiserver \
 cp kubernetes/server/kubernetes/server/bin/kubelet \
    kubernetes/server/kubernetes/server/bin/kube-proxy binaries/minion
 
+cp kubernetes/server/kubernetes/server/bin/kubectl binaries/
+
 rm -rf flannel* kubernetes* etcd*
 echo "Done! All your commands locate in ./binaries dir"

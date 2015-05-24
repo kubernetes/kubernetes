@@ -26,6 +26,8 @@ MASTER=""
 MASTER_IP=""
 MINION_IPS=""
 
+KUBECTL_PATH=${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl
+
 # Assumed Vars:
 #   KUBE_ROOT
 function test-build-release {
