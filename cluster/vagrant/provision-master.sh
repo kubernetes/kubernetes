@@ -61,7 +61,6 @@ echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' 
 mkdir -p /etc/salt/minion.d
 cat <<EOF >/etc/salt/minion.d/master.conf
 master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
-master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
 auth_timeout: 10
 auth_tries: 2
 auth_safemode: True
