@@ -134,7 +134,7 @@ The the kube-apiserver several options.
 **--port**=8080
 	DEPRECATED: see --insecure-port instead
 
-**--portal-net**=<nil>
+**--service-cluster-ip-range**=<nil>
 	A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.
 
 **--profiling**=true
@@ -184,7 +184,7 @@ The the kube-apiserver several options.
 
 # EXAMPLES
 ```
-/usr/bin/kube-apiserver --logtostderr=true --v=0 --etcd_servers=http://127.0.0.1:4001 --insecure_bind_address=127.0.0.1 --insecure_port=8080 --kubelet_port=10250 --portal_net=11.1.1.0/24 --allow_privileged=false
+/usr/bin/kube-apiserver --logtostderr=true --v=0 --etcd_servers=http://127.0.0.1:4001 --insecure_bind_address=127.0.0.1 --insecure_port=8080 --kubelet_port=10250 --service-cluster-ip-range=10.1.1.0/24 --allow_privileged=false
 ```
 
 # HISTORY

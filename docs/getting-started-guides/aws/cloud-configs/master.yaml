@@ -118,7 +118,7 @@ coreos:
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
         ExecStart=/opt/bin/kube-apiserver \
         --insecure-bind-address=0.0.0.0 \
-        --portal-net=10.100.0.0/16 \
+        --service-cluster-ip-range=10.100.0.0/16 \
         --etcd-servers=http://localhost:2379
         Restart=always
         RestartSec=10

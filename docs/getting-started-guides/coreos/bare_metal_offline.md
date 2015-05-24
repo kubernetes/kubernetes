@@ -363,7 +363,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             ExecStart=/opt/bin/kube-apiserver \
             --address=0.0.0.0 \
             --port=8080 \
-            --portal_net=10.100.0.0/16 \
+            --service-cluster-ip-range=10.100.0.0/16 \
             --etcd_servers=http://127.0.0.1:4001 \
             --logtostderr=true
             Restart=always

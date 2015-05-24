@@ -38,7 +38,7 @@
 
 {% set portal_net = "" -%}
 {% if pillar['portal_net'] is defined -%}
-  {% set portal_net = "--portal_net=" + pillar['portal_net'] -%}
+  {% set portal_net = "--service-cluster-ip-range=" + pillar['portal_net'] -%}
 {% endif -%}
 
 {% set cert_file = "--tls_cert_file=/srv/kubernetes/server.cert" -%}

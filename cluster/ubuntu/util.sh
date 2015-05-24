@@ -210,7 +210,7 @@ KUBE_APISERVER_OPTS="--address=0.0.0.0 \
 --port=8080 \
 --etcd_servers=http://127.0.0.1:4001 \
 --logtostderr=true \
---portal_net=${1}"
+--service-cluster-ip-range=${1}"
 EOF
 }
 

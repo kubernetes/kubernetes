@@ -260,7 +260,7 @@
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver\n",
           "        ExecStart=/opt/bin/kube-apiserver \\\n",
           "        --insecure-bind-address=0.0.0.0 \\\n",
-          "        --portal-net=10.100.0.0/16 \\\n",
+          "        --service-cluster-ip-range=10.100.0.0/16 \\\n",
           "        --etcd-servers=http://localhost:2379\n",
           "        Restart=always\n",
           "        RestartSec=10\n",
