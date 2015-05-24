@@ -65,7 +65,7 @@ Running
 -------
 
 Now that you have containerized your Meteor app it's time to set up
-your cluster. Edit `meteor-controller.json` and make sure the `image`
+your cluster. Edit [`meteor-controller.json`](meteor-controller.json) and make sure the `image`
 points to the container you just pushed to the Docker Hub or GCR.
 
 As you may know, Meteor uses MongoDB, and we'll need to provide it a
@@ -96,7 +96,7 @@ kubectl create -f meteor-controller.json
 kubectl create -f meteor-service.json
 ```
 
-Note that `meteor-service.json` creates an external load balancer, so
+Note that [`meteor-service.json`](meteor-service.json) creates an external load balancer, so
 your app should be available through the IP of that load balancer once
 the Meteor pods are started. You can find the IP of your load balancer
 by running:
@@ -127,20 +127,20 @@ ENTRYPOINT MONGO_URL=mongodb://$MONGO_SERVICE_HOST:$MONGO_SERVICE_PORT /usr/loca
 Here we can see the MongoDB host and port information being passed
 into the Meteor app. The `MONGO_SERVICE...` environment variables are
 set by Kubernetes, and point to the service named `mongo` specified in
-`mongo-service.json`. See the [environment
-docuementation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md)
+[`mongo-service.json`](mongo-service.json). See the [environment
+documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md)
 for more details.
 
 As you may know, Meteor uses long lasting connections, and requires
 _sticky sessions_. With Kubernetes you can scale out your app easily
-with session affinity. The `meteor-service.json` file contains
+with session affinity. The [`meteor-service.json`](meteor-service.json) file contains
 `"sessionAffinity": "ClientIP"`, which provides this for us. See the
 [service
 documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#portals-and-service-proxies)
 for more information.
 
 As mentioned above, the mongo container uses a volume which is mapped
-to a persistant disk by Kubernetes. In `mongo-pod.json` the container
+to a persistant disk by Kubernetes. In [`mongo-pod.json`](mongo-pod.json) the container
 section specifies the volume:
 ```
         "volumeMounts": [

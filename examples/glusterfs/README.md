@@ -9,7 +9,8 @@ The example assumes that you have already set up a Glusterfs server cluster and 
 Set up Glusterfs server cluster; install Glusterfs client package on the Kubernetes nodes. ([Guide](https://www.howtoforge.com/high-availability-storage-with-glusterfs-3.2.x-on-debian-wheezy-automatic-file-replication-mirror-across-two-storage-servers))
 
 ### Create endpoints
-Here is a snippet of glusterfs-endpoints.json,
+Here is a snippet of [glusterfs-endpoints.json](glusterfs-endpoints.json),
+
 ```
       "addresses": [
         {
@@ -40,7 +41,7 @@ glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
 
 ### Create a POD
 
-The following *volume* spec in glusterfs-pod.json illustrates a sample configuration.
+The following *volume* spec in [glusterfs-pod.json](glusterfs-pod.json) illustrates a sample configuration.
 
 ```js
 {
