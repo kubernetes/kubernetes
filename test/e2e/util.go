@@ -1069,6 +1069,8 @@ func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {
 // Prints summary metrics for request types with latency above threshold
 // and returns number of such request types.
 func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResources util.StringSet) (int, error) {
+	ignoredVerbs := util.NewStringSet("WATCHLIST", "PROXY")
+
 	metrics, err := ReadLatencyMetrics(c)
 	if err != nil {
 		return 0, err
@@ -1076,7 +1078,7 @@ func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResou
 	var badMetrics []LatencyMetric
 	for _, metric := range metrics {
 		if !ignoredResources.Has(metric.resource) &&
-			metric.verb != "WATCHLIST" &&
+			!ignoredVerbs.Has(metric.verb) &&
 			// We are only interested in 99%tile, but for logging purposes
 			// it's useful to have all the offending percentiles.
 			metric.quantile <= 0.99 &&
