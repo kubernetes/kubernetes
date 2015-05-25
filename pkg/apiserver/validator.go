@@ -102,7 +102,8 @@ func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	apiResource := ""
 	var httpCode int
 	reqStart := time.Now()
-	defer monitor(&verb, &apiResource, util.GetClient(r), &httpCode, reqStart)
+	preRequestMonitor(&verb, &apiResource, util.GetClient(r))
+	defer postRequestMonitor(&verb, &apiResource, util.GetClient(r), &httpCode, reqStart)
 
 	reply := []ServerStatus{}
 	for name, server := range v.servers() {

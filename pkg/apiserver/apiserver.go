@@ -56,6 +56,13 @@ var (
 		},
 		[]string{"verb", "resource", "client", "code"},
 	)
+	realTimeRequestCounter = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "apiserver_realtime_request_count",
+			Help: "Realtime counter of apiserver requests broken out for each verb, API resource, client, and HTTP response code.",
+		},
+		[]string{"verb", "resource", "client"},
+	)
 	requestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "apiserver_request_latencies",
@@ -76,25 +83,36 @@ var (
 
 func init() {
 	prometheus.MustRegister(requestCounter)
+	prometheus.MustRegister(realTimeRequestCounter)
 	prometheus.MustRegister(requestLatencies)
 	prometheus.MustRegister(requestLatenciesSummary)
 }
 
-// monitor is a helper function for each HTTP request handler to use for
-// instrumenting basic request counter and latency metrics.
-func monitor(verb, resource *string, client string, httpCode *int, reqStart time.Time) {
+// postRequestMonitor is a helper function for each HTTP request handler to use for
+// instrumenting basic request counter and latency metrics. It's meant to be called before
+// the filter chain which leads to the actual request.
+func postRequestMonitor(verb, resource *string, client string, httpCode *int, reqStart time.Time) {
 	requestCounter.WithLabelValues(*verb, *resource, client, strconv.Itoa(*httpCode)).Inc()
 	requestLatencies.WithLabelValues(*verb, *resource, client).Observe(float64((time.Since(reqStart)) / time.Microsecond))
 	requestLatenciesSummary.WithLabelValues(*verb, *resource).Observe(float64((time.Since(reqStart)) / time.Microsecond))
+	realTimeRequestCounter.WithLabelValues(*verb, *resource, client).Dec()
+}
+
+// preRequestMonitor is a helper function for each HTTP request handler to use for
+// instrumenting basic request counter and latency metrics. It's meant to be called after
+// the filter chain, and hence after the request is finished.
+func preRequestMonitor(verb, resource *string, client string) {
+	realTimeRequestCounter.WithLabelValues(*verb, *resource, client).Inc()
 }
 
 // monitorFilter creates a filter that reports the metrics for a given resource and action.
 func monitorFilter(action, resource string) restful.FilterFunction {
 	return func(req *restful.Request, res *restful.Response, chain *restful.FilterChain) {
+		preRequestMonitor(&action, &resource, util.GetClient(req.Request))
 		reqStart := time.Now()
 		chain.ProcessFilter(req, res)
 		httpCode := res.StatusCode()
-		monitor(&action, &resource, util.GetClient(req.Request), &httpCode, reqStart)
+		postRequestMonitor(&action, &resource, util.GetClient(req.Request), &httpCode, reqStart)
 	}
 }
 
