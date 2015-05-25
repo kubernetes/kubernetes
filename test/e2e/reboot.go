@@ -63,53 +63,102 @@ var _ = Describe("Reboot", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should reboot each node and ensure they function upon restart", func() {
-		// This test requires SSH, so the provider check should be identical to
-		// there (the limiting factor is the implementation of util.go's
-		// getSigner(...)).
-		provider := testContext.Provider
-		if !providerIs("gce", "gke") {
-			By(fmt.Sprintf("Skipping reboot test, which is not implemented for %s", provider))
-			return
-		}
+	It("each node by ordering clean reboot and ensure they function upon restart", func() {
+		// clean shutdown and restart
+		testReboot(c, "sudo reboot")
+	})
 
-		// Get all nodes, and kick off the test on each.
-		nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
-		if err != nil {
-			Failf("Error getting nodes: %v", err)
-		}
-		result := make(chan bool, len(nodelist.Items))
-		for _, n := range nodelist.Items {
-			go rebootNode(c, provider, n.ObjectMeta.Name, result)
-		}
+	It("each node by ordering unclean reboot and ensure they function upon restart", func() {
+		// unclean shutdown and restart
+		testReboot(c, "echo b | sudo tee /proc/sysrq-trigger")
+	})
 
-		// Wait for all to finish and check the final result.
-		failed := false
-		// TODO(mbforbes): Change to `for range` syntax and remove logging once
-		// we support only Go >= 1.4.
-		for _, n := range nodelist.Items {
-			if !<-result {
-				Failf("Node %s failed reboot test.", n.ObjectMeta.Name)
-				failed = true
-			}
-		}
-		if failed {
-			Failf("Test failed; at least one node failed to reboot in the time given.")
-		}
+	It("each node by triggering kernel panic and ensure they function upon restart", func() {
+		// kernel panic
+		testReboot(c, "echo c | sudo tee /proc/sysrq-trigger")
+	})
+
+	It("each node by switching off the network interface and ensure they function upon switch on", func() {
+		// switch the network interface off for a while to simulate a network outage
+		testReboot(c, "sudo ifdown eth0 && sleep 120 && sudo ifup eth0")
+	})
+
+	It("each node by dropping all inbound packages for a while and ensure they function afterwards", func() {
+		// tell the firewall to drop all inbound packets for a while
+		testReboot(c, "sudo iptables -A INPUT -j DROP && sleep 120 && sudo iptables -D INPUT -j DROP")
+	})
+
+	It("each node by dropping all outbound packages for a while and ensure they function afterwards", func() {
+		// tell the firewall to drop all outbound packets for a while
+		testReboot(c, "sudo iptables -A OUTPUT -j DROP && sleep 120 && sudo iptables -D OUTPUT -j DROP")
 	})
 })
+
+func testReboot(c *client.Client, rebootCmd string) {
+	// This test requires SSH, so the provider check should be identical to
+	// there (the limiting factor is the implementation of util.go's
+	// getSigner(...)).
+	provider := testContext.Provider
+	if !providerIs("gce", "gke") {
+		By(fmt.Sprintf("Skipping reboot test, which is not implemented for %s", provider))
+		return
+	}
+
+	// Get all nodes, and kick off the test on each.
+	nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	if err != nil {
+		Failf("Error getting nodes: %v", err)
+	}
+	result := make(chan bool, len(nodelist.Items))
+	for _, n := range nodelist.Items {
+		go rebootNode(c, provider, n.ObjectMeta.Name, rebootCmd, result)
+	}
+
+	// Wait for all to finish and check the final result.
+	failed := false
+	// TODO(mbforbes): Change to `for range` syntax and remove logging once
+	// we support only Go >= 1.4.
+	for _, n := range nodelist.Items {
+		if !<-result {
+			Failf("Node %s failed reboot test.", n.ObjectMeta.Name)
+			failed = true
+		}
+	}
+	if failed {
+		Failf("Test failed; at least one node failed to reboot in the time given.")
+	}
+}
+
+func issueSSHCommand(node *api.Node, provider, cmd string) error {
+	Logf("Getting external IP address for %s", node.Name)
+	host := ""
+	for _, a := range node.Status.Addresses {
+		if a.Type == api.NodeExternalIP {
+			host = a.Address + ":22"
+			break
+		}
+	}
+	if host == "" {
+		return fmt.Errorf("couldn't find external IP address for node %s", node.Name)
+	}
+	Logf("Calling %s on %s", cmd, node.Name)
+	if _, _, code, err := SSH(cmd, host, provider); code != 0 || err != nil {
+		return fmt.Errorf("when running %s on %s, got %d and %v", cmd, node.Name, code, err)
+	}
+	return nil
+}
 
 // rebootNode takes node name on provider through the following steps using c:
 //  - ensures the node is ready
 //  - ensures all pods on the node are running and ready
-//  - reboots the node
+//  - reboots the node (by executing rebootCmd over ssh)
 //  - ensures the node reaches some non-ready state
 //  - ensures the node becomes ready again
 //  - ensures all pods on the node become running and ready again
 //
 // It returns true through result only if all of the steps pass; at the first
 // failed step, it will return false through result and not run the rest.
-func rebootNode(c *client.Client, provider, name string, result chan bool) {
+func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan bool) {
 	// Get the node initially.
 	Logf("Getting %s", name)
 	node, err := c.Nodes().Get(name)
@@ -147,26 +196,9 @@ func rebootNode(c *client.Client, provider, name string, result chan bool) {
 	}
 
 	// Reboot the node.
-	Logf("Getting external IP address for %s", name)
-	host := ""
-	for _, a := range node.Status.Addresses {
-		if a.Type == api.NodeExternalIP {
-			host = a.Address + ":22"
-			break
-		}
-	}
-	if host == "" {
-		Logf("Couldn't find external IP address for node %s", name)
-		result <- false
-		return
-	}
-	Logf("Calling reboot on %s", name)
-	rebootCmd := "sudo reboot"
-	if _, _, code, err := SSH(rebootCmd, host, provider); code != 0 || err != nil {
-		Failf("Expected 0 exit code and nil error when running %s on %s, got %d and %v",
-			rebootCmd, node, code, err)
-		result <- false
-		return
+	if err = issueSSHCommand(node, provider, rebootCmd); err != nil {
+		// Just log the error as reboot may cause unclean termination of ssh session, which is expected.
+		Logf("Error while issuing ssh command: %v", err)
 	}
 
 	// Wait for some kind of "not ready" status.
