@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1024,12 +1025,20 @@ func getSigner(provider string) (ssh.Signer, error) {
 // LatencyMetrics stores data about request latency at a given quantile
 // broken down by verb (e.g. GET, PUT, LIST) and resource (e.g. pods, services).
 type LatencyMetric struct {
-	verb     string
-	resource string
+	Verb     string
+	Resource string
 	// 0 <= quantile <=1, e.g. 0.95 is 95%tile, 0.5 is median.
-	quantile float64
-	latency  time.Duration
+	Quantile float64
+	Latency  time.Duration
 }
+
+// LatencyMetricByLatency implements sort.Interface for []LatencyMetric based on
+// the latency field.
+type LatencyMetricByLatency []LatencyMetric
+
+func (a LatencyMetricByLatency) Len() int           { return len(a) }
+func (a LatencyMetricByLatency) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a LatencyMetricByLatency) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
 
 func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {
 	body, err := c.Get().AbsPath("/metrics").DoRaw()
@@ -1075,16 +1084,28 @@ func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResou
 	if err != nil {
 		return 0, err
 	}
+	sort.Sort(sort.Reverse(LatencyMetricByLatency(metrics)))
 	var badMetrics []LatencyMetric
+	top := 5
 	for _, metric := range metrics {
-		if !ignoredResources.Has(metric.resource) &&
-			!ignoredVerbs.Has(metric.verb) &&
+		if ignoredResources.Has(metric.Resource) || ignoredVerbs.Has(metric.Verb) {
+			continue
+		}
+		isBad := false
+		if metric.Latency > threshold &&
 			// We are only interested in 99%tile, but for logging purposes
 			// it's useful to have all the offending percentiles.
-			metric.quantile <= 0.99 &&
-			metric.latency > threshold {
-			Logf("WARNING - requests with too high latency: %+v", metric)
+			metric.Quantile <= 0.99 {
 			badMetrics = append(badMetrics, metric)
+			isBad = true
+		}
+		if top > 0 || isBad {
+			top--
+			prefix := ""
+			if isBad {
+				prefix = "WARNING "
+			}
+			Logf("%vTop latency metric: %+v", prefix, metric)
 		}
 	}
 
