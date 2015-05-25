@@ -30,6 +30,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const attachRetries = 5
+
 type GCEDiskUtil struct{}
 
 // Attaches a disk specified by a volume.GCEPersistentDisk to the current kubelet.
@@ -39,8 +41,17 @@ func (util *GCEDiskUtil) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath 
 	if err != nil {
 		return err
 	}
-	if err := gce.(*gce_cloud.GCECloud).AttachDisk(pd.pdName, pd.readOnly); err != nil {
-		return err
+	i := 0
+	t := time.Second
+	for i < attachRetries {
+		i++
+		if err := gce.(*gce_cloud.GCECloud).AttachDisk(pd.pdName, pd.readOnly); err == nil {
+			break
+		} else if i == attachRetries {
+			return err
+		}
+		time.Sleep(t)
+		t = t * t
 	}
 
 	devicePaths := []string{
