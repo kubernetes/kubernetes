@@ -107,7 +107,7 @@ func TestExampleObjects(t *testing.T) {
 							Path: "/tmp/data02",
 						},
 					},
-					ReclamationPolicy: api.RecycleOnRelease,
+					PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
 				},
 			},
 		},
@@ -182,7 +182,7 @@ func TestBindingWithExamples(t *testing.T) {
 	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
 
 	pv, err := client.PersistentVolumes().Get("any")
-	pv.Spec.ReclamationPolicy = api.RecycleOnRelease
+	pv.Spec.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimRecycle
 	if err != nil {
 		t.Error("Unexpected error getting PV from client: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestBindingWithExamples(t *testing.T) {
 		t.Errorf("Expected non-nil ClaimRef: %+v", pv.Spec)
 	}
 
-	// released volumes with a ReclamationPolicy (recycle/delete) can have further processing
+	// released volumes with a PersistentVolumeReclaimPolicy (recycle/delete) can have further processing
 	err = recycler.reclaimVolume(pv)
 	if err != nil {
 		t.Errorf("Unexpected error reclaiming volume: %+v", err)

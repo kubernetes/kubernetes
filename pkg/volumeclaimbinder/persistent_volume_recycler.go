@@ -91,15 +91,15 @@ func (recycler *PersistentVolumeRecycler) reclaimVolume(pv *api.PersistentVolume
 		// TODO: allow parallel recycling operations to increase throughput
 
 		var err error
-		switch pv.Spec.ReclamationPolicy {
-		case api.RecycleOnRelease:
+		switch pv.Spec.PersistentVolumeReclaimPolicy {
+		case api.PersistentVolumeReclaimRecycle:
 			err = recycler.handleRecycle(pv)
-		case api.DeleteOnRelease:
+		case api.PersistentVolumeReclaimDelete:
 			// TODO implement handleDelete in a separate PR w/ cloud volumes
-		case api.RetainOnRelease:
+		case api.PersistentVolumeReclaimRetain:
 			glog.V(5).Infof("Volume %s is set to retain after release.  Skipping.\n", pv.Name)
 		default:
-			err = fmt.Errorf("No ReclamationPolicy defined for spec: %+v", pv)
+			err = fmt.Errorf("No PersistentVolumeReclaimPolicy defined for spec: %+v", pv)
 		}
 		if err != nil {
 			errMsg := fmt.Sprintf("Could not recycle volume spec: %+v", err)

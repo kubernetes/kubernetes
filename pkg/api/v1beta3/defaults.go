@@ -117,8 +117,8 @@ func addDefaultingFuncs() {
 			if obj.Status.Phase == "" {
 				obj.Status.Phase = VolumePending
 			}
-			if obj.Spec.ReclamationPolicy == "" {
-				obj.Spec.ReclamationPolicy = RetainOnRelease
+			if obj.Spec.PersistentVolumeReclaimPolicy == "" {
+				obj.Spec.PersistentVolumeReclaimPolicy = PersistentVolumeReclaimRetain
 			}
 		},
 		func(obj *PersistentVolumeClaim) {

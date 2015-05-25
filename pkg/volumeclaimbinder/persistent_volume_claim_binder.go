@@ -202,7 +202,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
 		} else {
 			// another process is watching for released volumes.
-			// ReclamationPolicy is set per PersistentVolume
+			// PersistentVolumeReclaimPolicy is set per PersistentVolume
 		}
 
 	// recycled volumes can be made available again to new claims

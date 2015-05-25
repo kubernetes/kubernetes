@@ -59,7 +59,7 @@ func validNewPersistentVolume(name string) *api.PersistentVolume {
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 			},
-			ReclamationPolicy: api.RetainOnRelease,
+			PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRetain,
 		},
 		Status: api.PersistentVolumeStatus{
 			Phase: api.VolumePending,

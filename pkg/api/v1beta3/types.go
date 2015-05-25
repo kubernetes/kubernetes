@@ -280,23 +280,23 @@ type PersistentVolumeSpec struct {
 	// ClaimRef is expected to be non-nil when bound.
 	// claim.VolumeName is the authoritative bind between PV and PVC.
 	ClaimRef *ObjectReference `json:"claimRef,omitempty" description:"when bound, a reference to the bound claim"`
-	// ReclamationPolicy represents what happens to a persistent volume when released from its claim.
-	ReclamationPolicy ReclamationPolicy `json:"reclamationPolicy,omitempty" description:"reclamationPolicy is what happens to a volume when released from its claim; one of Recycle, Delete, Retain.  Default is Retain."`
+	// PersistentVolumeReclaimPolicy represents what happens to a persistent volume when released from its claim.
+	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"reclamationPolicy,omitempty" description:"reclamationPolicy is what happens to a volume when released from its claim; one of Recycle, Delete, Retain.  Default is Retain."`
 }
 
-// ReclamationPolicy describes a policy for end-of-life maintenance of persistent volumes
-type ReclamationPolicy string
+// PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
+type PersistentVolumeReclaimPolicy string
 
 const (
-	// RecycleOnRelease means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim.
+	// PersistentVolumeReclaimRecycle means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim.
 	// The volume plugin must support Recycling.
-	RecycleOnRelease ReclamationPolicy = "Recycle"
-	// DeleteOnRelease means the volume will be deleted from Kubernetes on release from its claim.
+	PersistentVolumeReclaimRecycle PersistentVolumeReclaimPolicy = "Recycle"
+	// PersistentVolumeReclaimDelete means the volume will be deleted from Kubernetes on release from its claim.
 	// The volume plugin must support Deletion.
-	DeleteOnRelease ReclamationPolicy = "Delete"
-	// RetainOnRelease means the volume will left in its current phase (Released) for manual reclamation by the administrator.
+	PersistentVolumeReclaimDelete PersistentVolumeReclaimPolicy = "Delete"
+	// PersistentVolumeReclaimRetain means the volume will left in its current phase (Released) for manual reclamation by the administrator.
 	// The default policy is Retain.
-	RetainOnRelease ReclamationPolicy = "Retain"
+	PersistentVolumeReclaimRetain PersistentVolumeReclaimPolicy = "Retain"
 )
 
 type PersistentVolumeStatus struct {
