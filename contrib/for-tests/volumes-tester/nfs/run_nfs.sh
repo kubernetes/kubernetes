@@ -6,7 +6,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,27 +18,20 @@ function start()
 {
 
     # prepare /etc/exports
-    seq=0
     for i in "$@"; do
-        echo "$i *(rw,sync,no_root_squash,insecure,fsid=$seq)" >> /etc/exports
-        seq=$(($seq + 1))
+        # fsid=0: needed for NFSv4
+        echo "$i *(rw,fsid=0)" >> /etc/exports
         echo "Serving $i"
     done
 
-    # from /lib/systemd/system/proc-fs-nfsd.mount
     mount -t nfsd nfds /proc/fs/nfsd
 
-    # from /lib/systemd/system/nfs-config.service
-    /usr/lib/systemd/scripts/nfs-utils_env.sh
+    # -N 2 -N 3: disable NFSv2+3
+    # -V 4.x: enable NFSv4
+    /usr/sbin/rpc.mountd -N 2 -N 3 -V 4 -V 4.1
 
-    # from /lib/systemd/system/nfs-mountd.service
-    . /run/sysconfig/nfs-utils
-    /usr/sbin/rpc.mountd $RPCMOUNTDARGS
-
-    # from /lib/systemd/system/nfs-server.service
-    . /run/sysconfig/nfs-utils
     /usr/sbin/exportfs -r
-    /usr/sbin/rpc.nfsd -N 2 -N 3 -V 4 -V 4.1 $RPCNFSDARGS
+    /usr/sbin/rpc.nfsd -N 2 -N 3 -V 4 -V 4.1 2
 
     echo "NFS started"
 }
@@ -47,16 +40,12 @@ function stop()
 {
     echo "Stopping NFS"
 
-    # from /lib/systemd/system/nfs-server.service
     /usr/sbin/rpc.nfsd 0
     /usr/sbin/exportfs -au
     /usr/sbin/exportfs -f
 
-    # from /lib/systemd/system/nfs-mountd.service
     kill $( pidof rpc.mountd )
-    # from /lib/systemd/system/proc-fs-nfsd.mount
     umount /proc/fs/nfsd
-
     echo > /etc/exports
     exit 0
 }
