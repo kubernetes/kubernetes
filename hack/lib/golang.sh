@@ -227,10 +227,10 @@ EOF
 }
 
 # This will take binaries from $GOPATH/bin and copy them to the appropriate
-# place in ${KUBE_OUTPUT_BINDIR}
+# place in ${KUBE_OUTPUT_BINPATH}
 #
 # Ideally this wouldn't be necessary and we could just set GOBIN to
-# KUBE_OUTPUT_BINDIR but that won't work in the face of cross compilation.  'go
+# KUBE_OUTPUT_BINPATH but that won't work in the face of cross compilation.  'go
 # install' will place binaries that match the host platform directly in $GOBIN
 # while placing cross compiled binaries into `platform_arch` subdirs.  This
 # complicates pretty much everything else we do around packaging and such.

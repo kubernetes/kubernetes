@@ -25,10 +25,10 @@ var W3C_OPTIONS = {
   output: 'json',
   // Remove some messages that angular will always display.
   filter: function(message) {
-    if (/Element head is missing a required instance of child element title/.test(message)) return false;
-    if (/Attribute .+ not allowed on element .+ at this point/.test(message)) return false;
-    if (/Element .+ not allowed as child of element .+ in this context/.test(message)) return false;
-    if (/Comments seen before doctype./.test(message)) return false;
+    if (/Element head is missing a required instance of child element title/.test(message)) { return false; }
+    if (/Attribute .+ not allowed on element .+ at this point/.test(message)) { return false; }
+    if (/Element .+ not allowed as child of element .+ in this context/.test(message)) { return false; }
+    if (/Comments seen before doctype./.test(message)) { return false; }
   }
 };
 
@@ -43,12 +43,23 @@ var ignored_files = '!' + hidden_files;
 var component_hidden_files = '**/js/**/*.*';
 var component_ignored_files = '!' + component_hidden_files;
 
+var target_folder = '../app';
+
 // VENDOR CONFIG
 var vendor = {
   // vendor scripts required to start the app
-  base: {source: require('./vendor.base.json'), dest: '../app/assets/js', name: 'base.js'},
+  base: {
+    source: require('./vendor.base.json'), 
+    dest: '../app/assets/js', 
+    name: 'base.js'
+  },
   // vendor scripts to make to app work. Usually via lazy loading
-  app: {source: require('./vendor.json'), dest: '../app/vendor'}
+  app: {
+    // instead of using require('./vendor.json') to pull the bower downloaded versions, 
+    // use the hand edited versions of these files from the shared/vendor directory.
+    source: 'shared/vendor/**/*.*',  
+    dest: '../app/vendor'
+  }
 };
 
 // SOURCES CONFIG
@@ -93,9 +104,22 @@ var source = {
       // , 'components/*/less/*.less'
       source: ['less/app/base.less', 'components/*/less/*.less'],
       dir: ['less/app', 'components'],
+      dest: '../app/assets/css',
       watch: ['less/*.less', 'less/**/*.less', 'components/**/less/*.less', 'components/**/less/**/*.less']
 
     }
+  },
+
+  html: {
+    app: {
+      source: ['shared/index.html'],
+      dest: '../app'
+    },
+    views: {
+      source: ['shared/views/**/*.*'],
+      dest: '../app'
+    },
+    watch: ['shared/index.html', 'shared/views/**/*.*']
   },
 
   components: {
@@ -108,7 +132,7 @@ var source = {
       '!components/**/less/**/*.*',
       '!components/**/README.md'
     ],
-    dest: 'components',
+    dest: '../app/components',
     watch: [
       'components/**/*.*',
       component_ignored_files,
@@ -121,14 +145,16 @@ var source = {
   config: {
     watch: [
       'shared/config/development.json',
-      'shared/config/production.json',
-      'shared/config/development.json',
       'shared/config/production.json'
     ],
     dest: 'shared/config'
   },
 
-  assets: {source: ['shared/assets/**/*.*'], dest: 'shared/assets', watch: ['shared/assets/**/*.*']}
+  assets: {
+    source: ['shared/assets/**/*.*'], 
+    dest: '../app/assets', 
+    watch: ['shared/assets/**/*.*']
+  }
 
   //,
   // bootstrap: {
@@ -140,10 +166,11 @@ var source = {
 
 // BUILD TARGET CONFIG
 var build = {
-  scripts: {app: {main: 'app.js', dir: '../app/assets/js'}},
-  assets: '../app/shared/assets',
-  styles: '../app/assets/css',
-  components: {dir: '../app/components'}
+  scripts: {
+    app: {
+      main: 'app.js', dir: '../app/assets/js'
+    }
+  }
 };
 
 function stringSrc(filename, string) {
@@ -153,6 +180,12 @@ function stringSrc(filename, string) {
     this.push(null);
   };
   return src;
+}
+
+// Error handler
+function handleError(err) {
+  console.log(err.toString());
+  this.emit('end');
 }
 
 //---------------
@@ -217,7 +250,7 @@ gulp.task('bundle-manifest-routes', function() {
 });
 
 // JS APP
-gulp.task('scripts:app', ['bundle-manifest', 'bundle-manifest-routes', 'config', 'scripts:app:base']);
+gulp.task('scripts:app', gulpsync.sync(['bundle-manifest', 'bundle-manifest-routes', 'config', 'scripts:app:base']));
 
 // JS APP BUILD
 gulp.task('scripts:app:base', function() {
@@ -227,14 +260,14 @@ gulp.task('scripts:app:base', function() {
       .pipe(concat(build.scripts.app.main))
       .pipe(ngAnnotate())
       .on("error", handleError)
-      .pipe(isProduction ? uglify({preserveComments: 'some'}) : gutil.noop())
+      // .pipe(isProduction ? uglify({preserveComments: 'some'}) : gutil.noop())
       .on("error", handleError)
       .pipe(useSourceMaps ? sourcemaps.write() : gutil.noop())
       .pipe(gulp.dest(build.scripts.app.dir));
 });
 
 // VENDOR BUILD
-gulp.task('scripts:vendor', ['scripts:vendor:base', 'scripts:vendor:app']);
+gulp.task('scripts:vendor', gulpsync.sync(['scripts:vendor:base', 'scripts:vendor:app']));
 
 //  This will be included vendor files statically
 gulp.task('scripts:vendor:base', function() {
@@ -242,7 +275,7 @@ gulp.task('scripts:vendor:base', function() {
   // Minify and copy all JavaScript (except vendor scripts)
   return gulp.src(vendor.base.source)
       .pipe(expect(vendor.base.source))
-      .pipe(uglify())
+      .pipe(isProduction ? uglify() : gutil.noop())
       .pipe(concat(vendor.base.name))
       .pipe(gulp.dest(vendor.base.dest));
 });
@@ -253,13 +286,13 @@ gulp.task('scripts:vendor:app', function() {
   var jsFilter = gulpFilter('**/*.js');
   var cssFilter = gulpFilter('**/*.css');
 
-  return gulp.src(vendor.app.source, {base: 'bower_components'})
+  return gulp.src(vendor.app.source)
       .pipe(expect(vendor.app.source))
       .pipe(jsFilter)
-      .pipe(uglify())
+      .pipe(isProduction ? uglify() : gutil.noop())
       .pipe(jsFilter.restore())
       .pipe(cssFilter)
-      .pipe(minifyCSS())
+      .pipe(isProduction ? minifyCSS() : gutil.noop())
       .pipe(cssFilter.restore())
       .pipe(gulp.dest(vendor.app.dest));
 
@@ -275,7 +308,7 @@ gulp.task('styles:app', function() {
       .on("error", handleError)
       .pipe(isProduction ? minifyCSS() : gutil.noop())
       .pipe(useSourceMaps ? sourcemaps.write() : gutil.noop())
-      .pipe(gulp.dest(build.styles));
+      .pipe(gulp.dest(source.styles.app.dest));
 });
 
 // // APP RTL
@@ -299,32 +332,31 @@ gulp.task('styles:app', function() {
 // Environment based configuration
 // https://github.com/kubernetes-ui/kubernetes-ui/issues/21
 
-gulp.task('config', ['config:base', 'config:copy']);
+gulp.task('config', gulpsync.sync(['config:base', 'config:copy']));
 
 gulp.task('config:base', function() {
+  del.sync(['shared/config/generated-config.js'], {force: true});
   return stringSrc('generated-config.js', 'angular.module("kubernetesApp.config", [])' +
                                               '\n' +
                                               '.constant("ENV", {})').pipe(gulp.dest(source.config.dest));
 });
 
 gulp.task('config:copy', function() {
-  var environment = argv.env || 'development';  // change this to whatever default environment you need.
-
+  var environment = argv.env || (isProduction ? 'production' : 'development');
   return gulp.src(['shared/config/' + environment + '.json', 'components/**/config/' + environment + '.json'])
-      .pipe(jsoncombine('generated-config.js',
-                        function(data) {
-                          var env = Object.keys(data).reduce(function(result, key) {
-                            // Map the key "environment" to "/" and the keys "component/config/environment" to
-                            // "component".
-                            var newKey = key.replace(environment, '/').replace(/\/config\/\/$/, '');
-                            result[newKey] = data[key];
-                            return result;
-                          }, {});
+    .pipe(jsoncombine('generated-config.js',
+      function(data) {
+        var env = Object.keys(data).reduce(function(result, key) {
+          // Map the key "environment" to "/" and the keys "component/config/environment" to "component".
+          var newKey = key.replace(environment, '/').replace(/\/config\/\/$/, '');
+          result[newKey] = data[key];
+          return result;
+        }, {});
 
-                          return new Buffer(JSON.stringify({'ENV': env}));
-                        }))
-      .pipe(ngConstant({name: 'kubernetesApp.config', deps: [], constants: {ngConstant: true}}))
-      .pipe(gulp.dest(source.config.dest));
+        return new Buffer(JSON.stringify({'ENV': env}));
+      }))
+    .pipe(ngConstant({name: 'kubernetesApp.config', deps: [], constants: {ngConstant: true}}))
+    .pipe(gulp.dest(source.config.dest));
 });
 
 gulp.task('copy:components', function() {
@@ -332,7 +364,7 @@ gulp.task('copy:components', function() {
   var jsFilter = gulpFilter('**/*.js');
   var cssFilter = gulpFilter('**/*.css');
 
-  del.sync([build.components.dir], {force: true});
+  del.sync([source.components.dest], {force: true});
 
   return gulp.src(source.components.source, {base: 'components'})
       .pipe(expect(source.components.source))
@@ -342,19 +374,54 @@ gulp.task('copy:components', function() {
       .pipe(cssFilter)
       .pipe(minifyCSS())
       .pipe(cssFilter.restore())
-      .pipe(gulp.dest(build.components.dir));
+      .pipe(gulp.dest(source.components.dest));
 });
 
 gulp.task('copy:shared-assets', function() {
-  del.sync([build.assets], {force: true});
+  del.sync([source.assets.dest], {force: true});
 
   return gulp.src(source.assets.source, {base: 'shared/assets'})
-      .pipe(gulp.dest(build.assets));
+      .pipe(gulp.dest(source.assets.dest));
 });
 
 // Assuming there's "version: 1.2.3" in package.json,
 // tag the last commit as "v1.2.3"//
 gulp.task('tag', function() { return gulp.src(['./package.json']).pipe(tag_version()); });
+
+// VIEWS
+gulp.task('content:html', gulpsync.sync(['content:html:app', 'content:html:views']));
+
+gulp.task('content:html:app', function() {
+  return gulp.src(source.html.app.source, {base: 'shared'})
+    .on("error", handleError)
+    .pipe(prettify({
+        indent_char: ' ',
+        indent_size: 4,
+        unformatted: ['a', 'sub', 'sup', 'b', 'i', 'u']
+    }))
+    // .pipe(htmlify({
+    //     customPrefixes: ['ui-']
+    // }))
+    // .pipe(w3cjs( W3C_OPTIONS ))
+    .pipe(gulp.dest(source.html.app.dest))
+    ;
+});
+
+gulp.task('content:html:views', function() {
+  return gulp.src(source.html.views.source, {base: 'shared'})
+    .on("error", handleError)
+    .pipe(prettify({
+        indent_char: ' ',
+        indent_size: 4,
+        unformatted: ['a', 'sub', 'sup', 'b', 'i', 'u']
+    }))
+    // .pipe(htmlify({
+    //     customPrefixes: ['ui-']
+    // }))
+    // .pipe(w3cjs( W3C_OPTIONS ))
+    .pipe(gulp.dest(source.html.views.dest))
+    ;
+});
 
 // // BOOSTRAP
 // gulp.task('bootstrap', function() {
@@ -431,10 +498,12 @@ gulp.task('tag', function() { return gulp.src(['./package.json']).pipe(tag_versi
 gulp.task('watch', function() {
   livereload.listen();
 
+  gulp.watch(source.config.watch, ['config']);
+  gulp.watch(source.assets.watch, ['copy:shared-assets']);
+  gulp.watch(source.components.watch, ['copy:components']);
+  gulp.watch(source.html.watch, ['content:html']);
   gulp.watch(source.scripts.watch, ['scripts:app']);
   gulp.watch(source.styles.app.watch, ['styles:app']);
-  gulp.watch(source.components.watch, ['copy:components']);
-  gulp.watch(source.assets.watch, ['copy:shared-assets']);
   // gulp.watch(source.templates.pages.watch,   ['templates:pages']);
   // gulp.watch(source.templates.views.watch,   ['templates:views']);
   // gulp.watch(source.templates.app.watch,     ['templates:app']);
@@ -457,15 +526,15 @@ gulp.task('watch', function() {
 //---------------
 
 // build for production (minify)
-gulp.task('build', ['prod', 'default']);
+gulp.task('build', gulpsync.sync(['prod', 'compile']));
 gulp.task('prod', function() { isProduction = true; });
 
 // build with sourcemaps (no minify)
-gulp.task('sourcemaps', ['usesources', 'default']);
+gulp.task('sourcemaps', gulpsync.sync(['usesources', 'compile']));
 gulp.task('usesources', function() { useSourceMaps = true; });
 
 // default (no minify)
-gulp.task('default', gulpsync.sync(['scripts:vendor', 'copy:components', 'scripts:app', 'start']), function() {
+gulp.task('default', gulpsync.sync(['compile', 'watch']), function() {
 
   gutil.log(gutil.colors.cyan('************'));
   gutil.log(gutil.colors.cyan('* All Done *'),
@@ -474,25 +543,22 @@ gulp.task('default', gulpsync.sync(['scripts:vendor', 'copy:components', 'script
 
 });
 
-gulp.task('start', [
-  'styles:app',
-  'copy:components',
+gulp.task('init', function() {
+  del.sync([target_folder], {force: true});
+});
+
+gulp.task('compile', gulpsync.sync([
+  'init',
   'copy:shared-assets',
+  'copy:components',
+  'content:html',
+  'scripts:vendor', 
+  'scripts:app', 
+  'styles:app'
   // 'templates:app',
   // 'templates:pages',
   // 'templates:views',
-  'watch'
-]);
-
-gulp.task('done', function() {
-  console.log('All Done!! You can start editing your code, LiveReload will update your browser after any change..');
-});
-
-// Error handler
-function handleError(err) {
-  console.log(err.toString());
-  this.emit('end');
-}
+]));
 
 // // Mini gulp plugin to flip css (rtl)
 // function flipcss(opt) {

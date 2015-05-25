@@ -25,9 +25,11 @@ ENV GOARCH  amd64
 # work around 64MB tmpfs size in Docker 1.6
 ENV TMPDIR /tmp.k8s
 
-# Get the code coverage tool and godep
+# Get the code coverage tool, godep and binary data file builder
 RUN mkdir $TMPDIR && \
-    go get golang.org/x/tools/cmd/cover github.com/tools/godep
+    go get golang.org/x/tools/cmd/cover && \
+    go get github.com/tools/godep && \
+    go get github.com/jteeuwen/go-bindata/...
 
 # We use rsync to copy some binaries around.  It is faster (0.3s vs. 1.1s) on my
 # machine vs. `install`

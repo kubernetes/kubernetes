@@ -14,14 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script builds ui assets into a single go datafile
+# Run a command in the Docker ui build container.  Typically this will be one of
+# the commands in `hack/ui`.  When running in the ui build container the user is sure
+# to have a consistent reproducible build environment.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "$KUBE_ROOT/build/common.sh"
 
-kube::ui::build_ui
-
+kube::build::verify_prereqs
+kube::build::build_ui_image
+kube::build::run_build_ui_command "$@"

@@ -23,5 +23,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::ui::build_ui
+
 kube::golang::build_binaries "$@"
 kube::golang::place_bins
