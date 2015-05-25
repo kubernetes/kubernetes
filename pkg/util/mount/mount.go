@@ -69,7 +69,7 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 	// Find all references to the device.
 	var refs []string
 	if deviceName == "" {
-		glog.Warningf("could not determine device for path: %s", mountPath)
+		glog.Warningf("could not determine device for path: %q", mountPath)
 	} else {
 		for i := range mps {
 			if mps[i].Device == deviceName && mps[i].Path != mountPath {

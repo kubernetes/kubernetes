@@ -75,5 +75,6 @@ else
   fi
   mkdir -p /mnt/kubelet
   ln -s /mnt/kubelet /var/lib/kubelet
+  KUBELET_ROOT="/mnt/kubelet"
 fi
 
