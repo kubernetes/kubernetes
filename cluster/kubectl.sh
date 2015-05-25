@@ -59,7 +59,7 @@ case "$(uname -m)" in
     host_arch=arm
     ;;
   i?86*)
-    host_arch=x86
+    host_arch=386
     ;;
   *)
     echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
