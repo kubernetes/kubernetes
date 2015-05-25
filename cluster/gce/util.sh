@@ -920,7 +920,7 @@ function test-setup {
   gcloud compute firewall-rules create \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG}" \
-    --allow tcp:80 tcp:8080 \
+    --allow tcp:80,tcp:8080 \
     --network "${NETWORK}" \
     "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
 
