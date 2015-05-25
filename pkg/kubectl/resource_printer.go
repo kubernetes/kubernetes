@@ -34,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/jq"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/docker/docker/pkg/units"
 	"github.com/ghodss/yaml"
@@ -889,6 +890,12 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		return resultValue.Interface().(error)
 	}
 	return fmt.Errorf("error: unknown type %#v", obj)
+}
+
+//JqPrinter is an implementation of ResourcePrinter which formats data with template using jq syntax
+type JqPrinter struct {
+	rawTemplate string
+	template    *jq.Jq
 }
 
 // TemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
