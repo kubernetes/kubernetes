@@ -36,6 +36,12 @@ ALLOCATE_NODE_CIDRS=true
 KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 
+# VERSION_REGEX matches things like "v0.13.1"
+readonly KUBE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+
+# CI_VERSION_REGEX matches things like "v0.14.1-341-ge0c9d9e"
+readonly KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(.*)$"
+
 # Verify prereqs
 function verify-prereqs {
   local cmd
@@ -218,6 +224,36 @@ function upload-server-tars() {
   # Convert from gs:// URL to an https:// URL
   SERVER_BINARY_TAR_URL="${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}"
   SALT_TAR_URL="${salt_gs_url/gs:\/\//https://storage.googleapis.com/}"
+}
+
+# Figure out which binary use on the server and assure it is available.
+# If KUBE_VERSION is specified use binaries specified by it, otherwise
+# use local dev binaries.
+#
+# Assumed vars:
+#   PROJECT
+# Vars set:
+#   SERVER_BINARY_TAR_URL
+#   SALT_TAR_URL
+function tars_from_version() {
+  if [[ -z "${KUBE_VERSION-}" ]]; then
+    find-release-tars
+    upload-server-tars
+  elif [[ ${KUBE_VERSION} =~ ${KUBE_VERSION_REGEX} ]]; then
+    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+  elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
+    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+  else
+    echo "Version doesn't match regexp" >&2
+    exit 1
+  fi
+
+  if ! curl -Ss --range 0-1 ${SERVER_BINARY_TAR_URL} >&/dev/null; then
+    echo "Can't find release at ${SERVER_BINARY_TAR_URL}" >&2
+    exit 1
+  fi
 }
 
 # Detect minions created in the minion group
@@ -809,12 +845,13 @@ function kube-down {
   set -e
 }
 
-# Update a kubernetes cluster with latest source
-function kube-push {
+# Prepare to upgrade a kubernetes cluster
+#  $1 upgrade_node
+function prepare-upgrade() {
   #TODO(dawnchen): figure out how to upgrade coreos node
   if [[ "${OS_DISTRIBUTION}" != "debian" ]]; then
     echo "Updating a kubernetes cluster with ${OS_DISTRIBUTION} is not supported yet." >&2
-    return
+    exit 1
   fi
 
   OUTPUT=${KUBE_ROOT}/_output/logs
@@ -828,17 +865,60 @@ function kube-push {
   get-bearer-token
 
   # Make sure we have the tar files staged on Google Storage
-  find-release-tars
-  upload-server-tars
+  tars_from_version
 
+  # Prepare node env vars and update MIG template
+  if [[ "${1-}" == "true" ]]; then
+    write-node-env
+
+    # TODO(mbforbes): Refactor setting scope flags.
+    local -a scope_flags=()
+    if (( "${#MINION_SCOPES[@]}" > 0 )); then
+      scope_flags=("--scopes" "${MINION_SCOPES[@]}")
+    else
+      scope_flags=("--no-scopes")
+    fi
+
+    gcloud compute instance-templates delete \
+      --project "${PROJECT}" \
+      --quiet \
+      "${NODE_INSTANCE_PREFIX}-template" || true
+
+    create-node-instance-template
+  fi
+}
+
+# Upgrade a kubernetes master
+function upgrade-master {
   echo "Updating master metadata ..."
   write-master-env
   add-instance-metadata-from-file "${KUBE_MASTER}" "kube-env=${KUBE_TEMP}/master-kube-env.yaml" "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh"
 
-  echo "Pushing to master (log at ${OUTPUT}/kube-push-${KUBE_MASTER}.log) ..."
-  cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${KUBE_MASTER}" --command "sudo bash -s -- --push" &> ${OUTPUT}/kube-push-"${KUBE_MASTER}".log
+  echo "Pushing to master (log at ${OUTPUT}/upgrade-${KUBE_MASTER}.log) ..."
+  cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${KUBE_MASTER}" --command "sudo bash -s -- --push" &> ${OUTPUT}/upgrade-"${KUBE_MASTER}".log
+}
 
-  kube-update-nodes push
+# Upgrade a kubernetes node
+function upgrade-node() {
+  node=${1}
+
+  echo "Updating node ${node} metadata... "
+  add-instance-metadata-from-file "${node}" "kube-env=${KUBE_TEMP}/node-kube-env.yaml" "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh"
+
+  echo "Start upgrading node ${node} (log at ${OUTPUT}/upgrade-${node}.log) ..."
+  cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${node}" --command "sudo bash -s -- --push" &> ${OUTPUT}/upgrade-"${node}".log
+}
+
+# Update a kubernetes cluster with latest source
+function kube-push {
+  prepare-upgrade true
+
+  upgrade-master
+
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    upgrade-node "${MINION_NAMES[$i]}" &
+  done
+  wait-for-jobs
 
   # TODO(zmerlynn): Re-create instance-template with the new
   # node-kube-env. This isn't important until the node-ip-range issue
@@ -855,43 +935,6 @@ function kube-push {
   echo
   echo "The user name and password to use is located in ~/.kube/config"
   echo
-}
-
-# Push or upgrade nodes.
-#
-# TODO: This really needs to trampoline somehow to the configure-vm.sh
-# from the .tar.gz that we're actually pushing onto the node, because
-# that configuration shifts over versions. Right now, we're blasting
-# the configure-vm from our version instead.
-#
-# Assumed vars:
-#  KUBE_ROOT
-#  MINION_NAMES
-#  KUBE_TEMP
-#  PROJECT
-#  ZONE
-function kube-update-nodes() {
-  action=${1}
-
-  OUTPUT=${KUBE_ROOT}/_output/logs
-  mkdir -p ${OUTPUT}
-
-  echo "Updating node metadata... "
-  write-node-env
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    add-instance-metadata-from-file "${MINION_NAMES[$i]}" "kube-env=${KUBE_TEMP}/node-kube-env.yaml" "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" &
-  done
-  wait-for-jobs
-  echo "Done"
-
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    echo "Starting ${action} on node (log at ${OUTPUT}/kube-${action}-${MINION_NAMES[$i]}.log) ..."
-    cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${MINION_NAMES[$i]}" --command "sudo bash -s -- --push" &> ${OUTPUT}/kube-${action}-"${MINION_NAMES[$i]}".log &
-  done
-
-  echo -n "Waiting..."
-  wait-for-jobs
-  echo "Done"
 }
 
 # -----------------------------------------------------------------------------
