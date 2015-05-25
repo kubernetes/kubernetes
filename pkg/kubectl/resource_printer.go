@@ -317,7 +317,7 @@ func formatEndpoints(endpoints *api.Endpoints, ports util.StringSet) string {
 	list := []string{}
 	max := 3
 	more := false
-Loop:
+	count := 0
 	for i := range endpoints.Subsets {
 		ss := &endpoints.Subsets[i]
 		for i := range ss.Ports {
@@ -326,17 +326,19 @@ Loop:
 				for i := range ss.Addresses {
 					if len(list) == max {
 						more = true
-						break Loop
 					}
 					addr := &ss.Addresses[i]
-					list = append(list, fmt.Sprintf("%s:%d", addr.IP, port.Port))
+					if !more {
+						list = append(list, fmt.Sprintf("%s:%d", addr.IP, port.Port))
+					}
+					count++
 				}
 			}
 		}
 	}
 	ret := strings.Join(list, ",")
 	if more {
-		ret += "..."
+		return fmt.Sprintf("%s + %d more...", ret, count-max)
 	}
 	return ret
 }

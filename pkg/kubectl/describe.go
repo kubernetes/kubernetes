@@ -522,7 +522,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			if sp.NodePort != 0 {
 				fmt.Fprintf(out, "NodePort:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
 			}
-			fmt.Fprintf(out, "Endpoints:\t%s\t%s\n", name, formatEndpoints(endpoints, util.NewStringSet(sp.Name)))
+			fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints, util.NewStringSet(sp.Name)))
 		}
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {
