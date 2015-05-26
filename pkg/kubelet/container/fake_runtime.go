@@ -18,6 +18,7 @@ package container
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 	"sync"
 	"time"
@@ -30,15 +31,37 @@ import (
 type FakeRuntime struct {
 	sync.Mutex
 	CalledFunctions   []string
-	Podlist           []*Pod
+	PodList           []*Pod
 	ContainerList     []*Container
+	ImageList         []Image
 	PodStatus         api.PodStatus
 	StartedPods       []string
 	KilledPods        []string
 	StartedContainers []string
 	KilledContainers  []string
-	VersionInfo       map[string]string
+	VersionInfo       string
 	Err               error
+}
+
+// FakeRuntime should implement Runtime.
+var _ Runtime = &FakeRuntime{}
+
+type FakeVersion struct {
+	Version string
+}
+
+func (fv *FakeVersion) String() string {
+	return fv.Version
+}
+
+func (fv *FakeVersion) Compare(other string) (int, error) {
+	result := 0
+	if fv.Version > other {
+		result = 1
+	} else if fv.Version < other {
+		result = -1
+	}
+	return result, nil
 }
 
 type FakeRuntimeCache struct {
@@ -63,14 +86,14 @@ func (f *FakeRuntime) ClearCalls() {
 	defer f.Unlock()
 
 	f.CalledFunctions = []string{}
-	f.Podlist = []*Pod{}
+	f.PodList = []*Pod{}
 	f.ContainerList = []*Container{}
 	f.PodStatus = api.PodStatus{}
 	f.StartedPods = []string{}
 	f.KilledPods = []string{}
 	f.StartedContainers = []string{}
 	f.KilledContainers = []string{}
-	f.VersionInfo = map[string]string{}
+	f.VersionInfo = ""
 	f.Err = nil
 }
 
@@ -112,12 +135,12 @@ func (f *FakeRuntime) AssertKilledContainers(containers []string) error {
 	return f.assertList(containers, f.KilledContainers)
 }
 
-func (f *FakeRuntime) Version() (map[string]string, error) {
+func (f *FakeRuntime) Version() (Version, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "Version")
-	return f.VersionInfo, f.Err
+	return &FakeVersion{Version: f.VersionInfo}, f.Err
 }
 
 func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
@@ -125,10 +148,10 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetPods")
-	return f.Podlist, f.Err
+	return f.PodList, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus) error {
+func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus, _ []api.Secret) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -140,13 +163,13 @@ func (f *FakeRuntime) SyncPod(pod *api.Pod, _ Pod, _ api.PodStatus) error {
 	return f.Err
 }
 
-func (f *FakeRuntime) KillPod(pod *api.Pod) error {
+func (f *FakeRuntime) KillPod(pod Pod) error {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "KillPod")
-	f.KilledPods = append(f.KilledPods, string(pod.UID))
-	for _, c := range pod.Spec.Containers {
+	f.KilledPods = append(f.KilledPods, string(pod.ID))
+	for _, c := range pod.Containers {
 		f.KilledContainers = append(f.KilledContainers, c.Name)
 	}
 	return f.Err
@@ -186,12 +209,13 @@ func (f *FakeRuntime) KillContainerInPod(container api.Container, pod *api.Pod) 
 	return f.Err
 }
 
-func (f *FakeRuntime) GetPodStatus(pod *Pod) (api.PodStatus, error) {
+func (f *FakeRuntime) GetPodStatus(*api.Pod) (*api.PodStatus, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetPodStatus")
-	return f.PodStatus, f.Err
+	status := f.PodStatus
+	return &status, f.Err
 }
 
 func (f *FakeRuntime) GetContainers(all bool) ([]*Container, error) {
@@ -200,4 +224,82 @@ func (f *FakeRuntime) GetContainers(all bool) ([]*Container, error) {
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetContainers")
 	return f.ContainerList, f.Err
+}
+
+func (f *FakeRuntime) ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "ExecInContainer")
+	return f.Err
+}
+
+func (f *FakeRuntime) RunInContainer(containerID string, cmd []string) ([]byte, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "RunInContainer")
+	return []byte{}, f.Err
+}
+
+func (f *FakeRuntime) GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetContainerLogs")
+	return f.Err
+}
+
+func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []api.Secret) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
+	return f.Err
+}
+
+func (f *FakeRuntime) IsImagePresent(image ImageSpec) (bool, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "IsImagePresent")
+	for _, i := range f.ImageList {
+		if i.ID == image.Image {
+			return true, f.Err
+		}
+	}
+	return false, f.Err
+}
+
+func (f *FakeRuntime) ListImages() ([]Image, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "ListImages")
+	return f.ImageList, f.Err
+}
+
+func (f *FakeRuntime) RemoveImage(image ImageSpec) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "RemoveImage")
+	index := 0
+	for i := range f.ImageList {
+		if f.ImageList[i].ID == image.Image {
+			index = i
+			break
+		}
+	}
+	f.ImageList = append(f.ImageList[:index], f.ImageList[index+1:]...)
+
+	return f.Err
+}
+
+func (f *FakeRuntime) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "PortForward")
+	return f.Err
 }
