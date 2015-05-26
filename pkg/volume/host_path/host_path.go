@@ -160,8 +160,8 @@ func (r *hostPathRecycler) Recycle() error {
 			Containers: []api.Container{
 				{
 					Name: "scrubber-" + uuid,
-					Image: "busybox",
-					Command: []string{"ls -la"},
+					Image: "gcr.io/google_containers/busybox",
+					Command: []string{"sh", "-c", "rm -rf"},
 					WorkingDir: "/scrub",
 					VolumeMounts: []api.VolumeMount{
 						{
