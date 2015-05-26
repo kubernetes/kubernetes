@@ -29,7 +29,8 @@ type ServiceGenerator struct{}
 
 func (ServiceGenerator) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
-		{"name", true},
+		{"default-name", true},
+		{"name", false},
 		{"selector", true},
 		{"port", true},
 		{"labels", false},
@@ -62,8 +63,11 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 	}
 
 	name, found := params["name"]
-	if !found {
-		return nil, fmt.Errorf("'name' is a required parameter.")
+	if !found || len(name) == 0 {
+		name, found = params["default-name"]
+		if !found || len(name) == 0 {
+			return nil, fmt.Errorf("'name' is a required parameter.")
+		}
 	}
 	portString, found := params["port"]
 	if !found {

@@ -98,6 +98,9 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	if err != nil {
 		return err
 	}
+	if len(infos) > 1 {
+		return fmt.Errorf("multiple resources provided: %v", args)
+	}
 	info := infos[0]
 
 	// Get the input object
@@ -118,10 +121,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
-	params["name"] = cmdutil.GetFlagString(cmd, "name")
-	if len(params["name"]) == 0 {
-		params["name"] = info.Name
-	}
+	params["default-name"] = info.Name
 	if s, found := params["selector"]; !found || len(s) == 0 || cmdutil.GetFlagInt(cmd, "port") < 1 {
 		if len(s) == 0 {
 			s, err := f.PodSelectorForObject(inputObject)
