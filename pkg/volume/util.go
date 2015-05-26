@@ -68,7 +68,7 @@ func ScrubPodVolumeAndWatchUntilCompletion(pod *api.Pod, client client.Interface
 	}
 
 	// the binder will eventually catch up and set status on Claims
-	watch := newPodWatch(client, pod.Namespace, pod.Name, 5)
+	watch := newPodWatch(client, pod.Namespace, pod.Name, 5 * time.Second)
 	defer watch.Stop()
 
 	success := false
@@ -82,10 +82,7 @@ func ScrubPodVolumeAndWatchUntilCompletion(pod *api.Pod, client client.Interface
 			success = true
 			break
 		} else {
-
-			// TODO how to handle pods that were killed by ActiveDeadlineSeconds
-
-			glog.V(5).Infof("Pod event %+v\n", pod)
+			glog.V(5).Infof("Pod event %+v\n", pod.Name + " " + string(pod.Status.Phase))
 		}
 	}
 

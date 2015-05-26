@@ -33,6 +33,10 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&hostPathPlugin{nil, newRecycler}}
 }
 
+func ProbeRecyclableVolumePlugins(recyclerFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error)) []volume.VolumePlugin {
+	return []volume.VolumePlugin{&hostPathPlugin{nil, recyclerFunc}}
+}
+
 type hostPathPlugin struct {
 	host volume.VolumeHost
 	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
