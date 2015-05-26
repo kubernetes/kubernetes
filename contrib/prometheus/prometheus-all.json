@@ -1,0 +1,76 @@
+{
+    "apiVersion": "v1beta3",
+    "kind": "ReplicationController",
+    "metadata": {
+        "labels": {
+            "name": "kube-prometheus"
+        },
+        "name": "kube-prometheus"
+    },
+    "spec": {
+        "replicas": 1,
+        "selector": {
+            "name": "kube-prometheus"
+        },
+        "template": {
+            "metadata": {
+                "labels": {
+                    "name": "kube-prometheus"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "name":"kube-promdash",
+                        "image": "prom/promdash",
+                        "env": [
+                            {
+                                "name": "DATABASE_URL",
+                                "value": "sqlite3:/promdash/file.sqlite3"
+                            }
+                        ],
+                        "ports": [
+                            {
+                                "containerPort": 3000,
+                                "hostPort": 3000,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/promdash",
+                                "name": "data"
+                            }
+                        ]
+                    },
+                    {
+                        "command": ["./run_prometheus.sh", "-t", "KUBERNETES_RO", "-d", "/var/prometheus/"],
+                        "image": "jayunit100/kube-prometheus",
+                        "name": "kube-prometheus",
+                        "ports": [
+                            {
+                                "containerPort": 9090,
+                                "hostPort": 9090,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/prometheus/",
+                                "name": "data"
+                            }
+                        ]
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": {
+                            "path": "/mnt/promdash"
+                        },
+                        "name": "data"
+                    }
+                ]
+            }
+        }
+    }
+}
