@@ -29,6 +29,8 @@ export KUBECTL KUBE_CONFIG_FILE
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
+export TEST_NODE="true"
+
 prepare-e2e
 
 "${KUBE_VERSION_ROOT}/cluster/kube-up.sh"

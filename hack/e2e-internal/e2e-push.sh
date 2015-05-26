@@ -29,6 +29,10 @@ export KUBECTL KUBE_CONFIG_FILE
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
+# Variable meaning that we should use test configuration for Nodes
+# instead of the default one.
+export TEST_NODE="true"
+
 prepare-e2e
 
 "${KUBE_VERSION_ROOT}/cluster/kube-push.sh" $@
