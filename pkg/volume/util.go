@@ -79,11 +79,17 @@ func ScrubPodVolumeAndWatchUntilCompletion(pod *api.Pod, client client.Interface
 		glog.V(5).Infof("Handling %s event for pod %+v\n", event.Type, pod)
 
 		if pod.Status.Phase == api.PodSucceeded {
+			glog.V(5).Infof("Success!  Scrub pod %s is phase %s\n", pod.Name, pod.Status.Phase)
 			success = true
 			break
 		} else {
 			glog.V(5).Infof("Pod event %+v\n", pod.Name + " " + string(pod.Status.Phase))
 		}
+	}
+
+	err = client.Pods(api.NamespaceDefault).Delete(pod.Name, nil)
+	if err != nil {
+		return fmt.Errorf("Error deleting scrubber pod: %s\n", pod.Name)
 	}
 
 	if success {

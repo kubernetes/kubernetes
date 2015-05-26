@@ -149,6 +149,7 @@ func (r *hostPathRecycler) Recycle() error {
 			},
 		},
 		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyNever,
 			Volumes: []api.Volume{
 				{
 					Name: uuid,
@@ -160,9 +161,9 @@ func (r *hostPathRecycler) Recycle() error {
 			Containers: []api.Container{
 				{
 					Name: "scrubber-" + uuid,
-					Image: "gcr.io/google_containers/busybox",
-					Command: []string{"sh", "-c", "rm -rf"},
-					WorkingDir: "/scrub",
+					Image: "centos",
+					// delete the contents of the volume, but not the directory itself
+					Command: []string{"/bin/rm", "-rfv", "/scrub/*"},
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name: uuid,
