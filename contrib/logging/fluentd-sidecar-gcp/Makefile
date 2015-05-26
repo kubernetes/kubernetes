@@ -1,6 +1,6 @@
 .PHONY:	build push
 
-TAG = 1.0
+TAG = 1.1
 
 build:
 	docker build -t gcr.io/google_containers/fluentd-sidecar-gcp:$(TAG) .
