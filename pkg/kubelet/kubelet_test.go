@@ -61,6 +61,8 @@ func init() {
 	util.ReallyCrash = true
 }
 
+// TODO: Depcreate this in favor of TestKubeletWithFakeRuntime after all
+// Docker-specific tests have been moved to dockertools.
 type TestKubelet struct {
 	kubelet          *Kubelet
 	fakeDocker       *dockertools.FakeDockerClient
@@ -171,6 +173,67 @@ func verifyBoolean(t *testing.T, expected, value bool) {
 	if expected != value {
 		t.Errorf("Unexpected boolean.  Expected %t.  Found %t", expected, value)
 	}
+}
+
+// TODO: Rename this to TestKubelet after TestKubelet is removed.
+type TestKubeletWithFakeRuntime struct {
+	kubelet          *Kubelet
+	fakeRuntime      *kubecontainer.FakeRuntime
+	fakeCadvisor     *cadvisor.Mock
+	fakeKubeClient   *testclient.Fake
+	fakeMirrorClient *fakeMirrorClient
+}
+
+func newTestKubeletWithFakeRuntime(t *testing.T) *TestKubeletWithFakeRuntime {
+	fakeRuntime := &kubecontainer.FakeRuntime{}
+	fakeRuntime.VersionInfo = "1.15"
+	fakeRecorder := &record.FakeRecorder{}
+	fakeKubeClient := &testclient.Fake{}
+	kubelet := &Kubelet{}
+	kubelet.kubeClient = fakeKubeClient
+	kubelet.os = kubecontainer.FakeOS{}
+
+	kubelet.hostname = testKubeletHostname
+	kubelet.runtimeUpThreshold = maxWaitForContainerRuntime
+	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
+		t.Fatalf("can't make a temp rootdir: %v", err)
+	} else {
+		kubelet.rootDirectory = tempDir
+	}
+	if err := os.MkdirAll(kubelet.rootDirectory, 0750); err != nil {
+		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
+	}
+	kubelet.sourcesReady = func() bool { return true }
+	kubelet.masterServiceNamespace = api.NamespaceDefault
+	kubelet.serviceLister = testServiceLister{}
+	kubelet.nodeLister = testNodeLister{}
+	kubelet.readinessManager = kubecontainer.NewReadinessManager()
+	kubelet.recorder = fakeRecorder
+	kubelet.statusManager = newStatusManager(fakeKubeClient)
+	if err := kubelet.setupDataDirs(); err != nil {
+		t.Fatalf("can't initialize kubelet data dirs: %v", err)
+	}
+	mockCadvisor := &cadvisor.Mock{}
+	kubelet.cadvisor = mockCadvisor
+	podManager, fakeMirrorClient := newFakePodManager()
+	kubelet.podManager = podManager
+	kubelet.containerRefManager = kubecontainer.NewRefManager()
+	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
+	if err != nil {
+		t.Fatalf("can't initialize disk space manager: %v", err)
+	}
+	kubelet.diskSpaceManager = diskSpaceManager
+
+	kubelet.containerRuntime = fakeRuntime
+	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerRuntime)
+	kubelet.podWorkers = &fakePodWorkers{
+		syncPodFn:    kubelet.syncPod,
+		runtimeCache: kubelet.runtimeCache,
+		t:            t,
+	}
+	kubelet.volumeManager = newVolumeManager()
+	return &TestKubeletWithFakeRuntime{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient}
 }
 
 func newTestPods(count int) []*api.Pod {
@@ -354,6 +417,8 @@ func apiContainerToContainer(c docker.APIContainers) container.Container {
 
 var emptyPodUIDs map[types.UID]metrics.SyncPodType
 
+// TODO: Remove this function after all docker-specifc tests have been migrated
+// to dockertools.
 func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 	var ports []api.ContainerPort
 	if !pod.Spec.HostNetwork {
@@ -368,73 +433,6 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 		Ports: ports,
 	}
 	return kubecontainer.HashContainer(container)
-}
-
-func TestSyncPodsDoesNothing(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-
-	container := api.Container{Name: "bar"}
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					container,
-				},
-			},
-		},
-	}
-
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>_<random>
-			Names: []string{"/k8s_bar." + strconv.FormatUint(kubecontainer.HashContainer(&container), 16) + "_foo_new_12345678_0"},
-			ID:    "1234",
-		},
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_foo_new_12345678_0"},
-			ID:    "9876",
-		},
-	}
-	fakeDocker.ContainerMap = map[string]*docker.Container{
-		"1234": {
-			ID:         "1234",
-			HostConfig: &docker.HostConfig{},
-			Config:     &docker.Config{},
-		},
-		"9876": {
-			ID:         "9876",
-			HostConfig: &docker.HostConfig{},
-			Config:     &docker.Config{},
-		},
-	}
-
-	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-		// Check the pod infra contianer.
-		"inspect_container",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-		// Get pods for deleting orphaned volumes.
-		"list",
-	})
 }
 
 func TestSyncPodsWithTerminationLog(t *testing.T) {
@@ -501,18 +499,13 @@ func matchString(t *testing.T, pattern, str string) bool {
 	return match
 }
 
-func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+func TestSyncPodsStartPod(t *testing.T) {
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-	// TODO: Move this test to dockertools so that we don't have to do the hacky
-	// type assertion here.
-	dm := kubelet.containerRuntime.(*dockertools.DockerManager)
-	dm.PodInfraContainerImage = "custom_image_name"
-	fakeDocker.ContainerList = []docker.APIContainers{}
+	fakeRuntime := testKubelet.fakeRuntime
 	pods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -532,164 +525,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
-	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
-		// Get pod status.
-		"list", "inspect_image",
-		// Create pod infra container.
-		"create", "start", "inspect_container",
-		// Create container.
-		"create", "start",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-		// Get pods for deleting orphaned volumes.
-		"list",
-	})
-
-	fakeDocker.Lock()
-
-	found := false
-	for _, c := range fakeDocker.ContainerList {
-		if c.Image == "custom_image_name" && strings.HasPrefix(c.Names[0], "/k8s_POD") {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("Custom pod infra container not found: %v", fakeDocker.ContainerList)
-	}
-
-	if len(fakeDocker.Created) != 2 ||
-		!matchString(t, "k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
-		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
-		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
-	}
-	fakeDocker.Unlock()
-}
-
-func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-	// TODO: Move this test to dockertools so that we don't have to do the hacky
-	// type assertion here.
-	dm := kubelet.containerRuntime.(*dockertools.DockerManager)
-	puller := dm.Puller.(*dockertools.FakeDockerPuller)
-	puller.HasImages = []string{}
-	dm.PodInfraContainerImage = "custom_image_name"
-	fakeDocker.ContainerList = []docker.APIContainers{}
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "bar", Image: "something", ImagePullPolicy: "IfNotPresent"},
-				},
-			},
-		},
-	}
-	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
-		// Get pod status.
-		"list", "inspect_image",
-		// Create pod infra container.
-		"create", "start", "inspect_container",
-		// Create container.
-		"create", "start",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-		// Get pods for deleting orphaned volumes.
-		"list",
-	})
-
-	fakeDocker.Lock()
-
-	if !reflect.DeepEqual(puller.ImagesPulled, []string{"custom_image_name", "something"}) {
-		t.Errorf("Unexpected pulled containers: %v", puller.ImagesPulled)
-	}
-
-	if len(fakeDocker.Created) != 2 ||
-		!matchString(t, "k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
-		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
-		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
-	}
-	fakeDocker.Unlock()
-}
-
-func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "bar"},
-				},
-			},
-		},
-	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_foo_new_12345678_0"},
-			ID:    "9876",
-		},
-	}
-	fakeDocker.ContainerMap = map[string]*docker.Container{
-		"9876": {
-			ID:         "9876",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-	}
-	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
-		// Get pod status.
-		"list", "inspect_container", "inspect_image",
-		// Check the pod infra container.
-		"inspect_container",
-		// Create container.
-		"create", "start",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-		// Get pods for deleting orphaned volumes.
-		"list",
-	})
-
-	fakeDocker.Lock()
-	if len(fakeDocker.Created) != 1 ||
-		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) {
-		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
-	}
-	fakeDocker.Unlock()
+	fakeRuntime.AssertStartedPods([]string{string(pods[0].UID)})
 }
 
 type fakeHTTP struct {
@@ -786,168 +622,33 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	}
 }
 
-func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo1",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "bar1"},
-				},
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "87654321",
-				Name:      "foo2",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "bar2"},
-				},
-			},
-		},
-	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
-			Names: []string{"/k8s_bar1_foo1_new_12345678_0"},
-			ID:    "1234",
-		},
-		{
-			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
-			Names: []string{"/k8s_bar2_foo2_new_87654321_0"},
-			ID:    "5678",
-		},
-		{
-			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
-			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_foo2_new_87654321_0"},
-			ID:    "8765",
-		},
-	}
-	fakeDocker.ContainerMap = map[string]*docker.Container{
-		"1234": {
-			ID:         "1234",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-		"5678": {
-			ID:         "5678",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-		"8765": {
-			ID:         "8765",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-	}
-
-	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	verifyCalls(t, fakeDocker, []string{
-		"list",
-
-		// foo1
-		"list",
-		// Get pod status.
-		"list", "inspect_container",
-		// Kill the container since pod infra container is not running.
-		"inspect_container", "stop",
-		// Create pod infra container.
-		"create", "start", "inspect_container",
-		// Create container.
-		"create", "start",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container", "inspect_container",
-
-		// foo2
-		"list",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-		// Check the pod infra container.
-		"inspect_container",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-
-		// Get pods for deleting orphaned volumes.
-		"list",
-	})
-
-	// A map iteration is used to delete containers, so must not depend on
-	// order here.
-	expectedToStop := map[string]bool{
-		"1234": true,
-	}
-	fakeDocker.Lock()
-	if len(fakeDocker.Stopped) != 1 || !expectedToStop[fakeDocker.Stopped[0]] {
-		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
-	}
-	fakeDocker.Unlock()
-}
-
 func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	ready := false
-	testKubelet := newTestKubelet(t)
+
+	testKubelet := newTestKubeletWithFakeRuntime(t)
+	fakeRuntime := testKubelet.fakeRuntime
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
 	kubelet.sourcesReady = func() bool { return ready }
 
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar_new_12345678_42"},
-			ID:    "1234",
-		},
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD_foo_new_12345678_42"},
-			ID:    "9876",
-		},
+	fakeRuntime.PodList = []*kubecontainer.Pod{
+		{ID: "12345678", Name: "foo", Namespace: "new", Containers: []*kubecontainer.Container{{Name: "bar"}}},
 	}
 	if err := kubelet.SyncPods([]*api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	// Validate nothing happened.
-	verifyCalls(t, fakeDocker, []string{"list"})
-	fakeDocker.ClearCalls()
+	// Sources are not ready yet. Don't remove any pods.
+	fakeRuntime.AssertKilledPods([]string{})
 
 	ready = true
 	if err := kubelet.SyncPods([]*api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	verifyCalls(t, fakeDocker, []string{"list", "inspect_container", "stop", "inspect_container", "stop", "list"})
 
-	// A map iteration is used to delete containers, so must not depend on
-	// order here.
-	expectedToStop := map[string]bool{
-		"1234": true,
-		"9876": true,
-	}
-	if len(fakeDocker.Stopped) != 2 ||
-		!expectedToStop[fakeDocker.Stopped[0]] ||
-		!expectedToStop[fakeDocker.Stopped[1]] {
-		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
-	}
+	// Sources are ready. Remove unwanted pods.
+	fakeRuntime.AssertKilledPods([]string{"12345678"})
 }
 
 func TestSyncPodsDeletes(t *testing.T) {
@@ -990,240 +691,6 @@ func TestSyncPodsDeletes(t *testing.T) {
 		!expectedToStop[fakeDocker.Stopped[0]] ||
 		!expectedToStop[fakeDocker.Stopped[1]] {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
-	}
-}
-
-func TestSyncPodsDeletesDuplicate(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "bar",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "foo"},
-				},
-			},
-		},
-	}
-
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar_new_12345678_1111"},
-			ID:    "1234",
-		},
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_bar_new_12345678_2222"},
-			ID:    "9876",
-		},
-		{
-			// Duplicate for the same container.
-			Names: []string{"/k8s_foo_bar_new_12345678_3333"},
-			ID:    "4567",
-		},
-	}
-	fakeDocker.ContainerMap = map[string]*docker.Container{
-		"1234": {
-			ID:         "1234",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-		"9876": {
-			ID:         "9876",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-		"4567": {
-			ID:         "4567",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-	}
-
-	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container", "inspect_container",
-		// Check the pod infra container.
-		"inspect_container",
-		// Kill the duplicated container.
-		"inspect_container", "stop",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container", "inspect_container",
-		// Get pods for deleting orphaned volumes.
-		"list",
-	})
-	// Expect one of the duplicates to be killed.
-	if len(fakeDocker.Stopped) != 1 || (fakeDocker.Stopped[0] != "1234" && fakeDocker.Stopped[0] != "4567") {
-		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
-	}
-}
-
-func TestSyncPodsBadHash(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "bar"},
-				},
-			},
-		},
-	}
-
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_bar.1234_foo_new_12345678_42"},
-			ID:    "1234",
-		},
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_foo_new_12345678_42"},
-			ID:    "9876",
-		},
-	}
-	fakeDocker.ContainerMap = map[string]*docker.Container{
-		"1234": {
-			ID:         "1234",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-		"9876": {
-			ID:         "9876",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-	}
-
-	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-		// Check the pod infra container.
-		"inspect_container",
-		// Kill and restart the bad hash container.
-		"inspect_container", "stop", "create", "start",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container", "inspect_container",
-		// Get pods for deleting orphaned volumes.
-		"list",
-	})
-
-	if err := fakeDocker.AssertStopped([]string{"1234"}); err != nil {
-		t.Errorf("%v", err)
-	}
-}
-
-func TestSyncPodsUnhealthy(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "bar",
-						LivenessProbe: &api.Probe{
-						// Always returns healthy == false
-						},
-					},
-				},
-			},
-		},
-	}
-
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_bar_foo_new_12345678_42"},
-			ID:    "1234",
-		},
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_foo_new_12345678_42"},
-			ID:    "9876",
-		},
-	}
-	fakeDocker.ContainerMap = map[string]*docker.Container{
-		"1234": {
-			ID:         "1234",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-		"9876": {
-			ID:         "9876",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-	}
-	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-		// Check the pod infra container.
-		"inspect_container",
-		// Kill the unhealthy container.
-		"inspect_container", "stop",
-		// Restart the unhealthy container.
-		"create", "start",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container", "inspect_container",
-		// Get pods for deleting orphaned volumes.
-		"list",
-	})
-
-	if err := fakeDocker.AssertStopped([]string{"1234"}); err != nil {
-		t.Errorf("%v", err)
 	}
 }
 
