@@ -181,6 +181,8 @@ func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 
 // decodeNodeList walks the tree of each node in the list and decodes into the specified object
 func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) error {
+	trace := util.NewTrace("decodeNodeList " + getTypeName(slicePtr))
+	defer trace.LogIfLong(500 * time.Millisecond)
 	v, err := conversion.EnforcePtr(slicePtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		// This should not happen at runtime.
@@ -188,9 +190,11 @@ func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 	}
 	for _, node := range nodes {
 		if node.Dir {
+			trace.Step("Decoding dir " + node.Key + " START")
 			if err := h.decodeNodeList(node.Nodes, slicePtr); err != nil {
 				return err
 			}
+			trace.Step("Decoding dir " + node.Key + " END")
 			continue
 		}
 		if obj, found := h.getFromCache(node.ModifiedIndex); found {
@@ -210,6 +214,7 @@ func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 			}
 		}
 	}
+	trace.Step(fmt.Sprintf("Decoded %v nodes", len(nodes)))
 	return nil
 }
 
@@ -222,15 +227,19 @@ type etcdCache interface {
 }
 
 func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
+	trace := util.NewTrace("getFromCache")
+	defer trace.LogIfLong(200 * time.Microsecond)
 	startTime := time.Now()
 	defer func() {
 		cacheGetLatency.Observe(float64(time.Since(startTime) / time.Microsecond))
 	}()
 	obj, found := h.cache.Get(index)
+	trace.Step("Raw get done")
 	if found {
 		// We should not return the object itself to avoid poluting the cache if someone
 		// modifies returned values.
 		objCopy, err := conversion.DeepCopy(obj)
+		trace.Step("Deep copied")
 		if err != nil {
 			glog.Errorf("Error during DeepCopy of cached object: %q", err)
 			return nil, false
@@ -261,20 +270,25 @@ func (h *EtcdHelper) addToCache(index uint64, obj runtime.Object) {
 // ExtractToList works on a *List api object (an object that satisfies the runtime.IsList
 // definition) and extracts a go object per etcd node into a slice with the resource version.
 func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
+	trace := util.NewTrace("ExtractToList " + getTypeName(listObj))
+	defer trace.LogIfLong(time.Second)
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {
 		return err
 	}
 	key = h.PrefixEtcdKey(key)
 	startTime := time.Now()
+	trace.Step("About to list etcd node")
 	nodes, index, err := h.listEtcdNode(key)
 	recordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
+	trace.Step("Etcd node listed")
 	if err != nil {
 		return err
 	}
 	if err := h.decodeNodeList(nodes, listPtr); err != nil {
 		return err
 	}
+	trace.Step("Node list decoded")
 	if h.Versioner != nil {
 		if err := h.Versioner.UpdateList(listObj, index); err != nil {
 			return err
@@ -286,14 +300,17 @@ func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
 // ExtractObjToList unmarshals json found at key and opaques it into a *List api object
 // (an object that satisfies the runtime.IsList definition).
 func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error {
+	trace := util.NewTrace("ExtractObjToList " + getTypeName(listObj))
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {
 		return err
 	}
 	key = h.PrefixEtcdKey(key)
 	startTime := time.Now()
+	trace.Step("About to read etcd node")
 	response, err := h.Client.Get(key, false, false)
 	recordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
+	trace.Step("Etcd node read")
 	if err != nil {
 		if IsEtcdNotFound(err) {
 			return nil
@@ -307,6 +324,7 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 	if err := h.decodeNodeList(nodes, listPtr); err != nil {
 		return err
 	}
+	trace.Step("Object decoded")
 	if h.Versioner != nil {
 		if err := h.Versioner.UpdateList(listObj, response.EtcdIndex); err != nil {
 			return err

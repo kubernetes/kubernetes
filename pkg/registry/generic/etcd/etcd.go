@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kubeerr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -28,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -144,22 +146,29 @@ func (e *Etcd) List(ctx api.Context, label labels.Selector, field fields.Selecto
 
 // ListPredicate returns a list of all the items matching m.
 func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
+	trace := util.NewTrace("List")
+	defer trace.LogIfLong(time.Second)
 	list := e.NewListFunc()
 	if name, ok := m.MatchesSingle(); ok {
+		trace.Step("About to read single object")
 		key, err := e.KeyFunc(ctx, name)
 		if err != nil {
 			return nil, err
 		}
 		err = e.Helper.ExtractObjToList(key, list)
+		trace.Step("Object extracted")
 		if err != nil {
 			return nil, err
 		}
 	} else {
+		trace.Step("About to list directory")
 		err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
+		trace.Step("List extracted")
 		if err != nil {
 			return nil, err
 		}
 	}
+	defer trace.Step("List filtered")
 	return generic.FilterList(list, m, generic.DecoratorFunc(e.Decorator))
 }
 
@@ -192,6 +201,8 @@ func (e *Etcd) CreateWithName(ctx api.Context, name string, obj runtime.Object) 
 
 // Create inserts a new item according to the unique key from the object.
 func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+	trace := util.NewTrace("Create")
+	defer trace.LogIfLong(time.Second)
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -210,12 +221,14 @@ func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, erro
 			return nil, err
 		}
 	}
+	trace.Step("About to create object")
 	out := e.NewFunc()
 	if err := e.Helper.CreateObj(key, obj, out, ttl); err != nil {
 		err = etcderr.InterpretCreateError(err, e.EndpointName, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		return nil, err
 	}
+	trace.Step("Object created")
 	if e.AfterCreate != nil {
 		if err := e.AfterCreate(out); err != nil {
 			return nil, err
@@ -255,6 +268,8 @@ func (e *Etcd) UpdateWithName(ctx api.Context, name string, obj runtime.Object) 
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
 func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	trace := util.NewTrace("Update")
+	defer trace.LogIfLong(time.Second)
 	name, err := e.ObjectNameFunc(obj)
 	if err != nil {
 		return nil, false, err
@@ -343,14 +358,18 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 
 // Get retrieves the item from etcd.
 func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
+	trace := util.NewTrace("Get")
+	defer trace.LogIfLong(time.Second)
 	obj := e.NewFunc()
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, err
 	}
+	trace.Step("About to read object")
 	if err := e.Helper.ExtractObj(key, obj, false); err != nil {
 		return nil, etcderr.InterpretGetError(err, e.EndpointName, name)
 	}
+	trace.Step("Object read")
 	if e.Decorator != nil {
 		if err := e.Decorator(obj); err != nil {
 			return nil, err
@@ -361,12 +380,15 @@ func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
 
 // Delete removes the item from etcd.
 func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
+	trace := util.NewTrace("Delete")
+	defer trace.LogIfLong(time.Second)
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 
 	obj := e.NewFunc()
+	trace.Step("About to read object")
 	if err := e.Helper.ExtractObj(key, obj, false); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}
@@ -383,6 +405,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 		return e.finalizeDelete(obj, false)
 	}
 	if graceful && *options.GracePeriodSeconds != 0 {
+		trace.Step("Graceful deletion")
 		out := e.NewFunc()
 		if err := e.Helper.SetObj(key, obj, out, uint64(*options.GracePeriodSeconds)); err != nil {
 			return nil, etcderr.InterpretUpdateError(err, e.EndpointName, name)
@@ -392,6 +415,7 @@ func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	// delete immediately, or no graceful deletion supported
 	out := e.NewFunc()
+	trace.Step("About to delete object")
 	if err := e.Helper.DeleteObj(key, out); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}
