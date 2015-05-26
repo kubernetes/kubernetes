@@ -277,6 +277,32 @@ dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 EOF
+
+    if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+apiserver_test_args: '$(echo "$APISERVER_TEST_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kubelet_test_args: '$(echo "$KUBELET_TEST_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+controller_manager_test_args: '$(echo "$CONTROLLER_MANAGER_TEST_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${SCHEDULER_TEST_ARGS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+scheduler_test_args: '$(echo "$SCHEDULER_TEST_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kubeproxy_test_args: '$(echo "$KUBEPROXY_TEST_ARGS" | sed -e "s/'/''/g")'
+EOF
+    fi
 }
 
 # This should only happen on cluster initialization.
