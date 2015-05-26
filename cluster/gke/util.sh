@@ -217,12 +217,12 @@ function detect-master() {
 }
 
 # Assumed vars:
-#   NUM_MINIONS
-#   CLUSTER_NAME
+#   none
 # Vars set:
-#   (none)
+#   MINION_NAMES
 function detect-minions() {
   echo "... in detect-minions()" >&2
+  detect-minion-names
 }
 
 # Detect minions created in the minion group
@@ -233,12 +233,11 @@ function detect-minions() {
 #   MINION_NAMES
 function detect-minion-names {
   detect-project
-  export MINION_NAMES=""
-  count=$("${GCLOUD}" alpha container clusters describe --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" | grep numNodes | cut -f 2 -d ' ')
-  for x in $(seq 1 $count); do
-    export MINION_NAMES="${MINION_NAMES} k8s-${CLUSTER_NAME}-node-${x} ";
-  done
-  MINION_NAMES=(${MINION_NAMES})
+  GROUP_NAME=($(gcloud preview --project "${PROJECT}" instance-groups \
+    --zone "${ZONE}" list | grep -o "k8s-${CLUSTER_NAME}-.\{8\}-group"))
+  MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
+    --zone "${ZONE}" instances --group "${GROUP_NAME}" list \
+    | cut -d'/' -f11))
   echo "MINION_NAMES=${MINION_NAMES[*]}"
 }
 
