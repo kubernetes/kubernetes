@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
@@ -82,9 +83,9 @@ func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, e
 
 func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
 	if spec.VolumeSource.HostPath != nil {
-		return &hostPathRecycler{spec.VolumeSource.HostPath.Path, host}, nil
+		return &hostPathRecycler{spec.Name, spec.VolumeSource.HostPath.Path, host}, nil
 	} else {
-		return &hostPathRecycler{spec.PersistentVolumeSource.HostPath.Path, host}, nil
+		return &hostPathRecycler{spec.Name, spec.PersistentVolumeSource.HostPath.Path, host}, nil
 	}
 }
 
@@ -121,25 +122,53 @@ func (hp *hostPath) TearDownAt(dir string) error {
 // hostPathRecycler scrubs a hostPath volume by running "rm -rf" on the volume in a pod
 // This recycler only works on a single host cluster and is for testing purposes only.
 type hostPathRecycler struct {
+	name string
 	path string
 	host volume.VolumeHost
 }
 
-func (hp *hostPathRecycler) GetPath() string {
-	return hp.path
+func (r *hostPathRecycler) GetPath() string {
+	return r.path
 }
 
 // Recycler provides methods to reclaim the volume resource.
-func (hp *hostPathRecycler) Recycle() error {
+func (r *hostPathRecycler) Recycle() error {
+	uuid := string(util.NewUUID())
+	timeout := int64(30)
 
-	// TODO implement "basic scrub" recycler -- busybox w/ "rm -rf" for volume
-
-	/*
-		1. make a pod that uses a volume like me
-		2. use host.client to save to API and watch it
-		3. if pod errors or times out, return error
-		   if pod exits, return nil for success
-	*/
-
-	return nil
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "scrubber-" + r.name,
+			Namespace: api.NamespaceDefault,
+			Labels: map[string]string{
+				"scrubber": uuid,
+			},
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: uuid,
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{ r.path },
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name: "scrubber-" + uuid,
+					Image: "busybox",
+					Command: []string{"ls -la"},
+					WorkingDir: "/scrub",
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name: uuid,
+							MountPath: "/scrub",
+						},
+					},
+				},
+			},
+			ActiveDeadlineSeconds: &timeout,
+		},
+	}
+	return volume.ScrubPodVolumeAndWatchUntilCompletion(pod, r.host.GetKubeClient())
 }

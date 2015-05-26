@@ -23,6 +23,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+
+	"github.com/golang/glog"
 )
 
 func GetAccessModesAsString(modes []api.PersistentVolumeAccessMode) string {
@@ -57,8 +59,42 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 	return false
 }
 
-// basicVolumeScrubber is an implementation of volume.Recycler
-type basicVolumeScrubber struct {
+func ScrubPodVolumeAndWatchUntilCompletion(pod *api.Pod, client client.Interface) error {
+
+	glog.V(5).Infof("Creating scrubber pod for volume %s\n", pod.Name)
+	pod, err := client.Pods(api.NamespaceDefault).Create(pod)
+	if err != nil {
+		return fmt.Errorf("Unexpected error creating a pod to scrub volume %s:  %+v\n", pod.Name, err)
+	}
+
+	// the binder will eventually catch up and set status on Claims
+	watch := newPodWatch(client, pod.Namespace, pod.Name, 5)
+	defer watch.Stop()
+
+	success := false
+	for {
+		event := <-watch.ResultChan()
+		pod := event.Object.(*api.Pod)
+
+		glog.V(5).Infof("Handling %s event for pod %+v\n", event.Type, pod)
+
+		if pod.Status.Phase == api.PodSucceeded {
+			success = true
+			break
+		} else {
+
+			// TODO how to handle pods that were killed by ActiveDeadlineSeconds
+
+			glog.V(5).Infof("Pod event %+v\n", pod)
+		}
+	}
+
+	if success {
+		glog.V(5).Infof("Successfully scrubbed volume with pod %s\n", pod.Name)
+		return nil
+	} else {
+		return fmt.Errorf("Volume was not recycled: %+v", pod.Name)
+	}
 }
 
 // podWatch provides watch semantics for a pod backed by a poller, since
