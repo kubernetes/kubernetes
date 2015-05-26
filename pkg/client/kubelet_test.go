@@ -59,7 +59,7 @@ func TestHTTPKubeletClient(t *testing.T) {
 		Client: http.DefaultClient,
 		Port:   uint(port),
 	}
-	gotObj, err := c.HealthCheck(parts[0])
+	gotObj, _, err := c.HealthCheck(parts[0])
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestHTTPKubeletClientError(t *testing.T) {
 		Client: http.DefaultClient,
 		Port:   uint(port),
 	}
-	gotObj, err := c.HealthCheck(parts[0])
+	gotObj, _, err := c.HealthCheck(parts[0])
 	if gotObj != expectObj {
 		t.Errorf("expected: %#v, got %#v", expectObj, gotObj)
 	}
@@ -114,7 +114,7 @@ func TestNewKubeletClient(t *testing.T) {
 	}
 
 	host := "127.0.0.1"
-	healthStatus, err := client.HealthCheck(host)
+	healthStatus, _, err := client.HealthCheck(host)
 	if healthStatus != probe.Failure {
 		t.Errorf("Expected %v and got %v.", probe.Failure, healthStatus)
 	}

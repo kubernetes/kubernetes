@@ -22,8 +22,11 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 
+	"fmt"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
+	allocator_etcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -37,15 +40,22 @@ func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
 	return fakeEtcdClient, helper
 }
 
-func newStorage(t *testing.T) (ipallocator.Interface, *ipallocator.Range, *tools.FakeEtcdClient) {
+func newStorage(t *testing.T) (ipallocator.Interface, allocator.Interface, *tools.FakeEtcdClient) {
 	fakeEtcdClient, h := newHelper(t)
 	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := ipallocator.NewCIDRRange(cidr)
-	storage := NewEtcd(r, h)
-	return storage, r, fakeEtcdClient
+
+	var backing allocator.Interface
+	storage := ipallocator.NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) allocator.Interface {
+		mem := allocator.NewAllocationMap(max, rangeSpec)
+		backing = mem
+		etcd := allocator_etcd.NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", h)
+		return etcd
+	})
+
+	return storage, backing, fakeEtcdClient
 }
 
 func key() string {
@@ -56,7 +66,7 @@ func key() string {
 func TestEmpty(t *testing.T) {
 	storage, _, ecli := newStorage(t)
 	ecli.ExpectNotFoundGet(key())
-	if err := storage.Allocate(net.ParseIP("192.168.1.2")); err != ipallocator.ErrAllocationDisabled {
+	if err := storage.Allocate(net.ParseIP("192.168.1.2")); fmt.Sprintf("%v", err) != "cannot allocate resources of type serviceipallocation at this time" {
 		t.Fatal(err)
 	}
 }
@@ -85,16 +95,18 @@ func initialObject(ecli *tools.FakeEtcdClient) {
 }
 
 func TestStore(t *testing.T) {
-	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-
 	storage, r, ecli := newStorage(t)
 	initialObject(ecli)
 
 	if err := storage.Allocate(net.ParseIP("192.168.1.2")); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Allocate(net.ParseIP("192.168.1.2")); err != ipallocator.ErrAllocated {
+	ok, err := r.Allocate(1)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if ok {
+		t.Fatal("Expected allocation to fail")
 	}
 	if err := storage.Allocate(net.ParseIP("192.168.1.2")); err != ipallocator.ErrAllocated {
 		t.Fatal(err)
@@ -105,29 +117,4 @@ func TestStore(t *testing.T) {
 		t.Fatalf("%s is empty: %#v", key(), obj)
 	}
 	t.Logf("data: %#v", obj.R.Node)
-
-	other := ipallocator.NewCIDRRange(cidr)
-
-	allocation := &api.RangeAllocation{}
-	if err := storage.(*Etcd).helper.ExtractObj(key(), allocation, false); err != nil {
-		t.Fatal(err)
-	}
-	if allocation.ResourceVersion != "1" {
-		t.Fatalf("%#v", allocation)
-	}
-	if allocation.Range != "192.168.1.0/24" {
-		t.Errorf("unexpected stored Range: %s", allocation.Range)
-	}
-	if err := other.Restore(cidr, allocation.Data); err != nil {
-		t.Fatal(err)
-	}
-	if !other.Has(net.ParseIP("192.168.1.2")) {
-		t.Fatalf("could not restore allocated IP: %#v", other)
-	}
-
-	other = ipallocator.NewCIDRRange(cidr)
-	otherStorage := NewEtcd(other, storage.(*Etcd).helper)
-	if err := otherStorage.Allocate(net.ParseIP("192.168.1.2")); err != ipallocator.ErrAllocated {
-		t.Fatal(err)
-	}
 }

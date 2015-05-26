@@ -51,7 +51,7 @@ type Namespace struct {
 }
 ```
 
-A *Namespace* name is a DNS compatible subdomain.
+A *Namespace* name is a DNS compatible label.
 
 A *Namespace* must exist prior to associating content with it.
 

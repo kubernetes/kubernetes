@@ -601,6 +601,7 @@ func TestEtcdUpdateService(t *testing.T) {
 				"baz": "bar",
 			},
 			SessionAffinity: "None",
+			Type:            api.ServiceTypeClusterIP,
 		},
 	}
 	_, err := registry.UpdateService(ctx, &testService)

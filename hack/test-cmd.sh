@@ -531,12 +531,12 @@ __EOF__
   # Post-condition: service exists
   kube::test::get_object_assert 'service frontend' "{{$port_field}}" '80'
   # Command
-  kubectl expose service frontend --port=443 --service-name=frontend-2 "${kube_flags[@]}"
+  kubectl expose service frontend --port=443 --name=frontend-2 "${kube_flags[@]}"
   # Post-condition: service exists
   kube::test::get_object_assert 'service frontend-2' "{{$port_field}}" '443'
   # Command
   kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
-  kubectl expose pod valid-pod --port=444 --service-name=frontend-3 "${kube_flags[@]}"
+  kubectl expose pod valid-pod --port=444 --name=frontend-3 "${kube_flags[@]}"
   # Post-condition: service exists
   kube::test::get_object_assert 'service frontend-3' "{{$port_field}}" '444'
   # Cleanup services

@@ -220,7 +220,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			return err
 		}
 
-		printer, err := f.PrinterForMapping(cmd, info.Mapping)
+		printer, err := f.PrinterForMapping(cmd, info.Mapping, false)
 		if err != nil {
 			return err
 		}

@@ -51,6 +51,7 @@ KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME})
+RKT_VERSION: $(yaml-quote ${RKT_VERSION})
 CA_CERT: $(yaml-quote ${CA_CERT_BASE64})
 MASTER_CERT: $(yaml-quote ${MASTER_CERT_BASE64:-})
 MASTER_KEY: $(yaml-quote ${MASTER_KEY_BASE64:-})
@@ -84,6 +85,7 @@ EXTRA_DOCKER_OPTS=$(yaml-quote ${EXTRA_DOCKER_OPTS})
 ENABLE_DOCKER_REGISTRY_CACHE=$(yaml-quote ${ENABLE_DOCKER_REGISTRY_CACHE:-false})
 PROJECT_ID=$(yaml-quote ${PROJECT})
 KUBERNETES_CONTAINER_RUNTIME=$(yaml-quote ${CONTAINER_RUNTIME})
+RKT_VERSION=$(yaml-quote ${RKT_VERSION})
 CA_CERT: $(yaml-quote ${CA_CERT_BASE64})
 KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
 KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
@@ -129,8 +131,15 @@ function create-master-instance {
 
 # TODO(dawnchen): Check $CONTAINER_RUNTIME to decide which
 # cloud_config yaml file should be passed
+# TODO(mbforbes): Make $1 required.
+# TODO(mbforbes): Document required vars (for this and call chain).
+# $1 version
 function create-node-instance-template {
-   create-node-template "${NODE_INSTANCE_PREFIX}-template" "${scope_flags[*]}" \
+  local suffix=""
+  if [[ -n ${1:-} ]]; then
+    suffix="-${1}"
+  fi
+   create-node-template "${NODE_INSTANCE_PREFIX}-template${suffix}" "${scope_flags[*]}" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
     "user-data=${KUBE_ROOT}/cluster/gce/coreos/node.yaml"
 }

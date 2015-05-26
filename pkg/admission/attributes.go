@@ -25,12 +25,12 @@ type attributesRecord struct {
 	kind      string
 	namespace string
 	resource  string
-	operation string
+	operation Operation
 	object    runtime.Object
 	userInfo  user.Info
 }
 
-func NewAttributesRecord(object runtime.Object, kind, namespace, resource, operation string, userInfo user.Info) Attributes {
+func NewAttributesRecord(object runtime.Object, kind, namespace, resource string, operation Operation, userInfo user.Info) Attributes {
 	return &attributesRecord{
 		kind:      kind,
 		namespace: namespace,
@@ -53,7 +53,7 @@ func (record *attributesRecord) GetResource() string {
 	return record.resource
 }
 
-func (record *attributesRecord) GetOperation() string {
+func (record *attributesRecord) GetOperation() Operation {
 	return record.operation
 }
 

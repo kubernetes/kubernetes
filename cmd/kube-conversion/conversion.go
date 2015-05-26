@@ -34,7 +34,6 @@ import (
 
 var (
 	functionDest = flag.StringP("funcDest", "f", "-", "Output for conversion functions; '-' means stdout")
-	namesDest    = flag.StringP("nameDest", "n", "-", "Output for function names; '-' means stdout")
 	version      = flag.StringP("version", "v", "v1beta3", "Version for conversion.")
 )
 
@@ -53,22 +52,10 @@ func main() {
 		defer file.Close()
 		funcOut = file
 	}
-	var nameOut io.Writer
-	if *namesDest == "-" {
-		nameOut = os.Stdout
-	} else {
-		file, err := os.Create(*namesDest)
-		if err != nil {
-			glog.Fatalf("Couldn't open %v: %v", *functionDest, err)
-		}
-		defer file.Close()
-		nameOut = file
-	}
 
 	generator := pkg_runtime.NewConversionGenerator(api.Scheme.Raw())
 	// TODO(wojtek-t): Change the overwrites to a flag.
 	generator.OverwritePackage(*version, "")
-	generator.OverwritePackage("api", "newer")
 	for _, knownType := range api.Scheme.KnownTypes(*version) {
 		if err := generator.GenerateConversionsForType(*version, knownType); err != nil {
 			glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
@@ -77,7 +64,7 @@ func main() {
 	if err := generator.WriteConversionFunctions(funcOut); err != nil {
 		glog.Fatalf("Error while writing conversion functions: %v", err)
 	}
-	if err := generator.WriteConversionFunctionNames(nameOut); err != nil {
+	if err := generator.RegisterConversionFunctions(funcOut); err != nil {
 		glog.Fatalf("Error while writing conversion functions: %v", err)
 	}
 }

@@ -383,6 +383,16 @@ function create-firewall-rule {
 # $4: The kube-env metadata.
 function create-node-template {
   detect-project
+
+  # First, ensure the template doesn't exist.
+  # TODO(mbforbes): To make this really robust, we need to parse the output and
+  #                 add retries. Just relying on a non-zero exit code doesn't
+  #                 distinguish an ephemeral failed call from a "not-exists".
+  if gcloud compute instance-templates describe "$1"; then
+    echo "Instance template ${1} already exists; continuing." >&2
+    return
+  fi
+
   local attempt=0
   while true; do
     if ! gcloud compute instance-templates create "$1" \
@@ -396,12 +406,12 @@ function create-node-template {
       --network "${NETWORK}" \
       $2 \
       --can-ip-forward \
-      --metadata-from-file "$3" "$4"; then
+      --metadata-from-file "$3","$4"; then
         if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to create instance template $1 ${color_norm}"
+          echo -e "${color_red}Failed to create instance template $1 ${color_norm}" >&2
           exit 2
         fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create instance template $1. Retrying.${color_norm}"
+        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create instance template $1. Retrying.${color_norm}" >&2
         attempt=$(($attempt+1))
     else
         break
@@ -449,7 +459,7 @@ function add-instance-metadata-from-file {
     if ! gcloud compute instances add-metadata "${instance}" \
       --project "${PROJECT}" \
       --zone "${ZONE}" \
-      --metadata-from-file "${kvs[@]}"; then
+      --metadata-from-file $(IFS=, ; echo "${kvs[*]}"); then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}"
           exit 2
@@ -624,6 +634,7 @@ function kube-up {
 
   echo "Creating minions."
 
+  # TODO(mbforbes): Refactor setting scope flags.
   local -a scope_flags=()
   if (( "${#MINION_SCOPES[@]}" > 0 )); then
     scope_flags=("--scopes" "${MINION_SCOPES[@]}")
@@ -771,8 +782,10 @@ function kube-down {
 
   # Delete routes.
   local -a routes
+  # Clean up all routes w/ names like "<cluster-name>-<node-GUID>"
+  # e.g. "kubernetes-12345678-90ab-cdef-1234-567890abcdef"
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
-              --regexp "${NODE_INSTANCE_PREFIX}-.+" | awk 'NR >= 2 { print $1 }') )
+    --regexp "${INSTANCE_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}" | awk 'NR >= 2 { print $1 }') )
   routes+=("${MASTER_NAME}")
   while (( "${#routes[@]}" > 0 )); do
     echo Deleting routes "${routes[*]::10}"
@@ -907,9 +920,18 @@ function test-setup {
   gcloud compute firewall-rules create \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG}" \
-    --allow tcp:80 tcp:8080 \
+    --allow tcp:80,tcp:8080 \
     --network "${NETWORK}" \
     "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
+
+  # Open up the NodePort range
+  # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
+  gcloud compute firewall-rules create \
+    --project "${PROJECT}" \
+    --target-tags "${MINION_TAG}" \
+    --allow tcp:30000-32767,udp:30000-32767 \
+    --network "${NETWORK}" \
+    "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports"
 }
 
 # Execute after running tests to perform any required clean-up. This is called
@@ -921,6 +943,10 @@ function test-teardown {
     --project "${PROJECT}" \
     --quiet \
     "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" || true
+  gcloud compute firewall-rules delete  \
+    --project "${PROJECT}" \
+    --quiet \
+    "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" || true
   "${KUBE_ROOT}/cluster/kube-down.sh"
 }
 

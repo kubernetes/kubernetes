@@ -16,7 +16,6 @@ app.controller('ListPodsCtrl', [
     $scope.serverView = false;
 
     $scope.headers = [
-      {name: '', field: 'thumb'},
       {name: 'Pod', field: 'pod'},
       {name: 'IP', field: 'ip'},
       {name: 'Status', field: 'status'},
@@ -36,15 +35,9 @@ app.controller('ListPodsCtrl', [
       status: 'grey'
     };
     $scope.sortable = ['pod', 'ip', 'status'];
-    $scope.thumbs = 'thumb';
     $scope.count = 10;
 
-    $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
-
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
+    $scope.go = function(data) { $location.path('/dashboard/pods/' + data.pod); };
 
     var orderedPodNames = [];
 
@@ -57,7 +50,7 @@ app.controller('ListPodsCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getPods().success(angular.bind(this, function(data) {
         $scope.loading = false;
@@ -81,18 +74,19 @@ app.controller('ListPodsCtrl', [
                 });
           }
 
-          Object.keys(pod.labels)
-              .forEach(function(key) {
-                if (key == 'name') {
-                  _labels += ', ' + pod.labels[key];
-                }
-                if (key == 'uses') {
-                  _uses += ', ' + pod.labels[key];
-                }
-              });
+          if (pod.labels) {
+            Object.keys(pod.labels)
+                .forEach(function(key) {
+                  if (key == 'name') {
+                    _labels += ', ' + pod.labels[key];
+                  }
+                  if (key == 'uses') {
+                    _uses += ', ' + pod.labels[key];
+                  }
+                });
+            }
 
           $scope.content.push({
-            thumb: '"assets/img/kubernetes.svg"',
             pod: pod.id,
             ip: pod.currentState.podIP,
             containers: _fixComma(_containers),
@@ -131,7 +125,7 @@ app.controller('ListPodsCtrl', [
       return _.indexOf(orderedPodNames, name) + 1;
     };
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);

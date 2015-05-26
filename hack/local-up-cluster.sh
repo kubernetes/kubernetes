@@ -110,27 +110,27 @@ cleanup()
 {
   echo "Cleaning up..."
   # Check if the API server is still running
-  [[ -n "${APISERVER_PID-}" ]] && APISERVER_PIDS=$(ps -eh --ppid=${APISERVER_PID} --pid=${APISERVER_PID} |awk '{print $1}'|xargs)
+  [[ -n "${APISERVER_PID-}" ]] && APISERVER_PIDS=$(pgrep -P ${APISERVER_PID} ; ps -o pid= -p ${APISERVER_PID})
   [[ -n "${APISERVER_PIDS-}" ]] && sudo kill ${APISERVER_PIDS}
 
   # Check if the controller-manager is still running
-  [[ -n "${CTLRMGR_PID-}" ]] && CTLRMGR_PIDS=$(ps -eh --ppid=${CTLRMGR_PID} --pid=${CTLRMGR_PID} |awk '{print $1}'|xargs)
+  [[ -n "${CTLRMGR_PID-}" ]] && CTLRMGR_PIDS=$(pgrep -P ${CTLRMGR_PID} ; ps -o pid= -p ${CTLRMGR_PID})
   [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill ${CTLRMGR_PIDS}
 
   if [[ -n "$DOCKERIZE_KUBELET" ]]; then
     cleanup_dockerized_kubelet
   else
     # Check if the kubelet is still running
-    [[ -n "${KUBELET_PID-}" ]] && KUBELET_PIDS=$(ps -eh --ppid=${KUBELET_PID} --pid=${KUBELET_PID} |awk '{print $1}'|xargs)
+    [[ -n "${KUBELET_PID-}" ]] && KUBELET_PIDS=$(pgrep -P ${KUBELET_PID} ; ps -o pid= -p ${KUBELET_PID})
     [[ -n "${KUBELET_PIDS-}" ]] && sudo kill ${KUBELET_PIDS}
   fi
 
   # Check if the proxy is still running
-  [[ -n "${PROXY_PID-}" ]] && PROXY_PIDS=$(ps -eh --ppid=${PROXY_PID} --pid=${PROXY_PID} |awk '{print $1}'|xargs)
+  [[ -n "${PROXY_PID-}" ]] && PROXY_PIDS=$(pgrep -P ${PROXY_PID} ; ps -o pid= -p ${PROXY_PID})
   [[ -n "${PROXY_PIDS-}" ]] && sudo kill ${PROXY_PIDS}
 
   # Check if the scheduler is still running
-  [[ -n "${SCHEDULER_PID-}" ]] && SCHEDULER_PIDS=$(ps -eh --ppid=${SCHEDULER_PID} --pid=${SCHEDULER_PID} |awk '{print $1}'|xargs)
+  [[ -n "${SCHEDULER_PID-}" ]] && SCHEDULER_PIDS=$(pgrep -P ${SCHEDULER_PID} ; ps -o pid= -p ${SCHEDULER_PID})
   [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill ${SCHEDULER_PIDS}
 
   # Check if the etcd is still running

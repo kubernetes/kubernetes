@@ -34,20 +34,21 @@ func init() {
 
 // plugin contains the client used by the SecurityContextDeny admission controller
 type plugin struct {
+	*admission.Handler
 	client client.Interface
 }
 
 // NewSecurityContextDeny creates a new instance of the SecurityContextDeny admission controller
 func NewSecurityContextDeny(client client.Interface) admission.Interface {
-	return &plugin{client}
+	return &plugin{
+		Handler: admission.NewHandler(admission.Create, admission.Update),
+		client:  client,
+	}
 }
 
 // Admit will deny any SecurityContext that defines options that were not previously available in the api.Container
 // struct (Capabilities and Privileged)
 func (p *plugin) Admit(a admission.Attributes) (err error) {
-	if a.GetOperation() == "DELETE" {
-		return nil
-	}
 	if a.GetResource() != string(api.ResourcePods) {
 		return nil
 	}

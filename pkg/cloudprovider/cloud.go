@@ -17,6 +17,7 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"errors"
 	"net"
 	"strings"
 
@@ -33,6 +34,8 @@ type Interface interface {
 	Zones() (Zones, bool)
 	// Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
 	Clusters() (Clusters, bool)
+	// Routes returns a routes interface along with whether the interface is supported.
+	Routes() (Routes, bool)
 }
 
 // Clusters is an abstract, pluggable interface for clusters of containers.
@@ -60,14 +63,19 @@ func GetLoadBalancerName(service *api.Service) string {
 type TCPLoadBalancer interface {
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetTCPLoadBalancer returns whether the specified load balancer exists, and
-	// if so, what its IP address or hostname is.
-	GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error)
-	// CreateTCPLoadBalancer creates a new tcp load balancer. Returns the IP address or hostname of the balancer
-	CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error)
+	// if so, what its status is.
+	GetTCPLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error)
+	// CreateTCPLoadBalancer creates a new tcp load balancer. Returns the status of the balancer
+	CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error)
 	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
 	UpdateTCPLoadBalancer(name, region string, hosts []string) error
-	// DeleteTCPLoadBalancer deletes a specified load balancer.
-	DeleteTCPLoadBalancer(name, region string) error
+	// EnsureTCPLoadBalancerDeleted deletes the specified load balancer if it
+	// exists, returning nil if the load balancer specified either didn't exist or
+	// was successfully deleted.
+	// This construction is useful because many cloud providers' load balancers
+	// have multiple underlying components, meaning a Get could say that the LB
+	// doesn't exist even if some part of it is still laying around.
+	EnsureTCPLoadBalancerDeleted(name, region string) error
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.
@@ -80,11 +88,33 @@ type Instances interface {
 	List(filter string) ([]string, error)
 	// GetNodeResources gets the resources for a particular node
 	GetNodeResources(name string) (*api.NodeResources, error)
-	// Configure the specified instance using the spec
-	Configure(name string, spec *api.NodeSpec) error
-	// Delete all the configuration related to the instance, including other cloud resources
-	Release(name string) error
 }
+
+// Route is a representation of an advanced routing rule.
+type Route struct {
+	// Name is the name of the routing rule in the cloud-provider.
+	Name string
+	// TargetInstance is the name of the instance as specified in routing rules
+	// for the cloud-provider (in gce: the Instance Name).
+	TargetInstance string
+	// Destination CIDR is the CIDR format IP range that this routing rule
+	// applies to.
+	DestinationCIDR string
+	// Description is a free-form string. It can be useful for tagging Routes.
+	Description string
+}
+
+// Routes is an abstract, pluggable interface for advanced routing rules.
+type Routes interface {
+	// List all routes that match the filter
+	ListRoutes(filter string) ([]*Route, error)
+	// Create the described route
+	CreateRoute(route *Route) error
+	// Delete the specified route
+	DeleteRoute(name string) error
+}
+
+var InstanceNotFound = errors.New("instance not found")
 
 // Zone represents the location of a particular machine.
 type Zone struct {

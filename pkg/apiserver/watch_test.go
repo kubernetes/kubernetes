@@ -18,11 +18,13 @@ package apiserver
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
@@ -277,5 +279,72 @@ func TestWatchProtocolSelection(t *testing.T) {
 		if !item.isWebsocket && response.StatusCode != http.StatusOK {
 			t.Errorf("Unexpected response %#v", response)
 		}
+	}
+
+}
+
+type fakeTimeoutFactory struct {
+	timeoutCh chan time.Time
+	done      chan struct{}
+}
+
+func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
+	return t.timeoutCh, func() bool {
+		defer close(t.done)
+		return true
+	}
+}
+
+func TestWatchHTTPTimeout(t *testing.T) {
+	watcher := watch.NewFake()
+	timeoutCh := make(chan time.Time)
+	done := make(chan struct{})
+
+	// Setup a new watchserver
+	watchServer := &WatchServer{
+		watcher,
+		version2ServerCodec,
+		func(obj runtime.Object) {},
+		&fakeTimeoutFactory{timeoutCh, done},
+	}
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		watchServer.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	// Setup a client
+	dest, _ := url.Parse(s.URL)
+	dest.Path = "/api/version/watch/resource"
+	dest.RawQuery = ""
+
+	req, _ := http.NewRequest("GET", dest.String(), nil)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	watcher.Add(&api.Pod{TypeMeta: api.TypeMeta{APIVersion: "v1beta3"}})
+
+	// Make sure we can actually watch an endpoint
+	decoder := json.NewDecoder(resp.Body)
+	var got watchJSON
+	err = decoder.Decode(&got)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Timeout and check for leaks
+	close(timeoutCh)
+	select {
+	case <-done:
+		if !watcher.Stopped {
+			t.Errorf("Leaked watch on timeout")
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Errorf("Failed to stop watcher after 100ms of timeout signal")
+	}
+
+	// Make sure we can't receive any more events through the timeout watch
+	err = decoder.Decode(&got)
+	if err != io.EOF {
+		t.Errorf("Unexpected non-error")
 	}
 }

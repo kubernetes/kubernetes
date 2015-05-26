@@ -19,7 +19,6 @@ package rkt
 import (
 	"encoding/json"
 	"fmt"
-	"hash/adler32"
 	"io"
 	"io/ioutil"
 	"os"
@@ -38,7 +37,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
 	"github.com/coreos/go-systemd/dbus"
@@ -460,14 +458,6 @@ func newUnitOption(section, name, value string) *unit.UnitOption {
 	return &unit.UnitOption{Section: section, Name: name, Value: value}
 }
 
-// TODO(yifan): Move this duplicated function to container runtime.
-// hashContainer computes the hash of one api.Container.
-func hashContainer(container *api.Container) uint64 {
-	hash := adler32.New()
-	util.DeepHashObject(hash, *container)
-	return uint64(hash.Sum32())
-}
-
 // TODO(yifan): Remove the receiver once we can solve the appName->imageID problem.
 func (r *runtime) apiPodToruntimePod(uuid string, pod *api.Pod) *kubecontainer.Pod {
 	p := &kubecontainer.Pod{
@@ -485,7 +475,7 @@ func (r *runtime) apiPodToruntimePod(uuid string, pod *api.Pod) *kubecontainer.P
 			ID:      types.UID(buildContainerID(&containerID{uuid, c.Name, img.id})),
 			Name:    c.Name,
 			Image:   c.Image,
-			Hash:    hashContainer(c),
+			Hash:    kubecontainer.HashContainer(c),
 			Created: time.Now().Unix(),
 		})
 	}
@@ -599,10 +589,10 @@ func (r *runtime) RunPod(pod *api.Pod) error {
 	return nil
 }
 
-// makeruntimePod constructs the container runtime pod. It will:
+// makeRuntimePod constructs the container runtime pod. It will:
 // 1, Construct the pod by the information stored in the unit file.
 // 2, Construct the pod status from pod info.
-func (r *runtime) makeruntimePod(unitName string, podInfos map[string]*podInfo) (*kubecontainer.Pod, error) {
+func (r *runtime) makeRuntimePod(unitName string, podInfos map[string]*podInfo) (*kubecontainer.Pod, error) {
 	f, err := os.Open(path.Join(systemdServiceDir, unitName))
 	if err != nil {
 		return nil, err
@@ -669,7 +659,7 @@ func (r *runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 			if !all && u.SubState != "running" {
 				continue
 			}
-			pod, err := r.makeruntimePod(u.Name, podInfos)
+			pod, err := r.makeRuntimePod(u.Name, podInfos)
 			if err != nil {
 				glog.Warningf("rkt: Cannot construct pod from unit file: %v.", err)
 				continue
@@ -789,7 +779,12 @@ func (r *runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 		tag = "latest"
 	}
 
-	creds, ok := r.dockerKeyring.Lookup(repoToPull)
+	keyring, err := credentialprovider.MakeDockerKeyring(pullSecrets, r.dockerKeyring)
+	if err != nil {
+		return err
+	}
+
+	creds, ok := keyring.Lookup(repoToPull)
 	if !ok {
 		glog.V(1).Infof("Pulling image %s without credentials", img)
 	}
@@ -827,7 +822,7 @@ func (r *runtime) RemoveImage(image kubecontainer.ImageSpec) error {
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.
-func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus) error {
+func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	if len(runningPod.Containers) == 0 {
 		glog.V(4).Infof("Pod %q is not running, will start it", podFullName)
@@ -842,7 +837,7 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 
 	restartPod := false
 	for _, container := range pod.Spec.Containers {
-		expectedHash := hashContainer(&container)
+		expectedHash := kubecontainer.HashContainer(&container)
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {

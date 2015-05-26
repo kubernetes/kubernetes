@@ -17,6 +17,9 @@ RUN apt-get -q update && \
     apt-get clean && \
     curl -s https://storage.googleapis.com/signals-agents/logging/google-fluentd-install.sh | sudo bash
 
+# Update gem for fluent-plugin-google-cloud
+RUN /usr/sbin/google-fluentd-gem update fluent-plugin-google-cloud
+
 # Copy the Fluentd configuration file for logging Docker container logs.
 COPY google-fluentd.conf /etc/google-fluentd/google-fluentd.conf
 

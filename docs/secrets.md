@@ -16,8 +16,10 @@ This is an example of a simple secret, in json format:
 {
   "apiVersion": "v1beta3",
   "kind": "Secret",
-  "name": "mysecret",
-  "namespace": "myns",
+  "metadata" : {
+    "name": "mysecret",
+    "namespace": "myns"
+  },  
   "data": {
     "username": "dmFsdWUtMQ0K",
     "password": "dmFsdWUtMg0KDQo="
@@ -32,31 +34,30 @@ The values are arbitrary data, encoded using base64.
 This is an example of a pod that uses a secret, in json format:
 ```json
 {
-  "kind": "Pod",
-  "apiVersion": "v1beta3",
+ "apiVersion": "v1beta3",
+ "kind": "Pod",
   "metadata": {
-    "name": "mypod"
+    "name": "mypod",
+    "namespace": "myns"
   },
   "spec": {
-    "manifest": {
-      "containers": [{
-        "name": "c",
-        "image": "example/image",
-        "volumeMounts": [{
-          "name": "foo",
-          "mountPath": "/etc/foo",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
+    "containers": [{
+      "name": "mypod",
+      "image": "redis",
+      "volumeMounts": [{
         "name": "foo",
-        "secret": {
-          "secretName": "mysecret"
-        }
+        "mountPath": "/etc/foo",
+        "readOnly": true
       }]
-    }
+    }],
+    "volumes": [{
+      "name": "foo",
+      "secret": {
+        "secretName": "mysecret"
+      }
+    }]
   }
-}]
+}
 ```
 
 ### Restrictions
@@ -88,8 +89,8 @@ Once a pod is created, its secret volumes will not change, even if the secret
 resource is modified.  To change the secret used, the original pod must be
 deleted, and a new pod (perhaps with an identical PodSpec) must be created.
 Therefore, updating a secret follows the same workflow as deploying a new
-container image.  The `kubectl rollingupdate` command can be used ([man
-page](kubectl-rollingupdate.md)).
+container image.  The `kubectl rolling-update` command can be used ([man
+page](kubectl_rolling-update.md)).
 
 The resourceVersion of the secret is not specified when it is referenced.
 Therefore, if a secret is updated at about the same time as pods are starting,

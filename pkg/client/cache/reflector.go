@@ -20,6 +20,7 @@ import (
 	"errors"
 	"io"
 	"reflect"
+	"sync"
 	"time"
 
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -53,8 +54,10 @@ type Reflector struct {
 	resyncPeriod time.Duration
 	// lastSyncResourceVersion is the resource version token last
 	// observed when doing a sync with the underlying store
-	// it is not thread safe as it is not synchronized with access to the store
+	// it is thread safe, but not synchronized with the underlying store
 	lastSyncResourceVersion string
+	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
+	lastSyncResourceVersionMutex sync.RWMutex
 }
 
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
@@ -145,7 +148,7 @@ func (r *Reflector) listAndWatch(stopCh <-chan struct{}) {
 		glog.Errorf("Unable to sync list result: %v", err)
 		return
 	}
-	r.lastSyncResourceVersion = resourceVersion
+	r.setLastSyncResourceVersion(resourceVersion)
 
 	for {
 		w, err := r.listerWatcher.Watch(resourceVersion)
@@ -225,7 +228,7 @@ loop:
 				glog.Errorf("unable to understand watch event %#v", event)
 			}
 			*resourceVersion = meta.ResourceVersion()
-			r.lastSyncResourceVersion = *resourceVersion
+			r.setLastSyncResourceVersion(*resourceVersion)
 			eventCount++
 		}
 	}
@@ -242,5 +245,13 @@ loop:
 // LastSyncResourceVersion is the resource version observed when last sync with the underlying store
 // The value returned is not synchronized with access to the underlying store and is not thread-safe
 func (r *Reflector) LastSyncResourceVersion() string {
+	r.lastSyncResourceVersionMutex.RLock()
+	defer r.lastSyncResourceVersionMutex.RUnlock()
 	return r.lastSyncResourceVersion
+}
+
+func (r *Reflector) setLastSyncResourceVersion(v string) {
+	r.lastSyncResourceVersionMutex.Lock()
+	defer r.lastSyncResourceVersionMutex.Unlock()
+	r.lastSyncResourceVersion = v
 }

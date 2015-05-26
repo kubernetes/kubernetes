@@ -112,6 +112,14 @@ while read line; do
   create-kubeconfig-secret "${token}" "${username}"
 done < /srv/kubernetes/known_tokens.csv
 
+# Create admission_control objects if defined before any other addon services. If the limits
+# are defined in a namespace other than default, we should still create the limits for the
+# default namespace.
+for obj in $(find /etc/kubernetes/admission-controls \( -name \*.yaml -o -name \*.json \)); do
+  start_addon ${obj} 100 10 &
+  echo "++ obj ${obj} is created ++"
+done
+
 for obj in $(find /etc/kubernetes/addons \( -name \*.yaml -o -name \*.json \)); do
   start_addon ${obj} 100 10 &
   echo "++ addon ${obj} starting in pid $! ++"

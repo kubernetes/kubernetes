@@ -55,8 +55,8 @@ func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.NFS != nil
 }
 
-func (plugin *nfsPlugin) GetAccessModes() []api.AccessModeType {
-	return []api.AccessModeType{
+func (plugin *nfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 		api.ReadOnlyMany,
 		api.ReadWriteMany,

@@ -32,7 +32,7 @@ const (
 	get_long = `Display one or many resources.
 
 Possible resources include pods (po), replication controllers (rc), services
-(svc), minions (mi), events (ev), or component statuses (cs).
+(svc), nodes, events (ev), or component statuses (cs).
 
 By specifying the output as 'template' and providing a Go template as the value
 of the --template flag, you can filter the attributes of the fetched resource(s).`
@@ -40,7 +40,7 @@ of the --template flag, you can filter the attributes of the fetched resource(s)
 $ kubectl get pods
 
 // List a single replication controller with specified NAME in ps output format.
-$ kubectl get replicationController web
+$ kubectl get replicationcontroller web
 
 // List a single pod in JSON output format.
 $ kubectl get -o json pod web-pod-13je7
@@ -58,7 +58,7 @@ $ kubectl get rc/web service/frontend pods/web-pod-13je7`
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
 func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	p := kubectl.NewHumanReadablePrinter(false)
+	p := kubectl.NewHumanReadablePrinter(false, false)
 	validArgs := p.HandledResources()
 
 	cmd := &cobra.Command{
@@ -76,6 +76,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
+	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	return cmd
 }
 
@@ -83,6 +84,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
 func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
+	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	mapper, typer := f.Object()
 
 	cmdNamespace, err := f.DefaultNamespace()
@@ -94,7 +96,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
 		r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
-			NamespaceParam(cmdNamespace).DefaultNamespace().
+			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 			SelectorParam(selector).
 			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
@@ -108,7 +110,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			return err
 		}
 
-		printer, err := f.PrinterForMapping(cmd, mapping)
+		printer, err := f.PrinterForMapping(cmd, mapping, allNamespaces)
 		if err != nil {
 			return err
 		}
@@ -143,7 +145,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	}
 
 	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
-		NamespaceParam(cmdNamespace).DefaultNamespace().
+		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
@@ -180,7 +182,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	// use the default printer for each object
 	return b.Do().Visit(func(r *resource.Info) error {
-		printer, err := f.PrinterForMapping(cmd, r.Mapping)
+		printer, err := f.PrinterForMapping(cmd, r.Mapping, allNamespaces)
 		if err != nil {
 			return err
 		}

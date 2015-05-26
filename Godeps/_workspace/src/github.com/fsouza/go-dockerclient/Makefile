@@ -1,35 +1,52 @@
 .PHONY: \
 	all \
-	deps \
-	updatedeps \
-	testdeps \
-	updatetestdeps \
-	cov \
+	vendor \
+	lint \
+	vet \
+	fmt \
+	fmtcheck \
+	pretest \
 	test \
+	cov \
 	clean
 
 all: test
 
-deps:
-	go get -d -v ./...
+vendor:
+	go get -v github.com/mjibson/party
+	party -d vendor -c -u
 
-updatedeps:
-	go get -d -v -u -f ./...
+lint:
+	go get -v github.com/golang/lint/golint
+	for file in $(shell git ls-files '*.go' | grep -v '^vendor/'); do \
+		golint $$file; \
+	done
 
-testdeps:
-	go get -d -v -t ./...
+vet:
+	go get -v golang.org/x/tools/cmd/vet
+	go vet ./...
 
-updatetestdeps:
-	go get -d -v -t -u -f ./...
+fmt:
+	gofmt -w $(shell git ls-files '*.go' | grep -v '^vendor/')
 
-cov: testdeps
+fmtcheck:
+	for file in $(shell git ls-files '*.go' | grep -v '^vendor/'); do \
+		gofmt $$file | diff -u $$file -; \
+		if [ -n "$$(gofmt $$file | diff -u $$file -)" ]; then\
+			exit 1; \
+		fi; \
+	done
+
+pretest: lint vet fmtcheck
+
+test: pretest
+	go test
+	go test ./testing
+
+cov:
 	go get -v github.com/axw/gocov/gocov
 	go get golang.org/x/tools/cmd/cover
 	gocov test | gocov report
-
-test: testdeps
-	go test ./...
-	./testing/bin/fmtpolice
 
 clean:
 	go clean ./...

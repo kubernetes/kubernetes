@@ -89,7 +89,7 @@ func (sv *secretVolume) SetUp() error {
 // This is the spec for the volume that this plugin wraps.
 var wrappedVolumeSpec = &volume.Spec{
 	Name:         "not-used",
-	VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageTypeMemory}},
+	VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}},
 }
 
 func (sv *secretVolume) SetUpAt(dir string) error {

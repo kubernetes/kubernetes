@@ -49,8 +49,9 @@ func (ec *fakeEtcdClient) Delete(path string, recursive bool) (*etcd.Response, e
 }
 
 const (
-	testDomain = "cluster.local"
-	basePath   = "/skydns/local/cluster"
+	testDomain       = "cluster.local"
+	basePath         = "/skydns/local/cluster"
+	serviceSubDomain = "svc"
 )
 
 func newKube2Sky(ec etcdClient) *kube2sky {
@@ -61,25 +62,12 @@ func newKube2Sky(ec etcdClient) *kube2sky {
 	}
 }
 
-func TestAddNoServiceIP(t *testing.T) {
-	const (
-		testService   = "testService"
-		testNamespace = "default"
-	)
-	ec := &fakeEtcdClient{make(map[string]string)}
-	k2s := newKube2Sky(ec)
-	service := kapi.Service{
-		ObjectMeta: kapi.ObjectMeta{
-			Name:      testNamespace,
-			Namespace: testNamespace,
-		},
-	}
-	k2s.newService(&service)
-	assert.Empty(t, ec.writes)
+func getEtcdOldStylePath(name, namespace string) string {
+	return path.Join(basePath, namespace, name)
 }
 
-func getEtcdPath(name, namespace string) string {
-	return path.Join(basePath, namespace, name)
+func getEtcdNewStylePath(name, namespace string) string {
+	return path.Join(basePath, serviceSubDomain, namespace, name)
 }
 
 type hostPort struct {
@@ -98,6 +86,39 @@ func getHostPortFromString(data string) (*hostPort, error) {
 	var res hostPort
 	err := json.Unmarshal([]byte(data), &res)
 	return &res, err
+}
+
+func assertDnsServiceEntryInEtcd(t *testing.T, ec *fakeEtcdClient, serviceName, namespace string, expectedHostPort *hostPort) {
+	oldStyleKey := getEtcdOldStylePath(serviceName, namespace)
+	val, exists := ec.writes[oldStyleKey]
+	require.True(t, exists)
+	actualHostPort, err := getHostPortFromString(val)
+	require.NoError(t, err)
+	assert.Equal(t, actualHostPort, expectedHostPort)
+
+	newStyleKey := getEtcdNewStylePath(serviceName, namespace)
+	val, exists = ec.writes[newStyleKey]
+	require.True(t, exists)
+	actualHostPort, err = getHostPortFromString(val)
+	require.NoError(t, err)
+	assert.Equal(t, actualHostPort, expectedHostPort)
+}
+
+func TestHeadlessService(t *testing.T) {
+	const (
+		testService   = "testService"
+		testNamespace = "default"
+	)
+	ec := &fakeEtcdClient{make(map[string]string)}
+	k2s := newKube2Sky(ec)
+	service := kapi.Service{
+		ObjectMeta: kapi.ObjectMeta{
+			Name:      testNamespace,
+			Namespace: testNamespace,
+		},
+	}
+	k2s.newService(&service)
+	assert.Empty(t, ec.writes)
 }
 
 func TestAddSinglePortService(t *testing.T) {
@@ -122,13 +143,8 @@ func TestAddSinglePortService(t *testing.T) {
 		},
 	}
 	k2s.newService(&service)
-	expectedKey := getEtcdPath(testService, testNamespace)
 	expectedValue := getHostPort(&service)
-	val, exists := ec.writes[expectedKey]
-	require.True(t, exists)
-	actualValue, err := getHostPortFromString(val)
-	require.NoError(t, err)
-	assert.Equal(t, actualValue, expectedValue)
+	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
 }
 
 func TestUpdateSinglePortService(t *testing.T) {
@@ -153,16 +169,11 @@ func TestUpdateSinglePortService(t *testing.T) {
 		},
 	}
 	k2s.newService(&service)
-	assert.Len(t, ec.writes, 1)
+	assert.Len(t, ec.writes, 2)
 	service.Spec.PortalIP = "0.0.0.0"
 	k2s.newService(&service)
-	expectedKey := getEtcdPath(testService, testNamespace)
 	expectedValue := getHostPort(&service)
-	val, exists := ec.writes[expectedKey]
-	require.True(t, exists)
-	actualValue, err := getHostPortFromString(val)
-	require.NoError(t, err)
-	assert.Equal(t, actualValue, expectedValue)
+	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
 }
 
 func TestDeleteSinglePortService(t *testing.T) {
@@ -188,7 +199,9 @@ func TestDeleteSinglePortService(t *testing.T) {
 	}
 	// Add the service
 	k2s.newService(&service)
-	assert.Len(t, ec.writes, 1)
+	// two entries should get created, one with the svc subdomain (new-style)
+	// , and one without the svc subdomain (old-style)
+	assert.Len(t, ec.writes, 2)
 	// Delete the service
 	k2s.removeService(&service)
 	assert.Empty(t, ec.writes)

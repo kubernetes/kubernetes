@@ -20,25 +20,25 @@ import (
 	"reflect"
 	"testing"
 
-	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	versioned "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	data, err := current.Codec.Encode(obj)
+	data, err := versioned.Codec.Encode(obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
 	}
-	obj2, err := newer.Codec.Decode(data)
+	obj2, err := api.Codec.Decode(data)
 	if err != nil {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), obj)
 		return nil
 	}
 	obj3 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
-	err = newer.Scheme.Convert(obj2, obj3)
+	err = api.Scheme.Convert(obj2, obj3)
 	if err != nil {
 		t.Errorf("%v\nSource: %#v", err, obj2)
 		return nil
@@ -48,14 +48,14 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 
 func TestSetDefaultReplicationController(t *testing.T) {
 	tests := []struct {
-		rc             *current.ReplicationController
+		rc             *versioned.ReplicationController
 		expectLabels   bool
 		expectSelector bool
 	}{
 		{
-			rc: &current.ReplicationController{
-				DesiredState: current.ReplicationControllerState{
-					PodTemplate: current.PodTemplate{
+			rc: &versioned.ReplicationController{
+				DesiredState: versioned.ReplicationControllerState{
+					PodTemplate: versioned.PodTemplate{
 						Labels: map[string]string{
 							"foo": "bar",
 						},
@@ -66,12 +66,12 @@ func TestSetDefaultReplicationController(t *testing.T) {
 			expectSelector: true,
 		},
 		{
-			rc: &current.ReplicationController{
+			rc: &versioned.ReplicationController{
 				Labels: map[string]string{
 					"bar": "foo",
 				},
-				DesiredState: current.ReplicationControllerState{
-					PodTemplate: current.PodTemplate{
+				DesiredState: versioned.ReplicationControllerState{
+					PodTemplate: versioned.PodTemplate{
 						Labels: map[string]string{
 							"foo": "bar",
 						},
@@ -82,15 +82,15 @@ func TestSetDefaultReplicationController(t *testing.T) {
 			expectSelector: true,
 		},
 		{
-			rc: &current.ReplicationController{
+			rc: &versioned.ReplicationController{
 				Labels: map[string]string{
 					"bar": "foo",
 				},
-				DesiredState: current.ReplicationControllerState{
+				DesiredState: versioned.ReplicationControllerState{
 					ReplicaSelector: map[string]string{
 						"some": "other",
 					},
-					PodTemplate: current.PodTemplate{
+					PodTemplate: versioned.PodTemplate{
 						Labels: map[string]string{
 							"foo": "bar",
 						},
@@ -101,12 +101,12 @@ func TestSetDefaultReplicationController(t *testing.T) {
 			expectSelector: false,
 		},
 		{
-			rc: &current.ReplicationController{
-				DesiredState: current.ReplicationControllerState{
+			rc: &versioned.ReplicationController{
+				DesiredState: versioned.ReplicationControllerState{
 					ReplicaSelector: map[string]string{
 						"some": "other",
 					},
-					PodTemplate: current.PodTemplate{
+					PodTemplate: versioned.PodTemplate{
 						Labels: map[string]string{
 							"foo": "bar",
 						},
@@ -120,7 +120,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 	for _, test := range tests {
 		rc := test.rc
 		obj2 := roundTrip(t, runtime.Object(rc))
-		rc2, ok := obj2.(*current.ReplicationController)
+		rc2, ok := obj2.(*versioned.ReplicationController)
 		if !ok {
 			t.Errorf("unexpected object: %v", rc2)
 			t.FailNow()
@@ -143,67 +143,80 @@ func TestSetDefaultReplicationController(t *testing.T) {
 }
 
 func TestSetDefaultService(t *testing.T) {
-	svc := &current.Service{}
+	svc := &versioned.Service{}
 	obj2 := roundTrip(t, runtime.Object(svc))
-	svc2 := obj2.(*current.Service)
-	if svc2.Protocol != current.ProtocolTCP {
-		t.Errorf("Expected default protocol :%s, got: %s", current.ProtocolTCP, svc2.Protocol)
+	svc2 := obj2.(*versioned.Service)
+	if svc2.Protocol != versioned.ProtocolTCP {
+		t.Errorf("Expected default protocol :%s, got: %s", versioned.ProtocolTCP, svc2.Protocol)
 	}
-	if svc2.SessionAffinity != current.AffinityTypeNone {
-		t.Errorf("Expected default sesseion affinity type:%s, got: %s", current.AffinityTypeNone, svc2.SessionAffinity)
+	if svc2.SessionAffinity != versioned.ServiceAffinityNone {
+		t.Errorf("Expected default session affinity type:%s, got: %s", versioned.ServiceAffinityNone, svc2.SessionAffinity)
+	}
+	if svc2.Type != versioned.ServiceTypeClusterIP {
+		t.Errorf("Expected default type:%s, got: %s", versioned.ServiceTypeClusterIP, svc2.Type)
+	}
+}
+
+func TestSetDefaultServiceWithLoadbalancer(t *testing.T) {
+	svc := &versioned.Service{}
+	svc.CreateExternalLoadBalancer = true
+	obj2 := roundTrip(t, runtime.Object(svc))
+	svc2 := obj2.(*versioned.Service)
+	if svc2.Type != versioned.ServiceTypeLoadBalancer {
+		t.Errorf("Expected default type:%s, got: %s", versioned.ServiceTypeLoadBalancer, svc2.Type)
 	}
 }
 
 func TestSetDefaultPersistentVolume(t *testing.T) {
-	pv := &current.PersistentVolume{}
+	pv := &versioned.PersistentVolume{}
 	obj2 := roundTrip(t, runtime.Object(pv))
-	pv2 := obj2.(*current.PersistentVolume)
+	pv2 := obj2.(*versioned.PersistentVolume)
 
-	if pv2.Status.Phase != current.VolumePending {
-		t.Errorf("Expected volume phase %v, got %v", current.VolumePending, pv2.Status.Phase)
+	if pv2.Status.Phase != versioned.VolumePending {
+		t.Errorf("Expected volume phase %v, got %v", versioned.VolumePending, pv2.Status.Phase)
 	}
 }
 
 func TestSetDefaultPersistentVolumeClaim(t *testing.T) {
-	pvc := &current.PersistentVolumeClaim{}
+	pvc := &versioned.PersistentVolumeClaim{}
 	obj2 := roundTrip(t, runtime.Object(pvc))
-	pvc2 := obj2.(*current.PersistentVolumeClaim)
+	pvc2 := obj2.(*versioned.PersistentVolumeClaim)
 
-	if pvc2.Status.Phase != current.ClaimPending {
-		t.Errorf("Expected claim phase %v, got %v", current.ClaimPending, pvc2.Status.Phase)
+	if pvc2.Status.Phase != versioned.ClaimPending {
+		t.Errorf("Expected claim phase %v, got %v", versioned.ClaimPending, pvc2.Status.Phase)
 	}
 }
 
 func TestSetDefaultSecret(t *testing.T) {
-	s := &current.Secret{}
+	s := &versioned.Secret{}
 	obj2 := roundTrip(t, runtime.Object(s))
-	s2 := obj2.(*current.Secret)
+	s2 := obj2.(*versioned.Secret)
 
-	if s2.Type != current.SecretTypeOpaque {
-		t.Errorf("Expected secret type %v, got %v", current.SecretTypeOpaque, s2.Type)
+	if s2.Type != versioned.SecretTypeOpaque {
+		t.Errorf("Expected secret type %v, got %v", versioned.SecretTypeOpaque, s2.Type)
 	}
 }
 
 func TestSetDefaulEndpointsLegacy(t *testing.T) {
-	in := &current.Endpoints{
+	in := &versioned.Endpoints{
 		Protocol:   "UDP",
 		Endpoints:  []string{"1.2.3.4:93", "5.6.7.8:76"},
-		TargetRefs: []current.EndpointObjectReference{{Endpoint: "1.2.3.4:93", ObjectReference: current.ObjectReference{ID: "foo"}}},
+		TargetRefs: []versioned.EndpointObjectReference{{Endpoint: "1.2.3.4:93", ObjectReference: versioned.ObjectReference{ID: "foo"}}},
 	}
 	obj := roundTrip(t, runtime.Object(in))
-	out := obj.(*current.Endpoints)
+	out := obj.(*versioned.Endpoints)
 
 	if len(out.Subsets) != 2 {
 		t.Errorf("Expected 2 EndpointSubsets, got %d (%#v)", len(out.Subsets), out.Subsets)
 	}
-	expected := []current.EndpointSubset{
+	expected := []versioned.EndpointSubset{
 		{
-			Addresses: []current.EndpointAddress{{IP: "1.2.3.4", TargetRef: &current.ObjectReference{ID: "foo"}}},
-			Ports:     []current.EndpointPort{{Protocol: current.ProtocolUDP, Port: 93}},
+			Addresses: []versioned.EndpointAddress{{IP: "1.2.3.4", TargetRef: &versioned.ObjectReference{ID: "foo"}}},
+			Ports:     []versioned.EndpointPort{{Protocol: versioned.ProtocolUDP, Port: 93}},
 		},
 		{
-			Addresses: []current.EndpointAddress{{IP: "5.6.7.8"}},
-			Ports:     []current.EndpointPort{{Protocol: current.ProtocolUDP, Port: 76}},
+			Addresses: []versioned.EndpointAddress{{IP: "5.6.7.8"}},
+			Ports:     []versioned.EndpointPort{{Protocol: versioned.ProtocolUDP, Port: 76}},
 		},
 	}
 	if !reflect.DeepEqual(out.Subsets, expected) {
@@ -212,20 +225,20 @@ func TestSetDefaulEndpointsLegacy(t *testing.T) {
 }
 
 func TestSetDefaulEndpointsProtocol(t *testing.T) {
-	in := &current.Endpoints{Subsets: []current.EndpointSubset{
-		{Ports: []current.EndpointPort{{}, {Protocol: "UDP"}, {}}},
+	in := &versioned.Endpoints{Subsets: []versioned.EndpointSubset{
+		{Ports: []versioned.EndpointPort{{}, {Protocol: "UDP"}, {}}},
 	}}
 	obj := roundTrip(t, runtime.Object(in))
-	out := obj.(*current.Endpoints)
+	out := obj.(*versioned.Endpoints)
 
-	if out.Protocol != current.ProtocolTCP {
-		t.Errorf("Expected protocol %s, got %s", current.ProtocolTCP, out.Protocol)
+	if out.Protocol != versioned.ProtocolTCP {
+		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Protocol)
 	}
 	for i := range out.Subsets {
 		for j := range out.Subsets[i].Ports {
 			if in.Subsets[i].Ports[j].Protocol == "" {
-				if out.Subsets[i].Ports[j].Protocol != current.ProtocolTCP {
-					t.Errorf("Expected protocol %s, got %s", current.ProtocolTCP, out.Subsets[i].Ports[j].Protocol)
+				if out.Subsets[i].Ports[j].Protocol != versioned.ProtocolTCP {
+					t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Subsets[i].Ports[j].Protocol)
 				}
 			} else {
 				if out.Subsets[i].Ports[j].Protocol != in.Subsets[i].Ports[j].Protocol {
@@ -237,32 +250,32 @@ func TestSetDefaulEndpointsProtocol(t *testing.T) {
 }
 
 func TestSetDefaultNamespace(t *testing.T) {
-	s := &current.Namespace{}
+	s := &versioned.Namespace{}
 	obj2 := roundTrip(t, runtime.Object(s))
-	s2 := obj2.(*current.Namespace)
+	s2 := obj2.(*versioned.Namespace)
 
-	if s2.Status.Phase != current.NamespaceActive {
-		t.Errorf("Expected phase %v, got %v", current.NamespaceActive, s2.Status.Phase)
+	if s2.Status.Phase != versioned.NamespaceActive {
+		t.Errorf("Expected phase %v, got %v", versioned.NamespaceActive, s2.Status.Phase)
 	}
 }
 
 func TestSetDefaultContainerManifestHostNetwork(t *testing.T) {
 	portNum := 8080
-	s := current.ContainerManifest{}
+	s := versioned.ContainerManifest{}
 	s.HostNetwork = true
-	s.Containers = []current.Container{
+	s.Containers = []versioned.Container{
 		{
-			Ports: []current.ContainerPort{
+			Ports: []versioned.ContainerPort{
 				{
 					ContainerPort: portNum,
 				},
 			},
 		},
 	}
-	obj2 := roundTrip(t, runtime.Object(&current.ContainerManifestList{
-		Items: []current.ContainerManifest{s},
+	obj2 := roundTrip(t, runtime.Object(&versioned.ContainerManifestList{
+		Items: []versioned.ContainerManifest{s},
 	}))
-	sList2 := obj2.(*current.ContainerManifestList)
+	sList2 := obj2.(*versioned.ContainerManifestList)
 	s2 := sList2.Items[0]
 
 	hostPortNum := s2.Containers[0].Ports[0].HostPort
@@ -273,30 +286,30 @@ func TestSetDefaultContainerManifestHostNetwork(t *testing.T) {
 
 func TestSetDefaultServicePort(t *testing.T) {
 	// Unchanged if set.
-	in := &current.Service{Ports: []current.ServicePort{{Protocol: "UDP", Port: 9376, ContainerPort: util.NewIntOrStringFromInt(118)}}}
-	out := roundTrip(t, runtime.Object(in)).(*current.Service)
-	if out.Ports[0].Protocol != current.ProtocolUDP {
-		t.Errorf("Expected protocol %s, got %s", current.ProtocolUDP, out.Ports[0].Protocol)
+	in := &versioned.Service{Ports: []versioned.ServicePort{{Protocol: "UDP", Port: 9376, ContainerPort: util.NewIntOrStringFromInt(118)}}}
+	out := roundTrip(t, runtime.Object(in)).(*versioned.Service)
+	if out.Ports[0].Protocol != versioned.ProtocolUDP {
+		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolUDP, out.Ports[0].Protocol)
 	}
 	if out.Ports[0].ContainerPort != in.Ports[0].ContainerPort {
 		t.Errorf("Expected port %d, got %d", in.Ports[0].ContainerPort, out.Ports[0].ContainerPort)
 	}
 
 	// Defaulted.
-	in = &current.Service{Ports: []current.ServicePort{{Protocol: "", Port: 9376, ContainerPort: util.NewIntOrStringFromInt(0)}}}
-	out = roundTrip(t, runtime.Object(in)).(*current.Service)
-	if out.Ports[0].Protocol != current.ProtocolTCP {
-		t.Errorf("Expected protocol %s, got %s", current.ProtocolTCP, out.Ports[0].Protocol)
+	in = &versioned.Service{Ports: []versioned.ServicePort{{Protocol: "", Port: 9376, ContainerPort: util.NewIntOrStringFromInt(0)}}}
+	out = roundTrip(t, runtime.Object(in)).(*versioned.Service)
+	if out.Ports[0].Protocol != versioned.ProtocolTCP {
+		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Ports[0].Protocol)
 	}
 	if out.Ports[0].ContainerPort != util.NewIntOrStringFromInt(in.Ports[0].Port) {
 		t.Errorf("Expected port %d, got %v", in.Ports[0].Port, out.Ports[0].ContainerPort)
 	}
 
 	// Defaulted.
-	in = &current.Service{Ports: []current.ServicePort{{Protocol: "", Port: 9376, ContainerPort: util.NewIntOrStringFromString("")}}}
-	out = roundTrip(t, runtime.Object(in)).(*current.Service)
-	if out.Ports[0].Protocol != current.ProtocolTCP {
-		t.Errorf("Expected protocol %s, got %s", current.ProtocolTCP, out.Ports[0].Protocol)
+	in = &versioned.Service{Ports: []versioned.ServicePort{{Protocol: "", Port: 9376, ContainerPort: util.NewIntOrStringFromString("")}}}
+	out = roundTrip(t, runtime.Object(in)).(*versioned.Service)
+	if out.Ports[0].Protocol != versioned.ProtocolTCP {
+		t.Errorf("Expected protocol %s, got %s", versioned.ProtocolTCP, out.Ports[0].Protocol)
 	}
 	if out.Ports[0].ContainerPort != util.NewIntOrStringFromInt(in.Ports[0].Port) {
 		t.Errorf("Expected port %d, got %v", in.Ports[0].Port, out.Ports[0].ContainerPort)
@@ -305,33 +318,33 @@ func TestSetDefaultServicePort(t *testing.T) {
 
 func TestSetDefaultMinionExternalID(t *testing.T) {
 	name := "node0"
-	m := &current.Minion{}
+	m := &versioned.Minion{}
 	m.ID = name
 	obj2 := roundTrip(t, runtime.Object(m))
-	m2 := obj2.(*current.Minion)
+	m2 := obj2.(*versioned.Minion)
 	if m2.ExternalID != name {
 		t.Errorf("Expected default External ID: %s, got: %s", name, m2.ExternalID)
 	}
 }
 
 func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
-	s := current.ContainerManifest{
-		Containers: []current.Container{
+	s := versioned.ContainerManifest{
+		Containers: []versioned.Container{
 			{
-				Env: []current.EnvVar{
+				Env: []versioned.EnvVar{
 					{
-						ValueFrom: &current.EnvVarSource{
-							FieldRef: &current.ObjectFieldSelector{},
+						ValueFrom: &versioned.EnvVarSource{
+							FieldRef: &versioned.ObjectFieldSelector{},
 						},
 					},
 				},
 			},
 		},
 	}
-	obj2 := roundTrip(t, runtime.Object(&current.ContainerManifestList{
-		Items: []current.ContainerManifest{s},
+	obj2 := roundTrip(t, runtime.Object(&versioned.ContainerManifestList{
+		Items: []versioned.ContainerManifest{s},
 	}))
-	sList2 := obj2.(*current.ContainerManifestList)
+	sList2 := obj2.(*versioned.ContainerManifestList)
 	s2 := sList2.Items[0]
 
 	apiVersion := s2.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion
@@ -344,74 +357,74 @@ func TestSetDefaultSecurityContext(t *testing.T) {
 	priv := false
 	privTrue := true
 	testCases := map[string]struct {
-		c current.Container
+		c versioned.Container
 	}{
 		"downward defaulting caps": {
-			c: current.Container{
+			c: versioned.Container{
 				Privileged: false,
-				Capabilities: current.Capabilities{
-					Add:  []current.CapabilityType{"foo"},
-					Drop: []current.CapabilityType{"bar"},
+				Capabilities: versioned.Capabilities{
+					Add:  []versioned.Capability{"foo"},
+					Drop: []versioned.Capability{"bar"},
 				},
-				SecurityContext: &current.SecurityContext{
+				SecurityContext: &versioned.SecurityContext{
 					Privileged: &priv,
 				},
 			},
 		},
 		"downward defaulting priv": {
-			c: current.Container{
+			c: versioned.Container{
 				Privileged: false,
-				Capabilities: current.Capabilities{
-					Add:  []current.CapabilityType{"foo"},
-					Drop: []current.CapabilityType{"bar"},
+				Capabilities: versioned.Capabilities{
+					Add:  []versioned.Capability{"foo"},
+					Drop: []versioned.Capability{"bar"},
 				},
-				SecurityContext: &current.SecurityContext{
-					Capabilities: &current.Capabilities{
-						Add:  []current.CapabilityType{"foo"},
-						Drop: []current.CapabilityType{"bar"},
+				SecurityContext: &versioned.SecurityContext{
+					Capabilities: &versioned.Capabilities{
+						Add:  []versioned.Capability{"foo"},
+						Drop: []versioned.Capability{"bar"},
 					},
 				},
 			},
 		},
 		"upward defaulting caps": {
-			c: current.Container{
+			c: versioned.Container{
 				Privileged: false,
-				SecurityContext: &current.SecurityContext{
+				SecurityContext: &versioned.SecurityContext{
 					Privileged: &priv,
-					Capabilities: &current.Capabilities{
-						Add:  []current.CapabilityType{"biz"},
-						Drop: []current.CapabilityType{"baz"},
+					Capabilities: &versioned.Capabilities{
+						Add:  []versioned.Capability{"biz"},
+						Drop: []versioned.Capability{"baz"},
 					},
 				},
 			},
 		},
 		"upward defaulting priv": {
-			c: current.Container{
-				Capabilities: current.Capabilities{
-					Add:  []current.CapabilityType{"foo"},
-					Drop: []current.CapabilityType{"bar"},
+			c: versioned.Container{
+				Capabilities: versioned.Capabilities{
+					Add:  []versioned.Capability{"foo"},
+					Drop: []versioned.Capability{"bar"},
 				},
-				SecurityContext: &current.SecurityContext{
+				SecurityContext: &versioned.SecurityContext{
 					Privileged: &privTrue,
-					Capabilities: &current.Capabilities{
-						Add:  []current.CapabilityType{"foo"},
-						Drop: []current.CapabilityType{"bar"},
+					Capabilities: &versioned.Capabilities{
+						Add:  []versioned.Capability{"foo"},
+						Drop: []versioned.Capability{"bar"},
 					},
 				},
 			},
 		},
 	}
 
-	pod := &current.Pod{
-		DesiredState: current.PodState{
-			Manifest: current.ContainerManifest{},
+	pod := &versioned.Pod{
+		DesiredState: versioned.PodState{
+			Manifest: versioned.ContainerManifest{},
 		},
 	}
 
 	for k, v := range testCases {
-		pod.DesiredState.Manifest.Containers = []current.Container{v.c}
+		pod.DesiredState.Manifest.Containers = []versioned.Container{v.c}
 		obj := roundTrip(t, runtime.Object(pod))
-		defaultedPod := obj.(*current.Pod)
+		defaultedPod := obj.(*versioned.Pod)
 		c := defaultedPod.DesiredState.Manifest.Containers[0]
 		if isEqual, issues := areSecurityContextAndContainerEqual(&c); !isEqual {
 			t.Errorf("test case %s expected the security context to have the same values as the container but found %#v", k, issues)
@@ -419,7 +432,7 @@ func TestSetDefaultSecurityContext(t *testing.T) {
 	}
 }
 
-func areSecurityContextAndContainerEqual(c *current.Container) (bool, []string) {
+func areSecurityContextAndContainerEqual(c *versioned.Container) (bool, []string) {
 	issues := make([]string, 0)
 	equal := true
 

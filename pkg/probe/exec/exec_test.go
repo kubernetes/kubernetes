@@ -34,13 +34,6 @@ func (f *FakeCmd) CombinedOutput() ([]byte, error) {
 
 func (f *FakeCmd) SetDir(dir string) {}
 
-type healthCheckTest struct {
-	expectedStatus probe.Result
-	expectError    bool
-	output         []byte
-	err            error
-}
-
 type fakeExitError struct {
 	exited     bool
 	statusCode int
@@ -64,30 +57,39 @@ func (f *fakeExitError) ExitStatus() int {
 
 func TestExec(t *testing.T) {
 	prober := New()
-	fake := FakeCmd{}
 
-	tests := []healthCheckTest{
+	tests := []struct {
+		expectedStatus probe.Result
+		expectError    bool
+		output         string
+		err            error
+	}{
 		// Ok
-		{probe.Success, false, []byte("OK"), nil},
+		{probe.Success, false, "OK", nil},
 		// Ok
-		{probe.Success, false, []byte("OK"), &fakeExitError{true, 0}},
+		{probe.Success, false, "OK", &fakeExitError{true, 0}},
 		// Run returns error
-		{probe.Unknown, true, []byte("OK, NOT"), fmt.Errorf("test error")},
+		{probe.Unknown, true, "", fmt.Errorf("test error")},
 		// Unhealthy
-		{probe.Failure, false, []byte("Fail"), &fakeExitError{true, 1}},
+		{probe.Failure, false, "Fail", &fakeExitError{true, 1}},
 	}
-	for _, test := range tests {
-		fake.out = test.output
-		fake.err = test.err
-		status, err := prober.Probe(&fake)
+	for i, test := range tests {
+		fake := FakeCmd{
+			out: []byte(test.output),
+			err: test.err,
+		}
+		status, output, err := prober.Probe(&fake)
 		if status != test.expectedStatus {
-			t.Errorf("expected %v, got %v", test.expectedStatus, status)
+			t.Errorf("[%d] expected %v, got %v", i, test.expectedStatus, status)
 		}
 		if err != nil && test.expectError == false {
-			t.Errorf("unexpected error: %v", err)
+			t.Errorf("[%d] unexpected error: %v", i, err)
 		}
 		if err == nil && test.expectError == true {
-			t.Errorf("unexpected non-error")
+			t.Errorf("[%d] unexpected non-error", i)
+		}
+		if test.output != output {
+			t.Errorf("[%d] expected %s, got %s", i, test.output, output)
 		}
 	}
 }

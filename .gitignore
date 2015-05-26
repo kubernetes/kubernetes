@@ -53,6 +53,6 @@ network_closure.sh
 
 # Web UI
 www/master/node_modules/
-
+www/master/npm-debug.log
 # Karma output
 www/test_out

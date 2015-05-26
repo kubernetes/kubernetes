@@ -104,8 +104,8 @@ func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID, mou
 	return &FakeVolume{podUID, volName, plugin}, nil
 }
 
-func (plugin *FakeVolumePlugin) GetAccessModes() []api.AccessModeType {
-	return []api.AccessModeType{}
+func (plugin *FakeVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+	return []api.PersistentVolumeAccessMode{}
 }
 
 type FakeVolume struct {

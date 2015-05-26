@@ -65,8 +65,8 @@ func (plugin *ISCSIPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *ISCSIPlugin) GetAccessModes() []api.AccessModeType {
-	return []api.AccessModeType{
+func (plugin *ISCSIPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 		api.ReadOnlyMany,
 	}

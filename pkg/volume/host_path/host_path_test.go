@@ -52,7 +52,7 @@ func TestGetAccessModes(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	if len(plug.GetAccessModes()) != 1 || plug.GetAccessModes()[0] != api.ReadWriteOnce {
-		t.Errorf("Expected %s AccessModeType", api.ReadWriteOnce)
+		t.Errorf("Expected %s PersistentVolumeAccessMode", api.ReadWriteOnce)
 	}
 }
 

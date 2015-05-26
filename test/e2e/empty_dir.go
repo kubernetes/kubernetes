@@ -22,27 +22,18 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 )
 
 var _ = Describe("emptyDir", func() {
-	var (
-		c *client.Client
-	)
-
-	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
-	})
+	f := NewFramework("emptydir")
 
 	It("volume on tmpfs should have the correct mode", func() {
 		volumePath := "/test-volume"
 		source := &api.EmptyDirVolumeSource{
-			Medium: api.StorageTypeMemory,
+			Medium: api.StorageMediumMemory,
 		}
 		pod := testPodWithVolume(volumePath, source)
 
@@ -50,7 +41,7 @@ var _ = Describe("emptyDir", func() {
 			fmt.Sprintf("--fs_type=%v", volumePath),
 			fmt.Sprintf("--file_mode=%v", volumePath),
 		}
-		testContainerOutput("emptydir r/w on tmpfs", c, pod, []string{
+		f.TestContainerOutput("emptydir r/w on tmpfs", pod, []string{
 			"mount type of \"/test-volume\": tmpfs",
 			"mode of file \"/test-volume\": dtrwxrwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
 		})
@@ -60,7 +51,7 @@ var _ = Describe("emptyDir", func() {
 		volumePath := "/test-volume"
 		filePath := path.Join(volumePath, "test-file")
 		source := &api.EmptyDirVolumeSource{
-			Medium: api.StorageTypeMemory,
+			Medium: api.StorageMediumMemory,
 		}
 		pod := testPodWithVolume(volumePath, source)
 
@@ -69,7 +60,7 @@ var _ = Describe("emptyDir", func() {
 			fmt.Sprintf("--rw_new_file=%v", filePath),
 			fmt.Sprintf("--file_mode=%v", filePath),
 		}
-		testContainerOutput("emptydir r/w on tmpfs", c, pod, []string{
+		f.TestContainerOutput("emptydir r/w on tmpfs", pod, []string{
 			"mount type of \"/test-volume\": tmpfs",
 			"mode of file \"/test-volume/test-file\": -rw-r--r--",
 			"content of file \"/test-volume/test-file\": mount-tester new file",

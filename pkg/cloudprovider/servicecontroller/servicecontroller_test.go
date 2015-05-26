@@ -28,8 +28,8 @@ import (
 
 const region = "us-central"
 
-func newService(name string, uid types.UID, external bool) *api.Service {
-	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: "namespace", UID: uid}, Spec: api.ServiceSpec{CreateExternalLoadBalancer: external}}
+func newService(name string, uid types.UID, serviceType api.ServiceType) *api.Service {
+	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: "namespace", UID: uid}, Spec: api.ServiceSpec{Type: serviceType}}
 }
 
 func TestCreateExternalLoadBalancer(t *testing.T) {
@@ -45,7 +45,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: api.ServiceSpec{
-					CreateExternalLoadBalancer: false,
+					Type: api.ServiceTypeClusterIP,
 				},
 			},
 			expectErr:           false,
@@ -62,7 +62,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 						Port:     80,
 						Protocol: api.ProtocolUDP,
 					}},
-					CreateExternalLoadBalancer: true,
+					Type: api.ServiceTypeLoadBalancer,
 				},
 			},
 			expectErr:           true,
@@ -79,7 +79,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 						Port:     80,
 						Protocol: api.ProtocolTCP,
 					}},
-					CreateExternalLoadBalancer: true,
+					Type: api.ServiceTypeLoadBalancer,
 				},
 			},
 			expectErr:           false,
@@ -144,15 +144,15 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			// Services do not have external load balancers: no calls should be made.
 			services: []*api.Service{
-				newService("s0", "111", false),
-				newService("s1", "222", false),
+				newService("s0", "111", api.ServiceTypeClusterIP),
+				newService("s1", "222", api.ServiceTypeNodePort),
 			},
 			expectedUpdateCalls: nil,
 		},
 		{
 			// Services does have an external load balancer: one call should be made.
 			services: []*api.Service{
-				newService("s0", "333", true),
+				newService("s0", "333", api.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
 				{Name: "a333", Region: region, Hosts: []string{"node0", "node1", "node73"}},
@@ -161,9 +161,9 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			// Three services have an external load balancer: three calls.
 			services: []*api.Service{
-				newService("s0", "444", true),
-				newService("s1", "555", true),
-				newService("s2", "666", true),
+				newService("s0", "444", api.ServiceTypeLoadBalancer),
+				newService("s1", "555", api.ServiceTypeLoadBalancer),
+				newService("s2", "666", api.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
 				{Name: "a444", Region: region, Hosts: []string{"node0", "node1", "node73"}},
@@ -174,10 +174,10 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			// Two services have an external load balancer and two don't: two calls.
 			services: []*api.Service{
-				newService("s0", "777", false),
-				newService("s1", "888", true),
-				newService("s3", "999", true),
-				newService("s4", "123", false),
+				newService("s0", "777", api.ServiceTypeNodePort),
+				newService("s1", "888", api.ServiceTypeLoadBalancer),
+				newService("s3", "999", api.ServiceTypeLoadBalancer),
+				newService("s4", "123", api.ServiceTypeClusterIP),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
 				{Name: "a888", Region: region, Hosts: []string{"node0", "node1", "node73"}},
@@ -187,7 +187,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			// One service has an external load balancer and one is nil: one call.
 			services: []*api.Service{
-				newService("s0", "234", true),
+				newService("s0", "234", api.ServiceTypeLoadBalancer),
 				nil,
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{

@@ -15,7 +15,7 @@ kubectl-exec.1
 kubectl-expose.1
 kubectl-get.1
 kubectl-label.1
-kubectl-log.1
+kubectl-logs.1
 kubectl-namespace.1
 kubectl-port-forward.1
 kubectl-proxy.1

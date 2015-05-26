@@ -52,8 +52,8 @@ func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.HostPath != nil || spec.PersistentVolumeSource.HostPath != nil
 }
 
-func (plugin *hostPathPlugin) GetAccessModes() []api.AccessModeType {
-	return []api.AccessModeType{
+func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 	}
 }

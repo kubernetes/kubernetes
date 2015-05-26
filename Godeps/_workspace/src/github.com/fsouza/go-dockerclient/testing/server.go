@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
-	"github.com/gorilla/mux"
+	"github.com/fsouza/go-dockerclient/vendor/github.com/gorilla/mux"
 )
 
 var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]+$`)
@@ -533,8 +533,19 @@ func (s *DockerServer) attachContainer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	outStream := newStdWriter(w, stdout)
-	fmt.Fprintf(outStream, "HTTP/1.1 200 OK\r\nContent-Type: application/vnd.docker.raw-stream\r\n\r\n")
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "cannot hijack connection", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/vnd.docker.raw-stream")
+	w.WriteHeader(http.StatusOK)
+	conn, _, err := hijacker.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	outStream := newStdWriter(conn, stdout)
 	if container.State.Running {
 		fmt.Fprintf(outStream, "Container %q is running\n", container.ID)
 	} else {
@@ -542,6 +553,7 @@ func (s *DockerServer) attachContainer(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintln(outStream, "What happened?")
 	fmt.Fprintln(outStream, "Something happened")
+	conn.Close()
 }
 
 func (s *DockerServer) waitContainer(w http.ResponseWriter, r *http.Request) {
@@ -566,12 +578,13 @@ func (s *DockerServer) waitContainer(w http.ResponseWriter, r *http.Request) {
 
 func (s *DockerServer) removeContainer(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
+	force := r.URL.Query().Get("force")
 	_, index, err := s.findContainer(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	if s.containers[index].State.Running {
+	if s.containers[index].State.Running && force != "1" {
 		msg := "Error: API error (406): Impossible to remove a running container, please stop it first"
 		http.Error(w, msg, http.StatusInternalServerError)
 		return

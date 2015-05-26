@@ -182,8 +182,12 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			protocols := []api.Protocol{api.ProtocolTCP, api.ProtocolUDP}
 			*p = protocols[c.Rand.Intn(len(protocols))]
 		},
-		func(p *api.AffinityType, c fuzz.Continue) {
-			types := []api.AffinityType{api.AffinityTypeClientIP, api.AffinityTypeNone}
+		func(p *api.ServiceAffinity, c fuzz.Continue) {
+			types := []api.ServiceAffinity{api.ServiceAffinityClientIP, api.ServiceAffinityNone}
+			*p = types[c.Rand.Intn(len(types))]
+		},
+		func(p *api.ServiceType, c fuzz.Continue) {
+			types := []api.ServiceType{api.ServiceTypeClusterIP, api.ServiceTypeNodePort, api.ServiceTypeLoadBalancer}
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *api.Container, c fuzz.Continue) {
@@ -209,8 +213,8 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			priv := c.RandBool()
 			sc.Privileged = &priv
 			sc.Capabilities = &api.Capabilities{
-				Add:  make([]api.CapabilityType, 0),
-				Drop: make([]api.CapabilityType, 0),
+				Add:  make([]api.Capability, 0),
+				Drop: make([]api.Capability, 0),
 			}
 			c.Fuzz(&sc.Capabilities.Add)
 			c.Fuzz(&sc.Capabilities.Drop)

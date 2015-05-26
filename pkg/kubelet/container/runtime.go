@@ -52,7 +52,7 @@ type Runtime interface {
 	// exited and dead containers (used for garbage collection).
 	GetPods(all bool) ([]*Pod, error)
 	// Syncs the running pod into the desired pod.
-	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus) error
+	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error
 	// KillPod kills all the containers of a pod.
 	KillPod(pod Pod) error
 	// GetPodStatus retrieves the status of the pod, including the information of
@@ -60,7 +60,7 @@ type Runtime interface {
 	GetPodStatus(*api.Pod) (*api.PodStatus, error)
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
-	PullImage(image ImageSpec, secrets []api.Secret) error
+	PullImage(image ImageSpec, pullSecrets []api.Secret) error
 	// IsImagePresent checks whether the container image is already in the local storage.
 	IsImagePresent(image ImageSpec) (bool, error)
 	// Gets all images currently on the machine.

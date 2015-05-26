@@ -20,11 +20,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("SSH", func() {
+	var c *client.Client
+
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()

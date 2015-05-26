@@ -130,6 +130,11 @@ func (v *OVirtCloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
+// Routes returns an implementation of Routes for oVirt cloud
+func (v *OVirtCloud) Routes() (cloudprovider.Routes, bool) {
+	return nil, false
+}
+
 // NodeAddresses returns the NodeAddresses of a particular machine instance
 func (v *OVirtCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	instance, err := v.fetchInstance(name)
@@ -249,12 +254,4 @@ func (v *OVirtCloud) List(filter string) ([]string, error) {
 
 func (v *OVirtCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	return nil, nil
-}
-
-func (v *OVirtCloud) Configure(name string, spec *api.NodeSpec) error {
-	return nil
-}
-
-func (v *OVirtCloud) Release(name string) error {
-	return nil
 }

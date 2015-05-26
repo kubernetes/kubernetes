@@ -44,12 +44,12 @@ func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*api.Node, error) {
 	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
 }
 
-func makeResources(milliCPU int64, memory int64, maxPods int64) api.NodeResources {
+func makeResources(milliCPU int64, memory int64, pods int64) api.NodeResources {
 	return api.NodeResources{
 		Capacity: api.ResourceList{
-			"cpu":     *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-			"memory":  *resource.NewQuantity(memory, resource.BinarySI),
-			"maxpods": *resource.NewQuantity(maxPods, resource.DecimalSI),
+			api.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+			api.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
+			api.ResourcePods:   *resource.NewQuantity(pods, resource.DecimalSI),
 		},
 	}
 }
@@ -60,8 +60,8 @@ func newResourcePod(usage ...resourceRequest) *api.Pod {
 		containers = append(containers, api.Container{
 			Resources: api.ResourceRequirements{
 				Limits: api.ResourceList{
-					"cpu":    *resource.NewMilliQuantity(req.milliCPU, resource.DecimalSI),
-					"memory": *resource.NewQuantity(req.memory, resource.BinarySI),
+					api.ResourceCPU:    *resource.NewMilliQuantity(req.milliCPU, resource.DecimalSI),
+					api.ResourceMemory: *resource.NewQuantity(req.memory, resource.BinarySI),
 				},
 			},
 		})

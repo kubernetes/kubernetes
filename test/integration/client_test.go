@@ -34,18 +34,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
 )
 
-func init() {
-	requireEtcd()
-}
-
 func TestClient(t *testing.T) {
-	_, s := runAMaster(t)
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
 	ns := api.NamespaceDefault
-	deleteAllEtcdKeys()
+	framework.DeleteAllEtcdKeys()
 	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
 
 	info, err := client.ServerVersion()
@@ -194,9 +191,9 @@ func TestMultiWatch(t *testing.T) {
 	const watcherCount = 50
 	runtime.GOMAXPROCS(watcherCount)
 
-	deleteAllEtcdKeys()
-	defer deleteAllEtcdKeys()
-	_, s := runAMaster(t)
+	framework.DeleteAllEtcdKeys()
+	defer framework.DeleteAllEtcdKeys()
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
 	ns := api.NamespaceDefault

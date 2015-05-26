@@ -195,6 +195,11 @@ func (gce *GCECloud) Zones() (cloudprovider.Zones, bool) {
 	return gce, true
 }
 
+// Routes returns an implementation of Routes for Google Compute Engine.
+func (gce *GCECloud) Routes() (cloudprovider.Routes, bool) {
+	return gce, true
+}
+
 func makeHostLink(projectID, zone, host string) string {
 	host = canonicalizeInstanceName(host)
 	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/instances/%s",
@@ -277,15 +282,18 @@ func (gce *GCECloud) waitForZoneOp(op *compute.Operation) error {
 }
 
 // GetTCPLoadBalancer is an implementation of TCPLoadBalancer.GetTCPLoadBalancer
-func (gce *GCECloud) GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error) {
-	fw, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
+func (gce *GCECloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
+	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err == nil {
-		return fw.IPAddress, true, nil
+		status := &api.LoadBalancerStatus{}
+		status.Ingress = []api.LoadBalancerIngress{{IP: fwd.IPAddress}}
+
+		return status, true, nil
 	}
 	if isHTTPErrorCode(err, http.StatusNotFound) {
-		return "", false, nil
+		return nil, false, nil
 	}
-	return "", false, err
+	return nil, false, err
 }
 
 func isHTTPErrorCode(err error, code int) bool {
@@ -294,11 +302,11 @@ func isHTTPErrorCode(err error, code int) bool {
 }
 
 // translate from what K8s supports to what the cloud provider supports for session affinity.
-func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
+func translateAffinityType(affinityType api.ServiceAffinity) GCEAffinityType {
 	switch affinityType {
-	case api.AffinityTypeClientIP:
+	case api.ServiceAffinityClientIP:
 		return GCEAffinityTypeClientIP
-	case api.AffinityTypeNone:
+	case api.ServiceAffinityNone:
 		return GCEAffinityTypeNone
 	default:
 		glog.Errorf("unexpected affinity type: %v", affinityType)
@@ -309,17 +317,17 @@ func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // TODO(a-robinson): Don't just ignore specified IP addresses. Check if they're
 // owned by the project and available to be used, and use them if they are.
-func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error) {
+func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	err := gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
 	if err != nil {
 		if !isHTTPErrorCode(err, http.StatusConflict) {
-			return "", err
+			return nil, err
 		}
 		glog.Infof("Creating forwarding rule pointing at target pool that already exists: %v", err)
 	}
 
 	if len(ports) == 0 {
-		return "", fmt.Errorf("no ports specified for GCE load balancer")
+		return nil, fmt.Errorf("no ports specified for GCE load balancer")
 	}
 	minPort := 65536
 	maxPort := 0
@@ -339,19 +347,22 @@ func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.I
 	}
 	op, err := gce.service.ForwardingRules.Insert(gce.projectID, region, req).Do()
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-		return "", err
+		return nil, err
 	}
 	if op != nil {
 		err = gce.waitForRegionOp(op, region)
 		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
-			return "", err
+			return nil, err
 		}
 	}
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return fwd.IPAddress, nil
+
+	status := &api.LoadBalancerStatus{}
+	status.Ingress = []api.LoadBalancerIngress{{IP: fwd.IPAddress}}
+	return status, nil
 }
 
 // UpdateTCPLoadBalancer is an implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
@@ -399,8 +410,8 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 	return nil
 }
 
-// DeleteTCPLoadBalancer is an implementation of TCPLoadBalancer.DeleteTCPLoadBalancer.
-func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
+// EnsureTCPLoadBalancerDeleted is an implementation of TCPLoadBalancer.EnsureTCPLoadBalancerDeleted.
+func (gce *GCECloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	op, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
 		glog.Infof("Forwarding rule %s already deleted. Continuing to delete target pool.", name)
@@ -411,6 +422,7 @@ func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 		err = gce.waitForRegionOp(op, region)
 		if err != nil {
 			glog.Warningf("Failed waiting for Forwarding Rule %s to be deleted: got error %s.", name, err.Error())
+			return err
 		}
 	}
 	op, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
@@ -444,7 +456,10 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 	name = canonicalizeInstanceName(name)
 	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, name).Do()
 	if err != nil {
-		glog.Errorf("Failed to retrieve TargetInstance resource for instance:%s", name)
+		glog.Errorf("Failed to retrieve TargetInstance resource for instance: %s", name)
+		if apiErr, ok := err.(*googleapi.Error); ok && apiErr.Code == http.StatusNotFound {
+			return nil, cloudprovider.InstanceNotFound
+		}
 		return nil, err
 	}
 	return res, nil
@@ -555,31 +570,45 @@ func getMetadataValue(metadata *compute.Metadata, key string) (string, bool) {
 	return "", false
 }
 
-func (gce *GCECloud) Configure(name string, spec *api.NodeSpec) error {
-	instanceName := canonicalizeInstanceName(name)
+func (gce *GCECloud) ListRoutes(filter string) ([]*cloudprovider.Route, error) {
+	listCall := gce.service.Routes.List(gce.projectID)
+	if len(filter) > 0 {
+		listCall = listCall.Filter("name eq " + filter)
+	}
+	res, err := listCall.Do()
+	if err != nil {
+		return nil, err
+	}
+	var routes []*cloudprovider.Route
+	for _, r := range res.Items {
+		if path.Base(r.Network) != gce.networkName {
+			continue
+		}
+		target := path.Base(r.NextHopInstance)
+		routes = append(routes, &cloudprovider.Route{r.Name, target, r.DestRange, r.Description})
+	}
+	return routes, nil
+}
+
+func (gce *GCECloud) CreateRoute(route *cloudprovider.Route) error {
+	instanceName := canonicalizeInstanceName(route.TargetInstance)
 	insertOp, err := gce.service.Routes.Insert(gce.projectID, &compute.Route{
-		Name:            instanceName,
-		DestRange:       spec.PodCIDR,
+		Name:            route.Name,
+		DestRange:       route.DestinationCIDR,
 		NextHopInstance: fmt.Sprintf("zones/%s/instances/%s", gce.zone, instanceName),
 		Network:         fmt.Sprintf("global/networks/%s", gce.networkName),
 		Priority:        1000,
+		Description:     route.Description,
 	}).Do()
 	if err != nil {
 		return err
 	}
-	if err := gce.waitForGlobalOp(insertOp); err != nil {
-		if gapiErr, ok := err.(*googleapi.Error); ok && gapiErr.Code == http.StatusConflict {
-			// TODO (cjcullen): Make this actually check the route is correct.
-			return nil
-		}
-	}
-	return err
+	return gce.waitForGlobalOp(insertOp)
 }
 
-func (gce *GCECloud) Release(name string) error {
+func (gce *GCECloud) DeleteRoute(name string) error {
 	instanceName := canonicalizeInstanceName(name)
-	deleteCall := gce.service.Routes.Delete(gce.projectID, instanceName)
-	deleteOp, err := deleteCall.Do()
+	deleteOp, err := gce.service.Routes.Delete(gce.projectID, instanceName).Do()
 	if err != nil {
 		return err
 	}

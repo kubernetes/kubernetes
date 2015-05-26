@@ -81,7 +81,7 @@ type ReplicationManager struct {
 	// To allow injection of syncReplicationController for testing.
 	syncHandler func(rcKey string) error
 	// A TTLCache of pod creates/deletes each rc expects to see
-	expectations *RCExpectations
+	expectations RCExpectationsManager
 	// A store of controllers, populated by the rcController
 	controllerStore cache.StoreToControllerLister
 	// A store of pods, populated by the podController
@@ -169,6 +169,14 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 	return rm
 }
 
+// SetEventRecorder replaces the event recorder used by the replication manager
+// with the given recorder. Only used for testing.
+func (rm *ReplicationManager) SetEventRecorder(recorder record.EventRecorder) {
+	// TODO: Hack. We can't cleanly shutdown the event recorder, so benchmarks
+	// need to pass in a fake.
+	rm.podControl = RealPodControl{rm.kubeClient, recorder}
+}
+
 // Run begins watching and syncing.
 func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 	defer util.HandleCrash()
@@ -178,6 +186,7 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 		go util.Until(rm.worker, time.Second, stopCh)
 	}
 	<-stopCh
+	glog.Infof("Shutting down RC Manager")
 	rm.queue.ShutDown()
 }
 
@@ -309,10 +318,13 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, controller
 		}
 		rm.expectations.ExpectDeletions(controller, diff)
 		glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", controller.Namespace, controller.Name, controller.Spec.Replicas, diff)
-		// Sort the pods in the order such that not-ready < ready, unscheduled
-		// < scheduled, and pending < running. This ensures that we delete pods
-		// in the earlier stages whenever possible.
-		sort.Sort(activePods(filteredPods))
+		// No need to sort pods if we are about to delete all of them
+		if controller.Spec.Replicas != 0 {
+			// Sort the pods in the order such that not-ready < ready, unscheduled
+			// < scheduled, and pending < running. This ensures that we delete pods
+			// in the earlier stages whenever possible.
+			sort.Sort(activePods(filteredPods))
+		}
 
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
@@ -342,6 +354,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	obj, exists, err := rm.controllerStore.Store.GetByKey(key)
 	if !exists {
 		glog.Infof("Replication Controller has been deleted %v", key)
+		rm.expectations.DeleteExpectations(key)
 		return nil
 	}
 	if err != nil {
@@ -351,16 +364,20 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 	controller := *obj.(*api.ReplicationController)
 
+	// Check the expectations of the rc before counting active pods, otherwise a new pod can sneak in
+	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
+	// the store after we've checked the expectation, the rc sync is just deferred till the next relist.
+	rcNeedsSync := rm.expectations.SatisfiedExpectations(&controller)
 	podList, err := rm.podStore.Pods(controller.Namespace).List(labels.Set(controller.Spec.Selector).AsSelector())
 	if err != nil {
 		glog.Errorf("Error getting pods for rc %q: %v", key, err)
 		rm.queue.Add(key)
 		return err
 	}
+
 	// TODO: Do this in a single pass, or use an index.
 	filteredPods := filterActivePods(podList.Items)
-
-	if rm.expectations.SatisfiedExpectations(&controller) {
+	if rcNeedsSync {
 		rm.manageReplicas(filteredPods, &controller)
 	}
 

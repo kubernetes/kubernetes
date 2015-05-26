@@ -1,8 +1,8 @@
 # Kubernetes deployed on ubuntu nodes
 
-This document describes how to deploy kubernetes on ubuntu nodes, including 1 master node and 3 minion nodes, and people uses this approach can scale to **any number of minion nodes** by changing some settings with ease. Although there exists saltstack based ubuntu k8s installation ,  it may be tedious and hard for a guy that knows little about saltstack but want to build a really distributed k8s cluster. This new approach of kubernetes deployment is much more easy and automatical than the previous one.
+This document describes how to deploy kubernetes on ubuntu nodes, including 1 master node and 3 minion nodes, and people uses this approach can scale to **any number of minion nodes** by changing some settings with ease. The original idea was heavily inspired by @jainvipin 's ubuntu single node work, which has been merge into this document.
 
-[Cloud team from ZJU](https://github.com/ZJU-SEL) will keep updating this work.
+[Cloud team from Zhejiang University](https://github.com/ZJU-SEL) will maintain this work.
 
 ### **Prerequisites：**
 *1 The minion nodes have installed docker version 1.2+ and bridge-utils to manipulate linux bridge* 
@@ -11,7 +11,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ma
 
 *3 These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it should also work on most Ubuntu versions*
 
-*4 Dependences of this guide: etcd-2.0.0, flannel-0.4.0, k8s-0.15.0, but it may work with higher versions*
+*4 Dependences of this guide: etcd-2.0.9, flannel-0.4.0, k8s-0.15.0, but it may work with higher versions*
 
 *5 All the remote servers can be ssh logged in without a password by using key authentication* 
 
@@ -24,7 +24,7 @@ then `$ cd kubernetes/cluster/ubuntu`.
 
 Then run `$ ./build.sh`, this will download all the needed binaries into `./binaries`.
 
-You can customize your etcd version, flannel version, k8s version by changing variable `ETCD_VERSION` , `FLANNEL_VERSION` and `K8S_VERSION` in build.sh, default etcd version is 2.0.0 , flannel version is 0.4.0 and K8s version is 0.15.0.
+You can customize your etcd version, flannel version, k8s version by changing variable `ETCD_VERSION` , `FLANNEL_VERSION` and `K8S_VERSION` in build.sh, default etcd version is 2.0.9, flannel version is 0.4.0 and K8s version is 0.15.0.
 
 Please make sure that there are `kube-apiserver`, `kube-controller-manager`, `kube-scheduler`, `kubelet`, `kube-proxy`, `etcd`, `etcdctl` and `flannel` in the binaries/master or binaries/minion directory.
 
@@ -61,7 +61,7 @@ Then the `roles ` variable defines the role of above machine in the same order, 
 
 The `NUM_MINIONS` variable defines the total number of minions.
 
-The `PORTAL_NET` variable defines the kubernetes service portal ip range. Please make sure that you do have a private ip range defined here.You can use below three private network range accordin to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
+The `PORTAL_NET` variable defines the kubernetes service portal ip range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range accordin to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
 
      10.0.0.0        -   10.255.255.255  (10/8 prefix)
 

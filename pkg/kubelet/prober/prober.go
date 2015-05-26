@@ -92,84 +92,109 @@ func NewTestProber(
 // If the container's liveness probe is unsuccessful, set readiness to false.
 // If liveness is successful, do a readiness check and set readiness accordingly.
 func (pb *prober) Probe(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
+	// Build a name string for logs.
+	ctrName := fmt.Sprintf("%s:%s", kubecontainer.GetPodFullName(pod), container.Name)
+
 	// Probe liveness.
-	live, err := pb.probeLiveness(pod, status, container, containerID, createdAt)
-	if err != nil {
-		glog.V(1).Infof("Liveness probe errored: %v", err)
-		pb.readinessManager.SetReadiness(containerID, false)
-		return probe.Unknown, err
-	}
-	if live != probe.Success {
-		glog.V(1).Infof("Liveness probe unsuccessful: %v", live)
-		pb.readinessManager.SetReadiness(containerID, false)
-		return live, nil
+	if container.LivenessProbe != nil {
+		live, output, err := pb.probeLiveness(pod, status, container, containerID, createdAt)
+		if err != nil || live != probe.Success {
+			// Liveness failed in one way or another.
+			pb.readinessManager.SetReadiness(containerID, false)
+			ref, ok := pb.refManager.GetRef(containerID)
+			if !ok {
+				glog.Warningf("No ref for pod %q - '%v'", containerID, container.Name)
+			}
+			if err != nil {
+				glog.V(1).Infof("Liveness probe for %q errored: %v", ctrName, err)
+				if ok {
+					pb.recorder.Eventf(ref, "unhealthy", "Liveness probe errored: %v", err)
+				}
+				return probe.Unknown, err
+			} else { // live != probe.Success
+				glog.V(1).Infof("Liveness probe for %q failed (%v): %s", ctrName, live, output)
+				if ok {
+					pb.recorder.Eventf(ref, "unhealthy", "Liveness probe failed: %s", output)
+				}
+				return live, nil
+			}
+		}
+		glog.V(3).Infof("Liveness probe for %q succeeded", ctrName)
 	}
 
 	// Probe readiness.
-	ready, err := pb.probeReadiness(pod, status, container, containerID, createdAt)
-	if err == nil && ready == probe.Success {
-		glog.V(3).Infof("Readiness probe successful: %v", ready)
-		pb.readinessManager.SetReadiness(containerID, true)
-		return probe.Success, nil
+	if container.ReadinessProbe != nil {
+		ready, output, err := pb.probeReadiness(pod, status, container, containerID, createdAt)
+		if err != nil || ready != probe.Success {
+			// Readiness failed in one way or another.
+			pb.readinessManager.SetReadiness(containerID, false)
+			ref, ok := pb.refManager.GetRef(containerID)
+			if !ok {
+				glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
+			}
+			if err != nil {
+				glog.V(1).Infof("readiness probe for %q errored: %v", ctrName, err)
+				if ok {
+					pb.recorder.Eventf(ref, "unhealthy", "Readiness probe errored: %v", err)
+				}
+				return probe.Unknown, err
+			} else { // ready != probe.Success
+				glog.V(1).Infof("Readiness probe for %q failed (%v): %s", ctrName, ready, output)
+				if ok {
+					pb.recorder.Eventf(ref, "unhealthy", "Readiness probe failed: %s", output)
+				}
+				return ready, nil
+			}
+		}
+		glog.V(3).Infof("Readiness probe for %q succeeded", ctrName)
 	}
 
-	glog.V(1).Infof("Readiness probe failed/errored: %v, %v", ready, err)
-	pb.readinessManager.SetReadiness(containerID, false)
-
-	ref, ok := pb.refManager.GetRef(containerID)
-	if !ok {
-		glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
-		return probe.Success, err
-	}
-
-	if ready != probe.Success {
-		pb.recorder.Eventf(ref, "unhealthy", "Readiness Probe Failed %v - %v", containerID, container.Name)
-	}
-
+	pb.readinessManager.SetReadiness(containerID, true)
 	return probe.Success, nil
 }
 
 // probeLiveness probes the liveness of a container.
 // If the initalDelay since container creation on liveness probe has not passed the probe will return probe.Success.
-func (pb *prober) probeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
+func (pb *prober) probeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, string, error) {
 	p := container.LivenessProbe
 	if p == nil {
-		return probe.Success, nil
+		return probe.Success, "", nil
 	}
 	if time.Now().Unix()-createdAt < p.InitialDelaySeconds {
-		return probe.Success, nil
+		return probe.Success, "", nil
 	}
 	return pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
 }
 
 // probeReadiness probes the readiness of a container.
 // If the initial delay on the readiness probe has not passed the probe will return probe.Failure.
-func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
+func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, string, error) {
 	p := container.ReadinessProbe
 	if p == nil {
-		return probe.Success, nil
+		return probe.Success, "", nil
 	}
 	if time.Now().Unix()-createdAt < p.InitialDelaySeconds {
-		return probe.Failure, nil
+		return probe.Failure, "", nil
 	}
 	return pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
 }
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
 // if it never succeeds.
-func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string, retries int) (probe.Result, error) {
+func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string, retries int) (probe.Result, string, error) {
 	var err error
 	var result probe.Result
+	var output string
 	for i := 0; i < retries; i++ {
-		result, err = pb.runProbe(p, pod, status, container, containerID)
+		result, output, err = pb.runProbe(p, pod, status, container, containerID)
 		if result == probe.Success {
-			return probe.Success, nil
+			return probe.Success, output, nil
 		}
 	}
-	return result, err
+	return result, output, err
 }
 
-func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string) (probe.Result, error) {
+func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string) (probe.Result, string, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		glog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod, container, p.Exec.Command)
@@ -178,7 +203,7 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 	if p.HTTPGet != nil {
 		port, err := extractPort(p.HTTPGet.Port, container)
 		if err != nil {
-			return probe.Unknown, err
+			return probe.Unknown, "", err
 		}
 		host, port, path := extractGetParams(p.HTTPGet, status, port)
 		glog.V(4).Infof("HTTP-Probe Host: %v, Port: %v, Path: %v", host, port, path)
@@ -187,13 +212,13 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)
 		if err != nil {
-			return probe.Unknown, err
+			return probe.Unknown, "", err
 		}
 		glog.V(4).Infof("TCP-Probe PodIP: %v, Port: %v, Timeout: %v", status.PodIP, port, timeout)
 		return pb.tcp.Probe(status.PodIP, port, timeout)
 	}
 	glog.Warningf("Failed to find probe builder for container: %v", container)
-	return probe.Unknown, nil
+	return probe.Unknown, "", nil
 }
 
 func extractGetParams(action *api.HTTPGetAction, status api.PodStatus, port int) (string, int, string) {

@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
+	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -56,6 +59,16 @@ const (
 	// How often to poll pods.
 	podPoll = 5 * time.Second
 )
+
+type CloudConfig struct {
+	ProjectID         string
+	Zone              string
+	MasterName        string
+	NodeInstanceGroup string
+	NumNodes          int
+
+	Provider cloudprovider.Interface
+}
 
 type TestContextType struct {
 	KubeConfig  string
@@ -96,6 +109,101 @@ func providerIs(providers ...string) bool {
 
 type podCondition func(pod *api.Pod) (bool, error)
 
+// podReady returns whether pod has a condition of Ready with a status of true.
+func podReady(pod *api.Pod) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == api.PodReady && cond.Status == api.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+// logPodStates logs basic info of provided pods for debugging.
+func logPodStates(pods []api.Pod) {
+	// Find maximum widths for pod, node, and phase strings for column printing.
+	maxPodW, maxNodeW, maxPhaseW := len("POD"), len("NODE"), len("PHASE")
+	for _, pod := range pods {
+		if len(pod.ObjectMeta.Name) > maxPodW {
+			maxPodW = len(pod.ObjectMeta.Name)
+		}
+		if len(pod.Spec.Host) > maxNodeW {
+			maxNodeW = len(pod.Spec.Host)
+		}
+		if len(pod.Status.Phase) > maxPhaseW {
+			maxPhaseW = len(pod.Status.Phase)
+		}
+	}
+	// Increase widths by one to separate by a single space.
+	maxPodW++
+	maxNodeW++
+	maxPhaseW++
+
+	// Log pod info. * does space padding, - makes them left-aligned.
+	Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %[7]s",
+		maxPodW, "POD", maxNodeW, "NODE", maxPhaseW, "PHASE", "CONDITIONS")
+	for _, pod := range pods {
+		Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %[7]s",
+			maxPodW, pod.ObjectMeta.Name, maxNodeW, pod.Spec.Host, maxPhaseW, pod.Status.Phase, pod.Status.Conditions)
+	}
+	Logf("") // Final empty line helps for readability.
+}
+
+// podRunningReady checks whether pod p's phase is running and it has a ready
+// condition of status true.
+func podRunningReady(p *api.Pod) (bool, error) {
+	// Check the phase is running.
+	if p.Status.Phase != api.PodRunning {
+		return false, fmt.Errorf("want pod '%s' on '%s' to be '%v' but was '%v'",
+			p.ObjectMeta.Name, p.Spec.Host, api.PodRunning, p.Status.Phase)
+	}
+	// Check the ready condition is true.
+	if !podReady(p) {
+		return false, fmt.Errorf("pod '%s' on '%s' didn't have condition {%v %v}; conditions: %v",
+			p.ObjectMeta.Name, p.Spec.Host, api.PodReady, api.ConditionTrue, p.Status.Conditions)
+
+	}
+	return true, nil
+}
+
+// waitForPodsRunningReady waits up to timeout to ensure that all pods in
+// namespace ns are running and ready, requiring that it finds at least minPods.
+// It has separate behavior from other 'wait for' pods functions in that it re-
+// queries the list of pods on every iteration. This is useful, for example, in
+// cluster startup, because the number of pods increases while waiting.
+func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) error {
+	c, err := loadClient()
+	if err != nil {
+		return err
+	}
+	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
+		timeout, minPods, ns)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(podPoll) {
+		// We get the new list of pods in every iteration beause more pods come
+		// online during startup and we want to ensure they are also checked.
+		podList, err := c.Pods(ns).List(labels.Everything(), fields.Everything())
+		if err != nil {
+			Logf("Error getting pods in namespace '%s': %v", ns, err)
+			continue
+		}
+		nOk, badPods := 0, []api.Pod{}
+		for _, pod := range podList.Items {
+			if res, err := podRunningReady(&pod); res && err == nil {
+				nOk++
+			} else {
+				badPods = append(badPods, pod)
+			}
+		}
+		Logf("%d / %d pods in namespace '%s' are running and ready (%d seconds elapsed)",
+			nOk, len(podList.Items), ns, int(time.Since(start).Seconds()))
+		if nOk == len(podList.Items) && nOk >= minPods {
+			return nil
+		}
+		logPodStates(badPods)
+	}
+	return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
+}
+
 func waitForPodCondition(c *client.Client, ns, podName, desc string, poll, timeout time.Duration, condition podCondition) error {
 	Logf("Waiting up to %v for pod %s status to be %s", timeout, podName, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
@@ -108,9 +216,10 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, poll, timeo
 		if done {
 			return err
 		}
-		Logf("Waiting for pod %s in namespace %s status to be %q (found %q) (%v)", podName, ns, desc, pod.Status.Phase, time.Since(start))
+		Logf("Waiting for pod '%s' in namespace '%s' status to be '%q' (found phase: '%q', readiness: %t) (%v)",
+			podName, ns, desc, pod.Status.Phase, podReady(pod), time.Since(start))
 	}
-	return fmt.Errorf("gave up waiting for pod %s to be %s after %v", podName, desc, timeout)
+	return fmt.Errorf("gave up waiting for pod '%s' to be '%s' after %v", podName, desc, timeout)
 }
 
 // createNS should be used by every test, note that we append a common prefix to the provided test name.
@@ -140,7 +249,7 @@ func waitForPodRunning(c *client.Client, podName string) error {
 func waitForPodNotPending(c *client.Client, ns, podName string) error {
 	return waitForPodCondition(c, ns, podName, "!pending", podPoll, podStartTimeout, func(pod *api.Pod) (bool, error) {
 		if pod.Status.Phase != api.PodPending {
-			Logf("Saw pod %s in namespace %s out of pending state (found %q)", podName, ns, pod.Status.Phase)
+			Logf("Saw pod '%s' in namespace '%s' out of pending state (found '%q')", podName, ns, pod.Status.Phase)
 			return true, nil
 		}
 		return false, nil
@@ -153,17 +262,17 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
 		ci, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, contName)
 		if !ok {
-			Logf("No Status.Info for container %s in pod %s yet", contName, podName)
+			Logf("No Status.Info for container '%s' in pod '%s' yet", contName, podName)
 		} else {
 			if ci.State.Termination != nil {
 				if ci.State.Termination.ExitCode == 0 {
 					By("Saw pod success")
 					return true, nil
 				} else {
-					return true, fmt.Errorf("pod %s terminated with failure: %+v", podName, ci.State.Termination)
+					return true, fmt.Errorf("pod '%s' terminated with failure: %+v", podName, ci.State.Termination)
 				}
 			} else {
-				Logf("Nil State.Termination for container %s in pod %s in namespace %s so far", contName, podName, namespace)
+				Logf("Nil State.Termination for container '%s' in pod '%s' in namespace '%s' so far", contName, podName, namespace)
 			}
 		}
 		return false, nil
@@ -174,6 +283,50 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 // The default namespace is used to identify pods.
 func waitForPodSuccess(c *client.Client, podName string, contName string) error {
 	return waitForPodSuccessInNamespace(c, podName, contName, api.NamespaceDefault)
+}
+
+// Context for checking pods responses by issuing GETs to them and verifying if the answer with pod name.
+type podResponseChecker struct {
+	c              *client.Client
+	ns             string
+	label          labels.Selector
+	controllerName string
+	pods           *api.PodList
+}
+
+// checkAllResponses issues GETs to all pods in the context and verify they reply with pod name.
+func (r podResponseChecker) checkAllResponses() (done bool, err error) {
+	successes := 0
+	currentPods, err := r.c.Pods(r.ns).List(r.label, fields.Everything())
+	Expect(err).NotTo(HaveOccurred())
+	for i, pod := range r.pods.Items {
+		// Check that the replica list remains unchanged, otherwise we have problems.
+		if !isElementOf(pod.UID, currentPods) {
+			return false, fmt.Errorf("pod with UID %s is no longer a member of the replica set.  Must have been restarted for some reason.  Current replica set: %v", pod.UID, currentPods)
+		}
+		body, err := r.c.Get().
+			Prefix("proxy").
+			Namespace(r.ns).
+			Resource("pods").
+			Name(string(pod.Name)).
+			Do().
+			Raw()
+		if err != nil {
+			Logf("Controller %s: Failed to GET from replica %d (%s): %v:", r.controllerName, i+1, pod.Name, err)
+			continue
+		}
+		// The body should be the pod name.
+		if string(body) != pod.Name {
+			Logf("Controller %s: Replica %d expected response %s but got %s", r.controllerName, i+1, pod.Name, string(body))
+			continue
+		}
+		successes++
+		Logf("Controller %s: Got expected result from replica %d: %s, %d of %d required successes so far", r.controllerName, i+1, string(body), successes, len(r.pods.Items))
+	}
+	if successes < len(r.pods.Items) {
+		return false, nil
+	}
+	return true, nil
 }
 
 func loadConfig() (*client.Config, error) {
@@ -188,7 +341,7 @@ func loadConfig() (*client.Config, error) {
 			fmt.Printf(">>> testContext.KubeContext: %s\n", testContext.KubeContext)
 			c.CurrentContext = testContext.KubeContext
 		}
-		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
+		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: testContext.Host}}).ClientConfig()
 	default:
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
 	}
@@ -302,7 +455,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 	Failf("Timed out after %v seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), testname)
 }
 
-// kubectlCmd runs the kubectl executable.
+// kubectlCmd runs the kubectl executable through the wrapper script.
 func kubectlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
 
@@ -329,7 +482,7 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	kubectlArgs := append(defaultArgs, args...)
 
 	//TODO: the "kubectl" path string might be worth externalizing into an (optional) ginko arg.
-	cmd := exec.Command("kubectl", kubectlArgs...)
+	cmd := exec.Command(filepath.Join(testContext.RepoRoot, "cluster/kubectl.sh"), kubectlArgs...)
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
 	return cmd
 }
@@ -675,11 +828,14 @@ func waitForRCPodsRunning(c *client.Client, ns, rcName string) error {
 // Delete a Replication Controller and all pods it spawned
 func DeleteRC(c *client.Client, ns, name string) error {
 	By(fmt.Sprintf("Deleting replication controller %s in namespace %s", name, ns))
-	reaper, err := kubectl.ReaperFor("ReplicationController", c)
+	reaper, err := kubectl.ReaperForReplicationController(c, 10*time.Minute)
 	if err != nil {
 		return err
 	}
+	startTime := time.Now()
 	_, err = reaper.Stop(ns, name, api.NewDeleteOptions(0))
+	deleteRCTime := time.Now().Sub(startTime)
+	Logf("Deleting RC took: %v", deleteRCTime)
 	return err
 }
 
@@ -872,12 +1028,20 @@ func getSigner(provider string) (ssh.Signer, error) {
 // LatencyMetrics stores data about request latency at a given quantile
 // broken down by verb (e.g. GET, PUT, LIST) and resource (e.g. pods, services).
 type LatencyMetric struct {
-	verb     string
-	resource string
+	Verb     string
+	Resource string
 	// 0 <= quantile <=1, e.g. 0.95 is 95%tile, 0.5 is median.
-	quantile float64
-	latency  time.Duration
+	Quantile float64
+	Latency  time.Duration
 }
+
+// LatencyMetricByLatency implements sort.Interface for []LatencyMetric based on
+// the latency field.
+type LatencyMetricByLatency []LatencyMetric
+
+func (a LatencyMetricByLatency) Len() int           { return len(a) }
+func (a LatencyMetricByLatency) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a LatencyMetricByLatency) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
 
 func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {
 	body, err := c.Get().AbsPath("/metrics").DoRaw()
@@ -917,20 +1081,34 @@ func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {
 // Prints summary metrics for request types with latency above threshold
 // and returns number of such request types.
 func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResources util.StringSet) (int, error) {
+	ignoredVerbs := util.NewStringSet("WATCHLIST", "PROXY")
+
 	metrics, err := ReadLatencyMetrics(c)
 	if err != nil {
 		return 0, err
 	}
+	sort.Sort(sort.Reverse(LatencyMetricByLatency(metrics)))
 	var badMetrics []LatencyMetric
+	top := 5
 	for _, metric := range metrics {
-		if !ignoredResources.Has(metric.resource) &&
-			metric.verb != "WATCHLIST" &&
+		if ignoredResources.Has(metric.Resource) || ignoredVerbs.Has(metric.Verb) {
+			continue
+		}
+		isBad := false
+		if metric.Latency > threshold &&
 			// We are only interested in 99%tile, but for logging purposes
 			// it's useful to have all the offending percentiles.
-			metric.quantile <= 0.99 &&
-			metric.latency > threshold {
-			Logf("WARNING - requests with too high latency: %+v", metric)
+			metric.Quantile <= 0.99 {
 			badMetrics = append(badMetrics, metric)
+			isBad = true
+		}
+		if top > 0 || isBad {
+			top--
+			prefix := ""
+			if isBad {
+				prefix = "WARNING "
+			}
+			Logf("%vTop latency metric: %+v", prefix, metric)
 		}
 	}
 

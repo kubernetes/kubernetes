@@ -58,6 +58,18 @@ var expKeyFunc = func(obj interface{}) (string, error) {
 	return "", fmt.Errorf("Could not find key for obj %#v", obj)
 }
 
+// RCExpectationsManager is an interface that allows users to set and wait on expectations.
+// Only abstracted out for testing.
+type RCExpectationsManager interface {
+	GetExpectations(rc *api.ReplicationController) (*PodExpectations, bool, error)
+	SatisfiedExpectations(rc *api.ReplicationController) bool
+	DeleteExpectations(rcKey string)
+	ExpectCreations(rc *api.ReplicationController, adds int) error
+	ExpectDeletions(rc *api.ReplicationController, dels int) error
+	CreationObserved(rc *api.ReplicationController)
+	DeletionObserved(rc *api.ReplicationController)
+}
+
 // RCExpectations is a ttl cache mapping rcs to what they expect to see before being woken up for a sync.
 type RCExpectations struct {
 	cache.Store
@@ -73,6 +85,15 @@ func (r *RCExpectations) GetExpectations(rc *api.ReplicationController) (*PodExp
 		return podExp.(*PodExpectations), true, nil
 	} else {
 		return nil, false, err
+	}
+}
+
+// DeleteExpectations deletes the expectations of the given RC from the TTLStore.
+func (r *RCExpectations) DeleteExpectations(rcKey string) {
+	if podExp, exists, err := r.GetByKey(rcKey); err == nil && exists {
+		if err := r.Delete(podExp); err != nil {
+			glog.V(2).Infof("Error deleting expectations for rc %v: %v", rcKey, err)
+		}
 	}
 }
 

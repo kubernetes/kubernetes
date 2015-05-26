@@ -13,9 +13,9 @@ var inspect = require('util').inspect;
 var util = require('./util.js');
 
 var coreos_image_ids = {
-  'stable': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Stable-633.1.0',
-  'beta': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Beta-647.0.0', // untested
-  'alpha': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Alpha-647.0.0' // untested
+  'stable': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Stable-647.0.0',
+  'beta': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Beta-668.3.0', // untested
+  'alpha': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Alpha-681.0.0' // untested
 };
 
 var conf = {};
@@ -170,6 +170,7 @@ exports.queue_storage_if_needed = function() {
     conf.resources['storage_account'] = util.rand_suffix;
     task_queue.push([
       'storage', 'account', 'create',
+      '--type=LRS',
       get_location(),
       conf.resources['storage_account'],
     ]);

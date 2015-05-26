@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.4.2",
+	"GoVersion": "go1.3.3",
 	"Packages": [
 		"./..."
 	],
@@ -47,6 +47,34 @@
 			"ImportPath": "github.com/appc/spec/schema",
 			"Comment": "v0.5.1-55-g87808a3",
 			"Rev": "87808a37061a4a2e6204ccea5fd2fc930576db94"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/aws",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/endpoints",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/protocol/ec2query",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/protocol/query/queryutil",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/protocol/xml/xmlutil",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/signer/v4",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/service/ec2",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
 		},
 		{
 			"ImportPath": "github.com/beorn7/perks/quantile",
@@ -173,7 +201,8 @@
 		},
 		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
-			"Rev": "09334c56c63bab2cd6c4ccab924d89e2419a361f"
+			"Comment": "0.2.1-532-g2f1ad24",
+			"Rev": "2f1ad24900b2777139b5becee93eb63a75b00617"
 		},
 		{
 			"ImportPath": "github.com/garyburd/redigo/internal",
@@ -357,21 +386,13 @@
 			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
 		},
 		{
-			"ImportPath": "github.com/mitchellh/goamz/aws",
-			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
-		},
-		{
-			"ImportPath": "github.com/mitchellh/goamz/ec2",
-			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
-		},
-		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
 			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
 		},
 		{
 			"ImportPath": "github.com/onsi/ginkgo",
-			"Comment": "v1.1.0-44-gae043a2",
-			"Rev": "ae043a2b2a91d6441adedc96d2c01958a78ee516"
+			"Comment": "v1.2.0-beta-9-gfbb6632",
+			"Rev": "fbb663242655b700c623e9629d7781db98957501"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega",

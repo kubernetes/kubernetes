@@ -18,7 +18,6 @@ package dockertools
 
 import (
 	"fmt"
-	"hash/adler32"
 	"math/rand"
 	"os"
 	"strconv"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -78,7 +78,7 @@ type KubeletContainerName struct {
 
 // DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
 type DockerPuller interface {
-	Pull(image string) error
+	Pull(image string, secrets []api.Secret) error
 	IsImagePresent(image string) (bool, error)
 }
 
@@ -113,7 +113,7 @@ func parseImageName(image string) (string, string) {
 	return parsers.ParseRepositoryTag(image)
 }
 
-func (p dockerPuller) Pull(image string) error {
+func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 	repoToPull, tag := parseImageName(image)
 
 	// If no tag was specified, use the default "latest".
@@ -126,7 +126,12 @@ func (p dockerPuller) Pull(image string) error {
 		Tag:        tag,
 	}
 
-	creds, haveCredentials := p.keyring.Lookup(repoToPull)
+	keyring, err := credentialprovider.MakeDockerKeyring(secrets, p.keyring)
+	if err != nil {
+		return err
+	}
+
+	creds, haveCredentials := keyring.Lookup(repoToPull)
 	if !haveCredentials {
 		glog.V(1).Infof("Pulling image %s without credentials", image)
 
@@ -161,9 +166,9 @@ func (p dockerPuller) Pull(image string) error {
 	return utilerrors.NewAggregate(pullErrs)
 }
 
-func (p throttledDockerPuller) Pull(image string) error {
+func (p throttledDockerPuller) Pull(image string, secrets []api.Secret) error {
 	if p.limiter.CanAccept() {
-		return p.puller.Pull(image)
+		return p.puller.Pull(image, secrets)
 	}
 	return fmt.Errorf("pull QPS exceeded.")
 }
@@ -207,15 +212,9 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 
 const containerNamePrefix = "k8s"
 
-func HashContainer(container *api.Container) uint64 {
-	hash := adler32.New()
-	util.DeepHashObject(hash, *container)
-	return uint64(hash.Sum32())
-}
-
 // Creates a name which can be reversed to identify both full pod name and container name.
 func BuildDockerName(dockerName KubeletContainerName, container *api.Container) string {
-	containerName := dockerName.ContainerName + "." + strconv.FormatUint(HashContainer(container), 16)
+	containerName := dockerName.ContainerName + "." + strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	return fmt.Sprintf("%s_%s_%s_%s_%08x",
 		containerNamePrefix,
 		containerName,
@@ -277,7 +276,7 @@ func getDockerEndpoint(dockerEndpoint string) string {
 func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 	if dockerEndpoint == "fake://" {
 		return &FakeDockerClient{
-			VersionInfo: docker.Env{"ApiVersion=1.16"},
+			VersionInfo: docker.Env{"ApiVersion=1.18"},
 		}
 	}
 	client, err := docker.NewClient(getDockerEndpoint(dockerEndpoint))

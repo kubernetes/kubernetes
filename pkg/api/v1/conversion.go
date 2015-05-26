@@ -20,14 +20,17 @@ import (
 	"fmt"
 	"reflect"
 
-	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
 func addConversionFuncs() {
-	err := newer.Scheme.AddConversionFuncs(
-		convert_v1_Container_To_api_Container,
-		convert_api_Container_To_v1_Container,
+	// Add non-generated conversion functions
+	err := api.Scheme.AddConversionFuncs(
+		convert_api_StatusDetails_To_v1_StatusDetails,
+		convert_v1_StatusDetails_To_api_StatusDetails,
+		convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
+		convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -35,7 +38,7 @@ func addConversionFuncs() {
 	}
 
 	// Add field conversion funcs.
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1", "Pod",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Pod",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -51,7 +54,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1", "Node",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Node",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name":
@@ -66,7 +69,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1", "ReplicationController",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "ReplicationController",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -80,7 +83,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1", "Event",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Event",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "involvedObject.kind",
@@ -101,7 +104,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1", "Namespace",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Namespace",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "status.phase":
@@ -116,189 +119,127 @@ func addConversionFuncs() {
 	}
 }
 
-func convert_v1_Container_To_api_Container(in *Container, out *newer.Container, s conversion.Scope) error {
+func convert_v1_StatusDetails_To_api_StatusDetails(in *StatusDetails, out *api.StatusDetails, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*Container))(in)
+		defaulting.(func(*StatusDetails))(in)
 	}
-	out.Name = in.Name
-	out.Image = in.Image
-	if in.Command != nil {
-		out.Command = make([]string, len(in.Command))
-		for i := range in.Command {
-			out.Command[i] = in.Command[i]
-		}
-	}
-	if in.Args != nil {
-		out.Args = make([]string, len(in.Args))
-		for i := range in.Args {
-			out.Args[i] = in.Args[i]
-		}
-	}
-	out.WorkingDir = in.WorkingDir
-	if in.Ports != nil {
-		out.Ports = make([]newer.ContainerPort, len(in.Ports))
-		for i := range in.Ports {
-			if err := convert_v1_ContainerPort_To_api_ContainerPort(&in.Ports[i], &out.Ports[i], s); err != nil {
+	out.ID = in.Name
+	out.Kind = in.Kind
+	if in.Causes != nil {
+		out.Causes = make([]api.StatusCause, len(in.Causes))
+		for i := range in.Causes {
+			if err := convert_v1_StatusCause_To_api_StatusCause(&in.Causes[i], &out.Causes[i], s); err != nil {
 				return err
 			}
 		}
+	} else {
+		out.Causes = nil
 	}
-	if in.Env != nil {
-		out.Env = make([]newer.EnvVar, len(in.Env))
-		for i := range in.Env {
-			if err := convert_v1_EnvVar_To_api_EnvVar(&in.Env[i], &out.Env[i], s); err != nil {
+	out.RetryAfterSeconds = in.RetryAfterSeconds
+	return nil
+}
+
+func convert_api_StatusDetails_To_v1_StatusDetails(in *api.StatusDetails, out *StatusDetails, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.StatusDetails))(in)
+	}
+	out.Name = in.ID
+	out.Kind = in.Kind
+	if in.Causes != nil {
+		out.Causes = make([]StatusCause, len(in.Causes))
+		for i := range in.Causes {
+			if err := convert_api_StatusCause_To_v1_StatusCause(&in.Causes[i], &out.Causes[i], s); err != nil {
 				return err
 			}
 		}
+	} else {
+		out.Causes = nil
 	}
-	if err := s.Convert(&in.Resources, &out.Resources, 0); err != nil {
-		return err
+	out.RetryAfterSeconds = in.RetryAfterSeconds
+	return nil
+}
+
+func convert_v1_StatusCause_To_api_StatusCause(in *StatusCause, out *api.StatusCause, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*StatusCause))(in)
 	}
-	if in.VolumeMounts != nil {
-		out.VolumeMounts = make([]newer.VolumeMount, len(in.VolumeMounts))
-		for i := range in.VolumeMounts {
-			if err := convert_v1_VolumeMount_To_api_VolumeMount(&in.VolumeMounts[i], &out.VolumeMounts[i], s); err != nil {
-				return err
-			}
+	out.Type = api.CauseType(in.Type)
+	out.Message = in.Message
+	out.Field = in.Field
+	return nil
+}
+
+func convert_api_StatusCause_To_v1_StatusCause(in *api.StatusCause, out *StatusCause, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.StatusCause))(in)
+	}
+	out.Type = CauseType(in.Type)
+	out.Message = in.Message
+	out.Field = in.Field
+	return nil
+}
+
+func convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *api.ReplicationControllerSpec, out *ReplicationControllerSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ReplicationControllerSpec))(in)
+	}
+	out.Replicas = new(int)
+	*out.Replicas = in.Replicas
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
 		}
+	} else {
+		out.Selector = nil
 	}
-	if in.LivenessProbe != nil {
-		out.LivenessProbe = new(newer.Probe)
-		if err := convert_v1_Probe_To_api_Probe(in.LivenessProbe, out.LivenessProbe, s); err != nil {
+	if in.TemplateRef != nil {
+		out.TemplateRef = new(ObjectReference)
+		if err := convert_api_ObjectReference_To_v1_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
 			return err
 		}
 	} else {
-		out.LivenessProbe = nil
+		out.TemplateRef = nil
 	}
-	if in.ReadinessProbe != nil {
-		out.ReadinessProbe = new(newer.Probe)
-		if err := convert_v1_Probe_To_api_Probe(in.ReadinessProbe, out.ReadinessProbe, s); err != nil {
+	if in.Template != nil {
+		out.Template = new(PodTemplateSpec)
+		if err := convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
 			return err
 		}
 	} else {
-		out.ReadinessProbe = nil
-	}
-	if in.Lifecycle != nil {
-		out.Lifecycle = new(newer.Lifecycle)
-		if err := convert_v1_Lifecycle_To_api_Lifecycle(in.Lifecycle, out.Lifecycle, s); err != nil {
-			return err
-		}
-	} else {
-		out.Lifecycle = nil
-	}
-	out.TerminationMessagePath = in.TerminationMessagePath
-	out.ImagePullPolicy = newer.PullPolicy(in.ImagePullPolicy)
-	if in.SecurityContext != nil {
-		if in.SecurityContext.Capabilities != nil {
-			if !reflect.DeepEqual(in.SecurityContext.Capabilities.Add, in.Capabilities.Add) ||
-				!reflect.DeepEqual(in.SecurityContext.Capabilities.Drop, in.Capabilities.Drop) {
-				return fmt.Errorf("container capability settings do not match security context settings, cannot convert")
-			}
-		}
-		if in.SecurityContext.Privileged != nil {
-			if in.Privileged != *in.SecurityContext.Privileged {
-				return fmt.Errorf("container privileged settings do not match security context settings, cannot convert")
-			}
-		}
-	}
-	if in.SecurityContext != nil {
-		out.SecurityContext = new(newer.SecurityContext)
-		if err := convert_v1_SecurityContext_To_api_SecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
+		out.Template = nil
 	}
 	return nil
 }
 
-func convert_api_Container_To_v1_Container(in *newer.Container, out *Container, s conversion.Scope) error {
+func convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *ReplicationControllerSpec, out *api.ReplicationControllerSpec, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*newer.Container))(in)
+		defaulting.(func(*ReplicationControllerSpec))(in)
 	}
-	out.Name = in.Name
-	out.Image = in.Image
-	if in.Command != nil {
-		out.Command = make([]string, len(in.Command))
-		for i := range in.Command {
-			out.Command[i] = in.Command[i]
+	out.Replicas = *in.Replicas
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
 		}
+	} else {
+		out.Selector = nil
 	}
-	if in.Args != nil {
-		out.Args = make([]string, len(in.Args))
-		for i := range in.Args {
-			out.Args[i] = in.Args[i]
-		}
-	}
-	out.WorkingDir = in.WorkingDir
-	if in.Ports != nil {
-		out.Ports = make([]ContainerPort, len(in.Ports))
-		for i := range in.Ports {
-			if err := convert_api_ContainerPort_To_v1_ContainerPort(&in.Ports[i], &out.Ports[i], s); err != nil {
-				return err
-			}
-		}
-	}
-	if in.Env != nil {
-		out.Env = make([]EnvVar, len(in.Env))
-		for i := range in.Env {
-			if err := convert_api_EnvVar_To_v1_EnvVar(&in.Env[i], &out.Env[i], s); err != nil {
-				return err
-			}
-		}
-	}
-	if err := s.Convert(&in.Resources, &out.Resources, 0); err != nil {
-		return err
-	}
-	if in.VolumeMounts != nil {
-		out.VolumeMounts = make([]VolumeMount, len(in.VolumeMounts))
-		for i := range in.VolumeMounts {
-			if err := convert_api_VolumeMount_To_v1_VolumeMount(&in.VolumeMounts[i], &out.VolumeMounts[i], s); err != nil {
-				return err
-			}
-		}
-	}
-	if in.LivenessProbe != nil {
-		out.LivenessProbe = new(Probe)
-		if err := convert_api_Probe_To_v1_Probe(in.LivenessProbe, out.LivenessProbe, s); err != nil {
+	if in.TemplateRef != nil {
+		out.TemplateRef = new(api.ObjectReference)
+		if err := convert_v1_ObjectReference_To_api_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
 			return err
 		}
 	} else {
-		out.LivenessProbe = nil
+		out.TemplateRef = nil
 	}
-	if in.ReadinessProbe != nil {
-		out.ReadinessProbe = new(Probe)
-		if err := convert_api_Probe_To_v1_Probe(in.ReadinessProbe, out.ReadinessProbe, s); err != nil {
+	if in.Template != nil {
+		out.Template = new(api.PodTemplateSpec)
+		if err := convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
 			return err
 		}
 	} else {
-		out.ReadinessProbe = nil
-	}
-	if in.Lifecycle != nil {
-		out.Lifecycle = new(Lifecycle)
-		if err := convert_api_Lifecycle_To_v1_Lifecycle(in.Lifecycle, out.Lifecycle, s); err != nil {
-			return err
-		}
-	} else {
-		out.Lifecycle = nil
-	}
-	out.TerminationMessagePath = in.TerminationMessagePath
-	out.ImagePullPolicy = PullPolicy(in.ImagePullPolicy)
-	if in.SecurityContext != nil {
-		out.SecurityContext = new(SecurityContext)
-		if err := convert_api_SecurityContext_To_v1_SecurityContext(in.SecurityContext, out.SecurityContext, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
-	// now that we've converted set the container field from security context
-	if out.SecurityContext != nil && out.SecurityContext.Privileged != nil {
-		out.Privileged = *out.SecurityContext.Privileged
-	}
-	// now that we've converted set the container field from security context
-	if out.SecurityContext != nil && out.SecurityContext.Capabilities != nil {
-		out.Capabilities = *out.SecurityContext.Capabilities
+		out.Template = nil
 	}
 	return nil
 }

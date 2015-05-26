@@ -96,7 +96,7 @@ func TestRunOnce(t *testing.T) {
 	}
 	podContainers := []docker.APIContainers{
 		{
-			Names:  []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo_new_12345678_42"},
+			Names:  []string{"/k8s_bar." + strconv.FormatUint(kubecontainer.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo_new_12345678_42"},
 			ID:     "1234",
 			Status: "running",
 		},

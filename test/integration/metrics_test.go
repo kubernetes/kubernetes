@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/test/integration/framework"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
@@ -37,10 +38,6 @@ import (
 )
 
 const scrapeRequestHeader = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=compact-text"
-
-func init() {
-	requireEtcd()
-}
 
 func scrapeMetrics(s *httptest.Server) ([]*prometheuspb.MetricFamily, error) {
 	req, err := http.NewRequest("GET", s.URL+"/metrics", nil)
@@ -90,7 +87,7 @@ func checkForExpectedMetrics(t *testing.T, metrics []*prometheuspb.MetricFamily,
 }
 
 func TestMasterProcessMetrics(t *testing.T) {
-	_, s := runAMaster(t)
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
 	metrics, err := scrapeMetrics(s)
@@ -107,7 +104,7 @@ func TestMasterProcessMetrics(t *testing.T) {
 }
 
 func TestApiserverMetrics(t *testing.T) {
-	_, s := runAMaster(t)
+	_, s := framework.RunAMaster(t)
 	defer s.Close()
 
 	// Make a request to the apiserver to ensure there's at least one data point

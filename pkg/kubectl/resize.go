@@ -101,6 +101,7 @@ type ReplicationControllerResizer struct {
 	c ResizerClient
 }
 
+// RetryParams encapsulates the retry parameters used by kubectl's resizer.
 type RetryParams struct {
 	Interval, Timeout time.Duration
 }

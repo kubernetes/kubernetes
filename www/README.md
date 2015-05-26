@@ -23,7 +23,7 @@ The `gulp` command will start a file watcher which will update the generated `ap
 * `master/node_modules` - contains npm dependencies
 * `master/bower_components` - contains the angular framework files and any custom dependencies
 
-Bower components should be refernced in one of the `vendor.json` files below:
+Bower components should be referenced in one of the `vendor.json` files below:
 
 * `master/vendor.base.json` - 3rd party vendor javascript required to start the app. JS is compiled to `base.js` and loaded before `app.js`
 * `master/vendor.json` - 3rd party vendor scripts to make the app work, usually lazy loaded. Can be js or css. Copied to `vendor/*`.

@@ -37,7 +37,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
@@ -81,8 +80,8 @@ func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.Roun
 	return "", 0, nil, errors.New("Not Implemented")
 }
 
-func (fakeKubeletClient) HealthCheck(host string) (probe.Result, error) {
-	return probe.Success, nil
+func (fakeKubeletClient) HealthCheck(host string) (probe.Result, string, error) {
+	return probe.Success, "", nil
 }
 
 type delegateHandler struct {
@@ -101,7 +100,6 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	// Setup
 	servers := []string{}
 	glog.Infof("Creating etcd client pointing to %v", servers)
-	machineList := []string{"localhost", "127.0.0.1"}
 
 	handler := delegateHandler{}
 	apiServer := httptest.NewServer(&handler)
@@ -190,15 +188,9 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	// TODO: Write an integration test for the replication controllers watch.
 	go controllerManager.Run(3, util.NeverStop)
 
-	nodeResources := &api.NodeResources{
-		Capacity: api.ResourceList{
-			api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-			api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-		}}
-
-	nodeController := nodecontroller.NewNodeController(nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewFakeRateLimiter(),
+	nodeController := nodecontroller.NewNodeController(nil, cl, 10, 5*time.Minute, util.NewFakeRateLimiter(),
 		40*time.Second, 60*time.Second, 5*time.Second, nil, false)
-	nodeController.Run(5*time.Second, true)
+	nodeController.Run(5 * time.Second)
 	cadvisorInterface := new(cadvisor.Fake)
 
 	// Kubelet (localhost)
@@ -206,7 +198,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	configFilePath := makeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
 	fakeDocker1.VersionInfo = docker.Env{"ApiVersion=1.15"}
-	kcfg := kubeletapp.SimpleKubelet(cl, &fakeDocker1, machineList[0], testRootDir, firstManifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, configFilePath, nil, kubecontainer.FakeOS{})
+	kcfg := kubeletapp.SimpleKubelet(cl, &fakeDocker1, "localhost", testRootDir, firstManifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, configFilePath, nil, kubecontainer.FakeOS{})
 	kubeletapp.RunKubelet(kcfg, nil)
 	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
@@ -214,7 +206,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	testRootDir = makeTempDirOrDie("kubelet_integ_2.", "")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
 	fakeDocker2.VersionInfo = docker.Env{"ApiVersion=1.15"}
-	kcfg = kubeletapp.SimpleKubelet(cl, &fakeDocker2, machineList[1], testRootDir, secondManifestURL, "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil, kubecontainer.FakeOS{})
+	kcfg = kubeletapp.SimpleKubelet(cl, &fakeDocker2, "127.0.0.1", testRootDir, secondManifestURL, "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil, kubecontainer.FakeOS{})
 	kubeletapp.RunKubelet(kcfg, nil)
 	return apiServer.URL, configFilePath
 }

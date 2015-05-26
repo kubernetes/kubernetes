@@ -11,7 +11,7 @@ IaaS Provider  | Config. Mgmt | OS     | Networking  | Docs                     
 GKE            |              |        | GCE         | [docs](https://cloud.google.com/container-engine)      | Commercial                   | Uses K8s version 0.15.0
 Vagrant        | Saltstack    | Fedora | OVS         | [docs](../../docs/getting-started-guides/vagrant.md)   | Project                      | Uses latest via https://get.k8s.io/
 GCE            | Saltstack    | Debian | GCE         | [docs](../../docs/getting-started-guides/gce.md)       | Project                      | Tested with 0.15.0 by @robertbailey
-Azure          | CoreOS       | CoreOS | Weave       | [docs](../../docs/getting-started-guides/coreos/azure/README.md)         | Community ([@errordeveloper](https://github.com/errordeveloper), [@squillace](https://github.com/squillace), [@chanezon](https://github.com/chanezon), [@crossorigin](https://github.com/crossorigin)) | Uses K8s version 0.15.0
+Azure          | CoreOS       | CoreOS | Weave       | [docs](../../docs/getting-started-guides/coreos/azure/README.md)         | Community ([@errordeveloper](https://github.com/errordeveloper), [@squillace](https://github.com/squillace), [@chanezon](https://github.com/chanezon), [@crossorigin](https://github.com/crossorigin)) | Uses K8s version 0.17.0
 Docker Single Node | custom       | N/A    | local       | [docs](docker.md) | Project (@brendandburns) | Tested @ 0.14.1 |
 Docker Multi Node  | Flannel | N/A    | local       | [docs](docker-multinode.md) | Project (@brendandburns) | Tested @ 0.14.1 |
 Bare-metal     | Ansible      | Fedora | flannel     | [docs](../../docs/getting-started-guides/fedora/fedora_ansible_config.md)       | Project    | Uses K8s v0.13.2
@@ -39,6 +39,7 @@ Docker Multi Node        | Flannel| N/A    | local       | [docs](docker-multino
 Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Community (@preillyme)                     |
 libvirt/KVM    | CoreOS       | CoreOS | libvirt/KVM | [docs](../../docs/getting-started-guides/libvirt-coreos.md) | Community (@lhuard1A)   |
 oVirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Community (@simon3z)         |
+Rackspace      | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/rackspace.md)     | Community (@doublerr)         | use k8s version 0.16.2
 
 
 *Note*: The above table is ordered by version test/used in notes followed by support level.

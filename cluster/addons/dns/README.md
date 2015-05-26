@@ -13,6 +13,11 @@ crashes or scheduling changes).  This maps well to DNS, which has a long
 history of clients that, on purpose or on accident, do not respect DNS TTLs
 (see previous remark about Pod IPs changing).
 
+## DNS Name format for Services
+Services get a DNS name with the format my-svc.my-namespace.svc.cluster.local
+'svc' should not be used a namespace label to avoid conflicts.
+The old format of my-svc.my-namespace.cluster.local has been deprecated. 
+
 ## How do I find the DNS server?
 The DNS server itself runs as a Kubernetes Service.  This gives it a stable IP
 address.  When you run the SkyDNS service, you want to assign a static IP to use for
@@ -35,12 +40,12 @@ example, see `cluster/gce/config-default.sh`.
 ```shell
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 ```
 
 This enables DNS with a DNS Service IP of `10.0.0.10` and a local domain of
-`kubernetes.local`, served by a single copy of SkyDNS.
+`cluster.local`, served by a single copy of SkyDNS.
 
 If you are not using a supported cluster setup, you will have to replicate some
 of this yourself.  First, each kubelet needs to run with the following flags
@@ -72,6 +77,13 @@ SkyDNS to find.
 Kubernetes installs do not configure the nodes' resolv.conf files to use the
 cluster DNS by default, because that process is inherently distro-specific.
 This should probably be implemented eventually.
+
+## Making changes
+Please observe the release process for making changes to the `kube2sky`
+image that is documented in [RELEASES.md](kube2sky/RELEASES.md). Any significant changes
+to the YAML template for `kube-dns` should result a bump of the version number
+for the `kube-dns` replication controller and well as the `version` label. This
+will permit a rolling update of `kube-dns`.
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns/README.md?pixel)]()

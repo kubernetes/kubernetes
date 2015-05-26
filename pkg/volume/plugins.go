@@ -76,7 +76,7 @@ type VolumePlugin interface {
 type PersistentVolumePlugin interface {
 	VolumePlugin
 	// GetAccessModes describes the ways a given volume can be accessed/mounted.
-	GetAccessModes() []api.AccessModeType
+	GetAccessModes() []api.PersistentVolumeAccessMode
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.

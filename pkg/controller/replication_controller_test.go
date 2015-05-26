@@ -953,3 +953,75 @@ func TestControllerBurstReplicas(t *testing.T) {
 	doTestControllerBurstReplicas(t, 5, 12)
 	doTestControllerBurstReplicas(t, 3, 2)
 }
+
+type FakeRCExpectations struct {
+	*RCExpectations
+	satisfied    bool
+	expSatisfied func()
+}
+
+func (fe FakeRCExpectations) SatisfiedExpectations(rc *api.ReplicationController) bool {
+	fe.expSatisfied()
+	return fe.satisfied
+}
+
+// TestRCSyncExpectations tests that a pod cannot sneak in between counting active pods
+// and checking expectations.
+func TestRCSyncExpectations(t *testing.T) {
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	fakePodControl := FakePodControl{}
+	manager := NewReplicationManager(client, 2)
+	manager.podControl = &fakePodControl
+
+	controllerSpec := newReplicationController(2)
+	manager.controllerStore.Store.Add(controllerSpec)
+	pods := newPodList(nil, 2, api.PodPending, controllerSpec)
+	manager.podStore.Store.Add(&pods.Items[0])
+	postExpectationsPod := pods.Items[1]
+
+	manager.expectations = FakeRCExpectations{
+		NewRCExpectations(), true, func() {
+			// If we check active pods before checking expectataions, the rc
+			// will create a new replica because it doesn't see this pod, but
+			// has fulfilled its expectations.
+			manager.podStore.Store.Add(&postExpectationsPod)
+		},
+	}
+	manager.syncReplicationController(getKey(controllerSpec, t))
+	validateSyncReplication(t, &fakePodControl, 0, 0)
+}
+
+func TestDeleteControllerAndExpectations(t *testing.T) {
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	manager := NewReplicationManager(client, 10)
+
+	rc := newReplicationController(1)
+	manager.controllerStore.Store.Add(rc)
+
+	fakePodControl := FakePodControl{}
+	manager.podControl = &fakePodControl
+
+	// This should set expectations for the rc
+	manager.syncReplicationController(getKey(rc, t))
+	validateSyncReplication(t, &fakePodControl, 1, 0)
+	fakePodControl.clear()
+
+	// This is to simulate a concurrent addPod, that has a handle on the expectations
+	// as the controller deletes it.
+	podExp, exists, err := manager.expectations.GetExpectations(rc)
+	if !exists || err != nil {
+		t.Errorf("No expectations found for rc")
+	}
+	manager.controllerStore.Delete(rc)
+	manager.syncReplicationController(getKey(rc, t))
+
+	if _, exists, err = manager.expectations.GetExpectations(rc); exists {
+		t.Errorf("Found expectaions, expected none since the rc has been deleted.")
+	}
+
+	// This should have no effect, since we've deleted the rc.
+	podExp.Seen(1, 0)
+	manager.podStore.Store.Replace(make([]interface{}, 0))
+	manager.syncReplicationController(getKey(rc, t))
+	validateSyncReplication(t, &fakePodControl, 0, 0)
+}

@@ -26,13 +26,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/routecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
@@ -57,15 +57,11 @@ type CMServer struct {
 	CloudConfigFile         string
 	ConcurrentEndpointSyncs int
 	ConcurrentRCSyncs       int
-	MinionRegexp            string
 	NodeSyncPeriod          time.Duration
 	ResourceQuotaSyncPeriod time.Duration
 	NamespaceSyncPeriod     time.Duration
 	PVClaimBinderSyncPeriod time.Duration
 	RegisterRetryCount      int
-	MachineList             util.StringList
-	SyncNodeList            bool
-	SyncNodeStatus          bool
 	NodeMonitorGracePeriod  time.Duration
 	NodeStartupGracePeriod  time.Duration
 	NodeMonitorPeriod       time.Duration
@@ -75,10 +71,6 @@ type CMServer struct {
 	DeletingPodsBurst       int
 	ServiceAccountKeyFile   string
 
-	// TODO: Discover these by pinging the host machines, and rip out these params.
-	NodeMilliCPU int64
-	NodeMemory   resource.Quantity
-
 	ClusterName       string
 	ClusterCIDR       util.IPNet
 	AllocateNodeCIDRs bool
@@ -86,6 +78,14 @@ type CMServer struct {
 
 	Master     string
 	Kubeconfig string
+
+	// The following fields are deprecated and unused except in flag parsing.
+	MinionRegexp   string
+	MachineList    util.StringList
+	SyncNodeList   bool
+	SyncNodeStatus bool
+	NodeMilliCPU   int64
+	NodeMemory     resource.Quantity
 }
 
 // NewCMServer creates a new CMServer with a default config.
@@ -101,8 +101,6 @@ func NewCMServer() *CMServer {
 		PVClaimBinderSyncPeriod: 10 * time.Second,
 		RegisterRetryCount:      10,
 		PodEvictionTimeout:      5 * time.Minute,
-		NodeMilliCPU:            1000,
-		NodeMemory:              resource.MustParse("3Gi"),
 		SyncNodeList:            true,
 		ClusterName:             "kubernetes",
 	}
@@ -118,6 +116,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.IntVar(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
 	fs.StringVar(&s.MinionRegexp, "minion-regexp", s.MinionRegexp, "If non empty, and --cloud-provider is specified, a regular expression for matching minion VMs.")
+	fs.MarkDeprecated("minion-regexp", "will be removed in a future version")
 	fs.DurationVar(&s.NodeSyncPeriod, "node-sync-period", s.NodeSyncPeriod, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
 		"fewer calls to cloud provider, but may delay addition of new nodes to cluster.")
@@ -130,7 +129,9 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.RegisterRetryCount, "register-retry-count", s.RegisterRetryCount, ""+
 		"The number of retries for initial node registration.  Retry interval equals node-sync-period.")
 	fs.Var(&s.MachineList, "machines", "List of machines to schedule onto, comma separated.")
+	fs.MarkDeprecated("machines", "will be removed in a future version")
 	fs.BoolVar(&s.SyncNodeList, "sync-nodes", s.SyncNodeList, "If true, and --cloud-provider is specified, sync nodes from the cloud provider. Default true.")
+	fs.MarkDeprecated("sync-nodes", "will be removed in a future version")
 	fs.BoolVar(&s.SyncNodeStatus, "sync-node-status", s.SyncNodeStatus,
 		"DEPRECATED. Does not have any effect now and it will be removed in a later release.")
 	fs.DurationVar(&s.NodeMonitorGracePeriod, "node-monitor-grace-period", 40*time.Second,
@@ -142,36 +143,20 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.NodeMonitorPeriod, "node-monitor-period", 5*time.Second,
 		"The period for syncing NodeStatus in NodeController.")
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA key used to sign service account tokens.")
-	// TODO: Discover these by pinging the host machines, and rip out these flags.
-	// TODO: in the meantime, use resource.QuantityFlag() instead of these
 	fs.Int64Var(&s.NodeMilliCPU, "node-milli-cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
+	fs.MarkDeprecated("node-milli-cpu", "will be removed in a future version")
 	fs.Var(resource.NewQuantityFlagValue(&s.NodeMemory), "node-memory", "The amount of memory (in bytes) provisioned on each node")
+	fs.MarkDeprecated("node-memory", "will be removed in a future version")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.Var(&s.ClusterCIDR, "cluster-cidr", "CIDR Range for Pods in cluster.")
 	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 }
 
-func (s *CMServer) verifyMinionFlags() {
-	if !s.SyncNodeList && s.MinionRegexp != "" {
-		glog.Info("--minion-regexp is ignored by --sync-nodes=false")
-	}
-	if s.CloudProvider == "" || s.MinionRegexp == "" {
-		if len(s.MachineList) == 0 {
-			glog.Info("No machines specified!")
-		}
-		return
-	}
-	if len(s.MachineList) != 0 {
-		glog.Info("--machines is overwritten by --minion-regexp")
-	}
-}
-
 // Run runs the CMServer.  This should never exit.
 func (s *CMServer) Run(_ []string) error {
-	s.verifyMinionFlags()
-
 	if s.Kubeconfig == "" && s.Master == "" {
 		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
 	}
@@ -217,25 +202,28 @@ func (s *CMServer) Run(_ []string) error {
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
 
 	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-	nodeResources := &api.NodeResources{
-		Capacity: api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(s.NodeMilliCPU, resource.DecimalSI),
-			api.ResourceMemory: s.NodeMemory,
-		},
-	}
 
 	if s.SyncNodeStatus {
 		glog.Warning("DEPRECATION NOTICE: sync-node-status flag is being deprecated. It has no effect now and it will be removed in a future version.")
 	}
 
-	nodeController := nodecontroller.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources,
-		kubeClient, s.RegisterRetryCount, s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
+	nodeController := nodecontroller.NewNodeController(cloud, kubeClient, s.RegisterRetryCount,
+		s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
 		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, (*net.IPNet)(&s.ClusterCIDR), s.AllocateNodeCIDRs)
-	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList)
+	nodeController.Run(s.NodeSyncPeriod)
 
 	serviceController := servicecontroller.New(cloud, kubeClient, s.ClusterName)
 	if err := serviceController.Run(s.NodeSyncPeriod); err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
+	}
+
+	if s.AllocateNodeCIDRs {
+		routes, ok := cloud.Routes()
+		if !ok {
+			glog.Fatal("Cloud provider must support routes if allocate-node-cidrs is set")
+		}
+		routeController := routecontroller.New(routes, kubeClient, s.ClusterName, (*net.IPNet)(&s.ClusterCIDR))
+		routeController.Run(s.NodeSyncPeriod)
 	}
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)

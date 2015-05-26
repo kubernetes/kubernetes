@@ -32,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/docker/docker/pkg/units"
@@ -177,16 +178,18 @@ type handlerEntry struct {
 // will only be printed if the object type changes. This makes it useful for printing items
 // recieved from watches.
 type HumanReadablePrinter struct {
-	handlerMap map[reflect.Type]*handlerEntry
-	noHeaders  bool
-	lastType   reflect.Type
+	handlerMap    map[reflect.Type]*handlerEntry
+	noHeaders     bool
+	withNamespace bool
+	lastType      reflect.Type
 }
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
-func NewHumanReadablePrinter(noHeaders bool) *HumanReadablePrinter {
+func NewHumanReadablePrinter(noHeaders, withNamespace bool) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
-		handlerMap: make(map[reflect.Type]*handlerEntry),
-		noHeaders:  noHeaders,
+		handlerMap:    make(map[reflect.Type]*handlerEntry),
+		noHeaders:     noHeaders,
+		withNamespace: withNamespace,
 	}
 	printer.addDefaultHandlers()
 	return printer
@@ -195,7 +198,7 @@ func NewHumanReadablePrinter(noHeaders bool) *HumanReadablePrinter {
 // Handler adds a print handler with a given set of columns to HumanReadablePrinter instance.
 // printFunc is the function that will be called to print an object.
 // It must be of the following type:
-//  func printFunc(object ObjectType, w io.Writer) error
+//  func printFunc(object ObjectType, w io.Writer, withNamespace bool) error
 // where ObjectType is the type of the object that will be printed.
 func (h *HumanReadablePrinter) Handler(columns []string, printFunc interface{}) error {
 	printFuncValue := reflect.ValueOf(printFunc)
@@ -216,14 +219,14 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 		return fmt.Errorf("invalid print handler. %#v is not a function.", printFunc)
 	}
 	funcType := printFunc.Type()
-	if funcType.NumIn() != 2 || funcType.NumOut() != 1 {
+	if funcType.NumIn() != 3 || funcType.NumOut() != 1 {
 		return fmt.Errorf("invalid print handler." +
-			"Must accept 2 parameters and return 1 value.")
+			"Must accept 3 parameters and return 1 value.")
 	}
 	if funcType.In(1) != reflect.TypeOf((*io.Writer)(nil)).Elem() ||
 		funcType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
 		return fmt.Errorf("invalid print handler. The expected signature is: "+
-			"func handler(obj %v, w io.Writer) error", funcType.In(0))
+			"func handler(obj %v, w io.Writer, withNamespace bool) error", funcType.In(0))
 	}
 	return nil
 }
@@ -391,9 +394,16 @@ func interpretContainerStatus(status *api.ContainerStatus) (string, string, stri
 	return "", "", "", fmt.Errorf("unknown container state %#v", *state)
 }
 
-func printPod(pod *api.Pod, w io.Writer) error {
+func printPod(pod *api.Pod, w io.Writer, withNamespace bool) error {
+	var name string
+	if withNamespace {
+		name = types.NamespacedName{pod.Namespace, pod.Name}.String()
+	} else {
+		name = pod.Name
+	}
+
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		pod.Name,
+		name,
 		pod.Status.PodIP,
 		"", "",
 		podHostString(pod.Spec.Host, pod.Status.HostIP),
@@ -411,8 +421,8 @@ func printPod(pod *api.Pod, w io.Writer) error {
 		// Container status has not been reported yet. Print basic information
 		// of the containers and exit the function.
 		for _, container := range pod.Spec.Containers {
-			_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				"", "", container.Name, container.Image, "", "", "", "")
+			_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				"", "", container.Name, container.Image, "", "", "", "", "")
 			if err != nil {
 				return err
 			}
@@ -442,23 +452,30 @@ func printPod(pod *api.Pod, w io.Writer) error {
 	return nil
 }
 
-func printPodList(podList *api.PodList, w io.Writer) error {
+func printPodList(podList *api.PodList, w io.Writer, withNamespace bool) error {
 	for _, pod := range podList.Items {
-		if err := printPod(&pod, w); err != nil {
+		if err := printPod(&pod, w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printPodTemplate(pod *api.PodTemplate, w io.Writer) error {
+func printPodTemplate(pod *api.PodTemplate, w io.Writer, withNamespace bool) error {
+	var name string
+	if withNamespace {
+		name = types.NamespacedName{pod.Namespace, pod.Name}.String()
+	} else {
+		name = pod.Name
+	}
+
 	containers := pod.Template.Spec.Containers
 	var firstContainer api.Container
 	if len(containers) > 0 {
 		firstContainer, containers = containers[0], containers[1:]
 	}
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
-		pod.Name,
+		name,
 		firstContainer.Name,
 		firstContainer.Image,
 		formatLabels(pod.Template.Labels),
@@ -476,23 +493,30 @@ func printPodTemplate(pod *api.PodTemplate, w io.Writer) error {
 	return nil
 }
 
-func printPodTemplateList(podList *api.PodTemplateList, w io.Writer) error {
+func printPodTemplateList(podList *api.PodTemplateList, w io.Writer, withNamespace bool) error {
 	for _, pod := range podList.Items {
-		if err := printPodTemplate(&pod, w); err != nil {
+		if err := printPodTemplate(&pod, w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printReplicationController(controller *api.ReplicationController, w io.Writer) error {
+func printReplicationController(controller *api.ReplicationController, w io.Writer, withNamespace bool) error {
+	var name string
+	if withNamespace {
+		name = types.NamespacedName{controller.Namespace, controller.Name}.String()
+	} else {
+		name = controller.Name
+	}
+
 	containers := controller.Spec.Template.Spec.Containers
 	var firstContainer api.Container
 	if len(containers) > 0 {
 		firstContainer, containers = containers[0], containers[1:]
 	}
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n",
-		controller.Name,
+		name,
 		firstContainer.Name,
 		firstContainer.Image,
 		formatLabels(controller.Spec.Selector),
@@ -510,21 +534,33 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 	return nil
 }
 
-func printReplicationControllerList(list *api.ReplicationControllerList, w io.Writer) error {
+func printReplicationControllerList(list *api.ReplicationControllerList, w io.Writer, withNamespace bool) error {
 	for _, controller := range list.Items {
-		if err := printReplicationController(&controller, w); err != nil {
+		if err := printReplicationController(&controller, w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printService(svc *api.Service, w io.Writer) error {
-	ips := []string{svc.Spec.PortalIP}
-	for _, publicIP := range svc.Spec.PublicIPs {
-		ips = append(ips, publicIP)
+func printService(svc *api.Service, w io.Writer, withNamespace bool) error {
+	var name string
+	if withNamespace {
+		name = types.NamespacedName{svc.Namespace, svc.Name}.String()
+	} else {
+		name = svc.Name
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s\n", svc.Name, formatLabels(svc.Labels),
+
+	ips := []string{svc.Spec.PortalIP}
+
+	ingress := svc.Status.LoadBalancer.Ingress
+	for i := range ingress {
+		if ingress[i].IP != "" {
+			ips = append(ips, ingress[i].IP)
+		}
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s\n", name, formatLabels(svc.Labels),
 		formatLabels(svc.Spec.Selector), ips[0], svc.Spec.Ports[0].Port, svc.Spec.Ports[0].Protocol); err != nil {
 		return err
 	}
@@ -551,51 +587,64 @@ func printService(svc *api.Service, w io.Writer) error {
 	return nil
 }
 
-func printServiceList(list *api.ServiceList, w io.Writer) error {
+func printServiceList(list *api.ServiceList, w io.Writer, withNamespace bool) error {
 	for _, svc := range list.Items {
-		if err := printService(&svc, w); err != nil {
+		if err := printService(&svc, w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printEndpoints(endpoints *api.Endpoints, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\n", endpoints.Name, formatEndpoints(endpoints, nil))
+func printEndpoints(endpoints *api.Endpoints, w io.Writer, withNamespace bool) error {
+	var name string
+	if withNamespace {
+		name = types.NamespacedName{endpoints.Namespace, endpoints.Name}.String()
+	} else {
+		name = endpoints.Name
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\n", name, formatEndpoints(endpoints, nil))
 	return err
 }
 
-func printEndpointsList(list *api.EndpointsList, w io.Writer) error {
+func printEndpointsList(list *api.EndpointsList, w io.Writer, withNamespace bool) error {
 	for _, item := range list.Items {
-		if err := printEndpoints(&item, w); err != nil {
+		if err := printEndpoints(&item, w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printNamespace(item *api.Namespace, w io.Writer) error {
+func printNamespace(item *api.Namespace, w io.Writer, withNamespace bool) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", item.Name, formatLabels(item.Labels), item.Status.Phase)
 	return err
 }
 
-func printNamespaceList(list *api.NamespaceList, w io.Writer) error {
+func printNamespaceList(list *api.NamespaceList, w io.Writer, withNamespace bool) error {
 	for _, item := range list.Items {
-		if err := printNamespace(&item, w); err != nil {
+		if err := printNamespace(&item, w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printSecret(item *api.Secret, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%v\n", item.Name, item.Type, len(item.Data))
+func printSecret(item *api.Secret, w io.Writer, withNamespace bool) error {
+	var name string
+	if withNamespace {
+		name = types.NamespacedName{item.Namespace, item.Name}.String()
+	} else {
+		name = item.Name
+	}
+
+	_, err := fmt.Fprintf(w, "%s\t%s\t%v\n", name, item.Type, len(item.Data))
 	return err
 }
 
-func printSecretList(list *api.SecretList, w io.Writer) error {
+func printSecretList(list *api.SecretList, w io.Writer, withNamespace bool) error {
 	for _, item := range list.Items {
-		if err := printSecret(&item, w); err != nil {
+		if err := printSecret(&item, w, withNamespace); err != nil {
 			return err
 		}
 	}
@@ -603,14 +652,21 @@ func printSecretList(list *api.SecretList, w io.Writer) error {
 	return nil
 }
 
-func printServiceAccount(item *api.ServiceAccount, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%d\n", item.Name, len(item.Secrets))
+func printServiceAccount(item *api.ServiceAccount, w io.Writer, withNamespace bool) error {
+	var name string
+	if withNamespace {
+		name = types.NamespacedName{item.Namespace, item.Name}.String()
+	} else {
+		name = item.Name
+	}
+
+	_, err := fmt.Fprintf(w, "%s\t%d\n", name, len(item.Secrets))
 	return err
 }
 
-func printServiceAccountList(list *api.ServiceAccountList, w io.Writer) error {
+func printServiceAccountList(list *api.ServiceAccountList, w io.Writer, withNamespace bool) error {
 	for _, item := range list.Items {
-		if err := printServiceAccount(&item, w); err != nil {
+		if err := printServiceAccount(&item, w, withNamespace); err != nil {
 			return err
 		}
 	}
@@ -618,7 +674,7 @@ func printServiceAccountList(list *api.ServiceAccountList, w io.Writer) error {
 	return nil
 }
 
-func printNode(node *api.Node, w io.Writer) error {
+func printNode(node *api.Node, w io.Writer, withNamespace bool) error {
 	conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
 	NodeAllConditions := []api.NodeConditionType{api.NodeReady}
 	for i := range node.Status.Conditions {
@@ -645,16 +701,23 @@ func printNode(node *api.Node, w io.Writer) error {
 	return err
 }
 
-func printNodeList(list *api.NodeList, w io.Writer) error {
+func printNodeList(list *api.NodeList, w io.Writer, withNamespace bool) error {
 	for _, node := range list.Items {
-		if err := printNode(&node, w); err != nil {
+		if err := printNode(&node, w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printPersistentVolume(pv *api.PersistentVolume, w io.Writer) error {
+func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, withNamespace bool) error {
+	var name string
+	if withNamespace {
+		name = types.NamespacedName{pv.Namespace, pv.Name}.String()
+	} else {
+		name = pv.Name
+	}
+
 	claimRefUID := ""
 	if pv.Spec.ClaimRef != nil {
 		claimRefUID += pv.Spec.ClaimRef.Namespace
@@ -667,34 +730,41 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer) error {
 	aQty := pv.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.Value()
 
-	_, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", pv.Name, pv.Labels, aSize, modesStr, pv.Status.Phase, claimRefUID)
+	_, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", name, formatLabels(pv.Labels), aSize, modesStr, pv.Status.Phase, claimRefUID)
 	return err
 }
 
-func printPersistentVolumeList(list *api.PersistentVolumeList, w io.Writer) error {
+func printPersistentVolumeList(list *api.PersistentVolumeList, w io.Writer, withNamespace bool) error {
 	for _, pv := range list.Items {
-		if err := printPersistentVolume(&pv, w); err != nil {
+		if err := printPersistentVolume(&pv, w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", pvc.Name, pvc.Labels, pvc.Status.Phase, pvc.Spec.VolumeName)
+func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, withNamespace bool) error {
+	var name string
+	if withNamespace {
+		name = types.NamespacedName{pvc.Namespace, pvc.Name}.String()
+	} else {
+		name = pvc.Name
+	}
+
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", name, pvc.Labels, pvc.Status.Phase, pvc.Spec.VolumeName)
 	return err
 }
 
-func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, w io.Writer) error {
+func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, w io.Writer, withNamespace bool) error {
 	for _, psd := range list.Items {
-		if err := printPersistentVolumeClaim(&psd, w); err != nil {
+		if err := printPersistentVolumeClaim(&psd, w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printEvent(event *api.Event, w io.Writer) error {
+func printEvent(event *api.Event, w io.Writer, withNamespace bool) error {
 	_, err := fmt.Fprintf(
 		w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
 		event.FirstTimestamp.Time.Format(time.RFC1123Z),
@@ -711,53 +781,67 @@ func printEvent(event *api.Event, w io.Writer) error {
 }
 
 // Sorts and prints the EventList in a human-friendly format.
-func printEventList(list *api.EventList, w io.Writer) error {
+func printEventList(list *api.EventList, w io.Writer, withNamespace bool) error {
 	sort.Sort(SortableEvents(list.Items))
 	for i := range list.Items {
-		if err := printEvent(&list.Items[i], w); err != nil {
+		if err := printEvent(&list.Items[i], w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printLimitRange(limitRange *api.LimitRange, w io.Writer) error {
+func printLimitRange(limitRange *api.LimitRange, w io.Writer, withNamespace bool) error {
+	var name string
+	if withNamespace {
+		name = types.NamespacedName{limitRange.Namespace, limitRange.Name}.String()
+	} else {
+		name = limitRange.Name
+	}
+
 	_, err := fmt.Fprintf(
 		w, "%s\n",
-		limitRange.Name,
+		name,
 	)
 	return err
 }
 
 // Prints the LimitRangeList in a human-friendly format.
-func printLimitRangeList(list *api.LimitRangeList, w io.Writer) error {
+func printLimitRangeList(list *api.LimitRangeList, w io.Writer, withNamespace bool) error {
 	for i := range list.Items {
-		if err := printLimitRange(&list.Items[i], w); err != nil {
+		if err := printLimitRange(&list.Items[i], w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printResourceQuota(resourceQuota *api.ResourceQuota, w io.Writer) error {
+func printResourceQuota(resourceQuota *api.ResourceQuota, w io.Writer, withNamespace bool) error {
+	var name string
+	if withNamespace {
+		name = types.NamespacedName{resourceQuota.Namespace, resourceQuota.Name}.String()
+	} else {
+		name = resourceQuota.Name
+	}
+
 	_, err := fmt.Fprintf(
 		w, "%s\n",
-		resourceQuota.Name,
+		name,
 	)
 	return err
 }
 
 // Prints the ResourceQuotaList in a human-friendly format.
-func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer) error {
+func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer, withNamespace bool) error {
 	for i := range list.Items {
-		if err := printResourceQuota(&list.Items[i], w); err != nil {
+		if err := printResourceQuota(&list.Items[i], w, withNamespace); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printComponentStatus(item *api.ComponentStatus, w io.Writer) error {
+func printComponentStatus(item *api.ComponentStatus, w io.Writer, withNamespace bool) error {
 	status := "Unknown"
 	message := ""
 	error := ""
@@ -777,9 +861,9 @@ func printComponentStatus(item *api.ComponentStatus, w io.Writer) error {
 	return err
 }
 
-func printComponentStatusList(list *api.ComponentStatusList, w io.Writer) error {
+func printComponentStatusList(list *api.ComponentStatusList, w io.Writer, withNamespace bool) error {
 	for _, item := range list.Items {
-		if err := printComponentStatus(&item, w); err != nil {
+		if err := printComponentStatus(&item, w, withNamespace); err != nil {
 			return err
 		}
 	}
@@ -797,7 +881,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 			h.printHeader(handler.columns, w)
 			h.lastType = t
 		}
-		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(w)}
+		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(w), reflect.ValueOf(h.withNamespace)}
 		resultValue := handler.printFunc.Call(args)[0]
 		if resultValue.IsNil() {
 			return nil

@@ -42,10 +42,12 @@ func init() {
 }
 
 type quota struct {
+	*admission.Handler
 	client  client.Interface
 	indexer cache.Indexer
 }
 
+// NewResourceQuota creates a new resource quota admission control handler
 func NewResourceQuota(client client.Interface) admission.Interface {
 	lw := &cache.ListWatch{
 		ListFunc: func() (runtime.Object, error) {
@@ -57,7 +59,15 @@ func NewResourceQuota(client client.Interface) admission.Interface {
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.ResourceQuota{}, 0)
 	reflector.Run()
-	return &quota{client: client, indexer: indexer}
+	return createResourceQuota(client, indexer)
+}
+
+func createResourceQuota(client client.Interface, indexer cache.Indexer) admission.Interface {
+	return &quota{
+		Handler: admission.NewHandler(admission.Create, admission.Update),
+		client:  client,
+		indexer: indexer,
+	}
 }
 
 var resourceToResourceName = map[string]api.ResourceName{
@@ -161,7 +171,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 	}
 	obj := a.GetObject()
 	// handle max counts for each kind of resource (pods, services, replicationControllers, etc.)
-	if a.GetOperation() == "CREATE" {
+	if a.GetOperation() == admission.Create {
 		// TODO v1beta1 had camel case, v1beta3 went to all lower, we can remove this line when we deprecate v1beta1
 		resourceNormalized := strings.ToLower(a.GetResource())
 		resourceName := resourceToResourceName[resourceNormalized]
@@ -185,7 +195,7 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 		deltaCPU := resourcequota.PodCPU(pod)
 		deltaMemory := resourcequota.PodMemory(pod)
 		// if this is an update, we need to find the delta cpu/memory usage from previous state
-		if a.GetOperation() == "UPDATE" {
+		if a.GetOperation() == admission.Update {
 			oldPod, err := client.Pods(a.GetNamespace()).Get(pod.Name)
 			if err != nil {
 				return false, err

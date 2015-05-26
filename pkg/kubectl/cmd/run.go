@@ -38,8 +38,8 @@ $ kubectl run-container nginx --image=nginx --replicas=5
 // Dry run. Print the corresponding API objects without creating them.
 $ kubectl run-container nginx --image=nginx --dry-run
 
-// Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON.
-$ kubectl run-container nginx --image=nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'`
+// Start a single instance of nginx, but overload the spec of the replication controller with a partial set of values parsed from JSON.
+$ kubectl run-container nginx --image=nginx --overrides='{ "apiVersion": "v1beta3", "spec": { ... } }'`
 )
 
 func NewCmdRunContainer(f *cmdutil.Factory, out io.Writer) *cobra.Command {

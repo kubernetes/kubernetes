@@ -46,6 +46,12 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	// Maximum duration before timing out read/write requests
+	// Set to a value larger than the timeouts in each watch server.
+	ReadWriteTimeout = time.Minute * 60
+)
+
 // APIServer runs a kubernetes api server.
 type APIServer struct {
 	InsecureBindAddress        util.IP
@@ -80,6 +86,7 @@ type APIServer struct {
 	CorsAllowedOriginList      util.StringList
 	AllowPrivileged            bool
 	PortalNet                  util.IPNet // TODO: make this a list
+	ServiceNodePorts           util.PortRange
 	EnableLogsSupport          bool
 	MasterServiceNamespace     string
 	RuntimeConfig              util.ConfigurationMap
@@ -177,6 +184,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.CorsAllowedOriginList, "cors-allowed-origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
 	fs.Var(&s.PortalNet, "portal-net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
+	fs.Var(&s.ServiceNodePorts, "service-node-ports", "A port range to reserve for services with NodePort visibility.  Example: '30000-32767'.  Inclusive at both ends of the range.")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver. api/<version> key can be used to turn on/off specific api versions. api/all and api/legacy are special keys to control all and legacy api versions respectively.")
 	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
@@ -393,8 +401,8 @@ func (s *APIServer) Run(_ []string) error {
 		readOnlyServer := &http.Server{
 			Addr:           roLocation,
 			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, m.InsecureHandler)))),
-			ReadTimeout:    5 * time.Minute,
-			WriteTimeout:   5 * time.Minute,
+			ReadTimeout:    ReadWriteTimeout,
+			WriteTimeout:   ReadWriteTimeout,
 			MaxHeaderBytes: 1 << 20,
 		}
 		glog.Infof("Serving read-only insecurely on %s", roLocation)
@@ -413,8 +421,8 @@ func (s *APIServer) Run(_ []string) error {
 		secureServer := &http.Server{
 			Addr:           secureLocation,
 			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(m.Handler)),
-			ReadTimeout:    5 * time.Minute,
-			WriteTimeout:   5 * time.Minute,
+			ReadTimeout:    ReadWriteTimeout,
+			WriteTimeout:   ReadWriteTimeout,
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
@@ -454,12 +462,11 @@ func (s *APIServer) Run(_ []string) error {
 			}
 		}()
 	}
-
 	http := &http.Server{
 		Addr:           insecureLocation,
 		Handler:        apiserver.RecoverPanics(m.InsecureHandler),
-		ReadTimeout:    5 * time.Minute,
-		WriteTimeout:   5 * time.Minute,
+		ReadTimeout:    ReadWriteTimeout,
+		WriteTimeout:   ReadWriteTimeout,
 		MaxHeaderBytes: 1 << 20,
 	}
 	glog.Infof("Serving insecurely on %s", insecureLocation)

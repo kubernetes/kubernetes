@@ -48,6 +48,41 @@
     ]
    },
    {
+    "path": "/api/v1beta3/bindings",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Binding",
+      "method": "POST",
+      "summary": "create a Binding",
+      "nickname": "createBinding",
+      "parameters": [
+       {
+        "type": "v1beta3.Binding",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Binding"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1beta3/namespaces/{namespaces}/componentstatuses",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
@@ -698,6 +733,35 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta3.Endpoints",
+      "method": "POST",
+      "summary": "create a Endpoints",
+      "nickname": "createEndpoints",
+      "parameters": [
+       {
+        "type": "v1beta3.Endpoints",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Endpoints"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -1226,6 +1290,35 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta3.EventList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta3.Event",
+      "method": "POST",
+      "summary": "create a Event",
+      "nickname": "createEvent",
+      "parameters": [
+       {
+        "type": "v1beta3.Event",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Event"
        }
       ],
       "produces": [
@@ -1770,6 +1863,35 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta3.LimitRange",
+      "method": "POST",
+      "summary": "create a LimitRange",
+      "nickname": "createLimitRange",
+      "parameters": [
+       {
+        "type": "v1beta3.LimitRange",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.LimitRange"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -1821,49 +1943,6 @@
         "code": 200,
         "message": "OK",
         "responseModel": "json.WatchEvent"
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta3/minions/{name}/status",
-    "description": "API at /api/v1beta3 version v1beta3",
-    "operations": [
-     {
-      "type": "v1beta3.Node",
-      "method": "PUT",
-      "summary": "replace the specified Node",
-      "nickname": "replaceNode",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta3.Node",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta3.Node"
        }
       ],
       "produces": [
@@ -3562,6 +3641,35 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta3.PersistentVolumeClaim",
+      "method": "POST",
+      "summary": "create a PersistentVolumeClaim",
+      "nickname": "createPersistentVolumeClaim",
+      "parameters": [
+       {
+        "type": "v1beta3.PersistentVolumeClaim",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.PersistentVolumeClaim"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -5018,6 +5126,64 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta3.Pod",
+      "method": "POST",
+      "summary": "create a Pod",
+      "nickname": "createPod",
+      "parameters": [
+       {
+        "type": "v1beta3.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Pod"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta3.Binding",
+      "method": "POST",
+      "summary": "create a Binding",
+      "nickname": "createBinding",
+      "parameters": [
+       {
+        "type": "v1beta3.Binding",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Binding"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -5913,6 +6079,35 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta3.PodTemplate",
+      "method": "POST",
+      "summary": "create a PodTemplate",
+      "nickname": "createPodTemplate",
+      "parameters": [
+       {
+        "type": "v1beta3.PodTemplate",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.PodTemplate"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -6457,6 +6652,35 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta3.ReplicationController",
+      "method": "POST",
+      "summary": "create a ReplicationController",
+      "nickname": "createReplicationController",
+      "parameters": [
+       {
+        "type": "v1beta3.ReplicationController",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ReplicationController"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -6993,6 +7217,35 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta3.ResourceQuotaList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta3.ResourceQuota",
+      "method": "POST",
+      "summary": "create a ResourceQuota",
+      "nickname": "createResourceQuota",
+      "parameters": [
+       {
+        "type": "v1beta3.ResourceQuota",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ResourceQuota"
        }
       ],
       "produces": [
@@ -7596,6 +7849,35 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta3.Secret",
+      "method": "POST",
+      "summary": "create a Secret",
+      "nickname": "createSecret",
+      "parameters": [
+       {
+        "type": "v1beta3.Secret",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Secret"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -7608,6 +7890,579 @@
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
       "nickname": "watchSecretlist",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/namespaces/{namespaces}/serviceaccounts",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.ServiceAccountList",
+      "method": "GET",
+      "summary": "list or watch objects of kind ServiceAccount",
+      "nickname": "listServiceAccount",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ServiceAccountList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta3.ServiceAccount",
+      "method": "POST",
+      "summary": "create a ServiceAccount",
+      "nickname": "createServiceAccount",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.ServiceAccount",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ServiceAccount"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/watch/namespaces/{namespaces}/serviceaccounts",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of ServiceAccount",
+      "nickname": "watchServiceAccountlist",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/namespaces/{namespaces}/serviceaccounts/{name}",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.ServiceAccount",
+      "method": "GET",
+      "summary": "read the specified ServiceAccount",
+      "nickname": "readServiceAccount",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ServiceAccount",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ServiceAccount"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta3.ServiceAccount",
+      "method": "PUT",
+      "summary": "replace the specified ServiceAccount",
+      "nickname": "replaceServiceAccount",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ServiceAccount",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.ServiceAccount",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ServiceAccount"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta3.ServiceAccount",
+      "method": "PATCH",
+      "summary": "partially update the specified ServiceAccount",
+      "nickname": "patchServiceAccount",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ServiceAccount",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "v1beta3.Status",
+      "method": "DELETE",
+      "summary": "delete a ServiceAccount",
+      "nickname": "deleteServiceAccount",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ServiceAccount",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Status"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/watch/namespaces/{namespaces}/serviceaccounts/{name}",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch changes to an object of kind ServiceAccount",
+      "nickname": "watchServiceAccount",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ServiceAccount",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/serviceaccounts",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.ServiceAccountList",
+      "method": "GET",
+      "summary": "list or watch objects of kind ServiceAccount",
+      "nickname": "listServiceAccount",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ServiceAccountList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta3.ServiceAccount",
+      "method": "POST",
+      "summary": "create a ServiceAccount",
+      "nickname": "createServiceAccount",
+      "parameters": [
+       {
+        "type": "v1beta3.ServiceAccount",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ServiceAccount"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/watch/serviceaccounts",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of ServiceAccount",
+      "nickname": "watchServiceAccountlist",
       "parameters": [
        {
         "type": "string",
@@ -8588,6 +9443,35 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta3.Service",
+      "method": "POST",
+      "summary": "create a Service",
+      "nickname": "createService",
+      "parameters": [
+       {
+        "type": "v1beta3.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Service"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -8668,7 +9552,8 @@
    "v1beta3.AWSElasticBlockStoreVolumeSource": {
     "id": "v1beta3.AWSElasticBlockStoreVolumeSource",
     "required": [
-     "volumeID"
+     "volumeID",
+     "fsType"
     ],
     "properties": {
      "fsType": {
@@ -8821,8 +9706,7 @@
     "id": "v1beta3.Container",
     "required": [
      "name",
-     "image",
-     "imagePullPolicy"
+     "image"
     ],
     "properties": {
      "args": {
@@ -9060,9 +9944,6 @@
    },
    "v1beta3.DeleteOptions": {
     "id": "v1beta3.DeleteOptions",
-    "required": [
-     "gracePeriodSeconds"
-    ],
     "properties": {
      "apiVersion": {
       "type": "string",
@@ -9081,9 +9962,6 @@
    },
    "v1beta3.EmptyDirVolumeSource": {
     "id": "v1beta3.EmptyDirVolumeSource",
-    "required": [
-     "medium"
-    ],
     "properties": {
      "medium": {
       "type": "string",
@@ -9236,7 +10114,8 @@
    "v1beta3.Event": {
     "id": "v1beta3.Event",
     "required": [
-     "metadata"
+     "metadata",
+     "involvedObject"
     ],
     "properties": {
      "apiVersion": {
@@ -9341,7 +10220,8 @@
    "v1beta3.GCEPersistentDiskVolumeSource": {
     "id": "v1beta3.GCEPersistentDiskVolumeSource",
     "required": [
-     "pdName"
+     "pdName",
+     "fsType"
     ],
     "properties": {
      "fsType": {
@@ -9366,8 +10246,7 @@
    "v1beta3.GitRepoVolumeSource": {
     "id": "v1beta3.GitRepoVolumeSource",
     "required": [
-     "repository",
-     "revision"
+     "repository"
     ],
     "properties": {
      "repository": {
@@ -9403,6 +10282,9 @@
    },
    "v1beta3.HTTPGetAction": {
     "id": "v1beta3.HTTPGetAction",
+    "required": [
+     "port"
+    ],
     "properties": {
      "host": {
       "type": "string",
@@ -9449,6 +10331,12 @@
    },
    "v1beta3.ISCSIVolumeSource": {
     "id": "v1beta3.ISCSIVolumeSource",
+    "required": [
+     "targetPortal",
+     "iqn",
+     "lun",
+     "fsType"
+    ],
     "properties": {
      "fsType": {
       "type": "string",
@@ -10009,7 +10897,8 @@
       "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
-      "$ref": "v1beta3.PersistentVolumeClaimSpec"
+      "$ref": "v1beta3.PersistentVolumeClaimSpec",
+      "description": "the desired characteristics of a volume"
      },
      "status": {
       "$ref": "v1beta3.PersistentVolumeClaimStatus",
@@ -10028,14 +10917,16 @@
       "type": "array",
       "items": {
        "$ref": "v1beta3.PersistentVolumeClaim"
-      }
+      },
+      "description": "a list of persistent volume claims"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "metadata": {
-      "$ref": "v1beta3.ListMeta"
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds"
      }
     }
    },
@@ -10052,6 +10943,10 @@
      "resources": {
       "$ref": "v1beta3.ResourceRequirements",
       "description": "the desired resources the volume should have"
+     },
+     "volumeName": {
+      "type": "string",
+      "description": "the binding reference to the persistent volume backing this claim"
      }
     }
    },
@@ -10072,10 +10967,6 @@
      "phase": {
       "type": "string",
       "description": "the current phase of the claim"
-     },
-     "volumeRef": {
-      "$ref": "v1beta3.ObjectReference",
-      "description": "a reference to the backing persistent volume, when bound"
      }
     }
    },
@@ -10111,19 +11002,13 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "metadata": {
-      "$ref": "v1beta3.ListMeta"
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds"
      }
     }
    },
    "v1beta3.PersistentVolumeSpec": {
     "id": "v1beta3.PersistentVolumeSpec",
-    "required": [
-     "gcePersistentDisk",
-     "awsElasticBlockStore",
-     "hostPath",
-     "glusterfs",
-     "nfs"
-    ],
     "properties": {
      "accessModes": {
       "type": "array",
@@ -10142,7 +11027,7 @@
      },
      "claimRef": {
       "$ref": "v1beta3.ObjectReference",
-      "description": "the binding reference to a persistent volume claim"
+      "description": "when bound, a reference to the bound claim"
      },
      "gcePersistentDisk": {
       "$ref": "v1beta3.GCEPersistentDiskVolumeSource",
@@ -10235,15 +11120,16 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "metadata": {
-      "$ref": "v1beta3.ListMeta"
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds"
      }
     }
    },
    "v1beta3.PodSpec": {
     "id": "v1beta3.PodSpec",
     "required": [
-     "volumes",
-     "containers"
+     "containers",
+     "serviceAccount"
     ],
     "properties": {
      "activeDeadlineSeconds": {
@@ -10276,6 +11162,10 @@
      "restartPolicy": {
       "type": "string",
       "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"
+     },
+     "serviceAccount": {
+      "type": "string",
+      "description": "name of the ServiceAccount to use to run this pod"
      },
      "terminationGracePeriodSeconds": {
       "type": "integer",
@@ -10472,9 +11362,6 @@
    },
    "v1beta3.ReplicationControllerSpec": {
     "id": "v1beta3.ReplicationControllerSpec",
-    "required": [
-     "replicas"
-    ],
     "properties": {
      "replicas": {
       "type": "integer",
@@ -10625,7 +11512,7 @@
      },
      "data": {
       "type": "any",
-      "description": "data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"
+      "description": "data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string as described in https://tools.ietf.org/html/rfc4648#section-4"
      },
      "kind": {
       "type": "string",
@@ -10727,6 +11614,57 @@
      }
     }
    },
+   "v1beta3.ServiceAccount": {
+    "id": "v1beta3.ServiceAccount",
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
+     },
+     "secrets": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta3.ObjectReference"
+      },
+      "description": "list of secrets that can be used by pods running as this service account"
+     }
+    }
+   },
+   "v1beta3.ServiceAccountList": {
+    "id": "v1beta3.ServiceAccountList",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta3.ServiceAccount"
+      },
+      "description": "list of ServiceAccounts"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
+     }
+    }
+   },
    "v1beta3.ServiceList": {
     "id": "v1beta3.ServiceList",
     "required": [
@@ -10757,10 +11695,7 @@
    "v1beta3.ServicePort": {
     "id": "v1beta3.ServicePort",
     "required": [
-     "name",
-     "protocol",
-     "port",
-     "targetPort"
+     "port"
     ],
     "properties": {
      "name": {
@@ -10786,7 +11721,6 @@
     "id": "v1beta3.ServiceSpec",
     "required": [
      "ports",
-     "selector",
      "portalIP"
     ],
     "properties": {
@@ -10907,6 +11841,9 @@
    },
    "v1beta3.TCPSocketAction": {
     "id": "v1beta3.TCPSocketAction",
+    "required": [
+     "port"
+    ],
     "properties": {
      "port": {
       "type": "string",
@@ -10917,16 +11854,7 @@
    "v1beta3.Volume": {
     "id": "v1beta3.Volume",
     "required": [
-     "name",
-     "emptyDir",
-     "secret",
-     "glusterfs",
-     "nfs",
-     "iscsi",
-     "hostPath",
-     "gcePersistentDisk",
-     "awsElasticBlockStore",
-     "gitRepo"
+     "name"
     ],
     "properties": {
      "awsElasticBlockStore": {

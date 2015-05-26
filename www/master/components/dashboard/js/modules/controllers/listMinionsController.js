@@ -28,12 +28,7 @@ app.controller('ListMinionsCtrl', [
     $scope.thumbs = 'thumb';
     $scope.count = 10;
 
-    $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
-
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
+    $scope.go = function(data) { $location.path('/dashboard/nodes/' + data.name); };
 
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
@@ -42,7 +37,7 @@ app.controller('ListMinionsCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getMinions().success(function(data) {
         $scope.loading = false;
@@ -70,7 +65,7 @@ app.controller('ListMinionsCtrl', [
       }).error($scope.handleError);
     }
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);

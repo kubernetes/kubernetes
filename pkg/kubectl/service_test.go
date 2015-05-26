@@ -144,7 +144,7 @@ func TestGenerateService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromString("foobar"),
 						},
 					},
-					PublicIPs: []string{"1.2.3.4"},
+					DeprecatedPublicIPs: []string{"1.2.3.4"},
 				},
 			},
 		},
@@ -175,8 +175,69 @@ func TestGenerateService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromString("foobar"),
 						},
 					},
-					PublicIPs:                  []string{"1.2.3.4"},
-					CreateExternalLoadBalancer: true,
+					Type:                api.ServiceTypeLoadBalancer,
+					DeprecatedPublicIPs: []string{"1.2.3.4"},
+				},
+			},
+		},
+		{
+			params: map[string]string{
+				"selector":       "foo=bar,baz=blah",
+				"name":           "test",
+				"port":           "80",
+				"protocol":       "UDP",
+				"container-port": "foobar",
+				"type":           string(api.ServiceTypeNodePort),
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "default",
+							Port:       80,
+							Protocol:   "UDP",
+							TargetPort: util.NewIntOrStringFromString("foobar"),
+						},
+					},
+					Type: api.ServiceTypeNodePort,
+				},
+			},
+		},
+		{
+			params: map[string]string{
+				"selector":                      "foo=bar,baz=blah",
+				"name":                          "test",
+				"port":                          "80",
+				"protocol":                      "UDP",
+				"container-port":                "foobar",
+				"create-external-load-balancer": "true", // ignored when type is present
+				"type": string(api.ServiceTypeNodePort),
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "default",
+							Port:       80,
+							Protocol:   "UDP",
+							TargetPort: util.NewIntOrStringFromString("foobar"),
+						},
+					},
+					Type: api.ServiceTypeNodePort,
 				},
 			},
 		},
