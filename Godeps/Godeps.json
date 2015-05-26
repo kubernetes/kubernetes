@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.3.3",
+	"GoVersion": "go1.4.2",
 	"Packages": [
 		"./..."
 	],
@@ -123,21 +123,6 @@
 			"Rev": "5ca80149b9d3f8b863af0e2bb6742e608603bd99"
 		},
 		{
-			"ImportPath": "github.com/docker/docker/pkg/archive",
-			"Comment": "v1.4.1-1714-ged66853",
-			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
-		},
-		{
-			"ImportPath": "github.com/docker/docker/pkg/fileutils",
-			"Comment": "v1.4.1-1714-ged66853",
-			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
-		},
-		{
-			"ImportPath": "github.com/docker/docker/pkg/ioutils",
-			"Comment": "v1.4.1-1714-ged66853",
-			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
-		},
-		{
 			"ImportPath": "github.com/docker/docker/pkg/mount",
 			"Comment": "v1.4.1-1714-ged66853",
 			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
@@ -148,32 +133,12 @@
 			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
 		},
 		{
-			"ImportPath": "github.com/docker/docker/pkg/pools",
-			"Comment": "v1.4.1-1714-ged66853",
-			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
-		},
-		{
-			"ImportPath": "github.com/docker/docker/pkg/promise",
-			"Comment": "v1.4.1-1714-ged66853",
-			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
-		},
-		{
-			"ImportPath": "github.com/docker/docker/pkg/system",
-			"Comment": "v1.4.1-1714-ged66853",
-			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
-		},
-		{
 			"ImportPath": "github.com/docker/docker/pkg/term",
 			"Comment": "v1.4.1-1714-ged66853",
 			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/units",
-			"Comment": "v1.4.1-1714-ged66853",
-			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
-		},
-		{
-			"ImportPath": "github.com/docker/docker/vendor/src/code.google.com/p/go/src/pkg/archive/tar",
 			"Comment": "v1.4.1-1714-ged66853",
 			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
 		},
@@ -468,10 +433,6 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
-			"Rev": "e4ec8152c15fc46bd5056ce65997a07c7d415325"
-		},
-		{
-			"ImportPath": "github.com/stretchr/testify/suite",
 			"Rev": "e4ec8152c15fc46bd5056ce65997a07c7d415325"
 		},
 		{
