@@ -18,24 +18,43 @@ package main
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/google/go-github/github"
+	flag "github.com/spf13/pflag"
+	"golang.org/x/oauth2"
 )
 
-var target = flag.Int("last-release-pr", 0, "The PR number of the last versioned release.")
+var (
+	target int
+	token  string
+)
+
+func init() {
+	flag.IntVar(&target, "last-release-pr", 0, "The PR number of the last versioned release.")
+	flag.StringVar(&token, "api-token", "", "Github api token for rate limiting. See https://developer.github.com/v3/#rate-limiting.")
+}
 
 func main() {
 	flag.Parse()
 	// Automatically determine this from github.
-	if *target == 0 {
+	if target == 0 {
 		fmt.Printf("--last-release-pr is required.\n")
 		os.Exit(1)
 	}
+	var tc *http.Client
 
-	client := github.NewClient(nil)
+	if len(token) > 0 {
+		tc = oauth2.NewClient(
+			oauth2.NoContext,
+			oauth2.StaticTokenSource(
+				&oauth2.Token{AccessToken: token}),
+		)
+	}
+
+	client := github.NewClient(tc)
 
 	done := false
 
@@ -62,7 +81,7 @@ func main() {
 			if result.MergedAt == nil {
 				continue
 			}
-			if *result.Number == *target {
+			if *result.Number == target {
 				done = true
 				break
 			}
