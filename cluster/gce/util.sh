@@ -406,7 +406,7 @@ function create-node-template {
       --network "${NETWORK}" \
       $2 \
       --can-ip-forward \
-      --metadata-from-file "$3" "$4"; then
+      --metadata-from-file "$3","$4"; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template $1 ${color_norm}" >&2
           exit 2
@@ -459,7 +459,7 @@ function add-instance-metadata-from-file {
     if ! gcloud compute instances add-metadata "${instance}" \
       --project "${PROJECT}" \
       --zone "${ZONE}" \
-      --metadata-from-file "${kvs[@]}"; then
+      --metadata-from-file $(IFS=, ; echo "${kvs[*]}"); then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}"
           exit 2
