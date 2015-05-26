@@ -1185,10 +1185,14 @@ func getDebugInfo(c *client.Client) (map[string]string, error) {
 	data := make(map[string]string)
 	for _, key := range []string{"block", "goroutine", "heap", "threadcreate"} {
 		resp, err := http.Get(c.Get().AbsPath(fmt.Sprintf("debug/pprof/%s", key)).URL().String() + "?debug=2")
+		if err != nil {
+			Logf("Warning: Error trying to fetch %s debug data: %v", key, err)
+			continue
+		}
 		body, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			Logf("Warning: Error trying to fetch %s debug data: %v", key, err)
+			Logf("Warning: Error trying to read %s debug data: %v", key, err)
 		}
 		data[key] = string(body)
 	}
