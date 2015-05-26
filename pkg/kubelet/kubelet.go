@@ -1819,7 +1819,9 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 
 	networkConfigured := true
 	if kl.configureCBR0 {
-		if err := kl.reconcileCBR0(node.Spec.PodCIDR); err != nil {
+		if len(node.Spec.PodCIDR) == 0 {
+			networkConfigured = false
+		} else if err := kl.reconcileCBR0(node.Spec.PodCIDR); err != nil {
 			networkConfigured = false
 			glog.Errorf("Error configuring cbr0: %v", err)
 		}
