@@ -456,7 +456,10 @@ func (s *APIServer) Run(_ []string) error {
 						glog.Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
 					}
 				}
-				_ = systemd.SdNotify("READY=1\n")
+				// err == systemd.SdNotifyNoSocket when not running on a systemd system
+				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
+					glog.Errorf("Unable to send systemd daemon sucessful start message: %v\n", err)
+				}
 				if err := secureServer.ListenAndServeTLS(s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
 				}
@@ -472,7 +475,10 @@ func (s *APIServer) Run(_ []string) error {
 		MaxHeaderBytes: 1 << 20,
 	}
 	if secureLocation == "" {
-		_ = systemd.SdNotify("READY=1\n")
+		// err == systemd.SdNotifyNoSocket when not running on a systemd system
+		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
+			glog.Errorf("Unable to send systemd daemon sucessful start message: %v\n", err)
+		}
 	}
 	glog.Infof("Serving insecurely on %s", insecureLocation)
 	glog.Fatal(http.ListenAndServe())
