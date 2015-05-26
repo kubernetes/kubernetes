@@ -164,10 +164,11 @@ coreos:
         After=kube-apiserver.service fleet.service
 
         [Service]
-        ExecStartPre=-/usr/bin/wget -nc -O /opt/bin/kube-register https://github.com/kelseyhightower/kube-register/releases/download/v0.0.3/kube-register-0.0.3-linux-amd64
+        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-register -z /opt/bin/kube-register https://github.com/kelseyhightower/kube-register/releases/download/v0.0.4/kube-register-0.0.4-linux-amd64
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register
         ExecStart=/opt/bin/kube-register \
         --metadata=k8srole=node \
+        --reverse-lookup=true \
         --fleet-endpoint=unix:///var/run/fleet.sock \
         --api-endpoint=http://127.0.0.1:8080
         Restart=always

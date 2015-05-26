@@ -53,8 +53,7 @@ coreos:
         # wait for kubernetes master to be up and ready
         ExecStartPre=/opt/bin/wupiao <master-private-ip> 8080
         ExecStart=/opt/bin/kubelet \
-        --api-servers=<master-private-ip>:8080 \
-        --hostname-override=$private_ipv4
+        --api-servers=<master-private-ip>:8080
         Restart=always
         RestartSec=10
     - name: kube-proxy.service
