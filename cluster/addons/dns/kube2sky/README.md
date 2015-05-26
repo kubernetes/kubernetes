@@ -21,8 +21,13 @@ example, if this is set to `kubernetes.io`, then a service named "nifty" in the
 
 `-verbose`: Log additional information.
 
-'-etcd_mutation_timeout': For how long the application will keep retrying etcd 
+`-etcd_mutation_timeout`: For how long the application will keep retrying etcd 
 mutation (insertion or removal of a dns entry) before giving up and crashing.
 
+`--etcd-server`: The etcd server that is being used by skydns.
+
+`--kube_master_url`: URL of kubernetes master. Reuired if `--kubecfg_file` is not set.
+
+`--kubecfg_file`: Path to kubecfg file that contains the master URL and tokens to authenticate with the master.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns/kube2sky/README.md?pixel)]()

@@ -23,17 +23,19 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	kcache "github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	kclientcmd "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	kclientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
-	kcontrollerFramework "github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
+	kframework "github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	kSelector "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	tools "github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -56,11 +58,19 @@ const (
 	maxConnectAttempts = 12
 	// Resync period for the kube controller loop.
 	resyncPeriod = 5 * time.Second
+	// A subdomain added to the user specified domain for all services.
+	serviceSubdomain = "svc"
 )
 
 type etcdClient interface {
 	Set(path, value string, ttl uint64) (*etcd.Response, error)
+	RawGet(key string, sort, recursive bool) (*etcd.RawResponse, error)
 	Delete(path string, recursive bool) (*etcd.Response, error)
+}
+
+type nameNamespace struct {
+	name      string
+	namespace string
 }
 
 type kube2sky struct {
@@ -70,41 +80,160 @@ type kube2sky struct {
 	domain string
 	// Etcd mutation timeout.
 	etcdMutationTimeout time.Duration
+	// A cache that contains all the endpoints in the system.
+	endpointsStore kcache.Store
+	// A cache that contains all the servicess in the system.
+	servicesStore kcache.Store
+	// Lock for controlling access to headless services.
+	mlock sync.Mutex
 }
 
-func (ks *kube2sky) removeDNS(record string) error {
-	glog.V(2).Infof("Removing %s from DNS", record)
-	_, err := ks.etcdClient.Delete(skymsg.Path(record), true)
+// Removes 'subdomain' from etcd.
+func (ks *kube2sky) removeDNS(subdomain string) error {
+	glog.V(2).Infof("Removing %s from DNS", subdomain)
+	resp, err := ks.etcdClient.RawGet(skymsg.Path(subdomain), false, false)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		glog.V(2).Infof("Subdomain %q does not exist in etcd", subdomain)
+		return nil
+	}
+	_, err = ks.etcdClient.Delete(skymsg.Path(subdomain), true)
 	return err
 }
 
-func (ks *kube2sky) addDNS(record string, service *kapi.Service) error {
-	// if PortalIP is not set, a DNS entry should not be created
-	if !kapi.IsServiceIPSet(service) {
-		glog.V(1).Infof("Skipping dns record for headless service: %s\n", service.Name)
+func (ks *kube2sky) writeSkyRecord(subdomain string, data string) error {
+	// Set with no TTL, and hope that kubernetes events are accurate.
+	_, err := ks.etcdClient.Set(skymsg.Path(subdomain), data, uint64(0))
+	return err
+}
+
+// Generates skydns records for a headless service.
+func (ks *kube2sky) newHeadlessService(subdomain string, service *kapi.Service) error {
+	// Create an A record for every pod in the service.
+	// This record must be periodically updated.
+	// Format is as follows:
+	// For a service x, with pods a and b create DNS records,
+	// a.x.ns.domain. and, b.x.ns.domain.
+	// TODO: Handle multi-port services.
+	ks.mlock.Lock()
+	defer ks.mlock.Unlock()
+	key, err := kcache.MetaNamespaceKeyFunc(service)
+	if err != nil {
+		return err
+	}
+	e, exists, err := ks.endpointsStore.GetByKey(key)
+	if err != nil {
+		return fmt.Errorf("failed to get endpoints object from endpoints store - %v", err)
+	}
+	if !exists {
+		glog.V(1).Infof("could not find endpoints for service %q in namespace %q. DNS records will be created once endpoints show up.", service.Name, service.Namespace)
 		return nil
 	}
+	if e, ok := e.(*kapi.Endpoints); ok {
+		return ks.generateRecordsForHeadlessService(subdomain, e, service)
+	}
+	return nil
+}
 
-	for i := range service.Spec.Ports {
-		svc := skymsg.Service{
-			Host:     service.Spec.PortalIP,
-			Port:     service.Spec.Ports[i].Port,
-			Priority: 10,
-			Weight:   10,
-			Ttl:      30,
+func getSkyMsg(ip string, port int) *skymsg.Service {
+	return &skymsg.Service{
+		Host:     ip,
+		Port:     port,
+		Priority: 10,
+		Weight:   10,
+		Ttl:      30,
+	}
+}
+
+func (ks *kube2sky) generateRecordsForHeadlessService(subdomain string, e *kapi.Endpoints, svc *kapi.Service) error {
+	for idx := range e.Subsets {
+		for subIdx := range e.Subsets[idx].Addresses {
+			subdomain := buildDNSNameString(subdomain, fmt.Sprintf("%d%d", idx, subIdx))
+			b, err := json.Marshal(getSkyMsg(e.Subsets[idx].Addresses[subIdx].IP, svc.Spec.Ports[0].Port))
+			if err != nil {
+				return err
+			}
+			glog.V(2).Infof("Setting DNS record: %v -> %q\n", subdomain, string(b))
+			if err := ks.writeSkyRecord(subdomain, string(b)); err != nil {
+				return err
+			}
 		}
-		b, err := json.Marshal(svc)
+	}
+
+	return nil
+}
+
+func (ks *kube2sky) getServiceFromEndpoints(e *kapi.Endpoints) (*kapi.Service, error) {
+	key, err := kcache.MetaNamespaceKeyFunc(e)
+	if err != nil {
+		return nil, err
+	}
+	obj, exists, err := ks.servicesStore.GetByKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service object from services store - %v", err)
+	}
+	if !exists {
+		glog.V(1).Infof("could not find service for endpoint %q in namespace %q", e.Name, e.Namespace)
+		return nil, nil
+	}
+	if svc, ok := obj.(*kapi.Service); ok {
+		return svc, nil
+	}
+	return nil, fmt.Errorf("got a non service object in services store %v", obj)
+}
+
+func (ks *kube2sky) addDNSUsingEndpoints(subdomain string, e *kapi.Endpoints) error {
+	ks.mlock.Lock()
+	defer ks.mlock.Unlock()
+	svc, err := ks.getServiceFromEndpoints(e)
+	if err != nil {
+		return err
+	}
+	if svc == nil || kapi.IsServiceIPSet(svc) {
+		// No headless service found corresponding to endpoints object.
+		return nil
+	}
+	// Remove existing DNS entry.
+	if err := ks.removeDNS(subdomain); err != nil {
+		return err
+	}
+	return ks.generateRecordsForHeadlessService(subdomain, e, svc)
+}
+
+func (ks *kube2sky) handleEndpointAdd(obj interface{}) {
+	if e, ok := obj.(*kapi.Endpoints); ok {
+		name := buildDNSNameString(ks.domain, e.Namespace, e.Name)
+		ks.mutateEtcdOrDie(func() error { return ks.addDNSUsingEndpoints(name, e) })
+		name = buildDNSNameString(ks.domain, serviceSubdomain, e.Namespace, e.Name)
+		ks.mutateEtcdOrDie(func() error { return ks.addDNSUsingEndpoints(name, e) })
+	}
+}
+
+func (ks *kube2sky) generateRecordsForPortalService(subdomain string, service *kapi.Service) error {
+	for i := range service.Spec.Ports {
+		b, err := json.Marshal(getSkyMsg(service.Spec.PortalIP, service.Spec.Ports[i].Port))
 		if err != nil {
 			return err
 		}
-		// Set with no TTL, and hope that kubernetes events are accurate.
-		glog.V(2).Infof("Setting DNS record: %v -> %s:%d\n", record, service.Spec.PortalIP, service.Spec.Ports[i].Port)
-		_, err = ks.etcdClient.Set(skymsg.Path(record), string(b), uint64(0))
-		if err != nil {
+		glog.V(2).Infof("Setting DNS record: %v -> %q\n", subdomain, string(b))
+		if err := ks.writeSkyRecord(subdomain, string(b)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (ks *kube2sky) addDNS(subdomain string, service *kapi.Service) error {
+	if len(service.Spec.Ports) == 0 {
+		glog.Fatalf("unexpected service with no ports: %v", service)
+	}
+	// if PortalIP is not set, a DNS entry should not be created
+	if !kapi.IsServiceIPSet(service) {
+		return ks.newHeadlessService(subdomain, service)
+	}
+	return ks.generateRecordsForPortalService(subdomain, service)
 }
 
 // Implements retry logic for arbitrary mutator. Crashes after retrying for
@@ -124,6 +253,47 @@ func (ks *kube2sky) mutateEtcdOrDie(mutator func() error) {
 				return
 			}
 		}
+	}
+}
+
+func buildDNSNameString(labels ...string) string {
+	var res string
+	for _, label := range labels {
+		if res == "" {
+			res = label
+		} else {
+			res = fmt.Sprintf("%s.%s", label, res)
+		}
+	}
+	return res
+}
+
+// Returns a cache.ListWatch that gets all changes to services.
+func createServiceLW(kubeClient *kclient.Client) *kcache.ListWatch {
+	return kcache.NewListWatchFromClient(kubeClient, "services", kapi.NamespaceAll, kSelector.Everything())
+}
+
+// Returns a cache.ListWatch that gets all changes to endpoints.
+func createEndpointsLW(kubeClient *kclient.Client) *kcache.ListWatch {
+	return kcache.NewListWatchFromClient(kubeClient, "endpoints", kapi.NamespaceAll, kSelector.Everything())
+}
+
+func (ks *kube2sky) newService(obj interface{}) {
+	if s, ok := obj.(*kapi.Service); ok {
+		//TODO(artfulcoder) stop adding and deleting old-format string for service
+		name := buildDNSNameString(ks.domain, s.Namespace, s.Name)
+		ks.mutateEtcdOrDie(func() error { return ks.addDNS(name, s) })
+		name = buildDNSNameString(ks.domain, serviceSubdomain, s.Namespace, s.Name)
+		ks.mutateEtcdOrDie(func() error { return ks.addDNS(name, s) })
+	}
+}
+
+func (ks *kube2sky) removeService(obj interface{}) {
+	if s, ok := obj.(*kapi.Service); ok {
+		name := buildDNSNameString(ks.domain, s.Namespace, s.Name)
+		ks.mutateEtcdOrDie(func() error { return ks.removeDNS(name) })
+		name = buildDNSNameString(ks.domain, serviceSubdomain, s.Namespace, s.Name)
+		ks.mutateEtcdOrDie(func() error { return ks.removeDNS(name) })
 	}
 }
 
@@ -204,61 +374,52 @@ func newKubeClient() (*kclient.Client, error) {
 	return kclient.New(config)
 }
 
-func buildOldNameString(service, namespace, domain string) string {
-	return fmt.Sprintf("%s.%s.%s.", service, namespace, domain)
-}
-
-func buildNewServiceNameString(service, namespace, domain string) string {
-	return fmt.Sprintf("%s.%s.svc.%s.", service, namespace, domain)
-}
-
-// Returns a cache.ListWatch that gets all changes to services.
-func createServiceLW(kubeClient *kclient.Client) *cache.ListWatch {
-	return cache.NewListWatchFromClient(kubeClient, "services", kapi.NamespaceAll, kSelector.Everything())
-}
-
-func (ks *kube2sky) newService(obj interface{}) {
-	if s, ok := obj.(*kapi.Service); ok {
-		//TODO(artfulcoder) stop adding and deleting old-format string for service
-		name := buildOldNameString(s.Name, s.Namespace, ks.domain)
-		ks.mutateEtcdOrDie(func() error { return ks.addDNS(name, s) })
-		name1 := buildNewServiceNameString(s.Name, s.Namespace, ks.domain)
-		ks.mutateEtcdOrDie(func() error { return ks.addDNS(name1, s) })
-	}
-}
-
-func (ks *kube2sky) removeService(obj interface{}) {
-	if s, ok := obj.(*kapi.Service); ok {
-		name := buildOldNameString(s.Name, s.Namespace, ks.domain)
-		ks.mutateEtcdOrDie(func() error { return ks.removeDNS(name) })
-		name1 := buildNewServiceNameString(s.Name, s.Namespace, ks.domain)
-		ks.mutateEtcdOrDie(func() error { return ks.removeDNS(name1) })
-	}
-}
-
-func watchForServices(kubeClient *kclient.Client, ks *kube2sky) {
-	var serviceController *kcontrollerFramework.Controller
-	_, serviceController = framework.NewInformer(
+func watchForServices(kubeClient *kclient.Client, ks *kube2sky) kcache.Store {
+	serviceStore, serviceController := kframework.NewInformer(
 		createServiceLW(kubeClient),
 		&kapi.Service{},
 		resyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		kframework.ResourceEventHandlerFuncs{
 			AddFunc:    ks.newService,
 			DeleteFunc: ks.removeService,
 			UpdateFunc: func(oldObj, newObj interface{}) {
+				// TODO: Avoid unwanted updates.
 				ks.newService(newObj)
 			},
 		},
 	)
-	serviceController.Run(util.NeverStop)
+	go serviceController.Run(util.NeverStop)
+	return serviceStore
+}
+
+func watchEndpoints(kubeClient *kclient.Client, ks *kube2sky) kcache.Store {
+	eStore, eController := kframework.NewInformer(
+		createEndpointsLW(kubeClient),
+		&kapi.Endpoints{},
+		resyncPeriod,
+		kframework.ResourceEventHandlerFuncs{
+			AddFunc: ks.handleEndpointAdd,
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				// TODO: Avoid unwanted updates.
+				ks.handleEndpointAdd(newObj)
+			},
+		},
+	)
+
+	go eController.Run(util.NeverStop)
+	return eStore
 }
 
 func main() {
 	flag.Parse()
 	var err error
 	// TODO: Validate input flags.
+	domain := *argDomain
+	if !strings.HasSuffix(domain, ".") {
+		domain = fmt.Sprintf("%s.", domain)
+	}
 	ks := kube2sky{
-		domain:              *argDomain,
+		domain:              domain,
 		etcdMutationTimeout: *argEtcdMutationTimeout,
 	}
 	if ks.etcdClient, err = newEtcdClient(*argEtcdServer); err != nil {
@@ -270,5 +431,8 @@ func main() {
 		glog.Fatalf("Failed to create a kubernetes client: %v", err)
 	}
 
-	watchForServices(kubeClient, &ks)
+	ks.endpointsStore = watchEndpoints(kubeClient, &ks)
+	ks.servicesStore = watchForServices(kubeClient, &ks)
+
+	select {}
 }
