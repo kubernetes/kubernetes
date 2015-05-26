@@ -1,3 +1,7 @@
 * Fri May 15 2015  Tim Hockin <thockin@google.com>
   - First Changelog entry
   - Current version is 1.4
+
+
+## Version 1.7 (May 25 2015 Vishnu Kannan <vishnuk@google.com>)
+- Adding support for headless services. All pods backing a headless service is addressible via DNS RR.
