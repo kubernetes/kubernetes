@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package jq
 import (
 	"fmt"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -128,6 +129,18 @@ func (l *lexer) next() rune {
 	return r
 }
 
+// peek returns but does not consume the next rune in the input.
+func (l *lexer) peek() rune {
+	r := l.next()
+	l.backup()
+	return r
+}
+
+// backup steps back one rune. Can only be called once per call of next.
+func (l *lexer) backup() {
+	l.pos -= l.width
+}
+
 // emit passes an item back to the client
 func (l *lexer) emit(t itemType) {
 	l.items <- item{t, l.start, l.input[l.start:l.pos]}
@@ -146,6 +159,28 @@ func (l *lexer) run() {
 	for l.state = lexText; l.state != nil; {
 		l.state = l.state(l)
 	}
+}
+
+// atTerminator reports whether the input is at valid termination character to
+// appear after an identifier. Breaks .X.Y into two pieces. Also catches cases
+// like "$x+2" not being acceptable without a space, in case we decide one
+// day to implement arithmetic.
+func (l *lexer) atTerminator() bool {
+	r := l.peek()
+	if isSpace(r) || isEndOfLine(r) {
+		return true
+	}
+	switch r {
+	case eof, '.', ',', '|', ':', ')', '(':
+		return true
+	}
+	// Does r start the delimiter? This can be ambiguous (with delim=="//", $x/2 will
+	// succeed but should fail) but only in extremely rare cases caused by willfully
+	// bad choice of delimiter.
+	if rd, _ := utf8.DecodeRuneInString(l.rightDelim); rd == r {
+		return true
+	}
+	return false
 }
 
 // lexText scans until an opening action delimiter.
@@ -202,11 +237,36 @@ func lexInsideAction(l *lexer) stateFn {
 // lexField scans a field: .Alphanumeric.
 // The . has been scanned.
 func lexField(l *lexer) stateFn {
+	if l.atTerminator() {
+		l.emit(itemDot)
+		return lexInsideAction
+	}
+	var r rune
+	for {
+		r = l.next()
+		if !isAlphaNumeric(r) {
+			l.backup()
+			break
+		}
+	}
+	if !l.atTerminator() {
+		return l.errorf("bad character %#U", r)
+	}
 	l.emit(itemField)
 	return lexInsideAction
+}
+
+// isSpace reports whether r is a space character.
+func isSpace(r rune) bool {
+	return r == ' ' || r == '\t'
 }
 
 // isEndOfLine reports whether r is an end-of-line character.
 func isEndOfLine(r rune) bool {
 	return r == '\r' || r == '\n'
+}
+
+// isAlphaNumeric reports whether r is an alphabetic, digit, or underscore.
+func isAlphaNumeric(r rune) bool {
+	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
 }
