@@ -60,6 +60,10 @@ func ReaperFor(kind string, c client.Interface) (Reaper, error) {
 	return nil, &NoSuchReaperError{kind}
 }
 
+func ReaperForReplicationController(c client.Interface, timeout time.Duration) (Reaper, error) {
+	return &ReplicationControllerReaper{c, Interval, timeout}, nil
+}
+
 type ReplicationControllerReaper struct {
 	client.Interface
 	pollInterval, timeout time.Duration

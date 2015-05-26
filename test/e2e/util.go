@@ -828,11 +828,14 @@ func waitForRCPodsRunning(c *client.Client, ns, rcName string) error {
 // Delete a Replication Controller and all pods it spawned
 func DeleteRC(c *client.Client, ns, name string) error {
 	By(fmt.Sprintf("Deleting replication controller %s in namespace %s", name, ns))
-	reaper, err := kubectl.ReaperFor("ReplicationController", c)
+	reaper, err := kubectl.ReaperForReplicationController(c, 10*time.Minute)
 	if err != nil {
 		return err
 	}
+	startTime := time.Now()
 	_, err = reaper.Stop(ns, name, api.NewDeleteOptions(0))
+	deleteRCTime := time.Now().Sub(startTime)
+	Logf("Deleting RC took: %v", deleteRCTime)
 	return err
 }
 
