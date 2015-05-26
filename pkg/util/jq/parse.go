@@ -120,6 +120,9 @@ type VariableNode struct {
 }
 
 func newVariable(pos Pos, name string) *VariableNode {
+	if name[0] == '.' {
+		name = name[1:]
+	}
 	return &VariableNode{NodeType: NodeVariable, Pos: pos, Name: name}
 }
 

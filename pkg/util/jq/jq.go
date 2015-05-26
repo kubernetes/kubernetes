@@ -35,13 +35,10 @@ func New(n string) *Jq {
 	}
 }
 
-func (j *Jq) Parse(text string) (*Jq, error) {
+func (j *Jq) Parse(text string) error {
 	var err error
 	j.tree, err = Parse(j.name, text)
-	if err != nil {
-		return nil, err
-	}
-	return j, nil
+	return err
 }
 
 func (j *Jq) Execute(wr io.Writer, data interface{}) error {

@@ -18,7 +18,7 @@ package jq
 
 import "testing"
 
-func TestPlainText(t *testing.T) {
+func TestLexPlainText(t *testing.T) {
 	text := "hello jq"
 	l := lex("hello", text, "'", "'")
 	item := l.nextItem()
@@ -34,7 +34,7 @@ func TestPlainText(t *testing.T) {
 	}
 }
 
-func TestVariable(t *testing.T) {
+func TestLexVariable(t *testing.T) {
 	text := "hello '.foo'"
 	l := lex("hello", text, "'", "'")
 	expect := []itemType{itemText, itemLeftDelim, itemField, itemRightDelim, itemEOF}

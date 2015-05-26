@@ -19,32 +19,36 @@ package jq
 import "testing"
 
 func TestParsePlainText(t *testing.T) {
-    tree, err := Parse("plain", "hello jq")
-    if err != nil {
-        t.Errorf("parse plain text error %v", err)
-    }
-    nodes := tree.Root.Nodes
-    if len(nodes) != 1 {
-        t.Errorf("expect one nodes, got %v",len(nodes) )
-    }
-    if nodes[0].Type() != NodeText {
-       t.Errorf("expect %v, got %v", )
-    }
+	tree, err := Parse("plain", "hello jq")
+	if err != nil {
+		t.Errorf("parse plain text error %v", err)
+	}
+	nodes := tree.Root.Nodes
+	if len(nodes) != 1 {
+		t.Errorf("expect one nodes, got %v", len(nodes))
+	}
+	if nodes[0].Type() != NodeText {
+		t.Errorf("expect %v, got %v")
+	}
 }
 
 func TestParseVariable(t *testing.T) {
-    tree, err := Parse("variable", "hello '.jq'")
-    if err != nil {
-        t.Errorf("parse plain text error %v", err)
-    }
-    nodes := tree.Root.Nodes
-    if len(nodes) != 2 {
-        t.Errorf("expect two nodes, got %v",len(nodes) )
-    }
-    if nodes[0].Type() != NodeText {
-       t.Errorf("expect NodeText, got %v", nodes[0])
-    }
-    if nodes[1].Type() != NodeVariable {
-        t.Errorf("expect NOdeVariable, got %v", nodes[1]t )
-    }
+	tree, err := Parse("variable", "hello '.jq'")
+	if err != nil {
+		t.Errorf("parse plain text error %v", err)
+	}
+	nodes := tree.Root.Nodes
+	if len(nodes) != 2 {
+		t.Errorf("expect two nodes, got %v", len(nodes))
+	}
+	if nodes[0].Type() != NodeText {
+		t.Errorf("expect NodeText, got %v", nodes[0])
+	}
+	if nodes[1].Type() != NodeVariable {
+		t.Errorf("expect NodeVariable, got %v", nodes[1])
+	}
+	node := nodes[1].(*VariableNode)
+	if node.Name != "jq" {
+		t.Errorf("expect NodeVariable jq, got %s", node.Name)
+	}
 }
