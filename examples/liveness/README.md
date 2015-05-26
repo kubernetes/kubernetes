@@ -20,7 +20,7 @@ echo ok > /tmp/health; sleep 10; rm -rf /tmp/health; sleep 600
 so when Kubelet executes the health check 15 seconds (defined by initialDelaySeconds) after the container started, the check would fail.
 
 
-The [http-liveness.yaml](./http-liveness.yaml) demonstrates the HTTP check.
+The [http-liveness.yaml](http-liveness.yaml) demonstrates the HTTP check.
 ```
     livenessProbe:
       httpGet:

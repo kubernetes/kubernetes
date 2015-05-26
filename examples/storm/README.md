@@ -30,14 +30,14 @@ instructions for your platform.
 ZooKeeper is a distributed coordination service that Storm uses as a
 bootstrap and for state storage.
 
-Use the `examples/storm/zookeeper.json` file to create a pod running
+Use the [`examples/storm/zookeeper.json`](zookeeper.json) file to create a pod running
 the ZooKeeper service.
 
 ```shell
 $ kubectl create -f examples/storm/zookeeper.json
 ```
 
-Then, use the `examples/storm/zookeeper-service.json` file to create a
+Then, use the [`examples/storm/zookeeper-service.json`](zookeeper-service.json) file to create a
 logical service endpoint that Storm can use to access the ZooKeeper
 pod.
 
@@ -74,14 +74,14 @@ imok
 The Nimbus service is the master (or head) service for a Storm
 cluster. It depends on a functional ZooKeeper service.
 
-Use the `examples/storm/storm-nimbus.json` file to create a pod running
+Use the [`examples/storm/storm-nimbus.json`](storm-nimbus.json) file to create a pod running
 the Nimbus service.
 
 ```shell
 $ kubectl create -f examples/storm/storm-nimbus.json
 ```
 
-Then, use the `examples/storm/storm-nimbus-service.json` file to
+Then, use the [`examples/storm/storm-nimbus-service.json`](storm-nimbus-service.json) file to
 create a logical service endpoint that Storm workers can use to access
 the Nimbus pod.
 
@@ -115,7 +115,7 @@ the Nimbus service.
 The Storm workers need both the ZooKeeper and Nimbus services to be
 running.
 
-Use the `examples/storm/storm-worker-controller.json` file to create a
+Use the [`examples/storm/storm-worker-controller.json`](storm-worker-controller.json) file to create a
 ReplicationController that manages the worker pods.
 
 ```shell

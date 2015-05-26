@@ -48,7 +48,7 @@ One pattern this organization could follow is to partition the Kubernetes cluste
 
 Let's create two new namespaces to hold our work.
 
-Use the file `examples/kubernetes-namespaces/namespace-dev.json` which describes a development namespace:
+Use the file [`examples/kubernetes-namespaces/namespace-dev.json`](namespace-dev.json) which describes a development namespace:
 
 ```js
 {

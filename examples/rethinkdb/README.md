@@ -97,7 +97,7 @@ rethinkdb-admin    db=influxdb   db=rethinkdb,role=admin   10.0.131.19      8080
 rethinkdb-driver   db=influxdb   db=rethinkdb              10.0.27.114      28015/TCP
 ```
 
-We request for an external load balancer in the admin-service.yaml file:
+We request for an external load balancer in the [admin-service.yaml](admin-service.yaml) file:
 
 ```
 createExternalLoadBalancer: true

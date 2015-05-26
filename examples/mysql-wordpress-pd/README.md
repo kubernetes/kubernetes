@@ -63,7 +63,7 @@ Now that the persistent disks are defined, the Kubernetes pods can be launched. 
 
 ### Start the Mysql pod
 
-First, **edit `mysql.yaml`**, the mysql pod definition, to use a database password that you specify.
+First, **edit [`mysql.yaml`](mysql.yaml)**, the mysql pod definition, to use a database password that you specify.
 `mysql.yaml` looks like this:
 
 ```yaml
@@ -133,7 +133,7 @@ We will specifically name the service `mysql`.  This will let us leverage the su
 
 So if we label our Kubernetes mysql service `mysql`, the wordpress pod will be able to use the Docker-links-compatible environment variables, defined by Kubernetes, to connect to the database.
 
-The `mysql-service.yaml` file looks like this:
+The [`mysql-service.yaml`](mysql-service.yaml) file looks like this:
 
 ```yaml
 apiVersion: v1beta3
@@ -167,7 +167,7 @@ $ <kubernetes>/cluster/kubectl.sh get services
 ## Start the WordPress Pod and Service
 
 Once the mysql service is up, start the wordpress pod, specified in
-`wordpress.yaml`.  Before you start it, **edit `wordpress.yaml`** and **set the database password to be the same as you used in `mysql.yaml`**.
+[`wordpress.yaml`](wordpress.yaml).  Before you start it, **edit `wordpress.yaml`** and **set the database password to be the same as you used in `mysql.yaml`**.
 Note that this config file also defines a volume, this one using the `wordpress-disk` persistent disk that you created.
 
 ```yaml
@@ -216,7 +216,7 @@ $ <kubernetes>/cluster/kubectl.sh get pods
 
 ### Start the WordPress service
 
-Once the wordpress pod is running, start its service, specified by `wordpress-service.yaml`.
+Once the wordpress pod is running, start its service, specified by [`wordpress-service.yaml`](wordpress-service.yaml).
 
 The service config file looks like this:
 
