@@ -151,7 +151,7 @@ func NewTree(name string) *Tree {
 func (t *Tree) Parse(text string) error {
 	t.Root = newList(0)
 	t.lex = lex(t.Name, text, "'", "'")
-	for {
+	for eof := false; eof != true; {
 		item := t.lex.nextItem()
 		switch item.typ {
 		case itemField:
@@ -159,7 +159,7 @@ func (t *Tree) Parse(text string) error {
 		case itemText:
 			t.Root.append(newText(item.pos, item.val))
 		case itemEOF:
-			break
+			eof = true
 		}
 	}
 	return nil
