@@ -889,7 +889,11 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
 	if err := wait.Poll(time.Second, time.Second*60, podRunning(client, baz.Namespace, baz.Name)); err != nil {
-		glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
+		if pod, perr := client.Pods(api.NamespaceDefault).Get("phantom.bar"); perr == nil {
+			glog.Fatalf("FAILED: 'phantom.bar' was never deleted: %#v", pod)
+		} else {
+			glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
+		}
 	}
 
 	glog.Info("Scheduler doesn't make phantom pods: test passed.")
