@@ -154,7 +154,11 @@ func (v *VagrantCloud) ExternalID(instance string) (string, error) {
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (v *VagrantCloud) InstanceID(instance string) (string, error) {
-	return "", nil
+	minion, err := v.getInstanceByAddress(instance)
+	if err != nil {
+		return "", err
+	}
+	return minion.IP, nil
 }
 
 // saltMinionsByRole filters a list of minions that have a matching role.
