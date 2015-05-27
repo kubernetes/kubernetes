@@ -108,15 +108,15 @@ func (plugin *nfsPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error)
 func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
 	if spec.VolumeSource.HostPath != nil {
 		return &nfsRecycler{
-			volName:    spec.Name,
-			server:     spec.VolumeSource.NFS.Server,
-			exportPath: spec.VolumeSource.NFS.Path,
+			name:   spec.Name,
+			server: spec.VolumeSource.NFS.Server,
+			path:   spec.VolumeSource.NFS.Path,
 		}, nil
 	} else {
 		return &nfsRecycler{
-			volName:    spec.Name,
-			server:     spec.PersistentVolumeSource.NFS.Server,
-			exportPath: spec.PersistentVolumeSource.NFS.Path,
+			name:   spec.Name,
+			server: spec.PersistentVolumeSource.NFS.Server,
+			path:   spec.PersistentVolumeSource.NFS.Path,
 		}, nil
 	}
 }
@@ -222,27 +222,59 @@ func (nfsVolume *nfs) TearDownAt(dir string) error {
 
 // nfsRecycler scrubs an NFS volume by running "rm -rf" on the volume in a pod.
 type nfsRecycler struct {
-	volName    string
-	server     string
-	exportPath string
-	host       volume.VolumeHost
+	name   string
+	server string
+	path   string
+	host   volume.VolumeHost
 }
 
 func (r *nfsRecycler) GetPath() string {
-	return r.exportPath
+	return r.path
 }
 
 // Recycler provides methods to reclaim the volume resource.
 func (r *nfsRecycler) Recycle() error {
+	uuid := string(util.NewUUID())
+	timeout := int64(60)
 
-	// TODO implement "basic scrub" recycler -- busybox w/ "rm -rf" for volume
-
-	/*
-		1. make a pod that uses a volume like me
-		2. use host.client to save to API and watch it
-		3. if pod errors or times out, return error
-		   if pod exits, return nil for success
-	*/
-
-	return nil
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "scrubber-" + r.name,
+			Namespace: api.NamespaceDefault,
+			Labels: map[string]string{
+				"scrubber": uuid,
+			},
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyNever,
+			Volumes: []api.Volume{
+				{
+					Name: uuid,
+					VolumeSource: api.VolumeSource{
+						NFS: &api.NFSVolumeSource{
+							Server: r.server,
+							Path:   r.path,
+						},
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:  "scrubber-" + uuid,
+					Image: "busybox",
+					// delete the contents of the volume, but not the directory itself
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "rm -rf /scrub/*"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      uuid,
+							MountPath: "/scrub",
+						},
+					},
+				},
+			},
+			ActiveDeadlineSeconds: &timeout,
+		},
+	}
+	return volume.ScrubPodVolumeAndWatchUntilCompletion(pod, r.host.GetKubeClient())
 }

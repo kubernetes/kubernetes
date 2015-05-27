@@ -21,8 +21,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
@@ -138,11 +138,11 @@ func (r *hostPathRecycler) GetPath() string {
 // Recycler provides methods to reclaim the volume resource.
 func (r *hostPathRecycler) Recycle() error {
 	uuid := string(util.NewUUID())
-	timeout := int64(30)
+	timeout := int64(60)
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "scrubber-" + r.name,
+			Name:      "scrubber-" + r.name,
 			Namespace: api.NamespaceDefault,
 			Labels: map[string]string{
 				"scrubber": uuid,
@@ -154,19 +154,20 @@ func (r *hostPathRecycler) Recycle() error {
 				{
 					Name: uuid,
 					VolumeSource: api.VolumeSource{
-						HostPath: &api.HostPathVolumeSource{ r.path },
+						HostPath: &api.HostPathVolumeSource{r.path},
 					},
 				},
 			},
 			Containers: []api.Container{
 				{
-					Name: "scrubber-" + uuid,
-					Image: "centos",
+					Name:  "scrubber-" + uuid,
+					Image: "busybox",
 					// delete the contents of the volume, but not the directory itself
-					Command: []string{"/bin/rm", "-rfv", "/scrub/*"},
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "rm -rf /scrub/*"},
 					VolumeMounts: []api.VolumeMount{
 						{
-							Name: uuid,
+							Name:      uuid,
 							MountPath: "/scrub",
 						},
 					},
