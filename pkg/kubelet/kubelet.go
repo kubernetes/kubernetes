@@ -1839,6 +1839,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		node.Status.Capacity = api.ResourceList{
 			api.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
 			api.ResourceMemory: resource.MustParse("0Gi"),
+			api.ResourcePods:   *resource.NewQuantity(int64(kl.pods), resource.DecimalSI),
 		}
 		glog.Errorf("Error getting machine info: %v", err)
 	} else {
