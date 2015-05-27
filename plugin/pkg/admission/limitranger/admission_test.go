@@ -84,7 +84,7 @@ func TestDefaultContainerResourceRequirements(t *testing.T) {
 	limitRange := validLimitRange()
 	expected := api.ResourceRequirements{
 		Limits:   getResourceList("50m", "5Mi"),
-		Requests: getResourceList("25m", "1Mi"),
+		Requests: api.ResourceList{},
 	}
 
 	actual := defaultContainerResourceRequirements(&limitRange)
@@ -118,10 +118,7 @@ func TestMergePodResourceRequirements(t *testing.T) {
 			api.ResourceCPU:    defaultRequirements.Limits[api.ResourceCPU],
 			api.ResourceMemory: resource.MustParse("512Mi"),
 		},
-		Requests: api.ResourceList{
-			api.ResourceCPU:    defaultRequirements.Requests[api.ResourceCPU],
-			api.ResourceMemory: defaultRequirements.Requests[api.ResourceMemory],
-		},
+		Requests: api.ResourceList{},
 	}
 	mergePodResourceRequirements(&pod, &defaultRequirements)
 	for i := range pod.Spec.Containers {
