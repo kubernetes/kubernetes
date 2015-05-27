@@ -8,7 +8,7 @@
     }
   },
   "spec": {
-    "replicas": 2,
+    "replicas": 8,
     "selector": {
       "name": "nettest"
     },
@@ -22,13 +22,9 @@
         "containers": [
           {
             "name": "webserver",
-            "image": "gcr.io/google_containers/nettest:1.4",
-            "imagePullPolicy": "Always",
-            "args": [
-              "-service=nettest",
-              "-port=8080",
-              "-namespace=default",
-              "-peers=2"
+            "image": "gcr.io/google_containers/nettest:1.1",
+            "command": [
+              "-service=nettest"
             ],
             "ports": [
               {
