@@ -8165,10 +8165,6 @@
      }
     }
    },
-   "v1beta1.AccessModeType": {
-    "id": "v1beta1.AccessModeType",
-    "properties": {}
-   },
    "v1beta1.Binding": {
     "id": "v1beta1.Binding",
     "required": [
@@ -8210,7 +8206,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "podID": {
       "type": "string",
@@ -8236,21 +8232,21 @@
      "add": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.CapabilityType"
+       "$ref": "v1beta1.Capability"
       },
       "description": "added capabilities"
      },
      "drop": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.CapabilityType"
+       "$ref": "v1beta1.Capability"
       },
       "description": "droped capabilities"
      }
     }
    },
-   "v1beta1.CapabilityType": {
-    "id": "v1beta1.CapabilityType",
+   "v1beta1.Capability": {
+    "id": "v1beta1.Capability",
     "properties": {}
    },
    "v1beta1.ComponentCondition": {
@@ -8322,7 +8318,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -8381,7 +8377,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -8532,9 +8528,16 @@
       "type": "string",
       "description": "manifest name; must be a DNS_SUBDOMAIN; cannot be updated"
      },
+     "imagePullSecrets": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.LocalObjectReference"
+      },
+      "description": "list of references to secrets in the same namespace available for pulling the container images"
+     },
      "restartPolicy": {
       "$ref": "v1beta1.RestartPolicy",
-      "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"
+      "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever; defaults to RestartPolicyAlways"
      },
      "terminationGracePeriodSeconds": {
       "type": "integer",
@@ -8629,7 +8632,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -8774,7 +8777,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "protocol": {
       "type": "string",
@@ -8851,7 +8854,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -8961,7 +8964,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "reason": {
       "type": "string",
@@ -9036,7 +9039,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -9249,7 +9252,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -9333,7 +9336,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -9391,6 +9394,15 @@
      }
     }
    },
+   "v1beta1.LocalObjectReference": {
+    "id": "v1beta1.LocalObjectReference",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name of the referent"
+     }
+    }
+   },
    "v1beta1.Minion": {
     "id": "v1beta1.Minion",
     "properties": {
@@ -9436,7 +9448,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "podCIDR": {
       "type": "string",
@@ -9518,7 +9530,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -9592,7 +9604,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -9659,7 +9671,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -9911,7 +9923,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -9934,6 +9946,10 @@
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
+   },
+   "v1beta1.PersistentVolumeAccessMode": {
+    "id": "v1beta1.PersistentVolumeAccessMode",
+    "properties": {}
    },
    "v1beta1.PersistentVolumeClaim": {
     "id": "v1beta1.PersistentVolumeClaim",
@@ -9968,7 +9984,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -10032,7 +10048,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -10054,7 +10070,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.AccessModeType"
+       "$ref": "v1beta1.PersistentVolumeAccessMode"
       },
       "description": "the desired access modes the volume should have"
      },
@@ -10074,7 +10090,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.AccessModeType"
+       "$ref": "v1beta1.PersistentVolumeAccessMode"
       },
       "description": "the actual access modes the volume has"
      },
@@ -10141,7 +10157,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -10160,17 +10176,17 @@
    "v1beta1.PersistentVolumeSpec": {
     "id": "v1beta1.PersistentVolumeSpec",
     "required": [
-     "persistentDisk",
-     "awsElasticBlockStore",
      "hostPath",
      "glusterfs",
-     "nfs"
+     "nfs",
+     "persistentDisk",
+     "awsElasticBlockStore"
     ],
     "properties": {
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.AccessModeType"
+       "$ref": "v1beta1.PersistentVolumeAccessMode"
       },
       "description": "all ways the volume can be mounted"
      },
@@ -10258,7 +10274,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "nodeSelector": {
       "type": "any",
@@ -10342,7 +10358,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -10468,7 +10484,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -10527,7 +10543,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -10601,7 +10617,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -10668,7 +10684,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -10806,7 +10822,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -10869,7 +10885,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -10969,7 +10985,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "port": {
       "type": "integer",
@@ -11065,7 +11081,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -11131,7 +11147,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -11190,7 +11206,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
       "type": "integer",
@@ -11280,7 +11296,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+      "description": "namespace to which the object belongs; must be a DNS_LABEL; 'default' by default; cannot be updated"
      },
      "reason": {
       "type": "string",

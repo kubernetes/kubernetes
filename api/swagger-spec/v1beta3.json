@@ -9575,10 +9575,6 @@
      }
     }
    },
-   "v1beta3.AccessModeType": {
-    "id": "v1beta3.AccessModeType",
-    "properties": {}
-   },
    "v1beta3.Binding": {
     "id": "v1beta3.Binding",
     "required": [
@@ -9609,21 +9605,21 @@
      "add": {
       "type": "array",
       "items": {
-       "$ref": "v1beta3.CapabilityType"
+       "$ref": "v1beta3.Capability"
       },
       "description": "added capabilities"
      },
      "drop": {
       "type": "array",
       "items": {
-       "$ref": "v1beta3.CapabilityType"
+       "$ref": "v1beta3.Capability"
       },
       "description": "droped capabilities"
      }
     }
    },
-   "v1beta3.CapabilityType": {
-    "id": "v1beta3.CapabilityType",
+   "v1beta3.Capability": {
+    "id": "v1beta3.Capability",
     "properties": {}
    },
    "v1beta3.ComponentCondition": {
@@ -10471,6 +10467,15 @@
      }
     }
    },
+   "v1beta3.LocalObjectReference": {
+    "id": "v1beta3.LocalObjectReference",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name of the referent"
+     }
+    }
+   },
    "v1beta3.NFSVolumeSource": {
     "id": "v1beta3.NFSVolumeSource",
     "required": [
@@ -10807,7 +10812,7 @@
      },
      "namespace": {
       "type": "string",
-      "description": "namespace of the object; cannot be updated"
+      "description": "namespace of the object; must be a DNS_LABEL; cannot be updated"
      },
      "resourceVersion": {
       "type": "string",
@@ -10881,6 +10886,10 @@
      }
     }
    },
+   "v1beta3.PersistentVolumeAccessMode": {
+    "id": "v1beta3.PersistentVolumeAccessMode",
+    "properties": {}
+   },
    "v1beta3.PersistentVolumeClaim": {
     "id": "v1beta3.PersistentVolumeClaim",
     "properties": {
@@ -10936,7 +10945,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta3.AccessModeType"
+       "$ref": "v1beta3.PersistentVolumeAccessMode"
       },
       "description": "the desired access modes the volume should have"
      },
@@ -10956,7 +10965,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta3.AccessModeType"
+       "$ref": "v1beta3.PersistentVolumeAccessMode"
       },
       "description": "the actual access modes the volume has"
      },
@@ -11013,7 +11022,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1beta3.AccessModeType"
+       "$ref": "v1beta3.PersistentVolumeAccessMode"
       },
       "description": "all ways the volume can be mounted"
      },
@@ -11155,13 +11164,20 @@
       "type": "boolean",
       "description": "host networking requested for this pod"
      },
+     "imagePullSecrets": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta3.LocalObjectReference"
+      },
+      "description": "list of references to secrets in the same namespace available for pulling the container images"
+     },
      "nodeSelector": {
       "type": "any",
       "description": "selector which must match a node's labels for the pod to be scheduled on that node"
      },
      "restartPolicy": {
       "type": "string",
-      "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"
+      "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever; defaults to RestartPolicyAlways"
      },
      "serviceAccount": {
       "type": "string",
