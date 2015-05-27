@@ -64,6 +64,36 @@ const containersHtmlTemplate = `
 	</div>
       </div>
       {{end}}
+     {{if .DockerStatus}}
+      <div class="col-sm-12">
+	<div class="page-header">
+	  <h3>Driver Status</h3>
+	</div>
+	<ul class="list-group">
+	  {{range $dockerstatus := .DockerStatus}}
+	  <li class ="list-group-item"><span class="stat-label">{{$dockerstatus.Key}}</span> {{$dockerstatus.Value}}</li>
+	  {{end}}
+	  {{if .DockerDriverStatus}}
+		<li class ="list-group-item"><span class="stat-label">Storage<br></span>
+		<ul class="list-group">
+		{{range $driverstatus := .DockerDriverStatus}}
+		<li class="list-group-item"><span class="stat-label">{{$driverstatus.Key}}</span> {{$driverstatus.Value}}</li>
+		{{end}}
+		</ul>
+		</li>
+	  </ul>
+	  {{end}}
+	</div>
+      {{end}}
+      {{if .DockerImages}}
+      <div class="col-sm-12">
+          <div class="page-header">
+            <h3>Images</h3>
+          </div>
+       <div id="docker-images"></div>
+       <br><br>
+       </div>
+      {{end}}
       {{if .ResourcesAvailable}}
       <div class="col-sm-12">
 	<div class="page-header">
@@ -185,7 +215,8 @@ const containersHtmlTemplate = `
       {{end}}
     </div>
     <script type="text/javascript">
-      startPage({{.ContainerName}}, {{.CpuAvailable}}, {{.MemoryAvailable}}, {{.Root}});
+      startPage({{.ContainerName}}, {{.CpuAvailable}}, {{.MemoryAvailable}}, {{.Root}}, {{.IsRoot}});
+      drawImages({{.DockerImages}});
     </script>
   </body>
 </html>
