@@ -161,6 +161,14 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			return err
 		}
 		var ok bool
+		// Handle filename input from stdin. The resource builder always returns an api.List
+		// when creating resource(s) from a stream.
+		if list, ok := obj.(*api.List); ok {
+			if len(list.Items) > 1 {
+				return cmdutil.UsageError(cmd, "%s specifies multiple items", filename)
+			}
+			obj = list.Items[0]
+		}
 		newRc, ok = obj.(*api.ReplicationController)
 		if !ok {
 			if _, kind, err := typer.ObjectVersionAndKind(obj); err == nil {
