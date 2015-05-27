@@ -197,7 +197,7 @@ type VolumeSource struct {
 	// Secret represents a secret that should populate this volume.
 	Secret *SecretVolumeSource `json:"secret,omitempty"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
-	NFS *NFSVolumeSource `json:"nfs"`
+	NFS *NFSVolumeSource `json:"nfs,omitempty"`
 	// ISCSIVolumeSource represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty"`
@@ -214,23 +214,23 @@ type VolumeSource struct {
 type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk"`
+	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk,omitempty"`
 	// AWSElasticBlockStore represents an AWS EBS disk that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore"`
+	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore,omitempty"`
 	// HostPath represents a directory on the host.
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way
-	HostPath *HostPathVolumeSource `json:"hostPath"`
+	HostPath *HostPathVolumeSource `json:"hostPath,omitempty"`
 	// Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod
-	Glusterfs *GlusterfsVolumeSource `json:"glusterfs"`
+	Glusterfs *GlusterfsVolumeSource `json:"glusterfs,omitempty"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
-	NFS *NFSVolumeSource `json:"nfs"`
+	NFS *NFSVolumeSource `json:"nfs,omitempty"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
-	RBD *RBDVolumeSource `json:"rbd"`
+	RBD *RBDVolumeSource `json:"rbd,omitempty"`
 	// ISCSIVolumeSource represents an ISCSI resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	ISCSI *ISCSIVolumeSource `json:"iscsi"`
+	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
