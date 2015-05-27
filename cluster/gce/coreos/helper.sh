@@ -25,6 +25,7 @@ function build-kube-env {
   # TODO(dawnchen): master node is still running with debian image
   if [[ "${master}" == "true" ]]; then
   cat >$file <<EOF
+KUBERNETES_MASTER: "true"
 ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
 INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
 NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
@@ -60,6 +61,7 @@ KUBECFG_KEY: $(yaml-quote ${KUBECFG_KEY_BASE64:-})
 EOF
   else
     cat >>$file <<EOF
+KUBERNETES_MASTER: "false"
 ENV_TIMESTAMP=$(yaml-quote $(date -u +%Y-%m-%dT%T%z))
 INSTANCE_PREFIX=$(yaml-quote ${INSTANCE_PREFIX})
 NODE_INSTANCE_PREFIX=$(yaml-quote ${NODE_INSTANCE_PREFIX})
