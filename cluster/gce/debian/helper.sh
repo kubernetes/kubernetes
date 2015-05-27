@@ -51,6 +51,7 @@ EOF
   if [[ "${master}" == "true" ]]; then
     # Master-only env vars.
     cat >>$file <<EOF
+KUBERNETES_MASTER: "true"
 KUBE_USER: $(yaml-quote ${KUBE_USER})
 KUBE_PASSWORD: $(yaml-quote ${KUBE_PASSWORD})
 KUBE_BEARER_TOKEN: $(yaml-quote ${KUBE_BEARER_TOKEN})
@@ -62,6 +63,7 @@ EOF
   else
     # Node-only env vars.
     cat >>$file <<EOF
+KUBERNETES_MASTER: "false"
 KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
 ZONE: $(yaml-quote ${ZONE})
 EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS})
