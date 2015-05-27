@@ -851,22 +851,15 @@ func TestGetContainerInfo(t *testing.T) {
 		},
 	}
 
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
+	fakeRuntime := testKubelet.fakeRuntime
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
+	mockCadvisor := testKubelet.fakeCadvisor
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
-
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			ID: containerID,
-			// pod id: qux
-			// container id: foo
-			Names: []string{"/k8s_foo_qux_ns_1234_42"},
-		},
+	fakeRuntime.PodList = []*kubecontainer.Pod{
+		{ID: "12345678", Name: "qux", Namespace: "ns", Containers: []*kubecontainer.Container{{Name: "foo", ID: types.UID(containerID)}}},
 	}
-
 	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", cadvisorReq)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -884,16 +877,11 @@ func TestGetRawContainerInfoRoot(t *testing.T) {
 			Name: containerPath,
 		},
 	}
-	fakeDocker := dockertools.FakeDockerClient{}
-
-	mockCadvisor := &cadvisor.Mock{}
+	testKubelet := newTestKubeletWithFakeRuntime(t)
+	kubelet := testKubelet.kubelet
+	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
-
-	kubelet := Kubelet{
-		dockerClient: &fakeDocker,
-		cadvisor:     mockCadvisor,
-	}
 
 	_, err := kubelet.GetRawContainerInfo(containerPath, cadvisorReq, false)
 	if err != nil {
@@ -916,16 +904,11 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 			},
 		},
 	}
-	fakeDocker := dockertools.FakeDockerClient{}
-
-	mockCadvisor := &cadvisor.Mock{}
+	testKubelet := newTestKubeletWithFakeRuntime(t)
+	kubelet := testKubelet.kubelet
+	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
 	mockCadvisor.On("SubcontainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
-
-	kubelet := Kubelet{
-		dockerClient: &fakeDocker,
-		cadvisor:     mockCadvisor,
-	}
 
 	result, err := kubelet.GetRawContainerInfo(containerPath, cadvisorReq, true)
 	if err != nil {
@@ -939,24 +922,17 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 
 func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	containerID := "ab2cdf"
-
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
 	mockCadvisor := testKubelet.fakeCadvisor
+	fakeRuntime := testKubelet.fakeRuntime
 	cadvisorApiFailure := fmt.Errorf("cAdvisor failure")
 	containerInfo := cadvisorApi.ContainerInfo{}
 	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, cadvisorApiFailure)
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			ID: containerID,
-			// pod id: qux
-			// container id: foo
-			Names: []string{"/k8s_foo_qux_ns_uuid_1234"},
-		},
+	fakeRuntime.PodList = []*kubecontainer.Pod{
+		{ID: "uuid", Name: "qux", Namespace: "ns", Containers: []*kubecontainer.Container{{Name: "foo", ID: types.UID(containerID)}}},
 	}
-
 	stats, err := kubelet.GetContainerInfo("qux_ns", "uuid", "foo", cadvisorReq)
 	if stats != nil {
 		t.Errorf("non-nil stats on error")
@@ -972,11 +948,11 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 }
 
 func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
 	mockCadvisor := testKubelet.fakeCadvisor
-	fakeDocker.ContainerList = []docker.APIContainers{}
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeRuntime.PodList = []*kubecontainer.Pod{}
 
 	stats, _ := kubelet.GetContainerInfo("qux", "", "foo", nil)
 	if stats != nil {
@@ -985,13 +961,13 @@ func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
-func TestGetContainerInfoWhenDockerToolsFailed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+func TestGetContainerInfoWhenContainerRuntimeFailed(t *testing.T) {
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
-	fakeDocker := testKubelet.fakeDocker
+	fakeRuntime := testKubelet.fakeRuntime
 	expectedErr := fmt.Errorf("List containers error")
-	fakeDocker.Errors["list"] = expectedErr
+	fakeRuntime.Err = expectedErr
 
 	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
 	if err == nil {
@@ -1007,7 +983,7 @@ func TestGetContainerInfoWhenDockerToolsFailed(t *testing.T) {
 }
 
 func TestGetContainerInfoWithNoContainers(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 
@@ -1025,15 +1001,12 @@ func TestGetContainerInfoWithNoContainers(t *testing.T) {
 }
 
 func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
+	fakeRuntime := testKubelet.fakeRuntime
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
-	fakeDocker := testKubelet.fakeDocker
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			ID:    "fakeId",
-			Names: []string{"/k8s_bar_qux_ns_1234_42"},
-		},
+	fakeRuntime.PodList = []*kubecontainer.Pod{
+		{ID: "12345678", Name: "qux", Namespace: "ns", Containers: []*kubecontainer.Container{{Name: "bar", ID: types.UID("fakeID")}}},
 	}
 
 	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
