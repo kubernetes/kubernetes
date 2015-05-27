@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
 func BenchmarkPodCopy(b *testing.B) {
@@ -36,7 +35,7 @@ func BenchmarkPodCopy(b *testing.B) {
 
 	var result *api.Pod
 	for i := 0; i < b.N; i++ {
-		obj, err := conversion.DeepCopy(&pod)
+		obj, err := api.Scheme.DeepCopy(&pod)
 		if err != nil {
 			b.Fatalf("Unexpected error copying pod: %v", err)
 		}
@@ -59,7 +58,7 @@ func BenchmarkNodeCopy(b *testing.B) {
 
 	var result *api.Node
 	for i := 0; i < b.N; i++ {
-		obj, err := conversion.DeepCopy(&node)
+		obj, err := api.Scheme.DeepCopy(&node)
 		if err != nil {
 			b.Fatalf("Unexpected error copying node: %v", err)
 		}
@@ -82,7 +81,7 @@ func BenchmarkReplicationControllerCopy(b *testing.B) {
 
 	var result *api.ReplicationController
 	for i := 0; i < b.N; i++ {
-		obj, err := conversion.DeepCopy(&replicationController)
+		obj, err := api.Scheme.DeepCopy(&replicationController)
 		if err != nil {
 			b.Fatalf("Unexpected error copying replication controller: %v", err)
 		}
