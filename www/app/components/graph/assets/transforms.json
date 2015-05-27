@@ -1,0 +1,193 @@
+{
+  "directory": [
+    {
+      "name": "Default",
+      "script": "templateTransform.js",
+      "data": {
+        "nodeMaps": [
+          {
+            "properties": {
+              "type": "$.type",
+              "name": "$.annotations.label",
+              "metadata": "$.properties"
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Cluster')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "timestamp": "$.timestamp"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Container')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "Dns": "$.properties.HostConfig.Dns",
+                "DnsSearch": "$.properties.HostConfig.DnsSearch",
+                "state": "$.properties.State",
+                "volumes": "$.properties.Volumes",
+                "timestamp": "$.timestamp"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Image')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "architecture": "$.properties.Architecture",
+                "checksum": "$.properties.Checksum",
+                "command": "$.properties.Config.Cmd",
+                "environment": "$.properties.Config.Env",
+                "exposedPorts": "$.properties.Config.ExposedPorts",
+                "image": "$.properties.Config.Image",
+                "timestamp": "$.timestamp"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Node')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "hostIP": "$.properties.hostIP",
+                "resources": "$.properties.resources",
+                "status": "$.properties.status.conditions",
+                "timestamp": "$.timestamp"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Pod')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "hostIP": "$.properties.currentState.hostIP",
+                "namespace": "$.properties.namespace",
+                "podIP": "$.properties.currentState.podIP",
+                "status": "$.properties.currentState.status",
+                "timestamp": "$.timestamp"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Process')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "command": "$.properties.COMMAND",
+                "%CPU": "$.properties.%CPU",
+                "%MEM": "$.properties.%MEM",
+                "PID": "$.properties.PID",
+                "time": "$.properties.TIME",
+                "user": "$.properties.USER",
+                "timestamp": "$.timestamp"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'ReplicationController')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "dnsPolicy": "$.properties.desiredState.podTemplate.desiredState.manifest.dnsPolicy",
+                "restartPolicy": "$.properties.desiredState.podTemplate.desiredState.manifest.restartPolicy",
+                "labels": "$.properties.labels",
+                "namespace": "$.properties.namespace",
+                "replicas": "$.properties.desiredState.replicas",
+                "timestamp": "$.timestamp"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Service')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "containerPort": "$.properties.containerPort",
+                "createExternalLoadBalancer": "$.properties.createExternalLoadBalancer",
+                "labels": "$.properties.labels",
+                "namespace": "$.properties.namespace",
+                "port": "$.properties.port",
+                "portalIP": "$.properties.portalIP",
+                "publicIPs": "$.properties.publicIPs",
+                "timestamp": "$.timestamp"
+              }
+            }
+          }
+        ],
+        "edgeMaps": [
+          {
+            "properties": {
+              "type": "$.type",
+              "label": "$.annotations.label",
+              "source": "$.source",
+              "target": "$.target",
+              "metadata": "$.properties"
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'loadBalances')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "type": "balances",
+              "label": "balances"
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'createdFrom')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "type": "uses",
+              "label": "uses"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

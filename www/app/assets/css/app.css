@@ -1508,3 +1508,99 @@ md-toolbar h1 {
 .dashboard .align-top tbody {
   vertical-align: top;
 }
+.graph .edgelabel {
+  font: 12px sans-serif;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+.graph .node text {
+  pointer-events: none;
+  font: 12px sans-serif;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+.d3-context-menu {
+  position: absolute;
+  display: none;
+  background-color: #f2f2f2;
+  border-radius: 4px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  min-width: 150px;
+  border: 1px solid #d4d4d4;
+  z-index: 1200;
+}
+.d3-context-menu ul {
+  list-style-type: none;
+  margin: 4px 0px;
+  padding: 0px;
+  cursor: default;
+}
+.d3-context-menu ul li {
+  padding: 4px 16px;
+}
+.d3-context-menu ul li:hover {
+  background-color: #4677f8;
+  color: #fefefe;
+}
+.details-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.details-table-content-row {
+  width: 100%;
+}
+.details-table-content {
+  width: 100%;
+  font-size: 0.8em;
+  padding: 8px;
+  word-break: break-all;
+  word-wrap: break-word;
+}
+.sidenav-card {
+  margin: 0;
+}
+.sidenav-frame {
+  padding: 0;
+}
+.legend-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.legend-table-content-row {
+  width: 100%;
+}
+.legend-table-icon {
+  width: 24px;
+  height: 24px;
+  padding-top: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  padding-bottom: 4px;
+}
+.legend-table-text {
+  font-size: 0.8em;
+  padding-top: 4px;
+  padding-left: 8px;
+  padding-right: 8px;
+  padding-bottom: 4px;
+  word-break: break-all;
+  word-wrap: break-word;
+  vertical-align: center;
+}
+.bold {
+  font-weight: 700;
+}
+.gray {
+  color: gray;
+}
+.pin-cursor {
+  cursor: url(../../components/graph/img/Pin.svg) 6 21, auto;
+}
+.zoom-cursor {
+  cursor: -webkit-zoom-in;
+}
