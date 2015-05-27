@@ -3159,18 +3159,16 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 		},
 	}
 
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
+	testKubelet := newTestKubeletWithFakeRuntime(t)
+	fakeRuntime := testKubelet.fakeRuntime
 	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
+	kubelet := testKubelet.kubelet
 
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			ID:    containerID,
-			Names: []string{"/k8s_foo_qux_ns_1234_42"},
-		},
+	fakeRuntime.PodList = []*kubecontainer.Pod{
+		{ID: "1234", Name: "qux", Namespace: "ns", Containers: []*kubecontainer.Container{
+			{Name: "foo", ID: types.UID(containerID)}}},
 	}
 
 	kubelet.podManager.SetPods(pods)
@@ -3507,10 +3505,10 @@ func TestIsPodPastActiveDeadline(t *testing.T) {
 }
 
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
+	fakeRuntime := testKubelet.fakeRuntime
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
 
 	now := util.Now()
 	startTime := util.NewTime(now.Time.Add(-1 * time.Minute))
@@ -3534,34 +3532,9 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 			},
 		},
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar_new_12345678_1111"},
-			ID:    "1234",
-		},
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_bar_new_12345678_2222"},
-			ID:    "9876",
-		},
-	}
-	fakeDocker.ContainerMap = map[string]*docker.Container{
-		"1234": {
-			ID:         "1234",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-		"9876": {
-			ID:         "9876",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-		"9999": {
-			ID:         "9999",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
+
+	fakeRuntime.PodList = []*kubecontainer.Pod{
+		{ID: "12345678", Name: "bar", Namespace: "new", Containers: []*kubecontainer.Container{{Name: "foo"}}},
 	}
 
 	// Let the pod worker sets the status to fail after this sync.
@@ -3580,10 +3553,10 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 }
 
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
+	fakeRuntime := testKubelet.fakeRuntime
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
 
 	now := util.Now()
 	startTime := util.NewTime(now.Time.Add(-1 * time.Minute))
@@ -3607,34 +3580,9 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 			},
 		},
 	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar_new_12345678_1111"},
-			ID:    "1234",
-		},
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_bar_new_12345678_2222"},
-			ID:    "9876",
-		},
-	}
-	fakeDocker.ContainerMap = map[string]*docker.Container{
-		"1234": {
-			ID:         "1234",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-		"9876": {
-			ID:         "9876",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-		"9999": {
-			ID:         "9999",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
+
+	fakeRuntime.PodList = []*kubecontainer.Pod{
+		{ID: "12345678", Name: "bar", Namespace: "new", Containers: []*kubecontainer.Container{{Name: "foo"}}},
 	}
 
 	kubelet.podManager.SetPods(pods)
