@@ -1,0 +1,35 @@
+<!--
+Copyright 2015 Google Inc. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+    
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<div ng-controller="InspectNodeCtrl" flex layout="row" layout-fill>
+  <div flex layout="column" layout-fill>
+    <md-toolbar class="dashboard-subnav">
+      <div class="md-toolbar-tools-small md-toolbar-tools">
+      <md-button id="backButton" class="icon-button" aria-label="PlayPause" ng-click="backToGraph()">
+        <md-icon md-svg-src="components/graph/img/BackButton.svg"></md-icon>
+        <paper-ripple class="circle recenteringTouch" fit></paper-ripple>
+      </md-button>
+      <h1 class="md-toolbar-tools">
+        <span>{{element}}</span>
+        </h1>
+      </div>
+    </md-toolbar>
+    <md-content layout="row">
+      <div class="md-tile-content">
+        <div json-human="metadata"></div>
+      </div>
+    </md-content>
+  </div>
+</div>

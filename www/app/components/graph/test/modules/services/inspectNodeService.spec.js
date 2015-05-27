@@ -1,0 +1,1 @@
+"use strict";describe("Inspect node service",function(){var e;beforeEach(module("kubernetesApp.components.graph.services")),beforeEach(inject(function(t){e=t})),it("should set and get data as intended",function(){var t={name:"pod",id:1};e.setDetailData(t);var a=e.getDetailData();expect(t).toEqual(a)})});

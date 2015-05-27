@@ -1,0 +1,172 @@
+<!--
+Copyright 2015 Google Inc. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+    
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<div ng-controller="GraphCtrl" flex layout="row" layout-fill>
+  <div flex layout="column" layout-fill>
+    <md-toolbar class="md-toolbar-small">
+      <div class="md-toolbar-tools-small md-toolbar-tools">
+        <span flex></span>
+        <md-button id="ExpandCollapse" class="icon-button" aria-label="ExpandCollapse" ng-click="toggleExpand()">
+          <md-icon md-svg-src="{{getExpandIcon()}}">
+          </md-icon>
+          <paper-ripple class="circle recenteringTouch" fit></paper-ripple>
+          <md-tooltip>
+            Expand/Collapse
+          </md-tooltip>
+        </md-button>
+        <md-button id="ToggleSelect" class="icon-button" aria-label="Select" ng-click="toggleSelect()">
+          <md-icon md-svg-src="{{getSelectIcon()}}">
+          </md-icon>
+          <paper-ripple class="circle recenteringTouch" fit></paper-ripple>
+          <md-tooltip>
+            Toggle Multiple Selection
+          </md-tooltip>
+        </md-button>
+        <md-button id="ToggleSource" class="icon-button" aria-label="Source" ng-click="toggleSource()">
+          <md-icon md-svg-src="{{getSourceIcon()}}">
+          </md-icon>
+          <paper-ripple class="circle recenteringTouch" fit></paper-ripple>
+          <md-tooltip>
+            Toggle Live Data
+          </md-tooltip>
+        </md-button>
+        <md-button class="icon-button" aria-label="PlayPause" ng-click="togglePlay()">
+          <md-icon md-svg-src="{{getPlayIcon()}}">
+          </md-icon>
+          <paper-ripple class="circle recenteringTouch" fit></paper-ripple>
+          <md-tooltip>
+            Poll Continuosly
+          </md-tooltip>
+        </md-button>
+        <md-button id="PollOnce" class="icon-button" aria-label="Refresh" ng-click="refresh()" ng-disabled="isPolling">
+          <md-icon md-svg-src="components/graph/img/Refresh.svg">
+          </md-icon>
+          <paper-ripple class="circle recenteringTouch" fit></paper-ripple>
+          <md-tooltip>
+            Poll Once
+          </md-tooltip>
+        </md-button>
+        <md-button ng-click="inspectSelection()" aria-label="Inspector">
+          <svg id="inspectBtn" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" style="stroke:white; fill:white;"/>
+          </svg>
+          <paper-ripple class="circle recenteringTouch" fit></paper-ripple>
+          <md-tooltip> 
+            Inspect Selected Nodes
+          </md-tooltip>
+        </md-button>
+      </div>
+    </md-toolbar>
+    <md-content layout="row">
+      <div flex="25">
+        <div layout="column">
+           <md-card flex layout="column" class="sidenav-frame">
+            <md-card flex class="sidenav-card">
+              <md-button id="toggleLegend" flex class="md-primary" ng-click="showHide('legend')">
+                Legend
+                <md-tooltip>
+                  Toggle Legend
+                </md-tooltip>
+              </md-button>
+            </md-card>
+            <div flex id="legend" class="sidenav-frame">
+              <md-card flex class="sidenav-card">
+                <table class="legend-table">
+                  <thead></thead>
+                  <tbody>
+                    <tr class="legend-table-content-row" ng-repeat="type in getLegendNodeTypes()">
+                      <td class="legend-table-icon">
+                        <svg width="20px" height="20px">
+                          <circle r="8" cx="10" cy="10"
+                                  fill="{{getLegendNodeFill(type)}}"
+                                  stroke="gray"
+                                  stroke-width="2px"
+                                  ng-click="toggleLegend(type)">
+                          </circle>
+                        </svg>
+                        <md-tooltip>
+                          Show/Hide {{getLegendNodeDisplayName(type)}}
+                        </md-tooltip>
+                      </td>
+                      <td class="legend-table-text">
+                        <span>{{getLegendNodeDisplayName(type)}}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </md-card>
+              <md-card flex class="sidenav-card">
+                <table class="legend-table">
+                  <thead></thead>
+                  <tbody>
+                    <tr class="legend-table-content-row" ng-repeat="type in getLegendLinkTypes()">
+                      <td class="legend-table-icon">
+                        <svg width="20px" height="20px">
+                          <line x1="2" y1="10" x2="20" y2="10"
+                                stroke="{{getLegendLinkStyle(type).stroke}}"
+                                stroke-dasharray="{{getLegendLinkStyle(type).dash}}"
+                                fill="{{getLegendLinkStyle(type).fill}}"
+                                stroke-width="{{getLegendLinkStyleStrokeWidth(type, 3)}}">
+                          </line>
+                        </svg>
+                      </td>
+                      <td class="legend-table-text">
+                        <span>{{type}}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </md-card>
+            </div>
+          </md-card>
+          <md-card flex layout="column" class="sidenav-frame">
+            <md-card flex class="sidenav-card">
+              <md-button id="toggleDetails" flex class="md-primary" ng-click="showHide('details')">
+                Details
+                <md-tooltip>
+                  Show/Hide Selection Details
+                </md-tooltip>
+              </md-button>
+            </md-card>
+            <div flex id="details" class="sidenav-frame">
+              <md-card flex class="sidenav-card">
+                <table class="details-table">
+                  <thead></thead>
+                  <tbody>
+                    <tr class="details-table-content-row" ng-repeat="(tag, value) in getSelectionDetails()">
+                      <td class="details-table-content" ng-class="bold">
+                        {{tag}}
+                      </td>
+                      <td class="details-table-content" ng-class="gray">
+                        <md-content>
+                          {{value}}
+                        </md-content>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </md-card>
+            </div>
+          </md-card>
+        </div>
+      </div>
+      <div flex="75" layout="column">
+        <md-card flex layout layout-padding>
+          <d3-visualization></d3-visualization>
+        </md-card>
+      </div>
+    </md-content>
+  </div>
+</div>
