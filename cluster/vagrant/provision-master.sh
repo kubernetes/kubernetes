@@ -215,7 +215,7 @@ external_auth:
       - .*
 rest_cherrypy:
   port: 8000
-  host: 127.0.0.1
+  host: ${MASTER_IP}
   disable_ssl: True
   webhook_disable_auth: True
 EOF
@@ -248,5 +248,5 @@ else
   # set up to run highstate as new minions join for the first time.
   echo "Executing configuration"
   salt '*' mine.update
-  salt --show-timeout --force-color '*' state.highstate
+  salt --force-color '*' state.highstate
 fi
