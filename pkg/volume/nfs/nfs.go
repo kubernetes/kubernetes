@@ -52,7 +52,7 @@ func (plugin *nfsPlugin) Name() string {
 }
 
 func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.VolumeSource.NFS != nil
+	return spec.VolumeSource.NFS != nil || spec.PersistentVolumeSource.NFS != nil
 }
 
 func (plugin *nfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
