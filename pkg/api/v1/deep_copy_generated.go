@@ -1130,6 +1130,14 @@ func deepCopy_v1_PersistentVolumeSource(in PersistentVolumeSource, out *Persiste
 	} else {
 		out.RBD = nil
 	}
+	if in.ISCSI != nil {
+		out.ISCSI = new(ISCSIVolumeSource)
+		if err := deepCopy_v1_ISCSIVolumeSource(*in.ISCSI, out.ISCSI, c); err != nil {
+			return err
+		}
+	} else {
+		out.ISCSI = nil
+	}
 	return nil
 }
 
@@ -1771,6 +1779,16 @@ func deepCopy_v1_ServiceAccount(in ServiceAccount, out *ServiceAccount, c *conve
 		}
 	} else {
 		out.Secrets = nil
+	}
+	if in.ImagePullSecrets != nil {
+		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
+		for i := range in.ImagePullSecrets {
+			if err := deepCopy_v1_LocalObjectReference(in.ImagePullSecrets[i], &out.ImagePullSecrets[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ImagePullSecrets = nil
 	}
 	return nil
 }
