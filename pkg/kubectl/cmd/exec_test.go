@@ -39,8 +39,67 @@ func (f *fakeRemoteExecutor) Execute(req *client.Request, config *client.Config,
 	return f.execErr
 }
 
-func TestExec(t *testing.T) {
+func TestPodAndContainer(t *testing.T) {
+	tests := []struct {
+		args              []string
+		p                 *execParams
+		expectError       bool
+		expectedPod       string
+		expectedContainer string
+	}{
+		{
+			p:           &execParams{},
+			expectError: true,
+		},
+		{
+			p:           &execParams{podName: "foo"},
+			expectError: true,
+		},
+		{
+			p:           &execParams{podName: "foo", containerName: "bar"},
+			expectError: true,
+		},
+		{
+			p:           &execParams{podName: "foo"},
+			args:        []string{"cmd"},
+			expectedPod: "foo",
+		},
+		{
+			p:           &execParams{},
+			args:        []string{"foo"},
+			expectError: true,
+		},
+		{
+			p:           &execParams{},
+			args:        []string{"foo", "cmd"},
+			expectedPod: "foo",
+		},
+		{
+			p:                 &execParams{containerName: "bar"},
+			args:              []string{"foo", "cmd"},
+			expectedPod:       "foo",
+			expectedContainer: "bar",
+		},
+	}
+	for _, test := range tests {
+		cmd := &cobra.Command{}
+		podName, containerName, err := extractPodAndContainer(cmd, test.args, test.p)
+		if podName != test.expectedPod {
+			t.Errorf("expected: %s, got: %s", test.expectedPod, podName)
+		}
+		if containerName != test.expectedContainer {
+			t.Errorf("expected: %s, got: %s", test.expectedContainer, containerName)
+		}
+		if test.expectError && err == nil {
+			t.Error("unexpected non-error")
+		}
+		if !test.expectError && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}
+}
 
+func TestExec(t *testing.T) {
 	tests := []struct {
 		name, version, podPath, execPath, container string
 		nsInQuery                                   bool
