@@ -238,6 +238,26 @@ func TestKeyringHitWithQualifiedDockerHub(t *testing.T) {
 	}
 }
 
+func TestIsDefaultRegistryMatch(t *testing.T) {
+	samples := []map[bool]string{
+		{true: "foo/bar"},
+		{true: "docker.io/foo/bar"},
+		{true: "index.docker.io/foo/bar"},
+		{true: "foo"},
+		{false: ""},
+		{false: "registry.tld/foo/bar"},
+		{false: "registry:5000/foo/bar"},
+		{false: "myhostdocker.io/foo/bar"},
+	}
+	for _, sample := range samples {
+		for expected, imageName := range sample {
+			if got := isDefaultRegistryMatch(imageName); got != expected {
+				t.Errorf("Expected '%s' to be %s, got %s", imageName, expected, got)
+			}
+		}
+	}
+}
+
 type testProvider struct {
 	Count int
 }

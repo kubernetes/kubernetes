@@ -106,8 +106,17 @@ const defaultRegistryHost = "index.docker.io/v1/"
 func isDefaultRegistryMatch(image string) bool {
 	parts := strings.SplitN(image, "/", 2)
 
+	if len(parts[0]) == 0 {
+		return false
+	}
+
 	if len(parts) == 1 {
 		// e.g. library/ubuntu
+		return true
+	}
+
+	if parts[0] == "docker.io" || parts[0] == "index.docker.io" {
+		// resolve docker.io/image and index.docker.io/image as default registry
 		return true
 	}
 
