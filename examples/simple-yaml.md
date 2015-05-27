@@ -1,7 +1,7 @@
 ## Getting started with config files.
 
 In addition to the imperative style commands described [elsewhere](simple-nginx.md), Kubernetes
-supports declarative YAML or JSON configuration files.  Often times config files are prefereable
+supports declarative YAML or JSON configuration files.  Often times config files are preferable
 to imperative commands, since they can be checked into version control and changes to the files
 can be code reviewed, producing a more robust, reliable and archival system.
 
