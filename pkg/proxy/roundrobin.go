@@ -96,6 +96,8 @@ func (lb *LoadBalancerRR) newServiceInternal(svcPort ServicePortName, affinityTy
 	if _, exists := lb.services[svcPort]; !exists {
 		lb.services[svcPort] = &balancerState{affinity: *newAffinityPolicy(affinityType, ttlMinutes)}
 		glog.V(4).Infof("LoadBalancerRR service %q did not exist, created", svcPort)
+	} else if affinityType != "" {
+		lb.services[svcPort].affinity.affinityType = affinityType
 	}
 	return lb.services[svcPort]
 }
@@ -261,8 +263,9 @@ func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
 				lb.updateAffinityMap(svcPort, newEndpoints)
 				// OnUpdate can be called without NewService being called externally.
 				// To be safe we will call it here.  A new service will only be created
-				// if one does not already exist.
-				state = lb.newServiceInternal(svcPort, api.ServiceAffinityNone, 0)
+				// if one does not already exist.  The affinity will be updated
+				// later, once NewService is called.
+				state = lb.newServiceInternal(svcPort, api.ServiceAffinity(""), 0)
 				state.endpoints = slice.ShuffleStrings(newEndpoints)
 
 				// Reset the round-robin index.
