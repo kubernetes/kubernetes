@@ -329,20 +329,20 @@ kube::golang::build_binaries_for_platform() {
 
   if [[ -n ${use_go_build:-} ]]; then
     kube::log::progress "    "
-    for binary in "${binaries[@]}"; do
-      local outfile=$(kube::golang::output_filename_for_binary "${binary}" \
-        "${platform}")
-      if kube::golang::is_statically_linked_library "${binary}"; then
-        CGO_ENABLED=0 go build -o "${outfile}" \
-          "${goflags[@]:+${goflags[@]}}" \
-          -ldflags "${version_ldflags}" \
-          "${binary}"
-      else
-        go build -o "${outfile}" \
-          "${goflags[@]:+${goflags[@]}}" \
-          -ldflags "${version_ldflags}" \
-          "${binary}"
-      fi
+    for binary in "${statics[@]:+${statics[@]}}"; do
+      local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
+      CGO_ENABLED=0 go build -o "${outfile}" \
+        "${goflags[@]:+${goflags[@]}}" \
+        -ldflags "${version_ldflags}" \
+        "${binary}"
+      kube::log::progress "*"
+    done
+    for binary in "${nonstatics[@]:+${nonstatics[@]}}"; do
+      local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
+      go build -o "${outfile}" \
+        "${goflags[@]:+${goflags[@]}}" \
+        -ldflags "${version_ldflags}" \
+        "${binary}"
       kube::log::progress "*"
     done
     kube::log::progress "\n"
