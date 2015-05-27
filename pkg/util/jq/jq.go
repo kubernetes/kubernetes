@@ -18,6 +18,7 @@ package jq
 
 import (
 	"errors"
+	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/parse"
 	"github.com/golang/glog"
 	"io"
 	"reflect"
@@ -26,7 +27,7 @@ import (
 
 type Jq struct {
 	name string
-	tree *Tree
+	tree *parse.Tree
 }
 
 func New(n string) *Jq {
@@ -37,7 +38,7 @@ func New(n string) *Jq {
 
 func (j *Jq) Parse(text string) error {
 	var err error
-	j.tree, err = Parse(j.name, text)
+	j.tree, err = parse.Parse(j.name, text)
 	return err
 }
 
@@ -50,22 +51,22 @@ func (j *Jq) Execute(wr io.Writer, data interface{}) error {
 	return nil
 }
 
-func (j *Jq) walk(wr io.Writer, value reflect.Value, node Node) reflect.Value {
+func (j *Jq) walk(wr io.Writer, value reflect.Value, node parse.Node) reflect.Value {
 	var text []byte
 	switch node := node.(type) {
-	case *ListNode:
+	case *parse.ListNode:
 		curValue := value
 		for _, node := range node.Nodes {
 			curValue = j.walk(wr, curValue, node)
 		}
 		return value
-	case *TextNode:
+	case *parse.TextNode:
 		text = node.Text
 		if _, err := wr.Write(text); err != nil {
 			glog.Errorf("%s", err)
 		}
 		return value
-	case *VariableNode:
+	case *parse.VariableNode:
 		value = j.evalVariable(wr, value, node.Name)
 		return value
 	default:
