@@ -16,14 +16,18 @@
 
 set -o pipefail
 
-IP=""
-if [[ -n "${KUBERNETES_RO_SERVICE_HOST}" ]]; then
+# TODO: Switch this example to get the IP address from DNS instead of using the
+# kubernetes API.
 
-  : ${NAMESPACE:=rethinkdb}
+IP=""
+if [[ -n "${KUBERNETES_SERVICE_HOST}" ]]; then
+  : ${NAMESPACE:=rethinkdb} # TODO: get namespace from downward API
   # try to pick up first different ip from endpoints
   MYHOST=$(ip addr | grep 'state UP' -A2 | tail -n1 | awk '{print $2}' | cut -f1  -d'/')
-  URL="${KUBERNETES_RO_SERVICE_HOST}/api/v1/namespaces/${NAMESPACE}/endpoints/rethinkdb-driver"
-  IP=$(curl -s ${URL} | jq -s -r --arg h "${MYHOST}" '.[0].subsets | .[].addresses | [ .[].IP ] | map(select(. != $h)) | .[0]') || exit 1
+  URL="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/endpoints/rethinkdb-driver"
+  token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+  IP=$(curl -s ${URL} --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer ${token}" \
+    | jq -s -r --arg h "${MYHOST}" '.[0].subsets | .[].addresses | [ .[].IP ] | map(select(. != $h)) | .[0]') || exit 1
   [[ "${IP}" == null ]] && IP=""
 fi
 
