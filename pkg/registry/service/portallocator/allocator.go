@@ -151,8 +151,7 @@ func (r *PortAllocator) Restore(pr util.PortRange, data []byte) error {
 	if !ok {
 		return fmt.Errorf("not a snapshottable allocator")
 	}
-	snapshottable.Restore(pr.String(), data)
-	return nil
+	return snapshottable.Restore(pr.String(), data)
 }
 
 // contains returns true and the offset if the port is in the range, and false
