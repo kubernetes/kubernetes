@@ -368,7 +368,13 @@ func (i *Instances) ExternalID(name string) (string, error) {
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (i *Instances) InstanceID(name string) (string, error) {
-	return "", nil
+	srv, err := getServerByName(i.compute, name)
+	if err != nil {
+		return "", err
+	}
+	// In the future it is possible to also return an endpoint as:
+	// <endpoint>/<instanceid>
+	return "/" + srv.ID, nil
 }
 
 func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
