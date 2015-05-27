@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -62,22 +63,30 @@ type serviceCache struct {
 }
 
 type ServiceController struct {
-	cloud       cloudprovider.Interface
-	kubeClient  client.Interface
-	clusterName string
-	balancer    cloudprovider.TCPLoadBalancer
-	zone        cloudprovider.Zone
-	cache       *serviceCache
+	cloud            cloudprovider.Interface
+	kubeClient       client.Interface
+	clusterName      string
+	balancer         cloudprovider.TCPLoadBalancer
+	zone             cloudprovider.Zone
+	cache            *serviceCache
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
 }
 
 // New returns a new service controller to keep cloud provider service resources
 // (like external load balancers) in sync with the registry.
 func New(cloud cloudprovider.Interface, kubeClient client.Interface, clusterName string) *ServiceController {
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartRecordingToSink(kubeClient.Events(""))
+	recorder := broadcaster.NewRecorder(api.EventSource{Component: "service-controller"})
+
 	return &ServiceController{
-		cloud:       cloud,
-		kubeClient:  kubeClient,
-		clusterName: clusterName,
-		cache:       &serviceCache{serviceMap: make(map[string]*cachedService)},
+		cloud:            cloud,
+		kubeClient:       kubeClient,
+		clusterName:      clusterName,
+		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
+		eventBroadcaster: broadcaster,
+		eventRecorder:    recorder,
 	}
 }
 
@@ -206,6 +215,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 	case cache.Sync:
 		err, retry := s.createLoadBalancerIfNeeded(namespacedName, service, cachedService.service)
 		if err != nil {
+			s.eventRecorder.Event(service, "creating loadbalancer failed", err.Error())
 			return err, retry
 		}
 		// Always update the cache upon success.
@@ -217,6 +227,7 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 	case cache.Deleted:
 		err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region)
 		if err != nil {
+			s.eventRecorder.Event(service, "deleting loadbalancer failed", err.Error())
 			return err, retryable
 		}
 		s.cache.delete(namespacedName.String())
