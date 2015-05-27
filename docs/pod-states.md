@@ -19,9 +19,28 @@ The number and meanings of `PodPhase` values are tightly guarded.  Other than wh
 
 A pod containing containers that specify readiness probes will also report the Ready condition. Condition status values may be `True`, `False`, or `Unknown`.
 
+## Container Probes
+
+A [Probe](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#Probe) is a diagnostic performed periodically by the kubelet on a container. Specifically the diagnostic is one of three [Handlers](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1#Handler):
+
+* `ExecAction`: executes a specified command inside the container expecting on success that the command exits with status code 0.
+* `TCPAction`: performs a tcp check against the container's IP address on a specified port expecting on success that the port is open.
+* `HTTPGetAction`: performs an HTTP Get againsts the container's IP address on a specified port and path expecting on success that the response has a status code greater than or equal to 200 and less than 400.
+
+Each probe will have one of three results:
+
+* `Success`: indicates that the container passed the diagnostic.
+* `Failure`: indicates that the container failed the diagnostic.
+* `Unknown`: indicates that the diagnostic failed so no action should be taken.
+
+Currently, the kubelet optionally performs two independent diagnostics on running containers which trigger action:
+
+* `LivenessProbe`: indicates whether the container is *live*, i.e. still running. The LivenessProbe hints to the kubelet when a container is unhealthy. If the LivenessProbe fails, the kubelet will kill the container and the container will be subjected to it's [RestartPolicy](#restartpolicy). The default state of Liveness before the initial delay is "Success". The state of Liveness for a container when no probe is provided is assumed to be "Success".
+* `ReadinessProbe`: indicates whether the container is *ready* to service requests. If the ReadinessProbe fails, the endpoints controller will remove the pod's IP address from the endpoints of all services that match the pod. Thus, the ReadinessProbe is sometimes useful to signal to the endpoints controller that even though a pod may be running, it should not receive traffic from the proxy (e.g. the container has a long startup time before it starts listening or the container is down for maintenance). The default state of Readiness before the initial delay is "Failure". The state of Readiness for a container when no probe is provided is assumed to be "Success".
+
 ## Container Statuses
 
-More detailed information about the current (and previous) container statuses can be found in `containerStatuses`. The information reported depends on the current ContainerState, which may be Waiting, Running, or Termination (sic). 
+More detailed information about the current (and previous) container statuses can be found in `containerStatuses`. The information reported depends on the current ContainerState, which may be Waiting, Running, or Termination (sic).
 
 ## RestartPolicy
 
