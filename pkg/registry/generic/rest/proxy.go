@@ -76,12 +76,33 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 		return
 	}
 
+	loc := *h.Location
+	loc.RawQuery = req.URL.RawQuery
+
+	// If original request URL ended in '/', append a '/' at the end of the
+	// of the proxy URL
+	if !strings.HasSuffix(loc.Path, "/") && strings.HasSuffix(req.URL.Path, "/") {
+		loc.Path += "/"
+	}
+
+	// From pkg/apiserver/proxy.go#ServeHTTP:
+	// Redirect requests with an empty path to a location that ends with a '/'
+	// This is essentially a hack for https://github.com/GoogleCloudPlatform/kubernetes/issues/4958.
+	// Note: Keep this code after tryUpgrade to not break that flow.
+	if len(loc.Path) == 0 {
+		var queryPart string
+		if len(req.URL.RawQuery) > 0 {
+			queryPart = "?" + req.URL.RawQuery
+		}
+		w.Header().Set("Location", req.URL.Path+"/"+queryPart)
+		w.WriteHeader(http.StatusMovedPermanently)
+		return
+	}
+
 	if h.Transport == nil {
 		h.Transport = h.defaultProxyTransport(req.URL)
 	}
 
-	loc := *h.Location
-	loc.RawQuery = req.URL.RawQuery
 	newReq, err := http.NewRequest(req.Method, loc.String(), req.Body)
 	if err != nil {
 		h.err = err
@@ -188,7 +209,11 @@ func (h *UpgradeAwareProxyHandler) dialURL() (net.Conn, error) {
 func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL) http.RoundTripper {
 	scheme := url.Scheme
 	host := url.Host
-	pathPrepend := strings.TrimRight(url.Path, h.Location.Path)
+	suffix := h.Location.Path
+	if strings.HasSuffix(url.Path, "/") && !strings.HasSuffix(suffix, "/") {
+		suffix += "/"
+	}
+	pathPrepend := strings.TrimSuffix(url.Path, suffix)
 	return &proxy.Transport{
 		Scheme:      scheme,
 		Host:        host,
