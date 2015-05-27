@@ -27,26 +27,24 @@ import (
 type containerID struct {
 	uuid    string // uuid of the pod.
 	appName string // name of the app in that pod.
-	imageID string // id of the image. TODO(yifan): Depreciate this.
 }
 
 // buildContainerID constructs the containers's ID using containerID,
 // which containers the pod uuid and the container name.
 // The result can be used to globally identify a container.
 func buildContainerID(c *containerID) string {
-	return fmt.Sprintf("%s:%s:%s", c.uuid, c.appName, c.imageID)
+	return fmt.Sprintf("%s:%s", c.uuid, c.appName)
 }
 
 // parseContainerID parses the containerID into pod uuid and the container name. The
 // results can be used to get more information of the container.
 func parseContainerID(id string) (*containerID, error) {
 	tuples := strings.Split(id, ":")
-	if len(tuples) != 3 {
+	if len(tuples) != 2 {
 		return nil, fmt.Errorf("rkt: cannot parse container ID for: %v", id)
 	}
 	return &containerID{
 		uuid:    tuples[0],
 		appName: tuples[1],
-		imageID: tuples[2],
 	}, nil
 }

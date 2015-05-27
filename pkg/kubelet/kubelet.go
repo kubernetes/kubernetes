@@ -313,7 +313,8 @@ func NewMainKubelet(
 			recorder,
 			containerRefManager,
 			readinessManager,
-			klet.volumeManager)
+			klet.volumeManager,
+			newKubeletRuntimeHooks(recorder))
 		if err != nil {
 			return nil, err
 		}
