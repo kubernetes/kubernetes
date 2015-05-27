@@ -23,11 +23,11 @@ If the resource is scalable it will be scaled to 0 before deletion.
 .SH OPTIONS
 .PP
 \fB\-\-all\fP=false
-    [\-all] to select all the specified resources
+    [\-all] to select all the specified resources.
 
 .PP
 \fB\-f\fP, \fB\-\-filename\fP=[]
-    Filename, directory, or URL to file of resource(s) to be stopped
+    Filename, directory, or URL to file of resource(s) to be stopped.
 
 .PP
 \fB\-\-grace\-period\fP=\-1
@@ -38,8 +38,12 @@ If the resource is scalable it will be scaled to 0 before deletion.
     help for stop
 
 .PP
+\fB\-\-ignore\-not\-found\fP=false
+    Treat "resource not found" as a successful stop.
+
+.PP
 \fB\-l\fP, \fB\-\-selector\fP=""
-    Selector (label query) to filter on
+    Selector (label query) to filter on.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
