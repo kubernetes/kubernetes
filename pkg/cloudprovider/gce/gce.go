@@ -499,7 +499,7 @@ func (gce *GCECloud) ExternalID(instance string) (string, error) {
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (gce *GCECloud) InstanceID(instance string) (string, error) {
-	return "", nil
+	return gce.projectID + "/" + gce.zone + "/" + canonicalizeInstanceName(instance), nil
 }
 
 // List is an implementation of Instances.List.
