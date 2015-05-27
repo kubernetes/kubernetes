@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
@@ -307,9 +308,17 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 
 	_, err = serviceAccounts.Update(serviceAccount)
 	if err != nil {
-		return err
+		// we weren't able to use the token, try to clean it up.
+		if err := e.client.Secrets(secret.Namespace).Delete(secret.Name); err != nil {
+			glog.Error(err) // if we fail, just log it
+		}
 	}
-	return nil
+	if apierrors.IsConflict(err) {
+		// nothing to do.  We got a conflict, that means that the service account was updated.  We simply need to return because we'll get an update notification later
+		return nil
+	}
+
+	return err
 }
 
 // generateTokenIfNeeded populates the token data for the given Secret if not already set
