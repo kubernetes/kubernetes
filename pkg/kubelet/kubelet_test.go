@@ -937,12 +937,10 @@ func (f *fakeContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port ui
 }
 
 func TestRunInContainerNoSuchPod(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-	fakeDocker.ContainerList = []docker.APIContainers{}
-	kubelet.runner = &fakeCommandRunner
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeRuntime.PodList = []*kubecontainer.Pod{}
 
 	podName := "podFoo"
 	podNamespace := "nsFoo"
@@ -961,36 +959,18 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 }
 
 func TestRunInContainer(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet.runner = &fakeCommandRunner
 
 	containerID := "abc1234"
-	podName := "podFoo"
-	podNamespace := "nsFoo"
-	containerName := "containerFoo"
-
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			ID:    containerID,
-			Names: []string{"/k8s_" + containerName + "_" + podName + "_" + podNamespace + "_12345678_42"},
-		},
+	fakeRuntime.PodList = []*kubecontainer.Pod{
+		{ID: "12345678", Name: "podFoo", Namespace: "nsFoo", Containers: []*kubecontainer.Container{{Name: "containerFoo", ID: types.UID(containerID)}}},
 	}
-
 	cmd := []string{"ls"}
-	_, err := kubelet.RunInContainer(
-		kubecontainer.GetPodFullName(&api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      podName,
-				Namespace: podNamespace,
-			},
-		}),
-		"",
-		containerName,
-		cmd)
+	_, err := kubelet.RunInContainer("podFoo_nsFoo", "", "containerFoo", cmd)
 	if fakeCommandRunner.ID != containerID {
 		t.Errorf("unexpected Name: %s", fakeCommandRunner.ID)
 	}
@@ -1923,20 +1903,20 @@ func TestGetPodReadyCondition(t *testing.T) {
 }
 
 func TestExecInContainerNoSuchPod(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-	fakeDocker.ContainerList = []docker.APIContainers{}
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet.runner = &fakeCommandRunner
+	fakeRuntime.PodList = []*kubecontainer.Pod{}
 
 	podName := "podFoo"
 	podNamespace := "nsFoo"
-	containerName := "containerFoo"
+	containerID := "containerFoo"
 	err := kubelet.ExecInContainer(
 		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
-		containerName,
+		containerID,
 		[]string{"ls"},
 		nil,
 		nil,
@@ -1952,21 +1932,17 @@ func TestExecInContainerNoSuchPod(t *testing.T) {
 }
 
 func TestExecInContainerNoSuchContainer(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
 	podNamespace := "nsFoo"
 	containerID := "containerFoo"
-
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			ID:    "notfound",
-			Names: []string{"/k8s_notfound_" + podName + "_" + podNamespace + "_12345678_42"},
-		},
+	fakeRuntime.PodList = []*kubecontainer.Pod{
+		{ID: "12345678", Name: podName, Namespace: podNamespace, Containers: []*kubecontainer.Container{{Name: "bar", ID: "barID"}}},
 	}
 
 	err := kubelet.ExecInContainer(
@@ -2006,10 +1982,10 @@ func (f *fakeReadWriteCloser) Close() error {
 }
 
 func TestExecInContainer(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
@@ -2020,12 +1996,9 @@ func TestExecInContainer(t *testing.T) {
 	stdout := &fakeReadWriteCloser{}
 	stderr := &fakeReadWriteCloser{}
 	tty := true
-
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			ID:    containerID,
-			Names: []string{"/k8s_" + containerID + "_" + podName + "_" + podNamespace + "_12345678_42"},
-		},
+	fakeRuntime.PodList = []*kubecontainer.Pod{
+		{ID: "12345678", Name: podName, Namespace: podNamespace, Containers: []*kubecontainer.Container{
+			{Name: containerID, ID: types.UID(containerID)}}},
 	}
 
 	err := kubelet.ExecInContainer(
@@ -2046,7 +2019,7 @@ func TestExecInContainer(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 	if e, a := containerID, fakeCommandRunner.ID; e != a {
-		t.Fatalf("container id: expected %s, got %s", e, a)
+		t.Fatalf("container name: expected %q, got %q", e, a)
 	}
 	if e, a := command, fakeCommandRunner.Cmd; !reflect.DeepEqual(e, a) {
 		t.Fatalf("command: expected '%v', got '%v'", e, a)
@@ -2066,11 +2039,11 @@ func TestExecInContainer(t *testing.T) {
 }
 
 func TestPortForwardNoSuchPod(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-	fakeDocker.ContainerList = []docker.APIContainers{}
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeRuntime.PodList = []*kubecontainer.Pod{}
+	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
@@ -2092,21 +2065,18 @@ func TestPortForwardNoSuchPod(t *testing.T) {
 }
 
 func TestPortForwardNoSuchContainer(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeCommandRunner := fakeContainerCommandRunner{}
 	kubelet.runner = &fakeCommandRunner
 
 	podName := "podFoo"
 	podNamespace := "nsFoo"
 	var port uint16 = 5000
 
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			ID:    "notfound",
-			Names: []string{"/k8s_notfound_" + podName + "_" + podNamespace + "_12345678_42"},
-		},
+	fakeRuntime.PodList = []*kubecontainer.Pod{
+		{ID: "12345678", Name: podName, Namespace: podNamespace, Containers: []*kubecontainer.Container{{Name: "bar", ID: "barID"}}},
 	}
 
 	err := kubelet.PortForward(
@@ -2172,7 +2142,7 @@ func TestPortForward(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 	if e, a := infraContainerID, fakeCommandRunner.ID; e != a {
-		t.Fatalf("container id: expected %s, got %s", e, a)
+		t.Fatalf("container id: expected %q, got %q", e, a)
 	}
 	if e, a := port, fakeCommandRunner.Port; e != a {
 		t.Fatalf("port: expected %v, got %v", e, a)
