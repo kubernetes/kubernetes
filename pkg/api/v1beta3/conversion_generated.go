@@ -1880,6 +1880,38 @@ func convert_api_ServiceAccountList_To_v1beta3_ServiceAccountList(in *api.Servic
 	return nil
 }
 
+func convert_api_ServiceAccountTokenRequest_To_v1beta3_ServiceAccountTokenRequest(in *api.ServiceAccountTokenRequest, out *ServiceAccountTokenRequest, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ServiceAccountTokenRequest))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1beta3_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Expires, &out.Expires, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_ServiceAccountTokenResponse_To_v1beta3_ServiceAccountTokenResponse(in *api.ServiceAccountTokenResponse, out *ServiceAccountTokenResponse, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ServiceAccountTokenResponse))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1beta3_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1beta3_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_LocalObjectReference_To_v1beta3_LocalObjectReference(&in.Secret, &out.Secret, s); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_api_ServiceList_To_v1beta3_ServiceList(in *api.ServiceList, out *ServiceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ServiceList))(in)
@@ -3942,6 +3974,38 @@ func convert_v1beta3_ServiceAccountList_To_api_ServiceAccountList(in *ServiceAcc
 	return nil
 }
 
+func convert_v1beta3_ServiceAccountTokenRequest_To_api_ServiceAccountTokenRequest(in *ServiceAccountTokenRequest, out *api.ServiceAccountTokenRequest, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ServiceAccountTokenRequest))(in)
+	}
+	if err := convert_v1beta3_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1beta3_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Expires, &out.Expires, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1beta3_ServiceAccountTokenResponse_To_api_ServiceAccountTokenResponse(in *ServiceAccountTokenResponse, out *api.ServiceAccountTokenResponse, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ServiceAccountTokenResponse))(in)
+	}
+	if err := convert_v1beta3_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1beta3_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1beta3_LocalObjectReference_To_api_LocalObjectReference(&in.Secret, &out.Secret, s); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1beta3_ServiceList_To_api_ServiceList(in *ServiceList, out *api.ServiceList, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ServiceList))(in)
@@ -4247,6 +4311,8 @@ func init() {
 		convert_api_SecurityContext_To_v1beta3_SecurityContext,
 		convert_api_SerializedReference_To_v1beta3_SerializedReference,
 		convert_api_ServiceAccountList_To_v1beta3_ServiceAccountList,
+		convert_api_ServiceAccountTokenRequest_To_v1beta3_ServiceAccountTokenRequest,
+		convert_api_ServiceAccountTokenResponse_To_v1beta3_ServiceAccountTokenResponse,
 		convert_api_ServiceAccount_To_v1beta3_ServiceAccount,
 		convert_api_ServiceList_To_v1beta3_ServiceList,
 		convert_api_ServicePort_To_v1beta3_ServicePort,
@@ -4354,6 +4420,8 @@ func init() {
 		convert_v1beta3_SecurityContext_To_api_SecurityContext,
 		convert_v1beta3_SerializedReference_To_api_SerializedReference,
 		convert_v1beta3_ServiceAccountList_To_api_ServiceAccountList,
+		convert_v1beta3_ServiceAccountTokenRequest_To_api_ServiceAccountTokenRequest,
+		convert_v1beta3_ServiceAccountTokenResponse_To_api_ServiceAccountTokenResponse,
 		convert_v1beta3_ServiceAccount_To_api_ServiceAccount,
 		convert_v1beta3_ServiceList_To_api_ServiceList,
 		convert_v1beta3_ServicePort_To_api_ServicePort,

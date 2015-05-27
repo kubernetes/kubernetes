@@ -69,7 +69,6 @@ type CMServer struct {
 	PodEvictionTimeout      time.Duration
 	DeletingPodsQps         float32
 	DeletingPodsBurst       int
-	ServiceAccountKeyFile   string
 
 	ClusterName       string
 	ClusterCIDR       util.IPNet
@@ -142,7 +141,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 		"Amount of time which we allow starting Node to be unresponsive before marking it unhealty.")
 	fs.DurationVar(&s.NodeMonitorPeriod, "node-monitor-period", 5*time.Second,
 		"The period for syncing NodeStatus in NodeController.")
-	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA key used to sign service account tokens.")
 	fs.Int64Var(&s.NodeMilliCPU, "node-milli-cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
 	fs.MarkDeprecated("node-milli-cpu", "will be removed in a future version")
 	fs.Var(resource.NewQuantityFlagValue(&s.NodeMemory), "node-memory", "The amount of memory (in bytes) provisioned on each node")
@@ -240,24 +238,8 @@ func (s *CMServer) Run(_ []string) error {
 	}
 	pvRecycler.Run()
 
-	if len(s.ServiceAccountKeyFile) > 0 {
-		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
-		if err != nil {
-			glog.Errorf("Error reading key for service account token controller: %v", err)
-		} else {
-			serviceaccount.NewTokensController(
-				kubeClient,
-				serviceaccount.DefaultTokenControllerOptions(
-					serviceaccount.JWTTokenGenerator(privateKey),
-				),
-			).Run()
-		}
-	}
-
-	serviceaccount.NewServiceAccountsController(
-		kubeClient,
-		serviceaccount.DefaultServiceAccountsControllerOptions(),
-	).Run()
+	serviceaccount.NewTokensController(kubeClient, serviceaccount.DefaultTokenControllerOptions()).Run()
+	serviceaccount.NewServiceAccountsController(kubeClient, serviceaccount.DefaultServiceAccountsControllerOptions()).Run()
 
 	select {}
 	return nil

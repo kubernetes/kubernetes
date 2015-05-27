@@ -57,10 +57,12 @@ import (
 	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
 	podtemplateetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/podtemplate/etcd"
 	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
 	secretetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	etcdallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/etcd"
 	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount"
 	serviceaccountetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
@@ -103,6 +105,7 @@ type Config struct {
 	SupportsBasicAuth      bool
 	Authorizer             authorizer.Authorizer
 	AdmissionControl       admission.Interface
+	TokenGenerator         serviceaccount.TokenGenerator
 	MasterServiceNamespace string
 
 	// Map requests to contexts. Exported so downstream consumers can provider their own mappers
@@ -398,8 +401,15 @@ func (m *Master) init(c *Config) {
 	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
 
 	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewStorage(c.EtcdHelper)
+
 	secretStorage := secretetcd.NewStorage(c.EtcdHelper)
+	secretRegistry := secret.NewRegistry(secretStorage)
+
 	serviceAccountStorage := serviceaccountetcd.NewStorage(c.EtcdHelper)
+	serviceAccountRegistry := serviceaccount.NewRegistry(serviceAccountStorage)
+
+	serviceAccountTokenStorage := serviceaccountetcd.NewTokenStorage(serviceAccountRegistry, secretRegistry, c.TokenGenerator)
+
 	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewStorage(c.EtcdHelper)
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewStorage(c.EtcdHelper)
 
@@ -466,6 +476,7 @@ func (m *Master) init(c *Config) {
 		"namespaces/finalize":           namespaceFinalizeStorage,
 		"secrets":                       secretStorage,
 		"serviceAccounts":               serviceAccountStorage,
+		"serviceAccounts/token":         serviceAccountTokenStorage,
 		"persistentVolumes":             persistentVolumeStorage,
 		"persistentVolumes/status":      persistentVolumeStatusStorage,
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,

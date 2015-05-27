@@ -53,6 +53,8 @@ func init() {
 		&NamespaceList{},
 		&ServiceAccount{},
 		&ServiceAccountList{},
+		&ServiceAccountTokenRequest{},
+		&ServiceAccountTokenResponse{},
 		&Secret{},
 		&SecretList{},
 		&PersistentVolume{},
@@ -74,46 +76,48 @@ func init() {
 	Scheme.AddKnownTypeWithName("", "MinionList", &NodeList{})
 }
 
-func (*Pod) IsAnAPIObject()                       {}
-func (*PodList) IsAnAPIObject()                   {}
-func (*PodStatusResult) IsAnAPIObject()           {}
-func (*PodTemplate) IsAnAPIObject()               {}
-func (*PodTemplateList) IsAnAPIObject()           {}
-func (*ReplicationController) IsAnAPIObject()     {}
-func (*ReplicationControllerList) IsAnAPIObject() {}
-func (*Service) IsAnAPIObject()                   {}
-func (*ServiceList) IsAnAPIObject()               {}
-func (*Endpoints) IsAnAPIObject()                 {}
-func (*EndpointsList) IsAnAPIObject()             {}
-func (*Node) IsAnAPIObject()                      {}
-func (*NodeList) IsAnAPIObject()                  {}
-func (*Binding) IsAnAPIObject()                   {}
-func (*Status) IsAnAPIObject()                    {}
-func (*Event) IsAnAPIObject()                     {}
-func (*EventList) IsAnAPIObject()                 {}
-func (*ContainerManifest) IsAnAPIObject()         {}
-func (*ContainerManifestList) IsAnAPIObject()     {}
-func (*List) IsAnAPIObject()                      {}
-func (*LimitRange) IsAnAPIObject()                {}
-func (*LimitRangeList) IsAnAPIObject()            {}
-func (*ResourceQuota) IsAnAPIObject()             {}
-func (*ResourceQuotaList) IsAnAPIObject()         {}
-func (*Namespace) IsAnAPIObject()                 {}
-func (*NamespaceList) IsAnAPIObject()             {}
-func (*ServiceAccount) IsAnAPIObject()            {}
-func (*ServiceAccountList) IsAnAPIObject()        {}
-func (*Secret) IsAnAPIObject()                    {}
-func (*SecretList) IsAnAPIObject()                {}
-func (*PersistentVolume) IsAnAPIObject()          {}
-func (*PersistentVolumeList) IsAnAPIObject()      {}
-func (*PersistentVolumeClaim) IsAnAPIObject()     {}
-func (*PersistentVolumeClaimList) IsAnAPIObject() {}
-func (*DeleteOptions) IsAnAPIObject()             {}
-func (*ListOptions) IsAnAPIObject()               {}
-func (*PodLogOptions) IsAnAPIObject()             {}
-func (*PodExecOptions) IsAnAPIObject()            {}
-func (*PodProxyOptions) IsAnAPIObject()           {}
-func (*ComponentStatus) IsAnAPIObject()           {}
-func (*ComponentStatusList) IsAnAPIObject()       {}
-func (*SerializedReference) IsAnAPIObject()       {}
-func (*RangeAllocation) IsAnAPIObject()           {}
+func (*Pod) IsAnAPIObject()                         {}
+func (*PodList) IsAnAPIObject()                     {}
+func (*PodStatusResult) IsAnAPIObject()             {}
+func (*PodTemplate) IsAnAPIObject()                 {}
+func (*PodTemplateList) IsAnAPIObject()             {}
+func (*ReplicationController) IsAnAPIObject()       {}
+func (*ReplicationControllerList) IsAnAPIObject()   {}
+func (*Service) IsAnAPIObject()                     {}
+func (*ServiceList) IsAnAPIObject()                 {}
+func (*Endpoints) IsAnAPIObject()                   {}
+func (*EndpointsList) IsAnAPIObject()               {}
+func (*Node) IsAnAPIObject()                        {}
+func (*NodeList) IsAnAPIObject()                    {}
+func (*Binding) IsAnAPIObject()                     {}
+func (*Status) IsAnAPIObject()                      {}
+func (*Event) IsAnAPIObject()                       {}
+func (*EventList) IsAnAPIObject()                   {}
+func (*ContainerManifest) IsAnAPIObject()           {}
+func (*ContainerManifestList) IsAnAPIObject()       {}
+func (*List) IsAnAPIObject()                        {}
+func (*LimitRange) IsAnAPIObject()                  {}
+func (*LimitRangeList) IsAnAPIObject()              {}
+func (*ResourceQuota) IsAnAPIObject()               {}
+func (*ResourceQuotaList) IsAnAPIObject()           {}
+func (*Namespace) IsAnAPIObject()                   {}
+func (*NamespaceList) IsAnAPIObject()               {}
+func (*ServiceAccount) IsAnAPIObject()              {}
+func (*ServiceAccountList) IsAnAPIObject()          {}
+func (*ServiceAccountTokenRequest) IsAnAPIObject()  {}
+func (*ServiceAccountTokenResponse) IsAnAPIObject() {}
+func (*Secret) IsAnAPIObject()                      {}
+func (*SecretList) IsAnAPIObject()                  {}
+func (*PersistentVolume) IsAnAPIObject()            {}
+func (*PersistentVolumeList) IsAnAPIObject()        {}
+func (*PersistentVolumeClaim) IsAnAPIObject()       {}
+func (*PersistentVolumeClaimList) IsAnAPIObject()   {}
+func (*DeleteOptions) IsAnAPIObject()               {}
+func (*ListOptions) IsAnAPIObject()                 {}
+func (*PodLogOptions) IsAnAPIObject()               {}
+func (*PodExecOptions) IsAnAPIObject()              {}
+func (*PodProxyOptions) IsAnAPIObject()             {}
+func (*ComponentStatus) IsAnAPIObject()             {}
+func (*ComponentStatusList) IsAnAPIObject()         {}
+func (*SerializedReference) IsAnAPIObject()         {}
+func (*RangeAllocation) IsAnAPIObject()             {}

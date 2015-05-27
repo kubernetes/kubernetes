@@ -1808,6 +1808,32 @@ func deepCopy_v1beta3_ServiceAccountList(in ServiceAccountList, out *ServiceAcco
 	return nil
 }
 
+func deepCopy_v1beta3_ServiceAccountTokenRequest(in ServiceAccountTokenRequest, out *ServiceAccountTokenRequest, c *conversion.Cloner) error {
+	if err := deepCopy_v1beta3_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1beta3_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_util_Time(in.Expires, &out.Expires, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1beta3_ServiceAccountTokenResponse(in ServiceAccountTokenResponse, out *ServiceAccountTokenResponse, c *conversion.Cloner) error {
+	if err := deepCopy_v1beta3_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1beta3_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1beta3_LocalObjectReference(in.Secret, &out.Secret, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_v1beta3_ServiceList(in ServiceList, out *ServiceList, c *conversion.Cloner) error {
 	if err := deepCopy_v1beta3_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -2179,6 +2205,8 @@ func init() {
 		deepCopy_v1beta3_Service,
 		deepCopy_v1beta3_ServiceAccount,
 		deepCopy_v1beta3_ServiceAccountList,
+		deepCopy_v1beta3_ServiceAccountTokenRequest,
+		deepCopy_v1beta3_ServiceAccountTokenResponse,
 		deepCopy_v1beta3_ServiceList,
 		deepCopy_v1beta3_ServicePort,
 		deepCopy_v1beta3_ServiceSpec,

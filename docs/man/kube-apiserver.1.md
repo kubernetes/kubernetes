@@ -153,7 +153,7 @@ The the kube-apiserver several options.
 	The port on which to serve HTTPS with authentication and authorization. If 0, don't serve HTTPS at all.
 
 **--service-account-key-file**=""
-	File containing PEM-encoded x509 RSA private or public key, used to verify ServiceAccount tokens. If unspecified, --tls-private-key-file is used.
+	File containing PEM-encoded x509 RSA private key, used to sign and verify ServiceAccount tokens. If unspecified, --tls-private-key-file is used.
 
 **--service-account-lookup**=false
 	If true, validate ServiceAccount tokens exist in etcd as part of authentication.

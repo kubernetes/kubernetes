@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	serviceaccountregistry "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount"
 )
 
 const (
@@ -39,17 +40,12 @@ const (
 
 	SubjectClaim            = "sub"
 	IssuerClaim             = "iss"
+	ExpiresClaim            = "exp"
 	ServiceAccountNameClaim = "kubernetes.io/serviceaccount/service-account.name"
 	ServiceAccountUIDClaim  = "kubernetes.io/serviceaccount/service-account.uid"
 	SecretNameClaim         = "kubernetes.io/serviceaccount/secret.name"
 	NamespaceClaim          = "kubernetes.io/serviceaccount/namespace"
 )
-
-type TokenGenerator interface {
-	// GenerateToken generates a token which will identify the given ServiceAccount.
-	// The returned token will be stored in the given (and yet-unpersisted) Secret.
-	GenerateToken(serviceAccount api.ServiceAccount, secret api.Secret) (string, error)
-}
 
 // ReadPrivateKey is a helper function for reading an rsa.PrivateKey from a PEM-encoded file
 func ReadPrivateKey(file string) (*rsa.PrivateKey, error) {
@@ -94,7 +90,7 @@ func SplitUsername(username string) (string, string, error) {
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.
 // privateKey is a PEM-encoded byte array of a private RSA key.
 // JWTTokenAuthenticator()
-func JWTTokenGenerator(key *rsa.PrivateKey) TokenGenerator {
+func JWTTokenGenerator(key *rsa.PrivateKey) serviceaccountregistry.TokenGenerator {
 	return &jwtTokenGenerator{key}
 }
 
@@ -102,11 +98,16 @@ type jwtTokenGenerator struct {
 	key *rsa.PrivateKey
 }
 
-func (j *jwtTokenGenerator) GenerateToken(serviceAccount api.ServiceAccount, secret api.Secret) (string, error) {
+func (j *jwtTokenGenerator) GenerateToken(tokenRequest api.ServiceAccountTokenRequest, serviceAccount api.ServiceAccount, secret api.Secret) (string, error) {
 	token := jwt.New(jwt.SigningMethodRS256)
 
 	// Identify the issuer
 	token.Claims[IssuerClaim] = Issuer
+
+	// Set expires claim if requested
+	if !tokenRequest.Expires.IsZero() {
+		token.Claims[ExpiresClaim] = tokenRequest.Expires.Unix()
+	}
 
 	// Username: `serviceaccount:<namespace>:<serviceaccount>`
 	token.Claims[SubjectClaim] = MakeUsername(serviceAccount.Namespace, serviceAccount.Name)

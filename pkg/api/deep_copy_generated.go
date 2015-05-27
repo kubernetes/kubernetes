@@ -1873,6 +1873,32 @@ func deepCopy_api_ServiceAccountList(in ServiceAccountList, out *ServiceAccountL
 	return nil
 }
 
+func deepCopy_api_ServiceAccountTokenRequest(in ServiceAccountTokenRequest, out *ServiceAccountTokenRequest, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_util_Time(in.Expires, &out.Expires, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_api_ServiceAccountTokenResponse(in ServiceAccountTokenResponse, out *ServiceAccountTokenResponse, c *conversion.Cloner) error {
+	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_api_LocalObjectReference(in.Secret, &out.Secret, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_api_ServiceList(in ServiceList, out *ServiceList, c *conversion.Cloner) error {
 	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -2246,6 +2272,8 @@ func init() {
 		deepCopy_api_Service,
 		deepCopy_api_ServiceAccount,
 		deepCopy_api_ServiceAccountList,
+		deepCopy_api_ServiceAccountTokenRequest,
+		deepCopy_api_ServiceAccountTokenResponse,
 		deepCopy_api_ServiceList,
 		deepCopy_api_ServicePort,
 		deepCopy_api_ServiceSpec,

@@ -59,3 +59,8 @@ func (c *FakeServiceAccounts) Watch(label labels.Selector, field fields.Selector
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-serviceAccounts", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
 }
+
+func (c *FakeServiceAccounts) RequestToken(serviceAccountName string, tokenRequest *api.ServiceAccountTokenRequest) (*api.ServiceAccountTokenResponse, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-serviceaccounttokenresponse", Value: serviceAccountName}, &api.ServiceAccountTokenResponse{})
+	return obj.(*api.ServiceAccountTokenResponse), err
+}

@@ -34,6 +34,8 @@ type ServiceAccountsInterface interface {
 	List(label labels.Selector, field fields.Selector) (*api.ServiceAccountList, error)
 	Get(name string) (*api.ServiceAccount, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+
+	RequestToken(serviceAccountName string, tokenRequest *api.ServiceAccountTokenRequest) (*api.ServiceAccountTokenResponse, error)
 }
 
 // serviceAccounts implements ServiceAccounts interface
@@ -122,4 +124,18 @@ func (s *serviceAccounts) Update(serviceAccount *api.ServiceAccount) (result *ap
 		Into(result)
 
 	return
+}
+
+func (s *serviceAccounts) RequestToken(serviceAccountName string, serviceAccountTokenRequest *api.ServiceAccountTokenRequest) (*api.ServiceAccountTokenResponse, error) {
+	result := &api.ServiceAccountTokenResponse{}
+	err := s.client.Post().
+		Namespace(s.namespace).
+		Resource("serviceAccounts").
+		Name(serviceAccountName).
+		SubResource("token").
+		Body(serviceAccountTokenRequest).
+		Do().
+		Into(result)
+
+	return result, err
 }

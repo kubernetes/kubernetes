@@ -1192,6 +1192,22 @@ type ServiceAccountList struct {
 	Items []ServiceAccount `json:"items"`
 }
 
+// ServiceAccountTokenRequest is used to request a service account token
+type ServiceAccountTokenRequest struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	Expires util.Time `json:"expires,omitempty"`
+}
+
+// ServiceAccountTokenResponse is used to return a reference to the secret containing the requested token
+type ServiceAccountTokenResponse struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	Secret LocalObjectReference `json:"secret"`
+}
+
 // Endpoints is a collection of endpoints that implement the actual service.  Example:
 //   Name: "mysvc",
 //   Subsets: [
