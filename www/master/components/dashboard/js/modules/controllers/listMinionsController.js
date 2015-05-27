@@ -6,7 +6,7 @@
 app.controller('ListMinionsCtrl', [
   '$scope',
   '$routeParams',
-  'k8sApi',
+  'k8sv1Beta3Api',
   '$location',
   function($scope, $routeParams, k8sApi, $location) {
     'use strict';
@@ -17,7 +17,7 @@ app.controller('ListMinionsCtrl', [
     $scope.groupedPods = null;
     $scope.serverView = false;
 
-    $scope.headers = [{name: 'Name', field: 'name'}, {name: 'IP', field: 'ip'}, {name: 'Status', field: 'status'}];
+    $scope.headers = [{name: 'Name', field: 'name'}, {name: 'Addresses', field: 'addresses'}, {name: 'Status', field: 'status'}];
 
     $scope.custom = {
       name: '',
@@ -28,7 +28,8 @@ app.controller('ListMinionsCtrl', [
     $scope.thumbs = 'thumb';
     $scope.count = 10;
 
-    $scope.go = function(data) { $location.path('/dashboard/nodes/' + data.name); };
+    $scope.go = function(d) { $location.path('/dashboard/nodes/' + d.name); };
+
 
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
@@ -51,15 +52,15 @@ app.controller('ListMinionsCtrl', [
         };
 
         data.items.forEach(function(minion) {
-          var _kind = '';
+          var _statusType = '';
 
           if (minion.status.conditions) {
             Object.keys(minion.status.conditions)
-                .forEach(function(key) { _kind += minion.status.conditions[key].kind; });
+                .forEach(function(key) { _statusType += minion.status.conditions[key].type; });
           }
 
-          $scope.content.push({name: minion.id, ip: minion.hostIP, status: _kind});
 
+          $scope.content.push({name: minion.metadata.name, addresses: _.map(minion.status.addresses, function(a) { return a.address }).join(', '), status: _statusType});
         });
 
       }).error($scope.handleError);

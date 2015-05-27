@@ -71,7 +71,9 @@ app.provider('k8sv1Beta3Api',
 
                  api.getPods = function(query) { return _get($http, api.getUrlBase() + '/pods', query); };
 
-                 api.getMinions = function(query) { return _get($http, urlBase + '/nodes', query); };
+                 api.getNodes = function(query) { return _get($http, urlBase + '/nodes', query); };
+
+                 api.getMinions = api.getNodes;
 
                  api.getServices = function(query) { return _get($http, api.getUrlBase() + '/services', query); };
 

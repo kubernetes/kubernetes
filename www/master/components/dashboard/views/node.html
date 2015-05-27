@@ -10,16 +10,16 @@
 
       <div class="heading">
         <span class="label">Name:</span>
-        <span>{{node.id}}</span>
+        <span>{{node.metadata.name}}</span>
       </div>
 
 
-      <table>
+      <table class="align-top">
         <tbody>
-          <tr>
+          <tr ng-show="node.metadata.labels">
             <td class="name">Labels</td>
             <td class="value">
-              <div ng-repeat="(label, value) in node.labels">
+              <div ng-repeat="(label, value) in node.metadata.labels">
                 {{label}}: {{value}}
               </div>
             </td>
@@ -28,23 +28,52 @@
           <tr>
             <td class="name">Created</td>
             <td class="value">
-              {{node.creationTimestamp | date:'medium'}}
+              {{node.metadata.creationTimestamp | date:'medium'}}
             </td>
           </tr>
 
           <tr>
-            <td class="name">Host IP</td>
+            <td class="name">Addresses</td>
             <td class="value">
-              {{node.hostIP}}
+              <div ng-repeat="a in node.status.addresses">
+                {{a.address}}
+              </div>
+            </td>
+          </tr>
+
+          <tr ng-show="node.status.capacity">
+            <td class="name">Capacity</td>
+            <td class="value">
+              <table>
+                <tr ng-repeat="(label, value) in node.status.capacity">
+                  <td>{{label}}:</td> <td>{{value}}</td>
+                </tr>
+              </table>
             </td>
           </tr>
 
           <tr>
             <td class="name">System Info</td>
             <td class="value">
-              <div ng-repeat="(label, value) in node.status.nodeInfo">
-                {{label}}: {{value}}
-              </div>
+              <table>
+              <tr ng-repeat="(label, value) in node.status.nodeInfo">
+                <td>{{label}}:</td> <td>{{value}}</td>
+              </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr ng-show="node.spec.podCIDR">
+            <td class="name">PodCIDR</td>
+            <td class="value">
+              {{node.spec.podCIDR}}
+            </td>
+          </tr>
+
+          <tr ng-show="node.spec.externalID">
+            <td class="name">ExternalID</td>
+            <td class="value">
+              {{node.spec.externalID}}
             </td>
           </tr>
 
@@ -58,4 +87,3 @@
   </div>
 </div>
 <div dashboard-footer></div>
-
