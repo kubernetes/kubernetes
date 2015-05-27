@@ -124,6 +124,7 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 	cases := []struct {
 		name      string
 		container *api.Container
+		envs      []kubecontainer.EnvVar
 		expected  *docker.CreateContainerOptions
 	}{
 		{
@@ -145,6 +146,27 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 			},
 		},
 		{
+			name: "command expanded",
+			container: &api.Container{
+				Command: []string{"foo", "$(VAR_TEST)", "$(VAR_TEST2)"},
+			},
+			envs: []kubecontainer.EnvVar{
+				{
+					Name:  "VAR_TEST",
+					Value: "zoo",
+				},
+				{
+					Name:  "VAR_TEST2",
+					Value: "boo",
+				},
+			},
+			expected: &docker.CreateContainerOptions{
+				Config: &docker.Config{
+					Entrypoint: []string{"foo", "zoo", "boo"},
+				},
+			},
+		},
+		{
 			name: "args",
 			container: &api.Container{
 				Args: []string{"foo", "bar"},
@@ -152,6 +174,27 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 			expected: &docker.CreateContainerOptions{
 				Config: &docker.Config{
 					Cmd: []string{"foo", "bar"},
+				},
+			},
+		},
+		{
+			name: "args expanded",
+			container: &api.Container{
+				Args: []string{"zap", "$(VAR_TEST)", "$(VAR_TEST2)"},
+			},
+			envs: []kubecontainer.EnvVar{
+				{
+					Name:  "VAR_TEST",
+					Value: "hap",
+				},
+				{
+					Name:  "VAR_TEST2",
+					Value: "trap",
+				},
+			},
+			expected: &docker.CreateContainerOptions{
+				Config: &docker.Config{
+					Cmd: []string{"zap", "hap", "trap"},
 				},
 			},
 		},
@@ -168,13 +211,44 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "both expanded",
+			container: &api.Container{
+				Command: []string{"$(VAR_TEST2)--$(VAR_TEST)", "foo", "$(VAR_TEST3)"},
+				Args:    []string{"foo", "$(VAR_TEST)", "$(VAR_TEST2)"},
+			},
+			envs: []kubecontainer.EnvVar{
+				{
+					Name:  "VAR_TEST",
+					Value: "zoo",
+				},
+				{
+					Name:  "VAR_TEST2",
+					Value: "boo",
+				},
+				{
+					Name:  "VAR_TEST3",
+					Value: "roo",
+				},
+			},
+			expected: &docker.CreateContainerOptions{
+				Config: &docker.Config{
+					Entrypoint: []string{"boo--zoo", "foo", "roo"},
+					Cmd:        []string{"foo", "zoo", "boo"},
+				},
+			},
+		},
 	}
 
 	for _, tc := range cases {
+		opts := &kubecontainer.RunContainerOptions{
+			Envs: tc.envs,
+		}
+
 		actualOpts := &docker.CreateContainerOptions{
 			Config: &docker.Config{},
 		}
-		setEntrypointAndCommand(tc.container, actualOpts)
+		setEntrypointAndCommand(tc.container, opts, actualOpts)
 
 		if e, a := tc.expected.Config.Entrypoint, actualOpts.Config.Entrypoint; !api.Semantic.DeepEqual(e, a) {
 			t.Errorf("%v: unexpected entrypoint: expected %v, got %v", tc.name, e, a)

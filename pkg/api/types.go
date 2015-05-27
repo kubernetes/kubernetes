@@ -544,7 +544,13 @@ type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
 	Name string `json:"name"`
 	// Optional: no more than one of the following may be specified.
-	// Optional: Defaults to "".
+	// Optional: Defaults to ""; variable references $(VAR_NAME) are expanded
+	// using the previous defined environment variables in the container and
+	// any service environment variables.  If a variable cannot be resolved,
+	// the reference in the input string will be unchanged.  The $(VAR_NAME)
+	// syntax can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped
+	// references will never be expanded, regardless of whether the variable
+	// exists or not.
 	Value string `json:"value,omitempty"`
 	// Optional: Specifies a source the value of this var should come from.
 	ValueFrom *EnvVarSource `json:"valueFrom,omitempty"`
@@ -643,8 +649,16 @@ type Container struct {
 	// Required.
 	Image string `json:"image"`
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
+	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
+	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
+	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
+	// regardless of whether the variable exists or not.
 	Command []string `json:"command,omitempty"`
 	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
+	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
+	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
+	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
+	// regardless of whether the variable exists or not.
 	Args []string `json:"args,omitempty"`
 	// Optional: Defaults to Docker's default.
 	WorkingDir string          `json:"workingDir,omitempty"`
