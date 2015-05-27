@@ -73,7 +73,7 @@ type SaltMinionsResponse struct {
 // newVagrantCloud creates a new instance of VagrantCloud configured to talk to the Salt REST API.
 func newVagrantCloud() (*VagrantCloud, error) {
 	return &VagrantCloud{
-		saltURL:  "http://127.0.0.1:8000",
+		saltURL:  "http://kubernetes-master:8000",
 		saltUser: "vagrant",
 		saltPass: "vagrant",
 		saltAuth: "pam",
