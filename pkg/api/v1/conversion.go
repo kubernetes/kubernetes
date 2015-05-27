@@ -31,6 +31,8 @@ func addConversionFuncs() {
 		convert_v1_StatusDetails_To_api_StatusDetails,
 		convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
 		convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
+		convert_api_ContainerImage_To_v1_ContainerImage,
+		convert_v1_ContainerImage_To_api_ContainerImage,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -241,5 +243,21 @@ func convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *R
 	} else {
 		out.Template = nil
 	}
+	return nil
+}
+
+func convert_v1_ContainerImage_To_api_ContainerImage(in *ContainerImage, out *api.ContainerImage, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ContainerImage))(in)
+	}
+	out.DockerImage = &api.DockerImage{Spec: in.DockerImage.Spec}
+	return nil
+}
+
+func convert_api_ContainerImage_To_v1_ContainerImage(in *api.ContainerImage, out *ContainerImage, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ContainerImage))(in)
+	}
+	out.DockerImage = &DockerImage{Spec: in.DockerImage.Spec}
 	return nil
 }

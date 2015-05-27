@@ -513,6 +513,22 @@ type RBDVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
+// ContainerImage represents the image format used by the container.
+// There must be exactly one of its members specified.
+type ContainerImage struct {
+	// DockerImage represents the image format of a Docker image.
+	DockerImage *DockerImage `json:"dockerImage",omitempty" description:"Docker image"`
+}
+
+// DockerImage represents the image format of a Docker image.
+// User can specify either "Digest" or "Tag" besides the name for more accurate reference to the image.
+// But he cannot specify both.
+type DockerImage struct {
+	// Required: Specification of the Docker image, it includes the namespace, name, tag/digest,
+	// e.g., "localhost.localdomain:5000/samalba/hipache:latest" or "localhost:5000/foo/bar@sha256:bc883ea...".
+	Spec string `json:"spec",omitempty" description:"Specfication of the Docker image, it includes the namespace, name, tag/digest"`
+}
+
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
@@ -647,7 +663,7 @@ type Container struct {
 	// have a unique name.
 	Name string `json:"name"`
 	// Required.
-	Image string `json:"image"`
+	Image ContainerImage `json:",inline" description:"image information for the container"`
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax

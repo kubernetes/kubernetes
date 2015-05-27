@@ -59,10 +59,14 @@ func addDefaultingFuncs() {
 		func(obj *Container) {
 			if obj.ImagePullPolicy == "" {
 				// TODO(dchen1107): Move ParseImageName code to pkg/util
-				parts := strings.Split(obj.Image, ":")
-				// Check image tag
-				if parts[len(parts)-1] == "latest" {
-					obj.ImagePullPolicy = PullAlways
+				if obj.Image.DockerImage != nil {
+					parts := strings.Split(obj.Image.DockerImage.Spec, ":")
+					// Check image tag
+					if parts[len(parts)-1] == "latest" {
+						obj.ImagePullPolicy = PullAlways
+					} else {
+						obj.ImagePullPolicy = PullIfNotPresent
+					}
 				} else {
 					obj.ImagePullPolicy = PullIfNotPresent
 				}
