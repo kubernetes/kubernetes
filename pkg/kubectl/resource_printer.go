@@ -381,7 +381,7 @@ func interpretContainerStatus(status *api.ContainerStatus) (string, string, stri
 	} else if state.Running != nil {
 		// Get the information of the last termination state. This is useful if
 		// a container is stuck in a crash loop.
-		message := getTermMsg(status.LastTerminationState.Termination)
+		message := getTermMsg(status.LastTerminationState.Terminated)
 		if message != "" {
 			message = "last termination: " + message
 		}
@@ -390,8 +390,8 @@ func interpretContainerStatus(status *api.ContainerStatus) (string, string, stri
 			stateMsg = stateMsg + " *not ready*"
 		}
 		return stateMsg, translateTimestamp(state.Running.StartedAt), message, nil
-	} else if state.Termination != nil {
-		return "Terminated", translateTimestamp(state.Termination.StartedAt), getTermMsg(state.Termination), nil
+	} else if state.Terminated != nil {
+		return "Terminated", translateTimestamp(state.Terminated.StartedAt), getTermMsg(state.Terminated), nil
 	}
 	return "", "", "", fmt.Errorf("unknown container state %#v", *state)
 }

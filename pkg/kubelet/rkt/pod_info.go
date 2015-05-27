@@ -136,7 +136,7 @@ func (p *podInfo) getContainerStatus(container *kubecontainer.Container) api.Con
 		}
 		exitCode = -1
 		status.State = api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
+			Terminated: &api.ContainerStateTerminated{
 				ExitCode:  exitCode,
 				StartedAt: util.Unix(container.Created, 0),
 			},

@@ -305,13 +305,13 @@ func deepCopy_api_ContainerState(in ContainerState, out *ContainerState, c *conv
 	} else {
 		out.Running = nil
 	}
-	if in.Termination != nil {
-		out.Termination = new(ContainerStateTerminated)
-		if err := deepCopy_api_ContainerStateTerminated(*in.Termination, out.Termination, c); err != nil {
+	if in.Terminated != nil {
+		out.Terminated = new(ContainerStateTerminated)
+		if err := deepCopy_api_ContainerStateTerminated(*in.Terminated, out.Terminated, c); err != nil {
 			return err
 		}
 	} else {
-		out.Termination = nil
+		out.Terminated = nil
 	}
 	return nil
 }

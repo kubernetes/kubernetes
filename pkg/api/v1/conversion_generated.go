@@ -257,13 +257,13 @@ func convert_api_ContainerState_To_v1_ContainerState(in *api.ContainerState, out
 	} else {
 		out.Running = nil
 	}
-	if in.Termination != nil {
-		out.Termination = new(ContainerStateTerminated)
-		if err := convert_api_ContainerStateTerminated_To_v1_ContainerStateTerminated(in.Termination, out.Termination, s); err != nil {
+	if in.Terminated != nil {
+		out.Terminated = new(ContainerStateTerminated)
+		if err := convert_api_ContainerStateTerminated_To_v1_ContainerStateTerminated(in.Terminated, out.Terminated, s); err != nil {
 			return err
 		}
 	} else {
-		out.Termination = nil
+		out.Terminated = nil
 	}
 	return nil
 }
@@ -2532,13 +2532,13 @@ func convert_v1_ContainerState_To_api_ContainerState(in *ContainerState, out *ap
 	} else {
 		out.Running = nil
 	}
-	if in.Termination != nil {
-		out.Termination = new(api.ContainerStateTerminated)
-		if err := convert_v1_ContainerStateTerminated_To_api_ContainerStateTerminated(in.Termination, out.Termination, s); err != nil {
+	if in.Terminated != nil {
+		out.Terminated = new(api.ContainerStateTerminated)
+		if err := convert_v1_ContainerStateTerminated_To_api_ContainerStateTerminated(in.Terminated, out.Terminated, s); err != nil {
 			return err
 		}
 	} else {
-		out.Termination = nil
+		out.Terminated = nil
 	}
 	return nil
 }

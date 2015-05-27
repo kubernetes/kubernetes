@@ -1632,6 +1632,30 @@ func addConversionFuncs() {
 			out.SecretName = in.Target.ID
 			return nil
 		},
+		func(in *api.ContainerState, out *ContainerState, s conversion.Scope) error {
+			if err := s.Convert(&in.Waiting, &out.Waiting, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Running, &out.Running, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Terminated, &out.Termination, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *ContainerState, out *api.ContainerState, s conversion.Scope) error {
+			if err := s.Convert(&in.Waiting, &out.Waiting, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Running, &out.Running, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Termination, &out.Terminated, 0); err != nil {
+				return err
+			}
+			return nil
+		},
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.

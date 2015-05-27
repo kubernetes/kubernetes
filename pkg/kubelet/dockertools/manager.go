@@ -290,7 +290,7 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string)
 		} else {
 			reason = inspectResult.State.Error
 		}
-		result.status.State.Termination = &api.ContainerStateTerminated{
+		result.status.State.Terminated = &api.ContainerStateTerminated{
 			ExitCode:    inspectResult.State.ExitCode,
 			Reason:      reason,
 			StartedAt:   util.NewTime(inspectResult.State.StartedAt),
@@ -304,7 +304,7 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string)
 				if err != nil {
 					glog.Errorf("Error on reading termination-log %s: %v", path, err)
 				} else {
-					result.status.State.Termination.Message = string(data)
+					result.status.State.Terminated.Message = string(data)
 				}
 			}
 		}
@@ -329,8 +329,8 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	lastObservedTime := make(map[string]util.Time, len(pod.Spec.Containers))
 	for _, status := range pod.Status.ContainerStatuses {
 		oldStatuses[status.Name] = status
-		if status.LastTerminationState.Termination != nil {
-			lastObservedTime[status.Name] = status.LastTerminationState.Termination.FinishedAt
+		if status.LastTerminationState.Terminated != nil {
+			lastObservedTime[status.Name] = status.LastTerminationState.Terminated.FinishedAt
 		}
 	}
 
@@ -381,19 +381,19 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		result := dm.inspectContainer(value.ID, dockerContainerName, terminationMessagePath)
 		if result.err != nil {
 			return nil, result.err
-		} else if result.status.State.Termination != nil {
+		} else if result.status.State.Terminated != nil {
 			terminationState = &result.status.State
 		}
 
 		if containerStatus, found := statuses[dockerContainerName]; found {
-			if containerStatus.LastTerminationState.Termination == nil && terminationState != nil {
+			if containerStatus.LastTerminationState.Terminated == nil && terminationState != nil {
 				// Populate the last termination state.
 				containerStatus.LastTerminationState = *terminationState
 			}
 			count := true
 			// Only count dead containers terminated after last time we observed,
 			if lastObservedTime, ok := lastObservedTime[dockerContainerName]; ok {
-				if terminationState != nil && terminationState.Termination.FinishedAt.After(lastObservedTime.Time) {
+				if terminationState != nil && terminationState.Terminated.FinishedAt.After(lastObservedTime.Time) {
 					count = false
 				} else {
 					// The container finished before the last observation. No

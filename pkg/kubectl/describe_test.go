@@ -157,7 +157,7 @@ func TestDescribeContainers(t *testing.T) {
 			input: api.ContainerStatus{
 				Name: "test",
 				State: api.ContainerState{
-					Termination: &api.ContainerStateTerminated{
+					Terminated: &api.ContainerStateTerminated{
 						StartedAt:  util.NewTime(time.Now()),
 						FinishedAt: util.NewTime(time.Now()),
 						Reason:     "potato",

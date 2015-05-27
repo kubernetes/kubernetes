@@ -1567,8 +1567,8 @@ func TestGetPodStatusWithLastTermination(t *testing.T) {
 		}
 		terminatedContainers := []string{}
 		for _, cs := range status.ContainerStatuses {
-			if cs.LastTerminationState.Termination != nil {
-				terminatedContainers = append(terminatedContainers, cs.LastTerminationState.Termination.ContainerID)
+			if cs.LastTerminationState.Terminated != nil {
+				terminatedContainers = append(terminatedContainers, cs.LastTerminationState.Terminated.ContainerID)
 			}
 		}
 		sort.StringSlice(terminatedContainers).Sort()

@@ -838,7 +838,7 @@ func TestInterpretContainerStatus(t *testing.T) {
 		{
 			status: &api.ContainerStatus{
 				State: api.ContainerState{
-					Termination: &api.ContainerStateTerminated{
+					Terminated: &api.ContainerStateTerminated{
 						ExitCode: 3,
 					},
 				},
@@ -851,7 +851,7 @@ func TestInterpretContainerStatus(t *testing.T) {
 		{
 			status: &api.ContainerStatus{
 				State: api.ContainerState{
-					Termination: &api.ContainerStateTerminated{
+					Terminated: &api.ContainerStateTerminated{
 						ExitCode: 5,
 						Reason:   "test reason",
 					},
