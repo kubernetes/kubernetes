@@ -38,6 +38,8 @@ const (
 	Deleting       = "deleting" // This covers pod.isExitedDeleting and pod.isDeleting.
 	Exited         = "exited"   // This covers pod.isExited and pod.isExitedGarbage.
 	Garbage        = "garbage"
+
+	ExitCodePrefix = "app-"
 )
 
 // podInfo is the internal type that represents the state of
@@ -49,9 +51,9 @@ type podInfo struct {
 	ip string
 	// The pid of the init process in the pod.
 	pid int
-	// A map from image hashes to exit codes.
-	// TODO(yifan): Should be appName to exit code in the future.
+	// A map of [app name]:[exit code].
 	exitCodes map[string]int
+	// TODO(yifan): Expose [app name]:[image id].
 }
 
 // parsePodInfo parses the result of 'rkt status' into podInfo.
@@ -80,12 +82,13 @@ func parsePodInfo(status []string) (*podInfo, error) {
 			}
 			p.pid = pid
 		}
-		if strings.HasPrefix(tuples[0], "sha512") {
+
+		if strings.HasPrefix(tuples[0], ExitCodePrefix) {
 			exitcode, err := strconv.Atoi(tuples[1])
 			if err != nil {
 				return nil, fmt.Errorf("cannot parse exit code from %s : %v", tuples[1], err)
 			}
-			p.exitCodes[tuples[0]] = exitcode
+			p.exitCodes[strings.TrimPrefix(tuples[0], ExitCodePrefix)] = exitcode
 		}
 	}
 	return p, nil
@@ -116,8 +119,7 @@ func (p *podInfo) getContainerStatus(container *kubecontainer.Container) api.Con
 	var status api.ContainerStatus
 	status.Name = container.Name
 	status.Image = container.Image
-	containerID, _ := parseContainerID(string(container.ID))
-	status.ImageID = containerID.imageID
+	status.ContainerID = string(container.ID)
 
 	switch p.state {
 	case Running:
@@ -130,11 +132,11 @@ func (p *podInfo) getContainerStatus(container *kubecontainer.Container) api.Con
 	case Embryo, Preparing, Prepared:
 		status.State = api.ContainerState{Waiting: &api.ContainerStateWaiting{}}
 	case AbortedPrepare, Deleting, Exited, Garbage:
-		exitCode, ok := p.exitCodes[status.ImageID]
+		exitCode, ok := p.exitCodes[status.Name]
 		if !ok {
 			glog.Warningf("rkt: Cannot get exit code for container %v", container)
+			exitCode = -1
 		}
-		exitCode = -1
 		status.State = api.ContainerState{
 			Terminated: &api.ContainerStateTerminated{
 				ExitCode:  exitCode,
