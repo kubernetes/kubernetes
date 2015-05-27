@@ -359,6 +359,9 @@ func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 	if r.err != nil {
 		return r
 	}
+	if s == nil {
+		return r
+	}
 	if s.Empty() {
 		return r
 	}
@@ -375,6 +378,9 @@ func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 // LabelsSelectorParam adds the given selector as a query parameter
 func (r *Request) LabelsSelectorParam(s labels.Selector) *Request {
 	if r.err != nil {
+		return r
+	}
+	if s == nil {
 		return r
 	}
 	if s.Empty() {
