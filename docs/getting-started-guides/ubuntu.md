@@ -92,7 +92,7 @@ If all things goes right, you will see the below message from console
 
 **All done !**
 
-You can also use kubectl command to see if the newly created k8s is working correctly. 
+You can also use `kubectl` command to see if the newly created k8s is working correctly. The `kubectl` binary is under the `cluster/ubuntu/binaries` directory. You can move it into your PATH. Then you can use the below command smoothly. 
 
 For example, use `$ kubectl get minions` to see if you get all your minion nodes comming up and ready. It may take some times for the minions be ready to use like below. 
 
