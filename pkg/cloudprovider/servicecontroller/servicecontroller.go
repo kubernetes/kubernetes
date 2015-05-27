@@ -38,6 +38,11 @@ import (
 const (
 	workerGoroutines = 10
 
+	// How long to wait before retrying the processing of a service change.
+	// If this changes, the sleep in hack/jenkins/e2e.sh before downing a cluster
+	// should be changed appropriately.
+	processingRetryInterval = 5 * time.Second
+
 	clientRetryCount    = 5
 	clientRetryInterval = 5 * time.Second
 
@@ -151,7 +156,7 @@ func (s *ServiceController) watchServices(serviceQueue *cache.DeltaFIFO) {
 		if shouldRetry {
 			// Add the failed service back to the queue so we'll retry it.
 			glog.Errorf("Failed to process service delta. Retrying: %v", err)
-			time.Sleep(5 * time.Second)
+			time.Sleep(processingRetryInterval)
 			serviceQueue.AddIfNotPresent(deltas)
 		} else if err != nil {
 			util.HandleError(fmt.Errorf("Failed to process service delta. Not retrying: %v", err))

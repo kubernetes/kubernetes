@@ -224,8 +224,10 @@ fi
 if [[ "${E2E_DOWN,,}" == "true" ]]; then
     # Sleep before deleting the cluster to give the controller manager time to
     # delete any cloudprovider resources still around from the last test.
-    # 60 seconds was chosen as an arbitrary bound for how long it should take
-    # to delete load balancer resources.
-    sleep 60
+    # This is calibrated to allow enough time for 3 attempts to delete the
+    # resources. Each attempt is allocated 5 seconds for requests to the
+    # cloudprovider plus the processingRetryInterval from servicecontroller.go
+    # for the wait between attempts.
+    sleep 30
     go run ./hack/e2e.go ${E2E_OPT} -v --down
 fi
