@@ -23,7 +23,7 @@ This example assumes that you have forked the repository and [turned up a Kubern
 
 ```bash
 $ cd kubernetes
-$ hack/dev-build-and-up.sh
+$ ./cluster/kube-up.sh
 ```
 
 ### Step One: Turn up the UX for the demo
@@ -83,8 +83,7 @@ This will first 'stop' the replication controller by turning the target number o
 To turn down a Kubernetes cluster:
 
 ```bash
-$ cd ../..  # Up to kubernetes.
-$ cluster/kube-down.sh
+$ ./cluster/kube-down.sh
 ```
 
 Kill the proxy running in the background:
