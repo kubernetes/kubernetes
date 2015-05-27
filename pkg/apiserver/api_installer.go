@@ -37,9 +37,10 @@ import (
 )
 
 type APIInstaller struct {
-	group  *APIGroupVersion
-	info   *APIRequestInfoResolver
-	prefix string // Path prefix where API resources are to be registered.
+	group             *APIGroupVersion
+	info              *APIRequestInfoResolver
+	prefix            string // Path prefix where API resources are to be registered.
+	minRequestTimeout int
 }
 
 // Struct capturing information about an action ("GET", "POST", "WATCH", PROXY", etc).
@@ -419,7 +420,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "LIST": // List all resources of a kind.
-			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, false)).
+			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, false, a.minRequestTimeout)).
 				Filter(m).
 				Doc("list objects of kind "+kind).
 				Operation("list"+kind).
@@ -492,7 +493,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			ws.Route(route)
 		// TODO: deprecated
 		case "WATCH": // Watch a resource.
-			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
+			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true, a.minRequestTimeout)).
 				Filter(m).
 				Doc("watch changes to an object of kind "+kind).
 				Operation("watch"+kind).
@@ -506,7 +507,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			ws.Route(route)
 		// TODO: deprecated
 		case "WATCHLIST": // Watch all resources of a kind.
-			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
+			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true, a.minRequestTimeout)).
 				Filter(m).
 				Doc("watch individual changes to a list of "+kind).
 				Operation("watch"+kind+"list").
