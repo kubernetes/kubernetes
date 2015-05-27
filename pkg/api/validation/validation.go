@@ -983,6 +983,15 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.containers", newPod.Spec.Containers, "may not add or remove containers"))
 		return allErrs
 	}
+
+	// for updates, we are allowing ActiveDeadlineSeconds to be 0
+	// since a user may just want to terminate the containers without deleting the pod
+	if newPod.Spec.ActiveDeadlineSeconds != nil {
+		if *newPod.Spec.ActiveDeadlineSeconds <= 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("activeDeadlineSeconds", newPod.Spec.ActiveDeadlineSeconds, "activeDeadlineSeconds must be a positive integer greater than 0"))
+		}
+	}
+
 	pod := *newPod
 	// Tricky, we need to copy the container list so that we don't overwrite the update
 	var newContainers []api.Container
@@ -991,6 +1000,14 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 		newContainers = append(newContainers, container)
 	}
 	pod.Spec.Containers = newContainers
+
+	// allow ActiveDeadlineSeconds to be updated as well
+	pod.Spec.ActiveDeadlineSeconds = nil
+	if oldPod.Spec.ActiveDeadlineSeconds != nil {
+		activeDeadlineSeconds := *oldPod.Spec.ActiveDeadlineSeconds
+		pod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+	}
+
 	if !api.Semantic.DeepEqual(pod.Spec, oldPod.Spec) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec", newPod.Spec, "may not update fields other than container.image"))
 	}
