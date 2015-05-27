@@ -78,6 +78,7 @@ type TestContextType struct {
 	RepoRoot    string
 	Provider    string
 	CloudConfig CloudConfig
+	KubectlPath string
 }
 
 var testContext TestContextType
@@ -481,9 +482,11 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	}
 	kubectlArgs := append(defaultArgs, args...)
 
-	//TODO: the "kubectl" path string might be worth externalizing into an (optional) ginko arg.
-	cmd := exec.Command(filepath.Join(testContext.RepoRoot, "cluster/kubectl.sh"), kubectlArgs...)
-	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
+	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
+	//and so on.
+	cmd := exec.Command(testContext.KubectlPath, kubectlArgs...)
+
+	//caller will invoke this and wait on it.
 	return cmd
 }
 
@@ -492,6 +495,7 @@ func runKubectl(args ...string) string {
 	cmd := kubectlCmd(args...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
+	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
 	if err := cmd.Run(); err != nil {
 		Failf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
 		return ""
