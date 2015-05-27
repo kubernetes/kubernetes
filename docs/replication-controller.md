@@ -36,7 +36,7 @@ The replication controller simply ensures that the desired number of pods matche
 
 The replication controller is forever constrained to this narrow responsibility. It itself will not perform readiness nor liveness probes. Rather than performing auto-scaling, it is intended to be controlled by an external auto-scaler (as discussed in [#492](https://github.com/GoogleCloudPlatform/kubernetes/issues/492)), which would change its `replicas` field. We will not add scheduling policies (e.g., [spreading](https://github.com/GoogleCloudPlatform/kubernetes/issues/367#issuecomment-48428019)) to replication controller. Nor should it verify that the pods controlled match the currently specified template, as that would obstruct auto-sizing and other automated processes. Similarly, completion deadlines, ordering dependencies, configuration expansion, and other features belong elsewhere. We even plan to factor out the mechanism for bulk pod creation ([#170](https://github.com/GoogleCloudPlatform/kubernetes/issues/170)).
 
-The replication controller is intended to be a composable building-block primitive. We expect higher-level APIs and/or tools to be built on top of it and other complementary primitives for user convenience in the future. The "macro" operations currently supported by kubectl (run-container, stop, resize, rolling-update) are proof-of-concept examples of this. For instance, we could imagine something like [Asgard](http://techblog.netflix.com/2012/06/asgard-web-based-cloud-management-and.html) managing replication controllers, auto-scalers, services, scheduling policies, canaries, etc.
+The replication controller is intended to be a composable building-block primitive. We expect higher-level APIs and/or tools to be built on top of it and other complementary primitives for user convenience in the future. The "macro" operations currently supported by kubectl (run, stop, scale, rolling-update) are proof-of-concept examples of this. For instance, we could imagine something like [Asgard](http://techblog.netflix.com/2012/06/asgard-web-based-cloud-management-and.html) managing replication controllers, auto-scalers, services, scheduling policies, canaries, etc.
 
 ## Common usage patterns
 
@@ -52,7 +52,7 @@ Replication controller makes it easy to scale the number of replicas up or down,
 
 Replication controller is designed to facilitate rolling updates to a service by replacing pods one-by-one.
 
-As explained in [#1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353), the recommended approach is to create a new replication controller with 1 replica, resize the new (+1) and old (-1) controllers one by one, and then delete the old controller after it reaches 0 replicas. This predictably updates the set of pods regardless of unexpected failures.
+As explained in [#1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353), the recommended approach is to create a new replication controller with 1 replica, scale the new (+1) and old (-1) controllers one by one, and then delete the old controller after it reaches 0 replicas. This predictably updates the set of pods regardless of unexpected failures.
 
 Ideally, the rolling update controller would take application readiness into account, and would ensure that a sufficient number of pods were productively serving at any given time.
 

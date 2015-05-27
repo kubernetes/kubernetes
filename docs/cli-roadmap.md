@@ -47,7 +47,7 @@ See also issues with the following labels:
 1. A fairly general-purpose way to specify fields on the command line during creation and update, not just from a config file
 1. Extensible API-based generator framework (i.e. invoke generators via an API/URL rather than building them into kubectl), so that complex client libraries don’t need to be rewritten in multiple languages, and so that the abstractions are available through all interfaces: API, CLI, UI, logs, ... [#5280](https://github.com/GoogleCloudPlatform/kubernetes/issues/5280)
   1. Need schema registry, and some way to invoke generator (e.g., using a container)
-  1. Convert run-container to API-based generator
+  1. Convert run command to API-based generator
 1. Transformation framework
   1. More intelligent defaulting of fields (e.g., [#2643](https://github.com/GoogleCloudPlatform/kubernetes/issues/2643))
 1. Update preconditions based on the values of arbitrary object fields. 

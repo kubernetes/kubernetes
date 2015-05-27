@@ -47,7 +47,7 @@ You can now use any of the cluster/kubectl.sh commands to interact with your loc
 cluster/kubectl.sh get pods
 cluster/kubectl.sh get services
 cluster/kubectl.sh get replicationcontrollers
-cluster/kubectl.sh run-container my-nginx --image=nginx --replicas=2 --port=80
+cluster/kubectl.sh run my-nginx --image=nginx --replicas=2 --port=80
 
 
 ## begin wait for provision to complete, you can monitor the docker pull by opening a new terminal

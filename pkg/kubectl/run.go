@@ -49,7 +49,7 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 		}
 	} else {
 		labels = map[string]string{
-			"run-container": params["name"],
+			"run": params["name"],
 		}
 	}
 	count, err := strconv.Atoi(params["replicas"])

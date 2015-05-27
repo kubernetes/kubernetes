@@ -18,7 +18,7 @@ If the status of any node is ```Unknown``` or ```NotReady``` your cluster is bro
 
 ### Run an application
 ```sh
-kubectl -s http://localhost:8080 run-container nginx --image=nginx --port=80
+kubectl -s http://localhost:8080 run nginx --image=nginx --port=80
 ```
 
 now run ```docker ps``` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
@@ -31,7 +31,7 @@ kubectl expose rc nginx --port=80
 This should print:
 ```
 NAME      LABELS    SELECTOR              IP          PORT(S)
-nginx     <none>    run-container=nginx   <ip-addr>   80/TCP
+nginx     <none>    run=nginx             <ip-addr>   80/TCP
 ```
 
 Hit the webserver:
@@ -46,7 +46,7 @@ Note that you will need run this curl command on your boot2docker VM if you are 
 Now try to scale up the nginx you created before:
 
 ```sh
-kubectl resize rc nginx --replicas=3
+kubectl scale rc nginx --replicas=3
 ```
 
 And list the pods

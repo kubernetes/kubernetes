@@ -297,7 +297,7 @@ func FindSourceController(r RollingUpdaterClient, namespace, name string) (*api.
 }
 
 // Update all pods for a ReplicationController (oldRc) by creating a new
-// controller (newRc) with 0 replicas, and synchronously resizing oldRc,newRc
+// controller (newRc) with 0 replicas, and synchronously scaling oldRc,newRc
 // by 1 until oldRc has 0 replicas and newRc has the original # of desired
 // replicas. Cleanup occurs based on a RollingUpdaterCleanupPolicy.
 //
@@ -364,12 +364,12 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 			oldName, oldRc.Spec.Replicas,
 			newName, newRc.Spec.Replicas)
 
-		newRc, err = r.resizeAndWait(newRc, retry, waitForReplicas)
+		newRc, err = r.scaleAndWait(newRc, retry, waitForReplicas)
 		if err != nil {
 			return err
 		}
 		time.Sleep(updatePeriod)
-		oldRc, err = r.resizeAndWait(oldRc, retry, waitForReplicas)
+		oldRc, err = r.scaleAndWait(oldRc, retry, waitForReplicas)
 		if err != nil {
 			return err
 		}
@@ -382,18 +382,18 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		fmt.Fprintf(out, "Stopping %s replicas: %d -> %d\n",
 			oldName, oldRc.Spec.Replicas, 0)
 		oldRc.Spec.Replicas = 0
-		oldRc, err = r.resizeAndWait(oldRc, retry, waitForReplicas)
-		// oldRc, err = r.resizeAndWait(oldRc, interval, timeout)
+		oldRc, err = r.scaleAndWait(oldRc, retry, waitForReplicas)
+		// oldRc, err = r.scaleAndWait(oldRc, interval, timeout)
 		if err != nil {
 			return err
 		}
 	}
 	// add remaining replicas on newRc
 	if newRc.Spec.Replicas != desired {
-		fmt.Fprintf(out, "Resizing %s replicas: %d -> %d\n",
+		fmt.Fprintf(out, "Scaling %s replicas: %d -> %d\n",
 			newName, newRc.Spec.Replicas, desired)
 		newRc.Spec.Replicas = desired
-		newRc, err = r.resizeAndWait(newRc, retry, waitForReplicas)
+		newRc, err = r.scaleAndWait(newRc, retry, waitForReplicas)
 		if err != nil {
 			return err
 		}
@@ -444,12 +444,12 @@ func (r *RollingUpdater) getExistingNewRc(sourceId, name string) (rc *api.Replic
 	return
 }
 
-func (r *RollingUpdater) resizeAndWait(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
-	resizer, err := ResizerFor("ReplicationController", r.c)
+func (r *RollingUpdater) scaleAndWait(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
+	scaler, err := ScalerFor("ReplicationController", r.c)
 	if err != nil {
 		return nil, err
 	}
-	if err := resizer.Resize(rc.Namespace, rc.Name, uint(rc.Spec.Replicas), &ResizePrecondition{-1, ""}, retry, wait); err != nil {
+	if err := scaler.Scale(rc.Namespace, rc.Name, uint(rc.Spec.Replicas), &ScalePrecondition{-1, ""}, retry, wait); err != nil {
 		return nil, err
 	}
 	return r.c.GetReplicationController(r.ns, rc.ObjectMeta.Name)

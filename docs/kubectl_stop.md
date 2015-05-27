@@ -8,7 +8,7 @@ Gracefully shut down a resource by id or filename.
 Gracefully shut down a resource by id or filename.
 
 Attempts to shut down and delete a resource that supports graceful termination.
-If the resource is resizable it will be resized to 0 before deletion.
+If the resource is scalable it will be scaled to 0 before deletion.
 
 ```
 kubectl stop (-f FILENAME | RESOURCE (ID | -l label | --all))

@@ -499,27 +499,27 @@ __EOF__
   # Describe command should print detailed information
   kube::test::describe_object_assert rc 'frontend' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
 
-  ### Resize replication controller frontend with current-replicas and replicas
+  ### Scale replication controller frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
   # Command
-  kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend "${kube_flags[@]}"
+  kubectl scale --current-replicas=3 --replicas=2 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: 2 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
 
-  ### Resize replication controller frontend with (wrong) current-replicas and replicas
+  ### Scale replication controller frontend with (wrong) current-replicas and replicas
   # Pre-condition: 2 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
   # Command
-  ! kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend "${kube_flags[@]}"
+  ! kubectl scale --current-replicas=3 --replicas=2 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: nothing changed
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
 
-  ### Resize replication controller frontend with replicas only
+  ### Scale replication controller frontend with replicas only
   # Pre-condition: 2 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
   # Command
-  kubectl resize  --replicas=3 replicationcontrollers frontend "${kube_flags[@]}"
+  kubectl scale  --replicas=3 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: 3 replicas
   kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
 

@@ -58,9 +58,9 @@ kubectl
 * [kubectl namespace](kubectl_namespace.md)	 - SUPERCEDED: Set and view the current Kubernetes namespace
 * [kubectl port-forward](kubectl_port-forward.md)	 - Forward one or more local ports to a pod.
 * [kubectl proxy](kubectl_proxy.md)	 - Run a proxy to the Kubernetes API server
-* [kubectl resize](kubectl_resize.md)	 - Set a new size for a Replication Controller.
 * [kubectl rolling-update](kubectl_rolling-update.md)	 - Perform a rolling update of the given ReplicationController.
-* [kubectl run-container](kubectl_run-container.md)	 - Run a particular image on the cluster.
+* [kubectl run](kubectl_run.md)	 - Run a particular image on the cluster.
+* [kubectl scale](kubectl_scale.md)	 - Set a new size for a Replication Controller.
 * [kubectl stop](kubectl_stop.md)	 - Gracefully shut down a resource by id or filename.
 * [kubectl update](kubectl_update.md)	 - Update a resource by filename or stdin.
 * [kubectl version](kubectl_version.md)	 - Print the client and server version information.

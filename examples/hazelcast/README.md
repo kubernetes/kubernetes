@@ -52,7 +52,7 @@ $ kubectl create -f hazelcast-service.yaml
 ```
 
 ### Adding replicated nodes
-The real power of Kubernetes and Hazelcast lies in easily building a replicated, resizable Hazelcast cluster.
+The real power of Kubernetes and Hazelcast lies in easily building a replicated, scalable Hazelcast cluster.
 
 In Kubernetes a _Replication Controller_ is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
 
@@ -129,9 +129,9 @@ You can see that the _Service_ has found the pod created by the replication cont
 
 Now it gets even more interesting.
 
-Let's resize our cluster to 2 pods:
+Let's scale our cluster to 2 pods:
 ```sh
-$ kubectl resize rc hazelcast --replicas=2
+$ kubectl scale rc hazelcast --replicas=2
 ```
 
 Now if you list the pods in your cluster, you should see two hazelcast pods:
@@ -141,7 +141,7 @@ $ kubectl get pods
 POD                 IP            CONTAINER(S)   IMAGE(S)              HOST                                 LABELS           STATUS    CREATED      MESSAGE
 hazelcast-pkyzd     10.244.90.3                                        e2e-test-minion-vj7k/104.197.8.214   name=hazelcast   Running   14 seconds
                                   hazelcast      pires/hazelcast-k8s:0.2                                                         Running   2 seconds
-hazelcast-ulkws     10.244.66.2                                        e2e-test-minion-2x1f/146.148.62.37   name=hazelcast   Running   7 seconds    
+hazelcast-ulkws     10.244.66.2                                        e2e-test-minion-2x1f/146.148.62.37   name=hazelcast   Running   7 seconds
                                   hazelcast      pires/hazelcast-k8s:0.2                                                         Running   6 seconds
 ```
 
@@ -175,9 +175,9 @@ Members [2] {
 2015-05-09 22:06:31.177  INFO 5 --- [           main] com.hazelcast.core.LifecycleService      : [10.244.66.2]:5701 [someGroup] [3.4.2] Address[10.244.66.2]:5701 is STARTED
 ```
 
-Now let's resize our cluster to 4 nodes:
+Now let's scale our cluster to 4 nodes:
 ```sh
-$ kubectl resize rc hazelcast --replicas=4
+$ kubectl scale rc hazelcast --replicas=4
 ```
 
 Examine the status again by checking a node’s log and you should see the 4 members connected.
@@ -193,10 +193,10 @@ kubectl create -f hazelcast-service.yaml
 kubectl create -f hazelcast-controller.yaml
 
 # scale up to 2 nodes
-kubectl resize rc hazelcast --replicas=2
+kubectl scale rc hazelcast --replicas=2
 
 # scale up to 4 nodes
-kubectl resize rc hazelcast --replicas=4
+kubectl scale rc hazelcast --replicas=4
 ```
 
 ### Hazelcast Discovery Source

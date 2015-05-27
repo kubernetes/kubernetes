@@ -442,9 +442,9 @@ _kubectl_rolling-update()
     must_have_one_noun=()
 }
 
-_kubectl_resize()
+_kubectl_scale()
 {
-    last_command="kubectl_resize"
+    last_command="kubectl_scale"
     commands=()
 
     flags=()
@@ -537,9 +537,9 @@ _kubectl_proxy()
     must_have_one_noun=()
 }
 
-_kubectl_run-container()
+_kubectl_run()
 {
-    last_command="kubectl_run-container"
+    last_command="kubectl_run"
     commands=()
 
     flags=()
@@ -897,11 +897,11 @@ _kubectl()
     commands+=("namespace")
     commands+=("logs")
     commands+=("rolling-update")
-    commands+=("resize")
+    commands+=("scale")
     commands+=("exec")
     commands+=("port-forward")
     commands+=("proxy")
-    commands+=("run-container")
+    commands+=("run")
     commands+=("stop")
     commands+=("expose")
     commands+=("label")
