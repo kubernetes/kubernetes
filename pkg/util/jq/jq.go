@@ -50,30 +50,35 @@ func (j *Jq) Execute(wr io.Writer, data interface{}) error {
 	return nil
 }
 
-func (j *Jq) walk(wr io.Writer, value reflect.Value, node Node) {
+func (j *Jq) walk(wr io.Writer, value reflect.Value, node Node) reflect.Value {
 	var text []byte
 	switch node := node.(type) {
 	case *ListNode:
+		curValue := value
 		for _, node := range node.Nodes {
-			j.walk(wr, value, node)
+			curValue = j.walk(wr, curValue, node)
 		}
+		return value
 	case *TextNode:
 		text = node.Text
+		if _, err := wr.Write(text); err != nil {
+			glog.Errorf("%s", err)
+		}
+		return value
 	case *VariableNode:
-		text = j.evalVariable(value, node.Name)
+		value = j.evalVariable(wr, value, node.Name)
+		return value
 	default:
-		return
+		return reflect.Value{}
 	}
-	if _, err := wr.Write(text); err != nil {
-		glog.Errorf("%s", err)
-	}
-
 }
 
-func (j *Jq) evalVariable(value reflect.Value, name string) []byte {
+func (j *Jq) evalVariable(wr io.Writer, value reflect.Value, name string) reflect.Value {
 	var text string
 	v := value.FieldByName(name)
 	switch v.Kind() {
+	case reflect.Struct:
+		return v
 	case reflect.Bool:
 		if variable := v.Bool(); variable {
 			text = "True"
@@ -91,5 +96,8 @@ func (j *Jq) evalVariable(value reflect.Value, name string) []byte {
 	default:
 		glog.Errorf("%s is not a printable variable", name)
 	}
-	return []byte(text)
+	if _, err := wr.Write([]byte(text)); err != nil {
+		glog.Errorf("%s", err)
+	}
+	return reflect.Value{}
 }

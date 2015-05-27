@@ -37,9 +37,9 @@ func TestLexPlainText(t *testing.T) {
 func TestLexVariable(t *testing.T) {
 	text := "hello '.foo'"
 	l := lex("hello", text, "'", "'")
-	expect := []itemType{itemText, itemLeftDelim, itemField, itemRightDelim, itemEOF}
+	expect := []itemType{itemText, itemLeftDelim, itemDot, itemField, itemRightDelim, itemEOF}
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 6; i++ {
 		item := l.nextItem()
 		if item.typ != expect[i] {
 			t.Logf("expect to get %v, got %v", expect[i], item)

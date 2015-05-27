@@ -44,10 +44,11 @@ func TestParseVariable(t *testing.T) {
 	if nodes[0].Type() != NodeText {
 		t.Errorf("expect NodeText, got %v", nodes[0])
 	}
-	if nodes[1].Type() != NodeVariable {
-		t.Errorf("expect NodeVariable, got %v", nodes[1])
+	if nodes[1].Type() != NodeList {
+		t.Errorf("expect NodeList, got %v", nodes[1])
 	}
-	node := nodes[1].(*VariableNode)
+	nodes = nodes[1].(*ListNode).Nodes
+	node := nodes[0].(*VariableNode)
 	if node.Name != "jq" {
 		t.Errorf("expect NodeVariable jq, got %s", node.Name)
 	}

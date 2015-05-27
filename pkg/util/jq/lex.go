@@ -162,9 +162,7 @@ func (l *lexer) run() {
 }
 
 // atTerminator reports whether the input is at valid termination character to
-// appear after an identifier. Breaks .X.Y into two pieces. Also catches cases
-// like "$x+2" not being acceptable without a space, in case we decide one
-// day to implement arithmetic.
+// appear after an identifier. Breaks .X.Y into two pieces.
 func (l *lexer) atTerminator() bool {
 	r := l.peek()
 	if isSpace(r) || isEndOfLine(r) {
@@ -227,6 +225,7 @@ func lexInsideAction(l *lexer) stateFn {
 	case r == eof || isEndOfLine(r):
 		return l.errorf("unclosed action")
 	case r == '.':
+		l.emit(itemDot)
 		return lexField
 	default:
 		return l.errorf("unrecognized charactor in action: %#U", r)

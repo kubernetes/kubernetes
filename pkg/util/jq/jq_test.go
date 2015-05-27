@@ -57,3 +57,29 @@ func TestVariable(t *testing.T) {
 		t.Errorf("expect to get %s, got %s", expect, out)
 	}
 }
+
+func TestNestedDict(t *testing.T) {
+	text := "hello '.jq.title'"
+	j := New("nestedDict")
+	err := j.Parse(text)
+	if err != nil {
+		t.Errorf("parse nested dict %s error %v", text, err)
+	}
+	buf := new(bytes.Buffer)
+
+	type inner struct {
+		title string
+	}
+	type outer struct {
+		jq inner
+	}
+	err = j.Execute(buf, outer{jq: inner{title: "world"}})
+	if err != nil {
+		t.Errorf("execute variable error %v", err)
+	}
+	out := buf.String()
+	expect := "hello world"
+	if out != expect {
+		t.Errorf("expect to get %s, got %s", expect, out)
+	}
+}

@@ -120,9 +120,6 @@ type VariableNode struct {
 }
 
 func newVariable(pos Pos, name string) *VariableNode {
-	if name[0] == '.' {
-		name = name[1:]
-	}
 	return &VariableNode{NodeType: NodeVariable, Pos: pos, Name: name}
 }
 
@@ -135,6 +132,7 @@ type Tree struct {
 	lex  *lexer
 	Root *ListNode
 	text string
+	cur  *ListNode
 }
 
 // Parse parsed the given text and return a node Tree.
@@ -154,13 +152,21 @@ func NewTree(name string) *Tree {
 func (t *Tree) Parse(text string) error {
 	t.Root = newList(0)
 	t.lex = lex(t.Name, text, "'", "'")
+	t.cur = t.Root
 	for eof := false; eof != true; {
 		item := t.lex.nextItem()
 		switch item.typ {
+		case itemLeftDelim:
+			newNode := newList(item.pos)
+			t.cur.append(newNode)
+			t.cur = newNode
+		case itemRightDelim:
+			t.cur = t.Root
 		case itemField:
-			t.Root.append(newVariable(item.pos, item.val))
+			newNode := newVariable(item.pos, item.val)
+			t.cur.append(newNode)
 		case itemText:
-			t.Root.append(newText(item.pos, item.val))
+			t.cur.append(newText(item.pos, item.val))
 		case itemEOF:
 			eof = true
 		}
