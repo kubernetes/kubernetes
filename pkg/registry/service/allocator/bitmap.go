@@ -55,6 +55,7 @@ var _ Snapshottable = &AllocationBitmap{}
 // allocateStrategy is a search strategy in the allocation map for a valid item.
 type allocateStrategy func(allocated *big.Int, max, count int) (int, bool)
 
+// NewAllocationMap creates an allocation bitmap using the random scan strategy.
 func NewAllocationMap(max int, rangeSpec string) *AllocationBitmap {
 	a := AllocationBitmap{
 		strategy:  randomScanStrategy,
@@ -64,6 +65,30 @@ func NewAllocationMap(max int, rangeSpec string) *AllocationBitmap {
 		rangeSpec: rangeSpec,
 	}
 	return &a
+}
+
+// NewContiguousAllocationMap creates an allocation bitmap using the contiguous scan strategy.
+func NewContiguousAllocationMap(max int, rangeSpec string) *AllocationBitmap {
+	a := AllocationBitmap{
+		strategy:  contiguousScanStrategy,
+		allocated: big.NewInt(0),
+		count:     0,
+		max:       max,
+		rangeSpec: rangeSpec,
+	}
+	return &a
+}
+
+// NewRandomAllocationInterface creates an allocation bitmap satisfying Interface using the
+// random scan strategy.
+func NewRandomAllocationInterface(max int, rangeSpec string) Interface {
+	return NewAllocationMap(max, rangeSpec)
+}
+
+// NewContiguousAllocationInterface creates an allocation bitmap satisfying Interface using the
+// contiguous scan strategy.
+func NewContiguousAllocationInterface(max int, rangeSpec string) Interface {
+	return NewContiguousAllocationMap(max, rangeSpec)
 }
 
 // Allocate attempts to reserve the provided item.
@@ -162,6 +187,19 @@ func randomScanStrategy(allocated *big.Int, max, count int) (int, bool) {
 		at := (offset + i) % max
 		if allocated.Bit(at) == 0 {
 			return at, true
+		}
+	}
+	return 0, false
+}
+
+// contiguousScanStrategy tries to allocate starting at 0 and filling in any gaps
+func contiguousScanStrategy(allocated *big.Int, max, count int) (int, bool) {
+	if count >= max {
+		return 0, false
+	}
+	for i := 0; i < max; i++ {
+		if allocated.Bit(i) == 0 {
+			return i, true
 		}
 	}
 	return 0, false
