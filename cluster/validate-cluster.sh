@@ -45,13 +45,15 @@ while true; do
   if (( ${found} == "${NUM_MINIONS}" )) && (( ${ready} == "${NUM_MINIONS}")); then
     break
   else
-    if (( attempt > 5 )); then
-      echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${NUM_MINIONS}. Your cluster may not be working. ${color_norm}"
+    if (( attempt > 20 )); then
+      echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${NUM_MINIONS}. Your cluster may not be working.${color_norm}"
       cat -n "${MINIONS_FILE}"
       exit 2
+		else
+      echo -e "${color_yellow}Waiting for ${NUM_MINIONS} ready nodes. ${ready} ready nodes, ${found} registered. Retrying.${color_norm}"
     fi
     attempt=$((attempt+1))
-    sleep 30
+    sleep 15
   fi
 done
 echo "Found ${found} nodes."
