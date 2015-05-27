@@ -1394,36 +1394,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: api.NamespaceDefault},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8082,
-				}},
-				PortalIP: "1.2.3.2",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: api.NamespaceDefault},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8082,
-				}},
-				PortalIP: "None",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: api.NamespaceDefault},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8082,
-				}},
-				PortalIP: "",
-			},
-		},
-		{
 			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test1"},
 			Spec: api.ServiceSpec{
 				Ports: []api.ServicePort{{
@@ -1480,16 +1450,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Port:     8086,
 				}},
 				PortalIP: "1.2.3.6",
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: "kubernetes"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
-					Protocol: "TCP",
-					Port:     8087,
-				}},
-				PortalIP: "1.2.3.7",
 			},
 		},
 		{
@@ -1565,13 +1525,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
 				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
 				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
-				{Name: "KUBERNETES_RO_SERVICE_HOST", Value: "1.2.3.2"},
-				{Name: "KUBERNETES_RO_SERVICE_PORT", Value: "8082"},
-				{Name: "KUBERNETES_RO_PORT", Value: "tcp://1.2.3.2:8082"},
-				{Name: "KUBERNETES_RO_PORT_8082_TCP", Value: "tcp://1.2.3.2:8082"},
-				{Name: "KUBERNETES_RO_PORT_8082_TCP_PROTO", Value: "tcp"},
-				{Name: "KUBERNETES_RO_PORT_8082_TCP_PORT", Value: "8082"},
-				{Name: "KUBERNETES_RO_PORT_8082_TCP_ADDR", Value: "1.2.3.2"},
 			},
 		},
 		{
@@ -1628,13 +1581,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
 				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
 				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
-				{Name: "KUBERNETES_RO_SERVICE_HOST", Value: "1.2.3.2"},
-				{Name: "KUBERNETES_RO_SERVICE_PORT", Value: "8082"},
-				{Name: "KUBERNETES_RO_PORT", Value: "tcp://1.2.3.2:8082"},
-				{Name: "KUBERNETES_RO_PORT_8082_TCP", Value: "tcp://1.2.3.2:8082"},
-				{Name: "KUBERNETES_RO_PORT_8082_TCP_PROTO", Value: "tcp"},
-				{Name: "KUBERNETES_RO_PORT_8082_TCP_PORT", Value: "8082"},
-				{Name: "KUBERNETES_RO_PORT_8082_TCP_ADDR", Value: "1.2.3.2"},
 			},
 		},
 		{
@@ -1663,13 +1609,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "KUBERNETES_PORT_8084_TCP_PROTO", Value: "tcp"},
 				{Name: "KUBERNETES_PORT_8084_TCP_PORT", Value: "8084"},
 				{Name: "KUBERNETES_PORT_8084_TCP_ADDR", Value: "1.2.3.4"},
-				{Name: "KUBERNETES_RO_SERVICE_HOST", Value: "1.2.3.7"},
-				{Name: "KUBERNETES_RO_SERVICE_PORT", Value: "8087"},
-				{Name: "KUBERNETES_RO_PORT", Value: "tcp://1.2.3.7:8087"},
-				{Name: "KUBERNETES_RO_PORT_8087_TCP", Value: "tcp://1.2.3.7:8087"},
-				{Name: "KUBERNETES_RO_PORT_8087_TCP_PROTO", Value: "tcp"},
-				{Name: "KUBERNETES_RO_PORT_8087_TCP_PORT", Value: "8087"},
-				{Name: "KUBERNETES_RO_PORT_8087_TCP_ADDR", Value: "1.2.3.7"},
 			},
 		},
 		{
@@ -1693,13 +1632,6 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "KUBERNETES_PORT_8086_TCP_PROTO", Value: "tcp"},
 				{Name: "KUBERNETES_PORT_8086_TCP_PORT", Value: "8086"},
 				{Name: "KUBERNETES_PORT_8086_TCP_ADDR", Value: "1.2.3.6"},
-				{Name: "KUBERNETES_RO_SERVICE_HOST", Value: "1.2.3.7"},
-				{Name: "KUBERNETES_RO_SERVICE_PORT", Value: "8087"},
-				{Name: "KUBERNETES_RO_PORT", Value: "tcp://1.2.3.7:8087"},
-				{Name: "KUBERNETES_RO_PORT_8087_TCP", Value: "tcp://1.2.3.7:8087"},
-				{Name: "KUBERNETES_RO_PORT_8087_TCP_PROTO", Value: "tcp"},
-				{Name: "KUBERNETES_RO_PORT_8087_TCP_PORT", Value: "8087"},
-				{Name: "KUBERNETES_RO_PORT_8087_TCP_ADDR", Value: "1.2.3.7"},
 			},
 		},
 		{
