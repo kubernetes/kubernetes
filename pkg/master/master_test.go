@@ -36,18 +36,7 @@ func TestGetServersToValidate(t *testing.T) {
 
 	master.nodeRegistry = registrytest.NewMinionRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
-	servers := master.getServersToValidate(&config, true)
-
-	if len(servers) != 7 {
-		t.Errorf("unexpected server list: %#v", servers)
-	}
-	for _, server := range []string{"scheduler", "controller-manager", "etcd-0", "etcd-1", "etcd-2", "node-0", "node-1"} {
-		if _, ok := servers[server]; !ok {
-			t.Errorf("server list missing: %s", server)
-		}
-	}
-
-	servers = master.getServersToValidate(&config, false)
+	servers := master.getServersToValidate(&config)
 
 	if len(servers) != 5 {
 		t.Errorf("unexpected server list: %#v", servers)
