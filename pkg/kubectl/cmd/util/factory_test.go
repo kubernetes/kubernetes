@@ -25,6 +25,7 @@ import (
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestNewFactoryDefaultFlagBindings(t *testing.T) {
@@ -151,5 +152,17 @@ func TestLabelsForObject(t *testing.T) {
 			t.Fatalf("%s: Labels mismatch! Expected %s, got %s", test.name, test.expected, got)
 		}
 
+	}
+}
+
+func TestFlagUnderscoreRenaming(t *testing.T) {
+	factory := NewFactory(nil)
+
+	factory.flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+	factory.flags.Bool("valid_flag", false, "bool value")
+
+	// In case of failure of this test check this PR: spf13/pflag#23
+	if factory.flags.Lookup("valid_flag").Name != "valid-flag" {
+		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.flags.Lookup("valid_flag").Name)
 	}
 }

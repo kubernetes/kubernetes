@@ -90,7 +90,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	mapper := kubectl.ShortcutExpander{latest.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	generators := map[string]kubectl.Generator{
 		"run-container/v1": kubectl.BasicReplicationController{},
@@ -236,17 +236,18 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 		f.flags.Bool("validate", false, "If true, use a schema to validate the input before sending it")
 	}
 
-	if f.flags != nil {
-		f.flags.VisitAll(func(flag *pflag.Flag) {
-			flags.AddFlag(flag)
-		})
-	}
+	// Merge factory's flags
+	util.AddPFlagSetToPFlagSet(f.flags, flags)
 
 	// Globally persistent flags across all subcommands.
 	// TODO Change flag names to consts to allow safer lookup from subcommands.
 	// TODO Add a verbose flag that turns on glog logging. Probably need a way
 	// to do that automatically for every subcommand.
 	flags.BoolVar(&f.clients.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
+
+	// Normalize all flags that are comming from other packages or pre-configurations
+	// a.k.a. change all "_" to "-". e.g. glog package
+	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
 }
 
 func getPorts(spec api.PodSpec) []string {

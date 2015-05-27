@@ -21,6 +21,7 @@ import (
 
 	cmdconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/config"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 
 	"github.com/spf13/cobra"
@@ -106,6 +107,9 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	}
 
 	f.BindFlags(cmds.PersistentFlags())
+
+	// From this point and forward we get warnings on flags that contain "_" separators
+	cmds.SetGlobalNormalizationFunc(util.WarnWordSepNormalizeFunc)
 
 	cmds.AddCommand(NewCmdGet(f, out))
 	cmds.AddCommand(NewCmdDescribe(f, out))
