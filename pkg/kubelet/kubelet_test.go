@@ -651,49 +651,6 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	fakeRuntime.AssertKilledPods([]string{"12345678"})
 }
 
-func TestSyncPodsDeletes(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// the k8s prefix is required for the kubelet to manage the container
-			Names: []string{"/k8s_foo_bar_new_12345678_42"},
-			ID:    "1234",
-		},
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD_foo_new_12345678_42"},
-			ID:    "9876",
-		},
-		{
-			Names: []string{"foo"},
-			ID:    "4567",
-		},
-	}
-	err := kubelet.SyncPods([]*api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	verifyCalls(t, fakeDocker, []string{"list", "inspect_container", "stop", "inspect_container", "stop", "list"})
-
-	// A map iteration is used to delete containers, so must not depend on
-	// order here.
-	expectedToStop := map[string]bool{
-		"1234": true,
-		"9876": true,
-	}
-	if len(fakeDocker.Stopped) != 2 ||
-		!expectedToStop[fakeDocker.Stopped[0]] ||
-		!expectedToStop[fakeDocker.Stopped[1]] {
-		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
-	}
-}
-
 func TestMountExternalVolumes(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
