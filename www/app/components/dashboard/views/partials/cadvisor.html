@@ -1,9 +1,0 @@
-<div class="dashboard" ng-controller="cAdvisorController">
-  <div class="server-overview">
-    <md-content layout="row" layout-wrap>
-      <div flex-sm="100" flex-md="50" flex-lg="33" flex-gt-lg="25" class="chart_area" ng-repeat="minion in minions.items">
-        <d3-minion-bar-gauge data="activeMinionDataById[minion.id]" class="concentric" graph-width="325" graph-height="325" thickness=18 />
-      </div>
-    </md-content>
-  </div>
-</div>
