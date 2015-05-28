@@ -474,13 +474,13 @@ func addConversionFuncs() {
 			if err := s.Convert(&in.Selector, &out.ReplicaSelector, 0); err != nil {
 				return err
 			}
-			if in.TemplateRef != nil && in.Template == nil {
-				return &api.ConversionError{
-					In:      in,
-					Out:     out,
-					Message: "objects with a template ref cannot be converted to older objects, must populate template",
-				}
-			}
+			//if in.TemplateRef != nil && in.Template == nil {
+			//	return &api.ConversionError{
+			//		In:      in,
+			//		Out:     out,
+			//		Message: "objects with a template ref cannot be converted to older objects, must populate template",
+			//	}
+			//}
 			if in.Template != nil {
 				if err := s.Convert(in.Template, &out.PodTemplate, 0); err != nil {
 					return err
