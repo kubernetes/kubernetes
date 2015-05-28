@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"os"
 
@@ -31,15 +32,12 @@ import (
 // TODO: Unit tests for this code, we can spin up a test SSH server with instructions here:
 // https://godoc.org/golang.org/x/crypto/ssh#ServerConn
 type SSHTunnel struct {
-	Config     *ssh.ClientConfig
-	Host       string
-	SSHPort    int
-	LocalPort  int
-	RemoteHost string
-	RemotePort int
-	running    bool
-	sock       net.Listener
-	client     *ssh.Client
+	Config  *ssh.ClientConfig
+	Host    string
+	SSHPort string
+	running bool
+	sock    net.Listener
+	client  *ssh.Client
 }
 
 func (s *SSHTunnel) copyBytes(out io.Writer, in io.Reader) {
@@ -48,7 +46,7 @@ func (s *SSHTunnel) copyBytes(out io.Writer, in io.Reader) {
 	}
 }
 
-func NewSSHTunnel(user, keyfile, host, remoteHost string, localPort, remotePort int) (*SSHTunnel, error) {
+func NewSSHTunnel(user, keyfile, host string) (*SSHTunnel, error) {
 	signer, err := MakePrivateKeySigner(keyfile)
 	if err != nil {
 		return nil, err
@@ -58,44 +56,51 @@ func NewSSHTunnel(user, keyfile, host, remoteHost string, localPort, remotePort 
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
 	}
 	return &SSHTunnel{
-		Config:     &config,
-		Host:       host,
-		SSHPort:    22,
-		LocalPort:  localPort,
-		RemotePort: remotePort,
-		RemoteHost: remoteHost,
+		Config:  &config,
+		Host:    host,
+		SSHPort: "22",
 	}, nil
 }
 
 func (s *SSHTunnel) Open() error {
 	var err error
-	s.client, err = ssh.Dial("tcp", fmt.Sprintf("%s:%d", s.Host, s.SSHPort), s.Config)
+	s.client, err = ssh.Dial("tcp", net.JoinHostPort(s.Host, s.SSHPort), s.Config)
 	if err != nil {
 		return err
 	}
-	s.sock, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", s.LocalPort))
+	return nil
+}
+
+func (s *SSHTunnel) Dial(network, address string) (net.Conn, error) {
+	return s.client.Dial(network, address)
+}
+
+func (s *SSHTunnel) Listen(remoteHost, localPort, remotePort string) error {
+	var err error
+	s.sock, err = net.Listen("tcp", net.JoinHostPort("localhost", localPort))
 	if err != nil {
 		return err
 	}
 	s.running = true
-	return nil
-}
-
-func (s *SSHTunnel) Listen() {
 	for s.running {
 		conn, err := s.sock.Accept()
 		if err != nil {
-			glog.Errorf("Error listening for ssh tunnel to %s (%v)", s.RemoteHost, err)
+			if s.running {
+				glog.Errorf("Error listening for ssh tunnel to %s (%v)", remoteHost, err)
+			} else {
+				glog.V(4).Infof("Error listening for ssh tunnel to %s (%v), this is likely due to the tunnel shutting down.", remoteHost, err)
+			}
 			continue
 		}
-		if err := s.tunnel(conn); err != nil {
+		if err := s.tunnel(conn, remoteHost, remotePort); err != nil {
 			glog.Errorf("Error starting tunnel: %v", err)
 		}
 	}
+	return nil
 }
 
-func (s *SSHTunnel) tunnel(conn net.Conn) error {
-	tunnel, err := s.client.Dial("tcp", fmt.Sprintf("%s:%d", s.RemoteHost, s.RemotePort))
+func (s *SSHTunnel) tunnel(conn net.Conn, remoteHost, remotePort string) error {
+	tunnel, err := s.client.Dial("tcp", net.JoinHostPort(remoteHost, remotePort))
 	if err != nil {
 		return err
 	}
@@ -104,13 +109,16 @@ func (s *SSHTunnel) tunnel(conn net.Conn) error {
 	return nil
 }
 
-func (s *SSHTunnel) Close() error {
+func (s *SSHTunnel) StopListening() error {
 	// TODO: try to shutdown copying here?
 	s.running = false
-	// TODO: Aggregate errors and keep going?
 	if err := s.sock.Close(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (s *SSHTunnel) Close() error {
 	if err := s.client.Close(); err != nil {
 		return err
 	}
@@ -171,4 +179,95 @@ func MakePrivateKeySigner(key string) (ssh.Signer, error) {
 		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", key, err)
 	}
 	return signer, nil
+}
+
+/*
+if len(r.tunnels) == 0 {
+		list, err := listNodes()
+		if err != nil {
+			glog.Errorf("unexpected error making tunnels: %v", err)
+			return
+		}
+		tunnels, err := MakeNodeSSHTunnels(list)
+		if err != nil {
+			status := errToAPIStatus(err)
+			writeJSON(status.Code, r.codec, status, w)
+			httpCode = status.Code
+			return
+		}
+		r.tunnels = tunnels
+	}
+	// TODO: round robin here
+	tunnel := r.tunnels[0]
+	if err != nil {
+		status := errToAPIStatus(err)
+		writeJSON(status.Code, r.codec, status, w)
+		httpCode = status.Code
+		return
+	}
+	defer func() {
+		if err := tunnel.Close(); err != nil {
+			glog.Errorf("Error closing ssh tunnel: %v", err)
+		}
+	}()
+	if err := tunnel.Open(); err != nil {
+		status := errToAPIStatus(err)
+		writeJSON(status.Code, r.codec, status, w)
+		httpCode = status.Code
+		return
+	}
+*/
+
+type SSHTunnelEntry struct {
+	Address string
+	Tunnel  *SSHTunnel
+}
+
+type SSHTunnelList []SSHTunnelEntry
+
+func MakeSSHTunnels(user, keyfile string, addresses []string) (SSHTunnelList, error) {
+	tunnels := []SSHTunnelEntry{}
+	for ix := range addresses {
+		addr := addresses[ix]
+		tunnel, err := NewSSHTunnel(user, keyfile, addr)
+		if err != nil {
+			return nil, err
+		}
+		tunnels = append(tunnels, SSHTunnelEntry{addr, tunnel})
+	}
+	return tunnels, nil
+}
+
+func (l SSHTunnelList) Open() error {
+	for ix := range l {
+		if err := l[ix].Tunnel.Open(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l SSHTunnelList) Close() error {
+	for ix := range l {
+		if err := l[ix].Tunnel.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l SSHTunnelList) Dial(network, addr string) (net.Conn, error) {
+	if len(l) == 0 {
+		return nil, fmt.Errorf("Empty tunnel list.")
+	}
+	return l[rand.Int()%len(l)].Tunnel.Dial(network, addr)
+}
+
+func (l SSHTunnelList) Has(addr string) bool {
+	for ix := range l {
+		if l[ix].Address == addr {
+			return true
+		}
+	}
+	return false
 }

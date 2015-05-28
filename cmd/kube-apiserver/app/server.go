@@ -95,6 +95,8 @@ type APIServer struct {
 	EnableProfiling            bool
 	MaxRequestsInFlight        int
 	LongRunningRequestRE       string
+	SSHUser                    string
+	SSHKeyfile                 string
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
@@ -197,6 +199,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ExternalHost, "external-hostname", "", "The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)")
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", 400, "The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.")
 	fs.StringVar(&s.LongRunningRequestRE, "long-running-request-regexp", "[.*\\/watch$][^\\/proxy.*]", "A regular expression matching long running requests which should be excluded from maximum inflight request handling.")
+	fs.StringVar(&s.SSHUser, "ssh-user", "", "If non-empty, use secure SSH proxy to the nodes, using this user name")
+	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", "", "If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -376,6 +380,8 @@ func (s *APIServer) Run(_ []string) error {
 		MasterServiceNamespace: s.MasterServiceNamespace,
 		ClusterName:            s.ClusterName,
 		ExternalHost:           s.ExternalHost,
+		SSHUser:                s.SSHUser,
+		SSHKeyfile:             s.SSHKeyfile,
 	}
 	m := master.New(config)
 
