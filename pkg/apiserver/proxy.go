@@ -49,6 +49,8 @@ type ProxyHandler struct {
 	codec                  runtime.Codec
 	context                api.RequestContextMapper
 	apiRequestInfoResolver *APIRequestInfoResolver
+
+	dial func(network, addr string) (net.Conn, error)
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -119,9 +121,9 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = http.StatusNotFound
 		return
 	}
-	// TODO: make this dynamic
-	location.Host = "localhost"
-	location.Scheme = "http"
+	if r.dial != nil {
+		transport = &http.Transport{Dial: r.dial}
+	}
 
 	// Default to http
 	if location.Scheme == "" {
