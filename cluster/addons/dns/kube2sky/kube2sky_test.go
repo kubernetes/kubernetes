@@ -94,7 +94,7 @@ type hostPort struct {
 
 func getHostPort(service *kapi.Service) *hostPort {
 	return &hostPort{
-		Host: service.Spec.PortalIP,
+		Host: service.Spec.ClusterIP,
 		Port: service.Spec.Ports[0].Port,
 	}
 }
@@ -134,7 +134,7 @@ func TestHeadlessService(t *testing.T) {
 			Namespace: testNamespace,
 		},
 		Spec: kapi.ServiceSpec{
-			PortalIP: "None",
+			ClusterIP: "None",
 			Ports: []kapi.ServicePort{
 				{Port: 80},
 			},
@@ -187,7 +187,7 @@ func TestHeadlessServiceEndpointsUpdate(t *testing.T) {
 			Namespace: testNamespace,
 		},
 		Spec: kapi.ServiceSpec{
-			PortalIP: "None",
+			ClusterIP: "None",
 			Ports: []kapi.ServicePort{
 				{Port: 80},
 			},
@@ -244,7 +244,7 @@ func TestHeadlessServiceWithDelayedEndpointsAddition(t *testing.T) {
 			Namespace: testNamespace,
 		},
 		Spec: kapi.ServiceSpec{
-			PortalIP: "None",
+			ClusterIP: "None",
 			Ports: []kapi.ServicePort{
 				{Port: 80},
 			},
@@ -308,7 +308,7 @@ func TestAddSinglePortService(t *testing.T) {
 					Port: 80,
 				},
 			},
-			PortalIP: "1.2.3.4",
+			ClusterIP: "1.2.3.4",
 		},
 	}
 	k2s.newService(&service)
@@ -334,12 +334,12 @@ func TestUpdateSinglePortService(t *testing.T) {
 					Port: 80,
 				},
 			},
-			PortalIP: "1.2.3.4",
+			ClusterIP: "1.2.3.4",
 		},
 	}
 	k2s.newService(&service)
 	assert.Len(t, ec.writes, 2)
-	service.Spec.PortalIP = "0.0.0.0"
+	service.Spec.ClusterIP = "0.0.0.0"
 	k2s.newService(&service)
 	expectedValue := getHostPort(&service)
 	assertDnsServiceEntryInEtcd(t, ec, testService, testNamespace, expectedValue)
@@ -363,7 +363,7 @@ func TestDeleteSinglePortService(t *testing.T) {
 					Port: 80,
 				},
 			},
-			PortalIP: "1.2.3.4",
+			ClusterIP: "1.2.3.4",
 		},
 	}
 	// Add the service

@@ -23,8 +23,8 @@ cluster/kubectl.sh create -f $OPENSHIFT_EXAMPLE/openshift-service.yaml
 sleep 30
 export PUBLIC_IP=$(cluster/kubectl.sh get services openshift --template="{{ index .spec.publicIPs 0 }}")
 echo $PUBLIC_IP
-export PORTAL_IP=$(cluster/kubectl.sh get services openshift --template="{{ .spec.portalIP }}")
-echo $PORTAL_IP
+export SVC_IP=$(cluster/kubectl.sh get services openshift --template="{{ .spec.portalIP }}")
+echo $SVC_IP
 docker run --privileged -v ${OPENSHIFT_CONFIG}:/config openshift/origin start master --write-config=/config --kubeconfig=/config/kubeconfig --master=https://localhost:8443 --public-master=https://${PUBLIC_IP}:8443
 sudo -E chown ${USER} -R ${OPENSHIFT_CONFIG}
 docker run -i -t --privileged -e="OPENSHIFTCONFIG=/config/admin.kubeconfig" -v ${OPENSHIFT_CONFIG}:/config openshift/origin ex bundle-secret openshift-config -f /config &> ${OPENSHIFT_EXAMPLE}/secret.json

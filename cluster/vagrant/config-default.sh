@@ -43,7 +43,7 @@ for ((i=0; i < NUM_MINIONS; i++)) do
   VAGRANT_MINION_NAMES[$i]="minion-$((i+1))"
 done
 
-PORTAL_NET=10.247.0.0/16
+SERVICE_CLUSTER_IP_RANGE=10.247.0.0/16  # formerly PORTAL_NET
 
 # Since this isn't exposed on the network, default to a simple user/passwd
 MASTER_USER=vagrant

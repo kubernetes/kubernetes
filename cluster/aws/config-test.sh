@@ -37,7 +37,7 @@ MINION_TAG="${INSTANCE_PREFIX}-minion"
 MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
 MINION_SCOPES=""
 POLL_SLEEP_INTERVAL=3
-PORTAL_NET="10.0.0.0/16"
+SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # If set to Elastic IP, master instance will be associated with this IP.
 # If set to auto, a new Elastic IP will be aquired

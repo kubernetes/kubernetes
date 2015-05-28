@@ -31,7 +31,7 @@ that is updated whenever the set of `Pods` in a `Service` changes.  For
 non-native applications, Kubernetes offers a virtual-IP-based bridge to Services
 which redirects to the backend `Pods`.
 
-## Defining a Service
+## Defining a service
 
 A `Service` in Kubernetes is a REST object, similar to a `Pod`.  Like all of the
 REST objects, a `Service` definition can be POSTed to the apiserver to create a
@@ -138,7 +138,7 @@ Accessing a `Service` without a selector works the same as if it had selector.
 The traffic will be routed to endpoints defined by the user (`1.2.3.4:80` in
 this example).
 
-## Portals and service proxies
+## Virtual IPs and service proxies
 
 Every node in a Kubernetes cluster runs a `kube-proxy`.  This application
 watches the Kubernetes master for the addition and removal of `Service`
@@ -199,20 +199,23 @@ disambiguated.  For example:
 }
 ```
 
-## Choosing your own PortalIP address
+## Choosing your own IP address
 
-A user can specify their own `PortalIP` address as part of a `Service` creation
-request.  For example, if they already have an existing DNS entry that they
-wish to replace, or legacy systems that are configured for a specific IP
-address and difficult to re-configure.  The `PortalIP` address that a user
-chooses must be a valid IP address and within the portal_net CIDR range that is
-specified by flag to the API server.  If the PortalIP value is invalid, the
-apiserver returns a 422 HTTP status code to indicate that the value is invalid.
+A user can specify their own cluster IP address as part of a `Service` creation
+request.  To do this, set the `spec.clusterIP` field (called `portalIP` in
+v1beta3 and earlier APIs). For example, if they already have an existing DNS
+entry that they wish to replace, or legacy systems that are configured for a
+specific IP address and difficult to re-configure.  The IP address that a user
+chooses must be a valid IP address and within the service_cluster_ip_range CIDR
+range that is specified by flag to the API server.  If the IP address value is
+invalid, the apiserver returns a 422 HTTP status code to indicate that the
+value is invalid.
 
 ### Why not use round-robin DNS?
 
 A question that pops up every now and then is why we do all this stuff with
-portals rather than just use standard round-robin DNS.  There are a few reasons:
+virtual IPs rather than just use standard round-robin DNS.  There are a few
+reasons:
 
    * There is a long history of DNS libraries not respecting DNS TTLs and
      caching the results of name lookups.
@@ -221,7 +224,7 @@ portals rather than just use standard round-robin DNS.  There are a few reasons:
      client re-resolving DNS over and over would be difficult to manage.
 
 We try to discourage users from doing things that hurt themselves.  That said,
-if enough people ask for this, we may implement it as an alternative to portals.
+if enough people ask for this, we may implement it as an alternative.
 
 ## Discovering services
 
@@ -238,7 +241,7 @@ and simpler `{SVCNAME}_SERVICE_HOST` and `{SVCNAME}_SERVICE_PORT` variables,
 where the Service name is upper-cased and dashes are converted to underscores.
 
 For example, the Service "redis-master" which exposes TCP port 6379 and has been
-allocated portal IP address 10.0.0.11 produces the following environment
+allocated cluster IP address 10.0.0.11 produces the following environment
 variables:
 
 ```
@@ -272,24 +275,25 @@ cluster IP.
 We will soon add DNS support for multi-port `Service`s in the form of SRV
 records.
 
-## Headless Services
+## Headless services
 
-Sometimes you don't need or want a single service IP.  In this case, you can
-create "headless" services by specifying `"None"` for the `PortalIP`.  For such
-`Service`s, a cluster IP is not allocated and service-specific environment
-variables for `Pod`s are not created.  DNS is configured to return multiple A
-records (addresses) for the `Service` name, which point directly to the `Pod`s
-backing the `Service`.  Additionally, the kube proxy does not handle these
-services and there is no load balancing or proxying done by the platform for
-them.  The endpoints controller will still create `Endpoints` records in the
-API.
+Sometimes you don't need or want load-balancing and a single service IP.  In
+this case, you can create "headless" services by specifying `"None"` for the
+cluster IP (`spec.clusterIP` or `spec.portalIP` in v1beta3 and earlier APIs).
+For such `Service`s, a cluster IP is not allocated and service-specific
+environment variables for `Pod`s are not created.  DNS is configured to return
+multiple A records (addresses) for the `Service` name, which point directly to
+the `Pod`s backing the `Service`.  Additionally, the kube proxy does not handle
+these services and there is no load balancing or proxying done by the platform
+for them.  The endpoints controller will still create `Endpoints` records in
+the API.
 
 This option allows developers to reduce coupling to the Kubernetes system, if
 they desire, but leaves them freedom to do discovery in their own way.
 Applications can still use a self-registration pattern and adapters for other
 discovery systems could easily be built upon this API.
 
-## External Services
+## External services
 
 For some parts of your application (e.g. frontends) you may want to expose a
 Service onto an external (outside of your cluster, maybe public internet) IP
@@ -366,7 +370,7 @@ though exactly how that works depends on the cloud provider.
 
 ## Shortcomings
 
-We expect that using iptables and userspace proxies for portals will work at
+We expect that using iptables and userspace proxies for VIPs will work at
 small to medium scale, but may not scale to very large clusters with thousands
 of Services.  See [the original design proposal for
 portals](https://github.com/GoogleCloudPlatform/kubernetes/issues/1107) for more
@@ -387,7 +391,7 @@ but the current API requires it.
 In the future we envision that the proxy policy can become more nuanced than
 simple round robin balancing, for example master elected or sharded.  We also
 envision that some `Services` will have "real" load balancers, in which case the
-portal will simply transport the packets there.
+VIP will simply transport the packets there.
 
 There's a
 [proposal](https://github.com/GoogleCloudPlatform/kubernetes/issues/3760) to
@@ -400,7 +404,7 @@ We intend to have first-class support for L7 (HTTP) `Service`s.
 We intend to have more flexible ingress modes for `Service`s which encompass
 the current `ClusterIP`, `NodePort`, and `LoadBalancer` modes and more.
 
-## The gory details of portals
+## The gory details of virtual IPs
 
 The previous information should be sufficient for many people who just want to
 use `Services`.  However, there is a lot going on behind the scenes that may be
@@ -427,26 +431,25 @@ of Kubernetes that used in memory locking) as well as checking for invalid
 assignments due to administrator intervention and cleaning up any any IPs
 that were allocated but which no service currently uses.
 
-### IPs and Portals
+### IPs and VIPs
 
 Unlike `Pod` IP addresses, which actually route to a fixed destination,
 `Service` IPs are not actually answered by a single host.  Instead, we use
 `iptables` (packet processing logic in Linux) to define virtual IP addresses
-which are transparently redirected as needed.  We call the tuple of the
-`Service` IP and the `Service` port the `portal`.  When clients connect to the
-`portal`, their traffic is automatically transported to an appropriate
-endpoint.  The environment variables and DNS for `Services` are actually
-populated in terms of the portal IP and port.
+which are transparently redirected as needed.  When clients connect to the
+VIP, their traffic is automatically transported to an appropriate endpoint.
+The environment variables and DNS for `Services` are actually populated in
+terms of the `Service`'s VIP and port.
 
 As an example, consider the image processing application described above.
-When the backend `Service` is created, the Kubernetes master assigns a portal
+When the backend `Service` is created, the Kubernetes master assigns a virtual
 IP address, for example 10.0.0.1.  Assuming the `Service` port is 1234, the
-portal is 10.0.0.1:1234.  The master stores that information, which is then
-observed by all of the `kube-proxy` instances in the cluster.  When a proxy
-sees a new portal, it opens a new random port, establishes an iptables redirect
-from the portal to this new port, and starts accepting connections on it.
+`Service` is observed by all of the `kube-proxy` instances in the cluster.
+When a proxy sees a new `Service`, it opens a new random port, establishes an
+iptables redirect from the VIP to this new port, and starts accepting
+connections on it.
 
-When a client connects to the portal the iptables rule kicks in, and redirects
+When a client connects to the VIP the iptables rule kicks in, and redirects
 the packets to the `Service proxy`'s own port.  The `Service proxy` chooses a
 backend, and starts proxying traffic from the client to the backend.
 

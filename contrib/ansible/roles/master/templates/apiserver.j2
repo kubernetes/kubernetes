@@ -14,7 +14,7 @@ KUBE_API_ADDRESS="--address=0.0.0.0"
 # KUBELET_PORT="--kubelet_port=10250"
 
 # Address range to use for services
-KUBE_SERVICE_ADDRESSES="--portal_net={{ kube_service_addresses }}"
+KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range={{ kube_service_addresses }}"
 
 # Location of the etcd cluster
 KUBE_ETCD_SERVERS="--etcd_servers=http://{{ groups['etcd'][0] }}:2379"

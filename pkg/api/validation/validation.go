@@ -1063,8 +1063,8 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	}
 
 	if api.IsServiceIPSet(service) {
-		if ip := net.ParseIP(service.Spec.PortalIP); ip == nil {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, "portalIP should be empty, 'None', or a valid IP address"))
+		if ip := net.ParseIP(service.Spec.ClusterIP); ip == nil {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, "clusterIP should be empty, 'None', or a valid IP address"))
 		}
 	}
 
@@ -1157,10 +1157,8 @@ func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErro
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldService.ObjectMeta, &service.ObjectMeta).Prefix("metadata")...)
 
-	// TODO: PortalIP should be a Status field, since the system can set a value != to the user's value
-	// once PortalIP is set, it cannot be unset.
-	if api.IsServiceIPSet(oldService) && service.Spec.PortalIP != oldService.Spec.PortalIP {
-		allErrs = append(allErrs, errs.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, "field is immutable"))
+	if api.IsServiceIPSet(oldService) && service.Spec.ClusterIP != oldService.Spec.ClusterIP {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, "field is immutable"))
 	}
 
 	allErrs = append(allErrs, ValidateService(service)...)

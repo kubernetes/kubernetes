@@ -23,10 +23,10 @@ export nodes="vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"
 export roles=("ai" "i" "i")
 # Define minion numbers
 export NUM_MINIONS=${NUM_MINIONS:-3}
-# define the IP range used for service portal.
+# define the IP range used for service cluster IPs.
 # according to rfc 1918 ref: https://tools.ietf.org/html/rfc1918 choose a private ip range here.
-export PORTAL_NET=192.168.3.0/24
-# define the IP range used for flannel overlay network, should not conflict with above PORTAL_NET range
+export SERVICE_CLUSTER_IP_RANGE=192.168.3.0/24  # formerly PORTAL_NET
+# define the IP range used for flannel overlay network, should not conflict with above SERVICE_CLUSTER_IP_RANGE
 export FLANNEL_NET=172.16.0.0/16
 
 # Admission Controllers to invoke prior to persisting objects in cluster
@@ -52,7 +52,7 @@ DOCKER_OPTS=""
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
-# DNS_SERVER_IP must be a IP in PORTAL_NET range
+# DNS_SERVER_IP must be a IP in SERVICE_CLUSTER_IP_RANGE
 DNS_SERVER_IP="192.168.3.10"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1

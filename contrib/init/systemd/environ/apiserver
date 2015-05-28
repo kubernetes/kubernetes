@@ -17,7 +17,7 @@ KUBE_API_ADDRESS="--address=127.0.0.1"
 KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
 
 # Address range to use for services
-KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
+KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
 
 # default admission control policies
 KUBE_ADMISSION_CONTROL="--admission_control=NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Verifies that services and portals work.
+# Verifies that services and virtual IPs work.
 
 set -o errexit
 set -o nounset
@@ -285,10 +285,10 @@ function verify_from_container() {
             fi
           done
       '")) \
-      || error "testing $1 portal from container failed"
+      || error "testing $1 VIP from container failed"
   found_pods=$(sort_args "${results[@]}")
   if [[ "${found_pods}" != "$5" ]]; then
-    error -e "$1 portal failed from container, expected:\n
+    error -e "$1 VIP failed from container, expected:\n
         $(printf '\t%s\n' $5)\n
         got:\n
         $(printf '\t%s\n' ${found_pods})
@@ -323,20 +323,20 @@ wait_for_pods "${svc2_name}" "${svc2_count}"
 svc1_pods=$(query_pods "${svc1_name}" "${svc1_count}")
 svc2_pods=$(query_pods "${svc2_name}" "${svc2_count}")
 
-# Get the portal IPs.
+# Get the VIP IPs.
 svc1_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc1_name}" --api-version=v1beta3)
 test -n "${svc1_ip}" || error "Service1 IP is blank"
 svc2_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc2_name}" --api-version=v1beta3)
 test -n "${svc2_ip}" || error "Service2 IP is blank"
 if [[ "${svc1_ip}" == "${svc2_ip}" ]]; then
-  error "Portal IPs conflict: ${svc1_ip}"
+  error "VIPs conflict: ${svc1_ip}"
 fi
 
 #
-# Test 1: Prove that the service portal is alive.
+# Test 1: Prove that the service VIP is alive.
 #
-echo "Test 1: Prove that the service portal is alive."
-echo "Verifying the portals from the host"
+echo "Test 1: Prove that the service VIP is alive."
+echo "Verifying the VIP from the host"
 wait_for_service_up "${svc1_name}" "${svc1_ip}" "${svc1_port}" \
     "${svc1_count}" "${svc1_pods}"
 for ip in ${svc1_publics}; do
@@ -345,7 +345,7 @@ for ip in ${svc1_publics}; do
 done
 wait_for_service_up "${svc2_name}" "${svc2_ip}" "${svc2_port}" \
     "${svc2_count}" "${svc2_pods}"
-echo "Verifying the portals from a container"
+echo "Verifying the VIP from a container"
 verify_from_container "${svc1_name}" "${svc1_ip}" "${svc1_port}" \
     "${svc1_count}" "${svc1_pods}"
 for ip in ${svc1_publics}; do
@@ -356,17 +356,17 @@ verify_from_container "${svc2_name}" "${svc2_ip}" "${svc2_port}" \
     "${svc2_count}" "${svc2_pods}"
 
 #
-# Test 2: Bounce the proxy and make sure the portal comes back.
+# Test 2: Bounce the proxy and make sure the VIP comes back.
 #
-echo "Test 2: Bounce the proxy and make sure the portal comes back."
+echo "Test 2: Bounce the proxy and make sure the VIP comes back."
 echo "Restarting kube-proxy"
 restart-kube-proxy "${test_node}"
-echo "Verifying the portals from the host"
+echo "Verifying the VIP from the host"
 wait_for_service_up "${svc1_name}" "${svc1_ip}" "${svc1_port}" \
     "${svc1_count}" "${svc1_pods}"
 wait_for_service_up "${svc2_name}" "${svc2_ip}" "${svc2_port}" \
     "${svc2_count}" "${svc2_pods}"
-echo "Verifying the portals from a container"
+echo "Verifying the VIP from a container"
 verify_from_container "${svc1_name}" "${svc1_ip}" "${svc1_port}" \
     "${svc1_count}" "${svc1_pods}"
 verify_from_container "${svc2_name}" "${svc2_ip}" "${svc2_port}" \
@@ -395,14 +395,14 @@ wait_for_pods "${svc3_name}" "${svc3_count}"
 # Get the sorted lists of pods.
 svc3_pods=$(query_pods "${svc3_name}" "${svc3_count}")
 
-# Get the portal IP.
+# Get the VIP.
 svc3_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc3_name}" --api-version=v1beta3)
 test -n "${svc3_ip}" || error "Service3 IP is blank"
 
-echo "Verifying the portals from the host"
+echo "Verifying the VIPs from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
     "${svc3_count}" "${svc3_pods}"
-echo "Verifying the portals from a container"
+echo "Verifying the VIPs from a container"
 verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
     "${svc3_count}" "${svc3_pods}"
 
@@ -415,31 +415,31 @@ echo "Manually removing iptables rules"
 ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PORTALS-HOST || true"
 ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true"
 ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PROXY || true"
-echo "Verifying the portals from the host"
+echo "Verifying the VIPs from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
     "${svc3_count}" "${svc3_pods}"
-echo "Verifying the portals from a container"
+echo "Verifying the VIPs from a container"
 verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
     "${svc3_count}" "${svc3_pods}"
 
 #
-# Test 6: Restart the master, make sure portals come back.
+# Test 6: Restart the master, make sure VIPs come back.
 #
-echo "Test 6: Restart the master, make sure portals come back."
+echo "Test 6: Restart the master, make sure VIPs come back."
 echo "Restarting the master"
 restart-apiserver "${master}"
 sleep 5
-echo "Verifying the portals from the host"
+echo "Verifying the VIPs from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
     "${svc3_count}" "${svc3_pods}"
-echo "Verifying the portals from a container"
+echo "Verifying the VIPs from a container"
 verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
     "${svc3_count}" "${svc3_pods}"
 
 #
-# Test 7: Bring up another service, make sure it does not re-use Portal IPs.
+# Test 7: Bring up another service, make sure it does not re-use IPs.
 #
-echo "Test 7: Bring up another service, make sure it does not re-use Portal IPs."
+echo "Test 7: Bring up another service, make sure it does not re-use IPs."
 svc4_name="service4"
 svc4_port=80
 svc4_count=3
@@ -451,17 +451,17 @@ wait_for_pods "${svc4_name}" "${svc4_count}"
 # Get the sorted lists of pods.
 svc4_pods=$(query_pods "${svc4_name}" "${svc4_count}")
 
-# Get the portal IP.
+# Get the VIP.
 svc4_ip=$(${KUBECTL} get services -o template '--template={{.spec.portalIP}}' "${svc4_name}" --api-version=v1beta3)
 test -n "${svc4_ip}" || error "Service4 IP is blank"
 if [[ "${svc4_ip}" == "${svc2_ip}" || "${svc4_ip}" == "${svc3_ip}" ]]; then
-  error "Portal IPs conflict: ${svc4_ip}"
+  error "VIPs conflict: ${svc4_ip}"
 fi
 
-echo "Verifying the portals from the host"
+echo "Verifying the VIPs from the host"
 wait_for_service_up "${svc4_name}" "${svc4_ip}" "${svc4_port}" \
     "${svc4_count}" "${svc4_pods}"
-echo "Verifying the portals from a container"
+echo "Verifying the VIPs from a container"
 verify_from_container "${svc4_name}" "${svc4_ip}" "${svc4_port}" \
     "${svc4_count}" "${svc4_pods}"
 

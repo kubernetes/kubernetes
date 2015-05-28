@@ -782,7 +782,7 @@ func addConversionFuncs() {
 				return err
 			}
 			out.PublicIPs = in.Spec.DeprecatedPublicIPs
-			out.PortalIP = in.Spec.PortalIP
+			out.PortalIP = in.Spec.ClusterIP
 			if err := s.Convert(&in.Spec.SessionAffinity, &out.SessionAffinity, 0); err != nil {
 				return err
 			}
@@ -834,7 +834,7 @@ func addConversionFuncs() {
 				return err
 			}
 			out.Spec.DeprecatedPublicIPs = in.PublicIPs
-			out.Spec.PortalIP = in.PortalIP
+			out.Spec.ClusterIP = in.PortalIP
 			if err := s.Convert(&in.SessionAffinity, &out.Spec.SessionAffinity, 0); err != nil {
 				return err
 			}

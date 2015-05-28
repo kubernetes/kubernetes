@@ -99,15 +99,15 @@ func NewDeleteOptions(grace int64) *DeleteOptions {
 	return &DeleteOptions{GracePeriodSeconds: &grace}
 }
 
-// this function aims to check if the service portal IP is set or not
+// this function aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *Service) bool {
-	return service.Spec.PortalIP != PortalIPNone && service.Spec.PortalIP != ""
+	return service.Spec.ClusterIP != ClusterIPNone && service.Spec.ClusterIP != ""
 }
 
-// this function aims to check if the service portal IP is requested or not
+// this function aims to check if the service's cluster IP is requested or not
 func IsServiceIPRequested(service *Service) bool {
-	return service.Spec.PortalIP == ""
+	return service.Spec.ClusterIP == ""
 }
 
 var standardFinalizers = util.NewStringSet(

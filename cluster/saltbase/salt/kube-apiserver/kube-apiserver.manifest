@@ -36,9 +36,9 @@
 
 {% set etcd_servers = "--etcd_servers=http://127.0.0.1:4001" -%}
 
-{% set portal_net = "" -%}
-{% if pillar['portal_net'] is defined -%}
-  {% set portal_net = "--portal_net=" + pillar['portal_net'] -%}
+{% set service_cluster_ip_range = "" -%}
+{% if pillar['service_cluster_ip_range'] is defined -%}
+  {% set service_cluster_ip_range = "--service-cluster-ip-range=" + pillar['service_cluster_ip_range'] -%}
 {% endif -%}
 
 {% set cert_file = "--tls_cert_file=/srv/kubernetes/server.cert" -%}
@@ -74,7 +74,7 @@
  {% set runtime_config = "--runtime_config=" + grains.runtime_config -%}
 {% endif -%}
 
-{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + portal_net + " " + client_ca_file + " " + basic_auth_file -%}
+{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file -%}
 {% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure_port=" + secure_port + " " + token_auth_file + " " + publicAddressOverride + " " + pillar['log_level'] -%}
 
 

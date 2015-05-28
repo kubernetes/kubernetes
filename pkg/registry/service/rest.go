@@ -46,19 +46,19 @@ type REST struct {
 	registry         Registry
 	machines         minion.Registry
 	endpoints        endpoint.Registry
-	portals          ipallocator.Interface
+	serviceIPs       ipallocator.Interface
 	serviceNodePorts portallocator.Interface
 	clusterName      string
 }
 
 // NewStorage returns a new REST.
-func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, portals ipallocator.Interface,
+func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, serviceIPs ipallocator.Interface,
 	serviceNodePorts portallocator.Interface, clusterName string) *REST {
 	return &REST{
 		registry:         registry,
 		machines:         machines,
 		endpoints:        endpoints,
-		portals:          portals,
+		serviceIPs:       serviceIPs,
 		serviceNodePorts: serviceNodePorts,
 		clusterName:      clusterName,
 	}
@@ -75,7 +75,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	defer func() {
 		if releaseServiceIP {
 			if api.IsServiceIPSet(service) {
-				rs.portals.Release(net.ParseIP(service.Spec.PortalIP))
+				rs.serviceIPs.Release(net.ParseIP(service.Spec.ClusterIP))
 			}
 		}
 	}()
@@ -85,17 +85,17 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 
 	if api.IsServiceIPRequested(service) {
 		// Allocate next available.
-		ip, err := rs.portals.AllocateNext()
+		ip, err := rs.serviceIPs.AllocateNext()
 		if err != nil {
-			el := fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, err.Error())}
+			el := fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, err.Error())}
 			return nil, errors.NewInvalid("Service", service.Name, el)
 		}
-		service.Spec.PortalIP = ip.String()
+		service.Spec.ClusterIP = ip.String()
 		releaseServiceIP = true
 	} else if api.IsServiceIPSet(service) {
 		// Try to respect the requested IP.
-		if err := rs.portals.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
-			el := fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, err.Error())}
+		if err := rs.serviceIPs.Allocate(net.ParseIP(service.Spec.ClusterIP)); err != nil {
+			el := fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("spec.clusterIP", service.Spec.ClusterIP, err.Error())}
 			return nil, errors.NewInvalid("Service", service.Name, el)
 		}
 		releaseServiceIP = true
@@ -150,7 +150,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	}
 
 	if api.IsServiceIPSet(service) {
-		rs.portals.Release(net.ParseIP(service.Spec.PortalIP))
+		rs.serviceIPs.Release(net.ParseIP(service.Spec.ClusterIP))
 	}
 
 	for _, nodePort := range CollectServiceNodePorts(service) {

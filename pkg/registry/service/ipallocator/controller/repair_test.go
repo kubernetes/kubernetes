@@ -121,22 +121,22 @@ func TestRepairWithExisting(t *testing.T) {
 	registry.List = api.ServiceList{
 		Items: []api.Service{
 			{
-				Spec: api.ServiceSpec{PortalIP: "192.168.1.1"},
+				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			{
-				Spec: api.ServiceSpec{PortalIP: "192.168.1.100"},
+				Spec: api.ServiceSpec{ClusterIP: "192.168.1.100"},
 			},
 			{ // outside CIDR, will be dropped
-				Spec: api.ServiceSpec{PortalIP: "192.168.0.1"},
+				Spec: api.ServiceSpec{ClusterIP: "192.168.0.1"},
 			},
 			{ // empty, ignored
-				Spec: api.ServiceSpec{PortalIP: ""},
+				Spec: api.ServiceSpec{ClusterIP: ""},
 			},
 			{ // duplicate, dropped
-				Spec: api.ServiceSpec{PortalIP: "192.168.1.1"},
+				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			{ // headless
-				Spec: api.ServiceSpec{PortalIP: "None"},
+				Spec: api.ServiceSpec{ClusterIP: "None"},
 			},
 		},
 	}

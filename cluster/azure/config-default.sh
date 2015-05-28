@@ -35,7 +35,7 @@ MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
 MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
 MINION_SCOPES=""
 
-PORTAL_NET="10.250.0.0/16"
+SERVICE_CLUSTER_IP_RANGE="10.250.0.0/16"  # formerly PORTAL_NET
 
 # Optional: Install node logging
 ENABLE_NODE_LOGGING=false

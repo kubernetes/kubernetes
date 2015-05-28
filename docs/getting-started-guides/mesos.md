@@ -69,7 +69,7 @@ $ ./bin/km apiserver \
   --address=${servicehost} \
   --mesos_master=${mesos_master} \
   --etcd_servers=http://${servicehost}:4001 \
-  --portal_net=10.10.10.0/24 \
+  --service-cluster-ip-range=10.10.10.0/24 \
   --port=8888 \
   --cloud_provider=mesos \
   --v=1 >apiserver.log 2>&1 &
@@ -235,7 +235,7 @@ $ mesos ps
 ```
 The number of Kubernetes pods listed earlier (from `bin/kubectl get pods`) should equal to the number active Mesos tasks listed the previous listing (`mesos ps`).
 
-Next, determine the internal IP address of the front end [service portal][8]:
+Next, determine the internal IP address of the front end [service][8]:
 
 ```bash
 $ bin/kubectl get services
@@ -268,14 +268,14 @@ Or interact with the frontend application via your browser, in 2 steps:
 First, open the firewall on the master machine.
 
 ```bash
-# determine the internal port for the frontend service portal
+# determine the internal port for the frontend service
 $ sudo iptables-save|grep -e frontend  # -- port 36336 in this case
 -A KUBE-PORTALS-CONTAINER -d 10.10.10.149/32 -p tcp -m comment --comment frontend -m tcp --dport 9998 -j DNAT --to-destination 10.22.183.23:36336
 -A KUBE-PORTALS-CONTAINER -d 10.22.183.23/32 -p tcp -m comment --comment frontend -m tcp --dport 9998 -j DNAT --to-destination 10.22.183.23:36336
 -A KUBE-PORTALS-HOST -d 10.10.10.149/32 -p tcp -m comment --comment frontend -m tcp --dport 9998 -j DNAT --to-destination 10.22.183.23:36336
 -A KUBE-PORTALS-HOST -d 10.22.183.23/32 -p tcp -m comment --comment frontend -m tcp --dport 9998 -j DNAT --to-destination 10.22.183.23:36336
 
-# open up access to the internal port for the frontend service portal
+# open up access to the internal port for the frontend service
 $ sudo iptables -A INPUT -i eth0 -p tcp -m state --state NEW,ESTABLISHED -m tcp \
   --dport ${internal_frontend_service_port} -j ACCEPT
 ```
@@ -297,7 +297,7 @@ Now, you can visit the guestbook in your browser!
 [5]: https://google.mesosphere.com
 [6]: http://mesosphere.com/docs/getting-started/cloud/google/mesosphere/#vpn-setup
 [7]: https://github.com/mesosphere/kubernetes-mesos/tree/v0.4.0/examples/guestbook
-[8]: https://github.com/GoogleCloudPlatform/kubernetes/blob/v0.11.0/docs/services.md#ips-and-portals
+[8]: https://github.com/GoogleCloudPlatform/kubernetes/blob/v0.11.0/docs/services.md#ips-and-vips
 [9]: mesos/k8s-firewall.png
 [10]: mesos/k8s-guestbook.png
 [11]: http://mesos.apache.org/
