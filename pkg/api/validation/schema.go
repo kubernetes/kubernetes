@@ -85,12 +85,12 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, typeName string) error {
 	models := s.api.Models
 	// TODO: handle required fields here too.
-	model, ok := models.At(typeName)
+	model, ok := models[typeName]
 	if !ok {
 		return fmt.Errorf("couldn't find type: %s", typeName)
 	}
 	properties := model.Properties
-	if len(properties.List) == 0 {
+	if len(properties) == 0 {
 		// The object does not have any sub-fields.
 		return nil
 	}
@@ -102,7 +102,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, t
 		fieldName = fieldName + "."
 	}
 	for key, value := range fields {
-		details, ok := properties.At(key)
+		details, ok := properties[key]
 		if !ok {
 			glog.Infof("unknown field: %s", key)
 			// Some properties can be missing because of
