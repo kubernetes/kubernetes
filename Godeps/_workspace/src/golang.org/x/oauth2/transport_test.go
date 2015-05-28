@@ -32,6 +32,39 @@ func TestTransportTokenSource(t *testing.T) {
 	client.Get(server.URL)
 }
 
+// Test for case-sensitive token types, per https://github.com/golang/oauth2/issues/113
+func TestTransportTokenSourceTypes(t *testing.T) {
+	const val = "abc"
+	tests := []struct {
+		key  string
+		val  string
+		want string
+	}{
+		{key: "bearer", val: val, want: "Bearer abc"},
+		{key: "mac", val: val, want: "MAC abc"},
+		{key: "basic", val: val, want: "Basic abc"},
+	}
+	for _, tc := range tests {
+		ts := &tokenSource{
+			token: &Token{
+				AccessToken: tc.val,
+				TokenType:   tc.key,
+			},
+		}
+		tr := &Transport{
+			Source: ts,
+		}
+		server := newMockServer(func(w http.ResponseWriter, r *http.Request) {
+			if got, want := r.Header.Get("Authorization"), tc.want; got != want {
+				t.Errorf("Authorization header (%q) = %q; want %q", val, got, want)
+			}
+		})
+		defer server.Close()
+		client := http.Client{Transport: tr}
+		client.Get(server.URL)
+	}
+}
+
 func TestTokenValidNoAccessToken(t *testing.T) {
 	token := &Token{}
 	if token.Valid() {

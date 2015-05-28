@@ -130,9 +130,3 @@ func (r *onEOFReader) runFunc() {
 		r.fn = nil
 	}
 }
-
-type errorTransport struct{ err error }
-
-func (t errorTransport) RoundTrip(*http.Request) (*http.Response, error) {
-	return nil, t.err
-}
