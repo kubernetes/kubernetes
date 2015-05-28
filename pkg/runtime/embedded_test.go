@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -224,7 +224,7 @@ func TestDeepCopyOfEmbeddedObject(t *testing.T) {
 	}
 	t.Logf("originalRole = %v\n", string(originalData))
 
-	copyOfOriginal, err := conversion.DeepCopy(original)
+	copyOfOriginal, err := api.Scheme.DeepCopy(original)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

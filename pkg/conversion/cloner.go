@@ -43,8 +43,12 @@ func NewCloner() *Cloner {
 
 // Prevent recursing into every byte...
 func byteSliceDeepCopy(in []byte, out *[]byte, c *Cloner) error {
-	*out = make([]byte, len(in))
-	copy(*out, in)
+	if in != nil {
+		*out = make([]byte, len(in))
+		copy(*out, in)
+	} else {
+		*out = nil
+	}
 	return nil
 }
 

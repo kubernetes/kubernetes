@@ -27,6 +27,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
+// TODO(wojtek-t): As suggested in #8320, we should consider the strategy
+// to first do the shallow copy and then recurse into things that need a
+// deep copy (maps, pointers, slices). That sort of copy function would
+// need one parameter - a pointer to the thing it's supposed to expand,
+// and it would involve a lot less memory copying.
 type DeepCopyGenerator interface {
 	// Adds a type to a generator.
 	// If the type is non-struct, it will return an error, otherwise deep-copy
