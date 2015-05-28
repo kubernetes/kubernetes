@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	sshutil "github.com/GoogleCloudPlatform/kubernetes/pkg/util/ssh"
 
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/davecgh/go-spew/spew"
@@ -990,7 +991,7 @@ func SSH(cmd, host, provider string) (string, string, int, error) {
 		return "", "", 0, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
 	}
 
-	return util.RunSSHCommand(cmd, host, signer)
+	return sshutil.RunSSHCommand(cmd, host, signer)
 }
 
 // getSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
@@ -1012,7 +1013,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 	key := filepath.Join(keydir, keyfile)
 	Logf("Using SSH key: %s", key)
 
-	return util.MakePrivateKeySigner(key)
+	return sshutil.MakePrivateKeySigner(key)
 }
 
 // LatencyMetrics stores data about request latency at a given quantile
