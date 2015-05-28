@@ -602,46 +602,9 @@ Reboot these servers to get the images PXEd and ready for running containers!
 ## Creating test pod
 Now that the CoreOS with Kubernetes installed is up and running lets spin up some Kubernetes pods to demonstrate the system.
 
-Here is a fork where you can do a full walk through by using [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough), or use the following example for a quick test.
+See [a simple nginx example](../../../examples/simple-nginx.md) to try out your new cluster.
 
-
-On the Kubernetes Master node lets create a '''nginx.yml'''
-    
-    apiVersion: v1beta1
-    kind: Pod
-    id: www
-    desiredState:
-      manifest:
-        version: v1beta1
-        id: www
-        containers:
-          - name: nginx
-            image: nginx
-    
-
-Now for the service: ```nginx-service.yml```
-    
-    kind: Service
-    apiVersion: v1beta1
-    # must be a DNS compatible name
-    id: nginx-example
-    # the port that this service should serve on
-    port: 80
-    # just like the selector in the replication controller,
-    # but this time it identifies the set of pods to load balance
-    # traffic to.
-    selector:
-      name: www
-    # the container on each pod to connect to, can be a name
-    # (e.g. 'www') or a number (e.g. 80)
-    containerPort: 80
-
-Now add the pod to Kubernetes:
-
-     kubectl create -f nginx.yml
-
-This might take a while to download depending on the environment.
-    
+For more complete applications, please look in the [examples directory](../../../examples).
 
 ## Helping commands for debugging
 
