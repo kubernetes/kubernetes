@@ -112,9 +112,7 @@ var _ = Describe("NetworkingNew", func() {
 	})
 
 	//Now we can proceed with the test.
-	It("should function for intra-pod communication", func(done Done) {
-		defer close(done)
-
+	It("should function for intra-pod communication", func() {
 		if testContext.Provider == "vagrant" {
 			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 			return
@@ -203,7 +201,8 @@ var _ = Describe("NetworkingNew", func() {
 				DoRaw()
 		}
 
-		for i := 0; !passed; i++ { // Timeout will keep us from going forever.
+		timeout := time.Now().Add(2 * time.Minute)
+		for i := 0; !passed && timeout.After(time.Now()); i++ {
 			time.Sleep(2 * time.Second)
 			Logf("About to make a proxy status call")
 			start := time.Now()
@@ -241,7 +240,7 @@ var _ = Describe("NetworkingNew", func() {
 			}
 		}
 		Expect(string(body)).To(Equal("pass"))
-	}, 120)
+	})
 
 })
 
@@ -326,9 +325,7 @@ var _ = Describe("Networking", func() {
 	})
 
 	//Now we can proceed with the test.
-	It("should function for intra-pod communication", func(done Done) {
-		defer close(done)
-
+	It("should function for intra-pod communication", func() {
 		if testContext.Provider == "vagrant" {
 			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 			return
@@ -417,7 +414,8 @@ var _ = Describe("Networking", func() {
 				DoRaw()
 		}
 
-		for i := 0; !passed; i++ { // Timeout will keep us from going forever.
+		timeout := time.Now().Add(2 * time.Minute)
+		for i := 0; !passed && timeout.After(time.Now()); i++ {
 			time.Sleep(2 * time.Second)
 			Logf("About to make a proxy status call")
 			start := time.Now()
@@ -455,6 +453,6 @@ var _ = Describe("Networking", func() {
 			}
 		}
 		Expect(string(body)).To(Equal("pass"))
-	}, 120)
+	})
 
 })
