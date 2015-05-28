@@ -23,6 +23,15 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+if [[ "${SETUP_SHIPPABLE}" == "true" ]]; then
+  XVFB=/usr/bin/Xvfb; XVFBARGS=":1 -screen 0 1024x768x24 -ac +extension GLX +render -noreset"; PIDFILE=/var/run/xvfb.pid;
+  export DISPLAY=:1
+  start-stop-daemon --start --quiet --pidfile $PIDFILE --make-pidfile --background --exec $XVFB -- $XVFBARGS
+  sleep 3 # give xvfb some time to start
+  nohup bash -c "./node_modules/protractor/bin/webdriver-manager start 2>&1 &"
+  sleep 3 # give xvfb some time to start
+fi
+
 # The api version in which objects are currently stored in etcd.
 KUBE_OLD_API_VERSION=${KUBE_OLD_API_VERSION:-"v1beta1"}
 # The api version in which our etcd objects should be converted to.
