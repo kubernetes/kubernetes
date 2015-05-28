@@ -67,7 +67,7 @@ func TestMerge(t *testing.T) {
 					Name: "baz",
 				},
 				Spec: api.PodSpec{
-					Host:          "bar",
+					NodeName:      "bar",
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 				},

@@ -408,7 +408,7 @@ func printPod(pod *api.Pod, w io.Writer, withNamespace bool) error {
 		name,
 		pod.Status.PodIP,
 		"", "",
-		podHostString(pod.Spec.Host, pod.Status.HostIP),
+		podHostString(pod.Spec.NodeName, pod.Status.HostIP),
 		formatLabels(pod.Labels),
 		pod.Status.Phase,
 		translateTimestamp(pod.CreationTimestamp),

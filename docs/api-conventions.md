@@ -301,7 +301,7 @@ Late Initialization
 Late initialization is when resource fields are set by a system controller
 after an object is created/updated.
 
-For example, the scheduler sets the pod.spec.host field after the pod is created.
+For example, the scheduler sets the pod.spec.nodeName field after the pod is created.
 
 Late-initializers should only make the following types of modifications:
   - Setting previously unset fields

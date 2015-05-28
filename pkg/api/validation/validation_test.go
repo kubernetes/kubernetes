@@ -1049,7 +1049,7 @@ func TestValidatePodSpec(t *testing.T) {
 			NodeSelector: map[string]string{
 				"key": "value",
 			},
-			Host:                  "foobar",
+			NodeName:              "foobar",
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
 		},
@@ -1116,7 +1116,7 @@ func TestValidatePodSpec(t *testing.T) {
 			NodeSelector: map[string]string{
 				"key": "value",
 			},
-			Host:                  "foobar",
+			NodeName:              "foobar",
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
 		},
@@ -1151,7 +1151,7 @@ func TestValidatePod(t *testing.T) {
 				NodeSelector: map[string]string{
 					"key": "value",
 				},
-				Host: "foobar",
+				NodeName: "foobar",
 			},
 		},
 	}

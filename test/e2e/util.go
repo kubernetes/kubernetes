@@ -128,8 +128,8 @@ func logPodStates(pods []api.Pod) {
 		if len(pod.ObjectMeta.Name) > maxPodW {
 			maxPodW = len(pod.ObjectMeta.Name)
 		}
-		if len(pod.Spec.Host) > maxNodeW {
-			maxNodeW = len(pod.Spec.Host)
+		if len(pod.Spec.NodeName) > maxNodeW {
+			maxNodeW = len(pod.Spec.NodeName)
 		}
 		if len(pod.Status.Phase) > maxPhaseW {
 			maxPhaseW = len(pod.Status.Phase)
@@ -145,7 +145,7 @@ func logPodStates(pods []api.Pod) {
 		maxPodW, "POD", maxNodeW, "NODE", maxPhaseW, "PHASE", "CONDITIONS")
 	for _, pod := range pods {
 		Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %[7]s",
-			maxPodW, pod.ObjectMeta.Name, maxNodeW, pod.Spec.Host, maxPhaseW, pod.Status.Phase, pod.Status.Conditions)
+			maxPodW, pod.ObjectMeta.Name, maxNodeW, pod.Spec.NodeName, maxPhaseW, pod.Status.Phase, pod.Status.Conditions)
 	}
 	Logf("") // Final empty line helps for readability.
 }
@@ -156,12 +156,12 @@ func podRunningReady(p *api.Pod) (bool, error) {
 	// Check the phase is running.
 	if p.Status.Phase != api.PodRunning {
 		return false, fmt.Errorf("want pod '%s' on '%s' to be '%v' but was '%v'",
-			p.ObjectMeta.Name, p.Spec.Host, api.PodRunning, p.Status.Phase)
+			p.ObjectMeta.Name, p.Spec.NodeName, api.PodRunning, p.Status.Phase)
 	}
 	// Check the ready condition is true.
 	if !podReady(p) {
 		return false, fmt.Errorf("pod '%s' on '%s' didn't have condition {%v %v}; conditions: %v",
-			p.ObjectMeta.Name, p.Spec.Host, api.PodReady, api.ConditionTrue, p.Status.Conditions)
+			p.ObjectMeta.Name, p.Spec.NodeName, api.PodReady, api.ConditionTrue, p.Status.Conditions)
 
 	}
 	return true, nil
@@ -538,8 +538,8 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 		Failf("Failed to get pod status: %v", err)
 	}
 
-	By(fmt.Sprintf("Trying to get logs from host %s pod %s container %s: %v",
-		podStatus.Spec.Host, podStatus.Name, containerName, err))
+	By(fmt.Sprintf("Trying to get logs from node %s pod %s container %s: %v",
+		podStatus.Spec.NodeName, podStatus.Name, containerName, err))
 	var logs []byte
 	start := time.Now()
 
@@ -548,15 +548,15 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 		logs, err = c.Get().
 			Prefix("proxy").
 			Resource("nodes").
-			Name(podStatus.Spec.Host).
+			Name(podStatus.Spec.NodeName).
 			Suffix("containerLogs", ns, podStatus.Name, containerName).
 			Do().
 			Raw()
 		fmt.Sprintf("pod logs:%v\n", string(logs))
 		By(fmt.Sprintf("pod logs:%v\n", string(logs)))
 		if strings.Contains(string(logs), "Internal Error") {
-			By(fmt.Sprintf("Failed to get logs from host %q pod %q container %q: %v",
-				podStatus.Spec.Host, podStatus.Name, containerName, string(logs)))
+			By(fmt.Sprintf("Failed to get logs from node %q pod %q container %q: %v",
+				podStatus.Spec.NodeName, podStatus.Name, containerName, string(logs)))
 			time.Sleep(5 * time.Second)
 			continue
 		}
@@ -619,15 +619,15 @@ func Diff(oldPods *api.PodList, curPods *api.PodList) PodDiff {
 
 	// New pods will show up in the curPods list but not in oldPods. They have oldhostname/phase == nonexist.
 	for _, pod := range curPods.Items {
-		podInfoMap[pod.Name] = &podInfo{hostname: pod.Spec.Host, phase: string(pod.Status.Phase), oldHostname: nonExist, oldPhase: nonExist}
+		podInfoMap[pod.Name] = &podInfo{hostname: pod.Spec.NodeName, phase: string(pod.Status.Phase), oldHostname: nonExist, oldPhase: nonExist}
 	}
 
 	// Deleted pods will show up in the oldPods list but not in curPods. They have a hostname/phase == nonexist.
 	for _, pod := range oldPods.Items {
 		if info, ok := podInfoMap[pod.Name]; ok {
-			info.oldHostname, info.oldPhase = pod.Spec.Host, string(pod.Status.Phase)
+			info.oldHostname, info.oldPhase = pod.Spec.NodeName, string(pod.Status.Phase)
 		} else {
-			podInfoMap[pod.Name] = &podInfo{hostname: nonExist, phase: nonExist, oldHostname: pod.Spec.Host, oldPhase: string(pod.Status.Phase)}
+			podInfoMap[pod.Name] = &podInfo{hostname: nonExist, phase: nonExist, oldHostname: pod.Spec.NodeName, oldPhase: string(pod.Status.Phase)}
 		}
 	}
 	return podInfoMap
@@ -739,7 +739,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 					failedContainers = failedContainers + v.restarts
 				}
 			} else if p.Status.Phase == api.PodPending {
-				if p.Spec.Host == "" {
+				if p.Spec.NodeName == "" {
 					waiting++
 				} else {
 					pending++

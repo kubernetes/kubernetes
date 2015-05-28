@@ -1739,7 +1739,7 @@ func failedState(cName string) api.ContainerStatus {
 
 func TestPodPhaseWithRestartAlways(t *testing.T) {
 	desiredState := api.PodSpec{
-		Host: "machine",
+		NodeName: "machine",
 		Containers: []api.Container{
 			{Name: "containerA"},
 			{Name: "containerB"},
@@ -1814,7 +1814,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 
 func TestPodPhaseWithRestartNever(t *testing.T) {
 	desiredState := api.PodSpec{
-		Host: "machine",
+		NodeName: "machine",
 		Containers: []api.Container{
 			{Name: "containerA"},
 			{Name: "containerB"},
@@ -1902,7 +1902,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 
 func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 	desiredState := api.PodSpec{
-		Host: "machine",
+		NodeName: "machine",
 		Containers: []api.Container{
 			{Name: "containerA"},
 			{Name: "containerB"},

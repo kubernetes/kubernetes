@@ -242,7 +242,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 
 	// Make the rc unique to the given host.
 	controller.Spec.Replicas = numPods
-	controller.Spec.Template.Spec.Host = host
+	controller.Spec.Template.Spec.NodeName = host
 	controller.Name = controller.Name + host
 	controller.Spec.Selector["host"] = host
 	controller.Spec.Template.Labels["host"] = host

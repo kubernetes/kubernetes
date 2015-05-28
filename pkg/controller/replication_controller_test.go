@@ -404,19 +404,19 @@ func TestSortingActivePods(t *testing.T) {
 		pods[i] = &podList.Items[i]
 	}
 	// pods[0] is not scheduled yet.
-	pods[0].Spec.Host = ""
+	pods[0].Spec.NodeName = ""
 	pods[0].Status.Phase = api.PodPending
 	// pods[1] is scheduled but pending.
-	pods[1].Spec.Host = "bar"
+	pods[1].Spec.NodeName = "bar"
 	pods[1].Status.Phase = api.PodPending
 	// pods[2] is unknown.
-	pods[2].Spec.Host = "foo"
+	pods[2].Spec.NodeName = "foo"
 	pods[2].Status.Phase = api.PodUnknown
 	// pods[3] is running but not ready.
-	pods[3].Spec.Host = "foo"
+	pods[3].Spec.NodeName = "foo"
 	pods[3].Status.Phase = api.PodRunning
 	// pods[4] is running and ready.
-	pods[4].Spec.Host = "foo"
+	pods[4].Spec.NodeName = "foo"
 	pods[4].Status.Phase = api.PodRunning
 	pods[4].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}}
 

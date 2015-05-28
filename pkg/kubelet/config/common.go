@@ -68,7 +68,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) er
 	glog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
 
 	// Set the Host field to indicate this pod is scheduled on the current node.
-	pod.Spec.Host = hostname
+	pod.Spec.NodeName = hostname
 
 	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
 	return nil

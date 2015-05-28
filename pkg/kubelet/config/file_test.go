@@ -99,7 +99,7 @@ func TestReadContainerManifestFromFile(t *testing.T) {
 					SelfLink:  getSelfLink("test-"+hostname, kubelet.NamespaceDefault),
 				},
 				Spec: api.PodSpec{
-					Host:          hostname,
+					NodeName:      hostname,
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 					Containers: []api.Container{{
@@ -126,7 +126,7 @@ func TestReadContainerManifestFromFile(t *testing.T) {
 					SelfLink:  getSelfLink("12345-"+hostname, kubelet.NamespaceDefault),
 				},
 				Spec: api.PodSpec{
-					Host:          hostname,
+					NodeName:      hostname,
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 					Containers: []api.Container{{
@@ -196,7 +196,7 @@ func TestReadPodsFromFile(t *testing.T) {
 					SelfLink:  getSelfLink("test-"+hostname, "mynamespace"),
 				},
 				Spec: api.PodSpec{
-					Host:          hostname,
+					NodeName:      hostname,
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 					Containers: []api.Container{{
@@ -231,7 +231,7 @@ func TestReadPodsFromFile(t *testing.T) {
 					SelfLink:  getSelfLink("12345-"+hostname, kubelet.NamespaceDefault),
 				},
 				Spec: api.PodSpec{
-					Host:          hostname,
+					NodeName:      hostname,
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 					Containers: []api.Container{{
@@ -371,7 +371,7 @@ func exampleManifestAndPod(id string) (v1beta1.ContainerManifest, *api.Pod) {
 			SelfLink:  getSelfLink(id+"-"+hostname, kubelet.NamespaceDefault),
 		},
 		Spec: api.PodSpec{
-			Host: hostname,
+			NodeName: hostname,
 			Containers: []api.Container{
 				{
 					Name:  "c" + id,

@@ -123,11 +123,11 @@ func (everythingMatcher) MatchesSingle() (string, bool) {
 func TestEtcdList(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Spec:       api.PodSpec{Host: "machine"},
+		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	podB := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
-		Spec:       api.PodSpec{Host: "machine"},
+		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
 	singleElemListResp := &etcd.Response{
@@ -230,11 +230,11 @@ func TestEtcdList(t *testing.T) {
 func TestEtcdCreate(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Spec:       api.PodSpec{Host: "machine"},
+		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	podB := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Spec:       api.PodSpec{Host: "machine2"},
+		Spec:       api.PodSpec{NodeName: "machine2"},
 	}
 
 	nodeWithPodA := tools.EtcdResponseWithError{
@@ -308,11 +308,11 @@ func TestEtcdCreate(t *testing.T) {
 func TestEtcdCreateWithName(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Spec:       api.PodSpec{Host: "machine"},
+		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	podB := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Spec:       api.PodSpec{Host: "machine2"},
+		Spec:       api.PodSpec{NodeName: "machine2"},
 	}
 
 	nodeWithPodA := tools.EtcdResponseWithError{
@@ -384,11 +384,11 @@ func TestEtcdCreateWithName(t *testing.T) {
 func TestEtcdUpdate(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Spec:       api.PodSpec{Host: "machine"},
+		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	podB := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault, ResourceVersion: "1"},
-		Spec:       api.PodSpec{Host: "machine2"},
+		Spec:       api.PodSpec{NodeName: "machine2"},
 	}
 
 	nodeWithPodA := tools.EtcdResponseWithError{
@@ -499,11 +499,11 @@ func TestEtcdUpdate(t *testing.T) {
 func TestEtcdUpdateWithName(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Spec:       api.PodSpec{Host: "machine"},
+		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	podB := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-		Spec:       api.PodSpec{Host: "machine2"},
+		Spec:       api.PodSpec{NodeName: "machine2"},
 	}
 
 	nodeWithPodA := tools.EtcdResponseWithError{
@@ -574,7 +574,7 @@ func TestEtcdUpdateWithName(t *testing.T) {
 func TestEtcdGet(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-		Spec:       api.PodSpec{Host: "machine"},
+		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
 	nodeWithPodA := tools.EtcdResponseWithError{
@@ -630,7 +630,7 @@ func TestEtcdGet(t *testing.T) {
 func TestEtcdDelete(t *testing.T) {
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-		Spec:       api.PodSpec{Host: "machine"},
+		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
 	nodeWithPodA := tools.EtcdResponseWithError{
@@ -699,7 +699,7 @@ func TestEtcdWatch(t *testing.T) {
 				Namespace:       api.NamespaceDefault,
 				ResourceVersion: "1",
 			},
-			Spec: api.PodSpec{Host: "machine"},
+			Spec: api.PodSpec{NodeName: "machine"},
 		}
 		respWithPodA := &etcd.Response{
 			Node: &etcd.Node{
