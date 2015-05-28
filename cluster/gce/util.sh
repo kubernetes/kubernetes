@@ -149,10 +149,10 @@ function already-staged() {
   local -r file=$1
   local -r newsum=$2
 
-  [[ -e "${file}.sha1" ]] || return 1
+  [[ -e "${file}.uploaded.sha1" ]] || return 1
 
   local oldsum
-  oldsum=$(cat "${file}.sha1")
+  oldsum=$(cat "${file}.uploaded.sha1")
 
   [[ "${oldsum}" == "${newsum}" ]]
 }
@@ -170,6 +170,7 @@ function copy-if-not-staged() {
     echo "${server_hash}" > "${tar}.sha1"
     gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
     gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha1" >/dev/null 2>&1
+    echo "${server_hash}" > "${tar}.uploaded.sha1"
   fi
 }
 
