@@ -60,6 +60,8 @@ function kube-up() {
 }
 
 function kube-down() {
+    # Remove the binary files from the charm directory.
+    rm -rf cluster/juju/charms/trusty/kubernetes-master/files/output/
     local jujuenv
     jujuenv=$(cat ~/.juju/current-environment)
     juju destroy-environment $jujuenv
