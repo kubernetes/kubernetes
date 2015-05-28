@@ -4,15 +4,20 @@ The example below creates a Kubernetes cluster with 4 worker node Virtual Machin
 
 ### Before you start
 
-If you want a simplified getting started experience and GUI for managing clusters, please consider trying [Google Container Engine](https://cloud.google.com/container-engine/) for hosted cluster installation and management.  
+If you want a simplified getting started experience and GUI for managing clusters, please consider trying [Google Container Engine](https://cloud.google.com/container-engine/) for hosted cluster installation and management.
 
 If you want to use custom binaries or pure open source Kubernetes, please continue with the instructions below.
 
 ### Prerequisites
 
 1. You need a Google Cloud Platform account with billing enabled. Visit the [Google Developers Console](http://cloud.google.com/console) for more details.
+1. Make sure you have the `gcloud preview` command line component installed. Simply run `gcloud preview` at the command line - if it asks to install any components, go ahead and install them. If it simply shows help text, you're good to go. This is required as the cluster setup script uses GCE [Instance Groups](https://cloud.google.com/compute/docs/instance-groups/), which are in the gcloud preview namespace.
+1. Make sure that gcloud is set to use the Google Cloud Platform project you want. You can check the current project using `gcloud config list project` and change it via `gcloud config set project <project-id>`.
+1. Make sure you have credentials for GCloud by running
+```bash
+gcloud auth login
+```
 1. Make sure you can start up a GCE VM from the command line.  At least make sure you can do the [Create an instance](https://cloud.google.com/compute/docs/quickstart#create_an_instance) part of the GCE Quickstart.
-1. Make sure you have the `gcloud preview` command line component installed. Simply run `gcloud preview` at the command line - if it asks to install any components, go ahead and install them. If it simply shows help text, you're good to go.
 1. Make sure you can ssh into the VM without interactive prompts.  See the [Log in to the instance](https://cloud.google.com/compute/docs/quickstart#ssh) part of the GCE Quickstart.
 
 ### Starting a Cluster
@@ -28,6 +33,17 @@ or
 ```bash
 wget -q -O - https://get.k8s.io | bash
 ```
+
+Once this command completes, you will have a master VM and four worker VMs, running as a Kubernetes cluster. By default, some containers will already be running on your cluster. These are used to run and monitor Kubernetes.
+
+If you run into trouble please see the section on [troubleshooting](gce.md#troubleshooting), or come ask questions on IRC at #google-containers on freenode.
+
+The next few steps will show you:
+
+1. how to set up the command line client on your workstation to manage the cluster
+1. examples of how to use the cluster
+1. how to delete the cluster
+1. how to start clusters with non-default options (like larger clusters)
 
 ### Installing the kubernetes client on your workstation
 
@@ -48,21 +64,20 @@ However the gcloud bundled kubectl version may be older than the one downloaded 
 get.k8s.io install script. We recommend you use the downloaded binary to avoid
 potential issues with client/server version skew.
 
-If you run into trouble please see the section on [troubleshooting](https://github.com/brendandburns/kubernetes/blob/docs/docs/getting-started-guides/gce.md#troubleshooting), or come ask questions on IRC at #google-containers on freenode.
-
-
 ### Getting started with your cluster
 See [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
 
 For more complete applications, please look in the [examples directory](../../examples)
 
-
 ### Tearing down the cluster
+To remove/delete/teardown the cluster, use the `kube-down.sh` script.
 
 ```bash
 cd kubernetes
 cluster/kube-down.sh
 ```
+
+Likewise, the `kube-up.sh` in the same directory will bring it back up. You do not need to rerun the `curl` or `wget` command: everything needed to setup the Kubernetes cluster is now on your workstation.
 
 ### Customizing
 
@@ -81,6 +96,12 @@ JSON API enabled. It is activated by default for new projects. Otherwise, it
 can be done in the Google Cloud Console.  See the [Google Cloud Storage JSON
 API Overview](https://cloud.google.com/storage/docs/json_api/) for more
 details.
+
+#### Cluster initialization hang
+
+If the Kubernetes startup script hangs waiting for the API to be reachable, you can troubleshoot by SSHing into the master and minion VMs and looking at logs such as `/var/log/startupscript.log`.
+
+Once you fix the issue, you should run `kube-down.sh` to cleanup after the partial cluster creation, before running `kube-up.sh` to try again.
 
 #### SSH
 
