@@ -32,7 +32,9 @@ const (
 	get_long = `Display one or many resources.
 
 Possible resources include pods (po), replication controllers (rc), services
-(svc), nodes, events (ev), or component statuses (cs).
+(svc), nodes, events (ev), component statuses (cs), limit ranges (limits),
+minions (mi), persistent volumes (pv), persistent volume claims (pvc)
+or resource quotas (quota).
 
 By specifying the output as 'template' and providing a Go template as the value
 of the --template flag, you can filter the attributes of the fetched resource(s).`
