@@ -201,7 +201,7 @@ The API supports three different PATCH operations, determined by their correspon
  * As defined in [RFC6902](https://tools.ietf.org/html/rfc6902), a JSON Patch is a sequence of operations that are executed on the resource, e.g. `{"op": "add", "path": "/a/b/c", "value": [ "foo", "bar" ]}`. For more details on how to use JSON Patch, see the RFC.
 * Merge Patch, `Content-Type: application/merge-json-patch+json`
  * As defined in [RFC7386](https://tools.ietf.org/html/rfc7386), a Merge Patch is essentially a partial representation of the resource. The submitted JSON is "merged" with the current resource to create a new one, then the new one is saved. For more details on how to use Merge Patch, see the RFC.
-* Strategic Merge Patch, `Content-Type: application/strategic-merge-json-patch+json`
+* Strategic Merge Patch, `Content-Type: application/strategic-merge-patch+json`
  * Strategic Merge Patch is a custom implementation of Merge Patch. For a detailed explanation of how it works and why it needed to be introduced, see below.
 
 #### Strategic Merge Patch
