@@ -1,12 +1,15 @@
+apiVersion: v1beta3
 kind: Service
-apiVersion: v1beta1
-id: skydns
-namespace: default
-protocol: UDP
-port: 53
-portalIP: ${DNS_SERVER_IP}
-containerPort: 53
-labels:
-  k8s-app: skydns
-selector:
-  k8s-app: skydns
+metadata:
+  labels:
+    k8s-app: skydns
+  name: skydns
+  namespace: default
+spec:
+  portalIP: ${DNS_SERVER_IP}
+  ports:
+  - port: 53
+    protocol: UDP
+    targetPort: 53
+  selector:
+    k8s-app: skydns
