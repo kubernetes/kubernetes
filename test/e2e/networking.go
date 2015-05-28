@@ -31,46 +31,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func LaunchNetTestPodPerNodeNew(f *Framework, nodes *api.NodeList, name string) []string {
-	podNames := []string{}
-
-	totalPods := len(nodes.Items)
-
-	Expect(totalPods).NotTo(Equal(0))
-
-	for _, node := range nodes.Items {
-		pod, err := f.Client.Pods(f.Namespace.Name).Create(&api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				GenerateName: name + "-",
-				Labels: map[string]string{
-					"name": name,
-				},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:  "webserver",
-						Image: "gcr.io/google_containers/nettest:1.4",
-						Args: []string{
-							"-service=" + name,
-							//peers >= totalPods should be asserted by the container.
-							//the nettest container finds peers by looking up list of svc endpoints.
-							fmt.Sprintf("-peers=%d", totalPods),
-							"-namespace=" + f.Namespace.Name},
-						Ports: []api.ContainerPort{{ContainerPort: 8080}},
-					},
-				},
-				NodeName:      node.Name,
-				RestartPolicy: api.RestartPolicyNever,
-			},
-		})
-		Expect(err).NotTo(HaveOccurred())
-		Logf("Created pod %s on node %s", pod.ObjectMeta.Name, node.Name)
-		podNames = append(podNames, pod.ObjectMeta.Name)
-	}
-	return podNames
-}
-
 var _ = Describe("NetworkingNew", func() {
 	f := NewFramework("nettestnew")
 
@@ -157,7 +117,7 @@ var _ = Describe("NetworkingNew", func() {
 			Failf("Failed to list nodes: %v", err)
 		}
 
-		podNames := LaunchNetTestPodPerNodeNew(f, nodes, svcname)
+		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.4")
 
 		// Clean up the pods
 		defer func() {
@@ -244,7 +204,7 @@ var _ = Describe("NetworkingNew", func() {
 
 })
 
-func LaunchNetTestPodPerNode(f *Framework, nodes *api.NodeList, name string) []string {
+func LaunchNetTestPodPerNode(f *Framework, nodes *api.NodeList, name, version string) []string {
 	podNames := []string{}
 
 	totalPods := len(nodes.Items)
@@ -263,7 +223,7 @@ func LaunchNetTestPodPerNode(f *Framework, nodes *api.NodeList, name string) []s
 				Containers: []api.Container{
 					{
 						Name:  "webserver",
-						Image: "gcr.io/google_containers/nettest:1.4",
+						Image: "gcr.io/google_containers/nettest:" + version,
 						Args: []string{
 							"-service=" + name,
 							//peers >= totalPods should be asserted by the container.
@@ -370,7 +330,7 @@ var _ = Describe("Networking", func() {
 			Failf("Failed to list nodes: %v", err)
 		}
 
-		podNames := LaunchNetTestPodPerNode(f, nodes, svcname)
+		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.3")
 
 		// Clean up the pods
 		defer func() {
