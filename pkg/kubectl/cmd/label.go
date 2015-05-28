@@ -25,12 +25,14 @@ import (
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/spf13/cobra"
 )
 
 const (
 	label_long = `Update the labels on a resource.
 
+A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
 If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
 If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`
 	label_example = `// Update pod 'foo' with the label 'unhealthy' and the value 'true'.
@@ -54,7 +56,7 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "label [--overwrite] RESOURCE NAME KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		Short:   "Update the labels on a resource",
-		Long:    label_long,
+		Long:    fmt.Sprintf(label_long, util.LabelValueMaxLength),
 		Example: label_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunLabel(f, out, cmd, args)
@@ -103,7 +105,7 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	for _, labelSpec := range spec {
 		if strings.Index(labelSpec, "=") != -1 {
 			parts := strings.Split(labelSpec, "=")
-			if len(parts) != 2 {
+			if len(parts) != 2 || len(parts[1]) == 0 || !util.IsValidLabelValue(parts[1]) {
 				return nil, nil, fmt.Errorf("invalid label spec: %v", labelSpec)
 			}
 			labels[parts[0]] = parts[1]
@@ -185,7 +187,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 	labels, remove, err := parseLabels(labelArgs)
 	if err != nil {
-		return err
+		return cmdutil.UsageError(cmd, err.Error())
 	}
 
 	mapper, typer := f.Object()
