@@ -70,7 +70,7 @@ def config_changed():
         # Create a branch to a tag to get the release version.
         branch = 'tags/{0}'.format(version)
 
-    # Get the package architecture, rather than the from the kernel (uname -m).
+    # Get the package architecture, rather than arch from the kernel (uname -m).
     arch = subprocess.check_output(['dpkg', '--print-architecture']).strip()
 
     if not branch:
@@ -155,6 +155,7 @@ def relation_changed():
     # Send api endpoint to minions
     notify_minions()
 
+
 @hooks.hook('network-relation-changed')
 def network_relation_changed():
     relation_id = hookenv.relation_id()
@@ -175,6 +176,7 @@ def notify_minions():
 def get_template_data():
     rels = hookenv.relations()
     config = hookenv.config()
+    version = config['version']
     template_data = {}
     template_data['etcd_servers'] = ",".join([
         "http://%s:%s" % (s[0], s[1]) for s in sorted(
@@ -186,8 +188,14 @@ def get_template_data():
     template_data['api_server_address'] = "http://%s:%s" % (
         hookenv.unit_private_ip(), 8080)
     arch = subprocess.check_output(['dpkg', '--print-architecture']).strip()
-    template_data['web_uri'] = "/kubernetes/%s/local/bin/linux/%s/" % (
-        config['version'], arch)
+
+    template_data['web_uri'] = "/kubernetes/%s/local/bin/linux/%s/" % (version,
+                                                                       arch)
+    if version == 'local':
+        template_data['alias'] = hookenv.charm_dir() + '/files/output/'
+    else:
+        directory = '/opt/kubernetes/_output/local/bin/linux/%s/' % arch
+        template_data['alias'] = directory
     _encode(template_data)
     return template_data
 
