@@ -13,7 +13,7 @@ type ModelBuildable interface {
 }
 
 type modelBuilder struct {
-	Models map[string]Model
+	Models *ModelList
 }
 
 // addModelFrom creates and adds a Model to the builder and detects and calls
@@ -23,7 +23,7 @@ func (b modelBuilder) addModelFrom(sample interface{}) {
 		// allow customizations
 		if buildable, ok := sample.(ModelBuildable); ok {
 			modelOrNil = buildable.PostBuildModel(modelOrNil)
-			b.Models[modelOrNil.Id] = *modelOrNil
+			b.Models.Put(modelOrNil.Id, *modelOrNil)
 		}
 	}
 }
@@ -38,16 +38,16 @@ func (b modelBuilder) addModel(st reflect.Type, nameOverride string) *Model {
 		return nil
 	}
 	// see if we already have visited this model
-	if _, ok := b.Models[modelName]; ok {
+	if _, ok := b.Models.At(modelName); ok {
 		return nil
 	}
 	sm := Model{
 		Id:         modelName,
 		Required:   []string{},
-		Properties: map[string]ModelProperty{}}
+		Properties: ModelPropertyList{}}
 
 	// reference the model before further initializing (enables recursive structs)
-	b.Models[modelName] = sm
+	b.Models.Put(modelName, sm)
 
 	// check for slice or array
 	if st.Kind() == reflect.Slice || st.Kind() == reflect.Array {
@@ -70,11 +70,11 @@ func (b modelBuilder) addModel(st reflect.Type, nameOverride string) *Model {
 			if b.isPropertyRequired(field) {
 				sm.Required = append(sm.Required, jsonName)
 			}
-			sm.Properties[jsonName] = prop
+			sm.Properties.Put(jsonName, prop)
 		}
 	}
 	// update model builder with completed model
-	b.Models[modelName] = sm
+	b.Models.Put(modelName, sm)
 
 	return &sm
 }
@@ -179,13 +179,13 @@ func (b modelBuilder) buildStructTypeProperty(field reflect.StructField, jsonNam
 
 	if field.Name == fieldType.Name() && field.Anonymous && !hasNamedJSONTag(field) {
 		// embedded struct
-		sub := modelBuilder{map[string]Model{}}
+		sub := modelBuilder{new(ModelList)}
 		sub.addModel(fieldType, "")
 		subKey := sub.keyFrom(fieldType)
 		// merge properties from sub
-		subModel := sub.Models[subKey]
-		for k, v := range subModel.Properties {
-			model.Properties[k] = v
+		subModel, _ := sub.Models.At(subKey)
+		subModel.Properties.Do(func(k string, v ModelProperty) {
+			model.Properties.Put(k, v)
 			// if subModel says this property is required then include it
 			required := false
 			for _, each := range subModel.Required {
@@ -197,15 +197,15 @@ func (b modelBuilder) buildStructTypeProperty(field reflect.StructField, jsonNam
 			if required {
 				model.Required = append(model.Required, k)
 			}
-		}
+		})
 		// add all new referenced models
-		for key, sub := range sub.Models {
+		sub.Models.Do(func(key string, sub Model) {
 			if key != subKey {
-				if _, ok := b.Models[key]; !ok {
-					b.Models[key] = sub
+				if _, ok := b.Models.At(key); !ok {
+					b.Models.Put(key, sub)
 				}
 			}
-		}
+		})
 		// empty name signals skip property
 		return "", prop
 	}

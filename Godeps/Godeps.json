@@ -157,8 +157,8 @@
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
-			"Comment": "v1.1.3-45-gd487287",
-			"Rev": "d4872876992d385f0e69b007f154e5633bdb40af"
+			"Comment": "v1.1.3-54-gbdfb7d4",
+			"Rev": "bdfb7d41639a84ea7c36df648e5865cd9fbf21e2"
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
