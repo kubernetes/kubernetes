@@ -119,6 +119,9 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = http.StatusNotFound
 		return
 	}
+	// TODO: make this dynamic
+	location.Host = "localhost"
+	location.Scheme = "http"
 
 	// Default to http
 	if location.Scheme == "" {
