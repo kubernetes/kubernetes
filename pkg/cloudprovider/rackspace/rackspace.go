@@ -38,6 +38,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const ProviderName = "rackspace"
+
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
 var ErrNoAddressFound = errors.New("No address found for host")
@@ -89,7 +91,7 @@ type Config struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("rackspace", func(config io.Reader) (cloudprovider.Interface, error) {
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
 		if err != nil {
 			return nil, err
@@ -364,9 +366,14 @@ func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: net.ParseIP(ip).String()}}, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (i *Instances) ExternalID(name string) (string, error) {
 	return "", fmt.Errorf("unimplemented")
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (i *Instances) InstanceID(name string) (string, error) {
+	return "", nil
 }
 
 func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
@@ -397,6 +404,11 @@ func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
 
 func (os *Rackspace) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
+}
+
+// ProviderName returns the cloud provider ID.
+func (os *Rackspace) ProviderName() string {
+	return ProviderName
 }
 
 func (os *Rackspace) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {

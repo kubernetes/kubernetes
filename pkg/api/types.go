@@ -1241,6 +1241,10 @@ type NodeSpec struct {
 	// External ID of the node assigned by some machine database (e.g. a cloud provider)
 	ExternalID string `json:"externalID,omitempty"`
 
+	// ID of the node assigned by the cloud provider
+	// Note: format is "<ProviderName>://<ProviderSpecificNodeID>"
+	ProviderID string `json:"providerID,omitempty"`
+
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	Unschedulable bool `json:"unschedulable,omitempty"`
 }

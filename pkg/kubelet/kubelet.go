@@ -700,11 +700,19 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 		}
 		// TODO(roberthbailey): Can we do this without having credentials to talk
 		// to the cloud provider?
-		instanceID, err := instances.ExternalID(kl.hostname)
+		// TODO: ExternalID is deprecated, we'll have to drop this code
+		externalID, err := instances.ExternalID(kl.hostname)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get instance ID from cloud provider: %v", err)
+			return nil, fmt.Errorf("failed to get external ID from cloud provider: %v", err)
 		}
-		node.Spec.ExternalID = instanceID
+		node.Spec.ExternalID = externalID
+		// TODO: We can't assume that the node has credentials to talk to the
+		// cloudprovider from arbitrary nodes. At most, we should talk to a
+		// local metadata server here.
+		node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(kl.cloud, kl.hostname)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		node.Spec.ExternalID = kl.hostname
 	}

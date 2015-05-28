@@ -902,6 +902,7 @@ func convert_api_NodeSpec_To_v1beta3_NodeSpec(in *api.NodeSpec, out *NodeSpec, s
 	}
 	out.PodCIDR = in.PodCIDR
 	out.ExternalID = in.ExternalID
+	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
 	return nil
 }
@@ -3047,6 +3048,7 @@ func convert_v1beta3_NodeSpec_To_api_NodeSpec(in *NodeSpec, out *api.NodeSpec, s
 	}
 	out.PodCIDR = in.PodCIDR
 	out.ExternalID = in.ExternalID
+	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
 	return nil
 }

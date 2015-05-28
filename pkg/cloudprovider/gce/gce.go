@@ -42,6 +42,8 @@ import (
 	"google.golang.org/cloud/compute/metadata"
 )
 
+const ProviderName = "gce"
+
 const EXTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
@@ -67,7 +69,7 @@ type Config struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("gce", func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
 }
 
 func getMetadata(url string) (string, error) {
@@ -180,6 +182,11 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 
 func (gce *GCECloud) Clusters() (cloudprovider.Clusters, bool) {
 	return gce, true
+}
+
+// ProviderName returns the cloud provider ID.
+func (gce *GCECloud) ProviderName() string {
+	return ProviderName
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Google Compute Engine.
@@ -481,13 +488,18 @@ func (gce *GCECloud) NodeAddresses(_ string) ([]api.NodeAddress, error) {
 	}, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (gce *GCECloud) ExternalID(instance string) (string, error) {
 	inst, err := gce.getInstanceByName(instance)
 	if err != nil {
 		return "", err
 	}
 	return strconv.FormatUint(inst.Id, 10), nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (gce *GCECloud) InstanceID(instance string) (string, error) {
+	return gce.projectID + "/" + gce.zone + "/" + canonicalizeInstanceName(instance), nil
 }
 
 // List is an implementation of Instances.List.

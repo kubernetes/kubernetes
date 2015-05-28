@@ -810,6 +810,7 @@ func addConversionFuncs() {
 			}
 			out.PodCIDR = in.Spec.PodCIDR
 			out.ExternalID = in.Spec.ExternalID
+			out.ProviderID = in.Spec.ProviderID
 			out.Unschedulable = in.Spec.Unschedulable
 			return s.Convert(&in.Status.Capacity, &out.NodeResources.Capacity, 0)
 		},
@@ -842,6 +843,7 @@ func addConversionFuncs() {
 			}
 			out.Spec.PodCIDR = in.PodCIDR
 			out.Spec.ExternalID = in.ExternalID
+			out.Spec.ProviderID = in.ProviderID
 			out.Spec.Unschedulable = in.Unschedulable
 			return s.Convert(&in.NodeResources.Capacity, &out.Status.Capacity, 0)
 		},

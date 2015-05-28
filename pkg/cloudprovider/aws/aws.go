@@ -41,6 +41,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const ProviderName = "aws"
+
 // Abstraction over EC2, to allow mocking/other implementations
 type EC2 interface {
 	// Query EC2 for instances matching the filter
@@ -244,7 +246,7 @@ func (s *awsSdkEC2) DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput,
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		metadata := &awsSdkMetadata{}
 		return newAWSCloud(config, getAuth, metadata)
 	})
@@ -360,6 +362,11 @@ func (aws *AWSCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
+// ProviderName returns the cloud provider ID.
+func (aws *AWSCloud) ProviderName() string {
+	return ProviderName
+}
+
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Amazon Web Services.
 func (aws *AWSCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return nil, false
@@ -414,13 +421,24 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	return addresses, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (aws *AWSCloud) ExternalID(name string) (string, error) {
 	inst, err := aws.getInstancesByDnsName(name)
 	if err != nil {
 		return "", err
 	}
 	return *inst.InstanceID, nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (aws *AWSCloud) InstanceID(name string) (string, error) {
+	inst, err := aws.getInstancesByDnsName(name)
+	if err != nil {
+		return "", err
+	}
+	// In the future it is possible to also return an endpoint as:
+	// <endpoint>/<zone>/<instanceid>
+	return "/" + *inst.Placement.AvailabilityZone + "/" + *inst.InstanceID, nil
 }
 
 // Return the instances matching the relevant private dns name.

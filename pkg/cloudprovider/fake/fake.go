@@ -26,6 +26,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
+const ProviderName = "fake"
+
 // FakeBalancer is a fake storage of balancer information
 type FakeBalancer struct {
 	Name       string
@@ -79,6 +81,11 @@ func (f *FakeCloud) Master(name string) (string, error) {
 
 func (f *FakeCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return f, true
+}
+
+// ProviderName returns the cloud provider ID.
+func (f *FakeCloud) ProviderName() string {
+	return ProviderName
 }
 
 // TCPLoadBalancer returns a fake implementation of TCPLoadBalancer.
@@ -150,6 +157,12 @@ func (f *FakeCloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
 func (f *FakeCloud) ExternalID(instance string) (string, error) {
 	f.addCall("external-id")
 	return f.ExtID[instance], f.Err
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (f *FakeCloud) InstanceID(instance string) (string, error) {
+	f.addCall("instance-id")
+	return f.ExtID[instance], nil
 }
 
 // List is a test-spy implementation of Instances.List.
