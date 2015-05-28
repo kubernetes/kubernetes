@@ -238,7 +238,13 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 
 func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
 	return waitForPodCondition(c, namespace, podName, "running", podPoll, podStartTimeout, func(pod *api.Pod) (bool, error) {
-		return (pod.Status.Phase == api.PodRunning), nil
+		if pod.Status.Phase == api.PodRunning {
+			return true, nil
+		}
+		if pod.Status.Phase == api.PodFailed {
+			return true, fmt.Errorf("Giving up; pod went into failed status: \n%#v", pod.Status)
+		}
+		return false, nil
 	})
 }
 
