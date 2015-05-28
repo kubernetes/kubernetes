@@ -59,46 +59,60 @@ def config_changed():
     config = hookenv.config()
     # Get the version of kubernetes to install.
     version = config['version']
-    # Get the package architecture, rather than the from the kernel (uname -m).
-    arch = subprocess.check_output(['dpkg', '--print-architecture']).strip()
-    kubernetes_dir = path('/opt/kubernetes')
-    if not kubernetes_dir.exists():
-        print('The source directory {0} does not exist'.format(kubernetes_dir))
-        print('Was the kubernetes code cloned during install?')
-        exit(1)
 
-    if version in ['source', 'head', 'master']:
+    if version == 'master':
+        # The 'master' branch of kuberentes is used when master is configured.
         branch = 'master'
+    elif version == 'local':
+        # Check for kubernetes binaries in the local files/output directory.
+        branch = None
     else:
-        # Create a branch to a tag.
+        # Create a branch to a tag to get the release version.
         branch = 'tags/{0}'.format(version)
 
-    # Construct the path to the binaries using the arch.
-    output_path = kubernetes_dir / '_output/local/bin/linux' / arch
-    installer = KubernetesInstaller(arch, version, output_path)
+    # Get the package architecture, rather than the from the kernel (uname -m).
+    arch = subprocess.check_output(['dpkg', '--print-architecture']).strip()
 
-    # Change to the kubernetes directory (git repository).
-    with kubernetes_dir:
-        # Create a command to get the current branch.
-        git_branch = 'git branch | grep "\*" | cut -d" " -f2'
-        current_branch = subprocess.check_output(git_branch, shell=True).strip()
-        print('Current branch: ', current_branch)
-        # Create the path to a file to indicate if the build was broken.
-        broken_build = charm_dir / '.broken_build'
-        # write out the .broken_build file while this block is executing.
-        with check_sentinel(broken_build) as last_build_failed:
-            print('Last build failed: ', last_build_failed)
-            # Rebuild if the current version is different or last build failed.
-            if current_branch != version or last_build_failed:
-                installer.build(branch)
-        if not output_path.exists():
-            broken_build.touch()
-        else:
-            print('Notifying minions of verison ' + version)
-            # Notify the minions of a version change.
-            for r in hookenv.relation_ids('minions-api'):
-                hookenv.relation_set(r, version=version)
-            print('Done notifing minions of version ' + version)
+    if not branch:
+        output_path = charm_dir / 'files/output'
+        installer = KubernetesInstaller(arch, version, output_path)
+    else:
+
+        # Build the kuberentes binaries from source on the units.
+        kubernetes_dir = path('/opt/kubernetes')
+
+        # Construct the path to the binaries using the arch.
+        output_path = kubernetes_dir / '_output/local/bin/linux' / arch
+        installer = KubernetesInstaller(arch, version, output_path)
+
+        if not kubernetes_dir.exists():
+            print('The source directory {0} does not exist'.format(kubernetes_dir))
+            print('Was the kubernetes code cloned during install?')
+            exit(1)
+
+        # Change to the kubernetes directory (git repository).
+        with kubernetes_dir:
+
+            # Create a command to get the current branch.
+            git_branch = 'git branch | grep "\*" | cut -d" " -f2'
+            current_branch = subprocess.check_output(git_branch, shell=True).strip()
+            print('Current branch: ', current_branch)
+            # Create the path to a file to indicate if the build was broken.
+            broken_build = charm_dir / '.broken_build'
+            # write out the .broken_build file while this block is executing.
+            with check_sentinel(broken_build) as last_build_failed:
+                print('Last build failed: ', last_build_failed)
+                # Rebuild if the current version is different or last build failed.
+                if current_branch != version or last_build_failed:
+                    installer.build(branch)
+            if not output_path.exists():
+                broken_build.touch()
+            else:
+                print('Notifying minions of verison ' + version)
+                # Notify the minions of a version change.
+                for r in hookenv.relation_ids('minions-api'):
+                    hookenv.relation_set(r, version=version)
+                print('Done notifing minions of version ' + version)
 
     # Create the symoblic links to the right directories.
     installer.install()
