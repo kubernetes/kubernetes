@@ -520,7 +520,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			}
 			fmt.Fprintf(out, "Port:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
 			if sp.NodePort != 0 {
-				fmt.Fprintf(out, "NodePort:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
+				fmt.Fprintf(out, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
 			}
 			fmt.Fprintf(out, "Endpoints:\t%s\t%s\n", name, formatEndpoints(endpoints, util.NewStringSet(sp.Name)))
 		}
