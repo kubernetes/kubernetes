@@ -73,7 +73,9 @@ var _ = Describe("DNS", func() {
 
 		probeCmd := "for i in `seq 1 600`; do "
 		for _, name := range namesToResolve {
-			// Resolve by TCP and UDP DNS.
+			// Resolve by TCP and UDP DNS.  Use $$(...) because $(...) is
+			// expanded by kubernetes (though this won't expand so should
+			// remain a literal, safe > sorry).
 			probeCmd += fmt.Sprintf(`test -n "$$(dig +notcp +noall +answer +search %s)" && echo OK > /results/udp@%s;`, name, name)
 			probeCmd += fmt.Sprintf(`test -n "$$(dig +tcp +noall +answer +search %s)" && echo OK > /results/tcp@%s;`, name, name)
 		}
@@ -234,9 +236,11 @@ var _ = Describe("DNS", func() {
 
 		probeCmd := "for i in `seq 1 600`; do "
 		for _, name := range namesToResolve {
-			// Resolve by TCP and UDP DNS.
-			probeCmd += fmt.Sprintf(`test -n "$(dig +notcp +noall +answer +search %s)" && echo OK > /results/udp@%s;`, name, name)
-			probeCmd += fmt.Sprintf(`test -n "$(dig +tcp +noall +answer +search %s)" && echo OK > /results/tcp@%s;`, name, name)
+			// Resolve by TCP and UDP DNS.  Use $$(...) because $(...) is
+			// expanded by kubernetes (though this won't expand so should
+			// remain a literal, safe > sorry).
+			probeCmd += fmt.Sprintf(`test -n "$$(dig +notcp +noall +answer +search %s)" && echo OK > /results/udp@%s;`, name, name)
+			probeCmd += fmt.Sprintf(`test -n "$$(dig +tcp +noall +answer +search %s)" && echo OK > /results/tcp@%s;`, name, name)
 		}
 		probeCmd += "sleep 1; done"
 		Logf("vishh: 1")
