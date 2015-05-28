@@ -112,7 +112,7 @@ type Config struct {
 	RestfulContainer *restful.Container
 
 	// If specified, requests will be allocated a random timeout between this value, and twice this value.
-	// Note that it is upto the request handlers to ignore or honor this timeout.
+	// Note that it is up to the request handlers to ignore or honor this timeout.
 	MinRequestTimeout int
 
 	// Number of masters running; all masters must be started with the
