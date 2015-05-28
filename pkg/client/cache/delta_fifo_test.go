@@ -27,24 +27,6 @@ func testPop(f *DeltaFIFO) testFifoObject {
 	return f.Pop().(Deltas).Newest().Object.(testFifoObject)
 }
 
-// keyLookupFunc adapts a raw function to be a KeyLookup.
-type keyLookupFunc func() []string
-
-// ListKeys just calls kl.
-func (kl keyLookupFunc) ListKeys() []string {
-	return kl()
-}
-
-// GetByKey returns the key if it exists in the list returned by kl.
-func (kl keyLookupFunc) GetByKey(key string) (interface{}, bool, error) {
-	for _, v := range kl() {
-		if v == key {
-			return key, true, nil
-		}
-	}
-	return nil, false, nil
-}
-
 func TestDeltaFIFO_basic(t *testing.T) {
 	f := NewDeltaFIFO(testFifoObjectKeyFunc, nil, nil)
 	const amount = 500
@@ -192,7 +174,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	f := NewDeltaFIFO(
 		testFifoObjectKeyFunc,
 		nil,
-		keyLookupFunc(func() []string {
+		KeyListerFunc(func() []string {
 			return []string{"foo", "bar", "baz"}
 		}),
 	)
@@ -202,9 +184,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	expectedList := []Deltas{
 		{{Deleted, mkFifoObj("baz", 10)}},
 		{{Sync, mkFifoObj("foo", 5)}},
-		// Since "bar" didn't have a delete event and wasn't in the Replace list
-		// it should get a tombstone key with the right Obj.
-		{{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: "bar"}}},
+		{{Deleted, DeletedFinalStateUnknown{Key: "bar"}}},
 	}
 
 	for _, expected := range expectedList {
@@ -279,9 +259,9 @@ func TestDeltaFIFO_KeyOf(t *testing.T) {
 		key string
 	}{
 		{obj: testFifoObject{name: "A"}, key: "A"},
-		{obj: DeletedFinalStateUnknown{Key: "B", Obj: nil}, key: "B"},
+		{obj: DeletedFinalStateUnknown{Key: "B"}, key: "B"},
 		{obj: Deltas{{Object: testFifoObject{name: "C"}}}, key: "C"},
-		{obj: Deltas{{Object: DeletedFinalStateUnknown{Key: "D", Obj: nil}}}, key: "D"},
+		{obj: Deltas{{Object: DeletedFinalStateUnknown{Key: "D"}}}, key: "D"},
 	}
 
 	for _, item := range table {
