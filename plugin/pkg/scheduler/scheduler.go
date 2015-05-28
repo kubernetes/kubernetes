@@ -73,6 +73,9 @@ type Config struct {
 	Algorithm    algorithm.ScheduleAlgorithm
 	Binder       Binder
 
+	// Rate at which we can create pods
+	BindPodsRateLimiter util.RateLimiter
+
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
@@ -106,6 +109,10 @@ func (s *Scheduler) Run() {
 
 func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
+	if s.config.BindPodsRateLimiter != nil {
+		s.config.BindPodsRateLimiter.Accept()
+	}
+
 	glog.V(3).Infof("Attempting to schedule: %v", pod)
 	start := time.Now()
 	defer func() {
