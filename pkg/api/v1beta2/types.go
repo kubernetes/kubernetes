@@ -146,7 +146,7 @@ type PersistentVolumeSpec struct {
 	// claim.VolumeName is the authoritative bind between PV and PVC.
 	ClaimRef *ObjectReference `json:"claimRef,omitempty" description:"when bound, a reference to the bound claim"`
 	// PersistentVolumeReclaimPolicy represents what happens to a persistent volume when released from its claim.
-	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"reclamationPolicy,omitempty" description:"reclamationPolicy is what happens to a volume when released from its claim; one of Recycle, Delete, Retain.  Default is Retain."`
+	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" description:"persistentVolumeReclaimPolicy is what happens to a volume when released from its claim; one of Recycle, Delete, Retain.  Default is Retain."`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes

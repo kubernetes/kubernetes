@@ -11,4 +11,4 @@ spec:
     - ReadWriteOnce
   hostPath:
     path: "/tmp/data02"
-  reclamationPolicy: Recycle
+  persistentVolumeReclaimPolicy: Recycle
