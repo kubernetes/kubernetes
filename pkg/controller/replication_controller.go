@@ -237,26 +237,28 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 // When a pod is deleted, enqueue the controller that manages the pod and update its expectations.
 // obj could be an *api.Pod, or a DeletionFinalStateUnknown marker item.
 func (rm *ReplicationManager) deletePod(obj interface{}) {
-	if pod, ok := obj.(*api.Pod); ok {
-		if rc := rm.getPodControllers(pod); rc != nil {
-			rm.expectations.DeletionObserved(rc)
-			rm.enqueueController(rc)
-		}
-		return
-	}
+	pod, ok := obj.(*api.Pod)
+
 	// When a delete is dropped, the relist will notice a pod in the store not
-	// in the list, leading to the insertion of a tombstone key. Since we don't
-	// know which rc to wake up/update expectations, we rely on the ttl on the
-	// expectation expiring. The rc syncs via the 30s periodic resync and notices
-	// fewer pods than its replica count.
-	podKey, err := framework.DeletionHandlingMetaNamespaceKeyFunc(obj)
-	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
-		return
+	// in the list, leading to the insertion of a tombstone object which contains
+	// the deleted key/value. Note that this value might be stale. If the pod
+	// changed labels the new rc will not be woken up till the periodic resync.
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			glog.Errorf("Couldn't get object from tombstone %+v, could take up to %v before a controller recreates a replica", obj, ExpectationsTimeout)
+			return
+		}
+		pod, ok = tombstone.Obj.(*api.Pod)
+		if !ok {
+			glog.Errorf("Tombstone contained object that is not a pod %+v, could take up to %v before controller recreates a replica", obj, ExpectationsTimeout)
+			return
+		}
 	}
-	// A periodic relist might not have a pod that the store has, in such cases we are sent a tombstone key.
-	// We don't know which controllers to sync, so just let the controller relist handle this.
-	glog.Infof("Pod %q was deleted but we don't have a record of its final state so it could take up to %v before a controller recreates a replica.", podKey, ExpectationsTimeout)
+	if rc := rm.getPodControllers(pod); rc != nil {
+		rm.expectations.DeletionObserved(rc)
+		rm.enqueueController(rc)
+	}
 }
 
 // obj could be an *api.ReplicationController, or a DeletionFinalStateUnknown marker item.

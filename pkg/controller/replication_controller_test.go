@@ -252,6 +252,38 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 	validateSyncReplication(t, &fakePodControl, 0, 1)
 }
 
+func TestDeleteFinalStateUnknown(t *testing.T) {
+	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
+	fakePodControl := FakePodControl{}
+	manager := NewReplicationManager(client, BurstReplicas)
+	manager.podControl = &fakePodControl
+
+	received := make(chan string)
+	manager.syncHandler = func(key string) error {
+		received <- key
+		return nil
+	}
+
+	// The DeletedFinalStateUnknown object should cause the rc manager to insert
+	// the controller matching the selectors of the deleted pod into the work queue.
+	controllerSpec := newReplicationController(1)
+	manager.controllerStore.Store.Add(controllerSpec)
+	pods := newPodList(nil, 1, api.PodRunning, controllerSpec)
+	manager.deletePod(cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]})
+
+	go manager.worker()
+
+	expected := getKey(controllerSpec, t)
+	select {
+	case key := <-received:
+		if key != expected {
+			t.Errorf("Unexpected sync all for rc %v, expected %v", key, expected)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Errorf("Processing DeleteFinalStateUnknown took longer than expected")
+	}
+}
+
 func TestSyncReplicationControllerCreates(t *testing.T) {
 	client := client.NewOrDie(&client.Config{Host: "", Version: testapi.Version()})
 	manager := NewReplicationManager(client, BurstReplicas)
