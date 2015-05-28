@@ -12,7 +12,7 @@ The `kubectl` line below spins up two containers running
 [Nginx](http://nginx.org/en/) running on port 80:
 
 ```bash
-kubectl run my-nginx --image=nginx --replicas=2 --port=80
+kubectl run-container my-nginx --image=nginx --replicas=2 --port=80
 ```
 
 Once the pods are created, you can list them to see what is up and running:
@@ -35,7 +35,7 @@ On some platforms (for example Google Compute Engine) the kubectl command can in
 to do this run:
 
 ```bash
-kubectl expose rc my-nginx --port=80 --type=LoadBalancer
+kubectl expose rc my-nginx --port=80 --create-external-load-balancer=true
 ```
 
 This should print the service that has been created, and map an external IP address to the service.
