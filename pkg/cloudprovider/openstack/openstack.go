@@ -317,6 +317,10 @@ func getAddressByName(api *gophercloud.ServiceClient, name string) (string, erro
 	return s, nil
 }
 
+func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
+}
+
 func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	glog.V(4).Infof("NodeAddresses(%v) called", name)
 

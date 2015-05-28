@@ -353,6 +353,11 @@ func (s *APIServer) Run(_ []string) error {
 		}
 	}
 
+	var installSSH master.InstallSSHKey
+	instances, supported := cloud.Instances()
+	if supported {
+		installSSH = instances.AddSSHKeyToAllInstances
+	}
 	config := &master.Config{
 		EtcdHelper:             helper,
 		EventTTL:               s.EventTTL,
@@ -382,6 +387,7 @@ func (s *APIServer) Run(_ []string) error {
 		ExternalHost:           s.ExternalHost,
 		SSHUser:                s.SSHUser,
 		SSHKeyfile:             s.SSHKeyfile,
+		InstallSSHKey:          installSSH,
 	}
 	m := master.New(config)
 
