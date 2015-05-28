@@ -19,8 +19,11 @@ package cache
 import (
 	"errors"
 	"io"
+	"net"
+	"net/url"
 	"reflect"
 	"sync"
+	"syscall"
 	"time"
 
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -161,10 +164,22 @@ func (r *Reflector) listAndWatch(stopCh <-chan struct{}) {
 			default:
 				glog.Errorf("Failed to watch %v: %v", r.expectedType, err)
 			}
+			// If this is "connection refused" error, it means that most likely apiserver is not responsive.
+			// It doesn't make sense to re-list all objects because most likely we will be able to restart
+			// watch where we ended.
+			// If that's the case wait and resend watch request.
+			if urlError, ok := err.(*url.Error); ok {
+				if opError, ok := urlError.Err.(*net.OpError); ok {
+					if errno, ok := opError.Err.(syscall.Errno); ok && errno == syscall.ECONNREFUSED {
+						time.Sleep(time.Second)
+						continue
+					}
+				}
+			}
 			return
 		}
 		if err := r.watchHandler(w, &resourceVersion, resyncCh, stopCh); err != nil {
-			if err != errorResyncRequested {
+			if err != errorResyncRequested && err != errorStopRequested {
 				glog.Errorf("watch of %v ended with: %v", r.expectedType, err)
 			}
 			return
