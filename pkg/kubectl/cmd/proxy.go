@@ -32,8 +32,8 @@ const (
 $ kubectl proxy --port=8011 --www=./local/www/
 
 // Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
-// This makes e.g. the pods api available at localhost:8011/k8s-api/v1beta1/pods/
-$ kubectl proxy --api-prefix=k8s-api`
+// This makes e.g. the pods api available at localhost:8011/k8s-api/v1beta3/pods/
+$ kubectl proxy --api-prefix=/k8s-api`
 )
 
 func NewCmdProxy(f *cmdutil.Factory, out io.Writer) *cobra.Command {
