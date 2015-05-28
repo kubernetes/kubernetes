@@ -140,8 +140,8 @@ function create-provision-scripts {
     echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
     echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
     echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
-    grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
+    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
@@ -161,8 +161,8 @@ function create-provision-scripts {
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
       echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
-      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
-      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
   done
 }
