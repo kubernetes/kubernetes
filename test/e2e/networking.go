@@ -60,7 +60,7 @@ func LaunchNetTestPodPerNodeNew(f *Framework, nodes *api.NodeList, name string) 
 						Ports: []api.ContainerPort{{ContainerPort: 8080}},
 					},
 				},
-				Host:          node.Name,
+				NodeName:      node.Name,
 				RestartPolicy: api.RestartPolicyNever,
 			},
 		})
