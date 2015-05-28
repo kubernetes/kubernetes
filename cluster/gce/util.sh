@@ -670,8 +670,18 @@ function kube-up {
   echo "  up."
   echo
 
+  # curl in mavericks is borked.
+  secure=""
+  if which sw_vers > /dev/null; then
+    if [[ $(sw_vers | grep ProductVersion | awk '{print $2}') = "10.9."* ]]; then
+      secure="--insecure"
+    fi
+  fi
+
+
   until curl --cacert "${CERT_DIR}/pki/ca.crt" \
           -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
+          ${secure} \
           --max-time 5 --fail --output /dev/null --silent \
           "https://${KUBE_MASTER_IP}/api/v1beta3/pods"; do
       printf "."
