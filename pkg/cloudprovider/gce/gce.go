@@ -42,6 +42,8 @@ import (
 	"google.golang.org/cloud/compute/metadata"
 )
 
+const EXTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
+
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service          *compute.Service
@@ -466,10 +468,10 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (gce *GCECloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
-	externalIP, err := gce.getExternalIP(instance)
+func (gce *GCECloud) NodeAddresses(_ string) ([]api.NodeAddress, error) {
+	externalIP, err := gce.metadataAccess(EXTERNAL_IP_METADATA_URL)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get external IP for instance %s: %v", instance, err)
+		return nil, fmt.Errorf("couldn't get external IP: %v", err)
 	}
 
 	return []api.NodeAddress{
@@ -477,18 +479,6 @@ func (gce *GCECloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
 		// TODO(mbforbes): Remove NodeLegacyHostIP once v1beta1 is removed.
 		{Type: api.NodeLegacyHostIP, Address: externalIP},
 	}, nil
-}
-
-func (gce *GCECloud) getExternalIP(instance string) (string, error) {
-	inst, err := gce.getInstanceByName(instance)
-	if err != nil {
-		return "", err
-	}
-	ip := net.ParseIP(inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
-	if ip == nil {
-		return "", fmt.Errorf("invalid network IP: %s", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
-	}
-	return ip.String(), nil
 }
 
 // ExternalID returns the cloud provider ID of the specified instance.
