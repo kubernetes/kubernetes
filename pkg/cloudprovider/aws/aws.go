@@ -140,6 +140,10 @@ func isNilOrEmpty(s *string) bool {
 	return s == nil || *s == ""
 }
 
+func (self *AWSCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
+}
+
 // Implementation of EC2.Instances
 func (self *awsSdkEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (resp []*ec2.Instance, err error) {
 	var filters []*ec2.Filter
