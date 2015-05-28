@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -472,6 +473,39 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 		return nil, err
 	}
 	return res, nil
+}
+
+func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	project, err := gce.service.Projects.Get(gce.projectID).Do()
+	if err != nil {
+		return err
+	}
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	found := false
+	for _, item := range project.CommonInstanceMetadata.Items {
+		if item.Key == "sshKeys" {
+			item.Value = fmt.Sprintf("%s\n%s:%s %s@%s", item.Value, user, string(keyData), user, hostname)
+			found = true
+			break
+		}
+	}
+	if !found {
+		// This is super unlikely, so log.
+		glog.Infof("Failed to find sshKeys metadata, creating a new item")
+		project.CommonInstanceMetadata.Items = append(project.CommonInstanceMetadata.Items,
+			&compute.MetadataItems{
+				Key:   "sshKeys",
+				Value: fmt.Sprint("%s:%s %s@%s", user, string(keyData), user, hostname),
+			})
+	}
+	op, err := gce.service.Projects.SetCommonInstanceMetadata(gce.projectID, project.CommonInstanceMetadata).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.

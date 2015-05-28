@@ -18,10 +18,14 @@ package util
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
+	mathrand "math/rand"
 	"net"
 	"os"
 
@@ -260,7 +264,7 @@ func (l SSHTunnelList) Dial(network, addr string) (net.Conn, error) {
 	if len(l) == 0 {
 		return nil, fmt.Errorf("Empty tunnel list.")
 	}
-	return l[rand.Int()%len(l)].Tunnel.Dial(network, addr)
+	return l[mathrand.Int()%len(l)].Tunnel.Dial(network, addr)
 }
 
 func (l SSHTunnelList) Has(addr string) bool {
@@ -270,4 +274,39 @@ func (l SSHTunnelList) Has(addr string) bool {
 		}
 	}
 	return false
+}
+
+func EncodePrivateKey(private *rsa.PrivateKey) []byte {
+	return pem.EncodeToMemory(&pem.Block{
+		Bytes: x509.MarshalPKCS1PrivateKey(private),
+		Type:  "RSA PRIVATE KEY",
+	})
+}
+
+func EncodePublicKey(public *rsa.PublicKey) ([]byte, error) {
+	publicBytes, err := x509.MarshalPKIXPublicKey(public)
+	if err != nil {
+		return nil, err
+	}
+
+	return pem.EncodeToMemory(&pem.Block{
+		Bytes: publicBytes,
+		Type:  "PUBLIC KEY",
+	}), nil
+}
+
+func EncodeSSHKey(public *rsa.PublicKey) ([]byte, error) {
+	publicKey, err := ssh.NewPublicKey(public)
+	if err != nil {
+		return nil, err
+	}
+	return ssh.MarshalAuthorizedKey(publicKey), nil
+}
+
+func GenerateKey(bits int) (*rsa.PrivateKey, *rsa.PublicKey, error) {
+	private, err := rsa.GenerateKey(rand.Reader, bits)
+	if err != nil {
+		return nil, nil, err
+	}
+	return private, &private.PublicKey, nil
 }

@@ -18,7 +18,9 @@ package master
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -147,9 +149,12 @@ type Config struct {
 	ServiceNodePortRange util.PortRange
 
 	// Used for secure proxy.  If empty, don't use secure proxy.
-	SSHUser    string
-	SSHKeyfile string
+	SSHUser       string
+	SSHKeyfile    string
+	InstallSSHKey InstallSSHKey
 }
+
+type InstallSSHKey func(user string, data []byte) error
 
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
@@ -204,7 +209,8 @@ type Master struct {
 	InsecureHandler http.Handler
 
 	// Used for secure proxy
-	tunnels util.SSHTunnelList
+	tunnels       util.SSHTunnelList
+	installSSHKey InstallSSHKey
 }
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
@@ -486,6 +492,16 @@ func (m *Master) init(c *Config) {
 	var proxyDialer func(net, addr string) (net.Conn, error)
 	if len(c.SSHUser) > 0 {
 		glog.Infof("Setting up proxy: %s %s", c.SSHUser, c.SSHKeyfile)
+		exists, err := util.FileExists(c.SSHKeyfile)
+		if err != nil {
+			glog.Errorf("Error detecting if key exists: %v", err)
+		} else if !exists {
+			glog.Infof("Key doesn't exist, attempting to create")
+			err := m.generateSSHKey(c.SSHUser, c.SSHKeyfile)
+			if err != nil {
+				glog.Errorf("Failed to create key pair: %v", err)
+			}
+		}
 		m.setupSecureProxy(c.SSHUser, c.SSHKeyfile)
 		proxyDialer = m.Dial
 	}
@@ -800,4 +816,22 @@ func (m *Master) setupSecureProxy(user, keyfile string) {
 			time.Sleep(sleep)
 		}
 	}()
+}
+
+func (m *Master) generateSSHKey(user, keyfile string) error {
+	if m.installSSHKey == nil {
+		return errors.New("ssh install function is null")
+	}
+
+	private, public, err := util.GenerateKey(2048)
+	if err != nil {
+		return err
+	}
+	ioutil.WriteFile(keyfile, util.EncodePrivateKey(private), 0600)
+	data, err := util.EncodeSSHKey(public)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("FOO: %s", data)
+	return m.installSSHKey(user, data)
 }

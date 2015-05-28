@@ -230,6 +230,10 @@ func newEc2Filter(name string, value string) *ec2.Filter {
 	return filter
 }
 
+func (self *AWSCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
+}
+
 // Implementation of EC2.Instances
 func (self *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*ec2.Instance, error) {
 	// Instances are paged
