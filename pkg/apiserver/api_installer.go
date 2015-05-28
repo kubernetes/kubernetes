@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	gpath "path"
@@ -55,14 +56,14 @@ type action struct {
 var errEmptyName = errors.NewBadRequest("name must be provided")
 
 // Installs handlers for API resources.
-func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
+func (a *APIInstaller) Install(proxyDialer func(network, addr string) (net.Conn, error)) (ws *restful.WebService, errors []error) {
 	errors = make([]error, 0)
 
 	// Create the WebService.
 	ws = a.newWebService()
 
 	redirectHandler := (&RedirectHandler{a.group.Storage, a.group.Codec, a.group.Context, a.info})
-	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info})
+	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info, proxyDialer})
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
 	paths := make([]string, len(a.group.Storage))
