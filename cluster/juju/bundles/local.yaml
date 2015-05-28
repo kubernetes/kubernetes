@@ -7,7 +7,7 @@ kubernetes-local:
         "gui-y": "0"
       expose: true
       options:
-        version: "v0.15.0"
+        version: "v0.17.1"
     docker:
       charm: cs:trusty/docker
       num_units: 2
