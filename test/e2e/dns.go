@@ -243,7 +243,6 @@ var _ = Describe("DNS", func() {
 			probeCmd += fmt.Sprintf(`test -n "$$(dig +tcp +noall +answer +search %s)" && echo OK > /results/tcp@%s;`, name, name)
 		}
 		probeCmd += "sleep 1; done"
-		Logf("vishh: 1")
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
 		pod := &api.Pod{
