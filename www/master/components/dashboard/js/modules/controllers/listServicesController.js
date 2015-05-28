@@ -86,7 +86,7 @@ app.controller('ListServicesCtrl', [
                 var n = '';
                 if(p.name)
                   n = p.name + ': ';
-                 n = n + p.port;
+                n = n + p.port;
                 return n;
                }).join(', ');
             }
