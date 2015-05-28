@@ -102,17 +102,11 @@ def config_changed():
             # write out the .broken_build file while this block is executing.
             with check_sentinel(broken_build) as last_build_failed:
                 print('Last build failed: ', last_build_failed)
-                # Rebuild if the current version is different or last build failed.
+                # Rebuild if current version is different or last build failed.
                 if current_branch != version or last_build_failed:
                     installer.build(branch)
-            if not output_path.exists():
+            if not output_path.isdir():
                 broken_build.touch()
-            else:
-                print('Notifying minions of verison ' + version)
-                # Notify the minions of a version change.
-                for r in hookenv.relation_ids('minions-api'):
-                    hookenv.relation_set(r, version=version)
-                print('Done notifing minions of version ' + version)
 
     # Create the symoblic links to the right directories.
     installer.install()
@@ -171,6 +165,7 @@ def notify_minions():
             hostname=hookenv.unit_private_ip(),
             port=8080,
             version=config['version'])
+    print("Notified minions of version " + config['version'])
 
 
 def get_template_data():
