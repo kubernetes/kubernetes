@@ -5,14 +5,6 @@ import (
 )
 
 // accept should match produces
-func TestMatchesAcceptPlainTextWhenProducePlainTextAsLast(t *testing.T) {
-	r := Route{Produces: []string{"application/json", "text/plain"}}
-	if !r.matchesAccept("text/plain") {
-		t.Errorf("accept should match text/plain")
-	}
-}
-
-// accept should match produces
 func TestMatchesAcceptStar(t *testing.T) {
 	r := Route{Produces: []string{"application/xml"}}
 	if !r.matchesAccept("*/*") {

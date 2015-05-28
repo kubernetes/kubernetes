@@ -15,8 +15,8 @@ func testJsonFromStruct(t *testing.T, sample interface{}, expectedJson string) b
 	return compareJson(t, string(data), expectedJson)
 }
 
-func modelsFromStruct(sample interface{}) *ModelList {
-	models := new(ModelList)
+func modelsFromStruct(sample interface{}) map[string]Model {
+	models := map[string]Model{}
 	builder := modelBuilder{models}
 	builder.addModelFrom(sample)
 	return models
@@ -28,12 +28,12 @@ func compareJson(t *testing.T, actualJsonAsString string, expectedJsonAsString s
 	var expectedMap map[string]interface{}
 	json.Unmarshal([]byte(expectedJsonAsString), &expectedMap)
 	if !reflect.DeepEqual(actualMap, expectedMap) {
-		t.Log("---- expected -----")
-		t.Log(withLineNumbers(expectedJsonAsString))
-		t.Log("---- actual -----")
-		t.Log(withLineNumbers(actualJsonAsString))
-		t.Log("---- raw -----")
-		t.Log(actualJsonAsString)
+		fmt.Println("---- expected -----")
+		fmt.Println(withLineNumbers(expectedJsonAsString))
+		fmt.Println("---- actual -----")
+		fmt.Println(withLineNumbers(actualJsonAsString))
+		fmt.Println("---- raw -----")
+		fmt.Println(actualJsonAsString)
 		t.Error("there are differences")
 		return false
 	}

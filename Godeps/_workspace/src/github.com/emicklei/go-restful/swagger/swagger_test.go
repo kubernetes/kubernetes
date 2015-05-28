@@ -26,7 +26,7 @@ func TestServiceToApi(t *testing.T) {
 		WebServicesUrl:   "http://here.com",
 		ApiPath:          "/apipath",
 		WebServices:      []*restful.WebService{ws},
-		PostBuildHandler: func(in *ApiDeclarationList) {},
+		PostBuildHandler: func(in map[string]ApiDeclaration) {},
 	}
 	sws := newSwaggerService(cfg)
 	decl := sws.composeDeclaration(ws, "/tests")
@@ -73,7 +73,7 @@ func TestComposeResponseMessages(t *testing.T) {
 	responseErrors[400] = restful.ResponseError{Code: 400, Message: "Bad Request", Model: TestItem{}}
 	route := restful.Route{ResponseErrors: responseErrors}
 	decl := new(ApiDeclaration)
-	decl.Models = ModelList{}
+	decl.Models = map[string]Model{}
 	msgs := composeResponseMessages(route, decl)
 	if msgs[0].ResponseModel != "swagger.TestItem" {
 		t.Errorf("got %s want swagger.TestItem", msgs[0].ResponseModel)
@@ -86,7 +86,7 @@ func TestComposeResponseMessageArray(t *testing.T) {
 	responseErrors[400] = restful.ResponseError{Code: 400, Message: "Bad Request", Model: []TestItem{}}
 	route := restful.Route{ResponseErrors: responseErrors}
 	decl := new(ApiDeclaration)
-	decl.Models = ModelList{}
+	decl.Models = map[string]Model{}
 	msgs := composeResponseMessages(route, decl)
 	if msgs[0].ResponseModel != "array[swagger.TestItem]" {
 		t.Errorf("got %s want swagger.TestItem", msgs[0].ResponseModel)
@@ -95,23 +95,23 @@ func TestComposeResponseMessageArray(t *testing.T) {
 
 func TestIssue78(t *testing.T) {
 	sws := newSwaggerService(Config{})
-	models := new(ModelList)
+	models := map[string]Model{}
 	sws.addModelFromSampleTo(&Operation{}, true, Response{Items: &[]TestItem{}}, models)
-	model, ok := models.At("swagger.Response")
+	model, ok := models["swagger.Response"]
 	if !ok {
 		t.Fatal("missing response model")
 	}
 	if "swagger.Response" != model.Id {
 		t.Fatal("wrong model id:" + model.Id)
 	}
-	code, ok := model.Properties.At("Code")
+	code, ok := model.Properties["Code"]
 	if !ok {
 		t.Fatal("missing code")
 	}
 	if "integer" != *code.Type {
 		t.Fatal("wrong code type:" + *code.Type)
 	}
-	items, ok := model.Properties.At("Items")
+	items, ok := model.Properties["Items"]
 	if !ok {
 		t.Fatal("missing items")
 	}
