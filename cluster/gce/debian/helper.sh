@@ -99,12 +99,11 @@ function create-master-instance {
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
     --network "${NETWORK}" \
-    --scopes "storage-ro" "compute-rw" \
+    --scopes "storage-ro,compute-rw" \
     --can-ip-forward \
     --metadata-from-file \
-      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
-    --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no
+      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
+    --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 }
 
 # TODO(mbforbes): Make $1 required.
