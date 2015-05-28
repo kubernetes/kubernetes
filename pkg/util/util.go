@@ -508,3 +508,16 @@ func GetClient(req *http.Request) string {
 	}
 	return "unknown"
 }
+
+func FileExists(filename string) (bool, error) {
+	file, err := os.Open(filename)
+	defer file.Close()
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	return true, nil
+}

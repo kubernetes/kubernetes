@@ -144,6 +144,10 @@ func (f *FakeCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	return f.Err
 }
 
+func (f *FakeCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
+}
+
 // NodeAddresses is a test-spy implementation of Instances.NodeAddresses.
 // It adds an entry "node-addresses" into the internal method call record.
 func (f *FakeCloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
