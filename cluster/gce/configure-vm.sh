@@ -50,6 +50,12 @@ function ensure-install-dir() {
   cd ${INSTALL_DIR}
 }
 
+function salt-apiserver-timeout-grain() {
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  minRequestTimeout: '$1'
+EOF
+}
+
 function set-broken-motd() {
   echo -e '\nBroken (or in progress) GCE Kubernetes node setup! Suggested first step:\n  tail /var/log/startupscript.log\n' > /etc/motd
 }
@@ -538,6 +544,9 @@ function configure-salt() {
   salt-run-local
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
     salt-master-role
+    if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}"  ]; then
+        salt-apiserver-timeout-grain $KUBE_APISERVER_REQUEST_TIMEOUT
+    fi
   else
     salt-node-role
     salt-docker-opts

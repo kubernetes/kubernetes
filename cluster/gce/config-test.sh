@@ -25,6 +25,7 @@ MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 MINION_DISK_TYPE=pd-standard
 MINION_DISK_SIZE=${MINION_DISK_SIZE:-100GB}
+KUBE_APISERVER_REQUEST_TIMEOUT=300
 
 OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20150505}
@@ -53,9 +54,9 @@ ENABLE_DOCKER_REGISTRY_CACHE=true
 ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none     - No cluster monitoring setup 
-#   influxdb - Heapster, InfluxDB, and Grafana 
-#   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging 
+#   none     - No cluster monitoring setup
+#   influxdb - Heapster, InfluxDB, and Grafana
+#   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
 # Optional: Enable node logging.
