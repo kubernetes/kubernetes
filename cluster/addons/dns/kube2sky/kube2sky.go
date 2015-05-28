@@ -49,7 +49,7 @@ var (
 	argEtcdMutationTimeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
 	argEtcdServer          = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
 	argKubecfgFile         = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes service")
-	argKubeMasterUrl       = flag.String("kube_master_url", "", "Url to reach kubernetes master. Env variables in this flag will be expanded.")
+	argKubeMasterURL       = flag.String("kube_master_url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 )
 
 const (
@@ -334,15 +334,15 @@ func newEtcdClient(etcdServer string) (*etcd.Client, error) {
 	return client, nil
 }
 
-func getKubeMasterUrl() (string, error) {
-	parsedUrl, err := url.Parse(os.ExpandEnv(*argKubeMasterUrl))
+func getKubeMasterURL() (string, error) {
+	parsedURL, err := url.Parse(os.ExpandEnv(*argKubeMasterURL))
 	if err != nil {
-		return "", fmt.Errorf("failed to parse --kube_master_url %s - %v", *argKubeMasterUrl, err)
+		return "", fmt.Errorf("failed to parse --kube_master_url %s - %v", *argKubeMasterURL, err)
 	}
-	if parsedUrl.Scheme == "" || parsedUrl.Host == "" || parsedUrl.Host == ":" {
-		return "", fmt.Errorf("invalid --kube_master_url specified %s", *argKubeMasterUrl)
+	if parsedURL.Scheme == "" || parsedURL.Host == "" || parsedURL.Host == ":" {
+		return "", fmt.Errorf("invalid --kube_master_url specified %s", *argKubeMasterURL)
 	}
-	return parsedUrl.String(), nil
+	return parsedURL.String(), nil
 }
 
 // TODO: evaluate using pkg/client/clientcmd
@@ -352,8 +352,8 @@ func newKubeClient() (*kclient.Client, error) {
 		err       error
 		masterURL string
 	)
-	if *argKubeMasterUrl != "" {
-		masterURL, err = getKubeMasterUrl()
+	if *argKubeMasterURL != "" {
+		masterURL, err = getKubeMasterURL()
 		if err != nil {
 			return nil, err
 		}
