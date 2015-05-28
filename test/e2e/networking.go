@@ -31,6 +31,219 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+func LaunchNetTestPodPerNodeNew(f *Framework, nodes *api.NodeList, name string) []string {
+	podNames := []string{}
+
+	totalPods := len(nodes.Items)
+
+	Expect(totalPods).NotTo(Equal(0))
+
+	for _, node := range nodes.Items {
+		pod, err := f.Client.Pods(f.Namespace.Name).Create(&api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				GenerateName: name + "-",
+				Labels: map[string]string{
+					"name": name,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "webserver",
+						Image: "gcr.io/google_containers/nettest:1.4",
+						Args: []string{
+							"-service=" + name,
+							//peers >= totalPods should be asserted by the container.
+							//the nettest container finds peers by looking up list of svc endpoints.
+							fmt.Sprintf("-peers=%d", totalPods),
+							"-namespace=" + f.Namespace.Name},
+						Ports: []api.ContainerPort{{ContainerPort: 8080}},
+					},
+				},
+				Host:          node.Name,
+				RestartPolicy: api.RestartPolicyNever,
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Logf("Created pod %s on node %s", pod.ObjectMeta.Name, node.Name)
+		podNames = append(podNames, pod.ObjectMeta.Name)
+	}
+	return podNames
+}
+
+var _ = Describe("NetworkingNew", func() {
+	f := NewFramework("nettestnew")
+
+	var svcname = "nettest"
+
+	BeforeEach(func() {
+		//Assert basic external connectivity.
+		//Since this is not really a test of kubernetes in any way, we
+		//leave it as a pre-test assertion, rather than a Ginko test.
+		By("Executing a successful http request from the external internet")
+		resp, err := http.Get("http://google.com")
+		if err != nil {
+			Failf("Unable to connect/talk to the internet: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			Failf("Unexpected error code, expected 200, got, %v (%v)", resp.StatusCode, resp)
+		}
+	})
+
+	// First test because it has no dependencies on variables created later on.
+	It("should provide unchanging, static URL paths for kubernetes api services.", func() {
+		tests := []struct {
+			path string
+		}{
+			{path: "/validate"},
+			{path: "/healthz"},
+			// TODO: test proxy links here
+		}
+		for _, test := range tests {
+			By(fmt.Sprintf("testing: %s", test.path))
+			data, err := f.Client.RESTClient.Get().
+				Namespace(f.Namespace.Name).
+				AbsPath(test.path).
+				DoRaw()
+			if err != nil {
+				Failf("Failed: %v\nBody: %s", err, string(data))
+			}
+		}
+	})
+
+	//Now we can proceed with the test.
+	It("should function for intra-pod communication", func() {
+		if testContext.Provider == "vagrant" {
+			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
+			return
+		}
+
+		By(fmt.Sprintf("Creating a service named %q in namespace %q", svcname, f.Namespace.Name))
+		svc, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name: svcname,
+				Labels: map[string]string{
+					"name": svcname,
+				},
+			},
+			Spec: api.ServiceSpec{
+				Ports: []api.ServicePort{{
+					Protocol:   "TCP",
+					Port:       8080,
+					TargetPort: util.NewIntOrStringFromInt(8080),
+				}},
+				Selector: map[string]string{
+					"name": svcname,
+				},
+			},
+		})
+		if err != nil {
+			Failf("unable to create test service named [%s] %v", svc.Name, err)
+		}
+
+		// Clean up service
+		defer func() {
+			defer GinkgoRecover()
+			By("Cleaning up the service")
+			if err = f.Client.Services(f.Namespace.Name).Delete(svc.Name); err != nil {
+				Failf("unable to delete svc %v: %v", svc.Name, err)
+			}
+		}()
+
+		By("Creating a webserver (pending) pod on each node")
+
+		nodes, err := f.Client.Nodes().List(labels.Everything(), fields.Everything())
+		if err != nil {
+			Failf("Failed to list nodes: %v", err)
+		}
+
+		podNames := LaunchNetTestPodPerNodeNew(f, nodes, svcname)
+
+		// Clean up the pods
+		defer func() {
+			defer GinkgoRecover()
+			By("Cleaning up the webserver pods")
+			for _, podName := range podNames {
+				if err = f.Client.Pods(f.Namespace.Name).Delete(podName, nil); err != nil {
+					Logf("Failed to delete pod %s: %v", podName, err)
+				}
+			}
+		}()
+
+		By("Waiting for the webserver pods to transition to Running state")
+		for _, podName := range podNames {
+			err = f.WaitForPodRunning(podName)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		By("Waiting for connectivity to be verified")
+		passed := false
+
+		//once response OK, evaluate response body for pass/fail.
+		var body []byte
+		getDetails := func() ([]byte, error) {
+			return f.Client.Get().
+				Namespace(f.Namespace.Name).
+				Prefix("proxy").
+				Resource("services").
+				Name(svc.Name).
+				Suffix("read").
+				DoRaw()
+		}
+
+		getStatus := func() ([]byte, error) {
+			return f.Client.Get().
+				Namespace(f.Namespace.Name).
+				Prefix("proxy").
+				Resource("services").
+				Name(svc.Name).
+				Suffix("status").
+				DoRaw()
+		}
+
+		timeout := time.Now().Add(2 * time.Minute)
+		for i := 0; !passed && timeout.After(time.Now()); i++ {
+			time.Sleep(2 * time.Second)
+			Logf("About to make a proxy status call")
+			start := time.Now()
+			body, err = getStatus()
+			Logf("Proxy status call returned in %v", time.Since(start))
+			if err != nil {
+				Logf("Attempt %v: service/pod still starting. (error: '%v')", i, err)
+				continue
+			}
+			// Finally, we pass/fail the test based on if the container's response body, as to wether or not it was able to find peers.
+			switch {
+			case string(body) == "pass":
+				Logf("Passed on attempt %v. Cleaning up.", i)
+				passed = true
+			case string(body) == "running":
+				Logf("Attempt %v: test still running", i)
+			case string(body) == "fail":
+				if body, err = getDetails(); err != nil {
+					Failf("Failed on attempt %v. Cleaning up. Error reading details: %v", i, err)
+				} else {
+					Failf("Failed on attempt %v. Cleaning up. Details:\n%s", i, string(body))
+				}
+			case strings.Contains(string(body), "no endpoints available"):
+				Logf("Attempt %v: waiting on service/endpoints", i)
+			default:
+				Logf("Unexpected response:\n%s", body)
+			}
+		}
+
+		if !passed {
+			if body, err = getDetails(); err != nil {
+				Failf("Timed out. Cleaning up. Error reading details: %v", err)
+			} else {
+				Failf("Timed out. Cleaning up. Details:\n%s", string(body))
+			}
+		}
+		Expect(string(body)).To(Equal("pass"))
+	})
+
+})
+
 func LaunchNetTestPodPerNode(f *Framework, nodes *api.NodeList, name string) []string {
 	podNames := []string{}
 
@@ -50,7 +263,7 @@ func LaunchNetTestPodPerNode(f *Framework, nodes *api.NodeList, name string) []s
 				Containers: []api.Container{
 					{
 						Name:  "webserver",
-						Image: "gcr.io/google_containers/nettest:1.3",
+						Image: "gcr.io/google_containers/nettest:1.4",
 						Args: []string{
 							"-service=" + name,
 							//peers >= totalPods should be asserted by the container.
@@ -112,9 +325,7 @@ var _ = Describe("Networking", func() {
 	})
 
 	//Now we can proceed with the test.
-	It("should function for intra-pod communication", func(done Done) {
-		defer close(done)
-
+	It("should function for intra-pod communication", func() {
 		if testContext.Provider == "vagrant" {
 			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 			return
@@ -203,7 +414,8 @@ var _ = Describe("Networking", func() {
 				DoRaw()
 		}
 
-		for i := 0; !passed; i++ { // Timeout will keep us from going forever.
+		timeout := time.Now().Add(2 * time.Minute)
+		for i := 0; !passed && timeout.After(time.Now()); i++ {
 			time.Sleep(2 * time.Second)
 			Logf("About to make a proxy status call")
 			start := time.Now()
@@ -241,6 +453,6 @@ var _ = Describe("Networking", func() {
 			}
 		}
 		Expect(string(body)).To(Equal("pass"))
-	}, 120)
+	})
 
 })
