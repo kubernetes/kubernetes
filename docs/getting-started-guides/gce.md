@@ -67,7 +67,7 @@ potential issues with client/server version skew.
 ### Getting started with your cluster
 See [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
 
-For more complete applications, please look in the [examples directory](../../examples)
+For more complete applications, please look in the [examples directory](../../examples).
 
 ### Tearing down the cluster
 To remove/delete/teardown the cluster, use the `kube-down.sh` script.

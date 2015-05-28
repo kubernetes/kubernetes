@@ -37,90 +37,10 @@ You can then use the `cluster/kube-*.sh` scripts to manage your azure cluster, s
 The script above will start (by default) a single master VM along with 4 worker VMs.  You
 can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
 
-### Running a container (simple version)
+### Getting started with your cluster
+See [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
 
-Once you have your instances up and running, the `hack/build-go.sh` script sets up
-your Go workspace and builds the Go components.
-
-The `kubectl.sh` line below spins up two containers running
-[Nginx](http://nginx.org/en/) running on port 80:
-
-```bash
-cluster/kubectl.sh run my-nginx --image=nginx --replicas=2 --port=80
-```
-
-To stop the containers:
-
-```bash
-cluster/kubectl.sh stop rc my-nginx
-```
-
-To delete the containers:
-
-```bash
-cluster/kubectl.sh delete rc my-nginx
-```
-
-### Running a container (more complete version)
-
-
-You can create a pod like this:
-
-
-```
-cd kubernetes
-cluster/kubectl.sh create -f docs/getting-started-guides/pod.json
-```
-
-Where pod.json contains something like:
-
-```
-{
-  "id": "php",
-  "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "php",
-      "containers": [{
-        "name": "nginx",
-        "image": "nginx",
-        "ports": [{
-          "containerPort": 80,
-          "hostPort": 8080
-        }],
-        "livenessProbe": {
-          "enabled": true,
-          "type": "http",
-          "initialDelaySeconds": 30,
-          "httpGet": {
-            "path": "/index.html",
-            "port": 8080
-          }
-        }
-      }]
-    }
-  },
-  "labels": {
-    "name": "foo"
-  }
-}
-```
-
-You can see your cluster's pods:
-
-```
-cluster/kubectl.sh get pods
-```
-
-and delete the pod you just created:
-
-```
-cluster/kubectl.sh delete pods php
-```
-
-Look in `api/examples/` for more examples
+For more complete applications, please look in the [examples directory](../../examples).
 
 ### Tearing down the cluster
 ```
