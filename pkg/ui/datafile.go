@@ -1592,7 +1592,7 @@ func www_app_assets_css_app_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37661, mode: os.FileMode(420), modTime: time.Unix(1432831810, 0)}
+	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37661, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3526,7 +3526,7 @@ app.controller('ListPodsCtrl', [
 app.controller('ListReplicationControllersCtrl', [
   '$scope',
   '$routeParams',
-  'k8sApi',
+  'k8sv1Beta3Api',
   '$location',
   function($scope, $routeParams, k8sApi, $location) {
     'use strict';
@@ -3582,27 +3582,26 @@ app.controller('ListReplicationControllersCtrl', [
 
           var _name = '', _image = '';
 
-          if (replicationController.desiredState.podTemplate.desiredState.manifest.containers) {
-            Object.keys(replicationController.desiredState.podTemplate.desiredState.manifest.containers)
+          if (replicationController.spec.template.spec.containers) {
+            Object.keys(replicationController.spec.template.spec.containers)
                 .forEach(function(key) {
-                  _name += replicationController.desiredState.podTemplate.desiredState.manifest.containers[key].name;
-                  _image += replicationController.desiredState.podTemplate.desiredState.manifest.containers[key].image;
+                  _name += replicationController.spec.template.spec.containers[key].name;
+                  _image += replicationController.spec.template.spec.containers[key].image;
                 });
           }
 
-          var _name_selector = '';
+          var _selectors = '';
 
-          if (replicationController.desiredState.replicaSelector) {
-            Object.keys(replicationController.desiredState.replicaSelector)
-                .forEach(function(key) { _name_selector += replicationController.desiredState.replicaSelector[key]; });
+          if (replicationController.spec.selector) {
+            _selectors = _.map(replicationController.spec.selector, function(v, k) { return k + '=' + v }).join(', ');
           }
 
           $scope.content.push({
-            controller: replicationController.id,
+            controller: replicationController.metadata.name,
             containers: _name,
             images: _image,
-            selector: _name_selector,
-            replicas: replicationController.currentState.replicas
+            selector: _selectors,
+            replicas: replicationController.status.replicas
           });
 
         });
@@ -3816,7 +3815,7 @@ ReplicationController.prototype.handleError = function(data, status, headers, co
 app.controller('ReplicationControllerCtrl', [
   '$scope',
   '$routeParams',
-  'k8sApi',
+  'k8sv1Beta3Api',
   function($scope, $routeParams, k8sApi) {
     $scope.controller = new ReplicationController();
     $scope.controller.k8sApi = k8sApi;
@@ -3824,6 +3823,7 @@ app.controller('ReplicationControllerCtrl', [
     $scope.controller.getData($routeParams.replicationControllerId);
 
     $scope.doTheBack = function() { window.history.back(); };
+    $scope.getSelectorUrlFragment = function(sel){ return _.map(sel, function(v, k) { return k + '=' + v }).join(','); };
 
   }
 ]);
@@ -4678,7 +4678,7 @@ func www_app_assets_js_app_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 93291, mode: os.FileMode(420), modTime: time.Unix(1432831807, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 93220, mode: os.FileMode(420), modTime: time.Unix(1432833385, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4720,7 +4720,7 @@ func www_app_assets_js_base_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(420), modTime: time.Unix(1432831806, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(420), modTime: time.Unix(1432833385, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4737,7 +4737,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_18px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4758,7 +4758,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_24px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4775,7 +4775,7 @@ func www_app_components_dashboard_img_icons_ic_close_18px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4792,7 +4792,7 @@ func www_app_components_dashboard_img_icons_ic_close_24px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4874,7 +4874,7 @@ func www_app_components_dashboard_manifest_json() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(420), modTime: time.Unix(1432831810, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4891,7 +4891,7 @@ func www_app_components_dashboard_pages_footer_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1432831810, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4934,7 +4934,7 @@ func www_app_components_dashboard_pages_header_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(420), modTime: time.Unix(1432831810, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4958,7 +4958,7 @@ func www_app_components_dashboard_pages_home_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1432831810, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4975,7 +4975,7 @@ func www_app_components_dashboard_protractor_smoke_spec_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/protractor/smoke.spec.js", size: 2616, mode: os.FileMode(420), modTime: time.Unix(1432831810, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/protractor/smoke.spec.js", size: 2616, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4992,7 +4992,7 @@ func www_app_components_dashboard_test_controllers_header_spec_js() (*asset, err
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/test/controllers/header.spec.js", size: 1293, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/test/controllers/header.spec.js", size: 1293, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5043,7 +5043,7 @@ func www_app_components_dashboard_views_groups_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1432831810, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5067,7 +5067,7 @@ func www_app_components_dashboard_views_listevents_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1432831810, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5091,7 +5091,7 @@ func www_app_components_dashboard_views_listminions_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(420), modTime: time.Unix(1432831810, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5115,7 +5115,7 @@ func www_app_components_dashboard_views_listpods_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(420), modTime: time.Unix(1432831810, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5191,7 +5191,7 @@ func www_app_components_dashboard_views_listpodscards_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5225,7 +5225,7 @@ func www_app_components_dashboard_views_listpodsvisualizer_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5249,7 +5249,7 @@ func www_app_components_dashboard_views_listreplicationcontrollers_html() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5273,7 +5273,7 @@ func www_app_components_dashboard_views_listservices_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5379,7 +5379,7 @@ func www_app_components_dashboard_views_node_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 2307, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 2307, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5405,7 +5405,7 @@ func www_app_components_dashboard_views_partials_cadvisor_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 443, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 443, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5442,7 +5442,7 @@ func www_app_components_dashboard_views_partials_groupbox_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5501,7 +5501,7 @@ func www_app_components_dashboard_views_partials_groupitem_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2213, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2213, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5551,7 +5551,7 @@ func www_app_components_dashboard_views_partials_podtilesbyname_html() (*asset, 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5601,7 +5601,7 @@ func www_app_components_dashboard_views_partials_podtilesbyserver_html() (*asset
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5732,7 +5732,7 @@ func www_app_components_dashboard_views_pod_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 4149, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 4149, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5749,37 +5749,46 @@ var _www_app_components_dashboard_views_replication_html = []byte(`<div dashboar
 
       <div class="heading">
         <span class="label">Replication Controller: </span>
-        <span>{{replicationController.id}}</span>
+        <span>{{replicationController.metadata.name}}</span>
       </div>
 
 
-      <table>
+      <table class="align-top">
         <tbody>
           <tr>
             <td class="name">Created</td>
             <td class="value">
-              {{replicationController.creationTimestamp | date:'medium'}}
+              {{replicationController.metadata.creationTimestamp | date:'medium'}}
             </td>
           </tr>
 
           <tr>
             <td class="name">Desired Replicas</td>
             <td class="value">
-              {{replicationController.desiredState.replicas}}
+              {{replicationController.spec.replicas}}
             </td>
           </tr>
 
           <tr>
             <td class="name">Current Replicas</td>
             <td class="value">
-              {{replicationController.currentState.replicas}}
+              {{replicationController.status.replicas}}
+            </td>
+          </tr>
+
+          <tr ng-show="replicationController.spec.selector">
+            <td class="name">Selector</td>
+            <td class="value">
+              <span ng-repeat="(label, value) in replicationController.spec.selector">
+                {{label}}={{value}}{{$last ? '' : ', '}}
+              </span>
             </td>
           </tr>
 
           <tr>
             <td class="name">Labels</td>
             <td class="value">
-              <div ng-repeat="(label, value) in replicationController.labels">
+              <div ng-repeat="(label, value) in replicationController.metadata.labels">
                   {{label}}: {{value}}
               </div>
             </td>
@@ -5788,9 +5797,13 @@ var _www_app_components_dashboard_views_replication_html = []byte(`<div dashboar
           <tr>
             <td class="name">Related Pods</td>
             <td class="value">
-              <div ng-repeat="(label, value) in replicationController.desiredState.replicaSelector">
-                  <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=pod">{{label}}: {{value}}</a>
-                </div>
+              <div ng-show="replicationController.spec.selector && Object.keys(replicationController.spec.selector).length > 1">
+                <a ng-href="#/dashboard/groups/type/selector/{{getSelectorUrlFragment(replicationController.spec.selector)}},type=pod">{{getSelectorUrlFragment(replicationController.spec.selector)}}</a>
+              </div>
+
+              <div ng-repeat="(label, value) in replicationController.spec.selector">
+                <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=pod">{{label}}={{value}}</a>
+              </div>
             </td>
           </tr>
 
@@ -5798,8 +5811,13 @@ var _www_app_components_dashboard_views_replication_html = []byte(`<div dashboar
           <tr>
             <td class="name">Related Services</td>
             <td class="value">
-              <div ng-repeat="(label, value) in replicationController.desiredState.replicaSelector">
-                  <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=service">{{label}}: {{value}}</a>
+              <div ng-show="replicationController.spec.selector && Object.keys(replicationController.spec.selector).length > 1">
+
+                <a ng-href="#/dashboard/groups/type/selector/{{getSelectorUrlFragment(replicationController.spec.selector)}},type=pod">{{getSelectorUrlFragment(replicationController.spec.selector)}}</a>
+              </div>
+
+              <div ng-repeat="(label, value) in replicationController.spec.selector">
+                  <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=service">{{label}}={{value}}</a>
                 </div>
             </td>
           </tr>
@@ -5831,7 +5849,7 @@ func www_app_components_dashboard_views_replication_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 2165, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 3207, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5962,7 +5980,7 @@ func www_app_components_dashboard_views_service_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 3539, mode: os.FileMode(420), modTime: time.Unix(1432831811, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 3539, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
