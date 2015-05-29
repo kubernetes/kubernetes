@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -216,7 +217,7 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		RootDirectory:      s.RootDirectory,
 		// ConfigFile: ""
 		// ManifestURL: ""
-		// FileCheckFrequency
+		FileCheckFrequency: s.FileCheckFrequency,
 		// HTTPCheckFrequency
 		PodInfraContainerImage:  s.PodInfraContainerImage,
 		SyncFrequency:           s.SyncFrequency,
@@ -360,6 +361,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 	//TODO(jdef) either configure Watch here with something useful, or else
 	// get rid of it from executor.Config
 	kubeletFinished := make(chan struct{})
+	staticPodsConfigPath := filepath.Join(kc.RootDirectory, "static-pods")
 	exec := executor.New(executor.Config{
 		Kubelet:         klet,
 		Updates:         updates,
@@ -379,6 +381,12 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		PodStatusFunc: func(_ executor.KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
 			return klet.GetRuntime().GetPodStatus(pod)
 		},
+		StaticPodsConfigPath: staticPodsConfigPath,
+	})
+
+	fileSourceUpdates := pc.Channel(kubelet.FileSource)
+	go exec.InitializeStaticPodsSource(func() {
+		kconfig.NewSourceFile(staticPodsConfigPath, kc.Hostname, kc.FileCheckFrequency, fileSourceUpdates)
 	})
 
 	k := &kubeletExecutor{
