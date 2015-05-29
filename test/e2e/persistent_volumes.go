@@ -92,7 +92,7 @@ var _ = Describe("persistentVolumes", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// allow the recycler a chance to catch up
-		time.Sleep(20 * time.Second)
+		time.Sleep(120 * time.Second)
 
 		pv, err = c.PersistentVolumes().Get(pv.Name)
 		Expect(err).NotTo(HaveOccurred())
@@ -100,7 +100,9 @@ var _ = Describe("persistentVolumes", func() {
 			Failf("Expected PersistentVolume to be unbound, but found non-nil ClaimRef: %+v", pv)
 		}
 
-		// TODO: run a pod to get the contents of the NFS volume to confirm it is scrubbed clean
+		// Now check that index.html from the NFS server was really removed
+		checkpod := makeCheckPod(ns, serverIP)
+		testContainerOutputInNamespace("the volume was scrubbed", c, checkpod, []string{"index.html does not exist",}, ns)
 
 	})
 })
@@ -150,4 +152,46 @@ func makePersistentVolumeClaim(ns string) *api.PersistentVolumeClaim {
 			},
 		},
 	}
+}
+
+func makeCheckPod(ns string, nfsserver string) *api.Pod {
+	// Prepare pod that mounts the NFS volume again and
+	// checks that /mnt/index.html was scrubbed there
+	return &api.Pod{
+		TypeMeta: api.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1beta3",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: "checker-" + string(util.NewUUID()),
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:    "checker-" + string(util.NewUUID()),
+					Image:   "busybox",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "test -e /mnt/index.html || echo 'index.html does not exist'"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      "nfs-volume",
+							MountPath: "/mnt",
+						},
+					},
+				},
+			},
+			Volumes: []api.Volume{
+				{
+					Name: "nfs-volume",
+					VolumeSource: api.VolumeSource{
+						NFS: &api.NFSVolumeSource{
+							Server: nfsserver,
+							Path:   "/",
+						},
+					},
+				},
+			},
+		},
+	}
+
 }
