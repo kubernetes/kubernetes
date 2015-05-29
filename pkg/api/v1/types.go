@@ -659,8 +659,8 @@ type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
 	// have a unique name.
 	Name string `json:"name" description:"name of the container; must be a DNS_LABEL and unique within the pod; cannot be updated"`
-	// Required.
-	Image string `json:"image" description:"Docker image name"`
+	// Optional.
+	Image string `json:"image,omitempty" description:"Docker image name"`
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
