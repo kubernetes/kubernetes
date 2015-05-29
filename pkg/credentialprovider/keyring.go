@@ -18,7 +18,9 @@ package credentialprovider
 
 import (
 	"encoding/json"
+	"net"
 	"net/url"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -118,6 +120,79 @@ func isDefaultRegistryMatch(image string) bool {
 	return !strings.ContainsAny(parts[0], ".:")
 }
 
+// url.Parse require a scheme, but ours don't have schemes.  Adding a
+// scheme to make url.Parse happy, then clear out the resulting scheme.
+func parseSchemelessUrl(schemelessUrl string) (*url.URL, error) {
+	parsed, err := url.Parse("https://" + schemelessUrl)
+	if err != nil {
+		return nil, err
+	}
+	// clear out the resulting scheme
+	parsed.Scheme = ""
+	return parsed, nil
+}
+
+// split the host name into parts, as well as the port
+func splitUrl(url *url.URL) (parts []string, port string) {
+	host, port, err := net.SplitHostPort(url.Host)
+	if err != nil {
+		// could not parse port
+		host, port = url.Host, ""
+	}
+	return strings.Split(host, "."), port
+}
+
+// overloaded version of urlsMatch, operating on strings instead of URLs.
+func urlsMatchStr(glob string, target string) (bool, error) {
+	globUrl, err := parseSchemelessUrl(glob)
+	if err != nil {
+		return false, err
+	}
+	targetUrl, err := parseSchemelessUrl(target)
+	if err != nil {
+		return false, err
+	}
+	return urlsMatch(globUrl, targetUrl)
+}
+
+// check whether the given target url matches the glob url, which may have
+// glob wild cards in the host name.
+//
+// Examples:
+//    globUrl=*.docker.io, targetUrl=blah.docker.io => match
+//    globUrl=*.docker.io, targetUrl=not.right.io   => no match
+//
+// Note that we don't support wildcards in ports and paths yet.
+func urlsMatch(globUrl *url.URL, targetUrl *url.URL) (bool, error) {
+	globUrlParts, globPort := splitUrl(globUrl)
+	targetUrlParts, targetPort := splitUrl(targetUrl)
+	if globPort != targetPort {
+		// port doesn't match
+		return false, nil
+	}
+	if len(globUrlParts) != len(targetUrlParts) {
+		// host name does not have the same number of parts
+		return false, nil
+	}
+	if !strings.HasPrefix(targetUrl.Path, globUrl.Path) {
+		// the path of the credential must be a prefix
+		return false, nil
+	}
+	for k, globUrlPart := range globUrlParts {
+		targetUrlPart := targetUrlParts[k]
+		matched, err := filepath.Match(globUrlPart, targetUrlPart)
+		if err != nil {
+			return false, err
+		}
+		if !matched {
+			// glob mismatch for some part
+			return false, nil
+		}
+	}
+	// everything matches
+	return true, nil
+}
+
 // Lookup implements the DockerKeyring method for fetching credentials based on image name.
 // Multiple credentials may be returned if there are multiple potentially valid credentials
 // available.  This allows for rotation.
@@ -125,9 +200,9 @@ func (dk *BasicDockerKeyring) Lookup(image string) ([]docker.AuthConfiguration, 
 	// range over the index as iterating over a map does not provide a predictable ordering
 	ret := []docker.AuthConfiguration{}
 	for _, k := range dk.index {
-		// NOTE: prefix is a sufficient check because while scheme is allowed,
-		// it is stripped as part of 'Add'
-		if !strings.HasPrefix(image, k) {
+		// both k and image are schemeless URLs because even though schemes are allowed
+		// in the credential configurations, we remove them in Add.
+		if matched, _ := urlsMatchStr(k, image); !matched {
 			continue
 		}
 
