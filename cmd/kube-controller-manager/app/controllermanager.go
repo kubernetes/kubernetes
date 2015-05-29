@@ -236,7 +236,7 @@ func (s *CMServer) Run(_ []string) error {
 	pvclaimBinder.Run()
 	pvRecycler, err := volumeclaimbinder.NewPersistentVolumeRecycler(kubeClient, s.PVClaimBinderSyncPeriod, ProbeRecyclableVolumePlugins())
 	if err != nil {
-		glog.Errorf("Failed to start persistent volume recycler: %+v", err)
+		glog.Fatalf("Failed to start persistent volume recycler: %+v", err)
 	}
 	pvRecycler.Run()
 
