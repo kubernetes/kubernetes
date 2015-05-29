@@ -28,6 +28,10 @@ source "$KUBE_ROOT/build/common.sh"
 KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
 
 kube::build::verify_prereqs
+
+kube::build::build_ui_image
+kube::build::run_build_ui_command hack/ui/build-www.sh
+
 kube::build::build_image
 kube::build::run_build_command hack/build-cross.sh
 
