@@ -17,7 +17,14 @@
 import re
 
 import salt.exceptions
-import salt.utils.ipaddr as ipaddr
+
+# Fix for https://github.com/GoogleCloudPlatform/kubernetes/issues/8114
+# We need to support both Salt v2014.01.13 and 2015.4.0, so try both versions'
+# import location for the ipaddr module.
+try:
+    import salt.utils.ipaddr as ipaddr
+except ImportError:
+    import salt.ext.ipaddr as ipaddr
 
 def ensure(name, cidr, mtu=1460):
     '''

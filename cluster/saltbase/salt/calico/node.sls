@@ -21,7 +21,7 @@ calico-network-plugin:
 
 calico-node:
   cmd.run:
-    - name: /home/vagrant/calicoctl node --ip={{ grains.node_ip }} --node-image=calico/node:v0.3.2
+    - name: /home/vagrant/calicoctl node --ip={{ grains.node_ip }} --node-image=calico/node:v0.4.2
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
     - require:
@@ -33,7 +33,7 @@ calico-node:
 
 calico-ip-pool-reset:
   cmd.run:
-    - name: /home/vagrant/calicoctl ipv4 pool remove 192.160.0.0/16
+    - name: /home/vagrant/calicoctl pool remove 192.160.0.0/16
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
     - require:
@@ -43,7 +43,7 @@ calico-ip-pool-reset:
 
 calico-ip-pool:
   cmd.run:
-    - name: /home/vagrant/calicoctl ipv4 pool add {{ grains['cbr-cidr'] }}
+    - name: /home/vagrant/calicoctl pool add {{ grains['cbr-cidr'] }}
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
     - require:
