@@ -102,7 +102,7 @@ var _ = Describe("persistentVolumes", func() {
 
 		// Now check that index.html from the NFS server was really removed
 		checkpod := makeCheckPod(ns, serverIP)
-		testContainerOutputInNamespace("the volume was scrubbed", c, checkpod, []string{"index.html does not exist",}, ns)
+		testContainerOutputInNamespace("the volume was scrubbed", c, checkpod, []string{"index.html does not exist"}, ns)
 
 	})
 })

@@ -98,7 +98,7 @@ func (recycler *PersistentVolumeRecycler) reclaimVolume(pv *api.PersistentVolume
 		// both handleRecycle and handleDelete block until completion
 		// TODO: allow parallel recycling operations to increase throughput
 
-//		var err error
+		//		var err error
 		switch pv.Spec.PersistentVolumeReclaimPolicy {
 		case api.PersistentVolumeReclaimRecycle:
 			err = recycler.handleRecycle(pv)
