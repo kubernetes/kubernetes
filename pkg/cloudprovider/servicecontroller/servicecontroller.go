@@ -366,6 +366,16 @@ func (s *serviceCache) ListKeys() []string {
 	return keys
 }
 
+// GetByKey returns the value stored in the serviceMap under the given key
+func (s *serviceCache) GetByKey(key string) (interface{}, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if v, ok := s.serviceMap[key]; ok {
+		return v, true, nil
+	}
+	return nil, false, nil
+}
+
 // ListKeys implements the interface required by DeltaFIFO to list the keys we
 // already know about.
 func (s *serviceCache) allServices() []*cachedService {
