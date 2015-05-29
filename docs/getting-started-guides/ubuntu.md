@@ -1,4 +1,4 @@
-# Kubernetes deployed on ubuntu nodes
+# Kubernetes Deployment On Bare-metal Ubuntu Nodes
 
 This document describes how to deploy kubernetes on ubuntu nodes, including 1 master node and 3 minion nodes, and people uses this approach can scale to **any number of minion nodes** by changing some settings with ease. The original idea was heavily inspired by @jainvipin 's ubuntu single node work, which has been merge into this document.
 

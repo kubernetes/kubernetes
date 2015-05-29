@@ -102,30 +102,18 @@ function verify-prereqs {
   fi
 }
 
-# Check prereqs on every k8s node
-function check-prereqs {
-  PATH=$PATH:/opt/bin/
-  # use ubuntu
-  if ! $(grep Ubuntu /etc/lsb-release > /dev/null 2>&1)
-  then
-      echo "warning: not detecting a ubuntu system"
-      exit 1
+# Install handler for signal trap
+function trap-add {
+  local handler="$1"
+  local signal="${2-EXIT}"
+  local cur
+
+  cur="$(eval "sh -c 'echo \$3' -- $(trap -p ${signal})")"
+  if [[ -n "${cur}" ]]; then
+    handler="${cur}; ${handler}"
   fi
 
-  # check etcd
-  if ! $(which etcd > /dev/null)
-  then
-      echo "warning: etcd binary is not found in the PATH: $PATH"
-      exit 1
-  fi
-
-  # detect the etcd version, we support only etcd 2.0.
-  etcdVersion=$(/opt/bin/etcd --version | awk '{print $3}')
-
-  if [ "$etcdVersion" != "2.0.0" ]; then
-    echo "We only support 2.0.0 version of etcd"
-    exit 1
-  fi
+  trap "${handler}" ${signal}
 }
 
 function verify-cluster {
