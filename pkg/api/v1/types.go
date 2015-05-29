@@ -280,11 +280,33 @@ type PersistentVolumeSpec struct {
 	// ClaimRef is expected to be non-nil when bound.
 	// claim.VolumeName is the authoritative bind between PV and PVC.
 	ClaimRef *ObjectReference `json:"claimRef,omitempty" description:"when bound, a reference to the bound claim"`
+	// Optional: what happens to a persistent volume when released from its claim.
+	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" description:"what happens to a volume when released from its claim; Valid options are Retain (default) and Recycle.  Recyling must be supported by the volume plugin underlying this persistent volume."`
 }
+
+// PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
+type PersistentVolumeReclaimPolicy string
+
+const (
+	// PersistentVolumeReclaimRecycle means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim.
+	// The volume plugin must support Recycling.
+	PersistentVolumeReclaimRecycle PersistentVolumeReclaimPolicy = "Recycle"
+	// PersistentVolumeReclaimDelete means the volume will be deleted from Kubernetes on release from its claim.
+	// The volume plugin must support Deletion.
+	// TODO: implement w/ DeletableVolumePlugin
+	// PersistentVolumeReclaimDelete PersistentVolumeReclaimPolicy = "Delete"
+	// PersistentVolumeReclaimRetain means the volume will left in its current phase (Released) for manual reclamation by the administrator.
+	// The default policy is Retain.
+	PersistentVolumeReclaimRetain PersistentVolumeReclaimPolicy = "Retain"
+)
 
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim
 	Phase PersistentVolumePhase `json:"phase,omitempty" description:"the current phase of a persistent volume"`
+	// A human-readable message indicating details about why the volume is in this state.
+	Message string `json:"message,omitempty" description:"human-readable message indicating details about why the volume is in this state"`
+	// Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI
+	Reason string `json:"reason,omitempty" description:"(brief) reason the volume is not is not available"`
 }
 
 type PersistentVolumeList struct {
@@ -348,12 +370,16 @@ const (
 	// used for PersistentVolumes that are not available
 	VolumePending PersistentVolumePhase = "Pending"
 	// used for PersistentVolumes that are not yet bound
+	// Available volumes are held by the binder and matched to PersistentVolumeClaims
 	VolumeAvailable PersistentVolumePhase = "Available"
 	// used for PersistentVolumes that are bound
 	VolumeBound PersistentVolumePhase = "Bound"
 	// used for PersistentVolumes where the bound PersistentVolumeClaim was deleted
 	// released volumes must be recycled before becoming available again
+	// this phase is used by the persistent volume claim binder to signal to another process to reclaim the resource
 	VolumeReleased PersistentVolumePhase = "Released"
+	// used for PersistentVolumes that failed to be correctly recycled or deleted after being released from a claim
+	VolumeFailed PersistentVolumePhase = "Failed"
 )
 
 type PersistentVolumeClaimPhase string

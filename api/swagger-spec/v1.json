@@ -10603,6 +10603,10 @@
      "claimRef": {
       "$ref": "v1.ObjectReference",
       "description": "when bound, a reference to the bound claim"
+     },
+     "persistentVolumeReclaimPolicy": {
+      "type": "string",
+      "description": "persistentVolumeReclaimPolicy is what happens to a volume when released from its claim; Default is Retain."
      }
     }
    },
@@ -10807,6 +10811,14 @@
      "phase": {
       "type": "string",
       "description": "the current phase of a persistent volume"
+     },
+     "message": {
+      "type": "string",
+      "description": "human-readable message indicating details about why the volume is in this state"
+     },
+     "reason": {
+      "type": "string",
+      "description": "(brief) reason the volume is not is not available, such as failed recycling"
      }
     }
    },
