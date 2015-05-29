@@ -15,6 +15,7 @@
           "protocol":"TCP"
         }
       ],
+      "createExternalLoadBalancer": true,
       "selector":{
          "name":"frontend"
       }

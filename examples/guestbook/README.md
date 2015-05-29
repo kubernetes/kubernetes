@@ -411,6 +411,7 @@ The service is described in the file `examples/guestbook/frontend-service.json`:
           "protocol":"TCP"
         }
       ],
+      "createExternalLoadBalancer": true,
       "publicIPs":["10.11.22.33"],
       "selector":{
          "name":"frontend"
