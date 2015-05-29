@@ -673,7 +673,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	current := 0
 	same := 0
 
-	By(fmt.Sprintf("Creating replication controller %s", name))
+	By(fmt.Sprintf("%v Creating replication controller %s", time.Now(), name))
 	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -703,7 +703,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
 	}
-	Logf("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, ns, rc.Spec.Replicas)
+	Logf("%v Created replication controller with name: %v, namespace: %v, replica count: %v", time.Now(), rc.Name, ns, rc.Spec.Replicas)
 
 	By(fmt.Sprintf("Making sure all %d replicas of rc %s in namespace %s exist", replicas, name, ns))
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
@@ -714,7 +714,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	current = len(pods.Items)
 	failCount := 5
 	for same < failCount && current < replicas {
-		Logf("Controller %s: Found %d pods out of %d", name, current, replicas)
+		Logf("%v Controller %s: Found %d pods out of %d", time.Now(), name, current, replicas)
 		if last < current {
 			same = 0
 		} else if last == current {
@@ -738,9 +738,9 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	if current != replicas {
 		return fmt.Errorf("Controller %s: Only found %d replicas out of %d", name, current, replicas)
 	}
-	Logf("Controller %s in ns %s: Found %d pods out of %d", name, ns, current, replicas)
+	Logf("%v Controller %s in ns %s: Found %d pods out of %d", time.Now(), name, ns, current, replicas)
 
-	By(fmt.Sprintf("Waiting for all %d replicas to be running with a max container failures of %d", replicas, maxContainerFailures))
+	By(fmt.Sprintf("%v Waiting for all %d replicas to be running with a max container failures of %d", time.Now(), replicas, maxContainerFailures))
 	same = 0
 	last = 0
 	failCount = 10

@@ -22,6 +22,8 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
+	"github.com/golang/glog"
 )
 
 // NewDeltaFIFO returns a Store which can be used process changes to items.
@@ -75,6 +77,13 @@ func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjectKeys K
 // A note on threading: If you call Pop() in parallel from multiple
 // threads, you could end up with multiple threads processing slightly
 // different versions of the same object.
+//
+// A note on the KeyLister used by the DeltaFIFO: It's main purpose is
+// to list keys that are "known", for the puspose of figuring out which
+// items have been deleted when Replace() is called. If the given KeyLister
+// also satisfies the KeyGetter interface, the deleted objet will be
+// included in the DeleteFinalStateUnknown markers. These objects
+// could be stale.
 //
 // You may provide a function to compress deltas (e.g., represent a
 // series of Updates as a single Update).
@@ -334,7 +343,21 @@ func (f *DeltaFIFO) Replace(list []interface{}) error {
 				continue
 			}
 		}
-		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k}); err != nil {
+		var deletedObj interface{}
+		if keyGetter, ok := f.knownObjectKeys.(KeyGetter); ok {
+			var exists bool
+			var err error
+			deletedObj, exists, err = keyGetter.GetByKey(k)
+			if err != nil || !exists {
+				deletedObj = nil
+				if err != nil {
+					glog.Errorf("Unexpected error %v during lookup of key %v, placing DeleteFinalStateUnknown marker without object", err, k)
+				} else {
+					glog.Infof("Key %v does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", k)
+				}
+			}
+		}
+		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
 			return err
 		}
 	}
@@ -346,12 +369,9 @@ type KeyLister interface {
 	ListKeys() []string
 }
 
-// KeyListerFunc adapts a raw function to be a KeyLister.
-type KeyListerFunc func() []string
-
-// ListKeys just calls kl.
-func (kl KeyListerFunc) ListKeys() []string {
-	return kl()
+// A KeyGetter is anything that knows how to get the value stored under a given key.
+type KeyGetter interface {
+	GetByKey(key string) (interface{}, bool, error)
 }
 
 // DeltaCompressor is an algorithm that removes redundant changes.
@@ -427,8 +447,10 @@ func copyDeltas(d Deltas) Deltas {
 }
 
 // DeletedFinalStateUnknown is placed into a DeltaFIFO in the case where
-// an object was deleted but the watch deletion event was was missed.
-// In this case we don't know the final "resting" state of the object.
+// an object was deleted but the watch deletion event was missed. In this
+// case we don't know the final "resting" state of the object, so there's
+// a chance the included `Obj` is stale.
 type DeletedFinalStateUnknown struct {
 	Key string
+	Obj interface{}
 }
