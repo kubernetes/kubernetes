@@ -340,6 +340,8 @@ func New(c *Config) *Master {
 		serviceReadWriteIP:  serviceReadWriteIP,
 		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
 		serviceReadWritePort: 443,
+		
+		installSSHKey: c.InstallSSHKey,
 	}
 
 	var handlerContainer *restful.Container
@@ -827,7 +829,9 @@ func (m *Master) generateSSHKey(user, keyfile string) error {
 	if err != nil {
 		return err
 	}
-	ioutil.WriteFile(keyfile, util.EncodePrivateKey(private), 0600)
+	if err := ioutil.WriteFile(keyfile, util.EncodePrivateKey(private), 0600); err != nil {
+		return err
+	}
 	data, err := util.EncodeSSHKey(public)
 	if err != nil {
 		return err

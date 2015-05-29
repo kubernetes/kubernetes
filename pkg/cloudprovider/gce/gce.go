@@ -17,6 +17,7 @@ limitations under the License.
 package gce_cloud
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -484,6 +485,7 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 	if err != nil {
 		return err
 	}
+	keyData = bytes.TrimSpace(keyData)
 	found := false
 	for _, item := range project.CommonInstanceMetadata.Items {
 		if item.Key == "sshKeys" {
