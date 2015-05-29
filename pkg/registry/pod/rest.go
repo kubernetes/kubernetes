@@ -204,7 +204,8 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, nil
 	}
-	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
+	// TODO: We need the SSH transport here.
+	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -247,7 +248,8 @@ func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, c
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, fmt.Errorf("pod %s does not have a host assigned", name)
 	}
-	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
+	// TODO: We need the SSH transport here.
+	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -289,7 +291,7 @@ func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGe
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
-	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
+	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost, nil)
 	if err != nil {
 		return nil, nil, err
 	}

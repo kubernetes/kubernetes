@@ -49,6 +49,8 @@ type ProxyHandler struct {
 	codec                  runtime.Codec
 	context                api.RequestContextMapper
 	apiRequestInfoResolver *APIRequestInfoResolver
+
+	dial func(network, addr string) (net.Conn, error)
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -105,7 +107,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	location, transport, err := redirector.ResourceLocation(ctx, id)
+	location, transport, err := redirector.ResourceLocation(ctx, id, r.dial)
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
 		status := errToAPIStatus(err)

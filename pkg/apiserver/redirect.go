@@ -79,7 +79,8 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	location, _, err := redirector.ResourceLocation(ctx, id)
+	// TODO: I think we need to use the SSH tunnels here too.
+	location, _, err := redirector.ResourceLocation(ctx, id, nil)
 	if err != nil {
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)

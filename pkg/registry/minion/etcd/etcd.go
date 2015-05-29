@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"net"
 	"net/http"
 	"net/url"
 
@@ -82,6 +83,6 @@ func NewStorage(h tools.EtcdHelper, connection client.ConnectionInfoGetter) (*RE
 var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified minion.
-func (r *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	return minion.ResourceLocation(r, r.connection, ctx, id)
+func (r *REST) ResourceLocation(ctx api.Context, id string, dial func(net, addr string) (net.Conn, error)) (*url.URL, http.RoundTripper, error) {
+	return minion.ResourceLocation(r, r.connection, ctx, id, dial)
 }
