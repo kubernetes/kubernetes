@@ -19,6 +19,7 @@ RUN apt-get update -qq && apt-get install -y glusterfs-server -qq
 ADD glusterd.vol /etc/glusterfs/
 ADD run_gluster.sh /usr/local/bin/
 ADD index.html /vol/
+RUN chmod 644 /vol/index.html
 
 EXPOSE 24007/tcp 24008/tcp 49152/tcp
 
