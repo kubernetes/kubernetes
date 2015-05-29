@@ -506,6 +506,21 @@ func (m *Master) init(c *Config) {
 		}
 		m.setupSecureProxy(c.SSHUser, c.SSHKeyfile)
 		proxyDialer = m.Dial
+
+		// This is pretty ugly.  A better solution would be to pull this all the way up into the
+		// server.go file.
+		httpKubeletClient, ok := c.KubeletClient.(*client.HTTPKubeletClient)
+		if ok {
+			httpKubeletClient.Config.Dial = m.Dial
+			transport, err := client.MakeTransport(httpKubeletClient.Config)
+			if err != nil {
+				glog.Errorf("Error setting up transport over SSH: %v", err)
+			} else {
+				httpKubeletClient.Client.Transport = transport
+			}
+		} else {
+			glog.Errorf("Failed to cast %v to HTTPKubeletClient, skipping SSH tunnel.")
+		}
 	}
 
 	apiVersions := []string{}
