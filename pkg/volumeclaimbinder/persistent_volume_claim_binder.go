@@ -99,7 +99,10 @@ func (binder *PersistentVolumeClaimBinder) addVolume(obj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
 	volume := obj.(*api.PersistentVolume)
-	syncVolume(binder.volumeIndex, binder.client, volume)
+	err := syncVolume(binder.volumeIndex, binder.client, volume)
+	if err != nil {
+		glog.Errorf("PVClaimBinder could not add volume %s: %+v", volume.Name, err)
+	}
 }
 
 func (binder *PersistentVolumeClaimBinder) updateVolume(oldObj, newObj interface{}) {
@@ -107,7 +110,10 @@ func (binder *PersistentVolumeClaimBinder) updateVolume(oldObj, newObj interface
 	defer binder.lock.Unlock()
 	newVolume := newObj.(*api.PersistentVolume)
 	binder.volumeIndex.Update(newVolume)
-	syncVolume(binder.volumeIndex, binder.client, newVolume)
+	err := syncVolume(binder.volumeIndex, binder.client, newVolume)
+	if err != nil {
+		glog.Errorf("PVClaimBinder could not update volume %s: %+v", newVolume.Name, err)
+	}
 }
 
 func (binder *PersistentVolumeClaimBinder) deleteVolume(obj interface{}) {
@@ -121,18 +127,24 @@ func (binder *PersistentVolumeClaimBinder) addClaim(obj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
 	claim := obj.(*api.PersistentVolumeClaim)
-	syncClaim(binder.volumeIndex, binder.client, claim)
+	err := syncClaim(binder.volumeIndex, binder.client, claim)
+	if err != nil {
+		glog.Errorf("PVClaimBinder could not add claim %s: %+v", claim.Name, err)
+	}
 }
 
 func (binder *PersistentVolumeClaimBinder) updateClaim(oldObj, newObj interface{}) {
 	binder.lock.Lock()
 	defer binder.lock.Unlock()
 	newClaim := newObj.(*api.PersistentVolumeClaim)
-	syncClaim(binder.volumeIndex, binder.client, newClaim)
+	err := syncClaim(binder.volumeIndex, binder.client, newClaim)
+	if err != nil {
+		glog.Errorf("PVClaimBinder could not update claim %s: %+v", newClaim.Name, err)
+	}
 }
 
 func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderClient, volume *api.PersistentVolume) (err error) {
-	glog.V(5).Infof("Synchronizing PersistentVolume[%s]\n", volume.Name)
+	glog.V(5).Infof("Synchronizing PersistentVolume[%s], current phase: %s\n", volume.Name, volume.Status.Phase)
 
 	// volumes can be in one of the following states:
 	//
@@ -140,12 +152,28 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 	// VolumeAvailable -- not bound to a claim, but processed at least once and found in this controller's volumeIndex.
 	// VolumeBound -- bound to a claim because volume.Spec.ClaimRef != nil.   Claim status may not be correct.
 	// VolumeReleased -- volume.Spec.ClaimRef != nil but the claim has been deleted by the user.
+	// VolumeFailed -- volume.Spec.ClaimRef != nil and the volume failed processing in the recycler
 	currentPhase := volume.Status.Phase
 	nextPhase := currentPhase
 
 	switch currentPhase {
 	// pending volumes are available only after indexing in order to be matched to claims.
 	case api.VolumePending:
+		if volume.Spec.ClaimRef != nil {
+			// Pending volumes that have a ClaimRef were recently recycled.  The Recycler set the phase to VolumePending
+			// to start the volume again at the beginning of this lifecycle.
+			// ClaimRef is the last bind between persistent volume and claim.
+			// The claim has already been deleted by the user at this point
+			oldClaimRef := volume.Spec.ClaimRef
+			volume.Spec.ClaimRef = nil
+			_, err = binderClient.UpdatePersistentVolume(volume)
+			if err != nil {
+				// rollback on error, keep the ClaimRef until we can successfully update the volume
+				volume.Spec.ClaimRef = oldClaimRef
+				return fmt.Errorf("Unexpected error saving PersistentVolume: %+v", err)
+			}
+		}
+
 		_, exists, err := volumeIndex.Get(volume)
 		if err != nil {
 			return err
@@ -170,10 +198,11 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 				}
 			}
 		}
+
 	//bound volumes require verification of their bound claims
 	case api.VolumeBound:
 		if volume.Spec.ClaimRef == nil {
-			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume)
+			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
 		} else {
 			_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
 			if err != nil {
@@ -184,12 +213,22 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 				}
 			}
 		}
+
 	// released volumes require recycling
 	case api.VolumeReleased:
 		if volume.Spec.ClaimRef == nil {
+			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume.Name, volume)
+		} else {
+			// another process is watching for released volumes.
+			// PersistentVolumeReclaimPolicy is set per PersistentVolume
+		}
+
+	// volumes are removed by processes external to this binder and must be removed from the cluster
+	case api.VolumeFailed:
+		if volume.Spec.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume)
 		} else {
-			// TODO: implement Recycle method on plugins
+			glog.V(5).Infof("PersistentVolume[%s] previously failed recycling.  Skipping.\n", volume.Name)
 		}
 	}
 
@@ -198,6 +237,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 
 		// a change in state will trigger another update through this controller.
 		// each pass through this controller evaluates current phase and decides whether or not to change to the next phase
+		glog.V(5).Infof("PersistentVolume[%s] changing phase from %s to %s\n", volume.Name, currentPhase, nextPhase)
 		volume, err := binderClient.UpdatePersistentVolumeStatus(volume)
 		if err != nil {
 			// Rollback to previous phase
@@ -254,6 +294,7 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 		}
 
 		if volume.Spec.ClaimRef == nil {
+			glog.V(5).Infof("Rebuilding bind on pv.Spec.ClaimRef\n")
 			claimRef, err := api.GetReference(claim)
 			if err != nil {
 				return fmt.Errorf("Unexpected error getting claim reference: %v\n", err)
@@ -318,6 +359,7 @@ func (controller *PersistentVolumeClaimBinder) Stop() {
 type binderClient interface {
 	GetPersistentVolume(name string) (*api.PersistentVolume, error)
 	UpdatePersistentVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error)
+	DeletePersistentVolume(volume *api.PersistentVolume) error
 	UpdatePersistentVolumeStatus(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 	GetPersistentVolumeClaim(namespace, name string) (*api.PersistentVolumeClaim, error)
 	UpdatePersistentVolumeClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
@@ -338,6 +380,10 @@ func (c *realBinderClient) GetPersistentVolume(name string) (*api.PersistentVolu
 
 func (c *realBinderClient) UpdatePersistentVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
 	return c.client.PersistentVolumes().Update(volume)
+}
+
+func (c *realBinderClient) DeletePersistentVolume(volume *api.PersistentVolume) error {
+	return c.client.PersistentVolumes().Delete(volume.Name)
 }
 
 func (c *realBinderClient) UpdatePersistentVolumeStatus(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
