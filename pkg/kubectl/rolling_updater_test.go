@@ -34,7 +34,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 )
 
 type updaterFake struct {
@@ -365,10 +364,8 @@ func TestRollingUpdater_preserveCleanup(t *testing.T) {
 				t.Fatalf("unexpected call to delete %s/%s", namespace, name)
 				return nil
 			},
-			ControllerHasDesiredReplicasFn: func(rc *api.ReplicationController) wait.ConditionFunc {
-				return func() (done bool, err error) {
-					return true, nil
-				}
+			ControllerHasDesiredReplicasFn: func(rc *api.ReplicationController, timeout time.Duration) error {
+				return nil
 			},
 		},
 	}
@@ -816,7 +813,7 @@ type rollingUpdaterClientImpl struct {
 	UpdateReplicationControllerFn  func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
 	CreateReplicationControllerFn  func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
 	DeleteReplicationControllerFn  func(namespace, name string) error
-	ControllerHasDesiredReplicasFn func(rc *api.ReplicationController) wait.ConditionFunc
+	ControllerHasDesiredReplicasFn func(rc *api.ReplicationController, timeout time.Duration) error
 }
 
 func (c *rollingUpdaterClientImpl) ListReplicationControllers(namespace string, selector labels.Selector) (*api.ReplicationControllerList, error) {
@@ -839,6 +836,6 @@ func (c *rollingUpdaterClientImpl) DeleteReplicationController(namespace, name s
 	return c.DeleteReplicationControllerFn(namespace, name)
 }
 
-func (c *rollingUpdaterClientImpl) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
-	return c.ControllerHasDesiredReplicasFn(rc)
+func (c *rollingUpdaterClientImpl) ControllerHasDesiredReplicas(rc *api.ReplicationController, timeout time.Duration) error {
+	return c.ControllerHasDesiredReplicasFn(rc, timeout)
 }

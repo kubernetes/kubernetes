@@ -23,7 +23,13 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // ScalePrecondition describes a condition that must be true for the scale to take place
@@ -35,7 +41,7 @@ type ScalePrecondition struct {
 	ResourceVersion string
 }
 
-// A PreconditionError is returned when a replication controller fails to match
+// PreconditionError is returned when a replication controller fails to match
 // the scale preconditions passed to kubectl.
 type PreconditionError struct {
 	Precondition  string
@@ -54,7 +60,7 @@ const (
 	ControllerScaleUpdateFailure
 )
 
-// A ControllerScaleError is returned when a scale request passes
+// ControllerScaleError is returned when a scale request passes
 // preconditions but fails to actually scale the controller.
 type ControllerScaleError struct {
 	FailureType     ControllerScaleErrorType
@@ -89,6 +95,8 @@ type Scaler interface {
 	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error)
 }
 
+// ScalerFor returns a scaler for the provided kind of resource if a
+// scaler implementation for that kind exists
 func ScalerFor(kind string, c ScalerClient) (Scaler, error) {
 	switch kind {
 	case "ReplicationController":
@@ -106,11 +114,12 @@ type RetryParams struct {
 	Interval, Timeout time.Duration
 }
 
+// NewRetryParams returns a new set of retry parameters
 func NewRetryParams(interval, timeout time.Duration) *RetryParams {
 	return &RetryParams{interval, timeout}
 }
 
-// ScaleCondition is a closure around Scale that facilitates retries via util.wait
+// ScaleCondition is a closure around ScaleSimple that facilitates retries via util.wait
 func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name string, count uint) wait.ConditionFunc {
 	return func() (bool, error) {
 		_, err := r.ScaleSimple(namespace, name, precondition, count)
@@ -126,6 +135,8 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 	}
 }
 
+// ScaleSimple does a simple one-shot attempt at scaling - not useful on it's own, but
+// a necessary building block for Scale
 func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
 	controller, err := scaler.c.GetReplicationController(namespace, name)
 	if err != nil {
@@ -161,9 +172,11 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 		return err
 	}
 	if waitForReplicas != nil {
-		rc := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: name}}
-		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			scaler.c.ControllerHasDesiredReplicas(rc))
+		rc, err := scaler.c.GetReplicationController(namespace, name)
+		if err != nil {
+			return err
+		}
+		return scaler.c.ControllerHasDesiredReplicas(rc, retry.Timeout)
 	}
 	return nil
 }
@@ -172,9 +185,10 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 type ScalerClient interface {
 	GetReplicationController(namespace, name string) (*api.ReplicationController, error)
 	UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
-	ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc
+	ControllerHasDesiredReplicas(rc *api.ReplicationController, timeout time.Duration) error
 }
 
+// NewScalerClient returns a new ScalerClient
 func NewScalerClient(c client.Interface) ScalerClient {
 	return &realScalerClient{c}
 }
@@ -184,14 +198,72 @@ type realScalerClient struct {
 	client client.Interface
 }
 
+// GetReplicationController returns the replication controller with the provided namespace/name
 func (c *realScalerClient) GetReplicationController(namespace, name string) (*api.ReplicationController, error) {
 	return c.client.ReplicationControllers(namespace).Get(name)
 }
 
+// UpdateReplicationController updates the provided replication controller in the given namespace
 func (c *realScalerClient) UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
 	return c.client.ReplicationControllers(namespace).Update(rc)
 }
 
-func (c *realScalerClient) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
-	return client.ControllerHasDesiredReplicas(c.client, rc)
+// ControllerHasDesiredReplicas is a closure around the ControllerHasDesiredReplicas function
+func (c *realScalerClient) ControllerHasDesiredReplicas(rc *api.ReplicationController, timeout time.Duration) error {
+	return ControllerHasDesiredReplicas(c.client, rc, timeout)
+}
+
+// ControllerHasDesiredReplicas accepts a replication controller and waits until it either observes that the pod
+// store has the desired replicas as defined in rc.spec.replicas or until it times out
+func ControllerHasDesiredReplicas(client client.Interface, rc *api.ReplicationController, timeout time.Duration) error {
+	if rc.Status.Replicas == rc.Spec.Replicas {
+		return nil
+	}
+
+	notify := make(chan struct{})
+	stopCh := make(chan struct{})
+
+	checkPods := func(obj interface{}) {
+		select {
+		case notify <- struct{}{}:
+		case <-stopCh:
+			return
+		}
+	}
+	store, controller := framework.NewInformer(
+		createPodLWForRC(client, rc),
+		&api.Pod{},
+		time.Second*30,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc:    checkPods,
+			DeleteFunc: checkPods,
+		},
+	)
+
+	go controller.Run(stopCh)
+out:
+	for {
+		select {
+		case <-notify:
+			if len(store.List()) == rc.Spec.Replicas {
+				break out
+			}
+		case <-time.After(timeout):
+			break out
+		}
+	}
+	close(stopCh)
+	return nil
+}
+
+// createPodLWForRC returns a listwatcher for the provided replication controller
+func createPodLWForRC(c client.Interface, rc *api.ReplicationController) *cache.ListWatch {
+	return &cache.ListWatch{
+		ListFunc: func() (runtime.Object, error) {
+			return c.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelector(), fields.Everything())
+		},
+		WatchFunc: func(rv string) (watch.Interface, error) {
+			return c.Pods(rc.Namespace).Watch(labels.Set(rc.Spec.Selector).AsSelector(), fields.Everything(), rv)
+		},
+	}
 }

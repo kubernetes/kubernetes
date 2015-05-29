@@ -317,8 +317,8 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 
 	oldName := oldRc.ObjectMeta.Name
 	newName := newRc.ObjectMeta.Name
-	retry := &RetryParams{interval, timeout}
-	waitForReplicas := &RetryParams{interval, timeout}
+	retry := NewRetryParams(interval, timeout)
+	waitForReplicas := NewRetryParams(interval, timeout)
 	if newRc.Spec.Replicas <= 0 {
 		return fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %s\n", newName, newRc.Spec)
 	}
@@ -460,7 +460,7 @@ func (r *RollingUpdater) updateAndWait(rc *api.ReplicationController, interval, 
 	if err != nil {
 		return nil, err
 	}
-	if err = wait.Poll(interval, timeout, r.c.ControllerHasDesiredReplicas(rc)); err != nil {
+	if err = r.c.ControllerHasDesiredReplicas(rc, timeout); err != nil {
 		return nil, err
 	}
 	return r.c.GetReplicationController(r.ns, rc.ObjectMeta.Name)
@@ -493,7 +493,7 @@ type RollingUpdaterClient interface {
 	UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
 	CreateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
 	DeleteReplicationController(namespace, name string) error
-	ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc
+	ControllerHasDesiredReplicas(rc *api.ReplicationController, timeout time.Duration) error
 }
 
 func NewRollingUpdaterClient(c client.Interface) RollingUpdaterClient {
@@ -525,6 +525,6 @@ func (c *realRollingUpdaterClient) DeleteReplicationController(namespace, name s
 	return c.client.ReplicationControllers(namespace).Delete(name)
 }
 
-func (c *realRollingUpdaterClient) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
-	return client.ControllerHasDesiredReplicas(c.client, rc)
+func (c *realRollingUpdaterClient) ControllerHasDesiredReplicas(rc *api.ReplicationController, timeout time.Duration) error {
+	return ControllerHasDesiredReplicas(c.client, rc, timeout)
 }
