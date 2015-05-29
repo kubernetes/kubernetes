@@ -39,19 +39,45 @@ type KubeletHealthChecker interface {
 }
 
 type ConnectionInfoGetter interface {
-	GetConnectionInfo(host string) (scheme string, port uint, transport http.RoundTripper, err error)
+	GetConnectionInfo(host string, dial func(net, addr string) (net.Conn, error)) (scheme string, port uint, transport http.RoundTripper, err error)
 }
 
 // HTTPKubeletClient is the default implementation of KubeletHealthchecker, accesses the kubelet over HTTP.
 type HTTPKubeletClient struct {
 	Client      *http.Client
+	Config      *KubeletConfig
 	Port        uint
 	EnableHttps bool
 }
 
 // TODO: this structure is questionable, it should be using client.Config and overriding defaults.
 func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
-	transport := http.DefaultTransport
+	transport, err := makeTransport(config, nil)
+	if err != nil {
+		return nil, err
+	}
+	c := &http.Client{
+		Transport: transport,
+		Timeout:   config.HTTPTimeout,
+	}
+	return &HTTPKubeletClient{
+		Client:      c,
+		Config:      config,
+		Port:        config.Port,
+		EnableHttps: config.EnableHttps,
+	}, nil
+}
+
+func makeTransport(config *KubeletConfig, dial func(net, addr string) (net.Conn, error)) (http.RoundTripper, error) {
+	var transport http.RoundTripper
+
+	if dial == nil {
+		transport = http.DefaultTransport
+	} else {
+		transport = &http.Transport{
+			Dial: dial,
+		}
+	}
 
 	cfg := &Config{TLSClientConfig: config.TLSClientConfig}
 	if config.EnableHttps {
@@ -66,27 +92,29 @@ func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 	}
 	if tlsConfig != nil {
 		transport = &http.Transport{
+			Dial:            dial,
 			TLSClientConfig: tlsConfig,
 		}
 	}
-
-	c := &http.Client{
-		Transport: transport,
-		Timeout:   config.HTTPTimeout,
-	}
-	return &HTTPKubeletClient{
-		Client:      c,
-		Port:        config.Port,
-		EnableHttps: config.EnableHttps,
-	}, nil
+	return transport, nil
 }
 
-func (c *HTTPKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+func (c *HTTPKubeletClient) GetConnectionInfo(host string, dial func(net, addr string) (net.Conn, error)) (string, uint, http.RoundTripper, error) {
 	scheme := "http"
 	if c.EnableHttps {
 		scheme = "https"
 	}
-	return scheme, c.Port, c.Client.Transport, nil
+	var transport http.RoundTripper
+	if dial == nil {
+		transport = c.Client.Transport
+	} else {
+		var err error
+		transport, err = makeTransport(c.Config, dial)
+		if err != nil {
+			return "", 0, nil, err
+		}
+	}
+	return scheme, c.Port, transport, nil
 }
 
 func (c *HTTPKubeletClient) url(host, path, query string) string {

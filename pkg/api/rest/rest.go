@@ -18,6 +18,7 @@ package rest
 
 import (
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 
@@ -199,7 +200,7 @@ type StandardStorage interface {
 // Redirector know how to return a remote resource's location.
 type Redirector interface {
 	// ResourceLocation should return the remote location of the given resource, and an optional transport to use to request it, or an error.
-	ResourceLocation(ctx api.Context, id string) (remoteLocation *url.URL, transport http.RoundTripper, err error)
+	ResourceLocation(ctx api.Context, id string, dial func(net, addr string) (net.Conn, error)) (remoteLocation *url.URL, transport http.RoundTripper, err error)
 }
 
 // ConnectHandler is a handler for HTTP connection requests. It extends the standard

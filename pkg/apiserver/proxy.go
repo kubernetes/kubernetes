@@ -107,7 +107,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	location, transport, err := redirector.ResourceLocation(ctx, id)
+	location, transport, err := redirector.ResourceLocation(ctx, id, r.dial)
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
 		status := errToAPIStatus(err)
@@ -120,9 +120,6 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		notFound(w, req)
 		httpCode = http.StatusNotFound
 		return
-	}
-	if r.dial != nil {
-		transport = &http.Transport{Dial: r.dial}
 	}
 
 	// Default to http

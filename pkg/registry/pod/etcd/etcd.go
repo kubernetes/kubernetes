@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -103,7 +104,7 @@ func NewStorage(h tools.EtcdHelper, k client.ConnectionInfoGetter) PodStorage {
 var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a pods location from its HostIP
-func (r *REST) ResourceLocation(ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
+func (r *REST) ResourceLocation(ctx api.Context, name string, dial func(net, addr string) (net.Conn, error)) (*url.URL, http.RoundTripper, error) {
 	return pod.ResourceLocation(r, ctx, name)
 }
 

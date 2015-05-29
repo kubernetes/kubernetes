@@ -288,7 +288,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
-func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
+func (rs *REST) ResourceLocation(ctx api.Context, id string, dial func(net, addr string) (net.Conn, error)) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "svcname" or "svcname:port".
 	svcName, portStr, valid := util.SplitPort(id)
 	if !valid {
