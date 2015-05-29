@@ -1712,7 +1712,7 @@ func stoppedState(cName string) api.ContainerStatus {
 	return api.ContainerStatus{
 		Name: cName,
 		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{},
+			Terminated: &api.ContainerStateTerminated{},
 		},
 	}
 }
@@ -1720,7 +1720,7 @@ func succeededState(cName string) api.ContainerStatus {
 	return api.ContainerStatus{
 		Name: cName,
 		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
+			Terminated: &api.ContainerStateTerminated{
 				ExitCode: 0,
 			},
 		},
@@ -1730,7 +1730,7 @@ func failedState(cName string) api.ContainerStatus {
 	return api.ContainerStatus{
 		Name: cName,
 		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
+			Terminated: &api.ContainerStateTerminated{
 				ExitCode: -1,
 			},
 		},
@@ -2577,7 +2577,7 @@ func TestValidateContainerStatus(t *testing.T) {
 						Running: &api.ContainerStateRunning{},
 					},
 					LastTerminationState: api.ContainerState{
-						Termination: &api.ContainerStateTerminated{},
+						Terminated: &api.ContainerStateTerminated{},
 					},
 				},
 			},
@@ -2588,7 +2588,7 @@ func TestValidateContainerStatus(t *testing.T) {
 				{
 					Name: containerName,
 					State: api.ContainerState{
-						Termination: &api.ContainerStateTerminated{},
+						Terminated: &api.ContainerStateTerminated{},
 					},
 				},
 			},

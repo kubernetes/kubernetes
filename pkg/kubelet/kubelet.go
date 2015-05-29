@@ -1668,10 +1668,10 @@ func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerNa
 		return "", fmt.Errorf("container %q not found in pod", containerName)
 	}
 	if previous {
-		if cStatus.LastTerminationState.Termination == nil {
+		if cStatus.LastTerminationState.Terminated == nil {
 			return "", fmt.Errorf("previous terminated container %q not found in pod", containerName)
 		}
-		cID = cStatus.LastTerminationState.Termination.ContainerID
+		cID = cStatus.LastTerminationState.Terminated.ContainerID
 	} else {
 		if cStatus.State.Waiting != nil {
 			return "", fmt.Errorf("container %q is in waiting state.", containerName)
@@ -1983,9 +1983,9 @@ func getPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 		if containerStatus, ok := api.GetContainerStatus(info, container.Name); ok {
 			if containerStatus.State.Running != nil {
 				running++
-			} else if containerStatus.State.Termination != nil {
+			} else if containerStatus.State.Terminated != nil {
 				stopped++
-				if containerStatus.State.Termination.ExitCode == 0 {
+				if containerStatus.State.Terminated.ExitCode == 0 {
 					succeeded++
 				} else {
 					failed++

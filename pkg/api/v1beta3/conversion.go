@@ -33,6 +33,10 @@ func addConversionFuncs() {
 		convert_api_ServiceSpec_To_v1beta3_ServiceSpec,
 		convert_v1beta3_PodSpec_To_api_PodSpec,
 		convert_api_PodSpec_To_v1beta3_PodSpec,
+		convert_v1beta3_ContainerState_To_api_ContainerState,
+		convert_api_ContainerState_To_v1beta3_ContainerState,
+		convert_api_ContainerStateTerminated_To_v1beta3_ContainerStateTerminated,
+		convert_v1beta3_ContainerStateTerminated_To_api_ContainerStateTerminated,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -544,5 +548,103 @@ func convert_api_PodSpec_To_v1beta3_PodSpec(in *api.PodSpec, out *PodSpec, s con
 	} else {
 		out.ImagePullSecrets = nil
 	}
+	return nil
+}
+
+func convert_api_ContainerState_To_v1beta3_ContainerState(in *api.ContainerState, out *ContainerState, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ContainerState))(in)
+	}
+	if in.Waiting != nil {
+		out.Waiting = new(ContainerStateWaiting)
+		if err := convert_api_ContainerStateWaiting_To_v1beta3_ContainerStateWaiting(in.Waiting, out.Waiting, s); err != nil {
+			return err
+		}
+	} else {
+		out.Waiting = nil
+	}
+	if in.Running != nil {
+		out.Running = new(ContainerStateRunning)
+		if err := convert_api_ContainerStateRunning_To_v1beta3_ContainerStateRunning(in.Running, out.Running, s); err != nil {
+			return err
+		}
+	} else {
+		out.Running = nil
+	}
+	if in.Terminated != nil {
+		out.Termination = new(ContainerStateTerminated)
+		if err := convert_api_ContainerStateTerminated_To_v1beta3_ContainerStateTerminated(in.Terminated, out.Termination, s); err != nil {
+			return err
+		}
+	} else {
+		out.Termination = nil
+	}
+	return nil
+}
+
+func convert_v1beta3_ContainerState_To_api_ContainerState(in *ContainerState, out *api.ContainerState, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ContainerState))(in)
+	}
+	if in.Waiting != nil {
+		out.Waiting = new(api.ContainerStateWaiting)
+		if err := convert_v1beta3_ContainerStateWaiting_To_api_ContainerStateWaiting(in.Waiting, out.Waiting, s); err != nil {
+			return err
+		}
+	} else {
+		out.Waiting = nil
+	}
+	if in.Running != nil {
+		out.Running = new(api.ContainerStateRunning)
+		if err := convert_v1beta3_ContainerStateRunning_To_api_ContainerStateRunning(in.Running, out.Running, s); err != nil {
+			return err
+		}
+	} else {
+		out.Running = nil
+	}
+	if in.Termination != nil {
+		out.Terminated = new(api.ContainerStateTerminated)
+		if err := convert_v1beta3_ContainerStateTerminated_To_api_ContainerStateTerminated(in.Termination, out.Terminated, s); err != nil {
+			return err
+		}
+	} else {
+		out.Terminated = nil
+	}
+	return nil
+}
+
+func convert_api_ContainerStateTerminated_To_v1beta3_ContainerStateTerminated(in *api.ContainerStateTerminated, out *ContainerStateTerminated, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ContainerStateTerminated))(in)
+	}
+	out.ExitCode = in.ExitCode
+	out.Signal = in.Signal
+	out.Reason = in.Reason
+	out.Message = in.Message
+	if err := s.Convert(&in.StartedAt, &out.StartedAt, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.FinishedAt, &out.FinishedAt, 0); err != nil {
+		return err
+	}
+	out.ContainerID = in.ContainerID
+	return nil
+}
+
+func convert_v1beta3_ContainerStateTerminated_To_api_ContainerStateTerminated(in *ContainerStateTerminated, out *api.ContainerStateTerminated, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ContainerStateTerminated))(in)
+	}
+	out.ExitCode = in.ExitCode
+	out.Signal = in.Signal
+	out.Reason = in.Reason
+	out.Message = in.Message
+	if err := s.Convert(&in.StartedAt, &out.StartedAt, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.FinishedAt, &out.FinishedAt, 0); err != nil {
+		return err
+	}
+	out.ContainerID = in.ContainerID
 	return nil
 }

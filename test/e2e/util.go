@@ -299,15 +299,15 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 		if !ok {
 			Logf("No Status.Info for container '%s' in pod '%s' yet", contName, podName)
 		} else {
-			if ci.State.Termination != nil {
-				if ci.State.Termination.ExitCode == 0 {
+			if ci.State.Terminated != nil {
+				if ci.State.Terminated.ExitCode == 0 {
 					By("Saw pod success")
 					return true, nil
 				} else {
-					return true, fmt.Errorf("pod '%s' terminated with failure: %+v", podName, ci.State.Termination)
+					return true, fmt.Errorf("pod '%s' terminated with failure: %+v", podName, ci.State.Terminated)
 				}
 			} else {
-				Logf("Nil State.Termination for container '%s' in pod '%s' in namespace '%s' so far", contName, podName, namespace)
+				Logf("Nil State.Terminated for container '%s' in pod '%s' in namespace '%s' so far", contName, podName, namespace)
 			}
 		}
 		return false, nil
@@ -903,10 +903,10 @@ func FailedContainers(pod api.Pod) map[string]ContainerFailures {
 		return nil
 	} else {
 		for _, status := range statuses {
-			if status.State.Termination != nil {
-				states[status.ContainerID] = ContainerFailures{status: status.State.Termination}
-			} else if status.LastTerminationState.Termination != nil {
-				states[status.ContainerID] = ContainerFailures{status: status.LastTerminationState.Termination}
+			if status.State.Terminated != nil {
+				states[status.ContainerID] = ContainerFailures{status: status.State.Terminated}
+			} else if status.LastTerminationState.Terminated != nil {
+				states[status.ContainerID] = ContainerFailures{status: status.LastTerminationState.Terminated}
 			}
 			if status.RestartCount > 0 {
 				var ok bool

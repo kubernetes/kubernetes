@@ -750,9 +750,9 @@ type ContainerStateTerminated struct {
 // Only one of its members may be specified.
 // If none of them is specified, the default one is ContainerStateWaiting.
 type ContainerState struct {
-	Waiting     *ContainerStateWaiting    `json:"waiting,omitempty" description:"details about a waiting container"`
-	Running     *ContainerStateRunning    `json:"running,omitempty" description:"details about a running container"`
-	Termination *ContainerStateTerminated `json:"termination,omitempty" description:"details about a terminated container"`
+	Waiting    *ContainerStateWaiting    `json:"waiting,omitempty" description:"details about a waiting container"`
+	Running    *ContainerStateRunning    `json:"running,omitempty" description:"details about a running container"`
+	Terminated *ContainerStateTerminated `json:"terminated,omitempty" description:"details about a terminated container"`
 }
 
 type ContainerStatus struct {

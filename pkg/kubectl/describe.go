@@ -349,20 +349,20 @@ func describeContainers(containers []api.ContainerStatus, out io.Writer) {
 			if container.State.Waiting.Reason != "" {
 				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Waiting.Reason)
 			}
-		case container.State.Termination != nil:
+		case container.State.Terminated != nil:
 			fmt.Fprintf(out, "    State:\tTerminated\n")
-			if container.State.Termination.Reason != "" {
-				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Termination.Reason)
+			if container.State.Terminated.Reason != "" {
+				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Terminated.Reason)
 			}
-			if container.State.Termination.Message != "" {
-				fmt.Fprintf(out, "      Message:\t%s\n", container.State.Termination.Message)
+			if container.State.Terminated.Message != "" {
+				fmt.Fprintf(out, "      Message:\t%s\n", container.State.Terminated.Message)
 			}
-			fmt.Fprintf(out, "      Exit Code:\t%d\n", container.State.Termination.ExitCode)
-			if container.State.Termination.Signal > 0 {
-				fmt.Fprintf(out, "      Signal:\t%d\n", container.State.Termination.Signal)
+			fmt.Fprintf(out, "      Exit Code:\t%d\n", container.State.Terminated.ExitCode)
+			if container.State.Terminated.Signal > 0 {
+				fmt.Fprintf(out, "      Signal:\t%d\n", container.State.Terminated.Signal)
 			}
-			fmt.Fprintf(out, "      Started:\t%s\n", container.State.Termination.StartedAt.Time.Format(time.RFC1123Z))
-			fmt.Fprintf(out, "      Finished:\t%s\n", container.State.Termination.FinishedAt.Time.Format(time.RFC1123Z))
+			fmt.Fprintf(out, "      Started:\t%s\n", container.State.Terminated.StartedAt.Time.Format(time.RFC1123Z))
+			fmt.Fprintf(out, "      Finished:\t%s\n", container.State.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
 		default:
 			fmt.Fprintf(out, "    State:\tWaiting\n")
 		}
