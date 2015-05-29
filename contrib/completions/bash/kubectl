@@ -334,12 +334,10 @@ _kubectl_update()
     flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--help")
     flags+=("-h")
-    flags+=("--patch=")
 
     must_have_one_flag=()
     must_have_one_flag+=("--filename=")
     must_have_one_flag+=("-f")
-    must_have_one_flag+=("--patch=")
     must_have_one_noun=()
 }
 

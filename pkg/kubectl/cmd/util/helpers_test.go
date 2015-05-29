@@ -54,6 +54,46 @@ func TestMerge(t *testing.T) {
 				},
 			},
 		},
+		/* TODO: uncomment this test once Merge is updated to use
+		strategic-merge-patch. See #844.
+		{
+			kind: "Pod",
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						api.Container{
+							Name:  "c1",
+							Image: "red-image",
+						},
+						api.Container{
+							Name:  "c2",
+							Image: "blue-image",
+						},
+					},
+				},
+			},
+			fragment: `{ "apiVersion": "v1beta3", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`,
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						api.Container{
+							Name:  "c1",
+							Image: "green-image",
+						},
+						api.Container{
+							Name:  "c2",
+							Image: "blue-image",
+						},
+					},
+				},
+			},
+		}, */
 		{
 			kind: "Pod",
 			obj: &api.Pod{

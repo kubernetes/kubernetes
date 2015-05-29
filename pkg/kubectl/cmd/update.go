@@ -36,10 +36,7 @@ JSON and YAML formats are accepted.`
 $ kubectl update -f pod.json
 
 // Update a pod based on the JSON passed into stdin.
-$ cat pod.json | kubectl update -f -
-
-// Update a pod by downloading it, applying the patch, then updating. Requires apiVersion be specified.
-$ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'`
+$ cat pod.json | kubectl update -f -`
 )
 
 func NewCmdUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -57,8 +54,9 @@ func NewCmdUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to file to use to update the resource."
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmd.MarkFlagRequired("filename")
-	cmd.Flags().String("patch", "", "A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.")
-	cmd.MarkFlagRequired("patch")
+	// TODO: re-enable --patch and make it use strategic-merge-patch
+	// cmd.Flags().String("patch", "", "A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.")
+	// cmd.MarkFlagRequired("patch")
 	return cmd
 }
 
@@ -73,7 +71,7 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return err
 	}
 
-	patch := cmdutil.GetFlagString(cmd, "patch")
+	/* patch := cmdutil.GetFlagString(cmd, "patch")
 	if len(filenames) == 0 && len(patch) == 0 {
 		return cmdutil.UsageError(cmd, "Must specify --filename or --patch to update")
 	}
@@ -89,6 +87,9 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		}
 		fmt.Fprintf(out, "%s\n", name)
 		return nil
+	} */
+	if len(filenames) == 0 {
+		return cmdutil.UsageError(cmd, "Must specify --filename to update")
 	}
 
 	mapper, typer := f.Object()
