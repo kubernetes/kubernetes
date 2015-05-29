@@ -121,7 +121,8 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = http.StatusNotFound
 		return
 	}
-	if r.dial != nil {
+	// If we have a custom dialer, and no pre-existing transport, initialize it to use the dialer.
+	if transport == nil && r.dial != nil {
 		transport = &http.Transport{Dial: r.dial}
 	}
 

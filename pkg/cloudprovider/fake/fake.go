@@ -17,6 +17,7 @@ limitations under the License.
 package fake_cloud
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"regexp"

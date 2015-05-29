@@ -45,14 +45,20 @@ type ConnectionInfoGetter interface {
 // HTTPKubeletClient is the default implementation of KubeletHealthchecker, accesses the kubelet over HTTP.
 type HTTPKubeletClient struct {
 	Client      *http.Client
+	Config      *KubeletConfig
 	Port        uint
 	EnableHttps bool
 }
 
-// TODO: this structure is questionable, it should be using client.Config and overriding defaults.
-func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
-	transport := http.DefaultTransport
-
+func MakeTransport(config *KubeletConfig) (http.RoundTripper, error) {
+	var transport http.RoundTripper
+	if config.Dial == nil {
+		transport = http.DefaultTransport
+	} else {
+		transport = &http.Transport{
+			Dial: config.Dial,
+		}
+	}
 	cfg := &Config{TLSClientConfig: config.TLSClientConfig}
 	if config.EnableHttps {
 		hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
@@ -69,13 +75,22 @@ func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 			TLSClientConfig: tlsConfig,
 		}
 	}
+	return transport, nil
+}
 
+// TODO: this structure is questionable, it should be using client.Config and overriding defaults.
+func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
+	transport, err := MakeTransport(config)
+	if err != nil {
+		return nil, err
+	}
 	c := &http.Client{
 		Transport: transport,
 		Timeout:   config.HTTPTimeout,
 	}
 	return &HTTPKubeletClient{
 		Client:      c,
+		Config:      config,
 		Port:        config.Port,
 		EnableHttps: config.EnableHttps,
 	}, nil
