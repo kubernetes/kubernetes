@@ -145,10 +145,6 @@ func defaultContainerResourceRequirements(limitRange *api.LimitRange) api.Resour
 				value := v.Copy()
 				requirements.Limits[k] = *value
 			}
-			for k, v := range limit.Min {
-				value := v.Copy()
-				requirements.Requests[k] = *value
-			}
 		}
 	}
 	return requirements
