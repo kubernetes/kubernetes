@@ -359,9 +359,7 @@ spec:
       command: [ "/bin/sh", "-c", "env" ]
       env:
         - name: PUBLIC_URL
-          valueFrom:
-            expansion:
-              expand: "http://$(GITSERVER_SERVICE_HOST):$(GITSERVER_SERVICE_PORT)"
+          value: "http://$(GITSERVER_SERVICE_HOST):$(GITSERVER_SERVICE_PORT)"
   restartPolicy: Never
 ```
 
@@ -383,9 +381,7 @@ spec:
             fieldRef:
               fieldPath: "metadata.namespace"
         - name: PUBLIC_URL
-          valueFrom:
-            expansion:
-              expand: "http://gitserver.$(POD_NAMESPACE):$(SERVICE_PORT)"
+          value: "http://gitserver.$(POD_NAMESPACE):$(SERVICE_PORT)"
   restartPolicy: Never
 ```
 
