@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -146,9 +147,9 @@ func (e *Etcd) List(ctx api.Context, label labels.Selector, field fields.Selecto
 
 // ListPredicate returns a list of all the items matching m.
 func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
-	trace := util.NewTrace("List")
-	defer trace.LogIfLong(time.Second)
 	list := e.NewListFunc()
+	trace := util.NewTrace("List " + reflect.TypeOf(list).String())
+	defer trace.LogIfLong(600 * time.Millisecond)
 	if name, ok := m.MatchesSingle(); ok {
 		trace.Step("About to read single object")
 		key, err := e.KeyFunc(ctx, name)
@@ -201,7 +202,7 @@ func (e *Etcd) CreateWithName(ctx api.Context, name string, obj runtime.Object) 
 
 // Create inserts a new item according to the unique key from the object.
 func (e *Etcd) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	trace := util.NewTrace("Create")
+	trace := util.NewTrace("Create " + reflect.TypeOf(obj).String())
 	defer trace.LogIfLong(time.Second)
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
@@ -268,7 +269,7 @@ func (e *Etcd) UpdateWithName(ctx api.Context, name string, obj runtime.Object) 
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
 func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	trace := util.NewTrace("Update")
+	trace := util.NewTrace("Update " + reflect.TypeOf(obj).String())
 	defer trace.LogIfLong(time.Second)
 	name, err := e.ObjectNameFunc(obj)
 	if err != nil {
@@ -358,9 +359,9 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 
 // Get retrieves the item from etcd.
 func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
-	trace := util.NewTrace("Get")
-	defer trace.LogIfLong(time.Second)
 	obj := e.NewFunc()
+	trace := util.NewTrace("Get " + reflect.TypeOf(obj).String())
+	defer trace.LogIfLong(time.Second)
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, err
@@ -380,14 +381,14 @@ func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
 
 // Delete removes the item from etcd.
 func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
-	trace := util.NewTrace("Delete")
-	defer trace.LogIfLong(time.Second)
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 
 	obj := e.NewFunc()
+	trace := util.NewTrace("Delete " + reflect.TypeOf(obj).String())
+	defer trace.LogIfLong(time.Second)
 	trace.Step("About to read object")
 	if err := e.Helper.ExtractObj(key, obj, false); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)

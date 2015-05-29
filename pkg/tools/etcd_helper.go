@@ -228,19 +228,15 @@ type etcdCache interface {
 }
 
 func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
-	trace := util.NewTrace("getFromCache")
-	defer trace.LogIfLong(200 * time.Microsecond)
 	startTime := time.Now()
 	defer func() {
 		cacheGetLatency.Observe(float64(time.Since(startTime) / time.Microsecond))
 	}()
 	obj, found := h.cache.Get(index)
-	trace.Step("Raw get done")
 	if found {
 		// We should not return the object itself to avoid poluting the cache if someone
 		// modifies returned values.
 		objCopy, err := api.Scheme.DeepCopy(obj)
-		trace.Step("Deep copied")
 		if err != nil {
 			glog.Errorf("Error during DeepCopy of cached object: %q", err)
 			return nil, false
