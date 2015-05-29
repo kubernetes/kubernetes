@@ -33,7 +33,7 @@ const (
 
 Possible resources include pods (po), replication controllers (rc), services
 (svc), nodes, events (ev), component statuses (cs), limit ranges (limits),
-minions (mi), persistent volumes (pv), persistent volume claims (pvc)
+nodes (no), persistent volumes (pv), persistent volume claims (pvc)
 or resource quotas (quota).
 
 By specifying the output as 'template' and providing a Go template as the value
