@@ -73,6 +73,10 @@ of very large secrets which would exhaust apiserver and kubelet memory.
 However, creation of many smaller secrets could also exhaust memory.  More
 comprehensive limits on memory usage due to secrets is a planned feature.
 
+Pods must be created via the API server to use secrets.  (Kubelets support
+running pods which are described in node-local files, or pulled from an
+URL other than than Kubernetes master.  Such pods don't use secrets.)
+
 ### Consuming Secret Values
 
 The program in a container is responsible for reading the secret(s) from the
