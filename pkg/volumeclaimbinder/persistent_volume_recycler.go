@@ -112,6 +112,10 @@ func (recycler *PersistentVolumeRecycler) reclaimVolume(pv *api.PersistentVolume
 
 func (recycler *PersistentVolumeRecycler) handleRecycle(pv *api.PersistentVolume) error {
 	glog.V(5).Infof("Recycling PersistentVolume[%s]\n", pv.Name)
+
+	currentPhase := pv.Status.Phase
+	nextPhase := currentPhase
+
 	spec := volume.NewSpecFromPersistentVolume(pv)
 	plugin, err := recycler.pluginMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
@@ -124,7 +128,8 @@ func (recycler *PersistentVolumeRecycler) handleRecycle(pv *api.PersistentVolume
 	// blocks until completion
 	err = volRecycler.Recycle()
 	if err != nil {
-		return fmt.Errorf("Could not recycle volume spec: %+v", err)
+		glog.Errorf("PersistentVolume[%s] failed recycling: %+v", err)
+		pv.Status.Phase = api.VolumeFailed
 	} else {
 		glog.V(5).Infof("PersistentVolume[%s] successfully recycled\n", pv.Name)
 		pv.Status.Phase = api.VolumeRecycled
@@ -133,7 +138,17 @@ func (recycler *PersistentVolumeRecycler) handleRecycle(pv *api.PersistentVolume
 			glog.Errorf("Error updating pv.Status: %+v", err)
 		}
 	}
-	glog.V(5).Infof("Successfully recycled PersistentVolume[%s]\n", pv.Name)
+
+	if currentPhase != nextPhase {
+		glog.V(5).Infof("PersistentVolume[%s] changing phase from %s to %s\n", pv.Name, currentPhase, nextPhase)
+		pv.Status.Phase = nextPhase
+		_, err := recycler.client.UpdatePersistentVolumeStatus(pv)
+		if err != nil {
+			// Rollback to previous phase
+			pv.Status.Phase = currentPhase
+		}
+	}
+
 	return nil
 }
 

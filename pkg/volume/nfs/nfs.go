@@ -111,12 +111,14 @@ func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, er
 			name:   spec.Name,
 			server: spec.VolumeSource.NFS.Server,
 			path:   spec.VolumeSource.NFS.Path,
+			host:   host,
 		}, nil
 	} else {
 		return &nfsRecycler{
 			name:   spec.Name,
 			server: spec.PersistentVolumeSource.NFS.Server,
 			path:   spec.PersistentVolumeSource.NFS.Path,
+			host:   host,
 		}, nil
 	}
 }

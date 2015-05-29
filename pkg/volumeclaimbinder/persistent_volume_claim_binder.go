@@ -152,6 +152,8 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 	// VolumeAvailable -- not bound to a claim, but processed at least once and found in this controller's volumeIndex.
 	// VolumeBound -- bound to a claim because volume.Spec.ClaimRef != nil.   Claim status may not be correct.
 	// VolumeReleased -- volume.Spec.ClaimRef != nil but the claim has been deleted by the user.
+	// VolumeDeleted -- volume.Spec.ClaimRef != nil but the volume was removed from the infrastructure and can be deleted from the cluster
+	// VolumeFailed -- volume.Spec.ClaimRef != nil and the volume failed processing in the recycler
 	currentPhase := volume.Status.Phase
 	nextPhase := currentPhase
 
@@ -238,6 +240,13 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 				return fmt.Errorf("Unexpected error deleting PersistentVolume: %+v", err)
 			}
 			volumeIndex.Delete(volume)
+		}
+	// volumes are removed by processes external to this binder and must be removed from the cluster
+	case api.VolumeFailed:
+		if volume.Spec.ClaimRef == nil {
+			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume)
+		} else {
+			glog.V(5).Infof("PersistentVolume[%s] previously failed recycling.  Skipping.\n", volume.Name)
 		}
 	}
 

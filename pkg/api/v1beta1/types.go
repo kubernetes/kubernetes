@@ -281,6 +281,8 @@ const (
 	VolumeRecycled PersistentVolumePhase = "Recycled"
 	// used for PersistentVolumes that have been removed from the infrastructure
 	VolumeDeleted PersistentVolumePhase = "Deleted"
+	// used for PersistentVolumes that failed to be correctly recycled or deleted after being released from a claim
+	VolumeFailed PersistentVolumePhase = "Failed"
 )
 
 type PersistentVolumeClaimPhase string

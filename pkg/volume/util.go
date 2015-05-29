@@ -69,6 +69,8 @@ func ScrubPodVolumeAndWatchUntilCompletion(pod *api.Pod, client client.Interface
 
 	// the binder will eventually catch up and set status on Claims
 	watch := newPodWatch(client, pod.Namespace, pod.Name, 5*time.Second)
+	numAttempts := 0
+	maxAttempts := 20
 	defer watch.Stop()
 
 	success := false
@@ -76,14 +78,21 @@ func ScrubPodVolumeAndWatchUntilCompletion(pod *api.Pod, client client.Interface
 		event := <-watch.ResultChan()
 		pod := event.Object.(*api.Pod)
 
-		glog.V(5).Infof("Handling %s event for pod %+v\n", event.Type, pod)
+		glog.V(5).Infof("Handling %s event for pod %+v, current phase %s\n", event.Type, pod.Name, pod.Status.Phase)
 
 		if pod.Status.Phase == api.PodSucceeded {
 			glog.V(5).Infof("Success!  Scrub pod %s is phase %s\n", pod.Name, pod.Status.Phase)
 			success = true
 			break
+		} else if pod.Status.Phase == api.PodFailed {
+			// success still false
+			break
 		} else {
+			numAttempts++
 			glog.V(5).Infof("Pod event %+v\n", pod.Name+" "+string(pod.Status.Phase))
+			if numAttempts > maxAttempts {
+				break
+			}
 		}
 	}
 
