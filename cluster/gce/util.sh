@@ -393,7 +393,7 @@ function create-node-template {
   # TODO(mbforbes): To make this really robust, we need to parse the output and
   #                 add retries. Just relying on a non-zero exit code doesn't
   #                 distinguish an ephemeral failed call from a "not-exists".
-  if gcloud compute instance-templates describe "$1"; then
+  if gcloud compute instance-templates describe "$1" &>/dev/null; then
     echo "Instance template ${1} already exists; continuing." >&2
     return
   fi
@@ -726,44 +726,52 @@ function kube-down {
 
   # The gcloud APIs don't return machine parsable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
-  deleteCmdOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" delete \
-    --project "${PROJECT}" \
-    --quiet \
-    "${NODE_INSTANCE_PREFIX}-group")
-  if [[ "$deleteCmdOutput" != ""  ]]; then
-    # Managed instance group deletion is done asyncronously, we must wait for it to complete, or subsequent steps fail
-    deleteCmdOperationId=$(echo $deleteCmdOutput | grep "Operation:" | sed "s/.*Operation:[[:space:]]*\([^[:space:]]*\).*/\1/g")
-    if [[ "$deleteCmdOperationId" != ""  ]]; then
-      deleteCmdStatus="PENDING"
-      while [[ "$deleteCmdStatus" != "DONE" ]]
-      do
-        sleep 5
-        deleteCmdOperationOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" get-operation $deleteCmdOperationId)
-        deleteCmdStatus=$(echo $deleteCmdOperationOutput | grep -i "status:" | sed "s/.*status:[[:space:]]*\([^[:space:]]*\).*/\1/g")
-        echo "Waiting for MIG deletion to complete. Current status: " $deleteCmdStatus
-      done
+  if gcloud preview managed-instance-groups --zone "${ZONE}" describe "${NODE_INSTANCE_PREFIX}-group" &>/dev/null; then
+    deleteCmdOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" delete \
+      --project "${PROJECT}" \
+      --quiet \
+      "${NODE_INSTANCE_PREFIX}-group")
+    if [[ "$deleteCmdOutput" != ""  ]]; then
+      # Managed instance group deletion is done asyncronously, we must wait for it to complete, or subsequent steps fail
+      deleteCmdOperationId=$(echo $deleteCmdOutput | grep "Operation:" | sed "s/.*Operation:[[:space:]]*\([^[:space:]]*\).*/\1/g")
+      if [[ "$deleteCmdOperationId" != ""  ]]; then
+        deleteCmdStatus="PENDING"
+        while [[ "$deleteCmdStatus" != "DONE" ]]
+        do
+          sleep 5
+          deleteCmdOperationOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" get-operation $deleteCmdOperationId)
+          deleteCmdStatus=$(echo $deleteCmdOperationOutput | grep -i "status:" | sed "s/.*status:[[:space:]]*\([^[:space:]]*\).*/\1/g")
+          echo "Waiting for MIG deletion to complete. Current status: " $deleteCmdStatus
+        done
+      fi
     fi
   fi
 
-  gcloud compute instance-templates delete \
-    --project "${PROJECT}" \
-    --quiet \
-    "${NODE_INSTANCE_PREFIX}-template"
+  if gcloud compute instance-templates describe "${NODE_INSTANCE_PREFIX}-template" &>/dev/null; then
+    gcloud compute instance-templates delete \
+      --project "${PROJECT}" \
+      --quiet \
+      "${NODE_INSTANCE_PREFIX}-template"
+  fi
 
   # First delete the master (if it exists).
-  gcloud compute instances delete \
-    --project "${PROJECT}" \
-    --quiet \
-    --delete-disks all \
-    --zone "${ZONE}" \
-    "${MASTER_NAME}"
+  if gcloud compute instances describe "${MASTER_NAME}" --zone "${ZONE}" &>/dev/null; then
+    gcloud compute instances delete \
+      --project "${PROJECT}" \
+      --quiet \
+      --delete-disks all \
+      --zone "${ZONE}" \
+      "${MASTER_NAME}"
+  fi
 
-  # Delete the master pd (possibly leaked by kube-up if master create failed)
-  gcloud compute disks delete \
-    --project "${PROJECT}" \
-    --quiet \
-    --zone "${ZONE}" \
-    "${MASTER_NAME}"-pd
+  # Delete the master pd (possibly leaked by kube-up if master create failed).
+  if gcloud compute disks describe "${MASTER_NAME}"-pd --zone "${ZONE}" &>/dev/null; then
+    gcloud compute disks delete \
+      --project "${PROJECT}" \
+      --quiet \
+      --zone "${ZONE}" \
+      "${MASTER_NAME}"-pd
+  fi
 
   # Find out what minions are running.
   local -a minions
@@ -784,24 +792,27 @@ function kube-down {
   done
 
   # Delete firewall rule for the master.
-  gcloud compute firewall-rules delete  \
-    --project "${PROJECT}" \
-    --quiet \
-    "${MASTER_NAME}-https"
+  if gcloud compute firewall-rules describe "${MASTER_NAME}-https" &>/dev/null; then
+    gcloud compute firewall-rules delete  \
+      --project "${PROJECT}" \
+      --quiet \
+      "${MASTER_NAME}-https"
+  fi
 
   # Delete firewall rule for minions.
-  gcloud compute firewall-rules delete  \
-    --project "${PROJECT}" \
-    --quiet \
-    "${MINION_TAG}-all"
+  if gcloud compute firewall-rules describe "${MINION_TAG}-all" &>/dev/null; then
+    gcloud compute firewall-rules delete  \
+      --project "${PROJECT}" \
+      --quiet \
+      "${MINION_TAG}-all"
+  fi
 
   # Delete routes.
   local -a routes
-  # Clean up all routes w/ names like "<cluster-name>-<node-GUID>"
-  # e.g. "kubernetes-12345678-90ab-cdef-1234-567890abcdef"
+  # Clean up all routes w/ names like "<cluster-name>-minion-<4-char-node-identifier>"
+  # e.g. "kubernetes-minion-2pl1"
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
-    --regexp "${INSTANCE_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}" | awk 'NR >= 2 { print $1 }') )
-  routes+=("${MASTER_NAME}")
+    --regexp "${INSTANCE_PREFIX}-minion-.{4}" | awk 'NR >= 2 { print $1 }') )
   while (( "${#routes[@]}" > 0 )); do
     echo Deleting routes "${routes[*]::10}"
     gcloud compute routes delete \
@@ -813,11 +824,13 @@ function kube-down {
 
   # Delete the master's reserved IP
   local REGION=${ZONE%-*}
-  gcloud compute addresses delete \
-    --project "${PROJECT}" \
-    --region "${REGION}" \
-    --quiet \
-    "${MASTER_NAME}-ip"
+  if gcloud compute addresses describe "${MASTER_NAME}-ip" --region "${REGION}" &>/dev/null; then
+    gcloud compute addresses delete \
+      --project "${PROJECT}" \
+      --region "${REGION}" \
+      --quiet \
+      "${MASTER_NAME}-ip"
+  fi
 
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
   clear-kubeconfig
