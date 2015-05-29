@@ -174,25 +174,27 @@ iptables -nvL
 ```
 cat << EOF > apache.json
 {
-  "id": "fedoraapache",
   "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "fedoraapache",
-      "containers": [{
-        "name": "fedoraapache",
-        "image": "fedora/apache",
-        "ports": [{
-          "containerPort": 80,
-          "hostPort": 80
-        }]
-      }]
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "fedoraapache",
+    "labels": {
+      "name": "fedoraapache"
     }
   },
-  "labels": {
-    "name": "fedoraapache"
+  "spec": {
+    "containers": [
+      {
+        "name": "fedoraapache",
+        "image": "fedora/apache",
+        "ports": [
+          {
+            "hostPort": 80,
+            "containerPort": 80
+          }
+        ]
+      }
+    ]
   }
 }
 EOF 
