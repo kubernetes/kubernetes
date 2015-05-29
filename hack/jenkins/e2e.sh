@@ -204,7 +204,9 @@ fi
 cd kubernetes
 
 # Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
-export E2E_REPORT_DIR=${WORKSPACE}
+ARTIFACTS=${WORKSPACE}/_artifacts
+mkdir -p ${ARTIFACTS}
+export E2E_REPORT_DIR=${ARTIFACTS}
 
 ### Set up ###
 if [[ "${E2E_UP,,}" == "true" ]]; then
@@ -219,6 +221,13 @@ fi
 if [[ "${E2E_TEST,,}" == "true" ]]; then
     go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}--ginkgo.noColor" || true
 fi
+
+# TODO(zml): We have a bunch of legacy Jenkins configs that are
+# expecting junit*.xml to be in ${WORKSPACE} root and it's Friday
+# afternoon, so just put the junit report where it's expected.
+for junit in ${ARTIFACTS}/junit*.xml; do
+  ln -s ${junit} ${WORKSPACE}
+done
 
 ### Clean up ###
 if [[ "${E2E_DOWN,,}" == "true" ]]; then
