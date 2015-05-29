@@ -1,0 +1,177 @@
+{
+  "directory": [
+    {
+      "name": "Default",
+      "script": "templateTransform.js",
+      "data": {
+        "nodeMaps": [
+          {
+            "properties": {
+              "type": "$.type",
+              "name": "$.annotations.label",
+              "metadata": "$.properties"
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Cluster')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Container')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "HostConfig": "$.properties.HostConfig",
+                "State": "$properties.State",
+                "labels": "$.properties.metadata.labels"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Image')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "Config": "$.properties.Config",
+                "labels": "$.properties.metadata.labels"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Node')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "status": "$.properties.status",
+                "labels": "$.properties.metadata.labels"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Pod')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "status": "$.properties.status",
+                "labels": "$.properties.metadata.labels"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Process')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "%CPU": "$.properties.%CPU", 
+                "%MEM": "$.properties.%MEM",
+                "COMMAND": "$.properties.COMMAND", 
+                "PID": "$.properties.PID",
+                "RSS": "$.properties.RSS", 
+                "START": "$.properties.START", 
+                "STAT": "$.properties.STAT", 
+                "TIME": "$.properties.TIME",
+                "TTY": "$.properties.TTY", 
+                "USER": "$.properties.USER",
+                "VSZ": "$.properties.VSZ",
+                "labels": "$.properties.metadata.labels"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'ReplicationController')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "replicas": "$.properties.spec.replicas",
+                "selector": "$.properties.spec.selector",
+                "labels": "$.properties.metadata.labels"
+              }
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'Service')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "tags": {
+                "spec": "$.properties.spec",
+                "status": "$.properties.status",
+                "labels": "$.properties.metadata.labels"
+              }
+            }
+          }
+        ],
+        "edgeMaps": [
+          {
+            "properties": {
+              "type": "$.type",
+              "label": "$.annotations.label",
+              "source": "$.source",
+              "target": "$.target",
+              "metadata": "$.properties"
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'loadBalances')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "type": "balances",
+              "label": "balances"
+            }
+          },
+          {
+            "filter": {
+              "eval": "('%s' == 'createdFrom')",
+              "args": [
+                "$.type"
+              ]
+            },
+            "properties": {
+              "type": "uses",
+              "label": "uses"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

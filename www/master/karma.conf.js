@@ -4,6 +4,18 @@ module.exports = function(config) {
     basePath: '../',
 
     files: [
+      {
+        pattern: 'app/components/graph/assets/**/*.*', 
+        watched: true, 
+        included: false, 
+        served: true
+      },
+      {
+        pattern: 'app/**/img/**/*.*', 
+        watched: true, 
+        included: false, 
+        served: true
+      },
       '../third_party/ui/bower_components/angular/angular.js',
       '../third_party/ui/bower_components/angular-aria/angular-aria.js',
       '../third_party/ui/bower_components/angular-material/angular-material.js',
@@ -14,9 +26,7 @@ module.exports = function(config) {
       '../third_party/ui/bower_components/lodash/dist/lodash.js',
       'app/assets/js/app.js',
       'app/assets/js/base.js',
-      'app/shared/**/*.js',
       'app/vendor/**/*.js',
-      'master/shared/**/*.js',
       'master/test/**/*.js',
       'master/components/**/test/**/*.js'
     ],

@@ -56,7 +56,7 @@ http-server -a localhost -p 8001
 Note that you'll need to tell the application where to find the api server by setting the value of the `k8sApiServer` configuration parameter in `www/master/shared/config/development.json` and then rebuilding the application. For example, for a cluster running locally at `localhost:8080`, as described [here](../docs/getting-started-guides/locally.md), you'll want to set it as follows:
 
 ```
-"k8sApiServer": "http://localhost:8080/api/v1beta3"
+"k8sApiServer": "http://localhost:8080/api/v1"
 ```
 
 ### Building the app for production
