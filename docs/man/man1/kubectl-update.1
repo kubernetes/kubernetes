@@ -28,10 +28,6 @@ JSON and YAML formats are accepted.
 \fB\-h\fP, \fB\-\-help\fP=false
     help for update
 
-.PP
-\fB\-\-patch\fP=""
-    A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.
-
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
@@ -141,9 +137,6 @@ $ kubectl update \-f pod.json
 
 // Update a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl update \-f \-
-
-// Update a pod by downloading it, applying the patch, then updating. Requires apiVersion be specified.
-$ kubectl update pods my\-pod \-\-patch='\{ "apiVersion": "v1beta1", "desiredState": \{ "manifest": [\{ "cpu": 100 \}]\}\}'
 
 .fi
 .RE

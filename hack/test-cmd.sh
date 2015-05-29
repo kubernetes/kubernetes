@@ -448,11 +448,6 @@ __EOF__
   # Post-condition:redis-master-service service is running
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:kubernetes-ro:redis-master:service-.*-test:'
 
-  # Command
-  kubectl update service "${kube_flags[@]}" service-${version}-test --patch="{\"spec\":{\"selector\":{\"my\":\"test-label\"}},\"apiVersion\":\"v1beta3\"}" --api-version=v1beta3
-  # Post-condition: selector has "test-label" label.
-  kube::test::get_object_assert "service service-${version}-test" "{{range$service_selector_field}}{{.}}{{end}}" "test-label"
-
   ### Identity
   kubectl get service "${kube_flags[@]}" service-${version}-test -o json | kubectl update "${kube_flags[@]}" -f -
 
