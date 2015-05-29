@@ -73,6 +73,12 @@ of very large secrets which would exhaust apiserver and kubelet memory.
 However, creation of many smaller secrets could also exhaust memory.  More
 comprehensive limits on memory usage due to secrets is a planned feature.
 
+Kubelet only supports use of secrets for Pods it gets from the API server.
+This includes any pods created using kubectl, or indirectly via a replication
+controller.  It does not include pods created via the kubelets
+`--manifest-url` flag, its `--config` flag, or its REST API (these are
+not common ways to create pods.)
+
 ### Consuming Secret Values
 
 The program in a container is responsible for reading the secret(s) from the
