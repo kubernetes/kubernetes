@@ -29,16 +29,24 @@ import (
 
 func TestRunExposeService(t *testing.T) {
 	tests := []struct {
-		name   string
-		args   []string
-		input  runtime.Object
-		flags  map[string]string
-		output runtime.Object
-		status int
+		name     string
+		args     []string
+		ns       string
+		calls    map[string]string
+		input    runtime.Object
+		flags    map[string]string
+		output   runtime.Object
+		expected string
+		status   int
 	}{
 		{
 			name: "expose-service-from-service",
 			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
 			input: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1beta3"},
@@ -61,7 +69,42 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"func": "stream"},
 				},
 			},
-			status: 200,
+			expected: "services/foo",
+			status:   200,
+		},
+		{
+			name: "no-name-passed-from-the-cli",
+			args: []string{"service", "mayor"},
+			ns:   "default",
+			calls: map[string]string{
+				"GET":  "/namespaces/default/services/mayor",
+				"POST": "/namespaces/default/services",
+			},
+			input: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "mayor", Namespace: "default", ResourceVersion: "12"},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1beta3"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"run": "this"},
+				},
+			},
+			// No --name flag specified below. Service will use the rc's name passed via the 'default-name' parameter
+			flags: map[string]string{"selector": "run=this", "port": "80", "labels": "runas=amayor"},
+			output: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "mayor", Namespace: "default", ResourceVersion: "12", Labels: map[string]string{"runas": "amayor"}},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1beta3"},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Name:     "default",
+							Protocol: api.Protocol("TCP"),
+							Port:     80,
+						},
+					},
+					Selector: map[string]string{"run": "this"},
+				},
+			},
+			expected: "services/mayor",
+			status:   200,
 		},
 	}
 
@@ -72,9 +115,9 @@ func TestRunExposeService(t *testing.T) {
 			Codec: codec,
 			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
-				case p == "/namespaces/test/services/baz" && m == "GET":
+				case p == test.calls[m] && m == "GET":
 					return &http.Response{StatusCode: test.status, Body: objBody(codec, test.input)}, nil
-				case p == "/namespaces/test/services" && m == "POST":
+				case p == test.calls[m] && m == "POST":
 					return &http.Response{StatusCode: test.status, Body: objBody(codec, test.output)}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -82,7 +125,7 @@ func TestRunExposeService(t *testing.T) {
 				}
 			}),
 		}
-		tf.Namespace = "test"
+		tf.Namespace = test.ns
 		buf := bytes.NewBuffer([]byte{})
 
 		cmd := NewCmdExposeService(f, buf)
@@ -93,7 +136,7 @@ func TestRunExposeService(t *testing.T) {
 		cmd.Run(cmd, test.args)
 
 		out := buf.String()
-		if strings.Contains(out, "services/foo") {
+		if strings.Contains(out, test.expected) {
 			t.Errorf("%s: unexpected output: %s", test.name, out)
 		}
 	}
