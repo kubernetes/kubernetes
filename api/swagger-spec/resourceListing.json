@@ -6,14 +6,6 @@
     "description": "get available API versions"
    },
    {
-    "path": "/api/v1beta1",
-    "description": "API at /api/v1beta1 version v1beta1"
-   },
-   {
-    "path": "/api/v1beta2",
-    "description": "API at /api/v1beta2 version v1beta2"
-   },
-   {
     "path": "/api/v1beta3",
     "description": "API at /api/v1beta3 version v1beta3"
    },
