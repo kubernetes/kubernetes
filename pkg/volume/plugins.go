@@ -79,6 +79,15 @@ type PersistentVolumePlugin interface {
 	GetAccessModes() []api.PersistentVolumeAccessMode
 }
 
+// RecyclableVolumePlugin is an extended interface of VolumePlugin and is used
+// by persistent volumes that want to be recycled before being made available again to new claims
+type RecyclableVolumePlugin interface {
+	VolumePlugin
+	// NewRecycler creates a new volume.Recycler which knows how to reclaim this resource
+	// after the volume's release from a PersistentVolumeClaim
+	NewRecycler(spec *Spec) (Recycler, error)
+}
+
 // VolumeHost is an interface that plugins can use to access the kubelet.
 type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
@@ -217,7 +226,20 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	return pm.plugins[matches[0]], nil
 }
 
-// FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
+// FindPersistentPluginBySpec looks for a persistent volume plugin that can support a given volume
+// specification.  If no plugin is found, return an error
+func (pm *VolumePluginMgr) FindPersistentPluginBySpec(spec *Spec) (PersistentVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, fmt.Errorf("Could not find volume plugin for spec: %+v", spec)
+	}
+	if persistentVolumePlugin, ok := volumePlugin.(PersistentVolumePlugin); ok {
+		return persistentVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no persistent volume plugin matched")
+}
+
+// FindPersistentPluginByName fetches a persistent volume plugin by name.  If no plugin
 // is found, returns error.
 func (pm *VolumePluginMgr) FindPersistentPluginByName(name string) (PersistentVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginByName(name)
@@ -227,5 +249,18 @@ func (pm *VolumePluginMgr) FindPersistentPluginByName(name string) (PersistentVo
 	if persistentVolumePlugin, ok := volumePlugin.(PersistentVolumePlugin); ok {
 		return persistentVolumePlugin, nil
 	}
-	return nil, fmt.Errorf("no persistent volume plugin matched")
+	return nil, fmt.Errorf("no persistent volume plugin matched: %+v")
+}
+
+// FindRecyclablePluginByName fetches a persistent volume plugin by name.  If no plugin
+// is found, returns error.
+func (pm *VolumePluginMgr) FindRecyclablePluginBySpec(spec *Spec) (RecyclableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if recyclableVolumePlugin, ok := volumePlugin.(RecyclableVolumePlugin); ok {
+		return recyclableVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no recyclable volume plugin matched")
 }

@@ -82,6 +82,7 @@ type FakeVolumePlugin struct {
 }
 
 var _ VolumePlugin = &FakeVolumePlugin{}
+var _ RecyclableVolumePlugin = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) Init(host VolumeHost) {
 	plugin.Host = host
@@ -102,6 +103,10 @@ func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, pod *api.Pod, opts Volume
 
 func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (Cleaner, error) {
 	return &FakeVolume{podUID, volName, plugin}, nil
+}
+
+func (plugin *FakeVolumePlugin) NewRecycler(spec *Spec) (Recycler, error) {
+	return &FakeRecycler{"/attributesTransferredFromSpec"}, nil
 }
 
 func (plugin *FakeVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -132,4 +137,17 @@ func (fv *FakeVolume) TearDown() error {
 
 func (fv *FakeVolume) TearDownAt(dir string) error {
 	return os.RemoveAll(dir)
+}
+
+type FakeRecycler struct {
+	path string
+}
+
+func (fr *FakeRecycler) Recycle() error {
+	// nil is success, else error
+	return nil
+}
+
+func (fr *FakeRecycler) GetPath() string {
+	return fr.path
 }
