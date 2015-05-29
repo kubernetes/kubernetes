@@ -19,12 +19,16 @@ package tools
 import (
 	"errors"
 	"fmt"
+	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path"
 	"reflect"
+	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
@@ -812,7 +816,24 @@ func TestGetEtcdVersion_ErrorStatus(t *testing.T) {
 }
 
 func TestGetEtcdVersion_NotListening(t *testing.T) {
-	_, err := GetEtcdVersion("http://127.0.0.1:4001")
+	portIsOpen := func(port int) bool {
+		conn, err := net.DialTimeout("tcp", "127.0.0.1:"+strconv.Itoa(port), 1*time.Second)
+		if err == nil {
+			conn.Close()
+			return true
+		}
+		return false
+	}
+
+	port := rand.Intn((1 << 16) - 1)
+	for tried := 0; portIsOpen(port); tried++ {
+		if tried >= 10 {
+			t.Fatal("Couldn't find a closed TCP port to continue testing")
+		}
+		port++
+	}
+
+	_, err := GetEtcdVersion("http://127.0.0.1:" + strconv.Itoa(port))
 	assert.NotNil(t, err)
 }
 
