@@ -7,14 +7,9 @@ package oauth2_test
 import (
 	"fmt"
 	"log"
-	"testing"
 
 	"golang.org/x/oauth2"
 )
-
-// TODO(jbd): Remove after Go 1.4.
-// Related to https://codereview.appspot.com/107320046
-func TestA(t *testing.T) {}
 
 func ExampleConfig() {
 	conf := &oauth2.Config{
