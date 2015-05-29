@@ -1,4 +1,3 @@
-# Secret Distribution
 
 ## Abstract
 
@@ -183,6 +182,11 @@ involved:
 For now, we will not implement validations around these limits.  Cluster operators will decide how
 much node storage is allocated to secrets. It will be the operator's responsibility to ensure that
 the allocated storage is sufficient for the workload scheduled onto a node.
+
+For now, kubelets will only attach secrets to api-sourced pods, and not file- or http-sourced
+ones.  Doing so would:
+  - confuse the secrets admission controller in the case of mirror pods.
+  - create an apiserver-liveness dependency -- avoiding this dependency is a main reason to use non-api-source pods.
 
 ### Use-Case: Kubelet read of secrets for node
 
