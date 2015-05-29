@@ -325,6 +325,9 @@ func TestSetDefaultMinionExternalID(t *testing.T) {
 	if m2.ExternalID != name {
 		t.Errorf("Expected default External ID: %s, got: %s", name, m2.ExternalID)
 	}
+	if m2.ProviderID != "" {
+		t.Errorf("Expected empty default Cloud Provider ID, got: %s", m2.ProviderID)
+	}
 }
 
 func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {

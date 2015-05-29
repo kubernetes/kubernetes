@@ -300,7 +300,7 @@ func TestMultiPortOnUpdate(t *testing.T) {
 
 	p.OnUpdate([]api.Service{{
 		ObjectMeta: api.ObjectMeta{Name: serviceP.Name, Namespace: serviceP.Namespace},
-		Spec: api.ServiceSpec{PortalIP: "1.2.3.4", Ports: []api.ServicePort{{
+		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",
 			Port:     80,
 			Protocol: "TCP",
@@ -315,7 +315,7 @@ func TestMultiPortOnUpdate(t *testing.T) {
 	if !exists {
 		t.Fatalf("can't find serviceInfo for %s", serviceP)
 	}
-	if svcInfo.portalIP.String() != "1.2.3.4" || svcInfo.portalPort != 80 || svcInfo.protocol != "TCP" {
+	if svcInfo.portal.ip.String() != "1.2.3.4" || svcInfo.portal.port != 80 || svcInfo.protocol != "TCP" {
 		t.Errorf("unexpected serviceInfo for %s: %#v", serviceP, svcInfo)
 	}
 
@@ -323,7 +323,7 @@ func TestMultiPortOnUpdate(t *testing.T) {
 	if !exists {
 		t.Fatalf("can't find serviceInfo for %s", serviceQ)
 	}
-	if svcInfo.portalIP.String() != "1.2.3.4" || svcInfo.portalPort != 81 || svcInfo.protocol != "UDP" {
+	if svcInfo.portal.ip.String() != "1.2.3.4" || svcInfo.portal.port != 81 || svcInfo.protocol != "UDP" {
 		t.Errorf("unexpected serviceInfo for %s: %#v", serviceQ, svcInfo)
 	}
 
@@ -530,7 +530,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 
 	p.OnUpdate([]api.Service{{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-		Spec: api.ServiceSpec{PortalIP: "1.2.3.4", Ports: []api.ServicePort{{
+		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",
 			Port:     svcInfo.proxyPort,
 			Protocol: "TCP",
@@ -582,7 +582,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 
 	p.OnUpdate([]api.Service{{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-		Spec: api.ServiceSpec{PortalIP: "1.2.3.4", Ports: []api.ServicePort{{
+		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",
 			Port:     svcInfo.proxyPort,
 			Protocol: "UDP",
@@ -624,7 +624,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 
 	p.OnUpdate([]api.Service{{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-		Spec: api.ServiceSpec{PortalIP: "1.2.3.4", Ports: []api.ServicePort{{
+		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",
 			Port:     99,
 			Protocol: "TCP",
@@ -671,7 +671,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 
 	p.OnUpdate([]api.Service{{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-		Spec: api.ServiceSpec{PortalIP: "1.2.3.4", Ports: []api.ServicePort{{
+		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",
 			Port:     99,
 			Protocol: "UDP",
@@ -720,10 +720,10 @@ func TestProxyUpdatePublicIPs(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Ports: []api.ServicePort{{
 				Name:     "p",
-				Port:     svcInfo.portalPort,
+				Port:     svcInfo.portal.port,
 				Protocol: "TCP",
 			}},
-			PortalIP:            svcInfo.portalIP.String(),
+			ClusterIP:           svcInfo.portal.ip.String(),
 			DeprecatedPublicIPs: []string{"4.3.2.1"},
 		},
 	}})
@@ -769,7 +769,7 @@ func TestProxyUpdatePortal(t *testing.T) {
 
 	p.OnUpdate([]api.Service{{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-		Spec: api.ServiceSpec{PortalIP: "", Ports: []api.ServicePort{{
+		Spec: api.ServiceSpec{ClusterIP: "", Ports: []api.ServicePort{{
 			Name:     "p",
 			Port:     svcInfo.proxyPort,
 			Protocol: "TCP",
@@ -777,12 +777,12 @@ func TestProxyUpdatePortal(t *testing.T) {
 	}})
 	_, exists := p.getServiceInfo(service)
 	if exists {
-		t.Fatalf("service with empty portalIP should not be included in the proxy")
+		t.Fatalf("service with empty ClusterIP should not be included in the proxy")
 	}
 
 	p.OnUpdate([]api.Service{{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-		Spec: api.ServiceSpec{PortalIP: "None", Ports: []api.ServicePort{{
+		Spec: api.ServiceSpec{ClusterIP: "None", Ports: []api.ServicePort{{
 			Name:     "p",
 			Port:     svcInfo.proxyPort,
 			Protocol: "TCP",
@@ -790,12 +790,12 @@ func TestProxyUpdatePortal(t *testing.T) {
 	}})
 	_, exists = p.getServiceInfo(service)
 	if exists {
-		t.Fatalf("service with 'None' as portalIP should not be included in the proxy")
+		t.Fatalf("service with 'None' as ClusterIP should not be included in the proxy")
 	}
 
 	p.OnUpdate([]api.Service{{
 		ObjectMeta: api.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
-		Spec: api.ServiceSpec{PortalIP: "1.2.3.4", Ports: []api.ServicePort{{
+		Spec: api.ServiceSpec{ClusterIP: "1.2.3.4", Ports: []api.ServicePort{{
 			Name:     "p",
 			Port:     svcInfo.proxyPort,
 			Protocol: "TCP",
@@ -803,7 +803,7 @@ func TestProxyUpdatePortal(t *testing.T) {
 	}})
 	svcInfo, exists = p.getServiceInfo(service)
 	if !exists {
-		t.Fatalf("service with portalIP set not found in the proxy")
+		t.Fatalf("service with ClusterIP set not found in the proxy")
 	}
 	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
 	waitForNumProxyLoops(t, p, 1)

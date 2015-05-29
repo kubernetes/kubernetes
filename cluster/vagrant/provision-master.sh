@@ -85,7 +85,7 @@ EOF
 
 mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
-  portal_net: '$(echo "$PORTAL_NET" | sed -e "s/'/''/g")'
+  service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
   cert_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   enable_cluster_monitoring: '$(echo "$ENABLE_CLUSTER_MONITORING" | sed -e "s/'/''/g")'
   enable_node_monitoring: '$(echo "$ENABLE_NODE_MONITORING" | sed -e "s/'/''/g")'

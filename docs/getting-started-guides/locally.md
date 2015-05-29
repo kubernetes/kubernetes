@@ -87,10 +87,10 @@ Some firewall software that uses iptables may not interact well with
 kubernetes.  If you're having trouble around networking, try disabling any
 firewall or other iptables-using systems, first.
 
-By default the IP range for service portals is 10.0.*.* - depending on your
+By default the IP range for service cluster IPs is 10.0.*.* - depending on your
 docker installation, this may conflict with IPs for containers.  If you find
 containers running with IPs in this range, edit hack/local-cluster-up.sh and
-change the portal_net flag to something else.
+change the service-cluster-ip-range flag to something else.
 
 #### I cannot create a replication controller with replica size greater than 1!  What gives?
 

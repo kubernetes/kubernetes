@@ -34,11 +34,22 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// createNamespaceIfDoesNotExist ensures that the namespace with specified name exists, or returns an error
+func createNamespaceIfDoesNotExist(c *client.Client, name string) (*api.Namespace, error) {
+	namespace, err := c.Namespaces().Get(name)
+	if err != nil {
+		namespace, err = c.Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: name}})
+	}
+	return namespace, err
+}
+
 func runLivenessTest(c *client.Client, podDescr *api.Pod, expectRestart bool) {
 	ns := "e2e-test-" + string(util.NewUUID())
+	_, err := createNamespaceIfDoesNotExist(c, ns)
+	expectNoError(err, fmt.Sprintf("creating namespace %s", ns))
 
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
-	_, err := c.Pods(ns).Create(podDescr)
+	_, err = c.Pods(ns).Create(podDescr)
 	expectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
@@ -85,10 +96,13 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod, expectRestart bool) {
 // testHostIP tests that a pod gets a host IP
 func testHostIP(c *client.Client, pod *api.Pod) {
 	ns := "e2e-test-" + string(util.NewUUID())
+	_, err := createNamespaceIfDoesNotExist(c, ns)
+	expectNoError(err, fmt.Sprintf("creating namespace %s", ns))
+
 	podClient := c.Pods(ns)
 	By("creating pod")
 	defer podClient.Delete(pod.Name, nil)
-	_, err := podClient.Create(pod)
+	_, err = podClient.Create(pod)
 	if err != nil {
 		Fail(fmt.Sprintf("Failed to create pod: %v", err))
 	}

@@ -123,7 +123,7 @@ func MatchPod(label labels.Selector, field fields.Selector) generic.Matcher {
 func PodToSelectableFields(pod *api.Pod) fields.Set {
 	return fields.Set{
 		"metadata.name": pod.Name,
-		"spec.host":     pod.Spec.Host,
+		"spec.host":     pod.Spec.NodeName,
 		"status.phase":  string(pod.Status.Phase),
 	}
 }
@@ -199,7 +199,7 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		}
 	}
-	nodeHost := pod.Spec.Host
+	nodeHost := pod.Spec.NodeName
 	if len(nodeHost) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, nil
@@ -242,7 +242,7 @@ func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, c
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		}
 	}
-	nodeHost := pod.Spec.Host
+	nodeHost := pod.Spec.NodeName
 	if len(nodeHost) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, fmt.Errorf("pod %s does not have a host assigned", name)
@@ -284,7 +284,7 @@ func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGe
 		return nil, nil, err
 	}
 
-	nodeHost := pod.Spec.Host
+	nodeHost := pod.Spec.NodeName
 	if len(nodeHost) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))

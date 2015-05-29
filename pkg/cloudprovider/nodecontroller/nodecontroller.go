@@ -159,13 +159,13 @@ func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
 		if node.Spec.PodCIDR == "" {
 			podCIDR, found := availableCIDRs.PopAny()
 			if !found {
-				glog.Errorf("No available CIDR for node %s", node.Name)
+				nc.recordNodeEvent(&node, "No available CIDR")
 				continue
 			}
 			glog.V(4).Infof("Assigning node %s CIDR %s", node.Name, podCIDR)
 			node.Spec.PodCIDR = podCIDR
 			if _, err := nc.kubeClient.Nodes().Update(&node); err != nil {
-				glog.Errorf("Unable to assign node %s CIDR %s: %v", node.Name, podCIDR, err)
+				nc.recordNodeEvent(&node, "CIDR assignment failed")
 			}
 		}
 	}
@@ -425,7 +425,7 @@ func (nc *NodeController) deletePods(nodeID string) error {
 	}
 	for _, pod := range pods.Items {
 		// Defensive check, also needed for tests.
-		if pod.Spec.Host != nodeID {
+		if pod.Spec.NodeName != nodeID {
 			continue
 		}
 		glog.V(2).Infof("Delete pod %v", pod.Name)

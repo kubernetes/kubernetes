@@ -45,7 +45,8 @@ while true; do
   if (( ${found} == "${NUM_MINIONS}" )) && (( ${ready} == "${NUM_MINIONS}")); then
     break
   else
-    if (( attempt > 20 )); then
+    # Set the timeout to ~10minutes (40 x 15 second) to avoid timeouts for 100-node clusters.
+    if (( attempt > 40 )); then
       echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${NUM_MINIONS}. Your cluster may not be working.${color_norm}"
       cat -n "${MINIONS_FILE}"
       exit 2

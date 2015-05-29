@@ -274,7 +274,7 @@ func (s activePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s activePods) Less(i, j int) bool {
 	// Unassigned < assigned
-	if s[i].Spec.Host == "" && s[j].Spec.Host != "" {
+	if s[i].Spec.NodeName == "" && s[j].Spec.NodeName != "" {
 		return true
 	}
 	// PodPending < PodUnknown < PodRunning

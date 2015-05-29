@@ -631,6 +631,9 @@ function kube::release::create_docker_images_for_server() {
         echo $md5_sum > ${1}/${binary_name}.docker_tag
 
         rm -rf ${docker_build_path}
+
+        kube::log::status "Deleting docker image ${docker_image_tag}"
+        "${DOCKER[@]}" rmi ${docker_image_tag}
       ) &
     done
 

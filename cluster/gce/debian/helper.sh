@@ -29,7 +29,7 @@ NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
 CLUSTER_IP_RANGE: $(yaml-quote ${CLUSTER_IP_RANGE:-10.244.0.0/16})
 SERVER_BINARY_TAR_URL: $(yaml-quote ${SERVER_BINARY_TAR_URL})
 SALT_TAR_URL: $(yaml-quote ${SALT_TAR_URL})
-PORTAL_NET: $(yaml-quote ${PORTAL_NET})
+SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
 ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
 ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
 ENABLE_NODE_MONITORING: $(yaml-quote ${ENABLE_NODE_MONITORING:-false})
@@ -99,12 +99,11 @@ function create-master-instance {
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
     --network "${NETWORK}" \
-    --scopes "storage-ro" "compute-rw" \
+    --scopes "storage-ro,compute-rw" \
     --can-ip-forward \
     --metadata-from-file \
-      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
-    --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no
+      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh,kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
+    --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 }
 
 # TODO(mbforbes): Make $1 required.

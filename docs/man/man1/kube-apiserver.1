@@ -178,8 +178,8 @@ The the kube\-apiserver several options.
     DEPRECATED: see \-\-insecure\-port instead
 
 .PP
-\fB\-\-portal\-net\fP=
-    A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.
+\fB\-\-service\-cluster\-ip\-range\fP=
+    A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.
 
 .PP
 \fB\-\-profiling\fP=true
@@ -246,7 +246,7 @@ The the kube\-apiserver several options.
 .RS
 
 .nf
-/usr/bin/kube\-apiserver \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001 \-\-insecure\_bind\_address=127.0.0.1 \-\-insecure\_port=8080 \-\-kubelet\_port=10250 \-\-portal\_net=11.1.1.0/24 \-\-allow\_privileged=false
+/usr/bin/kube\-apiserver \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001 \-\-insecure\_bind\_address=127.0.0.1 \-\-insecure\_port=8080 \-\-kubelet\_port=10250 \-\-service\-cluster\-ip\-range=10.1.1.0/24 \-\-allow\_privileged=false
 
 .fi
 

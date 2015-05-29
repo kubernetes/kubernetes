@@ -85,8 +85,8 @@ type APIServer struct {
 	OldEtcdPathPrefix          string
 	CorsAllowedOriginList      util.StringList
 	AllowPrivileged            bool
-	PortalNet                  util.IPNet // TODO: make this a list
-	ServiceNodePorts           util.PortRange
+	ServiceClusterIPRange      util.IPNet // TODO: make this a list
+	ServiceNodePortRange       util.PortRange
 	EnableLogsSupport          bool
 	MasterServiceNamespace     string
 	RuntimeConfig              util.ConfigurationMap
@@ -183,8 +183,12 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.OldEtcdPathPrefix, "old-etcd-prefix", s.OldEtcdPathPrefix, "The previous prefix for all resource paths in etcd, if any.")
 	fs.Var(&s.CorsAllowedOriginList, "cors-allowed-origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
-	fs.Var(&s.PortalNet, "portal-net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
-	fs.Var(&s.ServiceNodePorts, "service-node-ports", "A port range to reserve for services with NodePort visibility.  Example: '30000-32767'.  Inclusive at both ends of the range.")
+	fs.Var(&s.ServiceClusterIPRange, "service-cluster-ip-range", "A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
+	fs.Var(&s.ServiceClusterIPRange, "portal-net", "Deprecated: see --service-cluster-ip-range instead.")
+	fs.MarkDeprecated("portal-net", "see --service-cluster-ip-range instead.")
+	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", "A port range to reserve for services with NodePort visibility.  Example: '30000-32767'.  Inclusive at both ends of the range.")
+	fs.Var(&s.ServiceNodePortRange, "service-node-ports", "Deprecated: see --service-node-port-range instead.")
+	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead.")
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.Var(&s.RuntimeConfig, "runtime-config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver. api/<version> key can be used to turn on/off specific api versions. api/all and api/legacy are special keys to control all and legacy api versions respectively.")
 	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
@@ -196,9 +200,9 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
-func (s *APIServer) verifyPortalFlags() {
-	if s.PortalNet.IP == nil {
-		glog.Fatal("No --portal-net specified")
+func (s *APIServer) verifyClusterIPFlags() {
+	if s.ServiceClusterIPRange.IP == nil {
+		glog.Fatal("No --service-cluster-ip-range specified")
 	}
 }
 
@@ -227,7 +231,7 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersi
 
 // Run runs the specified APIServer.  This should never exit.
 func (s *APIServer) Run(_ []string) error {
-	s.verifyPortalFlags()
+	s.verifyClusterIPFlags()
 
 	if (s.EtcdConfigFile != "" && len(s.EtcdServerList) != 0) || (s.EtcdConfigFile == "" && len(s.EtcdServerList) == 0) {
 		glog.Fatalf("specify either --etcd-servers or --etcd-config")
@@ -302,7 +306,7 @@ func (s *APIServer) Run(_ []string) error {
 		}
 	}
 
-	n := net.IPNet(s.PortalNet)
+	n := net.IPNet(s.ServiceClusterIPRange)
 
 	// Default to the private server key for service account token signing
 	if s.ServiceAccountKeyFile == "" && s.TLSPrivateKeyFile != "" {
@@ -349,7 +353,7 @@ func (s *APIServer) Run(_ []string) error {
 		EtcdHelper:             helper,
 		EventTTL:               s.EventTTL,
 		KubeletClient:          kubeletClient,
-		PortalNet:              &n,
+		ServiceClusterIPRange:  &n,
 		EnableCoreControllers:  true,
 		EnableLogsSupport:      s.EnableLogsSupport,
 		EnableUISupport:        true,

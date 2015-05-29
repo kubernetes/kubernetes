@@ -32,7 +32,6 @@ kube::test::find_dirs() {
           -o -wholename './_output' \
           -o -wholename './release' \
           -o -wholename './target' \
-          -o -wholename '*/third_party/*' \
           -o -wholename '*/Godeps/*' \
           -o -wholename '*/contrib/podex/*' \
           -o -wholename '*/test/e2e/*' \

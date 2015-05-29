@@ -31,6 +31,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
+const ProviderName = "vagrant"
+
 // VagrantCloud is an implementation of Interface, TCPLoadBalancer and Instances for developer managed Vagrant cluster.
 type VagrantCloud struct {
 	saltURL  string
@@ -40,7 +42,7 @@ type VagrantCloud struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("vagrant", func(config io.Reader) (cloudprovider.Interface, error) { return newVagrantCloud() })
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newVagrantCloud() })
 }
 
 // SaltToken is an authorization token required by Salt REST API.
@@ -82,6 +84,11 @@ func newVagrantCloud() (*VagrantCloud, error) {
 
 func (v *VagrantCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
+}
+
+// ProviderName returns the cloud provider ID.
+func (v *VagrantCloud) ProviderName() string {
+	return ProviderName
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Vagrant cloud.
@@ -135,9 +142,18 @@ func (v *VagrantCloud) NodeAddresses(instance string) ([]api.NodeAddress, error)
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (v *VagrantCloud) ExternalID(instance string) (string, error) {
 	// Due to vagrant not running with a dedicated DNS setup, we return the IP address of a minion as its hostname at this time
+	minion, err := v.getInstanceByAddress(instance)
+	if err != nil {
+		return "", err
+	}
+	return minion.IP, nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (v *VagrantCloud) InstanceID(instance string) (string, error) {
 	minion, err := v.getInstanceByAddress(instance)
 	if err != nil {
 		return "", err

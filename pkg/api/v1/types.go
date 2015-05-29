@@ -750,9 +750,9 @@ type ContainerStateTerminated struct {
 // Only one of its members may be specified.
 // If none of them is specified, the default one is ContainerStateWaiting.
 type ContainerState struct {
-	Waiting     *ContainerStateWaiting    `json:"waiting,omitempty" description:"details about a waiting container"`
-	Running     *ContainerStateRunning    `json:"running,omitempty" description:"details about a running container"`
-	Termination *ContainerStateTerminated `json:"termination,omitempty" description:"details about a terminated container"`
+	Waiting    *ContainerStateWaiting    `json:"waiting,omitempty" description:"details about a waiting container"`
+	Running    *ContainerStateRunning    `json:"running,omitempty" description:"details about a running container"`
+	Terminated *ContainerStateTerminated `json:"terminated,omitempty" description:"details about a terminated container"`
 }
 
 type ContainerStatus struct {
@@ -862,10 +862,10 @@ type PodSpec struct {
 	// ServiceAccount is the name of the ServiceAccount to use to run this pod
 	ServiceAccount string `json:"serviceAccount,omitempty" description:"name of the ServiceAccount to use to run this pod"`
 
-	// Host is a request to schedule this pod onto a specific host.  If it is non-empty,
-	// the the scheduler simply schedules this pod onto that host, assuming that it fits
-	// resource requirements.
-	Host string `json:"host,omitempty" description:"host requested for this pod"`
+	// NodeName is a request to schedule this pod onto a specific node.  If it is non-empty,
+	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
+	// requirements.
+	NodeName string `json:"nodeName,omitempty" description:"node requested for this pod"`
 	// Uses the host's network namespace. If this option is set, the ports that will be
 	// used must be specified.
 	// Optional: Default to false.
@@ -962,7 +962,7 @@ type ReplicationControllerSpec struct {
 
 	// TemplateRef is a reference to an object that describes the pod that will be created if
 	// insufficient replicas are detected.
-	TemplateRef *ObjectReference `json:"templateRef,omitempty" description:"reference to an object that describes the pod that will be created if insufficient replicas are detected"`
+	//TemplateRef *ObjectReference `json:"templateRef,omitempty" description:"reference to an object that describes the pod that will be created if insufficient replicas are detected"`
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. This takes precedence over a
@@ -1015,7 +1015,7 @@ type ServiceType string
 
 const (
 	// ServiceTypeClusterIP means a service will only be accessible inside the
-	// cluster, via the portal IP.
+	// cluster, via the cluster IP.
 	ServiceTypeClusterIP ServiceType = "ClusterIP"
 
 	// ServiceTypeNodePort means a service will be exposed on one port of
@@ -1062,12 +1062,12 @@ type ServiceSpec struct {
 	// This service will route traffic to pods having labels matching this selector. If null, no endpoints will be automatically created. If empty, all pods will be selected.
 	Selector map[string]string `json:"selector,omitempty" description:"label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"`
 
-	// PortalIP is usually assigned by the master.  If specified by the user
+	// ClusterIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can
 	// not be changed by updates.
 	// Valid values are None, empty string (""), or a valid IP address
 	// None can be specified for headless services when proxying is not required
-	PortalIP string `json:"portalIP,omitempty description: IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise; cannot be updated; 'None' can be specified for a headless service when proxying is not required"`
+	ClusterIP string `json:"clusterIP,omitempty description: IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise; cannot be updated; 'None' can be specified for a headless service when proxying is not required"`
 
 	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
 	Type ServiceType `json:"type,omitempty" description:"type of this service; must be ClusterIP, NodePort, or LoadBalancer; defaults to ClusterIP"`
@@ -1120,9 +1120,9 @@ type Service struct {
 }
 
 const (
-	// PortalIPNone - do not assign a portal IP
+	// ClusterIPNone - do not assign a cluster IP
 	// no proxying required and no environment variables should be created for pods
-	PortalIPNone = "None"
+	ClusterIPNone = "None"
 )
 
 // ServiceList holds a list of services.
@@ -1229,7 +1229,9 @@ type NodeSpec struct {
 	// PodCIDR represents the pod IP range assigned to the node
 	PodCIDR string `json:"podCIDR,omitempty" description:"pod IP range assigned to the node"`
 	// External ID of the node assigned by some machine database (e.g. a cloud provider)
-	ExternalID string `json:"externalID,omitempty" description:"external ID assigned to the node by some machine database (e.g. a cloud provider). Defaults to node name when empty."`
+	ExternalID string `json:"externalID,omitempty" description:"deprecated. External ID assigned to the node by some machine database (e.g. a cloud provider). Defaults to node name when empty."`
+	// ID of the node assigned by the cloud provider
+	ProviderID string `json:"providerID,omitempty" description:"ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>"`
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	Unschedulable bool `json:"unschedulable,omitempty" description:"disable pod scheduling on the node"`
 }

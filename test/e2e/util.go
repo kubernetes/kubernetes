@@ -19,7 +19,6 @@ package e2e
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
@@ -29,8 +28,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"code.google.com/p/go-uuid/uuid"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -42,6 +39,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"code.google.com/p/go-uuid/uuid"
+	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/crypto/ssh"
 
 	. "github.com/onsi/ginkgo"
@@ -58,6 +57,13 @@ const (
 
 	// How often to poll pods.
 	podPoll = 5 * time.Second
+
+	// service accounts are provisioned after namespace creation
+	// a service account is required to support pod creation in a namespace as part of admission control
+	serviceAccountProvisionTimeout = 2 * time.Minute
+
+	// How often to poll for service accounts
+	serviceAccountPoll = 5 * time.Second
 )
 
 type CloudConfig struct {
@@ -128,8 +134,8 @@ func logPodStates(pods []api.Pod) {
 		if len(pod.ObjectMeta.Name) > maxPodW {
 			maxPodW = len(pod.ObjectMeta.Name)
 		}
-		if len(pod.Spec.Host) > maxNodeW {
-			maxNodeW = len(pod.Spec.Host)
+		if len(pod.Spec.NodeName) > maxNodeW {
+			maxNodeW = len(pod.Spec.NodeName)
 		}
 		if len(pod.Status.Phase) > maxPhaseW {
 			maxPhaseW = len(pod.Status.Phase)
@@ -145,7 +151,7 @@ func logPodStates(pods []api.Pod) {
 		maxPodW, "POD", maxNodeW, "NODE", maxPhaseW, "PHASE", "CONDITIONS")
 	for _, pod := range pods {
 		Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %[7]s",
-			maxPodW, pod.ObjectMeta.Name, maxNodeW, pod.Spec.Host, maxPhaseW, pod.Status.Phase, pod.Status.Conditions)
+			maxPodW, pod.ObjectMeta.Name, maxNodeW, pod.Spec.NodeName, maxPhaseW, pod.Status.Phase, pod.Status.Conditions)
 	}
 	Logf("") // Final empty line helps for readability.
 }
@@ -156,12 +162,12 @@ func podRunningReady(p *api.Pod) (bool, error) {
 	// Check the phase is running.
 	if p.Status.Phase != api.PodRunning {
 		return false, fmt.Errorf("want pod '%s' on '%s' to be '%v' but was '%v'",
-			p.ObjectMeta.Name, p.Spec.Host, api.PodRunning, p.Status.Phase)
+			p.ObjectMeta.Name, p.Spec.NodeName, api.PodRunning, p.Status.Phase)
 	}
 	// Check the ready condition is true.
 	if !podReady(p) {
 		return false, fmt.Errorf("pod '%s' on '%s' didn't have condition {%v %v}; conditions: %v",
-			p.ObjectMeta.Name, p.Spec.Host, api.PodReady, api.ConditionTrue, p.Status.Conditions)
+			p.ObjectMeta.Name, p.Spec.NodeName, api.PodReady, api.ConditionTrue, p.Status.Conditions)
 
 	}
 	return true, nil
@@ -205,6 +211,20 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 	return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
 }
 
+func waitForServiceAccountInNamespace(c *client.Client, ns, serviceAccountName string, poll, timeout time.Duration) error {
+	Logf("Waiting up to %v for service account %s to be provisioned in ns %s", timeout, serviceAccountName, ns)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		_, err := c.ServiceAccounts(ns).Get(serviceAccountName)
+		if err != nil {
+			Logf("Get service account %s in ns %s failed, ignoring for %v: %v", serviceAccountName, ns, poll, err)
+			continue
+		}
+		Logf("Service account %s in ns %s found. (%v)", serviceAccountName, ns, time.Since(start))
+		return nil
+	}
+	return fmt.Errorf("Service account %s in namespace %s not ready within %v", serviceAccountName, ns, timeout)
+}
+
 func waitForPodCondition(c *client.Client, ns, podName, desc string, poll, timeout time.Duration, condition podCondition) error {
 	Logf("Waiting up to %v for pod %s status to be %s", timeout, podName, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
@@ -223,7 +243,15 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, poll, timeo
 	return fmt.Errorf("gave up waiting for pod '%s' to be '%s' after %v", podName, desc, timeout)
 }
 
+// waitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
+// the default service account is what is associated with pods when they do not specify a service account
+// as a result, pods are not able to be provisioned in a namespace until the service account is provisioned
+func waitForDefaultServiceAccountInNamespace(c *client.Client, namespace string) error {
+	return waitForServiceAccountInNamespace(c, namespace, "default", serviceAccountPoll, serviceAccountProvisionTimeout)
+}
+
 // createNS should be used by every test, note that we append a common prefix to the provided test name.
+// Please see NewFramework instead of using this directly.
 func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) {
 	namespaceObj := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
@@ -238,7 +266,13 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 
 func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
 	return waitForPodCondition(c, namespace, podName, "running", podPoll, podStartTimeout, func(pod *api.Pod) (bool, error) {
-		return (pod.Status.Phase == api.PodRunning), nil
+		if pod.Status.Phase == api.PodRunning {
+			return true, nil
+		}
+		if pod.Status.Phase == api.PodFailed {
+			return true, fmt.Errorf("Giving up; pod went into failed status: \n%s", spew.Sprintf("%#v", pod))
+		}
+		return false, nil
 	})
 }
 
@@ -265,15 +299,15 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 		if !ok {
 			Logf("No Status.Info for container '%s' in pod '%s' yet", contName, podName)
 		} else {
-			if ci.State.Termination != nil {
-				if ci.State.Termination.ExitCode == 0 {
+			if ci.State.Terminated != nil {
+				if ci.State.Terminated.ExitCode == 0 {
 					By("Saw pod success")
 					return true, nil
 				} else {
-					return true, fmt.Errorf("pod '%s' terminated with failure: %+v", podName, ci.State.Termination)
+					return true, fmt.Errorf("pod '%s' terminated with failure: %+v", podName, ci.State.Terminated)
 				}
 			} else {
-				Logf("Nil State.Termination for container '%s' in pod '%s' in namespace '%s' so far", contName, podName, namespace)
+				Logf("Nil State.Terminated for container '%s' in pod '%s' in namespace '%s' so far", contName, podName, namespace)
 			}
 		}
 		return false, nil
@@ -532,8 +566,8 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 		Failf("Failed to get pod status: %v", err)
 	}
 
-	By(fmt.Sprintf("Trying to get logs from host %s pod %s container %s: %v",
-		podStatus.Spec.Host, podStatus.Name, containerName, err))
+	By(fmt.Sprintf("Trying to get logs from node %s pod %s container %s: %v",
+		podStatus.Spec.NodeName, podStatus.Name, containerName, err))
 	var logs []byte
 	start := time.Now()
 
@@ -542,15 +576,15 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 		logs, err = c.Get().
 			Prefix("proxy").
 			Resource("nodes").
-			Name(podStatus.Spec.Host).
+			Name(podStatus.Spec.NodeName).
 			Suffix("containerLogs", ns, podStatus.Name, containerName).
 			Do().
 			Raw()
 		fmt.Sprintf("pod logs:%v\n", string(logs))
 		By(fmt.Sprintf("pod logs:%v\n", string(logs)))
 		if strings.Contains(string(logs), "Internal Error") {
-			By(fmt.Sprintf("Failed to get logs from host %q pod %q container %q: %v",
-				podStatus.Spec.Host, podStatus.Name, containerName, string(logs)))
+			By(fmt.Sprintf("Failed to get logs from node %q pod %q container %q: %v",
+				podStatus.Spec.NodeName, podStatus.Name, containerName, string(logs)))
 			time.Sleep(5 * time.Second)
 			continue
 		}
@@ -613,15 +647,15 @@ func Diff(oldPods *api.PodList, curPods *api.PodList) PodDiff {
 
 	// New pods will show up in the curPods list but not in oldPods. They have oldhostname/phase == nonexist.
 	for _, pod := range curPods.Items {
-		podInfoMap[pod.Name] = &podInfo{hostname: pod.Spec.Host, phase: string(pod.Status.Phase), oldHostname: nonExist, oldPhase: nonExist}
+		podInfoMap[pod.Name] = &podInfo{hostname: pod.Spec.NodeName, phase: string(pod.Status.Phase), oldHostname: nonExist, oldPhase: nonExist}
 	}
 
 	// Deleted pods will show up in the oldPods list but not in curPods. They have a hostname/phase == nonexist.
 	for _, pod := range oldPods.Items {
 		if info, ok := podInfoMap[pod.Name]; ok {
-			info.oldHostname, info.oldPhase = pod.Spec.Host, string(pod.Status.Phase)
+			info.oldHostname, info.oldPhase = pod.Spec.NodeName, string(pod.Status.Phase)
 		} else {
-			podInfoMap[pod.Name] = &podInfo{hostname: nonExist, phase: nonExist, oldHostname: pod.Spec.Host, oldPhase: string(pod.Status.Phase)}
+			podInfoMap[pod.Name] = &podInfo{hostname: nonExist, phase: nonExist, oldHostname: pod.Spec.NodeName, oldPhase: string(pod.Status.Phase)}
 		}
 	}
 	return podInfoMap
@@ -733,7 +767,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 					failedContainers = failedContainers + v.restarts
 				}
 			} else if p.Status.Phase == api.PodPending {
-				if p.Spec.Host == "" {
+				if p.Spec.NodeName == "" {
 					waiting++
 				} else {
 					pending++
@@ -869,10 +903,10 @@ func FailedContainers(pod api.Pod) map[string]ContainerFailures {
 		return nil
 	} else {
 		for _, status := range statuses {
-			if status.State.Termination != nil {
-				states[status.ContainerID] = ContainerFailures{status: status.State.Termination}
-			} else if status.LastTerminationState.Termination != nil {
-				states[status.ContainerID] = ContainerFailures{status: status.LastTerminationState.Termination}
+			if status.State.Terminated != nil {
+				states[status.ContainerID] = ContainerFailures{status: status.State.Terminated}
+			} else if status.LastTerminationState.Terminated != nil {
+				states[status.ContainerID] = ContainerFailures{status: status.LastTerminationState.Terminated}
 			}
 			if status.RestartCount > 0 {
 				var ok bool
@@ -956,41 +990,7 @@ func SSH(cmd, host, provider string) (string, string, int, error) {
 		return "", "", 0, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
 	}
 
-	// Setup the config, dial the server, and open a session.
-	config := &ssh.ClientConfig{
-		User: os.Getenv("USER"),
-		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
-	}
-	client, err := ssh.Dial("tcp", host, config)
-	if err != nil {
-		return "", "", 0, fmt.Errorf("error getting SSH client to host %s: '%v'", host, err)
-	}
-	session, err := client.NewSession()
-	if err != nil {
-		return "", "", 0, fmt.Errorf("error creating session to host %s: '%v'", host, err)
-	}
-	defer session.Close()
-
-	// Run the command.
-	code := 0
-	var bout, berr bytes.Buffer
-	session.Stdout, session.Stderr = &bout, &berr
-	if err = session.Run(cmd); err != nil {
-		// Check whether the command failed to run or didn't complete.
-		if exiterr, ok := err.(*ssh.ExitError); ok {
-			// If we got an ExitError and the exit code is nonzero, we'll
-			// consider the SSH itself successful (just that the command run
-			// errored on the host).
-			if code = exiterr.ExitStatus(); code != 0 {
-				err = nil
-			}
-		} else {
-			// Some other kind of error happened (e.g. an IOError); consider the
-			// SSH unsuccessful.
-			err = fmt.Errorf("failed running `%s` on %s: '%v'", cmd, host, err)
-		}
-	}
-	return bout.String(), berr.String(), code, err
+	return util.RunSSHCommand(cmd, host, signer)
 }
 
 // getSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
@@ -1012,21 +1012,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 	key := filepath.Join(keydir, keyfile)
 	Logf("Using SSH key: %s", key)
 
-	// Create an actual signer.
-	file, err := os.Open(key)
-	if err != nil {
-		return nil, fmt.Errorf("error opening SSH key %s: '%v'", key, err)
-	}
-	defer file.Close()
-	buffer, err := ioutil.ReadAll(file)
-	if err != nil {
-		return nil, fmt.Errorf("error reading SSH key %s: '%v'", key, err)
-	}
-	signer, err := ssh.ParsePrivateKey(buffer)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", key, err)
-	}
-	return signer, nil
+	return util.MakePrivateKeySigner(key)
 }
 
 // LatencyMetrics stores data about request latency at a given quantile

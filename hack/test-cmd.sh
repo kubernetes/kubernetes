@@ -94,7 +94,7 @@ kube::log::status "Starting kube-apiserver"
   --kubelet_port=${KUBELET_PORT} \
   --runtime_config=api/v1beta3 \
   --cert_dir="${TMPDIR:-/tmp/}" \
-  --portal_net="10.0.0.0/24" 1>&2 &
+  --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
@@ -171,7 +171,7 @@ for version in "${kube_api_versions[@]}"; do
   kube::test::get_object_assert 'pod/valid-pod' "{{$id_field}}" 'valid-pod'
   kube::test::get_object_assert 'pods/valid-pod' "{{$id_field}}" 'valid-pod'
   # Describe command should print detailed information
-  kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image(s):" "Host:" "Labels:" "Status:" "Replication Controllers"
+  kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image(s):" "Node:" "Labels:" "Status:" "Replication Controllers"
 
   ### Dump current valid-pod POD
   output_pod=$(kubectl get pod valid-pod -o yaml --output-version=v1beta3 "${kube_flags[@]}")

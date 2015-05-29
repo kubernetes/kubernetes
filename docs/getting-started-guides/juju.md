@@ -96,26 +96,24 @@ We'll follow the aws-coreos example. Create a pod manifest: `pod.json`
 
 ```
 {
-  "id": "hello",
+  "apiVersion": "v1beta3",
   "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "hello",
-      "containers": [{
-        "name": "hello",
-        "image": "quay.io/kelseyhightower/hello",
-        "ports": [{
-          "containerPort": 80,
-          "hostPort": 80
-        }]
-      }]
+  "metadata": {
+    "name": "hello",
+    "labels": {
+      "name": "hello",
+      "environment": "testing"
     }
   },
-  "labels": {
-    "name": "hello",
-    "environment": "testing"
+  "spec": {
+    "containers": [{
+      "name": "hello",
+      "image": "quay.io/kelseyhightower/hello",
+      "ports": [{
+        "containerPort": 80,
+        "hostPort": 80
+      }]
+    }]
   }
 }
 ```

@@ -269,7 +269,7 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&pod.Spec))
-		fmt.Fprintf(out, "Host:\t%s\n", pod.Spec.Host+"/"+pod.Status.HostIP)
+		fmt.Fprintf(out, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
 		fmt.Fprintf(out, "Status:\t%s\n", string(pod.Status.Phase))
 		fmt.Fprintf(out, "Replication Controllers:\t%s\n", printReplicationControllersByLabels(rcs))
@@ -349,20 +349,20 @@ func describeContainers(containers []api.ContainerStatus, out io.Writer) {
 			if container.State.Waiting.Reason != "" {
 				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Waiting.Reason)
 			}
-		case container.State.Termination != nil:
+		case container.State.Terminated != nil:
 			fmt.Fprintf(out, "    State:\tTerminated\n")
-			if container.State.Termination.Reason != "" {
-				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Termination.Reason)
+			if container.State.Terminated.Reason != "" {
+				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Terminated.Reason)
 			}
-			if container.State.Termination.Message != "" {
-				fmt.Fprintf(out, "      Message:\t%s\n", container.State.Termination.Message)
+			if container.State.Terminated.Message != "" {
+				fmt.Fprintf(out, "      Message:\t%s\n", container.State.Terminated.Message)
 			}
-			fmt.Fprintf(out, "      Exit Code:\t%d\n", container.State.Termination.ExitCode)
-			if container.State.Termination.Signal > 0 {
-				fmt.Fprintf(out, "      Signal:\t%d\n", container.State.Termination.Signal)
+			fmt.Fprintf(out, "      Exit Code:\t%d\n", container.State.Terminated.ExitCode)
+			if container.State.Terminated.Signal > 0 {
+				fmt.Fprintf(out, "      Signal:\t%d\n", container.State.Terminated.Signal)
 			}
-			fmt.Fprintf(out, "      Started:\t%s\n", container.State.Termination.StartedAt.Time.Format(time.RFC1123Z))
-			fmt.Fprintf(out, "      Finished:\t%s\n", container.State.Termination.FinishedAt.Time.Format(time.RFC1123Z))
+			fmt.Fprintf(out, "      Started:\t%s\n", container.State.Terminated.StartedAt.Time.Format(time.RFC1123Z))
+			fmt.Fprintf(out, "      Finished:\t%s\n", container.State.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
 		default:
 			fmt.Fprintf(out, "    State:\tWaiting\n")
 		}
@@ -506,7 +506,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
 		fmt.Fprintf(out, "Type:\t%s\n", service.Spec.Type)
-		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.PortalIP)
+		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.ClusterIP)
 		if len(service.Status.LoadBalancer.Ingress) > 0 {
 			list := buildIngressString(service.Status.LoadBalancer.Ingress)
 			fmt.Fprintf(out, "LoadBalancer Ingress:\t%s\n", list)
@@ -520,9 +520,9 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			}
 			fmt.Fprintf(out, "Port:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
 			if sp.NodePort != 0 {
-				fmt.Fprintf(out, "NodePort:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
+				fmt.Fprintf(out, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
 			}
-			fmt.Fprintf(out, "Endpoints:\t%s\t%s\n", name, formatEndpoints(endpoints, util.NewStringSet(sp.Name)))
+			fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints, util.NewStringSet(sp.Name)))
 		}
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {
@@ -612,7 +612,7 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 	}
 	for i := range allPods.Items {
 		pod := &allPods.Items[i]
-		if pod.Spec.Host != name {
+		if pod.Spec.NodeName != name {
 			continue
 		}
 		pods = append(pods, pod)

@@ -63,6 +63,10 @@ func (f *Framework) beforeEach() {
 	Expect(err).NotTo(HaveOccurred())
 
 	f.Namespace = namespace
+
+	By("Waiting for a default service account to be provisioned in namespace")
+	err = waitForDefaultServiceAccountInNamespace(c, namespace.Name)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 // afterEach deletes the namespace, after reading its events.

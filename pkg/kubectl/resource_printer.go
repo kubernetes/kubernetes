@@ -317,7 +317,7 @@ func formatEndpoints(endpoints *api.Endpoints, ports util.StringSet) string {
 	list := []string{}
 	max := 3
 	more := false
-Loop:
+	count := 0
 	for i := range endpoints.Subsets {
 		ss := &endpoints.Subsets[i]
 		for i := range ss.Ports {
@@ -326,17 +326,19 @@ Loop:
 				for i := range ss.Addresses {
 					if len(list) == max {
 						more = true
-						break Loop
 					}
 					addr := &ss.Addresses[i]
-					list = append(list, fmt.Sprintf("%s:%d", addr.IP, port.Port))
+					if !more {
+						list = append(list, fmt.Sprintf("%s:%d", addr.IP, port.Port))
+					}
+					count++
 				}
 			}
 		}
 	}
 	ret := strings.Join(list, ",")
 	if more {
-		ret += "..."
+		return fmt.Sprintf("%s + %d more...", ret, count-max)
 	}
 	return ret
 }
@@ -379,7 +381,7 @@ func interpretContainerStatus(status *api.ContainerStatus) (string, string, stri
 	} else if state.Running != nil {
 		// Get the information of the last termination state. This is useful if
 		// a container is stuck in a crash loop.
-		message := getTermMsg(status.LastTerminationState.Termination)
+		message := getTermMsg(status.LastTerminationState.Terminated)
 		if message != "" {
 			message = "last termination: " + message
 		}
@@ -388,8 +390,8 @@ func interpretContainerStatus(status *api.ContainerStatus) (string, string, stri
 			stateMsg = stateMsg + " *not ready*"
 		}
 		return stateMsg, translateTimestamp(state.Running.StartedAt), message, nil
-	} else if state.Termination != nil {
-		return "Terminated", translateTimestamp(state.Termination.StartedAt), getTermMsg(state.Termination), nil
+	} else if state.Terminated != nil {
+		return "Terminated", translateTimestamp(state.Terminated.StartedAt), getTermMsg(state.Terminated), nil
 	}
 	return "", "", "", fmt.Errorf("unknown container state %#v", *state)
 }
@@ -406,7 +408,7 @@ func printPod(pod *api.Pod, w io.Writer, withNamespace bool) error {
 		name,
 		pod.Status.PodIP,
 		"", "",
-		podHostString(pod.Spec.Host, pod.Status.HostIP),
+		podHostString(pod.Spec.NodeName, pod.Status.HostIP),
 		formatLabels(pod.Labels),
 		pod.Status.Phase,
 		translateTimestamp(pod.CreationTimestamp),
@@ -551,7 +553,7 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool) error {
 		name = svc.Name
 	}
 
-	ips := []string{svc.Spec.PortalIP}
+	ips := []string{svc.Spec.ClusterIP}
 
 	ingress := svc.Status.LoadBalancer.Ingress
 	for i := range ingress {

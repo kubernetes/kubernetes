@@ -208,7 +208,7 @@ func (ec2 *FakeEC2) AttachVolume(volumeID, instanceId, mountDevice string) (resp
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DetachVolume(volumeID, instanceId, mountDevice string) (resp *ec2.VolumeAttachment, err error) {
+func (ec2 *FakeEC2) DetachVolume(request *ec2.DetachVolumeInput) (resp *ec2.VolumeAttachment, err error) {
 	panic("Not implemented")
 }
 

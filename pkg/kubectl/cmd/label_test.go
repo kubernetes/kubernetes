@@ -125,6 +125,14 @@ func TestParseLabels(t *testing.T) {
 			labels:    []string{"a=b", "c=d", "a-"},
 			expectErr: true,
 		},
+		{
+			labels:    []string{"a="},
+			expectErr: true,
+		},
+		{
+			labels:    []string{"a=%^$"},
+			expectErr: true,
+		},
 	}
 	for _, test := range tests {
 		labels, remove, err := parseLabels(test.labels)

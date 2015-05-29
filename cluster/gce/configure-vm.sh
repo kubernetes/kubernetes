@@ -250,7 +250,7 @@ instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 node_instance_prefix: '$(echo "$NODE_INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 allocate_node_cidrs: '$(echo "$ALLOCATE_NODE_CIDRS" | sed -e "s/'/''/g")'
-portal_net: '$(echo "$PORTAL_NET" | sed -e "s/'/''/g")'
+service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 enable_cluster_monitoring: '$(echo "$ENABLE_CLUSTER_MONITORING" | sed -e "s/'/''/g")'
 enable_node_monitoring: '$(echo "$ENABLE_NODE_MONITORING" | sed -e "s/'/''/g")'
 enable_cluster_logging: '$(echo "$ENABLE_CLUSTER_LOGGING" | sed -e "s/'/''/g")'
@@ -437,15 +437,22 @@ function download-release() {
   # store it when we download, and then when it's different infer that
   # a push occurred (otherwise it's a simple reboot).
 
-  echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
-  download-or-bust "$SERVER_BINARY_TAR_URL"
+  # In case of failure of unpacking Salt tree (the last command in the
+  # "until" block) retry downloading both release and Salt tars.
+  until
+    echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
+    download-or-bust "$SERVER_BINARY_TAR_URL"
 
-  echo "Downloading Salt tar ($SALT_TAR_URL)"
-  download-or-bust "$SALT_TAR_URL"
+    echo "Downloading Salt tar ($SALT_TAR_URL)"
+    download-or-bust "$SALT_TAR_URL"
 
-  echo "Unpacking Salt tree"
-  rm -rf kubernetes
-  tar xzf "${SALT_TAR_URL##*/}"
+    echo "Unpacking Salt tree"
+    rm -rf kubernetes
+    tar xzf "${SALT_TAR_URL##*/}"
+  do
+    sleep 15
+    echo "Couldn't unpack Salt tree. Retrying..."
+  done
 
   echo "Running release install script"
   sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"

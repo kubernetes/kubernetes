@@ -42,6 +42,10 @@ import (
 	"google.golang.org/cloud/compute/metadata"
 )
 
+const ProviderName = "gce"
+
+const EXTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
+
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service          *compute.Service
@@ -65,7 +69,7 @@ type Config struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("gce", func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
 }
 
 func getMetadata(url string) (string, error) {
@@ -178,6 +182,11 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 
 func (gce *GCECloud) Clusters() (cloudprovider.Clusters, bool) {
 	return gce, true
+}
+
+// ProviderName returns the cloud provider ID.
+func (gce *GCECloud) ProviderName() string {
+	return ProviderName
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Google Compute Engine.
@@ -466,10 +475,10 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (gce *GCECloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
-	externalIP, err := gce.getExternalIP(instance)
+func (gce *GCECloud) NodeAddresses(_ string) ([]api.NodeAddress, error) {
+	externalIP, err := gce.metadataAccess(EXTERNAL_IP_METADATA_URL)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get external IP for instance %s: %v", instance, err)
+		return nil, fmt.Errorf("couldn't get external IP: %v", err)
 	}
 
 	return []api.NodeAddress{
@@ -479,25 +488,18 @@ func (gce *GCECloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
 	}, nil
 }
 
-func (gce *GCECloud) getExternalIP(instance string) (string, error) {
-	inst, err := gce.getInstanceByName(instance)
-	if err != nil {
-		return "", err
-	}
-	ip := net.ParseIP(inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
-	if ip == nil {
-		return "", fmt.Errorf("invalid network IP: %s", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
-	}
-	return ip.String(), nil
-}
-
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (gce *GCECloud) ExternalID(instance string) (string, error) {
 	inst, err := gce.getInstanceByName(instance)
 	if err != nil {
 		return "", err
 	}
 	return strconv.FormatUint(inst.Id, 10), nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (gce *GCECloud) InstanceID(instance string) (string, error) {
+	return gce.projectID + "/" + gce.zone + "/" + canonicalizeInstanceName(instance), nil
 }
 
 // List is an implementation of Instances.List.

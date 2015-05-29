@@ -213,7 +213,7 @@ func (ks *kube2sky) handleEndpointAdd(obj interface{}) {
 
 func (ks *kube2sky) generateRecordsForPortalService(subdomain string, service *kapi.Service) error {
 	for i := range service.Spec.Ports {
-		b, err := json.Marshal(getSkyMsg(service.Spec.PortalIP, service.Spec.Ports[i].Port))
+		b, err := json.Marshal(getSkyMsg(service.Spec.ClusterIP, service.Spec.Ports[i].Port))
 		if err != nil {
 			return err
 		}
@@ -229,7 +229,7 @@ func (ks *kube2sky) addDNS(subdomain string, service *kapi.Service) error {
 	if len(service.Spec.Ports) == 0 {
 		glog.Fatalf("unexpected service with no ports: %v", service)
 	}
-	// if PortalIP is not set, a DNS entry should not be created
+	// if ClusterIP is not set, a DNS entry should not be created
 	if !kapi.IsServiceIPSet(service) {
 		return ks.newHeadlessService(subdomain, service)
 	}

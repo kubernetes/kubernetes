@@ -428,7 +428,7 @@ func chooseHostInterfaceNativeGo() (net.IP, error) {
 	if ip == nil {
 		return nil, fmt.Errorf("no acceptable interface from host")
 	}
-	glog.V(4).Infof("Choosing interface %s for from-host portals", intfs[i].Name)
+	glog.V(4).Infof("Choosing interface %s (IP %v) as default", intfs[i].Name, ip)
 	return ip, nil
 }
 

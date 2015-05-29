@@ -41,6 +41,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const ProviderName = "aws"
+
 // Abstraction over EC2, to allow mocking/other implementations
 type EC2 interface {
 	// Query EC2 for instances matching the filter
@@ -48,9 +50,8 @@ type EC2 interface {
 
 	// Attach a volume to an instance
 	AttachVolume(volumeID, instanceId, mountDevice string) (resp *ec2.VolumeAttachment, err error)
-	// Detach a volume from whatever instance it is attached to
-	// TODO: We should specify the InstanceID and the Device, for safety
-	DetachVolume(volumeID, instanceId, mountDevice string) (resp *ec2.VolumeAttachment, err error)
+	// Detach a volume from an instance it is attached to
+	DetachVolume(request *ec2.DetachVolumeInput) (resp *ec2.VolumeAttachment, err error)
 	// Lists volumes
 	Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.DescribeVolumesOutput, err error)
 	// Create an EBS volume
@@ -224,13 +225,8 @@ func (s *awsSdkEC2) AttachVolume(volumeID, instanceId, device string) (resp *ec2
 	return s.ec2.AttachVolume(&request)
 }
 
-func (s *awsSdkEC2) DetachVolume(volumeID, instanceId, device string) (resp *ec2.VolumeAttachment, err error) {
-	request := ec2.DetachVolumeInput{
-		Device:     &device,
-		InstanceID: &instanceId,
-		VolumeID:   &volumeID,
-	}
-	return s.ec2.DetachVolume(&request)
+func (s *awsSdkEC2) DetachVolume(request *ec2.DetachVolumeInput) (*ec2.VolumeAttachment, error) {
+	return s.ec2.DetachVolume(request)
 }
 
 func (s *awsSdkEC2) Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.DescribeVolumesOutput, err error) {
@@ -250,7 +246,7 @@ func (s *awsSdkEC2) DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput,
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		metadata := &awsSdkMetadata{}
 		return newAWSCloud(config, getAuth, metadata)
 	})
@@ -366,6 +362,11 @@ func (aws *AWSCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
+// ProviderName returns the cloud provider ID.
+func (aws *AWSCloud) ProviderName() string {
+	return ProviderName
+}
+
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Amazon Web Services.
 func (aws *AWSCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return nil, false
@@ -420,13 +421,24 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	return addresses, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (aws *AWSCloud) ExternalID(name string) (string, error) {
 	inst, err := aws.getInstancesByDnsName(name)
 	if err != nil {
 		return "", err
 	}
 	return *inst.InstanceID, nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (aws *AWSCloud) InstanceID(name string) (string, error) {
+	inst, err := aws.getInstancesByDnsName(name)
+	if err != nil {
+		return "", err
+	}
+	// In the future it is possible to also return an endpoint as:
+	// <endpoint>/<zone>/<instanceid>
+	return "/" + *inst.Placement.AvailabilityZone + "/" + *inst.InstanceID, nil
 }
 
 // Return the instances matching the relevant private dns name.
@@ -963,6 +975,27 @@ func (aws *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
 	return i, nil
 }
 
+// Gets the awsInstance named instanceName, or the 'self' instance if instanceName == ""
+func (aws *AWSCloud) getAwsInstance(instanceName string) (*awsInstance, error) {
+	var awsInstance *awsInstance
+	var err error
+	if instanceName == "" {
+		awsInstance, err = aws.getSelfAWSInstance()
+		if err != nil {
+			return nil, fmt.Errorf("error getting self-instance: %v", err)
+		}
+	} else {
+		instance, err := aws.getInstancesByDnsName(instanceName)
+		if err != nil {
+			return nil, fmt.Errorf("error finding instance: %v", err)
+		}
+
+		awsInstance = newAWSInstance(aws.ec2, *instance.InstanceID)
+	}
+
+	return awsInstance, nil
+}
+
 // Implements Volumes.AttachDisk
 func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) (string, error) {
 	disk, err := newAWSDisk(aws.ec2, diskName)
@@ -970,19 +1003,9 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 		return "", err
 	}
 
-	var awsInstance *awsInstance
-	if instanceName == "" {
-		awsInstance, err = aws.getSelfAWSInstance()
-		if err != nil {
-			return "", fmt.Errorf("Error getting self-instance: %v", err)
-		}
-	} else {
-		instance, err := aws.getInstancesByDnsName(instanceName)
-		if err != nil {
-			return "", fmt.Errorf("Error finding instance: %v", err)
-		}
-
-		awsInstance = newAWSInstance(aws.ec2, *instance.InstanceID)
+	awsInstance, err := aws.getAwsInstance(instanceName)
+	if err != nil {
+		return "", err
 	}
 
 	if readOnly {
@@ -1035,8 +1058,17 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 		return err
 	}
 
-	// TODO: We should specify the InstanceID and the Device, for safety
-	response, err := aws.ec2.DetachVolume(disk.awsID, instanceName, diskName)
+	awsInstance, err := aws.getAwsInstance(instanceName)
+	if err != nil {
+		return err
+	}
+
+	request := ec2.DetachVolumeInput{
+		InstanceID: &awsInstance.awsID,
+		VolumeID:   &disk.awsID,
+	}
+
+	response, err := aws.ec2.DetachVolume(&request)
 	if err != nil {
 		return fmt.Errorf("error detaching EBS volume: %v", err)
 	}

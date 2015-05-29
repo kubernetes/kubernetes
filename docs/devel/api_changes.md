@@ -254,6 +254,12 @@ regenerate auto-generated ones. To regenerate them:
    $ hack/update-generated-conversions.sh
 ```
 
+If running the above script is impossible due to compile errors, the easiest
+workaround is to comment out the code causing errors and let the script to
+regenerate it. If the auto-generated conversion methods are not used by the
+manually-written ones, it's fine to just remove the whole file and let the
+generator to create it from scratch.
+
 Unsurprisingly, adding manually written conversion also requires you to add tests to
 `pkg/api/<version>/conversion_test.go`.
 

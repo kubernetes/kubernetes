@@ -27,17 +27,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-// Repair is a controller loop that periodically examines all service PortalIP allocations
+// Repair is a controller loop that periodically examines all service ClusterIP allocations
 // and logs any errors, and then sets the compacted and accurate list of all allocated IPs.
 //
 // Handles:
-// * Duplicate PortalIP assignments caused by operator action or undetected race conditions
-// * PortalIPs that do not match the current portal network
+// * Duplicate ClusterIP assignments caused by operator action or undetected race conditions
+// * ClusterIPs that do not match the currently configured range
 // * Allocations to services that were not actually created due to a crash or powerloss
 // * Migrates old versions of Kubernetes services into the atomic ipallocator model automatically
 //
 // Can be run at infrequent intervals, and is best performed on startup of the master.
-// Is level driven and idempotent - all valid PortalIPs will be updated into the ipallocator
+// Is level driven and idempotent - all valid ClusterIPs will be updated into the ipallocator
 // map at the end of a single execution loop if no race is encountered.
 //
 // TODO: allocate new IPs if necessary
@@ -49,7 +49,7 @@ type Repair struct {
 	alloc    service.RangeRegistry
 }
 
-// NewRepair creates a controller that periodically ensures that all portalIPs are uniquely allocated across the cluster
+// NewRepair creates a controller that periodically ensures that all clusterIPs are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
 func NewRepair(interval time.Duration, registry service.Registry, network *net.IPNet, alloc service.RangeRegistry) *Repair {
 	return &Repair{
@@ -69,7 +69,7 @@ func (c *Repair) RunUntil(ch chan struct{}) {
 	}, c.interval, ch)
 }
 
-// RunOnce verifies the state of the portal IP allocations and returns an error if an unrecoverable problem occurs.
+// RunOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) RunOnce() error {
 	// TODO: (per smarterclayton) if Get() or ListServices() is a weak consistency read,
 	// or if they are executed against different leaders,
@@ -94,27 +94,27 @@ func (c *Repair) RunOnce() error {
 		if !api.IsServiceIPSet(&svc) {
 			continue
 		}
-		ip := net.ParseIP(svc.Spec.PortalIP)
+		ip := net.ParseIP(svc.Spec.ClusterIP)
 		if ip == nil {
-			// portal IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the portal IP %s for service %s/%s is not a valid IP; please recreate", svc.Spec.PortalIP, svc.Name, svc.Namespace))
+			// cluster IP is broken, reallocate
+			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not a valid IP; please recreate", svc.Spec.ClusterIP, svc.Name, svc.Namespace))
 			continue
 		}
 		switch err := r.Allocate(ip); err {
 		case nil:
 		case ipallocator.ErrAllocated:
 			// TODO: send event
-			// portal IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the portal IP %s for service %s/%s was assigned to multiple services; please recreate", ip, svc.Name, svc.Namespace))
+			// cluster IP is broken, reallocate
+			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s was assigned to multiple services; please recreate", ip, svc.Name, svc.Namespace))
 		case ipallocator.ErrNotInRange:
 			// TODO: send event
-			// portal IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the portal IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
+			// cluster IP is broken, reallocate
+			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
 		case ipallocator.ErrFull:
 			// TODO: send event
 			return fmt.Errorf("the service CIDR %s is full; you must widen the CIDR in order to create new services")
 		default:
-			return fmt.Errorf("unable to allocate portal IP %s for service %s/%s due to an unknown error, exiting: %v", ip, svc.Name, svc.Namespace, err)
+			return fmt.Errorf("unable to allocate cluster IP %s for service %s/%s due to an unknown error, exiting: %v", ip, svc.Name, svc.Namespace, err)
 		}
 	}
 

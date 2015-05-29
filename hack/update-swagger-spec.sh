@@ -54,7 +54,7 @@ kube::log::status "Starting kube-apiserver"
   --public_address_override="127.0.0.1" \
   --kubelet_port=${KUBELET_PORT} \
   --runtime_config=api/v1beta3 \
-  --portal_net="10.0.0.0/24" 1>&2 &
+  --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "

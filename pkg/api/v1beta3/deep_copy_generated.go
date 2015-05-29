@@ -856,6 +856,7 @@ func deepCopy_v1beta3_NodeList(in NodeList, out *NodeList, c *conversion.Cloner)
 func deepCopy_v1beta3_NodeSpec(in NodeSpec, out *NodeSpec, c *conversion.Cloner) error {
 	out.PodCIDR = in.PodCIDR
 	out.ExternalID = in.ExternalID
+	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
 	return nil
 }
@@ -1515,14 +1516,6 @@ func deepCopy_v1beta3_ReplicationControllerSpec(in ReplicationControllerSpec, ou
 		}
 	} else {
 		out.Selector = nil
-	}
-	if in.TemplateRef != nil {
-		out.TemplateRef = new(ObjectReference)
-		if err := deepCopy_v1beta3_ObjectReference(*in.TemplateRef, out.TemplateRef, c); err != nil {
-			return err
-		}
-	} else {
-		out.TemplateRef = nil
 	}
 	if in.Template != nil {
 		out.Template = new(PodTemplateSpec)

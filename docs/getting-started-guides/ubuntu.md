@@ -48,7 +48,7 @@ export roles=("ai" "i" "i")
 
 export NUM_MINIONS=${NUM_MINIONS:-3}
 
-export PORTAL_NET=11.1.1.0/24
+export SERVICE_CLUSTER_IP_RANGE=11.1.1.0/24
 
 export FLANNEL_NET=172.16.0.0/16
 
@@ -61,7 +61,7 @@ Then the `roles ` variable defines the role of above machine in the same order, 
 
 The `NUM_MINIONS` variable defines the total number of minions.
 
-The `PORTAL_NET` variable defines the kubernetes service portal ip range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range accordin to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
+The `SERVICE_CLUSTER_IP_RANGE` variable defines the kubernetes service IP range. Please make sure that you do have a valid private ip range defined here, because some IaaS provider may reserve private ips. You can use below three private network range accordin to rfc1918. Besides you'd better not choose the one that conflicts with your own private network range.
 
      10.0.0.0        -   10.255.255.255  (10/8 prefix)
 
@@ -69,7 +69,7 @@ The `PORTAL_NET` variable defines the kubernetes service portal ip range. Please
 
      192.168.0.0     -   192.168.255.255 (192.168/16 prefix) 
 
-The `FLANNEL_NET` variable defines the IP range used for flannel overlay network, should not conflict with above PORTAL_NET range
+The `FLANNEL_NET` variable defines the IP range used for flannel overlay network, should not conflict with above `SERVICE_CLUSTER_IP_RANGE`.
 
 After all the above variable being set correctly. We can use below command in cluster/ directory to bring up the whole cluster.
 
@@ -127,7 +127,7 @@ DNS_DOMAIN="kubernetes.local"
 DNS_REPLICAS=1
 
 ```
-The `DNS_SERVER_IP` is defining the ip of dns server which must be in the portal_net range.
+The `DNS_SERVER_IP` is defining the ip of dns server which must be in the service_cluster_ip_range.
 
 The `DNS_REPLICAS` describes how many dns pod running in the cluster.
 

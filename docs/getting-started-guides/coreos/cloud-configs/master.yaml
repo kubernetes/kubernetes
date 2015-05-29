@@ -116,7 +116,7 @@ coreos:
         --insecure_port=8080 \
         --kubelet_https=true \
         --secure_port=6443 \
-        --portal_net=10.100.0.0/16 \
+        --service-cluster-ip-range=10.100.0.0/16 \
         --etcd_servers=http://127.0.0.1:4001 \
         --public_address_override=${DEFAULT_IPV4} \
         --logtostderr=true

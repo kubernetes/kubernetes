@@ -61,7 +61,7 @@ systemctl stop iptables-services firewalld
 
 **Configure the kubernetes services on the master.**
 
-* Edit /etc/kubernetes/apiserver to appear as such.  The portal_net IP addresses must be an unused block of addresses, not used anywhere else.  They do not need to be routed or assigned to anything.
+* Edit /etc/kubernetes/apiserver to appear as such.  The service_cluster_ip_range IP addresses must be an unused block of addresses, not used anywhere else.  They do not need to be routed or assigned to anything.
 
 ```
 # The address on the local server to listen to.
@@ -71,7 +71,7 @@ KUBE_API_ADDRESS="--address=0.0.0.0"
 KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
 
 # Address range to use for services
-KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
+KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
 
 # Add your own!
 KUBE_API_ARGS=""

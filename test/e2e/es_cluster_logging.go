@@ -203,7 +203,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 						Command: []string{"bash", "-c", fmt.Sprintf("i=0; while ((i < %d)); do echo \"%d %s $i %s\"; i=$$(($i+1)); done", countTo, i, taintName, podName)},
 					},
 				},
-				Host:          node.Name,
+				NodeName:      node.Name,
 				RestartPolicy: api.RestartPolicyNever,
 			},
 		})

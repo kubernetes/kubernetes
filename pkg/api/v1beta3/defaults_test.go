@@ -334,6 +334,9 @@ func TestSetDefaultNodeExternalID(t *testing.T) {
 	if n2.Spec.ExternalID != name {
 		t.Errorf("Expected default External ID: %s, got: %s", name, n2.Spec.ExternalID)
 	}
+	if n2.Spec.ProviderID != "" {
+		t.Errorf("Expected empty default Cloud Provider ID, got: %s", n2.Spec.ProviderID)
+	}
 }
 
 func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {

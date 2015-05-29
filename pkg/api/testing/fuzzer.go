@@ -106,8 +106,8 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			j.Target.Name = c.RandString()
 		},
 		func(j *api.ReplicationControllerSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(j)   // fuzz self without calling this function again
-			j.TemplateRef = nil // this is required for round trip
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			//j.TemplateRef = nil // this is required for round trip
 		},
 		func(j *api.ReplicationControllerStatus, c fuzz.Continue) {
 			// only replicas round trips

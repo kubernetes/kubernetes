@@ -19,12 +19,16 @@ package tools
 import (
 	"errors"
 	"fmt"
+	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path"
 	"reflect"
+	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
@@ -529,9 +533,9 @@ func TestGuaranteedUpdate(t *testing.T) {
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet(key)
 	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
-		return obj, 0, nil
-	})
+	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+		return obj, nil
+	}))
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -548,15 +552,15 @@ func TestGuaranteedUpdate(t *testing.T) {
 	// Update an existing node.
 	callbackCalled := false
 	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
-	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
+	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 
 		if in.(*TestResource).Value != 1 {
 			t.Errorf("Callback input was not current set value")
 		}
 
-		return objUpdate, 0, nil
-	})
+		return objUpdate, nil
+	}))
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -575,6 +579,107 @@ func TestGuaranteedUpdate(t *testing.T) {
 	}
 }
 
+func TestGuaranteedUpdateTTL(t *testing.T) {
+	fakeClient := NewFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+	helper := NewEtcdHelper(fakeClient, codec, etcdtest.PathPrefix())
+	key := etcdtest.AddPrefix("/some/key")
+
+	// Create a new node.
+	fakeClient.ExpectNotFoundGet(key)
+	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
+		if res.TTL != 0 {
+			t.Fatalf("unexpected response meta: %#v", res)
+		}
+		ttl := uint64(10)
+		return obj, &ttl, nil
+	})
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	data, err := codec.Encode(obj)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	expect := string(data)
+	got := fakeClient.Data[key].R.Node.Value
+	if expect != got {
+		t.Errorf("Wanted %v, got %v", expect, got)
+	}
+	if fakeClient.Data[key].R.Node.TTL != 10 {
+		t.Errorf("expected TTL set: %d", fakeClient.Data[key].R.Node.TTL)
+	}
+
+	// Update an existing node.
+	callbackCalled := false
+	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
+	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
+		if res.TTL != 10 {
+			t.Fatalf("unexpected response meta: %#v", res)
+		}
+		callbackCalled = true
+
+		if in.(*TestResource).Value != 1 {
+			t.Errorf("Callback input was not current set value")
+		}
+
+		return objUpdate, nil, nil
+	})
+
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	data, err = codec.Encode(objUpdate)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	expect = string(data)
+	got = fakeClient.Data[key].R.Node.Value
+	if expect != got {
+		t.Errorf("Wanted %v, got %v", expect, got)
+	}
+	if fakeClient.Data[key].R.Node.TTL != 10 {
+		t.Errorf("expected TTL remained set: %d", fakeClient.Data[key].R.Node.TTL)
+	}
+
+	// Update an existing node and change ttl
+	callbackCalled = false
+	objUpdate = &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 3}
+	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
+		if res.TTL != 10 {
+			t.Fatalf("unexpected response meta: %#v", res)
+		}
+		callbackCalled = true
+
+		if in.(*TestResource).Value != 2 {
+			t.Errorf("Callback input was not current set value")
+		}
+
+		newTTL := uint64(20)
+		return objUpdate, &newTTL, nil
+	})
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	data, err = codec.Encode(objUpdate)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	expect = string(data)
+	got = fakeClient.Data[key].R.Node.Value
+	if expect != got {
+		t.Errorf("Wanted %v, got %v", expect, got)
+	}
+	if fakeClient.Data[key].R.Node.TTL != 20 {
+		t.Errorf("expected TTL changed: %d", fakeClient.Data[key].R.Node.TTL)
+	}
+
+	if !callbackCalled {
+		t.Errorf("tryUpdate callback should have been called.")
+	}
+}
+
 func TestGuaranteedUpdateNoChange(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
@@ -584,9 +689,9 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet(key)
 	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
-		return obj, 0, nil
-	})
+	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+		return obj, nil
+	}))
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -594,11 +699,11 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 	// Update an existing node with the same data
 	callbackCalled := false
 	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
+	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		fakeClient.Err = errors.New("should not be called")
 		callbackCalled = true
-		return objUpdate, 0, nil
-	})
+		return objUpdate, nil
+	}))
 	if err != nil {
 		t.Fatalf("Unexpected error %#v", err)
 	}
@@ -617,9 +722,9 @@ func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 	fakeClient.ExpectNotFoundGet(key)
 	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
 
-	f := func(in runtime.Object) (runtime.Object, uint64, error) {
-		return obj, 0, nil
-	}
+	f := SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+		return obj, nil
+	})
 
 	ignoreNotFound := false
 	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, ignoreNotFound, f)
@@ -654,7 +759,7 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 			defer wgDone.Done()
 
 			firstCall := true
-			err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
+			err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 				defer func() { firstCall = false }()
 
 				if firstCall {
@@ -665,8 +770,8 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 
 				currValue := in.(*TestResource).Value
 				obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: currValue + 1}
-				return obj, 0, nil
-			})
+				return obj, nil
+			}))
 			if err != nil {
 				t.Errorf("Unexpected error %#v", err)
 			}
@@ -711,7 +816,24 @@ func TestGetEtcdVersion_ErrorStatus(t *testing.T) {
 }
 
 func TestGetEtcdVersion_NotListening(t *testing.T) {
-	_, err := GetEtcdVersion("http://127.0.0.1:4001")
+	portIsOpen := func(port int) bool {
+		conn, err := net.DialTimeout("tcp", "127.0.0.1:"+strconv.Itoa(port), 1*time.Second)
+		if err == nil {
+			conn.Close()
+			return true
+		}
+		return false
+	}
+
+	port := rand.Intn((1 << 16) - 1)
+	for tried := 0; portIsOpen(port); tried++ {
+		if tried >= 10 {
+			t.Fatal("Couldn't find a closed TCP port to continue testing")
+		}
+		port++
+	}
+
+	_, err := GetEtcdVersion("http://127.0.0.1:" + strconv.Itoa(port))
 	assert.NotNil(t, err)
 }
 

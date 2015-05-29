@@ -44,7 +44,7 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 MINION_SCOPES=("storage-ro" "compute-rw" "https://www.googleapis.com/auth/logging.write" "https://www.googleapis.com/auth/monitoring")
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 POLL_SLEEP_INTERVAL=3
-PORTAL_NET="10.0.0.0/16"
+SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
 ENABLE_DOCKER_REGISTRY_CACHE=true
@@ -75,4 +75,4 @@ DNS_SERVER_IP="10.0.0.10"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
-ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota

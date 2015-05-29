@@ -36,6 +36,10 @@ ALLOCATE_NODE_CIDRS=true
 KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 
+function join_csv {
+  local IFS=','; echo "$*";
+}
+
 # Verify prereqs
 function verify-prereqs {
   local cmd
@@ -145,10 +149,10 @@ function already-staged() {
   local -r file=$1
   local -r newsum=$2
 
-  [[ -e "${file}.sha1" ]] || return 1
+  [[ -e "${file}.uploaded.sha1" ]] || return 1
 
   local oldsum
-  oldsum=$(cat "${file}.sha1")
+  oldsum=$(cat "${file}.uploaded.sha1")
 
   [[ "${oldsum}" == "${newsum}" ]]
 }
@@ -166,6 +170,7 @@ function copy-if-not-staged() {
     echo "${server_hash}" > "${tar}.sha1"
     gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
     gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha1" >/dev/null 2>&1
+    echo "${server_hash}" > "${tar}.uploaded.sha1"
   fi
 }
 
@@ -363,7 +368,7 @@ function create-firewall-rule {
       --network "${NETWORK}" \
       --source-ranges "$2" \
       --target-tags "$3" \
-      --allow tcp udp icmp esp ah sctp; then
+      --allow tcp,udp,icmp,esp,ah,sctp; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}"
           exit 2
@@ -459,7 +464,7 @@ function add-instance-metadata-from-file {
     if ! gcloud compute instances add-metadata "${instance}" \
       --project "${PROJECT}" \
       --zone "${ZONE}" \
-      --metadata-from-file $(IFS=, ; echo "${kvs[*]}"); then
+      --metadata-from-file "$(join_csv ${kvs[@]})"; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}"
           exit 2
@@ -575,7 +580,7 @@ function kube-up {
       --project "${PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "10.0.0.0/8" \
-      --allow "tcp:1-65535" "udp:1-65535" "icmp" &
+      --allow "tcp:1-65535,udp:1-65535,icmp" &
   fi
 
   if ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NETWORK}-default-ssh" &>/dev/null; then
@@ -637,7 +642,7 @@ function kube-up {
   # TODO(mbforbes): Refactor setting scope flags.
   local -a scope_flags=()
   if (( "${#MINION_SCOPES[@]}" > 0 )); then
-    scope_flags=("--scopes" "${MINION_SCOPES[@]}")
+    scope_flags=("--scopes" "$(join_csv ${MINION_SCOPES[@]})")
   else
     scope_flags=("--no-scopes")
   fi
@@ -665,8 +670,18 @@ function kube-up {
   echo "  up."
   echo
 
+  # curl in mavericks is borked.
+  secure=""
+  if which sw_vers > /dev/null; then
+    if [[ $(sw_vers | grep ProductVersion | awk '{print $2}') = "10.9."* ]]; then
+      secure="--insecure"
+    fi
+  fi
+
+
   until curl --cacert "${CERT_DIR}/pki/ca.crt" \
           -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
+          ${secure} \
           --max-time 5 --fail --output /dev/null --silent \
           "https://${KUBE_MASTER_IP}/api/v1beta3/pods"; do
       printf "."

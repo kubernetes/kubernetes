@@ -5,11 +5,16 @@
 package oauth2
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strconv"
 	"testing"
+	"time"
 
 	"golang.org/x/net/context"
 )
@@ -52,6 +57,15 @@ func TestAuthCodeURL(t *testing.T) {
 	conf := newConf("server")
 	url := conf.AuthCodeURL("foo", AccessTypeOffline, ApprovalForce)
 	if url != "server/auth?access_type=offline&approval_prompt=force&client_id=CLIENT_ID&redirect_uri=REDIRECT_URL&response_type=code&scope=scope1+scope2&state=foo" {
+		t.Errorf("Auth code URL doesn't match the expected, found: %v", url)
+	}
+}
+
+func TestAuthCodeURL_CustomParam(t *testing.T) {
+	conf := newConf("server")
+	param := SetAuthURLParam("foo", "bar")
+	url := conf.AuthCodeURL("baz", param)
+	if url != "server/auth?client_id=CLIENT_ID&foo=bar&redirect_uri=REDIRECT_URL&response_type=code&scope=scope1+scope2&state=baz" {
 		t.Errorf("Auth code URL doesn't match the expected, found: %v", url)
 	}
 }
@@ -158,6 +172,60 @@ func TestExchangeRequest_JSONResponse(t *testing.T) {
 	}
 }
 
+const day = 24 * time.Hour
+
+func TestExchangeRequest_JSONResponse_Expiry(t *testing.T) {
+	seconds := int32(day.Seconds())
+	jsonNumberType := reflect.TypeOf(json.Number("0"))
+	for _, c := range []struct {
+		expires string
+		expect  error
+	}{
+		{fmt.Sprintf(`"expires_in": %d`, seconds), nil},
+		{fmt.Sprintf(`"expires_in": "%d"`, seconds), nil},                                             // PayPal case
+		{fmt.Sprintf(`"expires": %d`, seconds), nil},                                                  // Facebook case
+		{`"expires": false`, &json.UnmarshalTypeError{Value: "bool", Type: jsonNumberType}},           // wrong type
+		{`"expires": {}`, &json.UnmarshalTypeError{Value: "object", Type: jsonNumberType}},            // wrong type
+		{`"expires": "zzz"`, &strconv.NumError{Func: "ParseInt", Num: "zzz", Err: strconv.ErrSyntax}}, // wrong value
+	} {
+		testExchangeRequest_JSONResponse_expiry(t, c.expires, c.expect)
+	}
+}
+
+func testExchangeRequest_JSONResponse_expiry(t *testing.T, exp string, expect error) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(fmt.Sprintf(`{"access_token": "90d", "scope": "user", "token_type": "bearer", %s}`, exp)))
+	}))
+	defer ts.Close()
+	conf := newConf(ts.URL)
+	t1 := time.Now().Add(day)
+	tok, err := conf.Exchange(NoContext, "exchange-code")
+	t2 := time.Now().Add(day)
+	// Do a fmt.Sprint comparison so either side can be
+	// nil. fmt.Sprint just stringifies them to "<nil>", and no
+	// non-nil expected error ever stringifies as "<nil>", so this
+	// isn't terribly disgusting.  We do this because Go 1.4 and
+	// Go 1.5 return a different deep value for
+	// json.UnmarshalTypeError.  In Go 1.5, the
+	// json.UnmarshalTypeError contains a new field with a new
+	// non-zero value.  Rather than ignore it here with reflect or
+	// add new files and +build tags, just look at the strings.
+	if fmt.Sprint(err) != fmt.Sprint(expect) {
+		t.Errorf("Error = %v; want %v", err, expect)
+	}
+	if err != nil {
+		return
+	}
+	if !tok.Valid() {
+		t.Fatalf("Token invalid. Got: %#v", tok)
+	}
+	expiry := tok.Expiry
+	if expiry.Before(t1) || expiry.After(t2) {
+		t.Errorf("Unexpected value for Expiry: %v (shold be between %v and %v)", expiry, t1, t2)
+	}
+}
+
 func TestExchangeRequest_BadResponse(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -210,6 +278,53 @@ func TestExchangeRequest_NonBasicAuth(t *testing.T) {
 	conf.Exchange(ctx, "code")
 }
 
+func TestPasswordCredentialsTokenRequest(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		expected := "/token"
+		if r.URL.String() != expected {
+			t.Errorf("URL = %q; want %q", r.URL, expected)
+		}
+		headerAuth := r.Header.Get("Authorization")
+		expected = "Basic Q0xJRU5UX0lEOkNMSUVOVF9TRUNSRVQ="
+		if headerAuth != expected {
+			t.Errorf("Authorization header = %q; want %q", headerAuth, expected)
+		}
+		headerContentType := r.Header.Get("Content-Type")
+		expected = "application/x-www-form-urlencoded"
+		if headerContentType != expected {
+			t.Errorf("Content-Type header = %q; want %q", headerContentType, expected)
+		}
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("Failed reading request body: %s.", err)
+		}
+		expected = "client_id=CLIENT_ID&grant_type=password&password=password1&scope=scope1+scope2&username=user1"
+		if string(body) != expected {
+			t.Errorf("res.Body = %q; want %q", string(body), expected)
+		}
+		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&scope=user&token_type=bearer"))
+	}))
+	defer ts.Close()
+	conf := newConf(ts.URL)
+	tok, err := conf.PasswordCredentialsToken(NoContext, "user1", "password1")
+	if err != nil {
+		t.Error(err)
+	}
+	if !tok.Valid() {
+		t.Fatalf("Token invalid. Got: %#v", tok)
+	}
+	expected := "90d64460d14870c08c81352a05dedd3465940a7c"
+	if tok.AccessToken != expected {
+		t.Errorf("AccessToken = %q; want %q", tok.AccessToken, expected)
+	}
+	expected = "bearer"
+	if tok.TokenType != expected {
+		t.Errorf("TokenType = %q; want %q", tok.TokenType, expected)
+	}
+}
+
 func TestTokenRefreshRequest(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == "/somethingelse" {
@@ -256,5 +371,52 @@ func TestFetchWithNoRefreshToken(t *testing.T) {
 	_, err := c.Get(ts.URL + "/somethingelse")
 	if err == nil {
 		t.Errorf("Fetch should return an error if no refresh token is set")
+	}
+}
+
+func TestRefreshToken_RefreshTokenReplacement(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"access_token":"ACCESS TOKEN",  "scope": "user", "token_type": "bearer", "refresh_token": "NEW REFRESH TOKEN"}`))
+		return
+	}))
+	defer ts.Close()
+	conf := newConf(ts.URL)
+	tkr := tokenRefresher{
+		conf:         conf,
+		ctx:          NoContext,
+		refreshToken: "OLD REFRESH TOKEN",
+	}
+	tk, err := tkr.Token()
+	if err != nil {
+		t.Errorf("Unexpected refreshToken error returned: %v", err)
+		return
+	}
+	if tk.RefreshToken != tkr.refreshToken {
+		t.Errorf("tokenRefresher.refresh_token = %s; want %s", tkr.refreshToken, tk.RefreshToken)
+	}
+}
+
+func TestConfigClientWithToken(t *testing.T) {
+	tok := &Token{
+		AccessToken: "abc123",
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got, want := r.Header.Get("Authorization"), fmt.Sprintf("Bearer %s", tok.AccessToken); got != want {
+			t.Errorf("Authorization header = %q; want %q", got, want)
+		}
+		return
+	}))
+	defer ts.Close()
+	conf := newConf(ts.URL)
+
+	c := conf.Client(NoContext, tok)
+	req, err := http.NewRequest("GET", ts.URL, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = c.Do(req)
+	if err != nil {
+		t.Error(err)
 	}
 }

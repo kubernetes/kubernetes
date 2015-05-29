@@ -33,6 +33,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
+const ProviderName = "ovirt"
+
 type OVirtInstance struct {
 	UUID      string
 	Name      string
@@ -75,7 +77,7 @@ type XmlVmsList struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("ovirt",
+	cloudprovider.RegisterCloudProvider(ProviderName,
 		func(config io.Reader) (cloudprovider.Interface, error) {
 			return newOVirtCloud(config)
 		})
@@ -113,6 +115,11 @@ func newOVirtCloud(config io.Reader) (*OVirtCloud, error) {
 
 func (aws *OVirtCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
+}
+
+// ProviderName returns the cloud provider ID.
+func (v *OVirtCloud) ProviderName() string {
+	return ProviderName
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for oVirt cloud
@@ -160,13 +167,24 @@ func (v *OVirtCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: address.String()}}, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (v *OVirtCloud) ExternalID(name string) (string, error) {
 	instance, err := v.fetchInstance(name)
 	if err != nil {
 		return "", err
 	}
 	return instance.UUID, nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (v *OVirtCloud) InstanceID(name string) (string, error) {
+	instance, err := v.fetchInstance(name)
+	if err != nil {
+		return "", err
+	}
+	// TODO: define a way to identify the provider instance to complete
+	// the format <provider_instance_id>/<instance_id>.
+	return "/" + instance.UUID, err
 }
 
 func getInstancesFromXml(body io.Reader) (OVirtInstanceMap, error) {

@@ -305,13 +305,13 @@ func deepCopy_api_ContainerState(in ContainerState, out *ContainerState, c *conv
 	} else {
 		out.Running = nil
 	}
-	if in.Termination != nil {
-		out.Termination = new(ContainerStateTerminated)
-		if err := deepCopy_api_ContainerStateTerminated(*in.Termination, out.Termination, c); err != nil {
+	if in.Terminated != nil {
+		out.Terminated = new(ContainerStateTerminated)
+		if err := deepCopy_api_ContainerStateTerminated(*in.Terminated, out.Terminated, c); err != nil {
 			return err
 		}
 	} else {
-		out.Termination = nil
+		out.Terminated = nil
 	}
 	return nil
 }
@@ -921,6 +921,7 @@ func deepCopy_api_NodeList(in NodeList, out *NodeList, c *conversion.Cloner) err
 func deepCopy_api_NodeSpec(in NodeSpec, out *NodeSpec, c *conversion.Cloner) error {
 	out.PodCIDR = in.PodCIDR
 	out.ExternalID = in.ExternalID
+	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
 	return nil
 }
@@ -1374,7 +1375,7 @@ func deepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 		out.NodeSelector = nil
 	}
 	out.ServiceAccount = in.ServiceAccount
-	out.Host = in.Host
+	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
 	if in.ImagePullSecrets != nil {
 		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
@@ -1580,14 +1581,6 @@ func deepCopy_api_ReplicationControllerSpec(in ReplicationControllerSpec, out *R
 		}
 	} else {
 		out.Selector = nil
-	}
-	if in.TemplateRef != nil {
-		out.TemplateRef = new(ObjectReference)
-		if err := deepCopy_api_ObjectReference(*in.TemplateRef, out.TemplateRef, c); err != nil {
-			return err
-		}
-	} else {
-		out.TemplateRef = nil
 	}
 	if in.Template != nil {
 		out.Template = new(PodTemplateSpec)
@@ -1927,7 +1920,7 @@ func deepCopy_api_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Cl
 	} else {
 		out.Selector = nil
 	}
-	out.PortalIP = in.PortalIP
+	out.ClusterIP = in.ClusterIP
 	out.Type = in.Type
 	if in.DeprecatedPublicIPs != nil {
 		out.DeprecatedPublicIPs = make([]string, len(in.DeprecatedPublicIPs))

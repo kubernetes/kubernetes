@@ -93,7 +93,7 @@ coreos:
         --etcd_servers=http://127.0.0.1:4001 \
         --logtostderr=true \
         --port=8080 \
-        --portal_net=PORTAL_NET \
+        --service-cluster-ip-range=SERVICE_CLUSTER_IP_RANGE \
         --token-auth-file=/var/lib/kube-apiserver/known_tokens.csv \
         --v=2
         Restart=always

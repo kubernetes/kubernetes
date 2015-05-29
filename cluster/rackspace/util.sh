@@ -164,7 +164,7 @@ rax-boot-master() {
       -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\\&}|" \
       -e "s|KUBE_USER|${KUBE_USER}|" \
       -e "s|KUBE_PASSWORD|${KUBE_PASSWORD}|" \
-      -e "s|PORTAL_NET|${PORTAL_NET}|" \
+      -e "s|SERVICE_CLUSTER_IP_RANGE|${SERVICE_CLUSTER_IP_RANGE}|" \
       -e "s|OS_AUTH_URL|${OS_AUTH_URL}|" \
       -e "s|OS_USERNAME|${OS_USERNAME}|" \
       -e "s|OS_PASSWORD|${OS_PASSWORD}|" \

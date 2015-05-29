@@ -92,7 +92,7 @@ func (s *SchedulerServer) Run(_ []string) error {
 		return err
 	}
 	kubeconfig.QPS = 20.0
-	kubeconfig.Burst = 100
+	kubeconfig.Burst = 30
 
 	kubeClient, err := client.New(kubeconfig)
 	if err != nil {

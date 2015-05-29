@@ -37,7 +37,7 @@ MINION_TAG="${INSTANCE_PREFIX}-minion"
 MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
 MINION_SCOPES=""
 POLL_SLEEP_INTERVAL=3
-PORTAL_NET="10.0.0.0/16"
+SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # If set to Elastic IP, master instance will be associated with this IP.
 # If set to auto, a new Elastic IP will be aquired
@@ -72,7 +72,7 @@ DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 
 # Optional: Enable/disable public IP assignment for minions.
 # Important Note: disable only if you have setup a NAT instance for internet access and configured appropriate routes!

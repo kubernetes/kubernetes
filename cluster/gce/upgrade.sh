@@ -159,7 +159,7 @@ function upgrade-nodes() {
   # TODO(mbforbes): Refactor setting scope flags.
   local -a scope_flags=()
   if (( "${#MINION_SCOPES[@]}" > 0 )); then
-    scope_flags=("--scopes" "${MINION_SCOPES[@]}")
+    scope_flags=("--scopes" "$(join_csv ${MINION_SCOPES[@]})")
   else
     scope_flags=("--no-scopes")
   fi

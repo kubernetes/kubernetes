@@ -157,8 +157,8 @@
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
-			"Comment": "v1.1.3-45-gd487287",
-			"Rev": "d4872876992d385f0e69b007f154e5633bdb40af"
+			"Comment": "v1.1.3-54-gbdfb7d4",
+			"Rev": "bdfb7d41639a84ea7c36df648e5865cd9fbf21e2"
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
@@ -475,7 +475,7 @@
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2",
-			"Rev": "2e66694fea36dc820636630792a55cdc6987e05b"
+			"Rev": "b5adcc2dcdf009d0391547edc6ecbaff889f5bb9"
 		},
 		{
 			"ImportPath": "google.golang.org/appengine",

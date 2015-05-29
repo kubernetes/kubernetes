@@ -35,10 +35,10 @@ func TestServiceSpreadPriority(t *testing.T) {
 		"baz": "blah",
 	}
 	zone1Spec := api.PodSpec{
-		Host: "machine1",
+		NodeName: "machine1",
 	}
 	zone2Spec := api.PodSpec{
-		Host: "machine2",
+		NodeName: "machine2",
 	}
 	tests := []struct {
 		pod          *api.Pod
@@ -191,13 +191,13 @@ func TestZoneSpreadPriority(t *testing.T) {
 		"name": "value",
 	}
 	zone0Spec := api.PodSpec{
-		Host: "machine01",
+		NodeName: "machine01",
 	}
 	zone1Spec := api.PodSpec{
-		Host: "machine11",
+		NodeName: "machine11",
 	}
 	zone2Spec := api.PodSpec{
-		Host: "machine21",
+		NodeName: "machine21",
 	}
 	labeledNodes := map[string]map[string]string{
 		"machine01": nozone, "machine02": nozone,
