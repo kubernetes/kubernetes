@@ -30,8 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
@@ -42,6 +40,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"code.google.com/p/go-uuid/uuid"
+	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/crypto/ssh"
 
 	. "github.com/onsi/ginkgo"
@@ -252,6 +252,7 @@ func waitForDefaultServiceAccountInNamespace(c *client.Client, namespace string)
 }
 
 // createNS should be used by every test, note that we append a common prefix to the provided test name.
+// Please see NewFramework instead of using this directly.
 func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) {
 	namespaceObj := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
@@ -270,7 +271,7 @@ func waitForPodRunningInNamespace(c *client.Client, podName string, namespace st
 			return true, nil
 		}
 		if pod.Status.Phase == api.PodFailed {
-			return true, fmt.Errorf("Giving up; pod went into failed status: \n%#v", pod.Status)
+			return true, fmt.Errorf("Giving up; pod went into failed status: \n%s", spew.Sprintf("%#v", pod))
 		}
 		return false, nil
 	})
