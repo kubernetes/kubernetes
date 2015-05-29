@@ -184,7 +184,7 @@ func StopRC(rc *api.ReplicationController, restClient *client.Client) error {
 	if err != nil || reaper == nil {
 		return err
 	}
-	_, err = reaper.Stop(rc.Namespace, rc.Name, nil)
+	_, err = reaper.Stop(rc.Namespace, rc.Name, 0, nil)
 	if err != nil {
 		return err
 	}

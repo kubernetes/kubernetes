@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -76,6 +77,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("ignore-not-found", false, "Treat \"resource not found\" as a successful delete.")
 	cmd.Flags().Bool("cascade", true, "If true, cascade the delete resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
 	cmd.Flags().Int("grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
+	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
 	return cmd
 }
 
@@ -102,12 +104,12 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	ignoreNotFound := cmdutil.GetFlagBool(cmd, "ignore-not-found")
 	// By default use a reaper to delete all related resources.
 	if cmdutil.GetFlagBool(cmd, "cascade") {
-		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagInt(cmd, "grace-period"))
+		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"))
 	}
 	return DeleteResult(r, out, ignoreNotFound)
 }
 
-func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, gracePeriod int) error {
+func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int) error {
 	found := 0
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -126,7 +128,7 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 		if gracePeriod >= 0 {
 			options = api.NewDeleteOptions(int64(gracePeriod))
 		}
-		if _, err := reaper.Stop(info.Namespace, info.Name, options); err != nil {
+		if _, err := reaper.Stop(info.Namespace, info.Name, timeout, options); err != nil {
 			return err
 		}
 		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
