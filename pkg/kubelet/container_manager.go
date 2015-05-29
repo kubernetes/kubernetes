@@ -20,5 +20,6 @@ package kubelet
 type containerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
+	// - Creates the system container where all non-containerized processes run.
 	Start() error
 }

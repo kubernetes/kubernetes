@@ -58,10 +58,12 @@
   {% set configure_cbr0 = "--configure-cbr0=" + pillar['allocate_node_cidrs'] -%}
 {% endif -%}
 
-# Run containers under the root cgroup.
+# Run containers under the root cgroup and create a system container.
+{% set system_container = "" -%}
 {% set cgroup_root = "" -%}
 {% if grains['os_family'] == 'Debian' -%}
+  {% set system_container = "--system-container=/system" -%}
   {% set cgroup_root = "--cgroup_root=/" -%}
 {% endif -%}
 
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{hostname_override}} {{cloud_provider}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{configure_cbr0}} {{cgroup_root}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{hostname_override}} {{cloud_provider}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}}"
