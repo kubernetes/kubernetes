@@ -58,6 +58,13 @@ const (
 
 	// How often to poll pods.
 	podPoll = 5 * time.Second
+
+	// service accounts are provisioned after namespace creation
+	// a service account is required to support pod creation in a namespace as part of admission control
+	serviceAccountProvisionTimeout = 2 * time.Minute
+
+	// How often to poll for service accounts
+	serviceAccountPoll = 5 * time.Second
 )
 
 type CloudConfig struct {
@@ -205,6 +212,20 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 	return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
 }
 
+func waitForServiceAccountInNamespace(c *client.Client, ns, serviceAccountName string, poll, timeout time.Duration) error {
+	Logf("Waiting up to %v for service account %s to be provisioned in ns %s", timeout, serviceAccountName, ns)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		_, err := c.ServiceAccounts(ns).Get(serviceAccountName)
+		if err != nil {
+			Logf("Get service account %s in ns %s failed, ignoring for %v: %v", serviceAccountName, ns, poll, err)
+			continue
+		}
+		Logf("Service account %s in ns %s found. (%v)", serviceAccountName, ns, time.Since(start))
+		return nil
+	}
+	return fmt.Errorf("Service account %s in namespace %s not ready within %v", serviceAccountName, ns, timeout)
+}
+
 func waitForPodCondition(c *client.Client, ns, podName, desc string, poll, timeout time.Duration, condition podCondition) error {
 	Logf("Waiting up to %v for pod %s status to be %s", timeout, podName, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
@@ -221,6 +242,13 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, poll, timeo
 			podName, ns, desc, pod.Status.Phase, podReady(pod), time.Since(start))
 	}
 	return fmt.Errorf("gave up waiting for pod '%s' to be '%s' after %v", podName, desc, timeout)
+}
+
+// waitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
+// the default service account is what is associated with pods when they do not specify a service account
+// as a result, pods are not able to be provisioned in a namespace until the service account is provisioned
+func waitForDefaultServiceAccountInNamespace(c *client.Client, namespace string) error {
+	return waitForServiceAccountInNamespace(c, namespace, "default", serviceAccountPoll, serviceAccountProvisionTimeout)
 }
 
 // createNS should be used by every test, note that we append a common prefix to the provided test name.
