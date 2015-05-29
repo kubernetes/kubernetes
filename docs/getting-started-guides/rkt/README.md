@@ -51,7 +51,7 @@ $ export KUBE_CONTAINER_RUNTIME=rkt
 
 You can optionally choose the version of rkt used by setting `KUBE_RKT_VERSION`:
 ```shell
-export KUBE_RKT_VERSION=0.5.6
+$ export KUBE_RKT_VERSION=0.5.6
 ```
 
 Then you can launch the cluster by:
