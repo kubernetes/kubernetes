@@ -19,6 +19,7 @@ RUN apt-get update -qq && apt-get install -y nfs-kernel-server -qq
 RUN mkdir -p /exports
 ADD run_nfs.sh /usr/local/bin/
 ADD index.html /exports/index.html
+RUN chmod 644 /exports/index.html
 
 EXPOSE 2049/tcp
 
