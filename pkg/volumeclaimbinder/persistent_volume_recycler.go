@@ -87,10 +87,18 @@ func (recycler *PersistentVolumeRecycler) reclaimVolume(pv *api.PersistentVolume
 	if pv.Status.Phase == api.VolumeReleased && pv.Spec.ClaimRef != nil {
 		glog.V(5).Infof("Reclaiming PersistentVolume[%s]\n", pv.Name)
 
+		latest, err := recycler.client.GetPersistentVolume(pv.Name)
+		if err != nil {
+			return fmt.Errorf("Could not find PersistentVolume %s", pv.Name)
+		}
+		if latest.Status.Phase != api.VolumeReleased {
+			return fmt.Errorf("PersistentVolume[%s] phase is %s, expected %s.  Skipping.", pv.Name, latest.Status.Phase, api.VolumeReleased)
+		}
+
 		// both handleRecycle and handleDelete block until completion
 		// TODO: allow parallel recycling operations to increase throughput
 
-		var err error
+//		var err error
 		switch pv.Spec.PersistentVolumeReclaimPolicy {
 		case api.PersistentVolumeReclaimRecycle:
 			err = recycler.handleRecycle(pv)

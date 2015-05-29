@@ -249,6 +249,8 @@ func TestBindingWithExamples(t *testing.T) {
 		t.Errorf("Expected non-nil ClaimRef: %+v", pv.Spec)
 	}
 
+	mockClient.volume = pv
+
 	// released volumes with a PersistentVolumeReclaimPolicy (recycle/delete) can have further processing
 	err = recycler.reclaimVolume(pv)
 	if err != nil {
