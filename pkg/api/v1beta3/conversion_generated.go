@@ -1544,14 +1544,6 @@ func convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec(
 	} else {
 		out.Selector = nil
 	}
-	if in.TemplateRef != nil {
-		out.TemplateRef = new(ObjectReference)
-		if err := convert_api_ObjectReference_To_v1beta3_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
-			return err
-		}
-	} else {
-		out.TemplateRef = nil
-	}
 	if in.Template != nil {
 		out.Template = new(PodTemplateSpec)
 		if err := convert_api_PodTemplateSpec_To_v1beta3_PodTemplateSpec(in.Template, out.Template, s); err != nil {
@@ -3640,14 +3632,6 @@ func convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec(
 		}
 	} else {
 		out.Selector = nil
-	}
-	if in.TemplateRef != nil {
-		out.TemplateRef = new(api.ObjectReference)
-		if err := convert_v1beta3_ObjectReference_To_api_ObjectReference(in.TemplateRef, out.TemplateRef, s); err != nil {
-			return err
-		}
-	} else {
-		out.TemplateRef = nil
 	}
 	if in.Template != nil {
 		out.Template = new(api.PodTemplateSpec)

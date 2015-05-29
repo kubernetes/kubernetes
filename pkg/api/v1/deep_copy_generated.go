@@ -1518,14 +1518,6 @@ func deepCopy_v1_ReplicationControllerSpec(in ReplicationControllerSpec, out *Re
 	} else {
 		out.Selector = nil
 	}
-	if in.TemplateRef != nil {
-		out.TemplateRef = new(ObjectReference)
-		if err := deepCopy_v1_ObjectReference(*in.TemplateRef, out.TemplateRef, c); err != nil {
-			return err
-		}
-	} else {
-		out.TemplateRef = nil
-	}
 	if in.Template != nil {
 		out.Template = new(PodTemplateSpec)
 		if err := deepCopy_v1_PodTemplateSpec(*in.Template, out.Template, c); err != nil {
