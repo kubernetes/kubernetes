@@ -43,7 +43,7 @@ port 9376 and carry a label "app=MyApp".
     "kind": "Service",
     "apiVersion": "v1beta3",
     "metadata": {
-        "name": "my-service",
+        "name": "my-service"
     },
     "spec": {
         "selector": {
@@ -175,7 +175,7 @@ disambiguated.  For example:
     "kind": "Service",
     "apiVersion": "v1beta3",
     "metadata": {
-        "name": "my-service",
+        "name": "my-service"
     },
     "spec": {
         "selector": {
@@ -336,7 +336,7 @@ information about the provisioned balancer will be published in the `Service`'s
     "kind": "Service",
     "apiVersion": "v1beta3",
     "metadata": {
-        "name": "my-service",
+        "name": "my-service"
     },
     "spec": {
         "selector": {
