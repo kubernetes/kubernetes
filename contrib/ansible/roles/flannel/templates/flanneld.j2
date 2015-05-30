@@ -1,7 +1,7 @@
 # Flanneld configuration options
 
 # etcd url location.  Point this to the server where etcd runs
-FLANNEL_ETCD="http://{{ groups['etcd'][0] }}:2379"
+FLANNEL_ETCD="{% for node in groups['etcd'] %}http://{{ node }}:2379{% if not loop.last %},{% endif %}{% endfor %}"
 
 # etcd config key.  This is the configuration key that flannel queries
 # For address range assignment
