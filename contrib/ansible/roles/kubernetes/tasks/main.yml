@@ -3,7 +3,10 @@
   when: ansible_distribution == "Fedora"
 
 - name: Install kubernetes
-  yum: pkg=kubernetes state=latest
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+        name: kubernetes
+        state: latest
   notify:
         - restart daemons
   when: not is_atomic
