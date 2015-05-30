@@ -89,6 +89,7 @@ func TestRunOnce(t *testing.T) {
 		os:                  kubecontainer.FakeOS{},
 		volumeManager:       newVolumeManager(),
 	}
+	kb.containerManager, _ = newContainerManager("", "", "")
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if err := kb.setupDataDirs(); err != nil {
