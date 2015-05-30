@@ -633,7 +633,7 @@ function kube::release::create_docker_images_for_server() {
         rm -rf ${docker_build_path}
 
         kube::log::status "Deleting docker image ${docker_image_tag}"
-        "${DOCKER[@]}" rmi ${docker_image_tag}
+        "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
       ) &
     done
 
