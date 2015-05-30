@@ -1,4 +1,13 @@
 ---
+- name: Install kubernetes
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+        name: kubernetes-node
+        state: latest
+  notify:
+        - restart daemons
+  when: not is_atomic
+
 - name: write the config files for kubelet
   template: src=kubelet.j2 dest=/etc/kubernetes/kubelet
   notify:
