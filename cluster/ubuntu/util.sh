@@ -205,7 +205,6 @@ EOF
 function create-kube-controller-manager-opts(){
   cat <<EOF > ~/kube/default/kube-controller-manager
 KUBE_CONTROLLER_MANAGER_OPTS="--master=127.0.0.1:8080 \
---machines=$1 \
 --logtostderr=true"
 EOF
 
