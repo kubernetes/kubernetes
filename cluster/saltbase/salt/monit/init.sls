@@ -12,6 +12,14 @@ monit:
     - group: root
     - mode: 644
 
+/etc/monit/monitrc:
+  file:
+    - managed
+    - source: salt://monit/monitrc
+    - user: root
+    - group: root
+    - mode: 600
+
 /etc/monit/conf.d/kubelet:
   file:
     - managed

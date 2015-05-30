@@ -1,0 +1,13 @@
+# Run as a daemon, check every 2 mins, but wait 2 mins
+# This is because we put our services in /etc/init.d/ _and_ monit
+# monit is only for restarting in case of failure
+set daemon 120 with start delay 120
+
+# Standard settings
+set logfile /var/log/monit.log
+set idfile /var/lib/monit/id
+set statefile /var/lib/monit/state
+set eventqueue basedir /var/lib/monit/events slots 100
+
+# Include additional config files
+include /etc/monit/conf.d/*
