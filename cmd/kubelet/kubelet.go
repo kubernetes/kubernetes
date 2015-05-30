@@ -27,6 +27,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/profiler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -42,6 +43,11 @@ func main() {
 	defer util.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
+
+	// Collect pprof profiles on SIGUSR1
+	prof := profiler.NewProfiler("pprof_kubelet")
+	prof.Run()
+	defer prof.Halt()
 
 	if err := s.Run(pflag.CommandLine.Args()); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
