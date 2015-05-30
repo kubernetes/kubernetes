@@ -4,13 +4,15 @@ This playbook helps you to set up a Kubernetes cluster on machines where you
 can't or don't want to use the salt scripts and cluster up/down tools. They
 can be real hardware, VMs, things in a public cloud, etc.
 
-## Usage
+## Before starting
 
-* Record the IP address of which machine you want to be your master
-* Record the IP address of the machine you want to be your etcd server (often same as master)
-* Record the IP addresses of the machines you want to be your nodes. (master can be a node)
+* Record the IP address/hostname of which machine you want to be your master (only support a single master)
+* Record the IP address/hostname of the machine you want to be your etcd server (often same as master, only one)
+* Record the IP addresses/hostname of the machines you want to be your nodes. (the master can also be a node)
 
-Stick the system information into the 'inventory' file.
+### Configure the inventory file
+
+Stick the system information gathered above into the 'inventory' file.
 
 ### Configure your cluster
 
@@ -22,24 +24,27 @@ in full detail.
 
 Now run the setup:
 
-    $ ansible-playbook -i inventory cluster.yml
+`$ ./setup.sh`
 
 In generel this will work on very recent Fedora, rawhide or F21.  Future work to
 support RHEL7, CentOS, and possible other distros should be forthcoming.
 
 ### You can just set up certain parts instead of doing it all
 
-Only the kubernetes daemons:
-
-    $ ansible-playbook -i inventory kubernetes-services.yml
-
 Only etcd:
 
-    $ ansible-playbook -i inventory etcd.yml
+`$ ./setup.sh --tags=etcd`
 
-Only flannel:
+Only the kubernetes master:
 
-    $ ansible-playbook -i inventory flannel.yml
+`$ ./setup.sh --tags=masters`
 
+Only the kubernetes nodes:
+
+`$ ./setup.sh --tags=nodes`
+
+### You may overwrite the inventory file by doing
+
+`INVENTORY=myinventory ./setup.sh`
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/ansible/README.md?pixel)]()
