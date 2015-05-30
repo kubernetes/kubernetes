@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
 	"github.com/golang/glog"
@@ -79,6 +80,23 @@ func validateObject(obj runtime.Object) (errors []error) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = validation.ValidateEndpoints(t)
+	case *api.Namespace:
+		errors = validation.ValidateNamespace(t)
+	case *api.Secret:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = validation.ValidateSecret(t)
+	case *api.LimitRange:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = validation.ValidateLimitRange(t)
+	case *api.ResourceQuota:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = validation.ValidateResourceQuota(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -107,7 +125,7 @@ func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error 
 			if ext == ".yaml" {
 				out, err := yaml.ToJSON(data)
 				if err != nil {
-					return err
+					return fmt.Errorf("%s: %v", path, err)
 				}
 				data = out
 			}
@@ -162,6 +180,11 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"claim-02": &api.PersistentVolumeClaim{},
 			"claim-03": &api.PersistentVolumeClaim{},
 		},
+		"../examples/persistent-volumes/simpletest": {
+			"namespace": &api.Namespace{},
+			"pod":       &api.Pod{},
+			"service":   &api.Service{},
+		},
 		"../examples/iscsi": {
 			"iscsi": &api.Pod{},
 		},
@@ -177,11 +200,125 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"pod":         &api.Pod{},
 			"replication": &api.ReplicationController{},
 		},
+		"../examples/rbd/secret": {
+			"ceph-secret": &api.Secret{},
+		},
 		"../examples/rbd/v1beta3": {
 			"rbd":             &api.Pod{},
 			"rbd-with-secret": &api.Pod{},
 		},
+		"../examples/cassandra": {
+			"cassandra-controller": &api.ReplicationController{},
+			"cassandra-service":    &api.Service{},
+			"cassandra":            &api.Pod{},
+		},
+		"../examples/celery-rabbitmq": {
+			"celery-controller":   &api.ReplicationController{},
+			"flower-controller":   &api.ReplicationController{},
+			"rabbitmq-controller": &api.ReplicationController{},
+			"rabbitmq-service":    &api.Service{},
+		},
+		"../examples/cluster-dns": {
+			"dns-backend-rc":      &api.ReplicationController{},
+			"dns-backend-service": &api.Service{},
+			"dns-frontend-pod":    &api.Pod{},
+			"namespace-dev":       &api.Namespace{},
+			"namespace-prod":      &api.Namespace{},
+		},
+		"../examples/downward-api": {
+			"dapi-pod": &api.Pod{},
+		},
+		"../examples/elasticsearch": {
+			"apiserver-secret": nil,
+			"music-rc":         &api.ReplicationController{},
+			"music-service":    &api.Service{},
+		},
+		"../examples/explorer": {
+			"pod": &api.Pod{},
+		},
+		"../examples/hazelcast": {
+			"hazelcast-controller": &api.ReplicationController{},
+			"hazelcast-service":    &api.Service{},
+		},
+		"../examples/kubernetes-namespaces": {
+			"namespace-dev":  &api.Namespace{},
+			"namespace-prod": &api.Namespace{},
+		},
+		"../examples/limitrange": {
+			"invalid-pod": &api.Pod{},
+			"limit-range": &api.LimitRange{},
+			"valid-pod":   &api.Pod{},
+		},
+		"../examples/logging-demo": {
+			"synthetic_0_25lps": &api.Pod{},
+			"synthetic_10lps":   &api.Pod{},
+		},
+		"../examples/meteor": {
+			"meteor-controller": &api.ReplicationController{},
+			"meteor-service":    &api.Service{},
+			"mongo-pod":         &api.Pod{},
+			"mongo-service":     &api.Service{},
+		},
+		"../examples/mysql-wordpress-pd": {
+			"mysql-service":     &api.Service{},
+			"mysql":             &api.Pod{},
+			"wordpress-service": &api.Service{},
+			"wordpress":         &api.Pod{},
+		},
+		"../examples/nfs": {
+			"nfs-server-pod":     &api.Pod{},
+			"nfs-server-service": &api.Service{},
+			"nfs-web-pod":        &api.Pod{},
+		},
+		"../examples/node-selection": {
+			"pod": &api.Pod{},
+		},
+		"../examples/openshift-origin": {
+			"openshift-controller": &api.ReplicationController{},
+			"openshift-service":    &api.Service{},
+		},
+		"../examples/phabricator": {
+			"authenticator-controller": &api.ReplicationController{},
+			"phabricator-controller":   &api.ReplicationController{},
+			"phabricator-service":      &api.Service{},
+		},
+		"../examples/redis": {
+			"redis-controller":          &api.ReplicationController{},
+			"redis-master":              &api.Pod{},
+			"redis-proxy":               &api.Pod{},
+			"redis-sentinel-controller": &api.ReplicationController{},
+			"redis-sentinel-service":    &api.Service{},
+		},
+		"../examples/resourcequota": {
+			"resource-quota": &api.ResourceQuota{},
+		},
+		"../examples/rethinkdb": {
+			"admin-pod":      &api.Pod{},
+			"admin-service":  &api.Service{},
+			"driver-service": &api.Service{},
+			"rc":             &api.ReplicationController{},
+		},
+		"../examples/secrets": {
+			"secret-pod": &api.Pod{},
+			"secret":     &api.Secret{},
+		},
+		"../examples/spark": {
+			"spark-master-service":    &api.Service{},
+			"spark-master":            &api.Pod{},
+			"spark-worker-controller": &api.ReplicationController{},
+		},
+		"../examples/storm": {
+			"storm-nimbus-service":    &api.Service{},
+			"storm-nimbus":            &api.Pod{},
+			"storm-worker-controller": &api.ReplicationController{},
+			"zookeeper-service":       &api.Service{},
+			"zookeeper":               &api.Pod{},
+		},
 	}
+
+	capabilities.SetForTests(capabilities.Capabilities{
+		AllowPrivileged: true,
+	})
 
 	for path, expected := range cases {
 		tested := 0
@@ -191,7 +328,11 @@ func TestExampleObjectSchemas(t *testing.T) {
 				t.Errorf("%s: %s does not have a test case defined", path, name)
 				return
 			}
-			tested += 1
+			tested++
+			if expectedType == nil {
+				t.Logf("skipping : %s/%s\n", path, name)
+				return
+			}
 			if err := latest.Codec.DecodeInto(data, expectedType); err != nil {
 				t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 				return
