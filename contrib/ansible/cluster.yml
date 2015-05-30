@@ -18,11 +18,11 @@
   tags:
         - masters
 
-- hosts: minions
+- hosts: nodes
   sudo: yes
   roles:
         - common
         - kubernetes
-        - minion
+        - node
   tags:
-        - minions
+        - nodes
