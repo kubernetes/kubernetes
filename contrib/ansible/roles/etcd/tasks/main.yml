@@ -1,6 +1,9 @@
 ---
 - name: Install etcd
-  yum: pkg=etcd state=latest
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+        name: etcd
+        state: latest
   notify:
         - restart etcd
   when: not is_atomic
