@@ -21,20 +21,31 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
 // This is the primary entrypoint for volume plugins.
+// Tests covering recycling should not use this func but instead
+// use their own array of plugins w/ a custom recyclerFunc as appropriate
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&hostPathPlugin{nil}}
+	return []volume.VolumePlugin{&hostPathPlugin{nil, newRecycler}}
+}
+
+func ProbeRecyclableVolumePlugins(recyclerFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error)) []volume.VolumePlugin {
+	return []volume.VolumePlugin{&hostPathPlugin{nil, recyclerFunc}}
 }
 
 type hostPathPlugin struct {
 	host volume.VolumeHost
+	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
+	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error)
 }
 
 var _ volume.VolumePlugin = &hostPathPlugin{}
+var _ volume.PersistentVolumePlugin = &hostPathPlugin{}
+var _ volume.RecyclableVolumePlugin = &hostPathPlugin{}
 
 const (
 	hostPathPluginName = "kubernetes.io/host-path"
@@ -70,6 +81,18 @@ func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID, _ mou
 	return &hostPath{""}, nil
 }
 
+func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
+	return plugin.newRecyclerFunc(spec, plugin.host)
+}
+
+func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
+	if spec.VolumeSource.HostPath != nil {
+		return &hostPathRecycler{spec.Name, spec.VolumeSource.HostPath.Path, host}, nil
+	} else {
+		return &hostPathRecycler{spec.Name, spec.PersistentVolumeSource.HostPath.Path, host}, nil
+	}
+}
+
 // HostPath volumes represent a bare host file or directory mount.
 // The direct at the specified path will be directly exposed to the container.
 type hostPath struct {
@@ -98,4 +121,60 @@ func (hp *hostPath) TearDown() error {
 // TearDownAt does not make sense for host paths - probably programmer error.
 func (hp *hostPath) TearDownAt(dir string) error {
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
+}
+
+// hostPathRecycler scrubs a hostPath volume by running "rm -rf" on the volume in a pod
+// This recycler only works on a single host cluster and is for testing purposes only.
+type hostPathRecycler struct {
+	name string
+	path string
+	host volume.VolumeHost
+}
+
+func (r *hostPathRecycler) GetPath() string {
+	return r.path
+}
+
+// Recycler provides methods to reclaim the volume resource.
+func (r *hostPathRecycler) Recycle() error {
+	uuid := string(util.NewUUID())
+	timeout := int64(60)
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "scrubber-" + r.name,
+			Namespace: api.NamespaceDefault,
+			Labels: map[string]string{
+				"scrubber": uuid,
+			},
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyNever,
+			Volumes: []api.Volume{
+				{
+					Name: uuid,
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{r.path},
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:  "scrubber-" + uuid,
+					Image: "busybox",
+					// delete the contents of the volume, but not the directory itself
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "rm -rf /scrub/*"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      uuid,
+							MountPath: "/scrub",
+						},
+					},
+				},
+			},
+			ActiveDeadlineSeconds: &timeout,
+		},
+	}
+	return volume.ScrubPodVolumeAndWatchUntilCompletion(pod, r.host.GetKubeClient())
 }

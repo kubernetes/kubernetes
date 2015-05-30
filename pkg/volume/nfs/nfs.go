@@ -29,15 +29,21 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
+// Tests covering recycling should not use this func but instead
+// use their own array of plugins w/ a custom recyclerFunc as appropriate
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&nfsPlugin{nil}}
+	return []volume.VolumePlugin{&nfsPlugin{nil, newRecycler}}
 }
 
 type nfsPlugin struct {
 	host volume.VolumeHost
+	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
+	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error)
 }
 
 var _ volume.VolumePlugin = &nfsPlugin{}
+var _ volume.PersistentVolumePlugin = &nfsPlugin{}
+var _ volume.RecyclableVolumePlugin = &nfsPlugin{}
 
 const (
 	nfsPluginName = "kubernetes.io/nfs"
@@ -95,6 +101,28 @@ func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mo
 	}, nil
 }
 
+func (plugin *nfsPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
+	return plugin.newRecyclerFunc(spec, plugin.host)
+}
+
+func newRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
+	if spec.VolumeSource.HostPath != nil {
+		return &nfsRecycler{
+			name:   spec.Name,
+			server: spec.VolumeSource.NFS.Server,
+			path:   spec.VolumeSource.NFS.Path,
+			host:   host,
+		}, nil
+	} else {
+		return &nfsRecycler{
+			name:   spec.Name,
+			server: spec.PersistentVolumeSource.NFS.Server,
+			path:   spec.PersistentVolumeSource.NFS.Path,
+			host:   host,
+		}, nil
+	}
+}
+
 // NFS volumes represent a bare host file or directory mount of an NFS export.
 type nfs struct {
 	volName    string
@@ -104,6 +132,8 @@ type nfs struct {
 	readOnly   bool
 	mounter    mount.Interface
 	plugin     *nfsPlugin
+	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
+	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error)
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
@@ -190,4 +220,63 @@ func (nfsVolume *nfs) TearDownAt(dir string) error {
 	}
 
 	return nil
+}
+
+// nfsRecycler scrubs an NFS volume by running "rm -rf" on the volume in a pod.
+type nfsRecycler struct {
+	name   string
+	server string
+	path   string
+	host   volume.VolumeHost
+}
+
+func (r *nfsRecycler) GetPath() string {
+	return r.path
+}
+
+// Recycler provides methods to reclaim the volume resource.
+func (r *nfsRecycler) Recycle() error {
+	uuid := string(util.NewUUID())
+	timeout := int64(60)
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "scrubber-" + r.name,
+			Namespace: api.NamespaceDefault,
+			Labels: map[string]string{
+				"scrubber": uuid,
+			},
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyNever,
+			Volumes: []api.Volume{
+				{
+					Name: uuid,
+					VolumeSource: api.VolumeSource{
+						NFS: &api.NFSVolumeSource{
+							Server: r.server,
+							Path:   r.path,
+						},
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:  "scrubber-" + uuid,
+					Image: "busybox",
+					// delete the contents of the volume, but not the directory itself
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "rm -rf /scrub/*"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      uuid,
+							MountPath: "/scrub",
+						},
+					},
+				},
+			},
+			ActiveDeadlineSeconds: &timeout,
+		},
+	}
+	return volume.ScrubPodVolumeAndWatchUntilCompletion(pod, r.host.GetKubeClient())
 }

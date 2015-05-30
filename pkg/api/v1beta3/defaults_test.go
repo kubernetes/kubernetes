@@ -195,6 +195,9 @@ func TestSetDefaultPersistentVolume(t *testing.T) {
 	if pv2.Status.Phase != versioned.VolumePending {
 		t.Errorf("Expected volume phase %v, got %v", versioned.VolumePending, pv2.Status.Phase)
 	}
+	if pv2.Spec.PersistentVolumeReclaimPolicy != versioned.PersistentVolumeReclaimRetain {
+		t.Errorf("Expected pv reclaim policy %v, got %v", versioned.PersistentVolumeReclaimRetain, pv2.Spec.PersistentVolumeReclaimPolicy)
+	}
 }
 
 func TestSetDefaultPersistentVolumeClaim(t *testing.T) {

@@ -1358,6 +1358,7 @@ func convert_api_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *api.Persist
 	} else {
 		out.ClaimRef = nil
 	}
+	out.PersistentVolumeReclaimPolicy = PersistentVolumeReclaimPolicy(in.PersistentVolumeReclaimPolicy)
 	return nil
 }
 
@@ -3633,6 +3634,7 @@ func convert_v1_PersistentVolumeSpec_To_api_PersistentVolumeSpec(in *PersistentV
 	} else {
 		out.ClaimRef = nil
 	}
+	out.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimPolicy(in.PersistentVolumeReclaimPolicy)
 	return nil
 }
 

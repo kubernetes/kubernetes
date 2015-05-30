@@ -1178,6 +1178,7 @@ func deepCopy_v1beta3_PersistentVolumeSpec(in PersistentVolumeSpec, out *Persist
 	} else {
 		out.ClaimRef = nil
 	}
+	out.PersistentVolumeReclaimPolicy = in.PersistentVolumeReclaimPolicy
 	return nil
 }
 

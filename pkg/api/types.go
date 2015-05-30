@@ -263,7 +263,24 @@ type PersistentVolumeSpec struct {
 	// ClaimRef is expected to be non-nil when bound.
 	// claim.VolumeName is the authoritative bind between PV and PVC.
 	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
+	// PersistentVolumeReclaimPolicy represents what happens to a persistent volume when released from its claim.
+	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty"`
 }
+
+// PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
+type PersistentVolumeReclaimPolicy string
+
+const (
+	// PersistentVolumeReclaimRecycle means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim.
+	// The volume plugin must support Recycling.
+	PersistentVolumeReclaimRecycle PersistentVolumeReclaimPolicy = "Recycle"
+	// PersistentVolumeReclaimDelete means the volume will be deleted from Kubernetes on release from its claim.
+	// The volume plugin must support Deletion.
+	PersistentVolumeReclaimDelete PersistentVolumeReclaimPolicy = "Delete"
+	// PersistentVolumeReclaimRetain means the volume will left in its current phase (Released) for manual reclamation by the administrator.
+	// The default policy is Retain.
+	PersistentVolumeReclaimRetain PersistentVolumeReclaimPolicy = "Retain"
+)
 
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim
@@ -337,6 +354,13 @@ const (
 	// used for PersistentVolumes where the bound PersistentVolumeClaim was deleted
 	// released volumes must be recycled before becoming available again
 	VolumeReleased PersistentVolumePhase = "Released"
+	// used for PersistentVolumes that have been recycled and can be made available
+	// again to new PersistentVolumeClaims
+	VolumeRecycled PersistentVolumePhase = "Recycled"
+	// used for PersistentVolumes that have been removed from the infrastructure
+	VolumeDeleted PersistentVolumePhase = "Deleted"
+	// used for PersistentVolumes that failed to be correctly recycled or deleted after being released from a claim
+	VolumeFailed PersistentVolumePhase = "Failed"
 )
 
 type PersistentVolumeClaimPhase string

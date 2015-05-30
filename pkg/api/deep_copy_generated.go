@@ -1243,6 +1243,7 @@ func deepCopy_api_PersistentVolumeSpec(in PersistentVolumeSpec, out *PersistentV
 	} else {
 		out.ClaimRef = nil
 	}
+	out.PersistentVolumeReclaimPolicy = in.PersistentVolumeReclaimPolicy
 	return nil
 }
 
