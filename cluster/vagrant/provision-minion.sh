@@ -77,6 +77,11 @@ grains:
 EOF
 
 # we will run provision to update code each time we test, so we do not want to do salt install each time
-# install-salt knows to check this.
-install-salt minion
-systemctl start salt-minion.service
+if ! which salt-minion >/dev/null 2>&1; then
+  # Install Salt
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
+else
+  # Sometimes the minion gets wedged when it comes up along with the master.
+  # Restarting it here un-wedges it.
+  systemctl restart salt-minion.service
+fi

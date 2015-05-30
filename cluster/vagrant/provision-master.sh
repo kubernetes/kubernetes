@@ -221,8 +221,11 @@ rest_cherrypy:
   webhook_disable_auth: True
 EOF
 
-  install-salt master
-  service salt-master start
+  # Install Salt Master
+  #
+  # -M installs the master
+  # -N does not install the minion
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M -N
 
   # Install salt-api
   #
@@ -238,7 +241,8 @@ fi
 
 if ! which salt-minion >/dev/null 2>&1; then
 
-  service salt-minion start
+  # Install Salt minion
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
 
 else
   # Only run highstate when updating the config.  In the first-run case, Salt is
