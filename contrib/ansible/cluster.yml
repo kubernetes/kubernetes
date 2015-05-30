@@ -1,4 +1,29 @@
-# Set up a whole working cluster!
-- include: etcd.yml
-- include: kubernetes-services.yml
+---
+# Install etcd
+- hosts: etcd
+  sudo: yes
+  roles:
+        - common
+        - etcd
+  tags:
+        - etcd
 
+# install kube master services
+- hosts: masters
+  sudo: yes
+  roles:
+        - common
+        - kubernetes
+        - master
+  tags:
+        - masters
+
+# install kubernetes on the nodes
+- hosts: minions
+  sudo: yes
+  roles:
+        - common
+        - kubernetes
+        - minion
+  tags:
+        - minions
