@@ -19,11 +19,11 @@
         - masters
 
 # install kubernetes on the nodes
-- hosts: minions
+- hosts: nodes
   sudo: yes
   roles:
         - common
         - kubernetes
-        - minion
+        - node
   tags:
-        - minions
+        - nodes

@@ -8,7 +8,7 @@ can be real hardware, VMs, things in a public cloud, etc.
 
 * Record the IP address of which machine you want to be your master
 * Record the IP address of the machine you want to be your etcd server (often same as master)
-* Record the IP addresses of the machines you want to be your minions. (master can be a minion)
+* Record the IP addresses of the machines you want to be your nodes. (master can be a node)
 
 Stick the system information into the 'inventory' file.
 

@@ -1,10 +1,10 @@
 ---
 - name: Open firewalld port for apiserver
   firewalld: port=8080/tcp permanent=false state=enabled
-  # in case this is also a minion with firewalld turned off
+  # in case this is also a node with firewalld turned off
   ignore_errors: yes
 
 - name: Save firewalld port for apiserver
   firewalld: port=8080/tcp permanent=true state=enabled
-  # in case this is also a minion with firewalld turned off
+  # in case this is also a node with firewalld turned off
   ignore_errors: yes
