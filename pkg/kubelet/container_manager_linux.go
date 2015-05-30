@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/docker/libcontainer/cgroups"
@@ -34,73 +36,132 @@ import (
 	"github.com/golang/glog"
 )
 
+// A non-user container tracked by the Kubelet.
+type systemContainer struct {
+	// Absolute name of the container.
+	name string
+
+	// CPU limit in millicores.
+	cpuMillicores int64
+
+	// Function that ensures the state of the container.
+	// m is the cgroup manager for the specified container.
+	ensureStateFunc func(m *fs.Manager) error
+
+	// Manager for the cgroups of the external container.
+	manager *fs.Manager
+}
+
+func newSystemContainer(containerName string) *systemContainer {
+	return &systemContainer{
+		name:    containerName,
+		manager: createManager(containerName),
+	}
+}
+
 type containerManagerImpl struct {
-	// Whether to create and use the specified containers.
-	useDockerContainer bool
-	useSystemContainer bool
-
-	// OOM score for the Docker container.
-	dockerOomScoreAdj int
-
-	// Managers for containers.
-	dockerContainer fs.Manager
-	systemContainer fs.Manager
-	rootContainer   fs.Manager
+	// External containers being managed.
+	systemContainers []*systemContainer
 }
 
 var _ containerManager = &containerManagerImpl{}
 
+// TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func newContainerManager(dockerDaemonContainer, systemContainer string) (containerManager, error) {
-	if systemContainer == "/" {
-		return nil, fmt.Errorf("system container cannot be root (\"/\")")
+func newContainerManager(dockerDaemonContainerName, systemContainerName, kubeletContainerName string) (containerManager, error) {
+	systemContainers := []*systemContainer{}
+
+	if dockerDaemonContainerName != "" {
+		cont := newSystemContainer(dockerDaemonContainerName)
+		cont.ensureStateFunc = func(manager *fs.Manager) error {
+			return ensureDockerInContainer(-900, createManager(dockerDaemonContainerName))
+		}
+		systemContainers = append(systemContainers, cont)
 	}
 
-	return &containerManagerImpl{
-		useDockerContainer: dockerDaemonContainer != "",
-		useSystemContainer: systemContainer != "",
-		dockerOomScoreAdj:  -900,
-		dockerContainer: fs.Manager{
-			Cgroups: &configs.Cgroup{
-				Name:            dockerDaemonContainer,
-				AllowAllDevices: true,
-			},
-		},
-		systemContainer: fs.Manager{
-			Cgroups: &configs.Cgroup{
-				Name:            systemContainer,
-				AllowAllDevices: true,
-			},
-		},
-		rootContainer: fs.Manager{
+	if systemContainerName != "" {
+		if systemContainerName == "/" {
+			return nil, fmt.Errorf("system container cannot be root (\"/\")")
+		}
+
+		rootContainer := &fs.Manager{
 			Cgroups: &configs.Cgroup{
 				Name: "/",
 			},
-		},
+		}
+		manager := createManager(systemContainerName)
+
+		err := ensureSystemContainer(rootContainer, manager)
+		if err != nil {
+			return nil, err
+		}
+		systemContainers = append(systemContainers, newSystemContainer(systemContainerName))
+	}
+
+	if kubeletContainerName != "" {
+		systemContainers = append(systemContainers, newSystemContainer(kubeletContainerName))
+	}
+
+	// TODO(vmarmol): Add Kube-proxy container.
+
+	return &containerManagerImpl{
+		systemContainers: systemContainers,
 	}, nil
 }
 
+// Create a cgroup container manager.
+func createManager(containerName string) *fs.Manager {
+	return &fs.Manager{
+		Cgroups: &configs.Cgroup{
+			Name:            containerName,
+			AllowAllDevices: true,
+		},
+	}
+}
+
 func (cm *containerManagerImpl) Start() error {
-	if cm.useSystemContainer {
-		err := cm.ensureSystemContainer()
-		if err != nil {
-			return err
+	// Don't run a background thread if there are no ensureStateFuncs.
+	numEnsureStateFuncs := 0
+	for _, cont := range cm.systemContainers {
+		if cont.ensureStateFunc != nil {
+			numEnsureStateFuncs++
 		}
 	}
-	if cm.useDockerContainer {
-		go util.Until(func() {
-			err := cm.ensureDockerInContainer()
-			if err != nil {
-				glog.Warningf("[ContainerManager] Failed to ensure Docker is in a container: %v", err)
-			}
-		}, time.Minute, util.NeverStop)
+	if numEnsureStateFuncs == 0 {
+		return nil
 	}
+
+	// Run ensure state functions every minute.
+	go util.Until(func() {
+		for _, cont := range cm.systemContainers {
+			if cont.ensureStateFunc != nil {
+				err := cont.ensureStateFunc(cont.manager)
+				glog.Warningf("[ContainerManager] Failed to ensure state of %q: %v", cont.name, err)
+			}
+		}
+	}, time.Minute, util.NeverStop)
+
 	return nil
 }
 
+func (cm *containerManagerImpl) SystemContainersLimit() api.ResourceList {
+	cpuLimit := int64(0)
+
+	// Sum up resources of all external containers.
+	for _, cont := range cm.systemContainers {
+		cpuLimit += cont.cpuMillicores
+	}
+
+	return api.ResourceList{
+		api.ResourceCPU: *resource.NewMilliQuantity(
+			cpuLimit,
+			resource.DecimalSI),
+	}
+}
+
 // Ensures that the Docker daemon is in the desired container.
-func (cm *containerManagerImpl) ensureDockerInContainer() error {
+func ensureDockerInContainer(oomScoreAdj int, manager *fs.Manager) error {
 	// What container is Docker in?
 	out, err := exec.Command("pidof", "docker").Output()
 	if err != nil {
@@ -126,16 +187,16 @@ func (cm *containerManagerImpl) ensureDockerInContainer() error {
 			errs = append(errs, fmt.Errorf("failed to find container of PID %q: %v", pid, err))
 		}
 
-		if cont != cm.dockerContainer.Cgroups.Name {
-			err = cm.dockerContainer.Apply(pid)
+		if cont != manager.Cgroups.Name {
+			err = manager.Apply(pid)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to move PID %q (in %q) to %q", pid, cont, cm.dockerContainer.Cgroups.Name))
+				errs = append(errs, fmt.Errorf("failed to move PID %q (in %q) to %q", pid, cont, manager.Cgroups.Name))
 			}
 		}
 
 		// Also apply oom_score_adj to processes
-		if err := util.ApplyOomScoreAdj(pid, cm.dockerOomScoreAdj); err != nil {
-			errs = append(errs, fmt.Errorf("failed to apply oom score %q to PID %q", cm.dockerOomScoreAdj, pid))
+		if err := util.ApplyOomScoreAdj(pid, oomScoreAdj); err != nil {
+			errs = append(errs, fmt.Errorf("failed to apply oom score %q to PID %q", oomScoreAdj, pid))
 		}
 	}
 
@@ -155,7 +216,7 @@ func getContainer(pid int) (string, error) {
 
 // Ensures the system container is created and all non-kernel processes without
 // a container are moved to it.
-func (cm *containerManagerImpl) ensureSystemContainer() error {
+func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error {
 	// Move non-kernel PIDs to the system container.
 	attemptsRemaining := 10
 	var errs []error
@@ -164,7 +225,7 @@ func (cm *containerManagerImpl) ensureSystemContainer() error {
 		errs = []error{}
 		attemptsRemaining--
 
-		allPids, err := cm.rootContainer.GetPids()
+		allPids, err := rootContainer.GetPids()
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Failed to list PIDs for root: %v", err))
 			continue
@@ -188,16 +249,16 @@ func (cm *containerManagerImpl) ensureSystemContainer() error {
 
 		glog.Infof("Moving non-kernel threads: %v", pids)
 		for _, pid := range pids {
-			err := cm.systemContainer.Apply(pid)
+			err := manager.Apply(pid)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to move PID %d into the system container %q: %v", pid, cm.systemContainer.Cgroups.Name, err))
+				errs = append(errs, fmt.Errorf("failed to move PID %d into the system container %q: %v", pid, manager.Cgroups.Name, err))
 				continue
 			}
 		}
 
 	}
 	if attemptsRemaining < 0 {
-		errs = append(errs, fmt.Errorf("ran out of attempts to create system containers %q", cm.systemContainer.Cgroups.Name))
+		errs = append(errs, fmt.Errorf("ran out of attempts to create system containers %q", manager.Cgroups.Name))
 	}
 
 	return errors.NewAggregate(errs)
