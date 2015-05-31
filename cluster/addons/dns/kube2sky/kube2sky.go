@@ -150,13 +150,13 @@ func getSkyMsg(ip string, port int) *skymsg.Service {
 func (ks *kube2sky) generateRecordsForHeadlessService(subdomain string, e *kapi.Endpoints, svc *kapi.Service) error {
 	for idx := range e.Subsets {
 		for subIdx := range e.Subsets[idx].Addresses {
-			subdomain := buildDNSNameString(subdomain, fmt.Sprintf("%d%d", idx, subIdx))
+			name := buildDNSNameString(subdomain, fmt.Sprintf("%d.%d", subIdx, idx))
 			b, err := json.Marshal(getSkyMsg(e.Subsets[idx].Addresses[subIdx].IP, svc.Spec.Ports[0].Port))
 			if err != nil {
 				return err
 			}
-			glog.V(2).Infof("Setting DNS record: %v -> %q\n", subdomain, string(b))
-			if err := ks.writeSkyRecord(subdomain, string(b)); err != nil {
+			glog.V(2).Infof("Setting DNS record: %v -> %q\n", name, string(b))
+			if err := ks.writeSkyRecord(name, string(b)); err != nil {
 				return err
 			}
 		}
