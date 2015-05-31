@@ -11,7 +11,7 @@ If you want to use custom binaries or pure open source Kubernetes, please contin
 ### Prerequisites
 
 1. You need a Google Cloud Platform account with billing enabled. Visit the [Google Developers Console](http://cloud.google.com/console) for more details.
-1. Make sure you have the `gcloud preview` command line component installed. Simply run `gcloud preview` at the command line - if it asks to install any components, go ahead and install them. If it simply shows help text, you're good to go. This is required as the cluster setup script uses GCE [Instance Groups](https://cloud.google.com/compute/docs/instance-groups/), which are in the gcloud preview namespace.
+1. Make sure you have the `gcloud preview` command line component installed. Simply run `gcloud preview` at the command line - if it asks to install any components, go ahead and install them. If it simply shows help text, you're good to go. This is required as the cluster setup script uses GCE [Instance Groups](https://cloud.google.com/compute/docs/instance-groups/), which are in the gcloud preview namespace. You will also need to enable `Compute Engine Instance Group Manager API` in the developers console. `gcloud` can be installed as a part of the [Google Cloud SDK](https://cloud.google.com/sdk/)
 1. Make sure that gcloud is set to use the Google Cloud Platform project you want. You can check the current project using `gcloud config list project` and change it via `gcloud config set project <project-id>`.
 1. Make sure you have credentials for GCloud by running ` gcloud auth login`.
 1. Make sure you can start up a GCE VM from the command line.  At least make sure you can do the [Create an instance](https://cloud.google.com/compute/docs/quickstart#create_an_instance) part of the GCE Quickstart.
@@ -31,7 +31,7 @@ or
 wget -q -O - https://get.k8s.io | bash
 ```
 
-Once this command completes, you will have a master VM and four worker VMs, running as a Kubernetes cluster. By default, some containers will already be running on your cluster. These are used to run and monitor Kubernetes.
+Once this command completes, you will have a master VM and four worker VMs, running as a Kubernetes cluster. By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](../logging.md), while `heapster` provides [monitoring](../../cluster/addons/cluster-monitoring/README.md) services.
 
 If you run into trouble please see the section on [troubleshooting](gce.md#troubleshooting), or come ask questions on IRC at #google-containers on freenode.
 
@@ -42,9 +42,9 @@ The next few steps will show you:
 1. how to delete the cluster
 1. how to start clusters with non-default options (like larger clusters)
 
-### Installing the kubernetes client on your workstation
+### Installing the kubernetes command line tools on your workstation
 
-This will leave you with a ```kubernetes``` directory on your workstation, and a running cluster.
+The cluster startup script will leave you with a running cluster and a ```kubernetes``` directory on your workstation.
 
 Add the appropriate binary folder to your ```PATH``` to access kubectl:
 
