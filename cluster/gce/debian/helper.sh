@@ -45,7 +45,7 @@ KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
 KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
-CA_CERT: $(yaml-quote ${CA_CERT_BASE64})
+CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
 EOF
 
   if [[ "${master}" == "true" ]]; then
