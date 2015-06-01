@@ -65,7 +65,7 @@ func (fake *fakeDiskManager) DetachDisk(disk rbd, mntPath string) error {
 	return nil
 }
 
-func doTestPlugin(t *testing, spec *volume.SpecT) {
+func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
