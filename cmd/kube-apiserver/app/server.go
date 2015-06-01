@@ -229,6 +229,22 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersi
 	return master.NewEtcdHelper(client, storageVersion, pathPrefix)
 }
 
+// Tells the service manager like systemd about startup. For further docs:
+// http://www.freedesktop.org/software/systemd/man/sd_notify.html
+func notifyReady() {
+	path := os.Getenv("NOTIFY_SOCKET")
+	if path != "" {
+		conn, err := net.DialUnix("unixgram", nil, &net.UnixAddr{Name: path, Net: "unix"})
+		if err == nil {
+			defer conn.Close()
+			_, err = conn.Write([]byte("READY=1\n"))
+		}
+		if err != nil {
+			glog.Warningf("unable to notify systemd about service ready state: %v", err)
+		}
+	}
+}
+
 // Run runs the specified APIServer.  This should never exit.
 func (s *APIServer) Run(_ []string) error {
 	s.verifyClusterIPFlags()
@@ -459,6 +475,9 @@ func (s *APIServer) Run(_ []string) error {
 						glog.Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
 					}
 				}
+
+				notifyReady()
+
 				if err := secureServer.ListenAndServeTLS(s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
 				}
@@ -474,6 +493,11 @@ func (s *APIServer) Run(_ []string) error {
 		MaxHeaderBytes: 1 << 20,
 	}
 	glog.Infof("Serving insecurely on %s", insecureLocation)
+
+	if secureLocation == "" {
+		notifyReady()
+	}
+
 	glog.Fatal(http.ListenAndServe())
 	return nil
 }
