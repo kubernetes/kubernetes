@@ -270,6 +270,23 @@ function upload-server-tars() {
     # We default to us-east-1 because that's the canonical region for S3,
     # and then the bucket is most-simply named (s3.amazonaws.com)
     aws s3 mb "s3://${AWS_S3_BUCKET}" --region ${AWS_S3_REGION}
+
+    local attempt=0
+    while true; do
+      if ! aws s3 ls "s3://${AWS_S3_BUCKET}" > /dev/null 2>&1; then
+        if (( attempt > 5 )); then
+          echo
+          echo -e "${color_red}Unable to confirm bucket creation." >&2
+          echo "Please ensure that s3://${AWS_S3_BUCKET} exists" >&2
+          echo -e "and run the script again. (sorry!)${color_norm}" >&2
+          exit 1
+        fi
+      else
+        break
+      fi
+      attempt=$(($attempt+1))
+      sleep 1
+    done
   fi
 
   local s3_bucket_location=$(aws --output text s3api get-bucket-location --bucket ${AWS_S3_BUCKET})
@@ -721,9 +738,9 @@ function kube-up {
         if [[ "${output}" != "working" ]]; then
           if (( attempt > 9 )); then
             echo
-            echo -e "Your cluster is unlikely to work correctly." >&2
+            echo -e "${color_red}Your cluster is unlikely to work correctly." >&2
             echo "Please run ./cluster/kube-down.sh and re-create the" >&2
-            echo -e "cluster. (sorry!)" >&2
+            echo -e "cluster. (sorry!)${color_norm}" >&2
             exit 1
           fi
         else
