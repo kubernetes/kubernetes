@@ -74,15 +74,17 @@ func (plugin *RBDPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 
 func (plugin *RBDPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	secret := ""
-	if spec.VolumeSource.RBD.SecretRef != nil {
+	source := plugin.getRBDVolumeSource(spec)
+
+	if source.SecretRef != nil {
 		kubeClient := plugin.host.GetKubeClient()
 		if kubeClient == nil {
 			return nil, fmt.Errorf("Cannot get kube client")
 		}
 
-		secretName, err := kubeClient.Secrets(pod.Namespace).Get(spec.VolumeSource.RBD.SecretRef.Name)
+		secretName, err := kubeClient.Secrets(pod.Namespace).Get(source.SecretRef.Name)
 		if err != nil {
-			glog.Errorf("Couldn't get secret %v/%v", pod.Namespace, spec.VolumeSource.RBD.SecretRef)
+			glog.Errorf("Couldn't get secret %v/%v", pod.Namespace, source.SecretRef)
 			return nil, err
 		}
 		for name, data := range secretName.Data {
@@ -95,16 +97,25 @@ func (plugin *RBDPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 	return plugin.newBuilderInternal(spec, pod.UID, &RBDUtil{}, mounter, secret)
 }
 
+func (plugin *RBDPlugin) getRBDVolumeSource(spec *volume.Spec) *api.RBDVolumeSource {
+	if spec.VolumeSource.RBD != nil {
+		return spec.VolumeSource.RBD
+	} else {
+		return spec.PersistentVolumeSource.RBD
+	}
+}
+
 func (plugin *RBDPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Builder, error) {
-	pool := spec.VolumeSource.RBD.RBDPool
+	source := plugin.getRBDVolumeSource(spec)
+	pool := source.RBDPool
 	if pool == "" {
 		pool = "rbd"
 	}
-	id := spec.VolumeSource.RBD.RadosUser
+	id := source.RadosUser
 	if id == "" {
 		id = "admin"
 	}
-	keyring := spec.VolumeSource.RBD.Keyring
+	keyring := source.Keyring
 	if keyring == "" {
 		keyring = "/etc/ceph/keyring"
 	}
@@ -112,14 +123,14 @@ func (plugin *RBDPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID,
 	return &rbd{
 		podUID:   podUID,
 		volName:  spec.Name,
-		mon:      spec.VolumeSource.RBD.CephMonitors,
-		image:    spec.VolumeSource.RBD.RBDImage,
+		mon:      source.CephMonitors,
+		image:    source.RBDImage,
 		pool:     pool,
 		id:       id,
 		keyring:  keyring,
 		secret:   secret,
-		fsType:   spec.VolumeSource.RBD.FSType,
-		readOnly: spec.VolumeSource.RBD.ReadOnly,
+		fsType:   source.FSType,
+		readOnly: source.ReadOnly,
 		manager:  manager,
 		mounter:  mounter,
 		plugin:   plugin,
