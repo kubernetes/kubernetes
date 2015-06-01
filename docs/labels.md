@@ -87,8 +87,8 @@ LIST and WATCH operations may specify label selectors to filter the sets of obje
 
 Kubernetes also currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationcontroller`s:
 
-* `service`: A [service](/docs/services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
-* `replicationcontroller`: A [replication controller](/docs/replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.
+* `service`: A [service](services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
+* `replicationcontroller`: A [replication controller](replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.
 
 The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationcontroller` is monitoring is also defined with a label selector. For management convenience and consistency, `services` and `replicationcontrollers` may themselves have labels and would generally carry the labels their corresponding pods have in common.
 
