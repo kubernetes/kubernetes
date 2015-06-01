@@ -36,6 +36,13 @@ ALLOCATE_NODE_CIDRS=true
 KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 
+# VERSION_REGEX matches things like "v0.13.1"
+readonly KUBE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+
+# CI_VERSION_REGEX matches things like "v0.14.1-341-ge0c9d9e"
+readonly KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(.*)$"
+
+
 function join_csv {
   local IFS=','; echo "$*";
 }
@@ -837,12 +844,13 @@ function kube-down {
   set -e
 }
 
-# Update a kubernetes cluster with latest source
-function kube-push {
+# Prepare to push new binaries to kubernetes cluster
+#  $1 - whether prepare push to node
+function prepare-push() {
   #TODO(dawnchen): figure out how to upgrade coreos node
   if [[ "${OS_DISTRIBUTION}" != "debian" ]]; then
     echo "Updating a kubernetes cluster with ${OS_DISTRIBUTION} is not supported yet." >&2
-    return
+    exit 1
   fi
 
   OUTPUT=${KUBE_ROOT}/_output/logs
@@ -856,17 +864,79 @@ function kube-push {
   get-bearer-token
 
   # Make sure we have the tar files staged on Google Storage
-  find-release-tars
-  upload-server-tars
+  tars_from_version
 
+  # Prepare node env vars and update MIG template
+  if [[ "${1-}" == "true" ]]; then
+    write-node-env
+
+    # TODO(mbforbes): Refactor setting scope flags.
+    local -a scope_flags=()
+    if (( "${#MINION_SCOPES[@]}" > 0 )); then
+      scope_flags=("--scopes" "${MINION_SCOPES[@]}")
+    else
+      scope_flags=("--no-scopes")
+    fi
+
+    # Ugly hack: Since it is not possible to delete instance-template that is currently
+    # being used, create a temp one, then delete the old one and recreate it once again.
+    create-node-instance-template "tmp"
+
+    gcloud preview managed-instance-groups --zone "${ZONE}" \
+      set-template "${NODE_INSTANCE_PREFIX}-group" \
+      --project "${PROJECT}" \
+      --template "${NODE_INSTANCE_PREFIX}-template-tmp" || true;
+
+    gcloud compute instance-templates delete \
+      --project "${PROJECT}" \
+      --quiet \
+      "${NODE_INSTANCE_PREFIX}-template" || true
+
+    create-node-instance-template
+
+    gcloud preview managed-instance-groups --zone "${ZONE}" \
+      set-template "${NODE_INSTANCE_PREFIX}-group" \
+      --project "${PROJECT}" \
+      --template "${NODE_INSTANCE_PREFIX}-template" || true;
+
+    gcloud compute instance-templates delete \
+      --project "${PROJECT}" \
+      --quiet \
+      "${NODE_INSTANCE_PREFIX}-template-tmp" || true
+  fi
+}
+
+# Push binaries to kubernetes master
+function push-master {
   echo "Updating master metadata ..."
   write-master-env
   add-instance-metadata-from-file "${KUBE_MASTER}" "kube-env=${KUBE_TEMP}/master-kube-env.yaml" "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh"
 
-  echo "Pushing to master (log at ${OUTPUT}/kube-push-${KUBE_MASTER}.log) ..."
-  cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${KUBE_MASTER}" --command "sudo bash -s -- --push" &> ${OUTPUT}/kube-push-"${KUBE_MASTER}".log
+  echo "Pushing to master (log at ${OUTPUT}/push-${KUBE_MASTER}.log) ..."
+  cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${KUBE_MASTER}" --command "sudo bash -s -- --push" &> ${OUTPUT}/push-"${KUBE_MASTER}".log
+}
 
-  kube-update-nodes push
+# Push binaries to kubernetes node
+function push-node() {
+  node=${1}
+
+  echo "Updating node ${node} metadata... "
+  add-instance-metadata-from-file "${node}" "kube-env=${KUBE_TEMP}/node-kube-env.yaml" "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh"
+
+  echo "Start upgrading node ${node} (log at ${OUTPUT}/push-${node}.log) ..."
+  cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${node}" --command "sudo bash -s -- --push" &> ${OUTPUT}/push-"${node}".log
+}
+
+# Push binaries to kubernetes cluster
+function kube-push {
+  prepare-push true
+
+  push-master
+
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    push-node "${MINION_NAMES[$i]}" &
+  done
+  wait-for-jobs
 
   # TODO(zmerlynn): Re-create instance-template with the new
   # node-kube-env. This isn't important until the node-ip-range issue
@@ -883,43 +953,6 @@ function kube-push {
   echo
   echo "The user name and password to use is located in ~/.kube/config"
   echo
-}
-
-# Push or upgrade nodes.
-#
-# TODO: This really needs to trampoline somehow to the configure-vm.sh
-# from the .tar.gz that we're actually pushing onto the node, because
-# that configuration shifts over versions. Right now, we're blasting
-# the configure-vm from our version instead.
-#
-# Assumed vars:
-#  KUBE_ROOT
-#  MINION_NAMES
-#  KUBE_TEMP
-#  PROJECT
-#  ZONE
-function kube-update-nodes() {
-  action=${1}
-
-  OUTPUT=${KUBE_ROOT}/_output/logs
-  mkdir -p ${OUTPUT}
-
-  echo "Updating node metadata... "
-  write-node-env
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    add-instance-metadata-from-file "${MINION_NAMES[$i]}" "kube-env=${KUBE_TEMP}/node-kube-env.yaml" "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" &
-  done
-  wait-for-jobs
-  echo "Done"
-
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    echo "Starting ${action} on node (log at ${OUTPUT}/kube-${action}-${MINION_NAMES[$i]}.log) ..."
-    cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${MINION_NAMES[$i]}" --command "sudo bash -s -- --push" &> ${OUTPUT}/kube-${action}-"${MINION_NAMES[$i]}".log &
-  done
-
-  echo -n "Waiting..."
-  wait-for-jobs
-  echo "Done"
 }
 
 # -----------------------------------------------------------------------------

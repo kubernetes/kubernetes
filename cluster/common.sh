@@ -168,3 +168,55 @@ function get-kubeconfig-bearertoken() {
     KUBE_BEARER_TOKEN=''
   fi
 }
+
+# Sets binary_version variable to the version passed in as an argument, or if argument is
+# latest_stable, latest_release, or latest_ci fetches and sets the correponding version number
+#
+# Args:
+#   $1 version string from command line
+# Vars set:
+#   KUBE_VERSION
+function set_binary_version() {
+  if [[ "${1}" == "latest_stable" ]]; then
+    KUBE_VERSION=$(gsutil cat gs://kubernetes-release/release/stable.txt)
+    echo "Using latest stable version: ${binary_version}"
+  elif [[ "${1}" == "latest_release" ]]; then
+    KUBE_VERSION=$(gsutil cat gs://kubernetes-release/release/latest.txt)
+    echo "Using latest release version: ${binary_version}"
+  elif [[ "${1}" == "latest_ci" ]]; then
+    KUBE_VERSION=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
+    echo "Using latest ci version: ${binary_version}"
+  else
+    KUBE_VERSION=${1}
+  fi
+}
+
+# Figure out which binary use on the server and assure it is available.
+# If KUBE_VERSION is specified use binaries specified by it, otherwise
+# use local dev binaries.
+#
+# Assumed vars:
+#   PROJECT
+# Vars set:
+#   SERVER_BINARY_TAR_URL
+#   SALT_TAR_URL
+function tars_from_version() {
+  if [[ -z "${KUBE_VERSION-}" ]]; then
+    find-release-tars
+    upload-server-tars
+  elif [[ ${KUBE_VERSION} =~ ${KUBE_VERSION_REGEX} ]]; then
+    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+  elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
+    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+  else
+    echo "Version doesn't match regexp" >&2
+    exit 1
+  fi
+
+  if ! curl -Ss --range 0-1 ${SERVER_BINARY_TAR_URL} >&/dev/null; then
+    echo "Can't find release at ${SERVER_BINARY_TAR_URL}" >&2
+    exit 1
+  fi
+}
