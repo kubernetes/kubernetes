@@ -61,5 +61,33 @@ $ kube-up.sh
 
 Note that we are still working on making all containerized the master components run smoothly in rkt. Before that we are not able to run the master node with rkt yet.
 
+### CoreOS cluster on AWS
+
+To use rkt as the container runtime for your CoreOS cluster on AWS, you need to specify the provider and OS distribution:
+```shell
+$ export KUBERNETES_PROVIDER=aws
+$ export KUBE_OS_DISTRIBUTION=coreos
+$ export KUBE_CONTAINER_RUNTIME=rkt
+```
+
+You can optionally choose the version of rkt used by setting `KUBE_RKT_VERSION`:
+```shell
+$ export KUBE_RKT_VERSION=0.5.6
+```
+
+You can optionally choose the CoreOS channel  by setting `COREOS_CHANNEL`:
+```shell
+$ export COREOS_CHANNEL=stable
+```
+
+Then you can launch the cluster by:
+````shell
+$ kube-up.sh
+```
+
+Note: CoreOS is not supported as the master using the automated launch
+scripts. The master node is always Ubuntu.
+
+
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/rkt/README.md?pixel)]()
