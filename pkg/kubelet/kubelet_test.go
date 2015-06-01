@@ -73,6 +73,16 @@ type TestKubelet struct {
 
 const testKubeletHostname = "127.0.0.1"
 
+type fakeHTTP struct {
+	url string
+	err error
+}
+
+func (f *fakeHTTP) Get(url string) (*http.Response, error) {
+	f.url = url
+	return nil, f.err
+}
+
 func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeDocker := &dockertools.FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
 	fakeDocker.VersionInfo = []string{"ApiVersion=1.15"}
@@ -528,100 +538,6 @@ func TestSyncPodsStartPod(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	fakeRuntime.AssertStartedPods([]string{string(pods[0].UID)})
-}
-
-type fakeHTTP struct {
-	url string
-	err error
-}
-
-func (f *fakeHTTP) Get(url string) (*http.Response, error) {
-	f.url = url
-	return nil, f.err
-}
-
-func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-	fakeHttp := fakeHTTP{}
-
-	// Simulate HTTP failure. Re-create the containerRuntime to inject the failure.
-	kubelet.httpClient = &fakeHttp
-	runtimeHooks := newKubeletRuntimeHooks(kubelet.recorder)
-	kubelet.containerRuntime = dockertools.NewFakeDockerManager(kubelet.dockerClient, kubelet.recorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, kubelet, kubelet.httpClient, runtimeHooks)
-
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name: "bar",
-						Lifecycle: &api.Lifecycle{
-							PostStart: &api.Handler{
-								HTTPGet: &api.HTTPGetAction{
-									Host: "foo",
-									Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
-									Path: "bar",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_foo_new_12345678_0"},
-			ID:    "9876",
-		},
-	}
-	fakeDocker.ContainerMap = map[string]*docker.Container{
-		"9876": {
-			ID:         "9876",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-	}
-	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
-		// Get pod status.
-		"list", "inspect_container", "inspect_image",
-		// Check the pod infra container.
-		"inspect_container",
-		// Create container.
-		"create", "start",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-		// Get pods for deleting orphaned volumes.
-		"list",
-	})
-
-	fakeDocker.Lock()
-	if len(fakeDocker.Created) != 1 ||
-		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) {
-		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
-	}
-	fakeDocker.Unlock()
-	if fakeHttp.url != "http://foo:8080/bar" {
-		t.Errorf("Unexpected handler: %q", fakeHttp.url)
-	}
 }
 
 func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
@@ -1083,95 +999,6 @@ func TestRunInContainer(t *testing.T) {
 	}
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestSyncPodEventHandlerFails(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-
-	// Simulate HTTP failure. Re-create the containerRuntime to inject the failure.
-	kubelet.httpClient = &fakeHTTP{
-		err: fmt.Errorf("test error"),
-	}
-	runtimeHooks := newKubeletRuntimeHooks(kubelet.recorder)
-	kubelet.containerRuntime = dockertools.NewFakeDockerManager(kubelet.dockerClient, kubelet.recorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, kubelet, kubelet.httpClient, runtimeHooks)
-
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{Name: "bar",
-						Lifecycle: &api.Lifecycle{
-							PostStart: &api.Handler{
-								HTTPGet: &api.HTTPGetAction{
-									Host: "does.no.exist",
-									Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
-									Path: "bar",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pods[0]), 16) + "_foo_new_12345678_42"},
-			ID:    "9876",
-		},
-	}
-	fakeDocker.ContainerMap = map[string]*docker.Container{
-		"9876": {
-			ID:         "9876",
-			Config:     &docker.Config{},
-			HostConfig: &docker.HostConfig{},
-		},
-	}
-	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
-		// Get pod status.
-		"list", "inspect_container", "inspect_image",
-		// Check the pod infra container.
-		"inspect_container",
-		// Create the container.
-		"create", "start",
-		// Kill the container since event handler fails.
-		"inspect_container", "stop",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-		// Get pods for deleting orphaned volumes.
-		"list",
-	})
-
-	// TODO(yifan): Check the stopped container's name.
-	if len(fakeDocker.Stopped) != 1 {
-		t.Fatalf("Wrong containers were stopped: %v", fakeDocker.Stopped)
-	}
-	dockerName, _, err := dockertools.ParseDockerName(fakeDocker.Stopped[0])
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if dockerName.ContainerName != "bar" {
-		t.Errorf("Wrong stopped container, expected: bar, get: %q", dockerName.ContainerName)
 	}
 }
 
