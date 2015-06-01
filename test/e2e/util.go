@@ -712,7 +712,7 @@ func Diff(oldPods []*api.Pod, curPods []*api.Pod) PodDiff {
 }
 
 // RunRC Launches (and verifies correctness) of a Replication Controller
-// It will waits for all pods it spawns to become "Running".
+// and will wait for all pods it spawns to become "Running".
 // It's the caller's responsibility to clean up externally (i.e. use the
 // namespace lifecycle for handling cleanup).
 func RunRC(config RCConfig) error {
@@ -766,26 +766,38 @@ func RunRC(config RCConfig) error {
 
 	// Create a routine to query for the list of pods
 	stop := make(chan struct{})
-	go func(stop <-chan struct{}, n string, ns string, l labels.Selector, i int) {
+	go func(stop <-chan struct{}, ns string, label labels.Selector, interval int) {
 		for {
 			select {
 			case <-stop:
 				return
 			default:
 				podLists.Push(podStore.List())
-				time.Sleep(time.Duration(i) * time.Second)
+				time.Sleep(time.Duration(interval) * time.Second)
 			}
 		}
-	}(stop, name, ns, label, interval)
+	}(stop, ns, label, interval)
 	defer close(stop)
 
+	// Look for all the replicas to be created by the replication
+	// controller.  Stop looking if all replicas are found or no new
+	// replicas are found for a continual number of times
 	By(fmt.Sprintf("Making sure all %d replicas of rc %s in namespace %s exist", replicas, name, ns))
-	failCount := int(120.0 / float64(interval))
+
+	// There must be some amount of new pods created within 2 minutes, so
+	// determine the number of checks needed to ensure timeout within
+	// that time period.  2 minutes is generous amount of time to see
+	// a change new pods created in the system even if it is under load.
+	failCount := int(math.Max(1.0, 120.0/float64(interval)))
 	for same < failCount && current < replicas {
+		// Wait just longer than an interval to allow processing
+		// information in the queue quickly
 		time.Sleep(time.Duration(float32(interval)*1.1) * time.Second)
 
 		// Greedily read all existing entries in the queue until
-		// all pods are found submitted or the queue is empty
+		// all pods are found submitted or the queue is empty.  If
+		// the queue is empty then we need to stop trying to process
+		// entries until there is something or process in the queue
 		for podLists.Len() > 0 && current < replicas {
 			item := podLists.Pop()
 			pods := item.value.([]*api.Pod)
@@ -810,19 +822,33 @@ func RunRC(config RCConfig) error {
 	}
 	Logf("%v Controller %s in ns %s: Found %d pods out of %d", time.Now(), name, ns, current, replicas)
 
+	// Look for all the replicas to be in a Running state.  Stop looking
+	// if all replicas are found in a Running state or no new
+	// replicas are found Running for a continual number of times
 	By(fmt.Sprintf("%v Waiting for all %d replicas to be running with a max container failures of %d", time.Now(), replicas, maxContainerFailures))
+
+	// There must be some amount of pods that have newly transitioned to
+	// the Running state within 100 seconds, so determine the number of
+	// checks needed to ensure timeout within that time period.
+	// 100 seconds is generous amount of time to see a change in the
+	// system even if it is under load.
+	failCount = int(math.Max(1.0, 100.0/float64(interval)))
+
 	same = 0
 	last = 0
-	failCount = int(100.0 / float64(interval))
 	current = 0
 	var oldPods []*api.Pod
 	podLists.Reset()
 	foundAllPods := false
 	for same < failCount && current < replicas {
+		// Wait just longer than an interval to allow processing
+		// information in the queue quickly
 		time.Sleep(time.Duration(float32(interval)*1.1) * time.Second)
 
 		// Greedily read all existing entries in the queue until
-		// either all pods are running or the queue is empty
+		// either all pods are running or the queue is empty.  If
+		// the queue is empty we need to stop looking for entries
+		// and wait for a new entry to process
 		for podLists.Len() > 0 && current < replicas {
 			item := podLists.Pop()
 			current = 0
