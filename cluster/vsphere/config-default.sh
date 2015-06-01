@@ -44,8 +44,11 @@ LOGGING_DESTINATION=elasticsearch
 ENABLE_CLUSTER_LOGGING=false
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
-# Optional: When set to true, heapster, Influxdb and Grafana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
+# Optional: Cluster monitoring to setup as part of the cluster bring up:
+#   none     - No cluster monitoring setup 
+#   influxdb - Heapster, InfluxDB, and Grafana 
+#   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
