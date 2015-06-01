@@ -40,6 +40,8 @@ export INSTANCE_PREFIX=k8s
 It will also try to create or reuse a keypair called "kubernetes", and IAM profiles called "kubernetes-master" and "kubernetes-minion".
 If these already exist, make sure you want them to be used here.
 
+NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS_SSH_KEY` key to point to your private key.
+
 ### Alternatives
 A contributed [example](aws-coreos.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using
 AWS CloudFormation or EC2 with user data (cloud-config).
