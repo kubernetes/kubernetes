@@ -303,10 +303,11 @@ address.  Kubernetes supports two ways of doing this: `NodePort`s and
 
 Every `Service` has a `Type` field which defines how the `Service` can be
 accessed.  Valid values for this field are:
-   - ClusterIP: use a cluster-internal IP (portal) only - this is the default
-   - NodePort: use a cluster IP, but also expose the service on a port on each
+
+   * `ClusterIP`: use a cluster-internal IP (portal) only - this is the default
+   * `NodePort`: use a cluster IP, but also expose the service on a port on each
      node of the cluster (the same port on each)
-   - LoadBalancer: use a ClusterIP and a NodePort, but also ask the cloud
+   * `LoadBalancer`: use a ClusterIP and a NodePort, but also ask the cloud
      provider for a load balancer which forwards to the `Service`
 
 Note that while `NodePort`s can be TCP or UDP, `LoadBalancer`s only support TCP
