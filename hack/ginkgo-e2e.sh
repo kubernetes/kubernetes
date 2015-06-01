@@ -101,6 +101,7 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --gce-project="${PROJECT:-}" \
   --gce-zone="${ZONE:-}" \
   --kube-master="${KUBE_MASTER:-}" \
+  --cluster-tag="${CLUSTER_ID:-}" \
   --repo-root="${KUBE_VERSION_ROOT}" \
   --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
   --num-nodes="${NUM_MINIONS:-}" \

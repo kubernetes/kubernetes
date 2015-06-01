@@ -72,6 +72,7 @@ type CloudConfig struct {
 	MasterName        string
 	NodeInstanceGroup string
 	NumNodes          int
+	ClusterTag        string
 
 	Provider cloudprovider.Interface
 }

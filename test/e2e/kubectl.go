@@ -113,8 +113,8 @@ var _ = Describe("kubectl", func() {
 		})
 
 		It("should create and stop a working application", func() {
-			if !providerIs("gce", "gke") {
-				By(fmt.Sprintf("Skipping guestbook, uses createExternalLoadBalancer, a (gce|gke) feature"))
+			if !providerIs("gce", "gke", "aws") {
+				By(fmt.Sprintf("Skipping guestbook, uses createExternalLoadBalancer, a (gce|gke|aws) feature"))
 				return
 			}
 

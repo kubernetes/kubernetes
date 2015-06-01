@@ -61,7 +61,7 @@
 			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
 		},
 		{
-			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/protocol/query/queryutil",
+			"ImportPath": "github.com/awslabs/aws-sdk-go/internal/protocol/query",
 			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
 		},
 		{
@@ -74,6 +74,10 @@
 		},
 		{
 			"ImportPath": "github.com/awslabs/aws-sdk-go/service/ec2",
+			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
+		},
+		{
+			"ImportPath": "github.com/awslabs/aws-sdk-go/service/elb",
 			"Rev": "c0a38f106248742920a2b786dcae81457af003d3"
 		},
 		{

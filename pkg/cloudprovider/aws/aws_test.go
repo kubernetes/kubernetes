@@ -23,19 +23,21 @@ import (
 	"testing"
 
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/aws/credentials"
 	"github.com/awslabs/aws-sdk-go/service/ec2"
+	"github.com/awslabs/aws-sdk-go/service/elb"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 )
 
+const TestClusterId = "clusterid.test"
+
 func TestReadAWSCloudConfig(t *testing.T) {
 	tests := []struct {
 		name string
 
-		reader   io.Reader
-		metadata AWSMetadata
+		reader io.Reader
+		aws    AWSServices
 
 		expectError bool
 		zone        string
@@ -62,27 +64,31 @@ func TestReadAWSCloudConfig(t *testing.T) {
 		},
 		{
 			"No zone in config, metadata does not have zone",
-			strings.NewReader("[global]\n"), &FakeMetadata{},
+			strings.NewReader("[global]\n"), NewFakeAWSServices().withAz(""),
 			true, "",
 		},
 		{
 			"No zone in config, metadata has zone",
-			strings.NewReader("[global]\n"), &FakeMetadata{availabilityZone: "eu-west-1a"},
-			false, "eu-west-1a",
+			strings.NewReader("[global]\n"), NewFakeAWSServices(),
+			false, "us-east-1a",
 		},
 		{
 			"Zone in config should take precedence over metadata",
-			strings.NewReader("[global]\nzone = us-east-1a"), &FakeMetadata{availabilityZone: "eu-west-1a"},
-			false, "us-east-1a",
+			strings.NewReader("[global]\nzone = eu-west-1a"), NewFakeAWSServices(),
+			false, "eu-west-1a",
 		},
 	}
 
 	for _, test := range tests {
 		t.Logf("Running test case %s", test.name)
-		cfg, err := readAWSCloudConfig(test.reader, test.metadata)
+		var metadata AWSMetadata
+		if test.aws != nil {
+			metadata = test.aws.Metadata()
+		}
+		cfg, err := readAWSCloudConfig(test.reader, metadata)
 		if test.expectError {
 			if err == nil {
-				t.Errorf("Should error for case %s", test.name)
+				t.Errorf("Should error for case %s (cfg=%v)", test.name, cfg)
 			}
 		} else {
 			if err != nil {
@@ -96,64 +102,127 @@ func TestReadAWSCloudConfig(t *testing.T) {
 	}
 }
 
-func TestNewAWSCloud(t *testing.T) {
-	fakeAuthFunc := func() (creds *credentials.Credentials) {
-		return credentials.NewStaticCredentials("", "", "")
+type FakeAWSServices struct {
+	availabilityZone string
+	instances        []*ec2.Instance
+	instanceId       string
+
+	ec2      *FakeEC2
+	elb      *FakeELB
+	metadata *FakeMetadata
+}
+
+func NewFakeAWSServices() *FakeAWSServices {
+	s := &FakeAWSServices{}
+	s.availabilityZone = "us-east-1a"
+	s.ec2 = &FakeEC2{aws: s}
+	s.elb = &FakeELB{aws: s}
+	s.metadata = &FakeMetadata{aws: s}
+
+	s.instanceId = "i-self"
+	var selfInstance ec2.Instance
+	selfInstance.InstanceID = &s.instanceId
+	s.instances = []*ec2.Instance{&selfInstance}
+
+	var tag ec2.Tag
+	tag.Key = aws.String(TagNameKubernetesCluster)
+	tag.Value = aws.String(TestClusterId)
+	selfInstance.Tags = []*ec2.Tag{&tag}
+
+	return s
+}
+
+func (s *FakeAWSServices) withAz(az string) *FakeAWSServices {
+	s.availabilityZone = az
+	return s
+}
+
+func (s *FakeAWSServices) withInstances(instances []*ec2.Instance) *FakeAWSServices {
+	s.instances = instances
+	return s
+}
+
+func (s *FakeAWSServices) Compute(region string) (EC2, error) {
+	return s.ec2, nil
+}
+
+func (s *FakeAWSServices) LoadBalancing(region string) (ELB, error) {
+	return s.elb, nil
+}
+
+func (s *FakeAWSServices) Metadata() AWSMetadata {
+	return s.metadata
+}
+
+func TestFilterTags(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
 	}
 
+	if len(c.filterTags) != 1 {
+		t.Errorf("unexpected filter tags: %v", c.filterTags)
+		return
+	}
+
+	if c.filterTags[TagNameKubernetesCluster] != TestClusterId {
+		t.Errorf("unexpected filter tags: %v", c.filterTags)
+	}
+}
+
+func TestNewAWSCloud(t *testing.T) {
 	tests := []struct {
 		name string
 
-		reader   io.Reader
-		authFunc AuthFunc
-		metadata AWSMetadata
+		reader      io.Reader
+		awsServices AWSServices
 
 		expectError bool
 		zone        string
 	}{
 		{
 			"No config reader",
-			nil, fakeAuthFunc, &FakeMetadata{},
+			nil, NewFakeAWSServices().withAz(""),
 			true, "",
 		},
 		{
 			"Config specified invalid zone",
-			strings.NewReader("[global]\nzone = blahonga"), fakeAuthFunc, &FakeMetadata{},
+			strings.NewReader("[global]\nzone = blahonga"), NewFakeAWSServices(),
 			true, "",
 		},
 		{
 			"Config specifies valid zone",
-			strings.NewReader("[global]\nzone = eu-west-1a"), fakeAuthFunc, &FakeMetadata{},
+			strings.NewReader("[global]\nzone = eu-west-1a"), NewFakeAWSServices(),
 			false, "eu-west-1a",
 		},
 		{
 			"Gets zone from metadata when not in config",
 
 			strings.NewReader("[global]\n"),
-			fakeAuthFunc,
-			&FakeMetadata{availabilityZone: "us-east-1a"},
-
+			NewFakeAWSServices(),
 			false, "us-east-1a",
 		},
 		{
 			"No zone in config or metadata",
-			strings.NewReader("[global]\n"), fakeAuthFunc, &FakeMetadata{},
+			strings.NewReader("[global]\n"),
+			NewFakeAWSServices().withAz(""),
 			true, "",
 		},
 	}
 
 	for _, test := range tests {
 		t.Logf("Running test case %s", test.name)
-		c, err := newAWSCloud(test.reader, test.authFunc, test.metadata)
+		c, err := newAWSCloud(test.reader, test.awsServices)
 		if test.expectError {
 			if err == nil {
 				t.Errorf("Should error for case %s", test.name)
 			}
 		} else {
 			if err != nil {
-				t.Errorf("Should succeed for case: %s", test.name)
-			}
-			if c.availabilityZone != test.zone {
+				t.Errorf("Should succeed for case: %s, got %v", test.name, err)
+			} else if c.availabilityZone != test.zone {
 				t.Errorf("Incorrect zone value (%s vs %s) for case: %s",
 					c.availabilityZone, test.zone, test.name)
 			}
@@ -162,7 +231,7 @@ func TestNewAWSCloud(t *testing.T) {
 }
 
 type FakeEC2 struct {
-	instances []*ec2.Instance
+	aws *FakeAWSServices
 }
 
 func contains(haystack []string, needle string) bool {
@@ -176,7 +245,7 @@ func contains(haystack []string, needle string) bool {
 
 func (self *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (instances []*ec2.Instance, err error) {
 	matches := []*ec2.Instance{}
-	for _, instance := range self.instances {
+	for _, instance := range self.aws.instances {
 		if filter != nil && !filter.Matches(instance) {
 			continue
 		}
@@ -190,15 +259,14 @@ func (self *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) 
 }
 
 type FakeMetadata struct {
-	availabilityZone string
-	instanceId       string
+	aws *FakeAWSServices
 }
 
 func (self *FakeMetadata) GetMetaData(key string) ([]byte, error) {
 	if key == "placement/availability-zone" {
-		return []byte(self.availabilityZone), nil
+		return []byte(self.aws.availabilityZone), nil
 	} else if key == "instance-id" {
-		return []byte(self.instanceId), nil
+		return []byte(self.aws.instanceId), nil
 	} else {
 		return nil, nil
 	}
@@ -224,23 +292,63 @@ func (ec2 *FakeEC2) DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput,
 	panic("Not implemented")
 }
 
-func mockInstancesResp(instances []*ec2.Instance) (aws *AWSCloud) {
-	availabilityZone := "us-west-2d"
+func (ec2 *FakeEC2) DescribeSecurityGroups(groupIds []string, filterName string, filterVpcId string) ([]*ec2.SecurityGroup, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (*ec2.CreateSecurityGroupOutput, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DescribeVPCs(*ec2.DescribeVPCsInput) (*ec2.DescribeVPCsOutput, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DescribeSubnets(*ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error) {
+	panic("Not implemented")
+}
+
+type FakeELB struct {
+	aws *FakeAWSServices
+}
+
+func (ec2 *FakeELB) CreateLoadBalancer(*elb.CreateLoadBalancerInput) (*elb.CreateLoadBalancerOutput, error) {
+	panic("Not implemented")
+}
+func (ec2 *FakeELB) DeleteLoadBalancer(*elb.DeleteLoadBalancerInput) (*elb.DeleteLoadBalancerOutput, error) {
+	panic("Not implemented")
+}
+func (ec2 *FakeELB) DescribeLoadBalancers(*elb.DescribeLoadBalancersInput) (*elb.DescribeLoadBalancersOutput, error) {
+	panic("Not implemented")
+}
+func (ec2 *FakeELB) RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error) {
+	panic("Not implemented")
+}
+func (ec2 *FakeELB) DeregisterInstancesFromLoadBalancer(*elb.DeregisterInstancesFromLoadBalancerInput) (*elb.DeregisterInstancesFromLoadBalancerOutput, error) {
+	panic("Not implemented")
+}
+
+func mockInstancesResp(instances []*ec2.Instance) *AWSCloud {
+	awsServices := NewFakeAWSServices().withInstances(instances)
 	return &AWSCloud{
-		ec2: &FakeEC2{
-			instances: instances,
-		},
-		availabilityZone: availabilityZone,
+		awsServices:      awsServices,
+		ec2:              awsServices.ec2,
+		availabilityZone: awsServices.availabilityZone,
 	}
 }
 
 func mockAvailabilityZone(region string, availabilityZone string) *AWSCloud {
+	awsServices := NewFakeAWSServices().withAz(availabilityZone)
 	return &AWSCloud{
-		ec2:              &FakeEC2{},
-		availabilityZone: availabilityZone,
+		awsServices:      awsServices,
+		ec2:              awsServices.ec2,
+		availabilityZone: awsServices.availabilityZone,
 		region:           region,
 	}
-
 }
 
 func TestList(t *testing.T) {

@@ -331,7 +331,7 @@ func (s *ServiceController) persistUpdate(service *api.Service) error {
 }
 
 func (s *ServiceController) createExternalLoadBalancer(service *api.Service) error {
-	ports, err := getTCPPorts(service)
+	ports, err := getPortsForLB(service)
 	if err != nil {
 		return err
 	}
@@ -436,7 +436,7 @@ func needsUpdate(oldService *api.Service, newService *api.Service) bool {
 	if wantsExternalLoadBalancer(oldService) != wantsExternalLoadBalancer(newService) {
 		return true
 	}
-	if !portsEqual(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
+	if !portsEqualForLB(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
 		return true
 	}
 	if len(oldService.Spec.DeprecatedPublicIPs) != len(newService.Spec.DeprecatedPublicIPs) {
@@ -454,8 +454,8 @@ func (s *ServiceController) loadBalancerName(service *api.Service) string {
 	return cloudprovider.GetLoadBalancerName(service)
 }
 
-func getTCPPorts(service *api.Service) ([]int, error) {
-	ports := []int{}
+func getPortsForLB(service *api.Service) ([]*api.ServicePort, error) {
+	ports := []*api.ServicePort{}
 	for i := range service.Spec.Ports {
 		// TODO: Support UDP. Remove the check from the API validation package once
 		// it's supported.
@@ -463,21 +463,58 @@ func getTCPPorts(service *api.Service) ([]int, error) {
 		if sp.Protocol != api.ProtocolTCP {
 			return nil, fmt.Errorf("external load balancers for non TCP services are not currently supported.")
 		}
-		ports = append(ports, sp.Port)
+		ports = append(ports, sp)
 	}
 	return ports, nil
 }
 
-func portsEqual(x, y *api.Service) bool {
-	xPorts, err := getTCPPorts(x)
+func portsEqualForLB(x, y *api.Service) bool {
+	xPorts, err := getPortsForLB(x)
 	if err != nil {
 		return false
 	}
-	yPorts, err := getTCPPorts(y)
+	yPorts, err := getPortsForLB(y)
 	if err != nil {
 		return false
 	}
-	return intSlicesEqual(xPorts, yPorts)
+	return portSlicesEqualForLB(xPorts, yPorts)
+}
+
+func portSlicesEqualForLB(x, y []*api.ServicePort) bool {
+	if len(x) != len(y) {
+		return false
+	}
+
+	for i := range x {
+		if !portEqualForLB(x[i], y[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func portEqualForLB(x, y *api.ServicePort) bool {
+	// TODO: Should we check name?  (In theory, an LB could expose it)
+	if x.Name != y.Name {
+		return false
+	}
+
+	if x.Protocol != y.Protocol {
+		return false
+	}
+
+	if x.Port != y.Port {
+		return false
+	}
+
+	if x.NodePort != y.NodePort {
+		return false
+	}
+
+	// We don't check TargetPort; that is not relevant for load balancing
+	// TODO: Should we blank it out?  Or just check it anyway?
+
+	return true
 }
 
 func intSlicesEqual(x, y []int) bool {
