@@ -24,12 +24,12 @@ coreos:
         Documentation=https://github.com/coreos/etcd/
         Requires=network-online.target
         [Service]
-        Environment=ETCD2_RELEASE_TARBALL=https://github.com/coreos/etcd/releases/download/v2.0.9/etcd-v2.0.9-linux-amd64.tar.gz
+        Environment=ETCD2_RELEASE_TARBALL=https://github.com/coreos/etcd/releases/download/v2.0.11/etcd-v2.0.11-linux-amd64.tar.gz
         ExecStartPre=/bin/mkdir -p /opt/bin
         ExecStart=/opt/bin/curl-retry.sh --silent --location $ETCD2_RELEASE_TARBALL --output /tmp/etcd2.tgz
         ExecStart=/bin/tar xzvf /tmp/etcd2.tgz -C /opt
-        ExecStartPost=/bin/ln -s /opt/etcd-v2.0.9-linux-amd64/etcd /opt/bin/etcd2
-        ExecStartPost=/bin/ln -s /opt/etcd-v2.0.9-linux-amd64/etcdctl /opt/bin/etcdctl2
+        ExecStartPost=/bin/ln -s /opt/etcd-v2.0.11-linux-amd64/etcd /opt/bin/etcd2
+        ExecStartPost=/bin/ln -s /opt/etcd-v2.0.11-linux-amd64/etcdctl /opt/bin/etcdctl2
         RemainAfterExit=yes
         Type=oneshot
         [Install]

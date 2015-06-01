@@ -23,11 +23,11 @@ npm install
 Now, all you need to do is:
 
 ```
-./azure-login.js
+./azure-login.js -u <your_username>
 ./create-kubernetes-cluster.js
 ```
 
-This script will provision a cluster suitable for production use, where there is a ring of 3 dedicated etcd nodes, Kubernetes master and 2 minions. The `kube-00` VM will be the master, your work loads are only to be deployed on the minion nodes, `kube-01` and `kube-02`. Initially, all VMs are single-core, to ensure a user of the free tier can reproduce it without paying extra. I will show how to add more bigger VMs later.
+This script will provision a cluster suitable for production use, where there is a ring of 3 dedicated etcd nodes, Kubernetes master and 2 nodes. The `kube-00` VM will be the master, your work loads are only to be deployed on the minion nodes, `kube-01` and `kube-02`. Initially, all VMs are single-core, to ensure a user of the free tier can reproduce it without paying extra. I will show how to add more bigger VMs later.
 
 ![VMs in Azure](initial_cluster.png)
 
@@ -35,21 +35,21 @@ Once the creation of Azure VMs has finished, you should see the following:
 
 ```
 ...
-azure_wrapper/info: Saved SSH config, you can use it like so: `ssh -F  ./output/kubernetes_1c1496016083b4_ssh_conf <hostname>`
+azure_wrapper/info: Saved SSH config, you can use it like so: `ssh -F  ./output/kube_1c1496016083b4_ssh_conf <hostname>`
 azure_wrapper/info: The hosts in this deployment are:
  [ 'etcd-00', 'etcd-01', 'etcd-02', 'kube-00', 'kube-01', 'kube-02' ]
-azure_wrapper/info: Saved state into `./output/kubernetes_1c1496016083b4_deployment.yml`
+azure_wrapper/info: Saved state into `./output/kube_1c1496016083b4_deployment.yml`
 ```
 
 Let's login to the master node like so:
 ```
-ssh -F  ./output/kubernetes_1c1496016083b4_ssh_conf kube-00
+ssh -F  ./output/kube_1c1496016083b4_ssh_conf kube-00
 ```
 > Note: config file name will be different, make sure to use the one you see.
 
-Check there are 2 minions in the cluster:
+Check there are 2 nodes in the cluster:
 ```
-core@kube-00 ~ $ kubectl get minions
+core@kube-00 ~ $ kubectl get nodes
 NAME                LABELS                   STATUS
 kube-01             environment=production   Ready
 kube-02             environment=production   Ready
@@ -68,11 +68,11 @@ kubectl create -f frontend-controller.json
 kubectl create -f frontend-service.json
 ```
 
-You need to wait for the pods to get deployed, run the following and wait for `STATUS` to change from `Unknown`, through `Pending` to `Running`. 
+You need to wait for the pods to get deployed, run the following and wait for `STATUS` to change from `Unknown`, through `Pending` to `Running`.
 ```
 kubectl get pods --watch
 ```
-> Note: the most time it will spend downloading Docker container images on each of the minions.
+> Note: the most time it will spend downloading Docker container images on each of the nodes.
 
 Eventually you should see:
 ```
@@ -88,7 +88,7 @@ redis-slave-controller-gziey   10.2.1.4       slave           brendanburns/redis
 
 ## Scaling
 
-Two single-core minions are certainly not enough for a production system of today, and, as you can see, there is one _unassigned_ pod. Let's scale the cluster by adding a couple of bigger nodes.
+Two single-core nodes are certainly not enough for a production system of today, and, as you can see, there is one _unassigned_ pod. Let's scale the cluster by adding a couple of bigger nodes.
 
 You will need to open another terminal window on your machine and go to the same working directory (e.g. `~/Workspace/weave-demos/coreos-azure`).
 
@@ -96,11 +96,11 @@ First, lets set the size of new VMs:
 ```
 export AZ_VM_SIZE=Large
 ```
-Now, run scale script with state file of the previous deployment and number of minions to add:
+Now, run scale script with state file of the previous deployment and number of nodes to add:
 ```
-./scale-kubernetes-cluster.js ./output/kubernetes_1c1496016083b4_deployment.yml 2
+./scale-kubernetes-cluster.js ./output/kube_1c1496016083b4_deployment.yml 2
 ...
-azure_wrapper/info: Saved SSH config, you can use it like so: `ssh -F  ./output/kubernetes_8f984af944f572_ssh_conf <hostname>`
+azure_wrapper/info: Saved SSH config, you can use it like so: `ssh -F  ./output/kube_8f984af944f572_ssh_conf <hostname>`
 azure_wrapper/info: The hosts in this deployment are:
  [ 'etcd-00',
   'etcd-01',
@@ -110,43 +110,45 @@ azure_wrapper/info: The hosts in this deployment are:
   'kube-02',
   'kube-03',
   'kube-04' ]
-azure_wrapper/info: Saved state into `./output/kubernetes_8f984af944f572_deployment.yml`
+azure_wrapper/info: Saved state into `./output/kube_8f984af944f572_deployment.yml`
 ```
 > Note: this step has created new files in `./output`.
 
 Back on `kube-00`:
 ```
-core@kube-00 ~ $ kubectl get minions
-NAME                LABELS                   STATUS
-kube-01             environment=production   Ready
-kube-02             environment=production   Ready
-kube-03             environment=production   Ready
-kube-04             environment=production   Ready
+core@kube-00 ~ $ kubectl get nodes
+NAME        LABELS                   STATUS
+kube-01     environment=production   Ready
+kube-02     environment=production   Ready
+kube-03     environment=production   Ready
+kube-04     environment=production   Ready
 ```
 
-You can see that two more minions joined happily. Let's scale the number of Guestbook instances now.
+You can see that two more nodes joined happily. Let's scale the number of Guestbook instances now.
 
 First, double-check how many replication controllers there are:
 
 ```
 core@kube-00 ~ $ kubectl get rc
-CONTROLLER               CONTAINER(S)  IMAGE(S)                                 SELECTOR         REPLICAS
-frontend-controller      php-redis     kubernetes/example-guestbook-php-redis   name=frontend    3
-redis-slave-controller   slave         brendanburns/redis-slave                 name=redisslave  2
+CONTROLLER     CONTAINER(S)   IMAGE(S)                                    SELECTOR            REPLICAS
+frontend       php-redis      kubernetes/example-guestbook-php-redis:v2   name=frontend       3
+redis-master   master         redis                                       name=redis-master   1
+redis-slave    slave          kubernetes/redis-slave:v2                   name=redis-slave    2
 ```
-As there are 4 minions, let's scale proportionally:
+As there are 4 nodes, let's scale proportionally:
 ```
-core@kube-00 ~ $ kubectl scale --replicas=4 rc redis-slave-controller
+core@kube-00 ~ $  kubectl scale --replicas=4 rc redis-slave
 scaled
-core@kube-00 ~ $ kubectl scale --replicas=4 rc frontend-controller
+core@kube-00 ~ $  kubectl scale --replicas=4 rc frontend
 scaled
 ```
 Check what you have now:
 ```
-kubectl get rc
-CONTROLLER               CONTAINER(S)  IMAGE(S)                                 SELECTOR         REPLICAS
-frontend-controller      php-redis     kubernetes/example-guestbook-php-redis   name=frontend    4
-redis-slave-controller   slave         brendanburns/redis-slave                 name=redisslave  4
+core@kube-00 ~ $ kubectl get rc
+CONTROLLER     CONTAINER(S)   IMAGE(S)                                    SELECTOR            REPLICAS
+frontend       php-redis      kubernetes/example-guestbook-php-redis:v2   name=frontend       4
+redis-master   master         redis                                       name=redis-master   1
+redis-slave    slave          kubernetes/redis-slave:v2                   name=redis-slave    4
 ```
 
 You now will have more instances of front-end Guestbook apps and Redis slaves; and, if you look up all pods labled `name=frontend`, you should see one running on each node.
@@ -179,7 +181,7 @@ You should probably try deploy other [example apps](https://github.com/GoogleClo
 If you don't wish care about the Azure bill, you can tear down the cluster. It's easy to redeploy it, as you can see.
 
 ```
-./destroy-cluster.js ./output/kubernetes_8f984af944f572_deployment.yml 
+./destroy-cluster.js ./output/kube_8f984af944f572_deployment.yml
 ```
 
 > Note: make sure to use the _latest state file_, as after scaling there is a new one.

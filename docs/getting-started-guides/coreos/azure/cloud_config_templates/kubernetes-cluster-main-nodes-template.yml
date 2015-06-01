@@ -239,7 +239,7 @@ coreos:
         Documentation=http://kubernetes.io/
         Requires=network-online.target
         [Service]
-        Environment=KUBE_RELEASE_TARBALL=https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.17.0/kubernetes.tar.gz
+        Environment=KUBE_RELEASE_TARBALL=https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.18.0/kubernetes.tar.gz
         ExecStartPre=/bin/mkdir -p /opt/
         ExecStart=/opt/bin/curl-retry.sh --silent --location $KUBE_RELEASE_TARBALL --output /tmp/kubernetes.tgz
         ExecStart=/bin/tar xzvf /tmp/kubernetes.tgz -C /tmp/
