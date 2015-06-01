@@ -1,50 +1,46 @@
-id: blog-pod
+apiVersion: v1beta3
 kind: Pod
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    version: v1beta1
-    containers:
-    - name: git-sync
-      image: proppy/git-sync
-      imagePullPolicy: PullAlways
-      env:
-      - name: GIT_SYNC_REPO
-        value: https://github.com/GoogleCloudPlatform/kubernetes.git
-      - name: GIT_SYNC_DEST
-        value: /git
-      volumeMounts:
-      - name: markdown
-        mountPath: /git
-    - name: hugo
-      image: proppy/hugo
-      imagePullPolicy: PullAlways
-      env:
-      - name: HUGO_SRC
-        value: /src/contrib/git-sync/demo/blog
-      - name: HUGO_BUILD_DRAFT
-        value: 'true'
-      - name: HUGO_BASE_URL
-        value: example.com
-      volumeMounts:
-      - name: markdown
-        mountPath: /src
-      - name: html
-        mountPath: /dest
-    - name: nginx
-      image: nginx
-      volumeMounts:
-      - name: html
-        mountPath: /usr/share/nginx/html
-      ports:
-      - name: http-server
-        containerPort: 80
-    volumes:
+metadata:
+  labels:
+    name: blog
+  name: blog-pod
+spec:
+  containers:
+  - name: git-sync
+    image: gcr.io/google_containers/git-sync
+    imagePullPolicy: Always
+    volumeMounts:
     - name: markdown
-      source:
-        emptyDir: {}
+      mountPath: /git
+    env:
+    - name: GIT_SYNC_REPO
+      value: https://github.com/GoogleCloudPlatform/kubernetes.git
+    - name: GIT_SYNC_DEST
+      value: /git
+  - name: hugo
+    image: gcr.io/google_containers/hugo
+    imagePullPolicy: Always
+    volumeMounts:
+    - name: markdown
+      mountPath: /src
     - name: html
-      source:
-        emptyDir: {}
-labels:
-  name: blog
+      mountPath: /dest
+    env:
+    - name: HUGO_SRC
+      value: /src/contrib/git-sync/demo/blog
+    - name: HUGO_BUILD_DRAFT
+      value: "true"
+    - name: HUGO_BASE_URL
+      value: example.com
+  - name: nginx
+    image: nginx
+    volumeMounts:
+    - name: html
+      mountPath: /usr/share/nginx/html
+    ports:
+    - containerPort: 80
+  volumes:
+  - name: markdown
+    emptyDir: {}
+  - name: html
+    emptyDir: {}

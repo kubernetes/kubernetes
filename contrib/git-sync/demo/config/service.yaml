@@ -1,8 +1,10 @@
-id: blog-service
+apiVersion: v1beta3
 kind: Service
-apiVersion: v1beta1
-port: 80
-containerPort: 80
-selector:
-  name: blog
-createExternalLoadBalancer: true
+metadata:
+  name: blog-service
+spec:
+  createExternalLoadBalancer: true
+  ports:
+  - port: 80
+  selector:
+    name: blog
