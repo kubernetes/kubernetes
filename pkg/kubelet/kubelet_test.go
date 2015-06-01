@@ -28,7 +28,6 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -83,6 +82,7 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 	return nil, f.err
 }
 
+// TODO: Depcreated. Please use newTestKubeletWithFakeRuntime instead.
 func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeDocker := &dockertools.FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
 	fakeDocker.VersionInfo = []string{"ApiVersion=1.15"}
@@ -261,7 +261,7 @@ func newTestPods(count int) []*api.Pod {
 }
 
 func TestKubeletDirs(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	root := kubelet.rootDirectory
 
@@ -323,7 +323,7 @@ func TestKubeletDirs(t *testing.T) {
 }
 
 func TestKubeletDirsCompat(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	root := kubelet.rootDirectory
 	if err := os.MkdirAll(root, 0750); err != nil {
@@ -570,7 +570,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 }
 
 func TestMountExternalVolumes(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{&volume.FakeVolumePlugin{"fake", nil}}, &volumeHost{kubelet})
 
@@ -605,7 +605,7 @@ func TestMountExternalVolumes(t *testing.T) {
 }
 
 func TestGetPodVolumesFromDisk(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	plug := &volume.FakeVolumePlugin{"fake", nil}
 	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
@@ -1499,7 +1499,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		testKubelet := newTestKubelet(t)
+		testKubelet := newTestKubeletWithFakeRuntime(t)
 		kl := testKubelet.kubelet
 		kl.masterServiceNamespace = tc.masterServiceNs
 		if tc.nilLister {
@@ -2208,7 +2208,7 @@ func TestGetHostPortConflicts(t *testing.T) {
 
 // Tests that we handle port conflicts correctly by setting the failed status in status map.
 func TestHandlePortConflicts(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kl := testKubelet.kubelet
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
@@ -2252,7 +2252,7 @@ func TestHandlePortConflicts(t *testing.T) {
 
 // Tests that we handle not matching labels selector correctly by setting the failed status in status map.
 func TestHandleNodeSelector(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kl := testKubelet.kubelet
 	kl.nodeLister = testNodeLister{nodes: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}}},
@@ -2294,7 +2294,7 @@ func TestHandleNodeSelector(t *testing.T) {
 
 // Tests that we handle exceeded resources correctly by setting the failed status in status map.
 func TestHandleMemExceeded(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kl := testKubelet.kubelet
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{MemoryCapacity: 100}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
@@ -2342,7 +2342,7 @@ func TestHandleMemExceeded(t *testing.T) {
 
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
 func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
@@ -2365,7 +2365,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 }
 
 func TestValidatePodStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	testCases := []struct {
 		podPhase api.PodPhase
@@ -2391,7 +2391,7 @@ func TestValidatePodStatus(t *testing.T) {
 }
 
 func TestValidateContainerStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	containerName := "x"
 	testCases := []struct {
@@ -2466,7 +2466,7 @@ func TestValidateContainerStatus(t *testing.T) {
 }
 
 func TestUpdateNewNodeStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
@@ -2544,7 +2544,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 }
 
 func TestUpdateExistingNodeStatus(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
@@ -2643,13 +2643,13 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 }
 
 func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	fakeDocker := testKubelet.fakeDocker
+	fakeRuntime := testKubelet.fakeRuntime
 	// This causes returning an error from GetContainerRuntimeVersion() which
 	// simulates that container runtime is down.
-	fakeDocker.VersionInfo = []string{}
+	fakeRuntime.VersionInfo = ""
 
 	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
@@ -2729,7 +2729,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 }
 
 func TestUpdateNodeStatusError(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	// No matching node for the kubelet
 	testKubelet.fakeKubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{}}).ReactFn
@@ -2743,7 +2743,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 }
 
 func TestCreateMirrorPod(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kl := testKubelet.kubelet
 	manager := testKubelet.fakeMirrorClient
 	pod := &api.Pod{
@@ -2772,7 +2772,7 @@ func TestCreateMirrorPod(t *testing.T) {
 }
 
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
@@ -2825,7 +2825,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 }
 
 func TestDeleteOrphanedMirrorPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
@@ -2945,7 +2945,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 }
 
 func TestDoNotCacheStatusForStaticPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
@@ -2981,7 +2981,7 @@ func TestDoNotCacheStatusForStaticPods(t *testing.T) {
 }
 
 func TestHostNetworkAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 
 	capabilities.SetForTests(capabilities.Capabilities{
@@ -3011,7 +3011,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 }
 
 func TestHostNetworkDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 
 	capabilities.SetForTests(capabilities.Capabilities{
@@ -3040,7 +3040,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 }
 
 func TestPrivilegeContainerAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 
 	capabilities.SetForTests(capabilities.Capabilities{
@@ -3067,7 +3067,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 }
 
 func TestPrivilegeContainerDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 
 	capabilities.SetForTests(capabilities.Capabilities{
@@ -3093,7 +3093,7 @@ func TestPrivilegeContainerDisallowed(t *testing.T) {
 }
 
 func TestFilterOutTerminatedPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	pods := newTestPods(5)
 	pods[0].Status.Phase = api.PodFailed
@@ -3110,7 +3110,7 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 }
 
 func TestRegisterExistingNodeWithApiserver(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactFn = func(action testclient.FakeAction) (runtime.Object, error) {
@@ -3239,7 +3239,7 @@ func TestMakePortMappings(t *testing.T) {
 }
 
 func TestIsPodPastActiveDeadline(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	kubelet := testKubelet.kubelet
 	pods := newTestPods(5)
 
@@ -3362,7 +3362,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 }
 
 func TestDeletePodDirsForDeletedPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
@@ -3410,7 +3410,7 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 }
 
 func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubeletWithFakeRuntime(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
