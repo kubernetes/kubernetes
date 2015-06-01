@@ -18,6 +18,8 @@ limitations under the License.
 // an alternate platform, we will need to abstract further.
 package mount
 
+import "github.com/golang/glog"
+
 type Interface interface {
 	// Mount mounts source to target as fstype with given options.
 	Mount(source string, target string, fstype string, options []string) error
@@ -66,9 +68,13 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 
 	// Find all references to the device.
 	var refs []string
-	for i := range mps {
-		if mps[i].Device == deviceName && mps[i].Path != mountPath {
-			refs = append(refs, mps[i].Path)
+	if deviceName == "" {
+		glog.Warningf("could not determine device for path: %q", mountPath)
+	} else {
+		for i := range mps {
+			if mps[i].Device == deviceName && mps[i].Path != mountPath {
+				refs = append(refs, mps[i].Path)
+			}
 		}
 	}
 	return refs, nil

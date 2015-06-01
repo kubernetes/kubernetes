@@ -55,6 +55,12 @@ if [[ -n "${DOCKER_ROOT}" ]]; then
 EOF
 fi
 
+if [[ -n "${KUBELET_ROOT}" ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  kubelet_root: '$(echo "$KUBELET_ROOT" | sed -e "s/'/''/g")'
+EOF
+fi
+
 install-salt
 
 service salt-minion start
