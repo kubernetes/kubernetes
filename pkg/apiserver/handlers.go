@@ -64,8 +64,8 @@ func ReadOnly(handler http.Handler) http.Handler {
 			handler.ServeHTTP(w, req)
 			return
 		}
-		w.WriteHeader(http.StatusForbidden)
-		fmt.Fprintf(w, "This is a read-only endpoint.")
+		w.Header().Set("Allow", "GET")
+		http.Error(w, "This is a read-only endpoint.", http.StatusMethodNotAllowed)
 	})
 }
 
