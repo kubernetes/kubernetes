@@ -12,6 +12,7 @@ write-files:
 coreos:
   etcd2:
     listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    advertise-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
     initial-cluster: master=http://<master-private-ip>:2380
     proxy: on
   fleet:
