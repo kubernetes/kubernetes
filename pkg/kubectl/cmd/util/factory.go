@@ -290,7 +290,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 //           1.  CommandLineLocation - this parsed from the command line, so it must be late bound.  If you specify this,
 //               then no other kubeconfig files are merged.  This file must exist.
 //           2.  If $KUBECONFIG is set, then it is treated as a list of files that should be merged.
-//			 3.  HomeDirectoryLocation
+//	     3.  HomeDirectoryLocation
 //           Empty filenames are ignored.  Files with non-deserializable content produced errors.
 //           The first file to set a particular value or map key wins and the value or map key is never changed.
 //           This means that the first file to set CurrentContext will have its context preserved.  It also means
@@ -316,6 +316,13 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 //           2.  If the command line does not specify one, and the auth info has conflicting techniques, fail.
 //           3.  If the command line specifies one and the auth info specifies another, honor the command line technique.
 //   2.  Use default values and potentially prompt for auth information
+//
+//   However, if it appears that we're running in a kubernetes cluster
+//   container environment, then run with the auth info kubernetes mounted for
+//   us. Specifically:
+//     The env vars KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT are
+//     set, and the file /var/run/secrets/kubernetes.io/serviceaccount/token
+//     exists and is not a directory.
 func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	flags.StringVar(&loadingRules.ExplicitPath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
