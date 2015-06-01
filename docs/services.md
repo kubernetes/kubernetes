@@ -6,7 +6,7 @@ Kubernetes [`Pods`](pods.md) are mortal. They are born and they die, and they
 are not resurrected.  [`ReplicationControllers`](replication-controller.md) in
 particular create and destroy `Pods` dynamically (e.g. when scaling up or down
 or when doing rolling updates).  While each `Pod` gets its own IP address, even
-those IP addresses can not be relied upon to be stable over time. This leads to
+those IP addresses cannot be relied upon to be stable over time. This leads to
 a problem: if some set of `Pods` (let's call them backends) provides
 functionality to other `Pods` (let's call them frontends) inside the Kubernetes
 cluster, how do those frontends find out and keep track of which backends are
