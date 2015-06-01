@@ -47,8 +47,23 @@ function kube-down {
 	echo "TODO"
 }
 
-# Update a kubernetes cluster with latest source
+# Update a kubernetes cluster
 function kube-push {
+	echo "TODO"
+}
+
+# Prepare update a kubernetes component
+function prepare-push {
+	echo "TODO"
+}
+
+# Update a kubernetes master
+function push-master {
+	echo "TODO"
+}
+
+# Update a kubernetes node
+function push-node {
 	echo "TODO"
 }
 

@@ -22,12 +22,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# VERSION_REGEX matches things like "v0.13.1"
-readonly VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
-
-# CI_VERSION_REGEX matches things like "v0.14.1-341-ge0c9d9e"
-readonly CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(.*)$"
-
 if [[ "${KUBERNETES_PROVIDER:-gce}" != "gce" ]]; then
   echo "!!! ${1} only works on GCE" >&2
   exit 1
@@ -95,41 +89,14 @@ function wait-for-master() {
   echo "== Done =="
 }
 
-# Sets binary_version variable to the version passed in as an argument, or if argument is
-# latest_stable, latest_release, or latest_ci fetches and sets the correponding version number
-#
-# Args:
-# $1 version string from command line
-function set_binary_version() {
-  if [[ "${1}" == "latest_stable" ]]; then
-    binary_version=$(gsutil cat gs://kubernetes-release/release/stable.txt)
-    echo "Using latest stable version: ${binary_version}"
-  elif [[ "${1}" == "latest_release" ]]; then
-    binary_version=$(gsutil cat gs://kubernetes-release/release/latest.txt)
-    echo "Using latest release version: ${binary_version}"
-  elif [[ "${1}" == "latest_ci" ]]; then
-    binary_version=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
-    echo "Using latest ci version: ${binary_version}"
-  else
-    binary_version=${1}
-  fi
-}
-
 # Perform common upgrade setup tasks
 #
 # Assumed vars
-#   local_binaries
-#   binary_version
+#   KUBE_VERSION
 function prepare-upgrade() {
   ensure-temp-dir
   detect-project
-
-  if [[ "${local_binaries}" == "true" ]]; then
-    find-release-tars
-    upload-server-tars
-  else
-    tars_from_version ${binary_version}
-  fi
+  tars_from_version
 }
 
 # Reads kube-env metadata from master and extracts value from provided key.
@@ -148,11 +115,15 @@ function get-env-val() {
     | grep ${1} | cut -d : -f 2 | cut -d \' -f 2
 }
 
-# $1 veresion
+# Assumed vars:
+#   KUBE_VERSION
+#   MINION_SCOPES
+#   NODE_INSTANCE_PREFIX
+#   PROJECT
+#   ZONE
 function upgrade-nodes() {
-  local version=${1}
-  local sanitized_version=$(echo ${version} | sed s/"\."/-/g)
-  echo "== Upgrading nodes to ${version}. =="
+  local sanitized_version=$(echo ${KUBE_VERSION} | sed s/"\."/-/g)
+  echo "== Upgrading nodes to ${KUBE_VERSION}. =="
 
   detect-minion-names
 
@@ -185,28 +156,6 @@ function upgrade-nodes() {
       --template "${NODE_INSTANCE_PREFIX}-template-${sanitized_version}"
 
   echo "== Done =="
-}
-
-function tars_from_version() {
-  version=${1-}
-
-  if [[ ${version} =~ ${VERSION_REGEX} ]]; then
-    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-server-linux-amd64.tar.gz"
-    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-salt.tar.gz"
-  elif [[ ${version} =~ ${CI_VERSION_REGEX} ]]; then
-    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${version}/kubernetes-server-linux-amd64.tar.gz"
-    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${version}/kubernetes-salt.tar.gz"
-  else
-    echo "!!! Version not provided or version doesn't match regexp" >&2
-    exit 1
-  fi
-
-  if ! curl -Ss --range 0-1 ${SERVER_BINARY_TAR_URL} >&/dev/null; then
-    echo "!!! Can't find release at ${SERVER_BINARY_TAR_URL}" >&2
-    exit 1
-  fi
-
-  echo "== Release ${version} validated =="
 }
 
 master_upgrade=true
@@ -261,7 +210,7 @@ if [[ "${node_upgrade}" == "true" ]]; then
   if [[ "${local_binaries}" == "true" ]]; then
     echo "Upgrading nodes to local binaries is not yet supported." >&2
   else
-    upgrade-nodes ${binary_version}
+    upgrade-nodes
   fi
 fi
 
