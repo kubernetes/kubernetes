@@ -28,13 +28,13 @@ Note that `ReplicationController`s may themselves have labels and would generall
 
 Pods may be removed from a replication controller's target set by changing their labels. This technique may be used to remove pods from service for debugging, data recovery, etc. Pods that are removed in this way will be replaced automatically (assuming that the number of replicas is not also changed).
 
-Similarly, deleting a replication controller does not affect the pods it created. It's `replicas` field must first be set to 0 in order to delete the pods controlled. In the future, we may provide a feature to do this and the deletion in a single client operation.
+Similarly, deleting a replication controller does not affect the pods it created. Its `replicas` field must first be set to 0 in order to delete the pods controlled. In the future, we may provide a feature to do this and the deletion in a single client operation.
 
 ## Responsibilities of the replication controller
 
 The replication controller simply ensures that the desired number of pods matches its label selector and are operational. Currently, only terminated pods are excluded from its count. In the future, [readiness](https://github.com/GoogleCloudPlatform/kubernetes/issues/620) and other information available from the system may be taken into account, we may add more controls over the replacement policy, and we plan to emit events that could be used by external clients to implement arbitrarily sophisticated replacement and/or scale-down policies.
 
-The replication controller is forever constrained to this narrow responsibility. It itself will not perform readiness nor liveness probes. Rather than performing auto-scaling, it is intended to be controlled by an external auto-scaler (as discussed in [#492](https://github.com/GoogleCloudPlatform/kubernetes/issues/492)), which would change its `replicas` field. We will not add scheduling policies (e.g., [spreading](https://github.com/GoogleCloudPlatform/kubernetes/issues/367#issuecomment-48428019)) to replication controller. Nor should it verify that the pods controlled match the currently specified template, as that would obstruct auto-sizing and other automated processes. Similarly, completion deadlines, ordering dependencies, configuration expansion, and other features belong elsewhere. We even plan to factor out the mechanism for bulk pod creation ([#170](https://github.com/GoogleCloudPlatform/kubernetes/issues/170)).
+The replication controller is forever constrained to this narrow responsibility. It itself will not perform readiness nor liveness probes. Rather than performing auto-scaling, it is intended to be controlled by an external auto-scaler (as discussed in [#492](https://github.com/GoogleCloudPlatform/kubernetes/issues/492)), which would change its `replicas` field. We will not add scheduling policies (e.g., [spreading](https://github.com/GoogleCloudPlatform/kubernetes/issues/367#issuecomment-48428019)) to the replication controller. Nor should it verify that the pods controlled match the currently specified template, as that would obstruct auto-sizing and other automated processes. Similarly, completion deadlines, ordering dependencies, configuration expansion, and other features belong elsewhere. We even plan to factor out the mechanism for bulk pod creation ([#170](https://github.com/GoogleCloudPlatform/kubernetes/issues/170)).
 
 The replication controller is intended to be a composable building-block primitive. We expect higher-level APIs and/or tools to be built on top of it and other complementary primitives for user convenience in the future. The "macro" operations currently supported by kubectl (run, stop, scale, rolling-update) are proof-of-concept examples of this. For instance, we could imagine something like [Asgard](http://techblog.netflix.com/2012/06/asgard-web-based-cloud-management-and.html) managing replication controllers, auto-scalers, services, scheduling policies, canaries, etc.
 
@@ -42,15 +42,15 @@ The replication controller is intended to be a composable building-block primiti
 
 ### Rescheduling
 
-As mentioned above, whether you have 1 pod you want to keep running, or 1000, replication controller will ensure that the specified number of pods exists, even in the event of node failure or pod termination (e.g., due to an action by another control agent).
+As mentioned above, whether you have 1 pod you want to keep running, or 1000, a replication controller will ensure that the specified number of pods exists, even in the event of node failure or pod termination (e.g., due to an action by another control agent).
 
 ### Scaling
 
-Replication controller makes it easy to scale the number of replicas up or down, either manually or by an auto-scaling control agent, by simply updating the `replicas` field.
+The replication controller makes it easy to scale the number of replicas up or down, either manually or by an auto-scaling control agent, by simply updating the `replicas` field.
 
 ### Rolling updates
 
-Replication controller is designed to facilitate rolling updates to a service by replacing pods one-by-one.
+The replication controller is designed to facilitate rolling updates to a service by replacing pods one-by-one.
 
 As explained in [#1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353), the recommended approach is to create a new replication controller with 1 replica, scale the new (+1) and old (-1) controllers one by one, and then delete the old controller after it reaches 0 replicas. This predictably updates the set of pods regardless of unexpected failures.
 
