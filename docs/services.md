@@ -83,12 +83,13 @@ is `TCP`.
 
 Services generally abstract access to Kubernetes `Pods`, but they can also
 abstract other kinds of backends.  For example:
-  - you want to have an external database cluster in production, but in test
-    you use your own databases
-  - you want to point your service to a service in another
-    [`Namespace`](namespaces.md) or on another cluster
-  - you are migrating your workload to Kubernetes and some of your backends run
-    outside of Kubernetes
+
+  * You want to have an external database cluster in production, but in test
+    you use your own databases.
+  * You want to point your service to a service in another
+    [`Namespace`](namespaces.md) or on another cluster.
+  * You are migrating your workload to Kubernetes and some of your backends run
+    outside of Kubernetes.
 
 In any of these scenarios you can define a service without a selector:
 
