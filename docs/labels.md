@@ -21,11 +21,12 @@ Labels enable users to map their own organizational structures onto system objec
 Service deployments and batch processing pipelines are often multi-dimensional entities (e.g., multiple partitions or deployments, multiple release tracks, multiple tiers, multiple micro-services per tier). Management often requires cross-cutting operations, which breaks encapsulation of strictly hierarchical representations, especially rigid hierarchies determined by the infrastructure rather than by users.
 
 Example labels:
-   - `"release" : "stable"`, `"release" : "canary"`, ...
-   - `"environment" : "dev"`, `"environment" : "qa"`, `"environment" : "production"`
-   - `"tier" : "frontend"`, `"tier" : "backend"`, `"tier" : "middleware"`
-   - `"partition" : "customerA"`, `"partition" : "customerB"`, ...
-   - `"track" : "daily"`, `"track" : "weekly"`
+
+   * `"release" : "stable"`, `"release" : "canary"`, ...
+   * `"environment" : "dev"`, `"environment" : "qa"`, `"environment" : "production"`
+   * `"tier" : "frontend"`, `"tier" : "backend"`, `"tier" : "middleware"`
+   * `"partition" : "customerA"`, `"partition" : "customerB"`, ...
+   * `"track" : "daily"`, `"track" : "weekly"`
 
 These are just examples; you are free to develop your own conventions.
 
