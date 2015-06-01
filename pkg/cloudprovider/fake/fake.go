@@ -17,6 +17,7 @@ limitations under the License.
 package fake_cloud
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"regexp"
@@ -142,6 +143,10 @@ func (f *FakeCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) e
 func (f *FakeCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	f.addCall("delete")
 	return f.Err
+}
+
+func (f *FakeCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
 }
 
 // NodeAddresses is a test-spy implementation of Instances.NodeAddresses.

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"path"
 	"strconv"
@@ -143,7 +144,7 @@ const (
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash. A restful WebService is created for the group and version.
-func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
+func (g *APIGroupVersion) InstallREST(container *restful.Container, proxyDialer func(network, addr string) (net.Conn, error)) error {
 	info := &APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(g.Root, "/")), g.Mapper}
 
 	prefix := path.Join(g.Root, g.Version)
@@ -152,7 +153,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 		info:   info,
 		prefix: prefix,
 	}
-	ws, registrationErrors := installer.Install()
+	ws, registrationErrors := installer.Install(proxyDialer)
 	container.Add(ws)
 	return errors.NewAggregate(registrationErrors)
 }
