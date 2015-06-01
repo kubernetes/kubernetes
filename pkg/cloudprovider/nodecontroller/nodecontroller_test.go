@@ -324,8 +324,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
+		podEvictor := NewPodEvictor(util.NewFakeRateLimiter())
 		nodeController := NewNodeController(nil, item.fakeNodeHandler, 10,
-			evictionTimeout, util.NewFakeRateLimiter(), testNodeMonitorGracePeriod,
+			evictionTimeout, podEvictor, testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -338,12 +339,15 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
+
+		podEvictor.TryEvict(func(nodeName string) { nodeController.deletePods(nodeName) })
 		podEvicted := false
 		for _, action := range item.fakeNodeHandler.Actions {
 			if action.Action == "delete-pod" {
 				podEvicted = true
 			}
 		}
+
 		if item.expectedEvictPods != podEvicted {
 			t.Errorf("expected pod eviction: %+v, got %+v for %+v", item.expectedEvictPods,
 				podEvicted, item.description)
@@ -527,7 +531,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, item.fakeNodeHandler, 10, 5*time.Minute, util.NewFakeRateLimiter(),
+		nodeController := NewNodeController(nil, item.fakeNodeHandler, 10, 5*time.Minute, NewPodEvictor(util.NewFakeRateLimiter()),
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, false)
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {

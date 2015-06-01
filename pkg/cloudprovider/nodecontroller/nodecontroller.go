@@ -39,8 +39,12 @@ var (
 	ErrCloudInstance  = errors.New("cloud provider doesn't support instances.")
 )
 
-// nodeStatusUpdateRetry controls the number of retries of writing NodeStatus update.
-const nodeStatusUpdateRetry = 5
+const (
+	// nodeStatusUpdateRetry controls the number of retries of writing NodeStatus update.
+	nodeStatusUpdateRetry = 5
+	// controls how often NodeController will try to evict Pods from non-responsive Nodes.
+	nodeEvictionPeriod = 100 * time.Millisecond
+)
 
 type nodeStatusData struct {
 	probeTimestamp           util.Time
@@ -55,6 +59,9 @@ type NodeController struct {
 	registerRetryCount      int
 	podEvictionTimeout      time.Duration
 	deletingPodsRateLimiter util.RateLimiter
+	// worker that evicts pods from unresponsive nodes.
+	podEvictor *PodEvictor
+
 	// per Node map storing last observed Status together with a local time when it was observed.
 	// This timestamp is to be used instead of LastProbeTime stored in Condition. We do this
 	// to aviod the problem with time skew across the cluster.
@@ -94,7 +101,7 @@ func NewNodeController(
 	kubeClient client.Interface,
 	registerRetryCount int,
 	podEvictionTimeout time.Duration,
-	deletingPodsRateLimiter util.RateLimiter,
+	podEvictor *PodEvictor,
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
@@ -112,20 +119,20 @@ func NewNodeController(
 		glog.Fatal("NodeController: Must specify clusterCIDR if allocateNodeCIDRs == true.")
 	}
 	return &NodeController{
-		cloud:                   cloud,
-		kubeClient:              kubeClient,
-		recorder:                recorder,
-		registerRetryCount:      registerRetryCount,
-		podEvictionTimeout:      podEvictionTimeout,
-		deletingPodsRateLimiter: deletingPodsRateLimiter,
-		nodeStatusMap:           make(map[string]nodeStatusData),
-		nodeMonitorGracePeriod:  nodeMonitorGracePeriod,
-		nodeMonitorPeriod:       nodeMonitorPeriod,
-		nodeStartupGracePeriod:  nodeStartupGracePeriod,
-		lookupIP:                net.LookupIP,
-		now:                     util.Now,
-		clusterCIDR:             clusterCIDR,
-		allocateNodeCIDRs:       allocateNodeCIDRs,
+		cloud:                  cloud,
+		kubeClient:             kubeClient,
+		recorder:               recorder,
+		registerRetryCount:     registerRetryCount,
+		podEvictionTimeout:     podEvictionTimeout,
+		podEvictor:             podEvictor,
+		nodeStatusMap:          make(map[string]nodeStatusData),
+		nodeMonitorGracePeriod: nodeMonitorGracePeriod,
+		nodeMonitorPeriod:      nodeMonitorPeriod,
+		nodeStartupGracePeriod: nodeStartupGracePeriod,
+		lookupIP:               net.LookupIP,
+		now:                    util.Now,
+		clusterCIDR:            clusterCIDR,
+		allocateNodeCIDRs:      allocateNodeCIDRs,
 	}
 }
 
@@ -179,6 +186,10 @@ func (nc *NodeController) Run(period time.Duration) {
 			glog.Errorf("Error monitoring node status: %v", err)
 		}
 	}, nc.nodeMonitorPeriod)
+
+	go util.Forever(func() {
+		nc.podEvictor.TryEvict(func(nodeName string) { nc.deletePods(nodeName) })
+	}, nodeEvictionPeriod)
 }
 
 func (nc *NodeController) recordNodeEvent(node *api.Node, event string) {
@@ -366,24 +377,19 @@ func (nc *NodeController) monitorNodeStatus() error {
 			// Check eviction timeout.
 			if lastReadyCondition.Status == api.ConditionFalse &&
 				nc.now().After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
-				// Node stays in not ready for at least 'podEvictionTimeout' - evict all pods on the unhealthy node.
-				// Makes sure we are not removing pods from too many nodes in the same time.
-				glog.Infof("Evicting pods: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout)
-				if nc.deletingPodsRateLimiter.CanAccept() {
-					if err := nc.deletePods(node.Name); err != nil {
-						glog.Errorf("Unable to delete pods from node %s: %v", node.Name, err)
-					}
+				if nc.podEvictor.AddNodeToEvict(node.Name) {
+					glog.Infof("Adding pods to evict: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout)
 				}
 			}
 			if lastReadyCondition.Status == api.ConditionUnknown &&
 				nc.now().After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout-gracePeriod)) {
-				// Same as above. Note however, since condition unknown is posted by node controller, which means we
-				// need to substract monitoring grace period in order to get the real 'podEvictionTimeout'.
-				glog.Infof("Evicting pods2: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
-				if nc.deletingPodsRateLimiter.CanAccept() {
-					if err := nc.deletePods(node.Name); err != nil {
-						glog.Errorf("Unable to delete pods from node %s: %v", node.Name, err)
-					}
+				if nc.podEvictor.AddNodeToEvict(node.Name) {
+					glog.Infof("Adding pods to evict2: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
+				}
+			}
+			if lastReadyCondition.Status == api.ConditionTrue {
+				if nc.podEvictor.RemoveNodeToEvict(node.Name) {
+					glog.Infof("Pods on %v won't be evicted", node.Name)
 				}
 			}
 
