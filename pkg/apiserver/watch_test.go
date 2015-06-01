@@ -303,7 +303,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	// Setup a new watchserver
 	watchServer := &WatchServer{
 		watcher,
-		version2ServerCodec,
+		newCodec,
 		func(obj runtime.Object) {},
 		&fakeTimeoutFactory{timeoutCh, done},
 	}
@@ -315,13 +315,13 @@ func TestWatchHTTPTimeout(t *testing.T) {
 
 	// Setup a client
 	dest, _ := url.Parse(s.URL)
-	dest.Path = "/api/version/watch/resource"
-	dest.RawQuery = ""
+	dest.Path = "/api/" + newVersion + "/simple"
+	dest.RawQuery = "watch=true"
 
 	req, _ := http.NewRequest("GET", dest.String(), nil)
 	client := http.Client{}
 	resp, err := client.Do(req)
-	watcher.Add(&api.Pod{TypeMeta: api.TypeMeta{APIVersion: "v1beta3"}})
+	watcher.Add(&Simple{TypeMeta: api.TypeMeta{APIVersion: newVersion}})
 
 	// Make sure we can actually watch an endpoint
 	decoder := json.NewDecoder(resp.Body)

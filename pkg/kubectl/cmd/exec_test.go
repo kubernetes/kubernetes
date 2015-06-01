@@ -107,14 +107,6 @@ func TestExec(t *testing.T) {
 		execErr                                     bool
 	}{
 		{
-			name:      "v1beta1 - pod exec",
-			version:   "v1beta1",
-			podPath:   "/api/v1beta1/pods/foo",
-			execPath:  "/api/v1beta1/pods/foo/exec",
-			nsInQuery: true,
-			pod:       execPod(),
-		},
-		{
 			name:      "v1beta3 - pod exec",
 			version:   "v1beta3",
 			podPath:   "/api/v1beta3/namespaces/test/pods/foo",

@@ -148,15 +148,6 @@ func (s *sourceFile) extractFromFile(filename string) (pod *api.Pod, err error) 
 		return s.applyDefaults(pod, filename)
 	}
 
-	parsed, _, pod, manifestErr := tryDecodeSingleManifest(data, defaultFn)
-	if parsed {
-		if manifestErr != nil {
-			// It parsed but could not be used.
-			return pod, manifestErr
-		}
-		return pod, nil
-	}
-
 	parsed, pod, podErr := tryDecodeSinglePod(data, defaultFn)
 	if parsed {
 		if podErr != nil {
@@ -165,7 +156,6 @@ func (s *sourceFile) extractFromFile(filename string) (pod *api.Pod, err error) 
 		return pod, nil
 	}
 
-	return pod, fmt.Errorf("%v: read '%v', but couldn't parse as neither "+
-		"manifest (%v) nor pod (%v).\n",
-		filename, string(data), manifestErr, podErr)
+	return pod, fmt.Errorf("%v: read '%v', but couldn't parse as pod(%v).\n",
+		filename, string(data), podErr)
 }

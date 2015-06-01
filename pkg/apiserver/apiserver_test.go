@@ -37,8 +37,6 @@ import (
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -55,20 +53,13 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 	return obj, nil
 }
 
-// This creates a fake API version, similar to api/latest.go for a v1beta1 equivalent api. It is distinct
-// from the Kubernetes API versions to allow clients to properly distinguish the two.
+// This creates fake API versions, similar to api/latest.go.
 const testVersion = "version"
+const newVersion = "version2"
 
-// The equivalent of the Kubernetes v1beta3 API.
-const testVersion2 = "version2"
-
-var versions = []string{testVersion, testVersion2}
-var legacyCodec = runtime.CodecFor(api.Scheme, testVersion)
-var codec = runtime.CodecFor(api.Scheme, testVersion2)
-
-// these codecs reflect ListOptions/DeleteOptions coming from the serverAPIversion
-var versionServerCodec = runtime.CodecFor(api.Scheme, "v1beta1")
-var version2ServerCodec = runtime.CodecFor(api.Scheme, "v1beta3")
+var versions = []string{testVersion, newVersion}
+var codec = runtime.CodecFor(api.Scheme, testVersion)
+var newCodec = runtime.CodecFor(api.Scheme, newVersion)
 
 var accessor = meta.NewAccessor()
 var versioner runtime.ResourceVersioner = accessor
@@ -81,13 +72,13 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
 	case testVersion:
 		return &meta.VersionInterfaces{
-			Codec:            legacyCodec,
+			Codec:            codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
-	case testVersion2:
+	case newVersion:
 		return &meta.VersionInterfaces{
-			Codec:            codec,
+			Codec:            newCodec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
@@ -109,26 +100,44 @@ func newMapper() *meta.DefaultRESTMapper {
 	)
 }
 
+func addTestTypes() {
+	type ListOptions struct {
+		runtime.Object
+		api.TypeMeta    `json:",inline"`
+		LabelSelector   string `json:"labels,omitempty"`
+		FieldSelector   string `json:"fields,omitempty"`
+		Watch           bool   `json:"watch,omitempty"`
+		ResourceVersion string `json:"resourceVersion,omitempty"`
+	}
+	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &api.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+}
+
+func addNewTestTypes() {
+	type ListOptions struct {
+		runtime.Object
+		api.TypeMeta    `json:",inline"`
+		LabelSelector   string `json:"labelSelector,omitempty"`
+		FieldSelector   string `json:"fieldSelector,omitempty"`
+		Watch           bool   `json:"watch,omitempty"`
+		ResourceVersion string `json:"resourceVersion,omitempty"`
+	}
+	api.Scheme.AddKnownTypes(newVersion, &Simple{}, &SimpleList{}, &api.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+}
+
 func init() {
 	// Certain API objects are returned regardless of the contents of storage:
 	// api.Status is returned in errors
 
 	// "internal" version
 	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{}, &api.Status{}, &api.ListOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
-	// "version" version
-	// TODO: Use versioned api objects?
-	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &v1beta1.Status{}, &SimpleGetOptions{}, &SimpleRoot{})
-	// "version2" version
-	// TODO: Use versioned api objects?
-	api.Scheme.AddKnownTypes(testVersion2, &Simple{}, &SimpleList{}, &v1beta3.Status{}, &SimpleGetOptions{}, &SimpleRoot{})
-
-	// Register SimpleGetOptions with the server versions to convert query params to it
-	api.Scheme.AddKnownTypes("v1beta1", &SimpleGetOptions{})
-	api.Scheme.AddKnownTypes("v1beta3", &SimpleGetOptions{})
+	addTestTypes()
+	addNewTestTypes()
 
 	nsMapper := newMapper()
 	legacyNsMapper := newMapper()
-	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources
+
+	// enumerate all supported versions, get the kinds, and register with
+	// the mapper how to address our resources
 	for _, version := range versions {
 		for kind := range api.Scheme.KnownTypes(version) {
 			mixedCase := true
@@ -149,13 +158,12 @@ func init() {
 	admissionControl = admit.NewAlwaysAdmit()
 	requestContextMapper = api.NewRequestContextMapper()
 
-	//mapper.(*meta.DefaultRESTMapper).Add(meta.RESTScopeNamespaceLegacy, "Simple", testVersion, false)
 	api.Scheme.AddFieldLabelConversionFunc(testVersion, "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	api.Scheme.AddFieldLabelConversionFunc(testVersion2, "Simple",
+	api.Scheme.AddFieldLabelConversionFunc(newVersion, "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
@@ -210,13 +218,13 @@ func handleInternal(legacy bool, storage map[string]rest.Storage, admissionContr
 	}
 	if legacy {
 		group.Version = testVersion
-		group.ServerVersion = "v1beta1"
-		group.Codec = legacyCodec
+		group.ServerVersion = testVersion
+		group.Codec = codec
 		group.Mapper = legacyNamespaceMapper
 	} else {
-		group.Version = testVersion2
-		group.ServerVersion = "v1beta3"
-		group.Codec = codec
+		group.Version = newVersion
+		group.ServerVersion = newVersion
+		group.Codec = newCodec
 		group.Mapper = namespaceMapper
 	}
 
@@ -757,7 +765,7 @@ func TestList(t *testing.T) {
 			selfLink:  "/api/version/simple?namespace=",
 			legacy:    true,
 		},
-		// list items in a namespace, v1beta3+
+		// list items in a namespace in the path
 		{
 			url:       "/api/version2/namespaces/default/simple",
 			namespace: "default",
@@ -1378,7 +1386,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	item := &api.DeleteOptions{
 		GracePeriodSeconds: &grace,
 	}
-	body, err := versionServerCodec.Encode(item)
+	body, err := codec.Encode(item)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1439,7 +1447,7 @@ func TestLegacyDeleteIgnoresOptions(t *testing.T) {
 	defer server.Close()
 
 	item := api.NewDeleteOptions(300)
-	body, err := versionServerCodec.Encode(item)
+	body, err := codec.Encode(item)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1888,9 +1896,9 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Context: requestContextMapper,
 		Mapper:  namespaceMapper,
 
-		Version:       testVersion2,
-		ServerVersion: "v1beta3",
-		Codec:         codec,
+		Version:       newVersion,
+		ServerVersion: newVersion,
+		Codec:         newCodec,
 	}
 	container := restful.NewContainer()
 	if err := group.InstallREST(container); err == nil {
@@ -1916,9 +1924,9 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Context: requestContextMapper,
 		Mapper:  namespaceMapper,
 
-		Version:       testVersion2,
-		ServerVersion: "v1beta3",
-		Codec:         codec,
+		Version:       newVersion,
+		ServerVersion: newVersion,
+		Codec:         newCodec,
 	}
 	container = restful.NewContainer()
 	if err := group.InstallREST(container); err != nil {

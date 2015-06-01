@@ -157,14 +157,6 @@ func TestLog(t *testing.T) {
 		pod                                        *api.Pod
 	}{
 		{
-			name:      "v1beta1 - pod log",
-			version:   "v1beta1",
-			podPath:   "/api/v1beta1/pods/foo",
-			logPath:   "/api/v1beta1/pods/foo/log",
-			nsInQuery: true,
-			pod:       testPod(),
-		},
-		{
 			name:      "v1beta3 - pod log",
 			version:   "v1beta3",
 			podPath:   "/api/v1beta3/namespaces/test/pods/foo",

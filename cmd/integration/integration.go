@@ -605,23 +605,6 @@ func runPatchTest(c *client.Client) {
 		RemoveLabelBody     []byte
 		RemoveAllLabelsBody []byte
 	}{
-		"v1beta1": {
-			api.JSONPatchType: {
-				[]byte(`[{"op":"add","path":"/labels","value":{"foo":"bar","baz":"qux"}}]`),
-				[]byte(`[{"op":"remove","path":"/labels/foo"}]`),
-				[]byte(`[{"op":"remove","path":"/labels"}]`),
-			},
-			api.MergePatchType: {
-				[]byte(`{"labels":{"foo":"bar","baz":"qux"}}`),
-				[]byte(`{"labels":{"foo":null}}`),
-				[]byte(`{"labels":null}`),
-			},
-			api.StrategicMergePatchType: {
-				[]byte(`{"labels":{"foo":"bar","baz":"qux"}}`),
-				[]byte(`{"labels":{"foo":null}}`),
-				[]byte(`{"labels":{"$patch":"replace"}}`),
-			},
-		},
 		"v1beta3": {
 			api.JSONPatchType: {
 				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
@@ -938,7 +921,7 @@ func main() {
 	glog.Infof("Running tests for APIVersion: %s", apiVersion)
 
 	firstManifestURL := ServeCachedManifestFile(testPodSpecFile)
-	secondManifestURL := ServeCachedManifestFile(testManifestFile)
+	secondManifestURL := ServeCachedManifestFile(testPodSpecFile)
 	apiServerURL, _ := startComponents(firstManifestURL, secondManifestURL, apiVersion)
 
 	// Ok. we're good to go.
@@ -1058,28 +1041,4 @@ const (
 			"volumes": [{	"name": "redis-data" }]
 		}
 	}`
-)
-
-const (
-	// This is copied from, and should be kept in sync with:
-	// https://raw.githubusercontent.com/GoogleCloudPlatform/container-vm-guestbook-redis-python/master/manifest.yaml
-	// Note that kubelet complains about these containers not having a self link.
-	testManifestFile = `version: v1beta2
-id: container-vm-guestbook-manifest
-containers:
-  - name: redis
-    image: redis
-    volumeMounts:
-      - name: redis-data
-        mountPath: /data
-
-  - name: guestbook
-    image: google/guestbook-python-redis
-    ports:
-      - name: www
-        hostPort: 80
-        containerPort: 80
-
-volumes:
-  - name: redis-data`
 )

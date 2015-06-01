@@ -52,7 +52,7 @@ KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 # Set to the goveralls binary path to report coverage results to Coveralls.io.
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # Comma separated list of API Versions that should be tested.
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1beta1,v1beta3"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1beta3"}
 # Run tests with the standard (registry) and a custom etcd prefix
 # (kubernetes.io/registry).
 KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry,kubernetes.io/registry"}

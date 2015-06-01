@@ -17,22 +17,18 @@ limitations under the License.
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"sort"
 	"testing"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
@@ -337,113 +333,5 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
 	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
-	}
-}
-
-func exampleManifestAndPod(id string) (v1beta1.ContainerManifest, *api.Pod) {
-	hostname := "an-example-host"
-
-	manifest := v1beta1.ContainerManifest{
-		Version: "v1beta1",
-		ID:      id,
-		UUID:    types.UID(id),
-		Containers: []v1beta1.Container{
-			{
-				Name:  "c" + id,
-				Image: "foo",
-				TerminationMessagePath: "/somepath",
-			},
-		},
-		Volumes: []v1beta1.Volume{
-			{
-				Name: "host-dir",
-				Source: v1beta1.VolumeSource{
-					HostDir: &v1beta1.HostPathVolumeSource{"/dir/path"},
-				},
-			},
-		},
-	}
-	expectedPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name:      id + "-" + hostname,
-			UID:       types.UID(id),
-			Namespace: kubelet.NamespaceDefault,
-			SelfLink:  getSelfLink(id+"-"+hostname, kubelet.NamespaceDefault),
-		},
-		Spec: api.PodSpec{
-			NodeName: hostname,
-			Containers: []api.Container{
-				{
-					Name:  "c" + id,
-					Image: "foo",
-				},
-			},
-			Volumes: []api.Volume{
-				{
-					Name: "host-dir",
-					VolumeSource: api.VolumeSource{
-						HostPath: &api.HostPathVolumeSource{"/dir/path"},
-					},
-				},
-			},
-		},
-	}
-	return manifest, expectedPod
-}
-
-func TestExtractFromDir(t *testing.T) {
-	if !api.PreV1Beta3(testapi.Version()) {
-		return
-	}
-	manifest, expectedPod := exampleManifestAndPod("1")
-	manifest2, expectedPod2 := exampleManifestAndPod("2")
-
-	manifests := []v1beta1.ContainerManifest{manifest, manifest2}
-	pods := []*api.Pod{expectedPod, expectedPod2}
-	files := make([]*os.File, len(manifests))
-
-	dirName, err := ioutil.TempDir("", "foo")
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	for i, manifest := range manifests {
-		data, err := json.Marshal(manifest)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
-		file, err := ioutil.TempFile(dirName, manifest.ID)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
-		name := file.Name()
-		if err := file.Close(); err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
-		ioutil.WriteFile(name, data, 0755)
-		files[i] = file
-	}
-
-	ch := make(chan interface{}, 1)
-	c := sourceFile{dirName, "an-example-host", ch}
-	err = c.extractFromPath()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, pods...)
-	sort.Sort(sortedPods(update.Pods))
-	sort.Sort(sortedPods(expected.Pods))
-	if !api.Semantic.DeepDerivative(expected, update) {
-		t.Fatalf("Expected %#v, Got %#v", expected, update)
-	}
-	for _, pod := range update.Pods {
-		if errs := validation.ValidatePod(pod); len(errs) != 0 {
-			t.Errorf("Expected no validation errors on %#v, Got %q", pod, errs)
-		}
 	}
 }

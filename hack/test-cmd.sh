@@ -114,8 +114,6 @@ PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
 
 kube_api_versions=(
   ""
-  v1beta1
-  v1beta2
   v1beta3
 )
 for version in "${kube_api_versions[@]}"; do

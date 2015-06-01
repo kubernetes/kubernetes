@@ -46,14 +46,6 @@ func TestPortForward(t *testing.T) {
 		pfErr                                     bool
 	}{
 		{
-			name:      "v1beta1 - pod portforward",
-			version:   "v1beta1",
-			podPath:   "/api/v1beta1/pods/foo",
-			pfPath:    "/api/v1beta1/pods/foo/portforward",
-			nsInQuery: true,
-			pod:       execPod(),
-		},
-		{
 			name:      "v1beta3 - pod portforward",
 			version:   "v1beta3",
 			podPath:   "/api/v1beta3/namespaces/test/pods/foo",

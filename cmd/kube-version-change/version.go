@@ -28,8 +28,6 @@ import (
 	"runtime"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
