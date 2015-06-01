@@ -70,16 +70,12 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 	return false
 }
 
-func TestPlugin(t *testing.T) {
+func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/glusterfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
-	}
-	spec := &api.Volume{
-		Name:         "vol1",
-		VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"ep", "vol", false}},
 	}
 	ep := &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Subsets: []api.EndpointSubset{{
 		Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}}}}}
@@ -98,7 +94,7 @@ func TestPlugin(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.(*glusterfsPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), ep, pod, &mount.FakeMounter{}, &fake)
+	builder, err := plug.(*glusterfsPlugin).newBuilderInternal(spec, ep, pod, &mount.FakeMounter{}, &fake)
 	volumePath := builder.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
@@ -135,4 +131,27 @@ func TestPlugin(t *testing.T) {
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
+}
+
+func TestPluginVolume(t *testing.T) {
+	vol := &api.Volume{
+		Name:         "vol1",
+		VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"ep", "vol", false}},
+	}
+	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+}
+
+func TestPluginPersistentVolume(t *testing.T) {
+	vol := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "vol1",
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				Glusterfs: &api.GlusterfsVolumeSource{"ep", "vol", false},
+			},
+		},
+	}
+
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol))
 }
