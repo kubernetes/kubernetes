@@ -13,6 +13,7 @@ Like labels, annotations are key-value maps.
 ```
 
 Possible information that could be recorded in annotations:
+
 * fields managed by a declarative configuration layer, to distinguish them from client- and/or server-set default values and other auto-generated fields, fields set by auto-sizing/auto-scaling systems, etc., in order to facilitate merging
 * build/release/image information (timestamps, release ids, git branch, PR numbers, image hashes, registry address, etc.)
 * pointers to logging/monitoring/analytics/audit repos

@@ -11,7 +11,7 @@ Each object can have a set of key/value labels defined.  Each Key must be unique
 }
 ```
 
-We'll eventually index and reverse-index labels for efficient queries and watches, use them to sort and group in UIs and CLIs, etc. We don't want to pollute labels with non-identifying, especially large and/or structured, data. Non-identifying information should be recorded using [annotations](/docs/annotations.md).
+We'll eventually index and reverse-index labels for efficient queries and watches, use them to sort and group in UIs and CLIs, etc. We don't want to pollute labels with non-identifying, especially large and/or structured, data. Non-identifying information should be recorded using [annotations](annotations.md).
 
 
 ## Motivation
@@ -21,11 +21,12 @@ Labels enable users to map their own organizational structures onto system objec
 Service deployments and batch processing pipelines are often multi-dimensional entities (e.g., multiple partitions or deployments, multiple release tracks, multiple tiers, multiple micro-services per tier). Management often requires cross-cutting operations, which breaks encapsulation of strictly hierarchical representations, especially rigid hierarchies determined by the infrastructure rather than by users.
 
 Example labels:
-   - `"release" : "stable"`, `"release" : "canary"`, ...
-   - `"environment" : "dev"`, `"environment" : "qa"`, `"environment" : "production"`
-   - `"tier" : "frontend"`, `"tier" : "backend"`, `"tier" : "middleware"`
-   - `"partition" : "customerA"`, `"partition" : "customerB"`, ...
-   - `"track" : "daily"`, `"track" : "weekly"`
+
+   * `"release" : "stable"`, `"release" : "canary"`, ...
+   * `"environment" : "dev"`, `"environment" : "qa"`, `"environment" : "production"`
+   * `"tier" : "frontend"`, `"tier" : "backend"`, `"tier" : "middleware"`
+   * `"partition" : "customerA"`, `"partition" : "customerB"`, ...
+   * `"track" : "daily"`, `"track" : "weekly"`
 
 These are just examples; you are free to develop your own conventions.
 
@@ -80,12 +81,14 @@ _Set-based_ requirements can be mixed with _equality-based_ requirements. For ex
 ## API
 
 LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter. Both requirements are permitted:
-   - _equality-based_ requirements: `?label-selector=key1%3Dvalue1,key2%3Dvalue2`
-   - _set-based_ requirements: `?label-selector=key+in+%28value1%2Cvalue2%29%2Ckey2+notin+%28value3`
+
+   * _equality-based_ requirements: `?label-selector=key1%3Dvalue1,key2%3Dvalue2`
+   * _set-based_ requirements: `?label-selector=key+in+%28value1%2Cvalue2%29%2Ckey2+notin+%28value3`
 
 Kubernetes also currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationcontroller`s:
-- `service`: A [service](/docs/services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
-- `replicationcontroller`: A [replication controller](/docs/replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.
+
+* `service`: A [service](services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
+* `replicationcontroller`: A [replication controller](replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.
 
 The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationcontroller` is monitoring is also defined with a label selector. For management convenience and consistency, `services` and `replicationcontrollers` may themselves have labels and would generally carry the labels their corresponding pods have in common.
 

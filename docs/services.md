@@ -6,7 +6,7 @@ Kubernetes [`Pods`](pods.md) are mortal. They are born and they die, and they
 are not resurrected.  [`ReplicationControllers`](replication-controller.md) in
 particular create and destroy `Pods` dynamically (e.g. when scaling up or down
 or when doing rolling updates).  While each `Pod` gets its own IP address, even
-those IP addresses can not be relied upon to be stable over time. This leads to
+those IP addresses cannot be relied upon to be stable over time. This leads to
 a problem: if some set of `Pods` (let's call them backends) provides
 functionality to other `Pods` (let's call them frontends) inside the Kubernetes
 cluster, how do those frontends find out and keep track of which backends are
@@ -83,12 +83,13 @@ is `TCP`.
 
 Services generally abstract access to Kubernetes `Pods`, but they can also
 abstract other kinds of backends.  For example:
-  - you want to have an external database cluster in production, but in test
-    you use your own databases
-  - you want to point your service to a service in another
-    [`Namespace`](namespaces.md) or on another cluster
-  - you are migrating your workload to Kubernetes and some of your backends run
-    outside of Kubernetes
+
+  * You want to have an external database cluster in production, but in test
+    you use your own databases.
+  * You want to point your service to a service in another
+    [`Namespace`](namespaces.md) or on another cluster.
+  * You are migrating your workload to Kubernetes and some of your backends run
+    outside of Kubernetes.
 
 In any of these scenarios you can define a service without a selector:
 
@@ -302,10 +303,11 @@ address.  Kubernetes supports two ways of doing this: `NodePort`s and
 
 Every `Service` has a `Type` field which defines how the `Service` can be
 accessed.  Valid values for this field are:
-   - ClusterIP: use a cluster-internal IP (portal) only - this is the default
-   - NodePort: use a cluster IP, but also expose the service on a port on each
+
+   * `ClusterIP`: use a cluster-internal IP (portal) only - this is the default
+   * `NodePort`: use a cluster IP, but also expose the service on a port on each
      node of the cluster (the same port on each)
-   - LoadBalancer: use a ClusterIP and a NodePort, but also ask the cloud
+   * `LoadBalancer`: use a ClusterIP and a NodePort, but also ask the cloud
      provider for a load balancer which forwards to the `Service`
 
 Note that while `NodePort`s can be TCP or UDP, `LoadBalancer`s only support TCP
@@ -389,7 +391,7 @@ but the current API requires it.
 ## Future work
 
 In the future we envision that the proxy policy can become more nuanced than
-simple round robin balancing, for example master elected or sharded.  We also
+simple round robin balancing, for example master-elected or sharded.  We also
 envision that some `Services` will have "real" load balancers, in which case the
 VIP will simply transport the packets there.
 
