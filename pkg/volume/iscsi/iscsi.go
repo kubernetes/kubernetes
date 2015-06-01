@@ -80,7 +80,13 @@ func (plugin *ISCSIPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.
 }
 
 func (plugin *ISCSIPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
-	iscsi := spec.VolumeSource.ISCSI
+	var iscsi *api.ISCSIVolumeSource
+	if spec.VolumeSource.ISCSI != nil {
+		iscsi = spec.VolumeSource.ISCSI
+	} else {
+		iscsi = spec.PersistentVolumeSource.ISCSI
+	}
+
 	lun := strconv.Itoa(iscsi.Lun)
 
 	return &iscsiDisk{
