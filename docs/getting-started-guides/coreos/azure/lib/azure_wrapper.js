@@ -13,9 +13,9 @@ var inspect = require('util').inspect;
 var util = require('./util.js');
 
 var coreos_image_ids = {
-  'stable': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Stable-647.0.0',
-  'beta': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Beta-668.3.0', // untested
-  'alpha': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Alpha-681.0.0' // untested
+  'stable': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Stable-647.2.0',
+  'beta': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Beta-681.0.0', // untested
+  'alpha': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Alpha-695.0.0' // untested
 };
 
 var conf = {};
