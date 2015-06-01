@@ -3,13 +3,13 @@ package parse
 import "testing"
 
 func TestLexPlainText(t *testing.T) {
-	text := "hello jq"
-	l := lex("hello", text, "'", "'")
+	text := "hello jsonpath"
+	l := lex("hello", text, "$", " ")
 	item := l.nextItem()
 	if item.typ != itemText {
 		t.Errorf("expect to get itemText, got %v", item)
 	}
-	if item.val != "hello jq" {
+	if item.val != "hello jsonpath" {
 		t.Errorf("expect to get %v, got %v", text, item.val)
 	}
 	item = l.nextItem()
@@ -19,14 +19,14 @@ func TestLexPlainText(t *testing.T) {
 }
 
 func TestLexVariable(t *testing.T) {
-	text := "hello '.foo'"
-	l := lex("hello", text, "'", "'")
-	expect := []itemType{itemText, itemLeftDelim, itemDot, itemField, itemRightDelim, itemEOF}
+	text := "hello $.foo"
+	l := lex("hello", text, "$", " ")
+	expect := []itemType{itemText, itemLeftDelim, itemDot, itemField, itemEOF}
 
-	for i := 0; i < 6; i++ {
+	for i := 0; i < 5; i++ {
 		item := l.nextItem()
 		if item.typ != expect[i] {
-			t.Logf("expect to get %v, got %v", expect[i], item)
+			t.Errorf("expect to get %v, got %v", expect[i], item)
 		}
 	}
 }

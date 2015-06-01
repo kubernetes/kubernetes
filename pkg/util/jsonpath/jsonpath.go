@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package jq
+package jsonpath
 
 import (
 	"errors"
@@ -25,33 +25,33 @@ import (
 	"strconv"
 )
 
-type Jq struct {
+type Jsonpath struct {
 	name string
 	tree *parse.Tree
 }
 
-func New(n string) *Jq {
-	return &Jq{
+func New(n string) *Jsonpath {
+	return &Jsonpath{
 		name: n,
 	}
 }
 
-func (j *Jq) Parse(text string) error {
+func (j *Jsonpath) Parse(text string) error {
 	var err error
 	j.tree, err = parse.Parse(j.name, text)
 	return err
 }
 
-func (j *Jq) Execute(wr io.Writer, data interface{}) error {
+func (j *Jsonpath) Execute(wr io.Writer, data interface{}) error {
 	value := reflect.ValueOf(data)
 	if j.tree == nil {
-		return errors.New(j.name + " is an incomplete jq template")
+		return errors.New(j.name + " is an incomplete jsonpath template")
 	}
 	j.walk(wr, value, j.tree.Root)
 	return nil
 }
 
-func (j *Jq) walk(wr io.Writer, value reflect.Value, node parse.Node) reflect.Value {
+func (j *Jsonpath) walk(wr io.Writer, value reflect.Value, node parse.Node) reflect.Value {
 	var text []byte
 	switch node := node.(type) {
 	case *parse.ListNode:
@@ -74,7 +74,7 @@ func (j *Jq) walk(wr io.Writer, value reflect.Value, node parse.Node) reflect.Va
 	}
 }
 
-func (j *Jq) evalVariable(wr io.Writer, value reflect.Value, name string) reflect.Value {
+func (j *Jsonpath) evalVariable(wr io.Writer, value reflect.Value, name string) reflect.Value {
 	var text string
 	v := value.FieldByName(name)
 	switch v.Kind() {

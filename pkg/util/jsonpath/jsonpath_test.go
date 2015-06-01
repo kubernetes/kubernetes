@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package jq
+package jsonpath
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ import (
 )
 
 func TestPlainText(t *testing.T) {
-	text := "hello jq"
+	text := "hello jsonpath"
 	j := New("plain")
 	err := j.Parse(text)
 	if err != nil {
@@ -40,14 +40,14 @@ func TestPlainText(t *testing.T) {
 }
 
 func TestVariable(t *testing.T) {
-	text := "hello '.jq'"
+	text := "hello $.jsonpath"
 	j := New("variable")
 	err := j.Parse(text)
 	if err != nil {
 		t.Errorf("parse variable %s error %v", text, err)
 	}
 	buf := new(bytes.Buffer)
-	err = j.Execute(buf, struct{ jq string }{jq: "world"})
+	err = j.Execute(buf, struct{ jsonpath string }{jsonpath: "world"})
 	if err != nil {
 		t.Errorf("execute variable error %v", err)
 	}
@@ -59,7 +59,7 @@ func TestVariable(t *testing.T) {
 }
 
 func TestNestedDict(t *testing.T) {
-	text := "hello '.jq.title'"
+	text := "hello $.jsonpath.title"
 	j := New("nestedDict")
 	err := j.Parse(text)
 	if err != nil {
@@ -71,9 +71,9 @@ func TestNestedDict(t *testing.T) {
 		title string
 	}
 	type outer struct {
-		jq inner
+		jsonpath inner
 	}
-	err = j.Execute(buf, outer{jq: inner{title: "world"}})
+	err = j.Execute(buf, outer{jsonpath: inner{title: "world"}})
 	if err != nil {
 		t.Errorf("execute variable error %v", err)
 	}

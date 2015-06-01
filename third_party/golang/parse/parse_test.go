@@ -1,9 +1,8 @@
 package parse
 
 import "testing"
-
 func TestParsePlainText(t *testing.T) {
-	tree, err := Parse("plain", "hello jq")
+	tree, err := Parse("plain", "hello jsonpath")
 	if err != nil {
 		t.Errorf("parse plain text error %v", err)
 	}
@@ -17,7 +16,7 @@ func TestParsePlainText(t *testing.T) {
 }
 
 func TestParseVariable(t *testing.T) {
-	tree, err := Parse("variable", "hello '.jq'")
+	tree, err := Parse("variable", "hello $.jsonpath")
 	if err != nil {
 		t.Errorf("parse plain text error %v", err)
 	}
@@ -33,7 +32,7 @@ func TestParseVariable(t *testing.T) {
 	}
 	nodes = nodes[1].(*ListNode).Nodes
 	node := nodes[0].(*VariableNode)
-	if node.Name != "jq" {
-		t.Errorf("expect NodeVariable jq, got %s", node.Name)
+	if node.Name != "jsonpath" {
+		t.Errorf("expect NodeVariable jsonpath, got %s", node.Name)
 	}
 }

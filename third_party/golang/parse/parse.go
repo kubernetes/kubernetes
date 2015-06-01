@@ -135,7 +135,7 @@ func NewTree(name string) *Tree {
 
 func (t *Tree) Parse(text string) error {
 	t.Root = newList(0)
-	t.lex = lex(t.Name, text, "'", "'")
+	t.lex = lex(t.Name, text, "$", " ")
 	t.cur = t.Root
 	for eof := false; eof != true; {
 		item := t.lex.nextItem()

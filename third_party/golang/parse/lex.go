@@ -49,13 +49,6 @@ func (i item) String() string {
 	return fmt.Sprintf("%q", i.val)
 }
 
-const (
-	leftDelim    = "'"
-	rightDelim   = "'"
-	leftComment  = "/*"
-	rightComment = "*/"
-)
-
 const eof = -1
 
 // stateFn represents the state of the scanner as a function that returns the next state.
@@ -77,12 +70,6 @@ type lexer struct {
 
 // lex creates a new scanner for the input string.
 func lex(name, input, left, right string) *lexer {
-	if left == "" {
-		left = leftDelim
-	}
-	if right == "" {
-		right = rightDelim
-	}
 	l := &lexer{
 		name:       name,
 		input:      input,
@@ -207,7 +194,8 @@ func lexInsideAction(l *lexer) stateFn {
 
 	switch r := l.next(); {
 	case r == eof || isEndOfLine(r):
-		return l.errorf("unclosed action")
+		l.emit(itemEOF)
+		return nil
 	case r == '.':
 		l.emit(itemDot)
 		return lexField
