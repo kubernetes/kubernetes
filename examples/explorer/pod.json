@@ -29,9 +29,7 @@
     "volumes": [
       {
         "name": "test-volume",
-        "VolumeSorce": {
-          "EmptyDir": {}
-        }
+        "emptyDir": {}
       }
     ]
   }
