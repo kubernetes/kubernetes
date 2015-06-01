@@ -391,7 +391,7 @@ but the current API requires it.
 ## Future work
 
 In the future we envision that the proxy policy can become more nuanced than
-simple round robin balancing, for example master elected or sharded.  We also
+simple round robin balancing, for example master-elected or sharded.  We also
 envision that some `Services` will have "real" load balancers, in which case the
 VIP will simply transport the packets there.
 
