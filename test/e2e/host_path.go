@@ -135,7 +135,8 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 					},
 				},
 			},
-			Volumes: mount(source),
+			RestartPolicy: api.RestartPolicyNever,
+			Volumes:       mount(source),
 		},
 	}
 }

@@ -95,6 +95,7 @@ func testPodWithVolume(path string, source *api.EmptyDirVolumeSource) *api.Pod {
 					},
 				},
 			},
+			RestartPolicy: api.RestartPolicyNever,
 			Volumes: []api.Volume{
 				{
 					Name: volumeName,
