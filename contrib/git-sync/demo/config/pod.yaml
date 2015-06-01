@@ -38,8 +38,7 @@ spec:
     - name: html
       mountPath: /usr/share/nginx/html
     ports:
-    - name: http-server
-      containerPort: 80
+    - containerPort: 80
   volumes:
   - name: markdown
     emptyDir: {}
