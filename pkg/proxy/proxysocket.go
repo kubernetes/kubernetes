@@ -40,6 +40,8 @@ type proxySocket interface {
 	Close() error
 	// ProxyLoop proxies incoming connections for the specified service to the service endpoints.
 	ProxyLoop(service ServicePortName, info *serviceInfo, proxier *Proxier)
+	// ListenPort returns the host port that the proxySocket is listening on
+	ListenPort() int
 }
 
 func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, error) {
@@ -50,7 +52,7 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, er
 		if err != nil {
 			return nil, err
 		}
-		return &tcpProxySocket{listener}, nil
+		return &tcpProxySocket{Listener: listener, port: port}, nil
 	case "UDP":
 		addr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(host, strconv.Itoa(port)))
 		if err != nil {
@@ -60,7 +62,7 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, er
 		if err != nil {
 			return nil, err
 		}
-		return &udpProxySocket{conn}, nil
+		return &udpProxySocket{UDPConn: conn, port: port}, nil
 	}
 	return nil, fmt.Errorf("unknown protocol %q", protocol)
 }
@@ -72,6 +74,11 @@ var endpointDialTimeout = []time.Duration{1, 2, 4, 8}
 // no new connections are allowed but existing connections are left untouched.
 type tcpProxySocket struct {
 	net.Listener
+	port int
+}
+
+func (tcp *tcpProxySocket) ListenPort() int {
+	return tcp.port
 }
 
 func tryConnect(service ServicePortName, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
@@ -162,6 +169,11 @@ func copyBytes(direction string, dest, src *net.TCPConn, wg *sync.WaitGroup) {
 // TODO: We could lame-duck this ourselves, if it becomes important.
 type udpProxySocket struct {
 	*net.UDPConn
+	port int
+}
+
+func (udp *udpProxySocket) ListenPort() int {
+	return udp.port
 }
 
 func (udp *udpProxySocket) Addr() net.Addr {

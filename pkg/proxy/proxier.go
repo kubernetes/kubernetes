@@ -74,6 +74,7 @@ type Proxier struct {
 	listenIP      net.IP
 	iptables      iptables.Interface
 	hostIP        net.IP
+	proxyPorts    PortAllocator
 }
 
 // A key for the portMap
@@ -105,7 +106,7 @@ func IsProxyLocked(err error) bool {
 // if iptables fails to update or acquire the initial lock. Once a proxier is
 // created, it will keep iptables up to date in the background and will not
 // terminate if a particular iptables call fails.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface) (*Proxier, error) {
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr util.PortRange) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		return nil, ErrProxyOnLocalhost
 	}
@@ -115,11 +116,17 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 		return nil, fmt.Errorf("failed to select a host interface: %v", err)
 	}
 
+	proxyPorts := newPortAllocator(pr)
+
 	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
-	return createProxier(loadBalancer, listenIP, iptables, hostIP)
+	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts)
 }
 
-func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP) (*Proxier, error) {
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator) (*Proxier, error) {
+	// convenient to pass nil for tests..
+	if proxyPorts == nil {
+		proxyPorts = newPortAllocator(util.PortRange{})
+	}
 	// Set up the iptables foundations we need.
 	if err := iptablesInit(iptables); err != nil {
 		return nil, fmt.Errorf("failed to initialize iptables: %v", err)
@@ -136,6 +143,7 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		listenIP:     listenIP,
 		iptables:     iptables,
 		hostIP:       hostIP,
+		proxyPorts:   proxyPorts,
 	}, nil
 }
 
@@ -189,7 +197,10 @@ func (proxier *Proxier) stopProxy(service ServicePortName, info *serviceInfo) er
 // This assumes proxier.mu is locked.
 func (proxier *Proxier) stopProxyInternal(service ServicePortName, info *serviceInfo) error {
 	delete(proxier.serviceMap, service)
-	return info.socket.Close()
+	err := info.socket.Close()
+	port := info.socket.ListenPort()
+	proxier.proxyPorts.Release(port)
+	return err
 }
 
 func (proxier *Proxier) getServiceInfo(service ServicePortName) (*serviceInfo, bool) {
@@ -285,8 +296,15 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 					glog.Errorf("Failed to stop service %q: %v", serviceName, err)
 				}
 			}
+
+			proxyPort, err := proxier.proxyPorts.AllocateNext()
+			if err != nil {
+				glog.Errorf("failed to allocate proxy port for service %q: %v", serviceName, err)
+				continue
+			}
+
 			glog.V(1).Infof("Adding new service %q at %s:%d/%s", serviceName, serviceIP, servicePort.Port, servicePort.Protocol)
-			info, err := proxier.addServiceOnPort(serviceName, servicePort.Protocol, 0, udpIdleTimeout)
+			info, err = proxier.addServiceOnPort(serviceName, servicePort.Protocol, proxyPort, udpIdleTimeout)
 			if err != nil {
 				glog.Errorf("Failed to start proxy for %q: %v", serviceName, err)
 				continue
