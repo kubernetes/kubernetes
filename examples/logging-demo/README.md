@@ -104,7 +104,6 @@ elasticsearch-logging    kubernetes.io/cluster-service=true,name=elasticsearch-l
 kibana-logging           kubernetes.io/cluster-service=true,name=kibana-logging              name=kibana-logging          10.0.188.118   5601/TCP
 kube-dns                 k8s-app=kube-dns,kubernetes.io/cluster-service=true,name=kube-dns   k8s-app=kube-dns             10.0.0.10      53/UDP
 kubernetes               component=apiserver,provider=kubernetes                             <none>                       10.0.0.2       443/TCP
-kubernetes-ro            component=apiserver,provider=kubernetes                             <none>                       10.0.0.1       80/TCP
 monitoring-grafana       kubernetes.io/cluster-service=true,name=grafana                     name=influxGrafana           10.0.254.202   80/TCP
 monitoring-heapster      kubernetes.io/cluster-service=true,name=heapster                    name=heapster                10.0.19.214    80/TCP
 monitoring-influxdb      name=influxGrafana                                                  name=influxGrafana           10.0.198.71    80/TCP

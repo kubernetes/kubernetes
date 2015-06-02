@@ -116,7 +116,6 @@ POD        IP        CONTAINER(S)        IMAGE(S)        HOST        LABELS     
 $ bin/kubectl get services       # your service IPs will likely differ
 NAME            LABELS                                    SELECTOR            IP             PORT
 kubernetes      component=apiserver,provider=kubernetes   <none>              10.10.10.2     443
-kubernetes-ro   component=apiserver,provider=kubernetes   <none>              10.10.10.1     80
 ```
 Lastly, use the Mesos CLI tool to validate the Kubernetes scheduler framework has been registered and running:
 ```bash
@@ -241,7 +240,6 @@ Next, determine the internal IP address of the front end [service][8]:
 $ bin/kubectl get services
 NAME            LABELS                                    SELECTOR            IP             PORT
 kubernetes      component=apiserver,provider=kubernetes   <none>              10.10.10.2     443
-kubernetes-ro   component=apiserver,provider=kubernetes   <none>              10.10.10.1     80
 redismaster     <none>                                    name=redis-master   10.10.10.49    10000
 redisslave      name=redisslave                           name=redisslave     10.10.10.109   10001
 frontend        <none>                                    name=frontend       10.10.10.149   9998
