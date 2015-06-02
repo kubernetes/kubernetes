@@ -272,6 +272,7 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EnableV1:          true,
 	})
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

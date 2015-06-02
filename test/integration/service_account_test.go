@@ -419,6 +419,7 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 		Authenticator:     authenticator,
 		Authorizer:        authorizer,
 		AdmissionControl:  serviceAccountAdmission,
+		EnableV1:          true,
 	})
 
 	// Start the service account and service account token controllers
