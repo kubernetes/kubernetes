@@ -437,8 +437,9 @@ function download-release() {
   # store it when we download, and then when it's different infer that
   # a push occurred (otherwise it's a simple reboot).
 
-  # In case of failure of unpacking Salt tree (the last command in the
-  # "until" block) retry downloading both release and Salt tars.
+  # In case of failure of unpacking Salt tree or checking integrity of
+  # binary release tar (the last command in the "until" block) retry
+  # downloading both release and Salt tars.
   until
     echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
     download-or-bust "$SERVER_BINARY_TAR_URL"
@@ -446,9 +447,9 @@ function download-release() {
     echo "Downloading Salt tar ($SALT_TAR_URL)"
     download-or-bust "$SALT_TAR_URL"
 
-    echo "Unpacking Salt tree"
+    echo "Unpacking Salt tree and checking integrity of binary release tar"
     rm -rf kubernetes
-    tar xzf "${SALT_TAR_URL##*/}"
+    tar xzf "${SALT_TAR_URL##*/}" && tar tzf "${SERVER_BINARY_TAR_URL##*/}" > /dev/null
   do
     sleep 15
     echo "Couldn't unpack Salt tree. Retrying..."
