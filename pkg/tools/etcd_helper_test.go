@@ -117,28 +117,32 @@ func TestExtractToList(t *testing.T) {
 			},
 		},
 	}
+	grace := int64(30)
 	expect := api.PodList{
 		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 		},
@@ -200,6 +204,7 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 			},
 		},
 	}
+	grace := int64(30)
 	expect := api.PodList{
 		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
@@ -207,22 +212,25 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 		},
@@ -272,28 +280,32 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 			},
 		},
 	}
+	grace := int64(30)
 	expect := api.PodList{
 		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 		},
@@ -313,11 +325,13 @@ func TestExtractObj(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
 	key := etcdtest.AddPrefix("/some/key")
+	grace := int64(30)
 	expect := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
+			RestartPolicy:                 api.RestartPolicyAlways,
+			DNSPolicy:                     api.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
 		},
 	}
 	fakeClient.Set(key, runtime.EncodeOrDie(testapi.Codec(), &expect), 0)

@@ -1153,7 +1153,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		// Create the container.
 		"create", "start",
 		// Kill the container since event handler fails.
-		"inspect_container", "stop",
+		"stop",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
 		// Get pods for deleting orphaned volumes.

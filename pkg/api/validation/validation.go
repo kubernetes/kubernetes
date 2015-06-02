@@ -252,6 +252,16 @@ func ValidateObjectMetaUpdate(old, meta *api.ObjectMeta) errs.ValidationErrorLis
 	} else {
 		meta.CreationTimestamp = old.CreationTimestamp
 	}
+	// an object can never remove a deletion timestamp or clear/change grace period seconds
+	if !old.DeletionTimestamp.IsZero() {
+		meta.DeletionTimestamp = old.DeletionTimestamp
+	}
+	if old.DeletionGracePeriodSeconds != nil && meta.DeletionGracePeriodSeconds == nil {
+		meta.DeletionGracePeriodSeconds = old.DeletionGracePeriodSeconds
+	}
+	if meta.DeletionGracePeriodSeconds != nil && *meta.DeletionGracePeriodSeconds != *old.DeletionGracePeriodSeconds {
+		allErrs = append(allErrs, errs.NewFieldInvalid("deletionGracePeriodSeconds", meta.DeletionGracePeriodSeconds, "field is immutable; may only be changed via deletion"))
+	}
 
 	// Reject updates that don't specify a resource version
 	if meta.ResourceVersion == "" {

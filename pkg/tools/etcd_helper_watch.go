@@ -39,6 +39,7 @@ const (
 	EtcdSet    = "set"
 	EtcdCAS    = "compareAndSwap"
 	EtcdDelete = "delete"
+	EtcdExpire = "expire"
 )
 
 // FilterFunc is a predicate which takes an API object and returns true
@@ -405,7 +406,7 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 		w.sendAdd(res)
 	case EtcdSet, EtcdCAS:
 		w.sendModify(res)
-	case EtcdDelete:
+	case EtcdDelete, EtcdExpire:
 		w.sendDelete(res)
 	default:
 		glog.Errorf("unknown action: %v", res.Action)

@@ -88,6 +88,58 @@ func TestExtractObj(t *testing.T) {
 	})
 }
 
+func TestWriteTTL(t *testing.T) {
+	client := framework.NewEtcdClient()
+	helper := tools.EtcdHelper{Client: client, Codec: stringCodec{}}
+	framework.WithEtcdKey(func(key string) {
+		_, err := client.Set(key, "object", 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		s := fakeAPIObject("")
+		err = helper.GuaranteedUpdate(key, &s, false, func(obj runtime.Object, res tools.ResponseMeta) (runtime.Object, *uint64, error) {
+			if *(obj.(*fakeAPIObject)) != "object" {
+				t.Fatalf("unexpected existing object: %v", obj)
+			}
+			if res.TTL != 0 {
+				t.Fatalf("unexpected TTL: %#v", res)
+			}
+			ttl := uint64(10)
+			out := fakeAPIObject("test")
+			return &out, &ttl, nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if s != "test" {
+			t.Errorf("unexpected response: %#v", s)
+		}
+		if res, err := client.Get(key, false, false); err != nil || res == nil || res.Node.TTL != 10 {
+			t.Fatalf("unexpected get: %v %#v", err, res)
+		}
+
+		err = helper.GuaranteedUpdate(key, &s, false, func(obj runtime.Object, res tools.ResponseMeta) (runtime.Object, *uint64, error) {
+			if *(obj.(*fakeAPIObject)) != "test" {
+				t.Fatalf("unexpected existing object: %v", obj)
+			}
+			if res.TTL <= 1 {
+				t.Fatalf("unexpected TTL: %#v", res)
+			}
+			out := fakeAPIObject("test2")
+			return &out, nil, nil
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if s != "test2" {
+			t.Errorf("unexpected response: %#v", s)
+		}
+		if res, err := client.Get(key, false, false); err != nil || res == nil || res.Node.TTL <= 1 {
+			t.Fatalf("unexpected get: %v %#v", err, res)
+		}
+	})
+}
+
 func TestWatch(t *testing.T) {
 	client := framework.NewEtcdClient()
 	helper := tools.NewEtcdHelper(client, testapi.Codec(), etcdtest.PathPrefix())

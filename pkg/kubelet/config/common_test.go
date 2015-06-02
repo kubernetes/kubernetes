@@ -30,6 +30,7 @@ import (
 func noDefault(*api.Pod) error { return nil }
 
 func TestDecodeSinglePod(t *testing.T) {
+	grace := int64(30)
 	pod := &api.Pod{
 		TypeMeta: api.TypeMeta{
 			APIVersion: "",
@@ -40,8 +41,9 @@ func TestDecodeSinglePod(t *testing.T) {
 			Namespace: "mynamespace",
 		},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
+			RestartPolicy:                 api.RestartPolicyAlways,
+			DNSPolicy:                     api.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
 			Containers: []api.Container{{
 				Name:                   "image",
 				Image:                  "test/image",
@@ -93,6 +95,7 @@ func TestDecodeSinglePod(t *testing.T) {
 }
 
 func TestDecodePodList(t *testing.T) {
+	grace := int64(30)
 	pod := &api.Pod{
 		TypeMeta: api.TypeMeta{
 			APIVersion: "",
@@ -103,8 +106,9 @@ func TestDecodePodList(t *testing.T) {
 			Namespace: "mynamespace",
 		},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
+			RestartPolicy:                 api.RestartPolicyAlways,
+			DNSPolicy:                     api.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
 			Containers: []api.Container{{
 				Name:                   "image",
 				Image:                  "test/image",
