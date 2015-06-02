@@ -623,6 +623,23 @@ func runPatchTest(c *client.Client) {
 				[]byte(`{"metadata":{"labels":{"$patch":"replace"}}}`),
 			},
 		},
+		"v1": {
+			api.JSONPatchType: {
+				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
+				[]byte(`[{"op":"remove","path":"/metadata/labels/foo"}]`),
+				[]byte(`[{"op":"remove","path":"/metadata/labels"}]`),
+			},
+			api.MergePatchType: {
+				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
+				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
+				[]byte(`{"metadata":{"labels":null}}`),
+			},
+			api.StrategicMergePatchType: {
+				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
+				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
+				[]byte(`{"metadata":{"labels":{"$patch":"replace"}}}`),
+			},
+		},
 	}
 
 	pb := patchBodies[c.APIVersion()]
