@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -67,6 +68,14 @@ var _ = Describe("Load", func() {
 		if err := c.Namespaces().Delete(ns); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
+
+		// Verify latency metrics
+		// TODO: Update threshold to 1s once we reach this goal
+		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
+		_, err := HighLatencyRequests(c, 5*time.Second, util.NewStringSet("events"))
+		expectNoError(err)
+		// TODO: uncomment the following line once the test is stable
+		// Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
 
 	type Load struct {
@@ -78,7 +87,7 @@ var _ = Describe("Load", func() {
 	}
 
 	for _, testArg := range loadTests {
-		name := fmt.Sprintf("[Skipped] should be able to handle %v pods per node", testArg.podsPerNode)
+		name := fmt.Sprintf("[Performance suite] [Skipped] should be able to handle %v pods per node", testArg.podsPerNode)
 
 		It(name, func() {
 			totalPods := testArg.podsPerNode * nodeCount

@@ -776,7 +776,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	By(fmt.Sprintf("%v Waiting for all %d replicas to be running with a max container failures of %d", time.Now(), replicas, maxContainerFailures))
 	same = 0
 	last = 0
-	failCount = 10
+	failCount = 20
 	current = 0
 	oldPods := make([]*api.Pod, 0)
 	for same < failCount && current < replicas {
