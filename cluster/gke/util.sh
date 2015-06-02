@@ -116,7 +116,7 @@ function kube-up() {
   detect-project >&2
 
   # Make the specified network if we need to.
-  if ! gcloud compute networks describe "${NETWORK}" &>/dev/null; then
+  if ! gcloud compute networks --project "${PROJECT}" describe "${NETWORK}" &>/dev/null; then
     echo "Creating new network: ${NETWORK}" >&2
     gcloud compute networks create "${NETWORK}" --project="${PROJECT}" --range "${NETWORK_RANGE}"
   else
@@ -125,7 +125,7 @@ function kube-up() {
 
   # Allow SSH on all nodes in the network. This doesn't actually check whether
   # such a rule exists, only whether we've created this exact rule.
-  if ! gcloud compute firewall-rules describe "${FIREWALL_SSH}" &>/dev/null; then
+  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${FIREWALL_SSH}" &>/dev/null; then
     echo "Creating new firewall for SSH: ${FIREWALL_SSH}" >&2
     gcloud compute firewall-rules create "${FIREWALL_SSH}" \
       --allow="tcp:22" \
