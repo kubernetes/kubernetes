@@ -7,16 +7,15 @@ Mesos ensures applications from different frameworks running on your cluster are
 
 Running Kubernetes on Mesos allows you to easily move Kubernetes workloads from one cloud provider to another to your own physical datacenter.
 
-This tutorial will walk you through setting up Kubernetes on a Mesos cluster on [Google Cloud Plaform][4].
+This tutorial will walk you through setting up Kubernetes on a Mesos cluster.
 It provides a step by step walk through of adding Kubernetes to a Mesos cluster and running the classic GuestBook demo application.
 The walkthrough presented here is based on the v0.4.x series of the Kubernetes-Mesos project, which itself is based on Kubernetes v0.11.0.
 
 ### Prerequisites
 
-* Understanding of [Apache Mesos][11]
+* Understanding of [Apache Mesos][10]
 * Mesos cluster on [Google Compute Engine][5]
-* Identify the Mesos master node external IP from Mesosphere [cluster launch pad][12]
-* A [VPN connection to the cluster][6].
+* A VPN connection to the cluster.
 
 ### Deploy Kubernetes-Mesos
 
@@ -36,7 +35,7 @@ $ mkdir -p bin && sudo docker run --rm -v $(pwd)/bin:/target \
 ```
 
 Set some environment variables.
-The internal IP address of the master is visible via the cluster details page on the Mesosphere launchpad, or may be obtained via `hostname -i`.
+The internal IP address of the master may be obtained via `hostname -i`.
 
 ```bash
 $ export servicehost=$(hostname -i)
@@ -122,9 +121,8 @@ Lastly, use the Mesos CLI tool to validate the Kubernetes scheduler framework ha
 $ mesos state | grep "Kubernetes"
          "name": "Kubernetes",
 ```
-Or, look for Kubernetes in the Mesos web GUI. You can get there by clicking the
-Mesos logo on the Mesosphere launchpad page, or by pointing your browser to
-`http://${mesos_master}`. Make sure you have an active [VPN connection][6].
+Or, look for Kubernetes in the Mesos web GUI by pointing your browser to
+`http://${mesos_master}`. Make sure you have an active VPN connection.
 Go to the Frameworks tab, and look for an active framework named "Kubernetes".
 
 ## Spin up a pod
@@ -186,7 +184,7 @@ started the Kubernetes pod.
 
 ## Run the Example Guestbook App
 
-Following the instructions from the kubernetes-mesos [examples/guestbook][7]:
+Following the instructions from the kubernetes-mesos [examples/guestbook][6]:
 
 ```bash
 $ export ex=k8sm/examples/guestbook
@@ -234,7 +232,7 @@ $ mesos ps
 ```
 The number of Kubernetes pods listed earlier (from `bin/kubectl get pods`) should equal to the number active Mesos tasks listed the previous listing (`mesos ps`).
 
-Next, determine the internal IP address of the front end [service][8]:
+Next, determine the internal IP address of the front end [service][7]:
 
 ```bash
 $ bin/kubectl get services
@@ -282,24 +280,23 @@ Next, add a firewall rule in the Google Cloud Platform Console. Choose Compute >
 Compute Engine > Networks, click on the name of your mesosphere-* network, then
 click "New firewall rule" and allow access to TCP port 9998.
 
-![Google Cloud Platform firewall configuration][9]
+![Google Cloud Platform firewall configuration][8]
 
 Now, you can visit the guestbook in your browser!
 
-![Kubernetes Guestbook app running on Mesos][10]
+![Kubernetes Guestbook app running on Mesos][9]
 
 [1]: http://mesosphere.com/docs/tutorials/run-hadoop-on-mesos-using-installer
 [2]: http://mesosphere.com/docs/tutorials/run-spark-on-mesos
 [3]: http://mesosphere.com/docs/tutorials/run-chronos-on-mesos
 [4]: http://cloud.google.com
-[5]: https://google.mesosphere.com
-[6]: http://mesosphere.com/docs/getting-started/cloud/google/mesosphere/#vpn-setup
-[7]: https://github.com/mesosphere/kubernetes-mesos/tree/v0.4.0/examples/guestbook
-[8]: https://github.com/GoogleCloudPlatform/kubernetes/blob/v0.11.0/docs/services.md#ips-and-vips
-[9]: mesos/k8s-firewall.png
-[10]: mesos/k8s-guestbook.png
-[11]: http://mesos.apache.org/
-[12]: https://google.mesosphere.com/clusters
+[5]: https://cloud.google.com/compute/
+[6]: https://github.com/mesosphere/kubernetes-mesos/tree/v0.4.0/examples/guestbook
+[7]: https://github.com/GoogleCloudPlatform/kubernetes/blob/v0.11.0/docs/services.md#ips-and-vips
+[8]: mesos/k8s-firewall.png
+[9]: mesos/k8s-guestbook.png
+[10]: http://mesos.apache.org/
+
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/mesos.md?pixel)]()
