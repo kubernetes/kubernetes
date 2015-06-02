@@ -58,6 +58,14 @@ var (
 		},
 		[]string{"operation_type"},
 	)
+	DockerErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: kubeletSubsystem,
+			Name:      "docker_errors",
+			Help:      "Cumulative number of Docker errors by operation type.",
+		},
+		[]string{"operation_type"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -70,6 +78,7 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(DockerOperationsLatency)
 		prometheus.MustRegister(SyncPodsLatency)
 		prometheus.MustRegister(ContainersPerPodCount)
+		prometheus.MustRegister(DockerErrors)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
 	})
 }
