@@ -691,8 +691,8 @@ func (lb *LoadBalancer) EnsureTCPLoadBalancerDeleted(name, region string) error 
 
 	if poolExists {
 		for _, monId := range pool.MonitorIDs {
-			// TODO(#8352): Delete the monitor, don't just disassociate it.
 			pools.DisassociateMonitor(lb.network, pool.ID, monId)
+			monitors.Delete(monId)
 		}
 		pools.Delete(lb.network, pool.ID)
 	}
