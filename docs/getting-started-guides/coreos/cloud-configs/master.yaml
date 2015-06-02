@@ -108,7 +108,7 @@ coreos:
         [Service]
         EnvironmentFile=/etc/network-environment
         ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-apiserver -z /opt/bin/kube-apiserver https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-apiserver
+        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-apiserver -z /opt/bin/kube-apiserver https://storage.googleapis.com/kubernetes-release/release/v0.18.0/bin/linux/amd64/kube-apiserver
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
         ExecStart=/opt/bin/kube-apiserver \
         --allow_privileged=true \
@@ -132,7 +132,7 @@ coreos:
         After=kube-apiserver.service
 
         [Service]
-        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-controller-manager -z /opt/bin/kube-controller-manager https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-controller-manager
+        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-controller-manager -z /opt/bin/kube-controller-manager https://storage.googleapis.com/kubernetes-release/release/v0.18.0/bin/linux/amd64/kube-controller-manager
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-controller-manager
         ExecStart=/opt/bin/kube-controller-manager \
         --master=127.0.0.1:8080 \
@@ -149,7 +149,7 @@ coreos:
         After=kube-apiserver.service
 
         [Service]
-        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-scheduler -z /opt/bin/kube-scheduler https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-scheduler
+        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-scheduler -z /opt/bin/kube-scheduler https://storage.googleapis.com/kubernetes-release/release/v0.18.0/bin/linux/amd64/kube-scheduler
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-scheduler
         ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080
         Restart=always
