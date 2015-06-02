@@ -52,12 +52,13 @@ func (nodes ClientNodeInfo) GetNodeInfo(nodeID string) (*api.Node, error) {
 
 func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 	if volume.GCEPersistentDisk != nil {
-		pdName := volume.GCEPersistentDisk.PDName
+		disk := volume.GCEPersistentDisk
 
 		manifest := &(pod.Spec)
 		for ix := range manifest.Volumes {
 			if manifest.Volumes[ix].GCEPersistentDisk != nil &&
-				manifest.Volumes[ix].GCEPersistentDisk.PDName == pdName {
+				manifest.Volumes[ix].GCEPersistentDisk.PDName == disk.PDName &&
+				!(manifest.Volumes[ix].GCEPersistentDisk.ReadOnly && disk.ReadOnly) {
 				return true
 			}
 		}
