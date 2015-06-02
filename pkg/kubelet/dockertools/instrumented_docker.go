@@ -34,130 +34,119 @@ func NewInstrumentedDockerInterface(dockerClient DockerInterface) DockerInterfac
 	}
 }
 
+// Record the duration of the operation.
+func recordOperation(operation string, start time.Time) {
+	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
+}
+
 func (in instrumentedDockerInterface) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("list_containers").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "list_containers"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.ListContainers(options)
 }
 
 func (in instrumentedDockerInterface) InspectContainer(id string) (*docker.Container, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("inspect_container").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "inspect_container"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.InspectContainer(id)
 }
 
 func (in instrumentedDockerInterface) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("create_container").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "create_container"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.CreateContainer(opts)
 }
 
 func (in instrumentedDockerInterface) StartContainer(id string, hostConfig *docker.HostConfig) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("start_container").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "start_container"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.StartContainer(id, hostConfig)
 }
 
 func (in instrumentedDockerInterface) StopContainer(id string, timeout uint) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("stop_container").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "stop_container"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.StopContainer(id, timeout)
 }
 
 func (in instrumentedDockerInterface) RemoveContainer(opts docker.RemoveContainerOptions) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("remove_container").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "remove_container"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.RemoveContainer(opts)
 }
 
 func (in instrumentedDockerInterface) InspectImage(image string) (*docker.Image, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("inspect_image").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "inspect_image"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.InspectImage(image)
 }
 
 func (in instrumentedDockerInterface) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("list_images").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "list_images"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.ListImages(opts)
 }
 
 func (in instrumentedDockerInterface) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("pull_image").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "pull_image"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.PullImage(opts, auth)
 }
 
 func (in instrumentedDockerInterface) RemoveImage(image string) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("remove_image").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "remove_image"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.RemoveImage(image)
 }
 
 func (in instrumentedDockerInterface) Logs(opts docker.LogsOptions) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("logs").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "logs"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.Logs(opts)
 }
 
 func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("version").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "version"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.Version()
 }
 
 func (in instrumentedDockerInterface) Info() (*docker.Env, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("info").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "info"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.Info()
 }
 
 func (in instrumentedDockerInterface) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("create_exec").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "create_exec"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.CreateExec(opts)
 }
 
 func (in instrumentedDockerInterface) StartExec(startExec string, opts docker.StartExecOptions) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("start_exec").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "start_exec"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.StartExec(startExec, opts)
 }
 
 func (in instrumentedDockerInterface) InspectExec(id string) (*docker.ExecInspect, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("inspect_exec").Observe(metrics.SinceInMicroseconds(start))
-	}()
+	const operation = "inspect_exec"
+	defer recordOperation(operation, time.Now())
+
 	return in.client.InspectExec(id)
 }
