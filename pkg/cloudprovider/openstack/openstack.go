@@ -463,6 +463,11 @@ func getVipByName(client *gophercloud.ServiceClient, name string) (*vips.Virtual
 		return true, nil
 	})
 	if err != nil {
+		if e, ok := err.(*gophercloud.UnexpectedResponseCodeError); ok {
+			if e.Actual == http.StatusNotFound {
+				return nil, ErrNotFound
+			}
+		}
 		return nil, err
 	}
 
