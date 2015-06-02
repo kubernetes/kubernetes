@@ -1,6 +1,6 @@
 ## Kubernetes Namespaces
 
-Kubernetes Namespaces help different projects, teams, or customers to share a Kubernetes cluster.
+Kubernetes _[namespaces](../../docs/namespaces.md)_ help different projects, teams, or customers to share a Kubernetes cluster.
 
 It does this by providing the following:
 
@@ -15,8 +15,8 @@ This example demonstrates how to use Kubernetes namespaces to subdivide your clu
 
 This example assumes the following:
 
-1. You have an existing Kubernetes cluster.
-2. You have a basic understanding of Kubernetes pods, services, and replication controllers.
+1. You have an [existing Kubernetes cluster](../../docs/getting-started-guides).
+2. You have a basic understanding of Kubernetes _[pods](../../docs/pods.md)_, _[services](../../docs/services.md)_, and _[replication controllers](../../docs/replication-controller.md)_.
 
 ### Step One: Understand the default namespace
 
