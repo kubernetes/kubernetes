@@ -32,8 +32,11 @@ import (
 	"k8s.io/kubernetes/pkg/registry/secret"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
+
+const NumServiceAccountRemoveReferenceRetries = 10
 
 // TokensControllerOptions contains options for the TokensController
 type TokensControllerOptions struct {
@@ -239,8 +242,16 @@ func (e *TokensController) secretDeleted(obj interface{}) {
 		return
 	}
 
-	if _, err := e.removeSecretReferenceIfNeeded(serviceAccount, secret.Name); err != nil {
-		glog.Error(err)
+	for i := 1; i <= NumServiceAccountRemoveReferenceRetries; i++ {
+		if _, err := e.removeSecretReferenceIfNeeded(serviceAccount, secret.Name); err != nil {
+			if apierrors.IsConflict(err) && i < NumServiceAccountRemoveReferenceRetries {
+				time.Sleep(wait.Jitter(100*time.Millisecond, 0.0))
+				continue
+			}
+			glog.Error(err)
+			break
+		}
+		break
 	}
 }
 
@@ -274,6 +285,21 @@ func (e *TokensController) createSecretIfNeeded(serviceAccount *api.ServiceAccou
 
 // createSecret creates a secret of type ServiceAccountToken for the given ServiceAccount
 func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) error {
+	// We don't want to update the cache's copy of the service account
+	// so add the secret to a freshly retrieved copy of the service account
+	serviceAccounts := e.client.ServiceAccounts(serviceAccount.Namespace)
+	liveServiceAccount, err := serviceAccounts.Get(serviceAccount.Name)
+	if err != nil {
+		return err
+	}
+	if liveServiceAccount.ResourceVersion != serviceAccount.ResourceVersion {
+		// our view of the service account is not up to date
+		// we'll get notified of an update event later and get to try again
+		// this only prevent interactions between successive runs of this controller's event handlers, but that is useful
+		glog.V(2).Infof("View of ServiceAccount %s/%s is not up to date, skipping token creation", serviceAccount.Namespace, serviceAccount.Name)
+		return nil
+	}
+
 	// Build the secret
 	secret := &api.Secret{
 		ObjectMeta: api.ObjectMeta{
@@ -303,16 +329,9 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 		return err
 	}
 
-	// We don't want to update the cache's copy of the service account
-	// so add the secret to a freshly retrieved copy of the service account
-	serviceAccounts := e.client.ServiceAccounts(serviceAccount.Namespace)
-	serviceAccount, err = serviceAccounts.Get(serviceAccount.Name)
-	if err != nil {
-		return err
-	}
-	serviceAccount.Secrets = append(serviceAccount.Secrets, api.ObjectReference{Name: secret.Name})
+	liveServiceAccount.Secrets = append(liveServiceAccount.Secrets, api.ObjectReference{Name: secret.Name})
 
-	_, err = serviceAccounts.Update(serviceAccount)
+	_, err = serviceAccounts.Update(liveServiceAccount)
 	if err != nil {
 		// we weren't able to use the token, try to clean it up.
 		glog.V(2).Infof("Deleting secret %s/%s because reference couldn't be added (%v)", secret.Namespace, secret.Name, err)
