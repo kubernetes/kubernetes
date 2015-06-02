@@ -209,8 +209,9 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		for _, ref := range filtered {
 			name := kubecontainer.GetPodFullName(ref)
 			if existing, found := pods[name]; found {
-				if checkAndUpdatePod(existing, ref) {
+				if !reflect.DeepEqual(existing.Spec, ref.Spec) {
 					// this is an update
+					existing.Spec = ref.Spec
 					updates.Pods = append(updates.Pods, existing)
 					continue
 				}
@@ -251,8 +252,9 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			name := kubecontainer.GetPodFullName(ref)
 			if existing, found := oldPods[name]; found {
 				pods[name] = existing
-				if checkAndUpdatePod(existing, ref) {
+				if !reflect.DeepEqual(existing.Spec, ref.Spec) {
 					// this is an update
+					existing.Spec = ref.Spec
 					updates.Pods = append(updates.Pods, existing)
 					continue
 				}
@@ -321,23 +323,6 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 		filtered = append(filtered, pod)
 	}
 	return
-}
-
-// checkAndUpdatePod updates existing if ref makes a meaningful change and returns true, or
-// returns false if there was no update.
-func checkAndUpdatePod(existing, ref *api.Pod) bool {
-	// TODO: it would be better to update the whole object and only preserve certain things
-	//       like the source annotation or the UID (to ensure safety)
-	if reflect.DeepEqual(existing.Spec, ref.Spec) &&
-		reflect.DeepEqual(existing.DeletionTimestamp, ref.DeletionTimestamp) &&
-		reflect.DeepEqual(existing.DeletionGracePeriodSeconds, ref.DeletionGracePeriodSeconds) {
-		return false
-	}
-	// this is an update
-	existing.Spec = ref.Spec
-	existing.DeletionTimestamp = ref.DeletionTimestamp
-	existing.DeletionGracePeriodSeconds = ref.DeletionGracePeriodSeconds
-	return true
 }
 
 // Sync sends a copy of the current state through the update channel.

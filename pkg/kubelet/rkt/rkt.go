@@ -671,11 +671,11 @@ func (r *runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 }
 
 // KillPod invokes 'systemctl kill' to kill the unit that runs the pod.
-func (r *runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod) error {
-	glog.V(4).Infof("Rkt is killing pod: name %q.", runningPod.Name)
+func (r *runtime) KillPod(pod kubecontainer.Pod) error {
+	glog.V(4).Infof("Rkt is killing pod: name %q.", pod.Name)
 
 	// TODO(yifan): More graceful stop. Replace with StopUnit and wait for a timeout.
-	r.systemd.KillUnit(makePodServiceFileName(runningPod.ID), int32(syscall.SIGKILL))
+	r.systemd.KillUnit(makePodServiceFileName(pod.ID), int32(syscall.SIGKILL))
 	return r.systemd.Reload()
 }
 
@@ -880,7 +880,7 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 
 	if restartPod {
 		// TODO(yifan): Handle network plugin.
-		if err := r.KillPod(pod, runningPod); err != nil {
+		if err := r.KillPod(runningPod); err != nil {
 			return err
 		}
 		if err := r.RunPod(pod); err != nil {

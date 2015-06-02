@@ -133,10 +133,6 @@ type ObjectMeta struct {
 	// will send a hard termination signal to the container.
 	DeletionTimestamp *util.Time `json:"deletionTimestamp,omitempty"`
 
-	// DeletionGracePeriodSeconds records the graceful deletion value set when graceful deletion
-	// was requested. Represents the most recent grace period, and may only be shortened once set.
-	DeletionGracePeriodSeconds *int64 `json:"deletionGracePeriodSeconds,omitempty"`
-
 	// Labels are key value pairs that may be used to scope and select individual resources.
 	// Label keys are of the form:
 	//     label-key ::= prefixed-name | name
