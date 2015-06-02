@@ -115,6 +115,9 @@ type DockerManager struct {
 
 	// Hooks injected into the container runtime.
 	runtimeHooks kubecontainer.RuntimeHooks
+
+	// Handler used to execute commands in containers.
+	execHandler ExecHandler
 }
 
 func NewDockerManager(
@@ -130,7 +133,8 @@ func NewDockerManager(
 	networkPlugin network.NetworkPlugin,
 	generator kubecontainer.RunContainerOptionsGenerator,
 	httpClient kubeletTypes.HttpGetter,
-	runtimeHooks kubecontainer.RuntimeHooks) *DockerManager {
+	runtimeHooks kubecontainer.RuntimeHooks,
+	execHandler ExecHandler) *DockerManager {
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
 	dockerRoot := "/var/lib/docker"
@@ -162,6 +166,7 @@ func NewDockerManager(
 	}
 
 	reasonCache := stringCache{cache: lru.New(maxReasonCacheEntries)}
+
 	dm := &DockerManager{
 		client:              client,
 		recorder:            recorder,
@@ -177,6 +182,7 @@ func NewDockerManager(
 		prober:                 nil,
 		generator:              generator,
 		runtimeHooks:           runtimeHooks,
+		execHandler:            execHandler,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	dm.prober = prober.New(dm, readinessManager, containerRefManager, recorder)
@@ -985,78 +991,24 @@ func (d *dockerExitError) ExitStatus() int {
 	return d.Inspect.ExitCode
 }
 
-// ExecInContainer uses nsenter to run the command inside the container identified by containerID.
+// ExecInContainer runs the command inside the container identified by containerID.
 //
 // TODO:
-//  - match cgroups of container
-//  - should we support `docker exec`?
-//  - should we support nsenter in a container, running with elevated privs and --pid=host?
 //  - use strong type for containerId
 func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
-	nsenter, err := exec.LookPath("nsenter")
-	if err != nil {
-		return fmt.Errorf("exec unavailable - unable to locate nsenter")
+	if dm.execHandler == nil {
+		return errors.New("unable to exec without an exec handler")
 	}
 
 	container, err := dm.client.InspectContainer(containerId)
 	if err != nil {
 		return err
 	}
-
 	if !container.State.Running {
 		return fmt.Errorf("container not running (%s)", container)
 	}
 
-	containerPid := container.State.Pid
-
-	// TODO what if the container doesn't have `env`???
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-m", "-i", "-u", "-n", "-p", "--", "env", "-i"}
-	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
-	args = append(args, container.Config.Env...)
-	args = append(args, cmd...)
-	command := exec.Command(nsenter, args...)
-	if tty {
-		p, err := kubecontainer.StartPty(command)
-		if err != nil {
-			return err
-		}
-		defer p.Close()
-
-		// make sure to close the stdout stream
-		defer stdout.Close()
-
-		if stdin != nil {
-			go io.Copy(p, stdin)
-		}
-
-		if stdout != nil {
-			go io.Copy(stdout, p)
-		}
-
-		return command.Wait()
-	} else {
-		if stdin != nil {
-			// Use an os.Pipe here as it returns true *os.File objects.
-			// This way, if you run 'kubectl exec <pod> -i bash' (no tty) and type 'exit',
-			// the call below to command.Run() can unblock because its Stdin is the read half
-			// of the pipe.
-			r, w, err := os.Pipe()
-			if err != nil {
-				return err
-			}
-			go io.Copy(w, stdin)
-
-			command.Stdin = r
-		}
-		if stdout != nil {
-			command.Stdout = stdout
-		}
-		if stderr != nil {
-			command.Stderr = stderr
-		}
-
-		return command.Run()
-	}
+	return dm.execHandler.ExecInContainer(dm.client, container, cmd, stdin, stdout, stderr, tty)
 }
 
 // PortForward executes socat in the pod's network namespace and copies
