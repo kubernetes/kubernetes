@@ -160,7 +160,6 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
 							ImagePullPolicy:        "Always",
-							//SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()
 						}},
 					},
 				}),
