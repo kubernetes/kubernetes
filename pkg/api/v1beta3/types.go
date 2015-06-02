@@ -870,7 +870,7 @@ type PodSpec struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"selector which must match a node's labels for the pod to be scheduled on that node"`
 
 	// ServiceAccount is the name of the ServiceAccount to use to run this pod
-	ServiceAccount string `json:"serviceAccount" description:"name of the ServiceAccount to use to run this pod"`
+	ServiceAccount string `json:"serviceAccount,omitempty" description:"name of the ServiceAccount to use to run this pod"`
 
 	// Host is a request to schedule this pod onto a specific host.  If it is non-empty,
 	// the the scheduler simply schedules this pod onto that host, assuming that it fits
