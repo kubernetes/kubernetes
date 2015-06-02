@@ -59,8 +59,8 @@ $kube_provider_boxes = {
   },
   :virtualbox => {
     'fedora' => {
-      :box_name => 'kube-fedora20',
-      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-20_chef-provisionerless.box'
+      :box_name => 'kube-fedora21',
+      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-21_chef-provisionerless.box'
     }
   },
   :libvirt => {
@@ -211,7 +211,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       c.vm.provision "shell", run: "always", path: script
     end
     c.vm.network "private_network", ip: "#{$master_ip}"
-    c.vm.hostname = ENV['MASTER_NAME']
   end
 
   # Kubernetes minion
@@ -229,7 +228,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         minion.vm.provision "shell", run: "always", path: script
       end
       minion.vm.network "private_network", ip: "#{minion_ip}"
-      minion.vm.hostname = minion_hostname
     end
   end
 end
