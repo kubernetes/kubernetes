@@ -1,23 +1,3 @@
-hazelcast-kubernetes
-====================
-
-Hazelcast clustering for Kubernetes made easy.
-
-Lean (186MB) JRE 8u45 + Hazelcast 3.4.2 + Kubernetes discovery Docker image, based on `progrium/busybox`.
-
-## Pre-requisites
-
-* Docker 1.5+
-* Kubernetes 0.18.0 or newer cluster
-
-## Kubernetes cluster
-
-You can test with a local cluster. Check [this other repository from yours truly](https://github.com/pires/kubernetes-vagrant-coreos-cluster).
-
-## Docker image
-
-The image is already available at [quay.io/pires](https://quay.io/repository/pires/hazelcast-kubernetes)
-
 ## Cloud Native Deployments of Hazelcast using Kubernetes
 
 The following document describes the development of a _cloud native_ [Hazelcast](http://hazelcast.org/) deployment on Kubernetes.  When we say _cloud native_ we mean an application which understands that it is running within a cluster manager, and uses this cluster management infrastructure to help implement the application. In particular, in this instance, a custom Hazelcast ```bootstrapper``` is used to enable Hazelcast to dynamically discover Hazelcast nodes that have already joined the cluster.
