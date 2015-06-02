@@ -1,18 +1,30 @@
 ---
+- name: Assures /srv/kubernetes/ dir exists
+  file: path=/srv/kubernetes/ state=directory
+
+- name: Create system kube-cert groups
+  group: name=kube-cert state=present system=yes
+
 - name: write the config file for the api server
   template: src=apiserver.j2 dest=/etc/kubernetes/apiserver
   notify:
-          - restart apiserver
+    - restart apiserver
 
 - name: write the config file for the controller-manager
   copy: src=controller-manager dest=/etc/kubernetes/controller-manager
   notify:
-          - restart controller-manager
+    - restart controller-manager
 
 - name: write the config file for the scheduler
   copy: src=scheduler dest=/etc/kubernetes/scheduler
   notify:
-          - restart scheduler
+    - restart scheduler
+
+- name: Run create cert ca script
+  script: make-cert.sh creates=/srv/kubernetes/server.cert 
+
+- name: change /srv/kubernetes user owner to 'kube' user
+  file: path=/srv/kubernetes owner=kube state=directory recurse=yes
 
 - name: Enable apiserver
   service: name=kube-apiserver enabled=yes state=started

@@ -1,0 +1,47 @@
+---
+- name: DNS | Assures /etc/kubernetes/addons/dns dir exists
+  file: path=/etc/kubernetes/addons/dns state=directory
+  tags: dns
+
+- name: DNS | Create sky-dns Replication Controller file
+  template: src=skydns-rc.yaml.j2 dest=/etc/kubernetes/addons/dns/skydns-rc.yaml
+  tags: dns
+
+- name: DNS | Create sky dns service file
+  template: src=skydns-svc.yaml.j2 dest=/etc/kubernetes/addons/dns/skydns-svc.yaml
+  tags: dns
+
+- name: DNS | Check if the DNS pod exists
+  shell: kubectl get rc kube-dns
+  register: has_dns_pod
+  failed_when: false
+  changed_when: false
+  tags: dns
+
+- name: DNS | Create SkyDNS pod
+  shell: kubectl create -f /etc/kubernetes/addons/dns/skydns-rc.yaml
+  when: dns_setup and has_dns_pod.rc != 0
+  tags: dns
+
+- name: DNS | Update DNS replication service
+  shell: kubectl update -f /etc/kubernetes/addons/dns/skydns-rc.yaml
+  when: dns_setup and has_dns_pod.rc == 0
+  tags: dns
+
+- name: DNS | Check that the DNS service exists
+  shell: kubectl get service kube-dns
+  register: has_dns_service
+  failed_when: false
+  changed_when: false
+  tags: dns
+
+- name: DNS | Create SkyDNS service
+  shell: kubectl create -f /etc/kubernetes/addons/dns/skydns-svc.yaml
+  when: dns_setup and has_dns_service.rc != 0
+  tags: dns
+
+- name: DNS | Update SkyDNS service
+  shell: kubectl update -f /etc/kubernetes/addons/dns/skydns-svc.yaml
+  when: dns_setup and has_dns_service.rc == 0
+  tags: dns
+

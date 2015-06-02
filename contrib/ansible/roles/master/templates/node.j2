@@ -2,7 +2,11 @@
     "apiVersion": "v1beta3",
     "kind": "Node",
     "metadata": {
-        "name": "{{ item }}"
+        "name": "{{ item }}",
+        "labels": {
+            "k8s-app": "kube-dns",
+            "kubernetes.io/cluster-service": "true"
+        }
     },
     "spec": {
         "externalID": "{{ item }}"
@@ -10,7 +14,7 @@
     "status": {
         "capacity": {
             "cpu": "1",
-            "memory": "1"
+            "memory": "5"
         }
     }
 }

@@ -1,0 +1,6 @@
+---
+- hosts: masters
+  sudo: yes
+  roles:
+          - kubernetes-addons
+

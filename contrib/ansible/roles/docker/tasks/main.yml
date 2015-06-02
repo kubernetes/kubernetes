@@ -1,0 +1,30 @@
+---
+- name: Create systemd conf drop
+  file: dest=/usr/lib/systemd/system/docker.service.d state=directory
+  tags: docker
+
+- name: Install http_proxy into docker drop-in
+  copy: dest=/usr/lib/systemd/system/docker.service.d/51-http-proxy.conf content="[Service]\nEnvironment="HTTP_PROXY={{ http_proxy }}""
+  when: http_proxy is defined
+  notify: 
+    - restart docker
+
+- name: Install https_proxy into docker drop-in
+  copy: dest=/usr/lib/systemd/system/docker.service.d/52-https-proxy.conf content="[Service]\nEnvironment="HTTPS_PROXY={{ https_proxy }}""
+  when: https_proxy is defined
+  notify: 
+    - restart docker
+
+- name: Install no-proxy into docker drop-in
+  copy: dest=/usr/lib/systemd/system/docker.service.d/49-no-proxy.conf content="[Service]\nEnvironment="NO_PROXY={{ no_proxy }}""
+  notify: 
+    - restart docker
+
+- name: Add insecure registry to docker config
+  lineinfile: dest=/etc/sysconfig/docker regexp="^INSECURE_REGISTRY=" line=INSECURE_REGISTRY='{% for reg in insecure_registrys %}--insecure-registry="{{ reg }}" {% endfor %}'
+  when: insecure_registrys is defined and insecure_registrys > 0
+  notify:
+    - restart docker
+
+- name: Enable Docker
+  service: name=docker enabled=yes state=started

@@ -1,0 +1,20 @@
+---
+- name: Assures /etc/kubernetes/addons/ dir exists
+  file: path=/etc/kubernetes/addons/ state=directory
+  tags: addons
+
+- include: dns.yml
+  when: dns_setup
+  tags: addons
+
+- name: Install kube-addons service 
+  template: src=kube-addons.service dest=/usr/lib/systemd/system/kube-addons.service
+  tags: addons
+
+- name: Install kube-addons.sh script for  the service. 
+  template: src=kube-addons.sh dest=/etc/kubernetes/kube-addons.sh mode=0755
+  tags: addons
+
+- name: Enable and start kube addons
+  service: name=kube-addons.service enabled=yes state=started
+  tags: addons

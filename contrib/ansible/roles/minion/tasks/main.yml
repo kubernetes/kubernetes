@@ -2,12 +2,12 @@
 - name: write the config files for kubelet
   template: src=kubelet.j2 dest=/etc/kubernetes/kubelet
   notify:
-          - restart kubelet
+    - restart kubelet
 
 - name: write the config files for proxy
   copy: src=proxy dest=/etc/kubernetes/proxy
   notify:
-          - restart proxy
+    - restart proxy
 
 - name: Enable kubelet
   service: name=kubelet enabled=yes state=started

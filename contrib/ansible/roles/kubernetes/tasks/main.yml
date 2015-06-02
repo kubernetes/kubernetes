@@ -3,12 +3,12 @@
   when: ansible_distribution == "Fedora"
 
 - name: Install kubernetes
-  yum: pkg=kubernetes state=latest
+  yum: pkg=kubernetes state=latest enablerepo=virt7-testing
   notify:
-        - restart daemons
+    - restart daemons
   when: not is_atomic
 
 - name: write the global config file
   template: src=config.j2 dest=/etc/kubernetes/config
   notify:
-          - restart daemons
+    - restart daemons
