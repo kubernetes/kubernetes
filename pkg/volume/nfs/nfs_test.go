@@ -69,20 +69,16 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 	return false
 }
 
-func TestPlugin(t *testing.T) {
+func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/nfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &api.Volume{
-		Name:         "vol1",
-		VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{"localhost", "/tmp", false}},
-	}
 	fake := &mount.FakeMounter{}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.(*nfsPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), pod, fake)
+	builder, err := plug.(*nfsPlugin).newBuilderInternal(spec, pod, fake)
 	volumePath := builder.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
@@ -140,4 +136,27 @@ func TestPlugin(t *testing.T) {
 	}
 
 	fake.ResetLog()
+}
+
+func TestPluginVolume(t *testing.T) {
+	vol := &api.Volume{
+		Name:         "vol1",
+		VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{"localhost", "/tmp", false}},
+	}
+	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+}
+
+func TestPluginPersistentVolume(t *testing.T) {
+	vol := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "vol1",
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				NFS: &api.NFSVolumeSource{"localhost", "/tmp", false},
+			},
+		},
+	}
+
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol))
 }

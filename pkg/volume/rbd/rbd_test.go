@@ -65,7 +65,7 @@ func (fake *fakeDiskManager) DetachDisk(disk rbd, mntPath string) error {
 	return nil
 }
 
-func TestPlugin(t *testing.T) {
+func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
@@ -73,17 +73,7 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &api.Volume{
-		Name: "vol1",
-		VolumeSource: api.VolumeSource{
-			RBD: &api.RBDVolumeSource{
-				CephMonitors: []string{"a", "b"},
-				RBDImage:     "bar",
-				FSType:       "ext4",
-			},
-		},
-	}
-	builder, err := plug.(*RBDPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{}, "secrets")
+	builder, err := plug.(*RBDPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{}, "secrets")
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -130,4 +120,36 @@ func TestPlugin(t *testing.T) {
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
+}
+
+func TestPluginVolume(t *testing.T) {
+	vol := &api.Volume{
+		Name: "vol1",
+		VolumeSource: api.VolumeSource{
+			RBD: &api.RBDVolumeSource{
+				CephMonitors: []string{"a", "b"},
+				RBDImage:     "bar",
+				FSType:       "ext4",
+			},
+		},
+	}
+	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+}
+func TestPluginPersistentVolume(t *testing.T) {
+	vol := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "vol1",
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				RBD: &api.RBDVolumeSource{
+					CephMonitors: []string{"a", "b"},
+					RBDImage:     "bar",
+					FSType:       "ext4",
+				},
+			},
+		},
+	}
+
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol))
 }
