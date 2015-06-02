@@ -552,7 +552,13 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	kubelet.sourcesReady = func() bool { return ready }
 
 	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{ID: "12345678", Name: "foo", Namespace: "new", Containers: []*kubecontainer.Container{{Name: "bar"}}},
+		{
+			ID:   "12345678",
+			Name: "foo", Namespace: "new",
+			Containers: []*kubecontainer.Container{
+				{Name: "bar"},
+			},
+		},
 	}
 	if err := kubelet.SyncPods([]*api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now()); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -733,7 +739,17 @@ func TestGetContainerInfo(t *testing.T) {
 	mockCadvisor := testKubelet.fakeCadvisor
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
 	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{ID: "12345678", Name: "qux", Namespace: "ns", Containers: []*kubecontainer.Container{{Name: "foo", ID: types.UID(containerID)}}},
+		{
+			ID:        "12345678",
+			Name:      "qux",
+			Namespace: "ns",
+			Containers: []*kubecontainer.Container{
+				{
+					Name: "foo",
+					ID:   types.UID(containerID),
+				},
+			},
+		},
 	}
 	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", cadvisorReq)
 	if err != nil {
@@ -806,7 +822,16 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, cadvisorApiFailure)
 	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{ID: "uuid", Name: "qux", Namespace: "ns", Containers: []*kubecontainer.Container{{Name: "foo", ID: types.UID(containerID)}}},
+		{
+			ID:        "uuid",
+			Name:      "qux",
+			Namespace: "ns",
+			Containers: []*kubecontainer.Container{
+				{Name: "foo",
+					ID: types.UID(containerID),
+				},
+			},
+		},
 	}
 	stats, err := kubelet.GetContainerInfo("qux_ns", "uuid", "foo", cadvisorReq)
 	if stats != nil {
@@ -881,7 +906,15 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{ID: "12345678", Name: "qux", Namespace: "ns", Containers: []*kubecontainer.Container{{Name: "bar", ID: types.UID("fakeID")}}},
+		{
+			ID:        "12345678",
+			Name:      "qux",
+			Namespace: "ns",
+			Containers: []*kubecontainer.Container{
+				{Name: "bar",
+					ID: types.UID("fakeID"),
+				},
+			}},
 	}
 
 	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
@@ -967,7 +1000,16 @@ func TestRunInContainer(t *testing.T) {
 
 	containerID := "abc1234"
 	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{ID: "12345678", Name: "podFoo", Namespace: "nsFoo", Containers: []*kubecontainer.Container{{Name: "containerFoo", ID: types.UID(containerID)}}},
+		{
+			ID:        "12345678",
+			Name:      "podFoo",
+			Namespace: "nsFoo",
+			Containers: []*kubecontainer.Container{
+				{Name: "containerFoo",
+					ID: types.UID(containerID),
+				},
+			},
+		},
 	}
 	cmd := []string{"ls"}
 	_, err := kubelet.RunInContainer("podFoo_nsFoo", "", "containerFoo", cmd)
@@ -1942,7 +1984,15 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 	podNamespace := "nsFoo"
 	containerID := "containerFoo"
 	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{ID: "12345678", Name: podName, Namespace: podNamespace, Containers: []*kubecontainer.Container{{Name: "bar", ID: "barID"}}},
+		{
+			ID:        "12345678",
+			Name:      podName,
+			Namespace: podNamespace,
+			Containers: []*kubecontainer.Container{
+				{Name: "bar",
+					ID: "barID"},
+			},
+		},
 	}
 
 	err := kubelet.ExecInContainer(
@@ -1997,8 +2047,16 @@ func TestExecInContainer(t *testing.T) {
 	stderr := &fakeReadWriteCloser{}
 	tty := true
 	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{ID: "12345678", Name: podName, Namespace: podNamespace, Containers: []*kubecontainer.Container{
-			{Name: containerID, ID: types.UID(containerID)}}},
+		{
+			ID:        "12345678",
+			Name:      podName,
+			Namespace: podNamespace,
+			Containers: []*kubecontainer.Container{
+				{Name: containerID,
+					ID: types.UID(containerID),
+				},
+			},
+		},
 	}
 
 	err := kubelet.ExecInContainer(
@@ -2076,7 +2134,15 @@ func TestPortForwardNoSuchContainer(t *testing.T) {
 	var port uint16 = 5000
 
 	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{ID: "12345678", Name: podName, Namespace: podNamespace, Containers: []*kubecontainer.Container{{Name: "bar", ID: "barID"}}},
+		{
+			ID:        "12345678",
+			Name:      podName,
+			Namespace: podNamespace,
+			Containers: []*kubecontainer.Container{
+				{Name: "bar",
+					ID: "barID"},
+			},
+		},
 	}
 
 	err := kubelet.PortForward(
@@ -2898,8 +2964,17 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 	kubelet := testKubelet.kubelet
 
 	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{ID: "1234", Name: "qux", Namespace: "ns", Containers: []*kubecontainer.Container{
-			{Name: "foo", ID: types.UID(containerID)}}},
+		{
+			ID:        "1234",
+			Name:      "qux",
+			Namespace: "ns",
+			Containers: []*kubecontainer.Container{
+				{
+					Name: "foo",
+					ID:   types.UID(containerID),
+				},
+			},
+		},
 	}
 
 	kubelet.podManager.SetPods(pods)
@@ -3265,7 +3340,14 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	}
 
 	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{ID: "12345678", Name: "bar", Namespace: "new", Containers: []*kubecontainer.Container{{Name: "foo"}}},
+		{
+			ID:        "12345678",
+			Name:      "bar",
+			Namespace: "new",
+			Containers: []*kubecontainer.Container{
+				{Name: "foo"},
+			},
+		},
 	}
 
 	// Let the pod worker sets the status to fail after this sync.
@@ -3313,7 +3395,14 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	}
 
 	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{ID: "12345678", Name: "bar", Namespace: "new", Containers: []*kubecontainer.Container{{Name: "foo"}}},
+		{
+			ID:        "12345678",
+			Name:      "bar",
+			Namespace: "new",
+			Containers: []*kubecontainer.Container{
+				{Name: "foo"},
+			},
+		},
 	}
 
 	kubelet.podManager.SetPods(pods)
