@@ -54,32 +54,38 @@ var _ = Describe("Reboot", func() {
 
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
 		// clean shutdown and restart
-		testReboot(c, "sudo reboot")
+		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is rebooted.
+		testReboot(c, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &")
 	})
 
 	It("each node by ordering unclean reboot and ensure they function upon restart", func() {
 		// unclean shutdown and restart
-		testReboot(c, "echo b | sudo tee /proc/sysrq-trigger")
+		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is shutdown.
+		testReboot(c, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
 	})
 
 	It("each node by triggering kernel panic and ensure they function upon restart", func() {
 		// kernel panic
-		testReboot(c, "echo c | sudo tee /proc/sysrq-trigger")
+		// We sleep 10 seconds to give some time for ssh command to cleanly finish before kernel panic is triggered.
+		testReboot(c, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
 	})
 
 	It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
-		testReboot(c, "sudo ifdown eth0 && sleep 120 && sudo ifup eth0")
+		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
+		testReboot(c, "nohup sh -c 'sleep 10 && sudo ifdown eth0 && sleep 120 && sudo ifup eth0' >/dev/null 2>&1 &")
 	})
 
-	It("each node by dropping all inbound packages for a while and ensure they function afterwards", func() {
+	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all inbound packets for a while
-		testReboot(c, "sudo iptables -A INPUT -j DROP && sleep 120 && sudo iptables -D INPUT -j DROP")
+		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
+		testReboot(c, "nohup sh -c 'sleep 10 && sudo iptables -A INPUT -j DROP && sleep 120 && sudo iptables -D INPUT -j DROP' >/dev/null 2>&1 &")
 	})
 
-	It("each node by dropping all outbound packages for a while and ensure they function afterwards", func() {
+	It("each node by dropping all outbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all outbound packets for a while
-		testReboot(c, "sudo iptables -A OUTPUT -j DROP && sleep 120 && sudo iptables -D OUTPUT -j DROP")
+		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
+		testReboot(c, "nohup sh -c 'sleep 10 && sudo iptables -A OUTPUT -j DROP && sleep 120 && sudo iptables -D OUTPUT -j DROP' >/dev/null 2>&1 &")
 	})
 })
 
@@ -184,8 +190,9 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 
 	// Reboot the node.
 	if err = issueSSHCommand(node, provider, rebootCmd); err != nil {
-		// Just log the error as reboot may cause unclean termination of ssh session, which is expected.
 		Logf("Error while issuing ssh command: %v", err)
+		result <- false
+		return
 	}
 
 	// Wait for some kind of "not ready" status.
