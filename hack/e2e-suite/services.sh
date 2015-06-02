@@ -64,19 +64,6 @@ function do_teardown() {
   ${KUBECTL} delete namespace "${NAMESPACE}"
 }
 
-function make_namespace() {
-  echo "Making namespace '${NAMESPACE}'"
-  ${KUBECTL} create -f - << __EOF__
-{
-    "kind": "Namespace",
-    "apiVersion": "v1beta3",
-    "metadata": {
-        "name": "${NAMESPACE}"
-    }
-}
-__EOF__
-}
-
 # Args:
 #   $1: service name
 #   $2: service port
@@ -304,9 +291,6 @@ trap do_teardown EXIT
 detect-minions
 test_node="${MINION_NAMES[0]}"
 master="${MASTER_NAME}"
-
-# Make our namespace
-make_namespace
 
 # Launch some pods and services.
 svc1_name="service1"
