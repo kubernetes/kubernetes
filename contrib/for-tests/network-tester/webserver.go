@@ -40,9 +40,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -50,11 +48,10 @@ import (
 )
 
 var (
-	port          = flag.Int("port", 8080, "Port number to serve at.")
-	peerCount     = flag.Int("peers", 8, "Must find at least this many peers for the test to pass.")
-	service       = flag.String("service", "nettest", "Service to find other network test pods in.")
-	namespace     = flag.String("namespace", "default", "Namespace of this pod. TODO: kubernetes should make this discoverable.")
-	delayShutdown = flag.Int("delay-shutdown", 0, "Number of seconds to delay shutdown when receiving SIGTERM.")
+	port      = flag.Int("port", 8080, "Port number to serve at.")
+	peerCount = flag.Int("peers", 8, "Must find at least this many peers for the test to pass.")
+	service   = flag.String("service", "nettest", "Service to find other network test pods in.")
+	namespace = flag.String("namespace", "default", "Namespace of this pod. TODO: kubernetes should make this discoverable.")
 )
 
 // State tracks the internal state of our little http server.
@@ -180,17 +177,6 @@ func main() {
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Fatalf("Error getting hostname: %v", err)
-	}
-
-	if *delayShutdown > 0 {
-		termCh := make(chan os.Signal)
-		signal.Notify(termCh, syscall.SIGTERM)
-		go func() {
-			<-termCh
-			log.Printf("Sleeping %d seconds before exit ...", *delayShutdown)
-			time.Sleep(time.Duration(*delayShutdown) * time.Second)
-			os.Exit(0)
-		}()
 	}
 
 	state := State{

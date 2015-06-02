@@ -37,7 +37,6 @@ var testTTL uint64 = 60
 
 func NewTestEventEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, generic.Registry) {
 	f := tools.NewFakeEtcdClient(t)
-	f.HideExpires = true
 	f.TestIndex = true
 
 	h := tools.NewEtcdHelper(f, testapi.Codec(), etcdtest.PathPrefix())

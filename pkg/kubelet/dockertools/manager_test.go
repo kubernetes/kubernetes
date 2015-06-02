@@ -417,7 +417,7 @@ func TestKillContainerInPod(t *testing.T) {
 		manager.readinessManager.SetReadiness(c.ID, true)
 	}
 
-	if err := manager.KillContainerInPod("", &pod.Spec.Containers[0], pod); err != nil {
+	if err := manager.KillContainerInPod(pod.Spec.Containers[0], pod); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Assert the container has been stopped.
@@ -490,14 +490,14 @@ func TestKillContainerInPodWithPreStop(t *testing.T) {
 		manager.readinessManager.SetReadiness(c.ID, true)
 	}
 
-	if err := manager.KillContainerInPod("", &pod.Spec.Containers[0], pod); err != nil {
+	if err := manager.KillContainerInPod(pod.Spec.Containers[0], pod); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Assert the container has been stopped.
 	if err := fakeDocker.AssertStopped([]string{containerToKill.ID}); err != nil {
 		t.Errorf("container was not stopped correctly: %v", err)
 	}
-	verifyCalls(t, fakeDocker, []string{"list", "create_exec", "start_exec", "stop"})
+	verifyCalls(t, fakeDocker, []string{"list", "inspect_container", "create_exec", "start_exec", "stop"})
 	if !reflect.DeepEqual(expectedCmd, fakeDocker.execCmd) {
 		t.Errorf("expected: %v, got %v", expectedCmd, fakeDocker.execCmd)
 	}
@@ -534,7 +534,7 @@ func TestKillContainerInPodWithError(t *testing.T) {
 		manager.readinessManager.SetReadiness(c.ID, true)
 	}
 
-	if err := manager.KillContainerInPod("", &pod.Spec.Containers[0], pod); err == nil {
+	if err := manager.KillContainerInPod(pod.Spec.Containers[0], pod); err == nil {
 		t.Errorf("expected error, found nil")
 	}
 
@@ -1030,7 +1030,7 @@ func TestSyncPodDeletesWithNoPodInfraContainer(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		// Kill the container since pod infra container is not running.
-		"stop",
+		"inspect_container", "stop",
 		// Create pod infra container.
 		"create", "start", "inspect_container",
 		// Create container.
@@ -1105,7 +1105,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 		// Check the pod infra container.
 		"inspect_container",
 		// Kill the duplicated container.
-		"stop",
+		"inspect_container", "stop",
 	})
 	// Expect one of the duplicates to be killed.
 	if len(fakeDocker.Stopped) != 1 || (fakeDocker.Stopped[0] != "1234" && fakeDocker.Stopped[0] != "4567") {
@@ -1159,7 +1159,7 @@ func TestSyncPodBadHash(t *testing.T) {
 		// Check the pod infra container.
 		"inspect_container",
 		// Kill and restart the bad hash container.
-		"stop", "create", "start",
+		"inspect_container", "stop", "create", "start",
 	})
 
 	if err := fakeDocker.AssertStopped([]string{"1234"}); err != nil {
@@ -1217,7 +1217,7 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 		// Check the pod infra container.
 		"inspect_container",
 		// Kill the unhealthy container.
-		"stop",
+		"inspect_container", "stop",
 		// Restart the unhealthy container.
 		"create", "start",
 	})
@@ -1426,7 +1426,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 				// Check the pod infra container.
 				"inspect_container",
 				// Stop the last pod infra container.
-				"stop",
+				"inspect_container", "stop",
 			},
 			[]string{},
 			[]string{"9876"},

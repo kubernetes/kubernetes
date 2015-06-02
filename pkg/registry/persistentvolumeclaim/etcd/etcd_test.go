@@ -325,7 +325,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	pvcStart := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, pvcStart), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, pvcStart), 1)
 
 	pvc := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{

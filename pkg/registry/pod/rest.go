@@ -81,26 +81,9 @@ func (podStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fiel
 	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
 }
 
-// CheckGracefulDelete allows a pod to be gracefully deleted. It updates the DeleteOptions to
-// reflect the desired grace value.
+// CheckGracefulDelete allows a pod to be gracefully deleted.
 func (podStrategy) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool {
-	if options == nil {
-		return false
-	}
-	period := int64(0)
-	// user has specified a value
-	if options.GracePeriodSeconds != nil {
-		period = *options.GracePeriodSeconds
-	} else {
-		// use the default value if set, or deletes the pod immediately (0)
-		pod := obj.(*api.Pod)
-		if pod.Spec.TerminationGracePeriodSeconds != nil {
-			period = *pod.Spec.TerminationGracePeriodSeconds
-		}
-	}
-	// ensure the options and the pod are in sync
-	options.GracePeriodSeconds = &period
-	return true
+	return false
 }
 
 type podStatusStrategy struct {
@@ -113,7 +96,6 @@ func (podStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Spec = oldPod.Spec
-	newPod.DeletionTimestamp = nil
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {

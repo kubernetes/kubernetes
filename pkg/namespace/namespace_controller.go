@@ -17,7 +17,6 @@ limitations under the License.
 package namespace
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -120,7 +119,7 @@ func deleteAllContent(kubeClient client.Interface, namespace string) (err error)
 	if err != nil {
 		return err
 	}
-	estimate, err := deletePods(kubeClient, namespace)
+	err = deletePods(kubeClient, namespace)
 	if err != nil {
 		return err
 	}
@@ -143,10 +142,6 @@ func deleteAllContent(kubeClient client.Interface, namespace string) (err error)
 	err = deleteEvents(kubeClient, namespace)
 	if err != nil {
 		return err
-	}
-
-	if estimate > 0 {
-		return fmt.Errorf("some resources are being gracefully deleted, estimate %d seconds", estimate)
 	}
 	return nil
 }
@@ -268,25 +263,18 @@ func deleteReplicationControllers(kubeClient client.Interface, ns string) error 
 	return nil
 }
 
-func deletePods(kubeClient client.Interface, ns string) (int64, error) {
+func deletePods(kubeClient client.Interface, ns string) error {
 	items, err := kubeClient.Pods(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
-		return 0, err
+		return err
 	}
-	estimate := int64(0)
 	for i := range items.Items {
-		if items.Items[i].Spec.TerminationGracePeriodSeconds != nil {
-			grace := *items.Items[i].Spec.TerminationGracePeriodSeconds
-			if grace > estimate {
-				estimate = grace
-			}
-		}
 		err := kubeClient.Pods(ns).Delete(items.Items[i].Name, nil)
 		if err != nil {
-			return 0, err
+			return err
 		}
 	}
-	return estimate, nil
+	return nil
 }
 
 func deleteEvents(kubeClient client.Interface, ns string) error {

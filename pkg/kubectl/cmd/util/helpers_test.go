@@ -29,7 +29,6 @@ import (
 )
 
 func TestMerge(t *testing.T) {
-	grace := int64(30)
 	tests := []struct {
 		obj       runtime.Object
 		fragment  string
@@ -50,9 +49,8 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},
@@ -119,9 +117,8 @@ func TestMerge(t *testing.T) {
 							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
 						},
 					},
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},

@@ -155,7 +155,6 @@ func TestRoundTripTypes(t *testing.T) {
 }
 
 func TestEncode_Ptr(t *testing.T) {
-	grace := int64(30)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Labels: map[string]string{"name": "foo"},
@@ -163,8 +162,6 @@ func TestEncode_Ptr(t *testing.T) {
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
-
-			TerminationGracePeriodSeconds: &grace,
 		},
 	}
 	obj := runtime.Object(pod)

@@ -204,12 +204,6 @@ func (rm *ReplicationManager) getPodControllers(pod *api.Pod) *api.ReplicationCo
 // When a pod is created, enqueue the controller that manages it and update it's expectations.
 func (rm *ReplicationManager) addPod(obj interface{}) {
 	pod := obj.(*api.Pod)
-	if pod.DeletionTimestamp != nil {
-		// on a restart of the controller manager, it's possible a new pod shows up in a state that
-		// is already pending deletion. Prevent the pod from being a creation observation.
-		rm.deletePod(pod)
-		return
-	}
 	if rc := rm.getPodControllers(pod); rc != nil {
 		rm.expectations.CreationObserved(rc)
 		rm.enqueueController(rc)
@@ -226,15 +220,6 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 	}
 	// TODO: Write a unittest for this case
 	curPod := cur.(*api.Pod)
-	if curPod.DeletionTimestamp != nil {
-		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
-		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
-		// for modification of the deletion timestamp and expect an rc to create more replicas asap, not wait
-		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
-		// an rc never initiates a phase change, and so is never asleep waiting for the same.
-		rm.deletePod(curPod)
-		return
-	}
 	if rc := rm.getPodControllers(curPod); rc != nil {
 		rm.enqueueController(rc)
 	}
