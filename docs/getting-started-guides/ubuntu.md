@@ -11,7 +11,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ma
 
 *3 These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it should also work on most Ubuntu versions*
 
-*4 Dependences of this guide: etcd-2.0.9, flannel-0.4.0, k8s-0.15.0, but it may work with higher versions*
+*4 Dependences of this guide: etcd-2.0.9, flannel-0.4.0, k8s-0.18.0, but it may work with higher versions*
 
 *5 All the remote servers can be ssh logged in without a password by using key authentication* 
 
@@ -24,7 +24,7 @@ then `$ cd kubernetes/cluster/ubuntu`.
 
 Then run `$ ./build.sh`, this will download all the needed binaries into `./binaries`.
 
-You can customize your etcd version, flannel version, k8s version by changing variable `ETCD_VERSION` , `FLANNEL_VERSION` and `K8S_VERSION` in build.sh, default etcd version is 2.0.9, flannel version is 0.4.0 and K8s version is 0.15.0.
+You can customize your etcd version, flannel version, k8s version by changing variable `ETCD_VERSION` , `FLANNEL_VERSION` and `K8S_VERSION` in build.sh, default etcd version is 2.0.9, flannel version is 0.4.0 and K8s version is 0.18.0.
 
 Please make sure that there are `kube-apiserver`, `kube-controller-manager`, `kube-scheduler`, `kubelet`, `kube-proxy`, `etcd`, `etcdctl` and `flannel` in the binaries/master or binaries/minion directory.
 
@@ -94,16 +94,18 @@ If all things goes right, you will see the below message from console
 
 You can also use `kubectl` command to see if the newly created k8s is working correctly. The `kubectl` binary is under the `cluster/ubuntu/binaries` directory. You can move it into your PATH. Then you can use the below command smoothly. 
 
-For example, use `$ kubectl get minions` to see if you get all your minion nodes comming up and ready. It may take some times for the minions be ready to use like below. 
+For example, use `$ kubectl get nodes` to see if all your minion nodes are in ready status. It may take some time for the minions ready to use like below. 
 
 ```
-NAME                 LABELS             STATUS
 
-10.10.103.162       <none>              Ready
+NAME            LABELS                                 STATUS
 
-10.10.103.223       <none>              Ready
+10.10.103.162   kubernetes.io/hostname=10.10.103.162   Ready
 
-10.10.103.250       <none>              Ready
+10.10.103.223   kubernetes.io/hostname=10.10.103.223   Ready
+
+10.10.103.250   kubernetes.io/hostname=10.10.103.250   Ready
+
 
 ```
 
