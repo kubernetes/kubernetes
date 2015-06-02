@@ -556,21 +556,14 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 		ttl := uint64(0)
 		if node != nil {
 			index = node.ModifiedIndex
-			if node.TTL != 0 {
+			if node.TTL > 0 {
 				ttl = uint64(node.TTL)
-			}
-			if node.Expiration != nil && ttl == 0 {
-				ttl = 1
 			}
 		} else if res != nil {
 			index = res.EtcdIndex
 		}
 
 		if newTTL != nil {
-			if ttl != 0 && *newTTL == 0 {
-				// TODO: remove this after we have verified this is no longer an issue
-				glog.V(4).Infof("GuaranteedUpdate is clearing TTL for %q, may not be intentional", key)
-			}
 			ttl = *newTTL
 		}
 

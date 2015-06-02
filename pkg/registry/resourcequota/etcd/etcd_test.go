@@ -477,7 +477,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	key, _ := registry.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
 	resourcequotaStart := validNewResourceQuota()
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, resourcequotaStart), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, resourcequotaStart), 1)
 
 	resourcequotaIn := &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{

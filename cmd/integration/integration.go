@@ -878,12 +878,10 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 
 	// Delete a pod to free up room.
 	glog.Infof("Deleting pod %v", bar.Name)
-	err = client.Pods(api.NamespaceDefault).Delete(bar.Name, api.NewDeleteOptions(1))
+	err = client.Pods(api.NamespaceDefault).Delete(bar.Name, nil)
 	if err != nil {
 		glog.Fatalf("FAILED: couldn't delete pod %q: %v", bar.Name, err)
 	}
-
-	time.Sleep(2 * time.Second)
 
 	pod.ObjectMeta.Name = "phantom.baz"
 	baz, err := client.Pods(api.NamespaceDefault).Create(pod)
@@ -891,11 +889,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
 	if err := wait.Poll(time.Second, time.Second*60, podRunning(client, baz.Namespace, baz.Name)); err != nil {
-		if pod, perr := client.Pods(api.NamespaceDefault).Get("phantom.bar"); perr == nil {
-			glog.Fatalf("FAILED: 'phantom.bar' was never deleted: %#v", pod)
-		} else {
-			glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
-		}
+		glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
 	}
 
 	glog.Info("Scheduler doesn't make phantom pods: test passed.")

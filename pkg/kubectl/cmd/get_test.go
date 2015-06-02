@@ -38,7 +38,6 @@ import (
 )
 
 func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
-	grace := int64(30)
 	pods := &api.PodList{
 		ListMeta: api.ListMeta{
 			ResourceVersion: "15",
@@ -47,17 +46,15 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
 				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			{
 				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
 				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},
@@ -506,7 +503,6 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	}
 }
 func watchTestData() ([]api.Pod, []watch.Event) {
-	grace := int64(30)
 	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -515,9 +511,8 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 				ResourceVersion: "10",
 			},
 			Spec: api.PodSpec{
-				RestartPolicy:                 api.RestartPolicyAlways,
-				DNSPolicy:                     api.DNSClusterFirst,
-				TerminationGracePeriodSeconds: &grace,
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
 	}
@@ -531,9 +526,8 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					ResourceVersion: "11",
 				},
 				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},
@@ -546,9 +540,8 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					ResourceVersion: "12",
 				},
 				Spec: api.PodSpec{
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},
