@@ -28,6 +28,7 @@ import (
 	mathrand "math/rand"
 	"net"
 	"os"
+	"time"
 
 	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
@@ -185,43 +186,6 @@ func MakePrivateKeySigner(key string) (ssh.Signer, error) {
 	return signer, nil
 }
 
-/*
-if len(r.tunnels) == 0 {
-		list, err := listNodes()
-		if err != nil {
-			glog.Errorf("unexpected error making tunnels: %v", err)
-			return
-		}
-		tunnels, err := MakeNodeSSHTunnels(list)
-		if err != nil {
-			status := errToAPIStatus(err)
-			writeJSON(status.Code, r.codec, status, w)
-			httpCode = status.Code
-			return
-		}
-		r.tunnels = tunnels
-	}
-	// TODO: round robin here
-	tunnel := r.tunnels[0]
-	if err != nil {
-		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w)
-		httpCode = status.Code
-		return
-	}
-	defer func() {
-		if err := tunnel.Close(); err != nil {
-			glog.Errorf("Error closing ssh tunnel: %v", err)
-		}
-	}()
-	if err := tunnel.Open(); err != nil {
-		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w)
-		httpCode = status.Code
-		return
-	}
-*/
-
 type SSHTunnelEntry struct {
 	Address string
 	Tunnel  *SSHTunnel
@@ -251,13 +215,16 @@ func (l SSHTunnelList) Open() error {
 	return nil
 }
 
-func (l SSHTunnelList) Close() error {
+func (l SSHTunnelList) Close() {
 	for ix := range l {
-		if err := l[ix].Tunnel.Close(); err != nil {
-			return err
-		}
+		entry := l[ix]
+		go func() {
+			time.Sleep(1 * time.Minute)
+			if err := entry.Tunnel.Close(); err != nil {
+				glog.Errorf("Failed to close tunnel %v: %v", entry, err)
+			}
+		}()
 	}
-	return nil
 }
 
 func (l SSHTunnelList) Dial(network, addr string) (net.Conn, error) {

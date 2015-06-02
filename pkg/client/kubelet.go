@@ -51,14 +51,7 @@ type HTTPKubeletClient struct {
 }
 
 func MakeTransport(config *KubeletConfig) (http.RoundTripper, error) {
-	var transport http.RoundTripper
-	if config.Dial == nil {
-		transport = http.DefaultTransport
-	} else {
-		transport = &http.Transport{
-			Dial: config.Dial,
-		}
-	}
+
 	cfg := &Config{TLSClientConfig: config.TLSClientConfig}
 	if config.EnableHttps {
 		hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
@@ -70,10 +63,15 @@ func MakeTransport(config *KubeletConfig) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
-	if tlsConfig != nil {
+
+	var transport http.RoundTripper
+	if config.Dial != nil || tlsConfig != nil {
 		transport = &http.Transport{
+			Dial:            config.Dial,
 			TLSClientConfig: tlsConfig,
 		}
+	} else {
+		transport = http.DefaultTransport
 	}
 	return transport, nil
 }

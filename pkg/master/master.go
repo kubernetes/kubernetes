@@ -767,7 +767,7 @@ func (m *Master) Dial(net, addr string) (net.Conn, error) {
 	return m.tunnels.Dial(net, addr)
 }
 
-func (m *Master) detectTunnelChanges(addrs []string) bool {
+func (m *Master) needToReplaceTunnels(addrs []string) bool {
 	if len(m.tunnels) != len(addrs) {
 		return true
 	}
@@ -779,27 +779,25 @@ func (m *Master) detectTunnelChanges(addrs []string) bool {
 	return false
 }
 
-func (m *Master) loadTunnels(user, keyfile string) error {
+func (m *Master) getNodeAddresses() ([]string, error) {
 	nodes, err := m.nodeRegistry.ListMinions(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	if err != nil {
-		return err
+		return nil, err
 	}
-	result := []string{}
+	addrs := []string{}
 	for ix := range nodes.Items {
 		node := &nodes.Items[ix]
 		addr, err := findExternalAddress(node)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		result = append(result, addr)
+		addrs = append(addrs, addr)
 	}
-	changesExist := m.detectTunnelChanges(result)
-	if !changesExist {
-		return nil
-	}
+	return addrs, nil
+}
 
-	// TODO: This is going to drop connections in the middle.  See comment about using Watch above.
-	tunnels, err := util.MakeSSHTunnels(user, keyfile, result)
+func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {
+	tunnels, err := util.MakeSSHTunnels(user, keyfile, newAddrs)
 	if err != nil {
 		return err
 	}
@@ -811,26 +809,52 @@ func (m *Master) loadTunnels(user, keyfile string) error {
 	return nil
 }
 
-func (m *Master) setupSecureProxy(user, keyfile string) {
-	loadTunnelsPrintError := func() {
-		if err := m.loadTunnels(user, keyfile); err != nil {
-			glog.Errorf("Failed to load SSH Tunnels: %v", err)
-		}
+func (m *Master) loadTunnels(user, keyfile string) error {
+	addrs, err := m.getNodeAddresses()
+	if err != nil {
+		return err
 	}
+	if !m.needToReplaceTunnels(addrs) {
+		return nil
+	}
+	// TODO: This is going to unnecessarily close connections to unchanged nodes.
+	// See comment about using Watch above.
+	return m.replaceTunnels(user, keyfile, addrs)
+}
 
+func (m *Master) refreshTunnels(user, keyfile string) error {
+	addrs, err := m.getNodeAddresses()
+	if err != nil {
+		return err
+	}
+	return m.replaceTunnels(user, keyfile, addrs)
+}
+
+func (m *Master) setupSecureProxy(user, keyfile string) {
 	// Sync loop for tunnels
 	// TODO: switch this to watch.
 	go func() {
 		for {
-			loadTunnelsPrintError()
-
+			if err := m.loadTunnels(user, keyfile); err != nil {
+				glog.Errorf("Failed to load SSH Tunnels: %v", err)
+			}
 			var sleep time.Duration
 			if len(m.tunnels) == 0 {
 				sleep = time.Second
 			} else {
-				sleep = time.Second * 120
+				sleep = time.Minute
 			}
 			time.Sleep(sleep)
+		}
+	}()
+	// Refresh loop for tunnels
+	// TODO: could make this more controller-ish
+	go func() {
+		for {
+			if err := m.refreshTunnels(user, keyfile); err != nil {
+				glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
+			}
+			time.Sleep(5 * time.Minute)
 		}
 	}()
 }
