@@ -5,6 +5,8 @@ metadata:
   namespace: default 
   labels: 
     k8s-app: influxGrafana
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "influxGrafana"
 spec: 
   ports: 
     - name: http
