@@ -69,7 +69,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("target-port", "", "Name or number for the port on the container that the service should direct traffic to. Optional.")
 	cmd.Flags().String("public-ip", "", "Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
-	cmd.Flags().String("name", "", "The name for the newly created service.")
+	cmd.Flags().String("name", "", "The name for the newly created object.")
 	return cmd
 }
 
@@ -117,7 +117,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 	generator, found := f.Generator(generatorName)
 	if !found {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generator))
+		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
 	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
