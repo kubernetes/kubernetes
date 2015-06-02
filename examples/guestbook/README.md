@@ -68,7 +68,7 @@ Now, create the redis pod in your Kubernetes cluster by running:
 ```shell
 $ kubectl create -f examples/guestbook/redis-master-controller.json
 
-$ cluster/kubectl.sh get rc
+$ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                 SELECTOR                     REPLICAS
 redis-master                           master                  redis                                    name=redis-master            1
 ```
@@ -96,7 +96,7 @@ CONTAINER ID        IMAGE                                  COMMAND              
 0ffef9649265        redis:latest                           "redis-server /etc/r   About a minute ago   Up About a minute                            k8s_redis-master.767aef46_redis-master-controller-gb50a.default.api_4530d7b3-ae5d-11e4-bf77-42010af0d719_579ee964
 ```
 
-(Note that initial `docker pull` may take a few minutes, depending on network conditions.  You can monitor the status of this by running `journalctl -f -u docker` to check when the image is being downloaded.  Of course, you can also run `journalctl -f -u kubelet` to see what state the kubelet is in as well during this time.
+(Note that initial `docker pull` may take a few minutes, depending on network conditions. The pods will be reported as pending while the image is being downloaded.) 
 
 ### Step Two: Fire up the master service
 A Kubernetes 'service' is a named load balancer that proxies traffic to *one or more* containers. This is done using the *labels* metadata which we defined in the redis-master pod above.  As mentioned, in redis there is only one master, but we nevertheless still want to create a service for it.  Why?  Because it gives us a deterministic way to route to the single master using an elastic IP.
@@ -207,12 +207,6 @@ $ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                 SELECTOR                     REPLICAS
 redis-master                           master                  redis                                    name=redis-master            1
 redis-slave                            slave                   kubernetes/redis-slave:v2                name=redis-slave             2
-```
-
-The redis slave is started with the following command:
-
-```shell
-redis-server --slaveof redis-master 6379
 ```
 
 Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
@@ -411,7 +405,6 @@ The service is described in the file `examples/guestbook/frontend-service.json`:
           "protocol":"TCP"
         }
       ],
-      "publicIPs":["10.11.22.33"],
       "selector":{
          "name":"frontend"
       }
@@ -419,6 +412,8 @@ The service is described in the file `examples/guestbook/frontend-service.json`:
 }
 ```
 
+When `createExternalLoadBalancer` is specified `"createExternalLoadBalancer":true`, it takes some time for an external IP to show up in `kubectl get services` output.
+There should eventually be an internal (10.x.x.x) and an external address assigned to the frontend service.
 If running a single node local setup, or single VM, you don't need `createExternalLoadBalancer`, nor do you need `publicIPs`.
 Read the *Accessing the guestbook site externally* section below for details and set 10.11.22.33 accordingly (for now, you can
 delete these parameters or run this - either way it won't hurt anything to have both parameters the way they are).
@@ -444,12 +439,12 @@ NAME                  REGION      IP_ADDRESS     IP_PROTOCOL TARGET
 frontend              us-central1 130.211.188.51 TCP         us-central1/targetPools/frontend
 ```
 
-You can grab the external IP of the load balancer associated with that rule and visit `http://130.211.188.51:8000`.
+You can grab the external IP of the load balancer associated with that rule and visit `http://130.211.188.51:80`.
 
-In GCE, you also may need to open the firewall for port 8000 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+In GCE, you also may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
 ```shell
-$ gcloud compute firewall-rules create --allow=tcp:8000 --target-tags=kubernetes-minion kubernetes-minion-8000
+$ gcloud compute firewall-rules create --allow=tcp:80 --target-tags=kubernetes-minion kubernetes-minion-80
 ```
 
 For GCE details about limiting traffic to specific sources, see the [GCE firewall documentation][gce-firewall-docs].
@@ -460,21 +455,15 @@ For GCE details about limiting traffic to specific sources, see the [GCE firewal
 ### Accessing the guestbook site externally
 
 The pods that we have set up are reachable through the frontend service, but you'll notice that 10.0.93.211 (the IP of the frontend service) is unavailable from outside of kubernetes.
-Of course, if you are running kubernetes minions locally, this isn't such a big problem - the port binding will allow you to reach the guestbook website at localhost:8000... but the beloved **localhost** solution obviously doesn't work in any real world scenario.
+Of course, if you are running kubernetes minions locally, this isn't such a big problem - the port binding will allow you to reach the guestbook website at localhost:80... but the beloved **localhost** solution obviously doesn't work in any real world scenario.
 
 Unless you have access to the `createExternalLoadBalancer` feature (cloud provider specific), you will want to set up a **publicIP on a node**, so that the service can be accessed from outside of the internal kubernetes network. This is quite easy.  You simply look at your list of kubelet IP addresses, and update the service file to include a `publicIPs` string, which is mapped to an IP address of any number of your existing kubelets.  This will allow all your kubelets to act as external entry points to the service (translation: this will allow you to browse the guestbook site at your kubelet IP address from your browser).
 
 If you are more advanced in the ops arena, note you can manually get the service IP from looking at the output of `kubectl get pods,services`, and modify your firewall using standard tools and services (firewalld, iptables, selinux) which you are already familar with.
 
-And of course, finally, if you are running Kubernetes locally, you can just visit http://localhost:8000.
+And of course, finally, if you are running Kubernetes locally, you can just visit http://localhost:80.
 
 ### Step Seven: Cleanup
-
-To turn down a Kubernetes cluster, if you ran this from source, you can use
-
-```shell
-$ cluster/kube-down.sh
-```
 
 If you are in a live kubernetes cluster, you can just kill the pods, using a script such as this (obviously, read through it and make sure you understand it before running it blindly, as it will kill several pods automatically for you).
 
@@ -486,6 +475,12 @@ kubectl stop -f examples/guestbook/frontend-controller.json
 kubectl delete -f examples/guestbook/redis-master-service.json
 kubectl delete -f examples/guestbook/redis-slave-service.json
 kubectl delete -f examples/guestbook/frontend-service.json
+```
+
+To completely tear down a Kubernetes cluster, if you ran this from source, you can use
+
+```shell
+$ cluster/kube-down.sh
 ```
 
 ### Troubleshooting
