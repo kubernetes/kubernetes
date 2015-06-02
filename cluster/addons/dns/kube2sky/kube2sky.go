@@ -34,7 +34,6 @@ import (
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	kcache "github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	kclientcmd "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	kclientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	kframework "github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	kSelector "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	tools "github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -50,7 +49,7 @@ var (
 	argEtcdMutationTimeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
 	argEtcdServer          = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
 	argKubecfgFile         = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes service")
-	argKubeMasterUrl       = flag.String("kube_master_url", "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}", "Url to reach kubernetes master. Env variables in this flag will be expanded.")
+	argKubeMasterURL       = flag.String("kube_master_url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 )
 
 const (
@@ -335,37 +334,46 @@ func newEtcdClient(etcdServer string) (*etcd.Client, error) {
 	return client, nil
 }
 
-func getKubeMasterUrl() (string, error) {
-	if *argKubeMasterUrl == "" {
-		return "", fmt.Errorf("no --kube_master_url specified")
-	}
-	parsedUrl, err := url.Parse(os.ExpandEnv(*argKubeMasterUrl))
+func getKubeMasterURL() (string, error) {
+	parsedURL, err := url.Parse(os.ExpandEnv(*argKubeMasterURL))
 	if err != nil {
-		return "", fmt.Errorf("failed to parse --kube_master_url %s - %v", *argKubeMasterUrl, err)
+		return "", fmt.Errorf("failed to parse --kube_master_url %s - %v", *argKubeMasterURL, err)
 	}
-	if parsedUrl.Scheme == "" || parsedUrl.Host == "" || parsedUrl.Host == ":" {
-		return "", fmt.Errorf("invalid --kube_master_url specified %s", *argKubeMasterUrl)
+	if parsedURL.Scheme == "" || parsedURL.Host == "" || parsedURL.Host == ":" {
+		return "", fmt.Errorf("invalid --kube_master_url specified %s", *argKubeMasterURL)
 	}
-	return parsedUrl.String(), nil
+	return parsedURL.String(), nil
 }
 
 // TODO: evaluate using pkg/client/clientcmd
 func newKubeClient() (*kclient.Client, error) {
-	var config *kclient.Config
-	masterUrl, err := getKubeMasterUrl()
-	if err != nil {
-		return nil, err
+	var (
+		config    *kclient.Config
+		err       error
+		masterURL string
+	)
+	if *argKubeMasterURL != "" {
+		masterURL, err = getKubeMasterURL()
+		if err != nil {
+			return nil, err
+		}
 	}
 	if *argKubecfgFile == "" {
+		if masterURL == "" {
+			return nil, fmt.Errorf("--kube_master_url must be set when --kubecfg_file is not set")
+		}
 		config = &kclient.Config{
-			Host:    masterUrl,
+			Host:    masterURL,
 			Version: "v1beta3",
 		}
 	} else {
-		var err error
+		overrides := &kclientcmd.ConfigOverrides{}
+		if masterURL != "" {
+			overrides.ClusterInfo.Server = masterURL
+		}
 		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 			&kclientcmd.ClientConfigLoadingRules{ExplicitPath: *argKubecfgFile},
-			&kclientcmd.ConfigOverrides{ClusterInfo: kclientcmdapi.Cluster{Server: masterUrl, InsecureSkipTLSVerify: true}}).ClientConfig(); err != nil {
+			overrides).ClientConfig(); err != nil {
 			return nil, err
 		}
 	}
