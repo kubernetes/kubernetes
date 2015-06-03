@@ -97,7 +97,7 @@ var _ = Describe("Load capacity", func() {
 	}
 
 	for _, testArg := range loadTests {
-		name := fmt.Sprintf("[Performance suite] [Skipped] should be able to handle %v pods per node", testArg.podsPerNode)
+		name := fmt.Sprintf("[Skipped] should be able to handle %v pods per node", testArg.podsPerNode)
 
 		It(name, func() {
 			totalPods := testArg.podsPerNode * nodeCount
