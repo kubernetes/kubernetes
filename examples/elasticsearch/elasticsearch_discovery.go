@@ -25,7 +25,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/golang/glog"
 )
@@ -68,7 +67,7 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failed to parse selector %q: %v", *selector, err)
 	}
-	pods, err := c.Pods(*namespace).List(l, fields.Everything())
+	pods, err := c.Pods(*namespace).List(l)
 	if err != nil {
 		glog.Fatalf("Failed to list pods: %v", err)
 	}
