@@ -326,7 +326,7 @@ function find-vagrant-name-by-minion-name {
     echo "master"
     return $?
   fi
-  local ip_pattern="${INSTANCE_PREFIX}-minion-(.*)"
+  local ip_pattern="${INSTANCE_PREFIX}-node-(.*)"
 
   [[ $ip =~ $ip_pattern ]] || {
     return 1

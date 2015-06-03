@@ -318,7 +318,7 @@ function kube-up {
         echo "cd /var/cache/kubernetes-install"
         echo "readonly MASTER_NAME='${MASTER_NAME}'"
         echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
-        echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
+        echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-node'"
         echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
         echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
         echo "readonly MASTER_HTPASSWD='${htpasswd}'"

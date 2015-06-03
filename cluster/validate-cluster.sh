@@ -33,7 +33,7 @@ while true; do
   # The "kubectl get nodes" output is three columns like this:
   #
   #     NAME                     LABELS    STATUS
-  #     kubernetes-minion-03nb   <none>    Ready
+  #     kubernetes-node-03nb   <none>    Ready
   #
   # Echo the output, strip the first line, then gather 2 counts:
   #  - Total number of nodes.

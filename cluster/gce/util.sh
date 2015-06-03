@@ -29,7 +29,7 @@ else
   exit 1
 fi
 
-NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
+NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-node"
 
 ALLOCATE_NODE_CIDRS=true
 
@@ -817,9 +817,9 @@ function kube-down {
   # Delete routes.
   local -a routes
   # Clean up all routes w/ names like "<cluster-name>-minion-<4-char-node-identifier>"
-  # e.g. "kubernetes-minion-2pl1"
+  # e.g. "kubernetes-node-2pl1"
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
-    --regexp "${INSTANCE_PREFIX}-minion-.{4}" | awk 'NR >= 2 { print $1 }') )
+    --regexp "${INSTANCE_PREFIX}-node-.{4}" | awk 'NR >= 2 { print $1 }') )
   while (( "${#routes[@]}" > 0 )); do
     echo Deleting routes "${routes[*]::10}"
     gcloud compute routes delete \
