@@ -300,7 +300,7 @@ trap do_teardown EXIT
 
 # Get node IP addresses and pick one as our test point.
 detect-minions
-test_node="${MINION_NAMES[0]}"
+test_node="${NODE_NAMES[0]}"
 master="${MASTER_NAME}"
 
 # Launch some pods and services.

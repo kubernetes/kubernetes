@@ -26,7 +26,7 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-pool
-  cbr-cidr: $MINION_IP_RANGE
+  cbr-cidr: $NODE_IP_RANGE
   cloud: aws
 EOF
 

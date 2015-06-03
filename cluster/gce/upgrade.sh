@@ -117,7 +117,7 @@ function get-env-val() {
 
 # Assumed vars:
 #   KUBE_VERSION
-#   MINION_SCOPES
+#   NODE_SCOPES
 #   NODE_INSTANCE_PREFIX
 #   PROJECT
 #   ZONE
@@ -129,8 +129,8 @@ function upgrade-nodes() {
 
   # TODO(mbforbes): Refactor setting scope flags.
   local -a scope_flags=()
-  if (( "${#MINION_SCOPES[@]}" > 0 )); then
-    scope_flags=("--scopes" "$(join_csv ${MINION_SCOPES[@]})")
+  if (( "${#NODE_SCOPES[@]}" > 0 )); then
+    scope_flags=("--scopes" "$(join_csv ${NODE_SCOPES[@]})")
   else
     scope_flags=("--no-scopes")
   fi

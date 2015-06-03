@@ -18,9 +18,9 @@
 # A library of helper functions for Ubuntu.
 
 function detect-minion-image() {
-  if [[ -z "${KUBE_MINION_IMAGE=-}" ]]; then
+  if [[ -z "${KUBE_NODE_IMAGE=-}" ]]; then
     detect-image
-    KUBE_MINION_IMAGE=$AWS_IMAGE
+    KUBE_NODE_IMAGE=$AWS_IMAGE
   fi
 }
 
@@ -29,7 +29,7 @@ function generate-minion-user-data {
   # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
   echo "#! /bin/bash"
   echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
-  echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
+  echo "NODE_IP_RANGE='${NODE_IP_RANGES[$i]}'"
   echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
   grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
   grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"

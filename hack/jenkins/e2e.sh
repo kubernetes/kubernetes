@@ -46,7 +46,7 @@ if [[ "${PERFORMANCE:-}" == "true" ]]; then
     else
       export MASTER_SIZE="n1-standard-4"
     fi
-    export NUM_MINIONS="100"
+    export NUM_NODES="100"
     GINKGO_TEST_ARGS="--ginkgo.focus=\[Performance suite\] "
 else
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
@@ -54,7 +54,7 @@ else
     else
       export MASTER_SIZE="g1-small"
     fi
-    export NUM_MINIONS="2"
+    export NUM_NODES="2"
 fi
 
 

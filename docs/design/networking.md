@@ -36,15 +36,15 @@ We set up this bridge on each node with SaltStack, in [container_bridge.py](clus
     grains:
       roles:
       - kubernetes-pool
-      cbr-cidr: $MINION_IP_RANGE
+      cbr-cidr: $NODE_IP_RANGE
 
 We make these addresses routable in GCE:
 
-    gcloud compute routes add "${MINION_NAMES[$i]}" \
+    gcloud compute routes add "${NODE_NAMES[$i]}" \
       --project "${PROJECT}" \
-      --destination-range "${MINION_IP_RANGES[$i]}" \
+      --destination-range "${NODE_IP_RANGES[$i]}" \
       --network "${NETWORK}" \
-      --next-hop-instance "${MINION_NAMES[$i]}" \
+      --next-hop-instance "${NODE_NAMES[$i]}" \
       --next-hop-instance-zone "${ZONE}" &
 
 The minion IP ranges are /24s in the 10-dot space.

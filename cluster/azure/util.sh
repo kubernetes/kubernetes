@@ -210,7 +210,7 @@ function upload-server-tars() {
 # Detect the information about the minions
 #
 # Assumed vars:
-#   MINION_NAMES
+#   NODE_NAMES
 #   ZONE
 # Vars set:
 #
@@ -218,9 +218,9 @@ function detect-minions () {
     if [[ -z "$AZ_CS" ]]; then
         verify-prereqs
     fi
-    ssh_ports=($(eval echo "2200{1..$NUM_MINIONS}"))
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        MINION_NAMES[$i]=$(ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net hostname -f)
+    ssh_ports=($(eval echo "2200{1..$NUM_NODES}"))
+    for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+        NODE_NAMES[$i]=$(ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net hostname -f)
     done
 }
 
@@ -293,18 +293,18 @@ function kube-up {
         -CAkey ${KUBE_TEMP}/ca.key \
         -CAserial ${KUBE_TEMP}/ca.srl \
         -out ${KUBE_TEMP}/server.crt
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        openssl genrsa -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.key
+    for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+        openssl genrsa -out ${KUBE_TEMP}/${NODE_NAMES[$i]}.key
         openssl req -new \
-            -key ${KUBE_TEMP}/${MINION_NAMES[$i]}.key \
-            -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.csr \
-            -subj "/CN=${MINION_NAMES[$i]}"
+            -key ${KUBE_TEMP}/${NODE_NAMES[$i]}.key \
+            -out ${KUBE_TEMP}/${NODE_NAMES[$i]}.csr \
+            -subj "/CN=${NODE_NAMES[$i]}"
         openssl x509 -req -days 1095 \
-            -in ${KUBE_TEMP}/${MINION_NAMES[$i]}.csr \
+            -in ${KUBE_TEMP}/${NODE_NAMES[$i]}.csr \
             -CA ${KUBE_TEMP}/ca.crt \
             -CAkey ${KUBE_TEMP}/ca.key \
             -CAserial ${KUBE_TEMP}/ca.srl \
-            -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.crt
+            -out ${KUBE_TEMP}/${NODE_NAMES[$i]}.crt
     done
 
     # Build up start up script for master
@@ -355,18 +355,18 @@ function kube-up {
         -b $AZ_SUBNET \
         $AZ_CS $AZ_IMAGE $USER
 
-    ssh_ports=($(eval echo "2200{1..$NUM_MINIONS}"))
+    ssh_ports=($(eval echo "2200{1..$NUM_NODES}"))
 
     #Build up start up script for minions
     echo "--> Building up start up script for minions"
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
         (
             echo "#!/bin/bash"
             echo "MASTER_NAME='${MASTER_NAME}'"
             echo "CA_CRT=\"$(cat ${KUBE_TEMP}/ca.crt)\""
-            echo "CLIENT_CRT=\"$(cat ${KUBE_TEMP}/${MINION_NAMES[$i]}.crt)\""
-            echo "CLIENT_KEY=\"$(cat ${KUBE_TEMP}/${MINION_NAMES[$i]}.key)\""
-            echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
+            echo "CLIENT_CRT=\"$(cat ${KUBE_TEMP}/${NODE_NAMES[$i]}.crt)\""
+            echo "CLIENT_KEY=\"$(cat ${KUBE_TEMP}/${NODE_NAMES[$i]}.key)\""
+            echo "NODE_IP_RANGE='${NODE_IP_RANGES[$i]}'"
             grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
             grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/salt-minion.sh"
         ) > "${KUBE_TEMP}/minion-start-${i}.sh"
@@ -374,7 +374,7 @@ function kube-up {
         echo "--> Starting VM"
         azure_call vm create \
             -c -w "$AZ_VNET" \
-            -n ${MINION_NAMES[$i]} \
+            -n ${NODE_NAMES[$i]} \
             -l "$AZ_LOCATION" \
             -t $AZ_SSH_CERT \
             -e ${ssh_ports[$i]} -P \
@@ -432,9 +432,9 @@ function kube-up {
     echo "  some uncaught error during start up."
     echo
     # Basic sanity checking
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
         # Make sure docker is installed
-        echo "--> Making sure docker is installed on ${MINION_NAMES[$i]}."
+        echo "--> Making sure docker is installed on ${NODE_NAMES[$i]}."
         until ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
             $AZ_CS.cloudapp.net which docker > /dev/null 2>&1; do
             printf "."
@@ -457,8 +457,8 @@ function kube-down {
 
     set +e
     azure_call vm delete $MASTER_NAME -b -q
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        azure_call vm delete ${MINION_NAMES[$i]} -b -q
+    for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+        azure_call vm delete ${NODE_NAMES[$i]} -b -q
     done
 
     wait

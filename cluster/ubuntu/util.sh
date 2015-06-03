@@ -24,7 +24,7 @@ declare -A mm
 CLUSTER=""
 MASTER=""
 MASTER_IP=""
-MINION_IPS=""
+NODE_IPS=""
 
 KUBECTL_PATH=${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl
 
@@ -54,15 +54,15 @@ function setClusterInfo() {
       if [ "${roles[${ii}]}" == "ai" ]; then
         MASTER_IP=$nodeIP
         MASTER=$i
-        MINION_IPS="$nodeIP"
+        NODE_IPS="$nodeIP"
       elif [ "${roles[${ii}]}" == "a" ]; then 
         MASTER_IP=$nodeIP
         MASTER=$i
       elif [ "${roles[${ii}]}" == "i" ]; then
-        if [ -z "${MINION_IPS}" ];then
-          MINION_IPS="$nodeIP"
+        if [ -z "${NODE_IPS}" ];then
+          NODE_IPS="$nodeIP"
         else
-          MINION_IPS="$MINION_IPS,$nodeIP"
+          NODE_IPS="$NODE_IPS,$nodeIP"
         fi
       else
         echo "unsupported role for ${i}. please check"
@@ -292,25 +292,25 @@ function detect-master {
 # Assumed vars:
 #   nodes
 # Vars set:
-#   KUBE_MINION_IP_ADDRESS (array)
+#   KUBE_NODE_IP_ADDRESS (array)
 function detect-minions {
   KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
-  KUBE_MINION_IP_ADDRESSES=()
+  KUBE_NODE_IP_ADDRESSES=()
   setClusterInfo
   
   ii=0
   for i in ${nodes}
   do
     if [ "${roles[${ii}]}" == "i" ] || [ "${roles[${ii}]}" == "ai" ]; then
-      KUBE_MINION_IP_ADDRESSES+=("${i#*@}")
+      KUBE_NODE_IP_ADDRESSES+=("${i#*@}")
     fi
 
     ((ii=ii+1))
   done
 
-  if [[ -z "${KUBE_MINION_IP_ADDRESSES[@]}" ]]; then
+  if [[ -z "${KUBE_NODE_IP_ADDRESSES[@]}" ]]; then
     echo "Could not detect Kubernetes minion nodes. Make sure you've launched a cluster with 'kube-up.sh'" >&2
     exit 1
   fi
@@ -365,7 +365,7 @@ function provision-master() {
                             setClusterInfo; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
                             create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}"; \
-                            create-kube-controller-manager-opts "${MINION_IPS}"; \
+                            create-kube-controller-manager-opts "${NODE_IPS}"; \
                             create-kube-scheduler-opts; \
                             sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
                             && sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/; \
@@ -404,7 +404,7 @@ function provision-masterandminion() {
                             setClusterInfo; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
                             create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}"; \
-                            create-kube-controller-manager-opts "${MINION_IPS}"; \
+                            create-kube-controller-manager-opts "${NODE_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";                     
                             create-kube-proxy-opts "${MASTER_IP}";\

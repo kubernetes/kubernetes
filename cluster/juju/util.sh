@@ -93,10 +93,10 @@ function detect-minions() {
     # Stdout: |
     #    10.202.146.124
     #  UnitId: kubernetes/1
-    export KUBE_MINION_IP_ADDRESSES=($(${JUJU_PATH}/return-node-ips.py "${ipoutput}"))
-    echo "Kubernetes minions:  " ${KUBE_MINION_IP_ADDRESSES[@]}
-    export NUM_MINIONS=${#KUBE_MINION_IP_ADDRESSES[@]}
-    export MINION_NAMES=$KUBE_MINION_IP_ADDRESSES
+    export KUBE_NODE_IP_ADDRESSES=($(${JUJU_PATH}/return-node-ips.py "${ipoutput}"))
+    echo "Kubernetes minions:  " ${KUBE_NODE_IP_ADDRESSES[@]}
+    export NUM_NODES=${#KUBE_NODE_IP_ADDRESSES[@]}
+    export NODE_NAMES=$KUBE_NODE_IP_ADDRESSES
 }
 
 function setup-logging-firewall() {

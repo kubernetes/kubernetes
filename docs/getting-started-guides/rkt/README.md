@@ -44,8 +44,8 @@ $ cluster/kubectl.sh create -f example/pod.yaml
 To use rkt as the container runtime for your CoreOS cluster on GCE, you need to specify the OS distribution, project, image:
 ```shell
 $ export KUBE_OS_DISTRIBUTION=coreos
-$ export KUBE_GCE_MINION_IMAGE=<image_id>
-$ export KUBE_GCE_MINION_PROJECT=coreos-cloud
+$ export KUBE_GCE_NODE_IMAGE=<image_id>
+$ export KUBE_GCE_NODE_PROJECT=coreos-cloud
 $ export KUBE_CONTAINER_RUNTIME=rkt
 ```
 

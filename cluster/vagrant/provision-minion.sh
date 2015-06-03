@@ -24,9 +24,9 @@ if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
 fi
 
 # Setup hosts file to support ping by hostname to each minion in the cluster
-for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-  minion=${MINION_NAMES[$i]}
-  ip=${MINION_IPS[$i]}
+for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+  minion=${NODE_NAMES[$i]}
+  ip=${NODE_IPS[$i]}
   if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
     echo "Adding $minion to hosts file"
     echo "$ip $minion" >> /etc/hosts
@@ -66,13 +66,13 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   cloud: vagrant
   network_mode: openvswitch
-  node_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
+  node_ip: '$(echo "$NODE_IP" | sed -e "s/'/''/g")'
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   networkInterfaceName: eth1
   roles:
     - kubernetes-pool
   cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
-  hostname_override: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
+  hostname_override: '$(echo "$NODE_IP" | sed -e "s/'/''/g")'
 EOF
 
 # we will run provision to update code each time we test, so we do not want to do salt install each time

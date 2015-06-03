@@ -276,10 +276,10 @@ Log on to one of the minions (`vagrant ssh minion-1`) and inspect the salt minio
 
 #### I want to change the number of minions!
 
-You can control the number of minions that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough minions to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `NUM_MINIONS` to 1 like so:
+You can control the number of minions that are instantiated via the environment variable `NUM_NODES` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough minions to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `NUM_NODES` to 1 like so:
 
 ```sh
-export NUM_MINIONS=1
+export NUM_NODES=1
 ```
 
 #### I want my VMs to have more memory!
@@ -295,7 +295,7 @@ If you need more granular control, you can set the amount of memory for the mast
 
 ```sh
 export KUBERNETES_MASTER_MEMORY=1536
-export KUBERNETES_MINION_MEMORY=2048
+export KUBERNETES_NODE_MEMORY=2048
 ```
 
 #### I ran vagrant suspend and nothing works!

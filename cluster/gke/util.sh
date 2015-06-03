@@ -110,7 +110,7 @@ function verify-prereqs() {
 #   CLUSTER_NAME
 #   ZONE
 #   CLUSTER_API_VERSION (optional)
-#   NUM_MINIONS
+#   NUM_NODES
 function kube-up() {
   echo "... in kube-up()" >&2
   detect-project >&2
@@ -141,7 +141,7 @@ function kube-up() {
     --zone="${ZONE}" \
     --project="${PROJECT}" \
     --cluster-api-version="${CLUSTER_API_VERSION:-}" \
-    --num-nodes="${NUM_MINIONS}" \
+    --num-nodes="${NUM_NODES}" \
     --network="${NETWORK}"
 }
 
@@ -153,30 +153,30 @@ function kube-up() {
 #   CLUSTER_NAME
 #   GCLOUD
 # Vars set:
-#   MINION_TAG
+#   NODE_TAG
 function test-setup() {
   echo "... in test-setup()" >&2
   # Detect the project into $PROJECT if it isn't set
   detect-project >&2
 
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG="k8s-${CLUSTER_NAME}-node"
+  NODE_TAG="k8s-${CLUSTER_NAME}-node"
 
   # Open up port 80 & 8080 so common containers on minions can be reached.
   # TODO(mbforbes): Is adding ${USER} necessary, and sufficient, to avoid
   #                 collisions here?
   "${GCLOUD}" compute firewall-rules create \
-    "${MINION_TAG}-${USER}-http-alt" \
+    "${NODE_TAG}-${USER}-http-alt" \
     --allow tcp:80,tcp:8080 \
     --project "${PROJECT}" \
-    --target-tags "${MINION_TAG}" \
+    --target-tags "${NODE_TAG}" \
     --network="${NETWORK}"
 
   "${GCLOUD}" compute firewall-rules create \
-    "${MINION_TAG}-${USER}-nodeports" \
+    "${NODE_TAG}-${USER}-nodeports" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --project "${PROJECT}" \
-    --target-tags "${MINION_TAG}" \
+    --target-tags "${NODE_TAG}" \
     --network="${NETWORK}"
 }
 
@@ -219,7 +219,7 @@ function detect-master() {
 # Assumed vars:
 #   none
 # Vars set:
-#   MINION_NAMES
+#   NODE_NAMES
 function detect-minions() {
   echo "... in detect-minions()" >&2
   detect-minion-names
@@ -230,15 +230,15 @@ function detect-minions() {
 # Assumed vars:
 #   none
 # Vars set:
-#   MINION_NAMES
+#   NODE_NAMES
 function detect-minion-names {
   detect-project
   GROUP_NAME=($(gcloud preview --project "${PROJECT}" instance-groups \
     --zone "${ZONE}" list | grep -o "k8s-${CLUSTER_NAME}-.\{8\}-group"))
-  MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
+  NODE_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
     --zone "${ZONE}" instances --group "${GROUP_NAME}" list \
     | cut -d'/' -f11))
-  echo "MINION_NAMES=${MINION_NAMES[*]}"
+  echo "NODE_NAMES=${NODE_NAMES[*]}"
 }
 
 # SSH to a node by name ($1) and run a command ($2).
@@ -288,13 +288,13 @@ function test-teardown() {
 
   detect-project >&2
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG="k8s-${CLUSTER_NAME}-node"
+  NODE_TAG="k8s-${CLUSTER_NAME}-node"
 
   # First, remove anything we did with test-setup (currently, the firewall).
   # NOTE: Keep in sync with names above in test-setup.
-  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-${USER}-http-alt" \
+  "${GCLOUD}" compute firewall-rules delete "${NODE_TAG}-${USER}-http-alt" \
     --project="${PROJECT}" || true
-  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-${USER}-nodeports" \
+  "${GCLOUD}" compute firewall-rules delete "${NODE_TAG}-${USER}-nodeports" \
     --project="${PROJECT}" || true
 
   # Then actually turn down the cluster.

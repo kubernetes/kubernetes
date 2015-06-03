@@ -24,12 +24,12 @@ function detect-master {
 
 # Get minion names if they are not static.
 function detect-minion-names {
-        echo "MINION_NAMES: ${MINION_NAMES[*]}"
+        echo "NODE_NAMES: ${NODE_NAMES[*]}"
 }
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
+# Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
 function detect-minions {
-	echo "KUBE_MINION_IP_ADDRESSES=[]"
+	echo "KUBE_NODE_IP_ADDRESSES=[]"
 }
 
 # Verify prereqs on host machine
