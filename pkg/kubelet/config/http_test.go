@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
@@ -161,7 +160,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
 							ImagePullPolicy:        "Always",
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+						}},
 					},
 				}),
 		},
@@ -214,7 +213,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
 							ImagePullPolicy:        "Always",
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+						}},
 					},
 				},
 				&api.Pod{
@@ -234,7 +233,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							Image: "bar",
 							TerminationMessagePath: "/dev/termination-log",
 							ImagePullPolicy:        "IfNotPresent",
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+						}},
 					},
 				}),
 		},
