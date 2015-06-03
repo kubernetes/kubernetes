@@ -35,7 +35,7 @@ import (
 )
 
 // Controller is the controller manager for the core bootstrap Kubernetes controller
-// loops, which manage creating the "kubernetes" and "kubernetes-ro" services, the "default"
+// loops, which manage creating the "kubernetes" service, the "default"
 // namespace, and provide the IP repair check on service IPs
 type Controller struct {
 	NamespaceRegistry namespace.Registry

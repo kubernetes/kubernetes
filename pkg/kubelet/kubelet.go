@@ -872,7 +872,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 	return opts, nil
 }
 
-var masterServices = util.NewStringSet("kubernetes", "kubernetes-ro")
+var masterServices = util.NewStringSet("kubernetes")
 
 // getServiceEnvVarMap makes a map[string]string of env vars for services a pod in namespace ns should see
 func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
@@ -909,8 +909,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 			serviceMap[serviceName] = service
 		case kl.masterServiceNamespace:
 			if masterServices.Has(serviceName) {
-				_, exists := serviceMap[serviceName]
-				if !exists {
+				if _, exists := serviceMap[serviceName]; !exists {
 					serviceMap[serviceName] = service
 				}
 			}

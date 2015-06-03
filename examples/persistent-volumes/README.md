@@ -89,7 +89,6 @@ cluster/kubectl.sh get services
 NAME              LABELS                                    SELECTOR            IP           PORT(S)
 frontendservice   <none>                                    name=frontendhttp   10.0.0.241   3000/TCP
 kubernetes        component=apiserver,provider=kubernetes   <none>              10.0.0.2     443/TCP
-kubernetes-ro     component=apiserver,provider=kubernetes   <none>              10.0.0.1     80/TCP
 
 
 ```

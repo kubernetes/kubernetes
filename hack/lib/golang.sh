@@ -99,6 +99,11 @@ readonly KUBE_STATIC_LIBRARIES=(
 kube::golang::is_statically_linked_library() {
   local e
   for e in "${KUBE_STATIC_LIBRARIES[@]}"; do [[ "$1" == *"/$e" ]] && return 0; done;
+  # Allow individual overrides--e.g., so that you can get a static build of
+  # kubectl for inclusion in a container.
+  if [ -n "${KUBE_STATIC_OVERRIDES:+x}" ]; then
+    for e in "${KUBE_STATIC_OVERRIDES[@]}"; do [[ "$1" == *"/$e" ]] && return 0; done;
+  fi
   return 1;
 }
 

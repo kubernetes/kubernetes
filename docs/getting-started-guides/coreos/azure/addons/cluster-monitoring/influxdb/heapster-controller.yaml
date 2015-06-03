@@ -20,5 +20,5 @@ spec:
           name: heapster
           command:
             - /heapster
-            - --source=kubernetes:http://kubernetes-ro?auth=
+            - --source=kubernetes:http://kubernetes?auth=
             - --sink=influxdb:http://monitoring-influxdb:8086

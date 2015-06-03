@@ -62,7 +62,6 @@ zookeeper           192.168.86.4        zookeeper           mattf/zookeeper     
 $ kubectl get services
 NAME                LABELS                                    SELECTOR            IP                  PORT
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
-kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
 zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
 
 $ echo ruok | nc 10.254.139.141 2181; echo
@@ -97,7 +96,6 @@ Ensure that the Nimbus service is running and functional.
 $ kubectl get services
 NAME                LABELS                                    SELECTOR            IP                  PORT
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
-kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
 zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
 nimbus              name=nimbus                               name=nimbus         10.254.115.208      6627
 

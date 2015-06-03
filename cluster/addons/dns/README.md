@@ -87,7 +87,7 @@ what etcd offers (at least not in the way we use it).  For simplicty, we run
 etcd and SkyDNS together in a pod, and we do not try to link etcd instances
 across replicas.  A helper container called [kube2sky](kube2sky/) also runs in
 the pod and acts a bridge between Kubernetes and SkyDNS.  It finds the
-Kubernetes master through the `kubernetes-ro` service (via environment
+Kubernetes master through the `kubernetes` service (via environment
 variables), pulls service info from the master, and writes that to etcd for
 SkyDNS to find.
 

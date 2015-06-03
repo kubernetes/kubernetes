@@ -43,9 +43,9 @@ Now, you can access the service `wget 10.0.1.89:9090`, and build graphs.
 
 ## How it works
 
-This is a v1beta3 based, containerized prometheus ReplicationController, which scrapes endpoints which are readable on the KUBERNETES_RO service (the internal kubernetes service running in the default namespace, which is visible to all pods).
+This is a v1beta3 based, containerized prometheus ReplicationController, which scrapes endpoints which are readable on the KUBERNETES service (the internal kubernetes service running in the default namespace, which is visible to all pods).
 
-1. The KUBERNETES_RO service is already running : providing read access to the API metrics.
+1. Use kubectl to handle auth & proxy the kubernetes API locally, emulating the old KUBERNETES_RO service.
 
 1. The list of services to be monitored is passed as a command line aguments in
 the yaml file.
@@ -74,5 +74,7 @@ at port 9090.
 - We should publish this image into the kube/ namespace.
 - Possibly use postgre or mysql as a promdash database.
 - push gateway (https://github.com/prometheus/pushgateway) setup.
+- stop using kubectl to make a local proxy faking the old RO port and build in
+  real auth capabilities.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/prometheus/README.md?pixel)]()

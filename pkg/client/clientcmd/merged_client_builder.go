@@ -45,6 +45,11 @@ func NewInteractiveDeferredLoadingClientConfig(loadingRules *ClientConfigLoading
 }
 
 func (config DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
+	// Are we running in a cluster? If so, use that.
+	icc := inClusterClientConfig{}
+	if icc.Possible() {
+		return icc, nil
+	}
 	mergedConfig, err := config.loadingRules.Load()
 	if err != nil {
 		return nil, err

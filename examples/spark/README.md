@@ -54,7 +54,6 @@ POD                             IP                  CONTAINER(S)        IMAGE(S)
 spark-master                    192.168.90.14       spark-master        mattf/spark-master   172.18.145.8/172.18.145.8     name=spark-master                     Running
 NAME                LABELS                                    SELECTOR            IP                  PORT
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
-kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
 spark-master        name=spark-master                         name=spark-master   10.254.125.166      7077
 ```
 
@@ -135,7 +134,6 @@ spark-worker-controller-5v48c   192.168.90.17       spark-worker        mattf/sp
 spark-worker-controller-ehq23   192.168.35.17       spark-worker        mattf/spark-worker   172.18.145.12/172.18.145.12   name=spark-worker,uses=spark-master   Running
 NAME                LABELS                                    SELECTOR            IP                  PORT
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
-kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
 spark-master        name=spark-master                         name=spark-master   10.254.125.166      7077
 
 $ sudo docker run -it mattf/spark-base sh
