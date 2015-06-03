@@ -99,25 +99,38 @@ Node Controller is unable to provision the node for you, i.e. it won't install
 any binary; therefore, to
 join Kubernetes cluster, you as an admin need to make sure proper services are
 running in the node. In the future, we plan to automatically provision some node
-services. In case of no cloud provider, Node Controller simply registers all
-machines from `--machines` flag, any further interactions need to be done manually
-by using `kubectl`. If you are paranoid, leave `--machines` empty and create all
-machines from `kubectl` one by one - the two approaches are equivalent.
-Optionally you can skip cluster-wide node synchronization with
-'--sync_nodes=false' and can use REST api/kubectl cli to add/remove nodes.
+services. 
 
-Node life-cycle management in the Node Controller is still under development, it
-is supposed to manage the Node Status Specification defined above.
+### Self-Registration of nodes
 
-### Manual Node Administration
+When kubelet flag `--register-node` is true (the default), then the kubelet will attempt to
+register itself with the API server.  This is the preferred pattern, used by most distros.
 
-A Kubernetes administrator typically uses `kubectl` to manage `Node`. Similar
-to Node Controller, `kubectl` command only creates/deletes node representation.
-Note if Kubernetes is running on cloud provider, `kubectl create` a node will
-be refused if Node Controller has already synchronized nodes from cloud provider.
-Admin can choose to make the node unschedulable using `kubectl`. Unscheduling the node
-will not affect any existing pods on the node but it will disable creation of
-any new pods on the node. Node unschedulable example:
+For self-registration, the kubelet is started with the following options:
+  - `--apiservers=` tells the kubelet the location of the apiserver.
+  - `--kubeconfig` tells kubelet where to find credentials to authenticate itself to the apiserver.  
+  - `--cloud_provider=` tells the kubelet how to talk to a cloud provider to read metadata about itself.
+  - `--register-node` tells the kubelet to create its own node resource.
+
+Currently, any kubelet is authorized to create/modify any node resource, but in practice it only creates/modifies
+its own.  (In the future, we plan to limit authorization to only allow a kubelet to modify its own Node resource.)
+
+#### Manual Node Administration
+
+A cluster administrator can create and modify Node objects.
+
+If the administrator wishes to create node objects manually, set kubelet flag
+`--register-node=false`.
+
+The administrator can modify Node resources (regardless of the setting of `--register-node`).
+Modifications include setting labels on the Node, and marking it unschedulable.
+
+Labels on nodes can be used in conjuction with node selectors on pods to control scheduling.
+
+Making a node unscheduleable will prevent new pods from being scheduled to that
+node, but will not affect any existing pods on the node.  This is useful as a
+preparatory step before a node reboot, etc.  For example, to mark a node
+unschedulable, run this command:
 ```
 kubectl update nodes 10.1.2.3 --patch='{"apiVersion": "v1beta3", "unschedulable": true}'
 ```
