@@ -80,27 +80,29 @@ type execParams struct {
 	tty           bool
 }
 
-func extractPodAndContainer(cmd *cobra.Command, args []string, p *execParams) (podName string, containerName string, err error) {
-	if len(p.podName) == 0 && len(args) == 0 {
-		return "", "", cmdutil.UsageError(cmd, "POD is required for exec")
+func extractPodAndContainer(cmd *cobra.Command, argsIn []string, p *execParams) (podName string, containerName string, args []string, err error) {
+	if len(p.podName) == 0 && len(argsIn) == 0 {
+		return "", "", nil, cmdutil.UsageError(cmd, "POD is required for exec")
 	}
 	if len(p.podName) != 0 {
 		printDeprecationWarning("exec POD", "-p POD")
 		podName = p.podName
-		if len(args) < 1 {
-			return "", "", cmdutil.UsageError(cmd, "COMMAND is required for exec")
+		if len(argsIn) < 1 {
+			return "", "", nil, cmdutil.UsageError(cmd, "COMMAND is required for exec")
 		}
+		args = argsIn
 	} else {
-		podName = args[0]
-		if len(args) < 2 {
-			return "", "", cmdutil.UsageError(cmd, "COMMAND is required for exec")
+		podName = argsIn[0]
+		args = argsIn[1:]
+		if len(args) < 1 {
+			return "", "", nil, cmdutil.UsageError(cmd, "COMMAND is required for exec")
 		}
 	}
-	return podName, p.containerName, nil
+	return podName, p.containerName, args, nil
 }
 
-func RunExec(f *cmdutil.Factory, cmd *cobra.Command, cmdIn io.Reader, cmdOut, cmdErr io.Writer, p *execParams, args []string, re remoteExecutor) error {
-	podName, containerName, err := extractPodAndContainer(cmd, args, p)
+func RunExec(f *cmdutil.Factory, cmd *cobra.Command, cmdIn io.Reader, cmdOut, cmdErr io.Writer, p *execParams, argsIn []string, re remoteExecutor) error {
+	podName, containerName, args, err := extractPodAndContainer(cmd, argsIn, p)
 	namespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
