@@ -1811,7 +1811,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	} else {
 		addr := net.ParseIP(kl.hostname)
 		if addr != nil {
-			node.Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: addr.String()}}
+			node.Status.Addresses = []api.NodeAddress{{Type: api.NodeInternalIP, Address: addr.String()}}
 		} else {
 			addrs, err := net.LookupIP(node.Name)
 			if err != nil {
@@ -1819,7 +1819,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			} else if len(addrs) == 0 {
 				return fmt.Errorf("no ip address for node %v", node.Name)
 			} else {
-				node.Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: addrs[0].String()}}
+				node.Status.Addresses = []api.NodeAddress{{Type: api.NodeInternalIP, Address: addrs[0].String()}}
 			}
 		}
 	}
