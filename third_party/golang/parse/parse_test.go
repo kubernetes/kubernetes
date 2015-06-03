@@ -16,7 +16,7 @@ func TestParsePlainText(t *testing.T) {
 }
 
 func TestParseVariable(t *testing.T) {
-	tree, err := Parse("variable", "hello $.jsonpath")
+	tree, err := Parse("variable", "hello ${.jsonpath}")
 	if err != nil {
 		t.Errorf("parse plain text error %v", err)
 	}

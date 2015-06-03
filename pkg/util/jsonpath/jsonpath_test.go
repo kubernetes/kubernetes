@@ -40,7 +40,7 @@ func TestPlainText(t *testing.T) {
 }
 
 func TestVariable(t *testing.T) {
-	text := "hello $.jsonpath"
+	text := "hello ${.jsonpath}"
 	j := New("variable")
 	err := j.Parse(text)
 	if err != nil {
@@ -59,7 +59,7 @@ func TestVariable(t *testing.T) {
 }
 
 func TestNestedDict(t *testing.T) {
-	text := "hello $.jsonpath.title"
+	text := "hello ${.jsonpath.title}"
 	j := New("nestedDict")
 	err := j.Parse(text)
 	if err != nil {

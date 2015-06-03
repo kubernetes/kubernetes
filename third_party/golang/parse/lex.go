@@ -194,8 +194,7 @@ func lexInsideAction(l *lexer) stateFn {
 
 	switch r := l.next(); {
 	case r == eof || isEndOfLine(r):
-		l.emit(itemEOF)
-		return nil
+		return l.errorf("unclosed action")
 	case r == '.':
 		l.emit(itemDot)
 		return lexField
