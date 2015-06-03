@@ -13,10 +13,28 @@ crashes or scheduling changes).  This maps well to DNS, which has a long
 history of clients that, on purpose or on accident, do not respect DNS TTLs
 (see previous remark about Pod IPs changing).
 
-## DNS Name format for Services
-Services get a DNS name with the format my-svc.my-namespace.svc.cluster.local
-'svc' should not be used a namespace label to avoid conflicts.
-The old format of my-svc.my-namespace.cluster.local has been deprecated. 
+## Supported DNS schema
+The following sections detail the supported record types and layout that is
+supported.  Any other layout or names or queries that happen to work are
+considered implementation details and are subject to change without warning.
+
+### A records
+"Normal" (not headless) Services are assigned a DNS A record for a name of the
+form `my-svc.my-namespace.svc.cluster.local`.  This resolves to the cluster IP
+of the Service.
+
+"Headless" (without a cluster IP) Services are also assigned a DNS A record for
+a name of the form `my-svc.my-namespace.svc.cluster.local`.  Unlike normal
+Services, this resolves to the set of IPs of the pods selected by the Service.
+Clients are expected to consume the set or else use standard round-robin
+selection from the set.
+
+### Backwards compatibility
+Previous versions of kube-dns made names of the for
+`my-svc.my-namespace.cluster.local` (the 'svc' level was added later).  For
+compatibility, kube-dns supports both names for the time being.  Users should
+avoid creating a namespace named 'svc', to avoid conflicts.  The old name
+format is deprecated and will be removed in a future release.
 
 ## How do I find the DNS server?
 The DNS server itself runs as a Kubernetes Service.  This gives it a stable IP
@@ -73,10 +91,25 @@ Kubernetes master through the `kubernetes-ro` service (via environment
 variables), pulls service info from the master, and writes that to etcd for
 SkyDNS to find.
 
+## Inheriting DNS from the node
+When running a pod, kubelet will prepend the cluster DNS server and search
+paths to the node's own DNS settings.  If the node is able to resolve DNS names
+specific to the larger environment, pods should be able to, also.  See "Known
+issues" below for a caveat.
+
 ## Known issues
 Kubernetes installs do not configure the nodes' resolv.conf files to use the
 cluster DNS by default, because that process is inherently distro-specific.
 This should probably be implemented eventually.
+
+Linux's libc is impossibly stuck ([see this bug from
+2005](https://bugzilla.redhat.com/show_bug.cgi?id=168253)) with limits of just
+3 DNS `nameserver` records and 6 DNS `search` records.  Kubernetes needs to
+consume 1 `nameserver` record and 3 `search` records.  This means that if a
+local installation already uses 3 `nameserver`s or uses more than 3 `search`es,
+some of those settings will be lost.  As a partial workaround, the node can run
+`dnsmasq` which will provide more `nameserver` entries, but not more `search`
+entries.
 
 ## Making changes
 Please observe the release process for making changes to the `kube2sky`
