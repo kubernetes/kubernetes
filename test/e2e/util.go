@@ -797,7 +797,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	defer podStore.Stop()
 	pods := podStore.List()
 	current = len(pods)
-	failCount := 5
+	failCount := 24
 	for same < failCount && current < replicas {
 		Logf("%v Controller %s: Found %d pods out of %d", time.Now(), name, current, replicas)
 		if last < current {
