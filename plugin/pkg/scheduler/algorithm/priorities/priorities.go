@@ -80,8 +80,8 @@ func calculateOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.
 // It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 // based on the minimum of the average of the fraction of requested to capacity.
 // Details: (Sum(requested cpu) / Capacity + Sum(requested memory) / Capacity) * 50
-func LeastRequestedPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
-	nodes, err := minionLister.List()
+func LeastRequestedPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+	nodes, err := nodeLister.List()
 	if err != nil {
 		return algorithm.HostPriorityList{}, err
 	}
@@ -110,9 +110,9 @@ func NewNodeLabelPriority(label string, presence bool) algorithm.PriorityFunctio
 // CalculateNodeLabelPriority checks whether a particular label exists on a minion or not, regardless of its value.
 // If presence is true, prioritizes minions that have the specified label, regardless of value.
 // If presence is false, prioritizes minions that do not have the specified label.
-func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
 	var score int
-	minions, err := minionLister.List()
+	minions, err := nodeLister.List()
 	if err != nil {
 		return nil, err
 	}
@@ -143,8 +143,8 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podListe
 // close the two metrics are to each other.
 // Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
 // "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-func BalancedResourceAllocation(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
-	nodes, err := minionLister.List()
+func BalancedResourceAllocation(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+	nodes, err := nodeLister.List()
 	if err != nil {
 		return algorithm.HostPriorityList{}, err
 	}

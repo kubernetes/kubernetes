@@ -25,14 +25,14 @@ import (
 // Some functions used by multiple scheduler tests.
 
 type schedulerTester struct {
-	t            *testing.T
-	scheduler    ScheduleAlgorithm
-	minionLister MinionLister
+	t          *testing.T
+	scheduler  ScheduleAlgorithm
+	nodeLister NodeLister
 }
 
 // Call if you know exactly where pod should get scheduled.
 func (st *schedulerTester) expectSchedule(pod *api.Pod, expected string) {
-	actual, err := st.scheduler.Schedule(pod, st.minionLister)
+	actual, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err != nil {
 		st.t.Errorf("Unexpected error %v\nTried to scheduler: %#v", err, pod)
 		return
@@ -44,7 +44,7 @@ func (st *schedulerTester) expectSchedule(pod *api.Pod, expected string) {
 
 // Call if you can't predict where pod will be scheduled.
 func (st *schedulerTester) expectSuccess(pod *api.Pod) {
-	_, err := st.scheduler.Schedule(pod, st.minionLister)
+	_, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err != nil {
 		st.t.Errorf("Unexpected error %v\nTried to scheduler: %#v", err, pod)
 		return
@@ -53,7 +53,7 @@ func (st *schedulerTester) expectSuccess(pod *api.Pod) {
 
 // Call if pod should *not* schedule.
 func (st *schedulerTester) expectFailure(pod *api.Pod) {
-	_, err := st.scheduler.Schedule(pod, st.minionLister)
+	_, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err == nil {
 		st.t.Error("Unexpected non-error")
 	}

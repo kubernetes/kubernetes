@@ -40,8 +40,8 @@ func matchesPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool,
 	return pod.Name == node, nil
 }
 
-func numericPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
-	nodes, err := minionLister.List()
+func numericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+	nodes, err := nodeLister.List()
 	result := []algorithm.HostPriority{}
 
 	if err != nil {
@@ -60,11 +60,11 @@ func numericPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister a
 	return result, nil
 }
 
-func reverseNumericPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func reverseNumericPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
 	reverseResult := []algorithm.HostPriority{}
-	result, err := numericPriority(pod, podLister, minionLister)
+	result, err := numericPriority(pod, podLister, nodeLister)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func TestGenericScheduler(t *testing.T) {
 	for _, test := range tests {
 		random := rand.New(rand.NewSource(0))
 		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, algorithm.FakePodLister([]*api.Pod{}), random)
-		machine, err := scheduler.Schedule(test.pod, algorithm.FakeMinionLister(makeNodeList(test.nodes)))
+		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
 				t.Error("Unexpected non-error")

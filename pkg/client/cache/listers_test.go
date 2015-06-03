@@ -24,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func TestStoreToMinionLister(t *testing.T) {
+func TestStoreToNodeLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
 	ids := util.NewStringSet("foo", "bar", "baz")
 	for id := range ids {

@@ -23,5 +23,5 @@ import (
 // Scheduler is an interface implemented by things that know how to schedule pods
 // onto machines.
 type ScheduleAlgorithm interface {
-	Schedule(*api.Pod, MinionLister) (selectedMachine string, err error)
+	Schedule(*api.Pod, NodeLister) (selectedMachine string, err error)
 }

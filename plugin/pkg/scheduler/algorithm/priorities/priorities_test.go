@@ -261,7 +261,7 @@ func TestLeastRequested(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		list, err := LeastRequestedPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeMinionLister(api.NodeList{Items: test.nodes}))
+		list, err := LeastRequestedPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -355,7 +355,7 @@ func TestNewNodeLabelPriority(t *testing.T) {
 			label:    test.label,
 			presence: test.presence,
 		}
-		list, err := prioritizer.CalculateNodeLabelPriority(nil, nil, algorithm.FakeMinionLister(api.NodeList{Items: test.nodes}))
+		list, err := prioritizer.CalculateNodeLabelPriority(nil, nil, algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -591,7 +591,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		list, err := BalancedResourceAllocation(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeMinionLister(api.NodeList{Items: test.nodes}))
+		list, err := BalancedResourceAllocation(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
