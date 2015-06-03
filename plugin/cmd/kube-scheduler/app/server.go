@@ -124,6 +124,7 @@ func (s *SchedulerServer) Run(_ []string) error {
 
 	eventBroadcaster := record.NewBroadcaster()
 	config.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
 
 	sched := scheduler.New(config)
