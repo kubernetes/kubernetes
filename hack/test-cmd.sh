@@ -93,6 +93,7 @@ kube::log::status "Starting kube-apiserver"
   --public_address_override="127.0.0.1" \
   --kubelet_port=${KUBELET_PORT} \
   --runtime_config=api/v1beta3 \
+  --runtime_config=api/v1 \
   --cert_dir="${TMPDIR:-/tmp/}" \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
@@ -115,6 +116,7 @@ PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
 kube_api_versions=(
   ""
   v1beta3
+  v1
 )
 for version in "${kube_api_versions[@]}"; do
   if [[ -z "${version}" ]]; then
@@ -138,15 +140,6 @@ for version in "${kube_api_versions[@]}"; do
   rc_status_replicas_field=".status.replicas"
   rc_container_image_field=".spec.template.spec.containers"
   port_field="(index .spec.ports 0).port"
-  if [ "${version}" = "v1beta1" ] || [ "${version}" = "v1beta2" ]; then
-    id_field=".id"
-    labels_field=".labels"
-    service_selector_field=".selector"
-    rc_replicas_field=".desiredState.replicas"
-    rc_status_replicas_field=".currentState.replicas"
-    rc_container_image_field=".desiredState.podTemplate.desiredState.manifest.containers"
-    port_field=".port"
-  fi
 
   # Passing no arguments to create is an error
   ! kubectl create
