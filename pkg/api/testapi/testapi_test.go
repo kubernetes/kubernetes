@@ -46,9 +46,9 @@ func TestResourcePathWithPrefixForV1Beta3(t *testing.T) {
 	}
 }
 
-func TestResourcePathWithPrefixForV1Beta1(t *testing.T) {
-	if Version() != "v1beta1" {
-		// Skip the test if we are not testing v1beta1.
+func TestResourcePathWithPrefixForV1(t *testing.T) {
+	if Version() != "v1" {
+		// Skip the test if we are not testing v1.
 		return
 	}
 
@@ -59,11 +59,11 @@ func TestResourcePathWithPrefixForV1Beta1(t *testing.T) {
 		name      string
 		expected  string
 	}{
-		{"prefix", "resource", "mynamespace", "myresource", "/api/v1beta1/prefix/resource/myresource"},
-		{"prefix", "resource", "", "myresource", "/api/v1beta1/prefix/resource/myresource"},
-		{"prefix", "resource", "mynamespace", "", "/api/v1beta1/prefix/resource"},
-		{"prefix", "resource", "", "", "/api/v1beta1/prefix/resource"},
-		{"", "resource", "mynamespace", "myresource", "/api/v1beta1/resource/myresource"},
+		{"prefix", "resource", "mynamespace", "myresource", "/api/v1/prefix/namespaces/mynamespace/resource/myresource"},
+		{"prefix", "resource", "", "myresource", "/api/v1/prefix/resource/myresource"},
+		{"prefix", "resource", "mynamespace", "", "/api/v1/prefix/namespaces/mynamespace/resource"},
+		{"prefix", "resource", "", "", "/api/v1/prefix/resource"},
+		{"", "resource", "mynamespace", "myresource", "/api/v1/namespaces/mynamespace/resource/myresource"},
 	}
 	for _, item := range testCases {
 		if actual := ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
@@ -96,9 +96,9 @@ func TestResourcePathForV1Beta3(t *testing.T) {
 	}
 }
 
-func TestResourcePathForV1Beta1(t *testing.T) {
-	if Version() != "v1beta1" {
-		// Skip the test if we are not testing v1beta1.
+func TestResourcePathForV1(t *testing.T) {
+	if Version() != "v1" {
+		// Skip the test if we are not testing v1.
 		return
 	}
 
@@ -108,10 +108,10 @@ func TestResourcePathForV1Beta1(t *testing.T) {
 		name      string
 		expected  string
 	}{
-		{"resource", "mynamespace", "myresource", "/api/v1beta1/resource/myresource"},
-		{"resource", "", "myresource", "/api/v1beta1/resource/myresource"},
-		{"resource", "mynamespace", "", "/api/v1beta1/resource"},
-		{"resource", "", "", "/api/v1beta1/resource"},
+		{"resource", "mynamespace", "myresource", "/api/v1/namespaces/mynamespace/resource/myresource"},
+		{"resource", "", "myresource", "/api/v1/resource/myresource"},
+		{"resource", "mynamespace", "", "/api/v1/namespaces/mynamespace/resource"},
+		{"resource", "", "", "/api/v1/resource"},
 	}
 	for _, item := range testCases {
 		if actual := ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
@@ -144,9 +144,9 @@ func TestResourcePathWithNamespaceQueryForV1Beta3(t *testing.T) {
 	}
 }
 
-func TestResourcePathWithNamespaceQueryForV1Beta1(t *testing.T) {
-	if Version() != "v1beta1" {
-		// Skip the test if we are not testing v1beta1.
+func TestResourcePathWithNamespaceQueryForV1(t *testing.T) {
+	if Version() != "v1" {
+		// Skip the test if we are not testing v1.
 		return
 	}
 
@@ -156,10 +156,10 @@ func TestResourcePathWithNamespaceQueryForV1Beta1(t *testing.T) {
 		name      string
 		expected  string
 	}{
-		{"resource", "mynamespace", "myresource", "/api/v1beta1/resource/myresource?namespace=mynamespace"},
-		{"resource", "", "myresource", "/api/v1beta1/resource/myresource"},
-		{"resource", "mynamespace", "", "/api/v1beta1/resource?namespace=mynamespace"},
-		{"resource", "", "", "/api/v1beta1/resource"},
+		{"resource", "mynamespace", "myresource", "/api/v1/namespaces/mynamespace/resource/myresource"},
+		{"resource", "", "myresource", "/api/v1/resource/myresource"},
+		{"resource", "mynamespace", "", "/api/v1/namespaces/mynamespace/resource"},
+		{"resource", "", "", "/api/v1/resource"},
 	}
 	for _, item := range testCases {
 		if actual := ResourcePathWithNamespaceQuery(item.resource, item.namespace, item.name); actual != item.expected {
