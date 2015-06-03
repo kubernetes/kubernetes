@@ -25,7 +25,9 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 func TestMerge(t *testing.T) {
@@ -396,6 +398,39 @@ func TestReadConfigData(t *testing.T) {
 		}
 		if !test.expectErr && !reflect.DeepEqual(test.data, dataOut) {
 			t.Errorf("unexpected data: %v, expected %v", dataOut, test.data)
+		}
+	}
+}
+
+func TestCheckInvalidErr(t *testing.T) {
+	tests := []struct {
+		err      error
+		expected string
+	}{
+		{
+			errors.NewInvalid("Invalid1", "invalidation", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("Cause", "single", "details")}),
+			`Error from server: Invalid1 "invalidation" is invalid: Cause: invalid value 'single': details`,
+		},
+		{
+			errors.NewInvalid("Invalid2", "invalidation", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("Cause", "multi1", "details"), fielderrors.NewFieldInvalid("Cause", "multi2", "details")}),
+			`Error from server: Invalid2 "invalidation" is invalid: [Cause: invalid value 'multi1': details, Cause: invalid value 'multi2': details]`,
+		},
+		{
+			errors.NewInvalid("Invalid3", "invalidation", fielderrors.ValidationErrorList{}),
+			`Error from server: Invalid3 "invalidation" is invalid: <nil>`,
+		},
+	}
+
+	var errReturned string
+	errHandle := func(err string) {
+		errReturned = err
+	}
+
+	for _, test := range tests {
+		checkErr(test.err, errHandle)
+
+		if errReturned != test.expected {
+			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
 		}
 	}
 }
