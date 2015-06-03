@@ -70,6 +70,8 @@ project.](salt.md).
 
 * **Authorization** [authorization]( authorization.md)
 
+* **Admission Controllers** [admission_controllers]( admission_controllers.md)
+
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/cluster-admin-guide.md?pixel)]()
