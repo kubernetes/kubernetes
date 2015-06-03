@@ -18,6 +18,7 @@ package clientcmd
 
 import (
 	"io"
+	"net/url"
 	"os"
 
 	"github.com/imdario/mergo"
@@ -85,6 +86,13 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 
 	clientConfig := &client.Config{}
 	clientConfig.Host = configClusterInfo.Server
+	if u, err := url.ParseRequestURI(clientConfig.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
+		clientConfig.Prefix = u.Path
+		u.Path = ""
+		u.RawQuery = ""
+		u.Fragment = ""
+		clientConfig.Host = u.String()
+	}
 	clientConfig.Version = configClusterInfo.APIVersion
 
 	// only try to read the auth information if we are secure

@@ -141,9 +141,47 @@ func TestCreateClean(t *testing.T) {
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
+	matchStringArg("", clientConfig.Prefix, t)
 	matchStringArg(config.Clusters["clean"].APIVersion, clientConfig.Version, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
+}
+
+func TestCreateCleanWithPrefix(t *testing.T) {
+	tt := []struct {
+		server string
+		host   string
+		prefix string
+	}{
+		{"https://anything.com:8080/foo/bar", "https://anything.com:8080", "/foo/bar"},
+		{"http://anything.com:8080/foo/bar", "http://anything.com:8080", "/foo/bar"},
+		{"http://anything.com:8080/foo/bar/", "http://anything.com:8080", "/foo/bar/"},
+		{"http://anything.com:8080/", "http://anything.com:8080/", ""},
+		{"http://anything.com:8080//", "http://anything.com:8080", "//"},
+		{"anything.com:8080/foo/bar", "anything.com:8080/foo/bar", ""},
+		{"anything.com:8080", "anything.com:8080", ""},
+		{"anything.com", "anything.com", ""},
+		{"anything", "anything", ""},
+		{"", "http://localhost:8080", ""},
+	}
+
+	for _, tc := range tt {
+		config := createValidTestConfig()
+
+		cleanConfig := config.Clusters["clean"]
+		cleanConfig.Server = tc.server
+		config.Clusters["clean"] = cleanConfig
+
+		clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
+
+		clientConfig, err := clientBuilder.ClientConfig()
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+
+		matchStringArg(tc.host, clientConfig.Host, t)
+		matchStringArg(tc.prefix, clientConfig.Prefix, t)
+	}
 }
 
 func TestCreateCleanDefault(t *testing.T) {
@@ -187,7 +225,7 @@ func matchBoolArg(expected, got bool, t *testing.T) {
 
 func matchStringArg(expected, got string, t *testing.T) {
 	if expected != got {
-		t.Errorf("Expected %v, got %v", expected, got)
+		t.Errorf("Expected %q, got %q", expected, got)
 	}
 }
 
