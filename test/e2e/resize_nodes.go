@@ -207,23 +207,7 @@ func verifyPodsResponding(c *client.Client, ns, name string, pods *api.PodList) 
 	return wait.Poll(retryInterval, retryTimeout, podResponseChecker{c, ns, label, name, pods}.checkAllResponses)
 }
 
-func waitForPodsCreatedRunningResponding(c *client.Client, ns, name string, replicas int) error {
-	pods, err := waitForPodsCreated(c, ns, name, replicas)
-	if err != nil {
-		return err
-	}
-	e := waitForPodsRunning(c, pods)
-	if len(e) > 0 {
-		return fmt.Errorf("Failed to wait for pods running: %v", e)
-	}
-	err = verifyPodsResponding(c, ns, name, pods)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-var _ = Describe("Nodes", func() {
+var _ = Describe("ResizeNodes", func() {
 	supportedProviders := []string{"gce"}
 	var testName string
 	var c *client.Client
@@ -239,173 +223,116 @@ var _ = Describe("Nodes", func() {
 	})
 
 	AfterEach(func() {
+		if !providerIs(supportedProviders...) {
+			return
+		}
 		By(fmt.Sprintf("destroying namespace for this suite %s", ns))
 		if err := c.Namespaces().Delete(ns); err != nil {
 			Failf("Couldn't delete namespace '%s', %v", ns, err)
 		}
+		By("restoring the original node instance group size")
+		if err := resizeNodeInstanceGroup(testContext.CloudConfig.NumNodes); err != nil {
+			Failf("Couldn't restore the original node instance group size: %v", err)
+		}
+		if err := waitForNodeInstanceGroupSize(testContext.CloudConfig.NumNodes); err != nil {
+			Failf("Couldn't restore the original node instance group size: %v", err)
+		}
+		if err := waitForClusterSize(c, testContext.CloudConfig.NumNodes); err != nil {
+			Failf("Couldn't restore the original cluster size: %v", err)
+		}
 	})
 
-	Describe("Resize", func() {
-		BeforeEach(func() {
-			if !providerIs(supportedProviders...) {
-				Failf("Nodes.Resize test is only supported for providers %v (not %s). You can avoid this failure by using ginkgo.skip=Nodes.Resize in your environment.",
-					supportedProviders, testContext.Provider)
-			}
-		})
+	testName = "should be able to delete nodes."
+	It(testName, func() {
+		Logf("starting test %s", testName)
 
-		AfterEach(func() {
-			if !providerIs(supportedProviders...) {
-				return
-			}
-			By("restoring the original node instance group size")
-			if err := resizeNodeInstanceGroup(testContext.CloudConfig.NumNodes); err != nil {
-				Failf("Couldn't restore the original node instance group size: %v", err)
-			}
-			if err := waitForNodeInstanceGroupSize(testContext.CloudConfig.NumNodes); err != nil {
-				Failf("Couldn't restore the original node instance group size: %v", err)
-			}
-			if err := waitForClusterSize(c, testContext.CloudConfig.NumNodes); err != nil {
-				Failf("Couldn't restore the original cluster size: %v", err)
-			}
-		})
+		if !providerIs(supportedProviders...) {
+			By(fmt.Sprintf("Skipping %s test, which is only supported for providers %v (not %s)",
+				testName, supportedProviders, testContext.Provider))
+			return
+		}
 
-		testName = "should be able to delete nodes."
-		It(testName, func() {
-			Logf("starting test %s", testName)
+		if testContext.CloudConfig.NumNodes < 2 {
+			By(fmt.Sprintf("skipping %s test, which requires at lease 2 nodes (not %d)",
+				testName, testContext.CloudConfig.NumNodes))
+			return
+		}
 
-			if testContext.CloudConfig.NumNodes < 2 {
-				Failf("Failing test %s as it requires at lease 2 nodes (not %d)", testName, testContext.CloudConfig.NumNodes)
-				return
-			}
+		// Create a replication controller for a service that serves its hostname.
+		// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
+		name := "my-hostname-delete-node-" + string(util.NewUUID())
+		replicas := testContext.CloudConfig.NumNodes
+		createServeHostnameReplicationController(c, ns, name, replicas)
+		pods, err := waitForPodsCreated(c, ns, name, replicas)
+		Expect(err).NotTo(HaveOccurred())
+		e := waitForPodsRunning(c, pods)
+		if len(e) > 0 {
+			Failf("Failed to wait for pods running: %v", e)
+		}
+		err = verifyPodsResponding(c, ns, name, pods)
+		Expect(err).NotTo(HaveOccurred())
 
-			// Create a replication controller for a service that serves its hostname.
-			// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
-			name := "my-hostname-delete-node"
-			replicas := testContext.CloudConfig.NumNodes
-			createServeHostnameReplicationController(c, ns, name, replicas)
-			err := waitForPodsCreatedRunningResponding(c, ns, name, replicas)
-			Expect(err).NotTo(HaveOccurred())
+		By(fmt.Sprintf("decreasing cluster size to %d", replicas-1))
+		err = resizeNodeInstanceGroup(replicas - 1)
+		Expect(err).NotTo(HaveOccurred())
+		err = waitForNodeInstanceGroupSize(replicas - 1)
+		Expect(err).NotTo(HaveOccurred())
+		err = waitForClusterSize(c, replicas-1)
+		Expect(err).NotTo(HaveOccurred())
 
-			By(fmt.Sprintf("decreasing cluster size to %d", replicas-1))
-			err = resizeNodeInstanceGroup(replicas - 1)
-			Expect(err).NotTo(HaveOccurred())
-			err = waitForNodeInstanceGroupSize(replicas - 1)
-			Expect(err).NotTo(HaveOccurred())
-			err = waitForClusterSize(c, replicas-1)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("verifying whether the pods from the removed node are recreated")
-			err = waitForPodsCreatedRunningResponding(c, ns, name, replicas)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		testName = "should be able to add nodes."
-		It(testName, func() {
-			Logf("starting test %s", testName)
-
-			if testContext.CloudConfig.NumNodes < 2 {
-				Failf("Failing test %s as it requires at lease 2 nodes (not %d)", testName, testContext.CloudConfig.NumNodes)
-				return
-			}
-
-			// Create a replication controller for a service that serves its hostname.
-			// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
-			name := "my-hostname-add-node"
-			createServiceWithNameSelector(c, ns, name)
-			replicas := testContext.CloudConfig.NumNodes
-			createServeHostnameReplicationController(c, ns, name, replicas)
-			err := waitForPodsCreatedRunningResponding(c, ns, name, replicas)
-			Expect(err).NotTo(HaveOccurred())
-
-			By(fmt.Sprintf("increasing cluster size to %d", replicas+1))
-			err = resizeNodeInstanceGroup(replicas + 1)
-			Expect(err).NotTo(HaveOccurred())
-			err = waitForNodeInstanceGroupSize(replicas + 1)
-			Expect(err).NotTo(HaveOccurred())
-			err = waitForClusterSize(c, replicas+1)
-			Expect(err).NotTo(HaveOccurred())
-
-			By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", replicas+1))
-			err = resizeReplicationController(c, ns, name, replicas+1)
-			Expect(err).NotTo(HaveOccurred())
-			err = waitForPodsCreatedRunningResponding(c, ns, name, replicas+1)
-			Expect(err).NotTo(HaveOccurred())
-		})
+		By("verifying whether the pods from the removed node are recreated")
+		pods, err = waitForPodsCreated(c, ns, name, replicas)
+		Expect(err).NotTo(HaveOccurred())
+		e = waitForPodsRunning(c, pods)
+		if len(e) > 0 {
+			Failf("Failed to wait for pods running: %v", e)
+		}
+		err = verifyPodsResponding(c, ns, name, pods)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	Describe("Network", func() {
-		BeforeEach(func() {
-			if !providerIs(supportedProviders...) {
-				Failf("Nodes.Network test is only supported for providers %v (not %s). You can avoid this failure by using ginkgo.skip=Nodes.Network in your environment.",
-					supportedProviders, testContext.Provider)
-			}
-		})
+	testName = "should be able to add nodes."
+	It(testName, func() {
+		Logf("starting test %s", testName)
 
-		testName = "should survive network partition."
-		It(testName, func() {
-			if testContext.CloudConfig.NumNodes < 2 {
-				By(fmt.Sprintf("skipping %s test, which requires at lease 2 nodes (not %d)",
-					testName, testContext.CloudConfig.NumNodes))
-				return
-			}
+		if !providerIs(supportedProviders...) {
+			By(fmt.Sprintf("Skipping %s test, which is only supported for providers %v (not %s)",
+				testName, supportedProviders, testContext.Provider))
+			return
+		}
 
-			// Create a replication controller for a service that serves its hostname.
-			// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
-			name := "my-hostname-net"
-			createServiceWithNameSelector(c, ns, name)
-			replicas := testContext.CloudConfig.NumNodes
-			createServeHostnameReplicationController(c, ns, name, replicas)
-			err := waitForPodsCreatedRunningResponding(c, ns, name, replicas)
-			Expect(err).NotTo(HaveOccurred())
+		// Create a replication controller for a service that serves its hostname.
+		// The source for the Docker containter kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
+		name := "my-hostname-add-node-" + string(util.NewUUID())
+		createServiceWithNameSelector(c, ns, name)
+		replicas := testContext.CloudConfig.NumNodes
+		createServeHostnameReplicationController(c, ns, name, replicas)
+		pods, err := waitForPodsCreated(c, ns, name, replicas)
+		Expect(err).NotTo(HaveOccurred())
+		e := waitForPodsRunning(c, pods)
+		if len(e) > 0 {
+			Failf("Failed to wait for pods running: %v", e)
+		}
+		err = verifyPodsResponding(c, ns, name, pods)
+		Expect(err).NotTo(HaveOccurred())
 
-			By("cause network partition on one node")
-			nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
-			Expect(err).NotTo(HaveOccurred())
-			node := nodelist.Items[0]
-			pod, err := waitForRCPodOnNode(c, ns, name, node.Name)
-			Expect(err).NotTo(HaveOccurred())
-			Logf("Getting external IP address for %s", name)
-			host := ""
-			for _, a := range node.Status.Addresses {
-				if a.Type == api.NodeExternalIP {
-					host = a.Address + ":22"
-					break
-				}
-			}
-			Logf("Setting network partition on %s", node.Name)
-			dropCmd := fmt.Sprintf("sudo iptables -I OUTPUT 1 -d %s -j DROP", testContext.CloudConfig.MasterName)
-			if _, _, code, err := SSH(dropCmd, host, testContext.Provider); code != 0 || err != nil {
-				Failf("Expected 0 exit code and nil error when running %s on %s, got %d and %v",
-					dropCmd, node, code, err)
-			}
+		By(fmt.Sprintf("increasing cluster size to %d", replicas+1))
+		err = resizeNodeInstanceGroup(replicas + 1)
+		Expect(err).NotTo(HaveOccurred())
+		err = waitForNodeInstanceGroupSize(replicas + 1)
+		Expect(err).NotTo(HaveOccurred())
+		err = waitForClusterSize(c, replicas+1)
+		Expect(err).NotTo(HaveOccurred())
 
-			Logf("Waiting for node %s to be not ready", node.Name)
-			waitForNodeToBe(c, node.Name, false, 2*time.Minute)
-
-			Logf("Waiting for pod %s to be removed", pod.Name)
-			waitForRCPodToDisappear(c, ns, name, pod.Name)
-
-			By("verifying whether the pod from the partitioned node is recreated")
-			err = waitForPodsCreatedRunningResponding(c, ns, name, replicas)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("remove network partition")
-			undropCmd := "sudo iptables --delete OUTPUT 1"
-			if _, _, code, err := SSH(undropCmd, host, testContext.Provider); code != 0 || err != nil {
-				Failf("Expected 0 exit code and nil error when running %s on %s, got %d and %v",
-					undropCmd, node, code, err)
-			}
-
-			Logf("Waiting for node %s to be ready", node.Name)
-			waitForNodeToBe(c, node.Name, true, 2*time.Minute)
-
-			By("verify wheter new pods can be created on the re-attached node")
-			err = resizeReplicationController(c, ns, name, replicas+1)
-			Expect(err).NotTo(HaveOccurred())
-			err = waitForPodsCreatedRunningResponding(c, ns, name, replicas+1)
-			Expect(err).NotTo(HaveOccurred())
-			_, err = waitForRCPodOnNode(c, ns, name, node.Name)
-			Expect(err).NotTo(HaveOccurred())
-		})
+		By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", replicas+1))
+		resizeReplicationController(c, ns, name, replicas+1)
+		pods, err = waitForPodsCreated(c, ns, name, replicas+1)
+		Expect(err).NotTo(HaveOccurred())
+		e = waitForPodsRunning(c, pods)
+		if len(e) > 0 {
+			Failf("Failed to wait for pods running: %v", e)
+		}
+		err = verifyPodsResponding(c, ns, name, pods)
+		Expect(err).NotTo(HaveOccurred())
 	})
 })
