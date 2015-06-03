@@ -152,7 +152,7 @@ type ec2InstanceFilter struct {
 
 // True if the passed instance matches the filter
 func (f *ec2InstanceFilter) Matches(instance *ec2.Instance) bool {
-	if f.PrivateDNSName != "" && *instance.PrivateDNSName != f.PrivateDNSName {
+	if f.PrivateDNSName != "" && orEmpty(instance.PrivateDNSName) != f.PrivateDNSName {
 		return false
 	}
 	return true
@@ -549,11 +549,11 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 
 	addresses := []api.NodeAddress{}
 
-	if *instance.PrivateIPAddress != "" {
+	if !isNilOrEmpty(instance.PrivateIPAddress) {
 		ipAddress := *instance.PrivateIPAddress
 		ip := net.ParseIP(ipAddress)
 		if ip == nil {
-			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", *instance.InstanceID, ipAddress)
+			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", orEmpty(instance.InstanceID), ipAddress)
 		}
 		addresses = append(addresses, api.NodeAddress{Type: api.NodeInternalIP, Address: ip.String()})
 
@@ -562,11 +562,11 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	}
 
 	// TODO: Other IP addresses (multiple ips)?
-	if *instance.PublicIPAddress != "" {
+	if !isNilOrEmpty(instance.PublicIPAddress) {
 		ipAddress := *instance.PublicIPAddress
 		ip := net.ParseIP(ipAddress)
 		if ip == nil {
-			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", *instance.InstanceID, ipAddress)
+			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", orEmpty(instance.InstanceID), ipAddress)
 		}
 		addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalIP, Address: ip.String()})
 	}
@@ -580,7 +580,7 @@ func (aws *AWSCloud) ExternalID(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return *inst.InstanceID, nil
+	return orEmpty(inst.InstanceID), nil
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
@@ -591,7 +591,7 @@ func (aws *AWSCloud) InstanceID(name string) (string, error) {
 	}
 	// In the future it is possible to also return an endpoint as:
 	// <endpoint>/<zone>/<instanceid>
-	return "/" + *inst.Placement.AvailabilityZone + "/" + *inst.InstanceID, nil
+	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceID), nil
 }
 
 // Return the instances matching the relevant private dns name.
@@ -611,7 +611,7 @@ func (s *AWSCloud) getInstanceByDnsName(name string) (*ec2.Instance, error) {
 			continue
 		}
 
-		if *instance.PrivateDNSName != name {
+		if orEmpty(instance.PrivateDNSName) != name {
 			// TODO: Should we warn here? - the filter should have caught this
 			// (this will happen in the tests if they don't fully mock the EC2 API)
 			continue
@@ -632,14 +632,18 @@ func (s *AWSCloud) getInstanceByDnsName(name string) (*ec2.Instance, error) {
 // Check if the instance is alive (running or pending)
 // We typically ignore instances that are not alive
 func isAlive(instance *ec2.Instance) bool {
-	state := *instance.State
-	switch *state.Name {
+	if instance.State == nil {
+		glog.Warning("Instance state was unexpectedly nil: ", instance)
+		return false
+	}
+	stateName := orEmpty(instance.State.Name)
+	switch stateName {
 	case "shutting-down", "terminated", "stopping", "stopped":
 		return false
 	case "pending", "running":
 		return true
 	default:
-		glog.Errorf("unknown EC2 instance state: %s", *instance.State)
+		glog.Errorf("unknown EC2 instance state: %s", stateName)
 		return false
 	}
 }
@@ -668,26 +672,26 @@ func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 	for _, instance := range instances {
 		// TODO: Push filtering down into EC2 API filter?
 		if !isAlive(instance) {
-			glog.V(2).Infof("skipping EC2 instance (%s): %s",
-				*instance.State.Name, *instance.InstanceID)
 			continue
 		}
 
 		// Only return fully-ready instances when listing instances
 		// (vs a query by name, where we will return it if we find it)
-		if *instance.State.Name == "pending" {
+		if orEmpty(instance.State.Name) == "pending" {
 			glog.V(2).Infof("skipping EC2 instance (pending): %s", *instance.InstanceID)
 			continue
 		}
-		if *instance.PrivateDNSName == "" {
+
+		privateDNSName := orEmpty(instance.PrivateDNSName)
+		if privateDNSName == "" {
 			glog.V(2).Infof("skipping EC2 instance (no PrivateDNSName): %s",
-				*instance.InstanceID)
+				orEmpty(instance.InstanceID))
 			continue
 		}
 
 		for _, tag := range instance.Tags {
-			if *tag.Key == "Name" && re.MatchString(*tag.Value) {
-				matchingInstances = append(matchingInstances, *instance.PrivateDNSName)
+			if orEmpty(tag.Key) == "Name" && re.MatchString(orEmpty(tag.Value)) {
+				matchingInstances = append(matchingInstances, privateDNSName)
 				break
 			}
 		}
@@ -709,7 +713,7 @@ func (aws *AWSCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 		return nil, err
 	}
 
-	resources, err := getResourcesByInstanceType(*instance.InstanceType)
+	resources, err := getResourcesByInstanceType(orEmpty(instance.InstanceType))
 	if err != nil {
 		return nil, err
 	}
@@ -950,7 +954,7 @@ func (self *awsInstance) assignMountDevice(volumeID string) (mountDevice string,
 		}
 		deviceMappings := map[string]string{}
 		for _, blockDevice := range info.BlockDeviceMappings {
-			deviceMappings[*blockDevice.DeviceName] = *blockDevice.EBS.VolumeID
+			deviceMappings[orEmpty(blockDevice.DeviceName)] = orEmpty(blockDevice.EBS.VolumeID)
 		}
 		self.deviceMappings = deviceMappings
 	}
@@ -1077,7 +1081,12 @@ func (self *awsDisk) waitForAttachmentStatus(status string) error {
 			if attachmentStatus != "" {
 				glog.Warning("Found multiple attachments: ", info)
 			}
-			attachmentStatus = *attachment.State
+			if attachment.State != nil {
+				attachmentStatus = *attachment.State
+			} else {
+				// Shouldn't happen, but don't panic...
+				glog.Warning("Ignoring nil attachment state: ", attachment)
+			}
 		}
 		if attachmentStatus == "" {
 			attachmentStatus = "detached"
@@ -1144,7 +1153,7 @@ func (aws *AWSCloud) getAwsInstance(instanceName string) (*awsInstance, error) {
 			return nil, fmt.Errorf("error finding instance: %v", err)
 		}
 
-		awsInstance = newAWSInstance(aws.ec2, *instance.InstanceID)
+		awsInstance = newAWSInstance(aws.ec2, orEmpty(instance.InstanceID))
 	}
 
 	return awsInstance, nil
@@ -1248,10 +1257,10 @@ func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) 
 		return "", err
 	}
 
-	az := response.AvailabilityZone
-	awsID := response.VolumeID
+	az := orEmpty(response.AvailabilityZone)
+	awsID := orEmpty(response.VolumeID)
 
-	volumeName := "aws://" + *az + "/" + *awsID
+	volumeName := "aws://" + az + "/" + awsID
 
 	return volumeName, nil
 }
