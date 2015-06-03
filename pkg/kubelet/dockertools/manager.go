@@ -1263,9 +1263,12 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 			}
 			return "", err
 		}
+		if ref != nil {
+			dm.recorder.Eventf(ref, "pulled", "Successfully pulled Pod container image %q", container.Image)
+		}
 	}
-	if ref != nil {
-		dm.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
+	if ok && ref != nil {
+		dm.recorder.Eventf(ref, "pulled", "Pod container image %q already present on machine", container.Image)
 	}
 
 	id, err := dm.runContainerInPod(pod, container, netNamespace, "")
@@ -1494,7 +1497,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, pod
 	// Start everything
 	for idx := range containerChanges.ContainersToStart {
 		container := &pod.Spec.Containers[idx]
-		glog.V(4).Infof("Creating container %+v", container)
+		glog.V(4).Infof("Creating container %+v in pod %v", container, podFullName)
 		err := dm.pullImage(pod, container, pullSecrets)
 		dm.updateReasonCache(pod, container, err)
 		if err != nil {
