@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	internal "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 )
 
 func TestResourceVersioner(t *testing.T) {
