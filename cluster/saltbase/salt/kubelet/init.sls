@@ -72,4 +72,5 @@ kubelet:
 {% if grains['os_family'] != 'RedHat' %}
       - file: /etc/init.d/kubelet
 {% endif %}
+      - file: {{ environment_file }}
       - file: /var/lib/kubelet/kubernetes_auth
