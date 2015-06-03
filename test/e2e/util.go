@@ -40,7 +40,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"code.google.com/p/go-uuid/uuid"
@@ -357,54 +356,6 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 // The default namespace is used to identify pods.
 func waitForPodSuccess(c *client.Client, podName string, contName string) error {
 	return waitForPodSuccessInNamespace(c, podName, contName, api.NamespaceDefault)
-}
-
-// waitForRCPodOnNode returns the pod from the given replication controller (decribed by rcName) which is scheduled on the given node.
-// In case of failure or too long waiting time, an error is returned.
-func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, error) {
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
-	var p *api.Pod = nil
-	err := wait.Poll(3*time.Minute, 5*time.Second, func() (bool, error) {
-		Logf("Waiting for pod %s to appear on node %s", rcName, node)
-		pods, err := c.Pods(ns).List(label, fields.Everything())
-		if err != nil {
-			return false, err
-		}
-		for _, pod := range pods.Items {
-			if pod.Spec.NodeName == node {
-				Logf("Pod %s found on node %s", pod.Name, node)
-				p = &pod
-				return true, nil
-			}
-		}
-		return false, nil
-	})
-	return p, err
-}
-
-// waitForRCPodOnNode returns nil if the pod from the given replication controller (decribed by rcName) no longer exists.
-// In case of failure or too long waiting time, an error is returned.
-func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error {
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
-	return wait.Poll(5*time.Minute, 20*time.Second, func() (bool, error) {
-		Logf("Waiting for pod %s to disappear", podName)
-		pods, err := c.Pods(ns).List(label, fields.Everything())
-		if err != nil {
-			return false, err
-		}
-		found := false
-		for _, pod := range pods.Items {
-			if pod.Name == podName {
-				Logf("Pod %s still exists", podName)
-				found = true
-			}
-		}
-		if !found {
-			Logf("Pod %s no longer exists", podName)
-			return true, nil
-		}
-		return false, nil
-	})
 }
 
 // Context for checking pods responses by issuing GETs to them and verifying if the answer with pod name.
