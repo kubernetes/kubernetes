@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Pod Disks", func() {
+var _ = Describe("PD", func() {
 	var (
 		c         *client.Client
 		podClient client.PodInterface
