@@ -10,8 +10,41 @@ ansible_ssh_user: root
 # If a password is needed to sudo to root that password must be set here
 #ansible_sudo_pass: password
 
+# A list of insecure registrys you night need to define
+insecure_registrys:
+  - "docker.example.com"
+  - "docker2.example.com"
+
+# If you need a proxy for the docker daemon define these here
+#  The condition is if they are defined so just comment them out if you don't 
+#  need a proxy.
+# http_proxy: "http://proxy.example.com:3128"
+# https_proxy: "http://proxy.example.com:3128"
+
+
 # Kubernetes internal network for services.
 # Kubernetes services will get fake IP addresses from this range.
 # This range must not conflict with anything in your infrastructure. These
 # addresses do not need to be routable and must just be an unused block of space.
 kube_service_addresses: 10.254.0.0/16
+
+flannel_network: 192.168.0.0
+
+# Turn this varable to 'false' to disable whole DNS configuration.
+dns_setup: true
+# How many replicas in the Replication Controller
+dns_replicas: 1
+
+# Internal DNS domain name.
+# This domain must not be used in your network. Services will be discoverable
+# under <service-name>.<namespace>.<domainname>, e.g.
+# myservice.default.kube.local
+dns_domain: kube.local
+
+# IP address of the DNS server.
+# Kubernetes will create a pod with several containers, serving as the DNS
+# server and expose it under this IP address. The IP address must be from
+# the range specified as kube_service_addresses above.
+# And this is the IP address you should use as address of the DNS server
+# in your containers.
+dns_server: 10.254.0.10

@@ -2,16 +2,16 @@
 - hosts: masters:minions
   sudo: yes
   roles:
-          - common
+    - common
 
 - hosts: masters
   sudo: yes
   roles:
-          - kubernetes
-          - master
+    - kubernetes
+    - master
 
 - hosts: minions
   sudo: yes
   roles:
-          - kubernetes
-          - minion
+    - kubernetes
+    - minion

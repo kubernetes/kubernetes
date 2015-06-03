@@ -4,6 +4,16 @@
   register: s
   changed_when: false
 
+- name: Determine if CentOS7
+  shell: "grep 'CentOS Linux.*release 7' /etc/redhat-release"
+  register: is_centos7
+  ignore_errors: yes
+  changed_when: false
+
+- name: Install Testing centos7 repo for new tool versions
+  copy: src=virt7-testing.repo dest=/etc/yum.repos.d/virt7-testing.repo
+  when: is_centos7
+
 - name: Init the is_atomic fact
   set_fact:
     is_atomic: false

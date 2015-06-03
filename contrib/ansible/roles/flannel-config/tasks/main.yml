@@ -1,0 +1,13 @@
+---
+- name: Copy the configure script
+  template: src=config-flannel.sh.j2 dest=~/config-flannel.sh mode=755
+
+- name: Run the configure script
+  command: ~/config-flannel.sh 
+  register: command_result
+  failed_when: command_result.rc != 0 and 'Key already exists' not in command_result.stderr
+  changed_when: "command_result.rc == 0"
+  when: inventory_hostname == groups['etcd'][0]
+
+- name: Remove the configure script
+  file: name=~/config-flannel.sh state=absent
