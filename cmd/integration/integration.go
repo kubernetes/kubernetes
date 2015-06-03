@@ -176,6 +176,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(cl.Events(""))
 	scheduler.New(schedulerConfig).Run()
 

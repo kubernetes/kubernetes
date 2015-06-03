@@ -97,6 +97,7 @@ type ReplicationManager struct {
 // NewReplicationManager creates a new ReplicationManager.
 func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
 
 	rm := &ReplicationManager{
