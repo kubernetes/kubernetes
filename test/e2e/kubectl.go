@@ -44,7 +44,7 @@ const (
 	guestbookResponseTimeout = 3 * time.Minute
 )
 
-var _ = Describe("kubectl", func() {
+var _ = Describe("Kubectl client", func() {
 	defer GinkgoRecover()
 	var c *client.Client
 	var ns string
@@ -53,7 +53,7 @@ var _ = Describe("kubectl", func() {
 		var err error
 		c, err = loadClient()
 		expectNoError(err)
-		testingNs, err = createTestingNS("kubectl", c)
+		testingNs, err = createTestingNS("Kubectl client", c)
 		ns = testingNs.Name
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -65,7 +65,7 @@ var _ = Describe("kubectl", func() {
 		}
 	})
 
-	Describe("update-demo", func() {
+	Describe("Update Demo", func() {
 		var updateDemoRoot, nautilusPath, kittenPath string
 		BeforeEach(func() {
 			updateDemoRoot = filepath.Join(testContext.RepoRoot, "examples/update-demo")
@@ -106,7 +106,7 @@ var _ = Describe("kubectl", func() {
 		})
 	})
 
-	Describe("guestbook", func() {
+	Describe("Guestbook application", func() {
 		var guestbookPath string
 		BeforeEach(func() {
 			guestbookPath = filepath.Join(testContext.RepoRoot, "examples/guestbook")
