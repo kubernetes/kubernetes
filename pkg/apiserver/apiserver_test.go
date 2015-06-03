@@ -231,7 +231,7 @@ func handleInternal(legacy bool, storage map[string]rest.Storage, admissionContr
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
 	mux := container.ServeMux
-	if err := group.InstallREST(container); err != nil {
+	if err := group.InstallREST(&RestContainer{container, 0}); err != nil {
 		panic(fmt.Sprintf("unable to install container %s: %v", group.Version, err))
 	}
 	ws := new(restful.WebService)
@@ -1901,7 +1901,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Codec:         newCodec,
 	}
 	container := restful.NewContainer()
-	if err := group.InstallREST(container); err == nil {
+	if err := group.InstallREST(&RestContainer{container, 0}); err == nil {
 		t.Fatal("expected error")
 	}
 
@@ -1929,7 +1929,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Codec:         newCodec,
 	}
 	container = restful.NewContainer()
-	if err := group.InstallREST(container); err != nil {
+	if err := group.InstallREST(&RestContainer{container, 0}); err != nil {
 		t.Fatal(err)
 	}
 

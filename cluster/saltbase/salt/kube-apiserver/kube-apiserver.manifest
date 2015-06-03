@@ -59,6 +59,11 @@
 {% set token_auth_file = "--token_auth_file=/dev/null" -%}
 {% set basic_auth_file = "" -%}
 
+{% set min_request_timeout = "" -%}
+{% if grains.minRequestTimeout is defined -%}
+  {% set min_request_timeout = "--min-request-timeout=" + grains.minRequestTimeout -%}
+{% endif -%}
+
 {% if grains.cloud is defined -%}
 {% if grains.cloud in [ 'aws', 'gce', 'vagrant' ] -%}
     {% set token_auth_file = "--token_auth_file=/srv/kubernetes/known_tokens.csv" -%}
@@ -79,7 +84,7 @@
  {% set runtime_config = "--runtime_config=" + grains.runtime_config -%}
 {% endif -%}
 
-{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file -%}
+{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
 {% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure_port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address -%}
 
 {

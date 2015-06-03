@@ -111,6 +111,10 @@ type Config struct {
 	// If specified, all web services will be registered into this container
 	RestfulContainer *restful.Container
 
+	// If specified, requests will be allocated a random timeout between this value, and twice this value.
+	// Note that it is up to the request handlers to ignore or honor this timeout.
+	MinRequestTimeout int
+
 	// Number of masters running; all masters must be started with the
 	// same value for this field. (Numbers > 1 currently untested.)
 	MasterCount int
@@ -153,7 +157,7 @@ type Master struct {
 
 	mux                   apiserver.Mux
 	muxHelper             *apiserver.MuxHelper
-	handlerContainer      *restful.Container
+	handlerContainer      *apiserver.RestContainer
 	rootWebService        *restful.WebService
 	enableCoreControllers bool
 	enableLogsSupport     bool
@@ -341,14 +345,16 @@ func New(c *Config) *Master {
 		serviceReadWritePort: 443,
 	}
 
+	var handlerContainer *restful.Container
 	if c.RestfulContainer != nil {
 		m.mux = c.RestfulContainer.ServeMux
-		m.handlerContainer = c.RestfulContainer
+		handlerContainer = c.RestfulContainer
 	} else {
 		mux := http.NewServeMux()
 		m.mux = mux
-		m.handlerContainer = NewHandlerContainer(mux)
+		handlerContainer = NewHandlerContainer(mux)
 	}
+	m.handlerContainer = &apiserver.RestContainer{handlerContainer, c.MinRequestTimeout}
 	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
 	m.handlerContainer.Router(restful.CurlyRouter{})
 	m.muxHelper = &apiserver.MuxHelper{m.mux, []string{}}
@@ -507,16 +513,16 @@ func (m *Master) init(c *Config) {
 	}
 
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
-	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
+	apiserver.AddApiWebService(m.handlerContainer.Container, c.APIPrefix, apiVersions)
 	defaultVersion := m.defaultAPIGroupVersion()
 	requestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), defaultVersion.Mapper}
-	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
+	apiserver.InstallServiceErrorHandler(m.handlerContainer.Container, requestInfoResolver, apiVersions)
 
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
 	// Allow master to be embedded in contexts which already have something registered at the root
 	if c.EnableIndex {
-		m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
+		m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer.Container, m.muxHelper))
 	}
 
 	if c.EnableLogsSupport {
@@ -649,7 +655,7 @@ func (m *Master) InstallSwaggerAPI() {
 		SwaggerPath:     "/swaggerui/",
 		SwaggerFilePath: "/swagger-ui/",
 	}
-	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
+	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer.Container)
 }
 
 func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {

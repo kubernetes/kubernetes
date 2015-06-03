@@ -66,10 +66,12 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 }
 
 // serveWatch handles serving requests to the server
-func serveWatch(watcher watch.Interface, scope RequestScope, w http.ResponseWriter, req *restful.Request) {
-	// Each watch gets a random timeout to avoid thundering herds. Rand is seeded once in the api installer.
-	timeout := time.Duration(MinTimeoutSecs+rand.Intn(MaxTimeoutSecs-MinTimeoutSecs)) * time.Second
-
+func serveWatch(watcher watch.Interface, scope RequestScope, w http.ResponseWriter, req *restful.Request, minRequestTimeout int) {
+	var timeout time.Duration
+	if minRequestTimeout > 0 {
+		// Each watch gets a random timeout between minRequestTimeout and 2*minRequestTimeout to avoid thundering herds.
+		timeout = time.Duration(minRequestTimeout+rand.Intn(minRequestTimeout)) * time.Second
+	}
 	watchServer := &WatchServer{watcher, scope.Codec, func(obj runtime.Object) {
 		if err := setSelfLink(obj, req, scope.Namer); err != nil {
 			glog.V(5).Infof("Failed to set self link for object %v: %v", reflect.TypeOf(obj), err)

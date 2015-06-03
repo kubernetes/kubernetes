@@ -47,7 +47,11 @@ ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
 EOF
-
+  if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}"  ]; then
+    cat >>$file <<EOF
+KUBE_APISERVER_REQUEST_TIMEOUT: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT})
+EOF
+  fi
   if [[ "${master}" == "true" ]]; then
     # Master-only env vars.
     cat >>$file <<EOF

@@ -140,17 +140,24 @@ const (
 	MaxTimeoutSecs = 600
 )
 
+// restContainer is a wrapper around a generic restful Container that also contains a MinRequestTimeout
+type RestContainer struct {
+	*restful.Container
+	MinRequestTimeout int
+}
+
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash. A restful WebService is created for the group and version.
-func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
+func (g *APIGroupVersion) InstallREST(container *RestContainer) error {
 	info := &APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(g.Root, "/")), g.Mapper}
 
 	prefix := path.Join(g.Root, g.Version)
 	installer := &APIInstaller{
-		group:  g,
-		info:   info,
-		prefix: prefix,
+		group:             g,
+		info:              info,
+		prefix:            prefix,
+		minRequestTimeout: container.MinRequestTimeout,
 	}
 	ws, registrationErrors := installer.Install()
 	container.Add(ws)
