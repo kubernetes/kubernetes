@@ -77,13 +77,6 @@ import pipes,sys,yaml
 for k,v in yaml.load(sys.stdin).iteritems():
   print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
 ''' < "${kube_env_yaml}")
-
-  # Infer master status from hostname
-  if [[ $(hostname) == "${INSTANCE_PREFIX}-master" ]]; then
-    KUBERNETES_MASTER="true"
-  else
-    KUBERNETES_MASTER="false"
-  fi
 }
 
 function remove-docker-artifacts() {
