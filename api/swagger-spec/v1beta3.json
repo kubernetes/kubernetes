@@ -10862,8 +10862,7 @@
    "v1beta3.PodSpec": {
     "id": "v1beta3.PodSpec",
     "required": [
-     "containers",
-     "serviceAccount"
+     "containers"
     ],
     "properties": {
      "volumes": {
@@ -10882,7 +10881,7 @@
      },
      "restartPolicy": {
       "type": "string",
-      "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever; defaults to RestartPolicyAlways"
+      "description": "restart policy for all containers within the pod; one of Always, OnFailure, Never; defaults to Always"
      },
      "terminationGracePeriodSeconds": {
       "type": "integer",
