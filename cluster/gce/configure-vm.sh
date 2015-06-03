@@ -494,8 +494,10 @@ EOF
 token-url = ${TOKEN_URL}
 project-id = ${PROJECT_ID}
 EOF
+    EXTERNAL_IP=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   cloud_config: /etc/gce.conf
+  advertise_address: '${EXTERNAL_IP}'
 EOF
   fi
 }

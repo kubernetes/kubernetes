@@ -58,6 +58,7 @@ type APIServer struct {
 	InsecureBindAddress        util.IP
 	InsecurePort               int
 	BindAddress                util.IP
+	AdvertiseAddress           util.IP
 	ReadOnlyPort               int
 	SecurePort                 int
 	ExternalHost               string
@@ -145,8 +146,14 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"Defaults to localhost.")
 	fs.Var(&s.InsecureBindAddress, "address", "DEPRECATED: see --insecure-bind-address instead")
 	fs.Var(&s.BindAddress, "bind-address", ""+
-		"The IP address on which to serve the --read-only-port and --secure-port ports. This "+
-		"address must be reachable by the rest of the cluster. If blank, all interfaces will be used.")
+		"The IP address on which to serve the --read-only-port and --secure-port ports. The "+
+		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
+		"clients. If blank, all interfaces will be used (0.0.0.0).")
+	fs.Var(&s.AdvertiseAddress, "advertise-address", ""+
+		"The IP address on which to advertise the apiserver to members of the cluster. This "+
+		"address must be reachable by the rest of the cluster. If blank, the --bind-address "+
+		"will be used. If --bind-address is unspecified, the host's default interface will "+
+		"be used.")
 	fs.Var(&s.BindAddress, "public-address-override", "DEPRECATED: see --bind-address instead")
 	fs.IntVar(&s.ReadOnlyPort, "read-only-port", s.ReadOnlyPort, ""+
 		"The port on which to serve read-only resources. If 0, don't serve read-only "+
@@ -233,6 +240,13 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersi
 // Run runs the specified APIServer.  This should never exit.
 func (s *APIServer) Run(_ []string) error {
 	s.verifyClusterIPFlags()
+
+	// If advertise-address is not specified, use bind-address. If bind-address
+	// is also unset (or 0.0.0.0), setDefaults() in pkg/master/master.go will
+	// do the right thing and use the host's default interface.
+	if s.AdvertiseAddress == nil || net.IP(s.AdvertiseAddress).IsUnspecified() {
+		s.AdvertiseAddress = s.BindAddress
+	}
 
 	if (s.EtcdConfigFile != "" && len(s.EtcdServerList) != 0) || (s.EtcdConfigFile == "" && len(s.EtcdServerList) == 0) {
 		glog.Fatalf("specify either --etcd-servers or --etcd-config")
@@ -356,7 +370,7 @@ func (s *APIServer) Run(_ []string) error {
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,
 		ReadOnlyPort:           s.ReadOnlyPort,
 		ReadWritePort:          s.SecurePort,
-		PublicAddress:          net.IP(s.BindAddress),
+		PublicAddress:          net.IP(s.AdvertiseAddress),
 		Authenticator:          authenticator,
 		SupportsBasicAuth:      len(s.BasicAuthFile) > 0,
 		Authorizer:             authorizer,
@@ -443,6 +457,7 @@ func (s *APIServer) Run(_ []string) error {
 				if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
 					s.TLSCertFile = path.Join(s.CertDirectory, "apiserver.crt")
 					s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "apiserver.key")
+					// TODO (cjcullen): Is PublicAddress the right address to sign a cert with?
 					if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
 						glog.Errorf("Unable to generate self signed cert: %v", err)
 					} else {
