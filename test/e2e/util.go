@@ -723,12 +723,16 @@ func RunRC(config RCConfig) error {
 	image := config.Image
 	replicas := config.Replicas
 	interval := config.PollInterval
-
 	maxContainerFailures := int(math.Max(1.0, float64(replicas)*.01))
 	current := 0
 	same := 0
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	podLists := newFifoQueue()
+
+	// Default to 10 second polling/check interval
+	if interval <= 0 {
+		interval = 10
+	}
 
 	By(fmt.Sprintf("%v Creating replication controller %s", time.Now(), name))
 	rc := &api.ReplicationController{
