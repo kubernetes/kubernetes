@@ -468,12 +468,13 @@ function kube-up {
 
   echo "Using VPC $VPC_ID"
 
-  SUBNET_ID=$($AWS_CMD describe-subnets | get_subnet_id $VPC_ID $ZONE)
+  SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:Role,Values=kube-subnet | get_subnet_id $VPC_ID $ZONE)
   if [[ -z "$SUBNET_ID" ]]; then
     echo "Creating subnet."
     SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $INTERNAL_IP_BASE.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
+    add-tag $SUBNET_ID Role kube-subnet
   else
-    EXISTING_CIDR=$($AWS_CMD describe-subnets | get_cidr $VPC_ID $ZONE)
+    EXISTING_CIDR=$($AWS_CMD describe-subnets --filters Name=tag:Role,Values=kube-subnet | get_cidr $VPC_ID $ZONE)
     echo "Using existing CIDR $EXISTING_CIDR"
     INTERNAL_IP_BASE=${EXISTING_CIDR%.*}
     MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
@@ -491,10 +492,13 @@ function kube-up {
   echo "Using Internet Gateway $IGW_ID"
 
   echo "Associating route table."
-  ROUTE_TABLE_ID=$($AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID | json_val '["RouteTables"][0]["RouteTableId"]')
-  $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $SUBNET_ID > $LOG || true
+  ROUTE_TABLE_ID=$($AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID Name=association.subnet-id,Values=$SUBNET_ID | json_val '["RouteTables"][0]["RouteTableId"]')
+  if [[ -z "$ROUTE_TABLE_ID" ]]; then
+    ROUTE_TABLE_ID=$($AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID | json_val '["RouteTables"][0]["RouteTableId"]')
+    $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $SUBNET_ID > $LOG || true
+  fi
   echo "Configuring route table."
-  $AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID > $LOG || true
+  $AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID Name=association.subnet-id,Values=$SUBNET_ID > $LOG || true
   echo "Adding route to route table."
   $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID > $LOG || true
 
