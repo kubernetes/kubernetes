@@ -17,7 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -66,99 +65,6 @@ func writeTestFile(t *testing.T, dir, name string, contents string) *os.File {
 		t.Fatalf("Unable to write test file %#v", err)
 	}
 	return file
-}
-
-func TestReadContainerManifestFromFile(t *testing.T) {
-	// ContainerManifest is supported only for pre v1beta3 versions.
-	if !api.PreV1Beta3(testapi.Version()) {
-		return
-	}
-	hostname := "random-test-hostname"
-	var testCases = []struct {
-		desc         string
-		fileContents string
-		expected     kubelet.PodUpdate
-	}{
-		{
-			desc: "Manifest",
-			fileContents: fmt.Sprintf(`{
-					"version": "%s",
-					"uuid": "12345",
-					"id": "test",
-					"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
-				}`, testapi.Version()),
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "test-" + hostname,
-					UID:       "12345",
-					Namespace: kubelet.NamespaceDefault,
-					SelfLink:  getSelfLink("test-"+hostname, kubelet.NamespaceDefault),
-				},
-				Spec: api.PodSpec{
-					NodeName:      hostname,
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-					Containers: []api.Container{{
-						Name:  "image",
-						Image: "test/image",
-						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "Always",
-						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
-				},
-			}),
-		},
-		{
-			desc: "Manifest without ID",
-			fileContents: fmt.Sprintf(`{
-						"version": "%s",
-						"uuid": "12345",
-						"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
-					}`, testapi.Version()),
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "12345-" + hostname,
-					UID:       "12345",
-					Namespace: kubelet.NamespaceDefault,
-					SelfLink:  getSelfLink("12345-"+hostname, kubelet.NamespaceDefault),
-				},
-				Spec: api.PodSpec{
-					NodeName:      hostname,
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-					Containers: []api.Container{{
-						Name:  "image",
-						Image: "test/image",
-						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "Always",
-						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
-				},
-			}),
-		},
-	}
-
-	for _, testCase := range testCases {
-		func() {
-			file := writeTestFile(t, os.TempDir(), "test_pod_config", testCase.fileContents)
-			defer os.Remove(file.Name())
-
-			ch := make(chan interface{})
-			NewSourceFile(file.Name(), hostname, time.Millisecond, ch)
-			select {
-			case got := <-ch:
-				update := got.(kubelet.PodUpdate)
-				for _, pod := range update.Pods {
-					if errs := validation.ValidatePod(pod); len(errs) > 0 {
-						t.Errorf("%s: Invalid pod %#v, %#v", testCase.desc, pod, errs)
-					}
-				}
-				if !api.Semantic.DeepEqual(testCase.expected, update) {
-					t.Errorf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
-				}
-			case <-time.After(time.Second):
-				t.Errorf("%s: Expected update, timeout instead", testCase.desc)
-			}
-		}()
-	}
 }
 
 func TestReadPodsFromFile(t *testing.T) {
@@ -273,32 +179,6 @@ func TestReadPodsFromFile(t *testing.T) {
 				t.Errorf("%s: Expected update, timeout instead", testCase.desc)
 			}
 		}()
-	}
-}
-
-func TestReadManifestFromFileWithDefaults(t *testing.T) {
-	if !api.PreV1Beta3(testapi.Version()) {
-		return
-	}
-	file := writeTestFile(t, os.TempDir(), "test_pod_config",
-		fmt.Sprintf(`{
-			"version": "%s",
-			"id": "test",
-			"containers": [{ "name": "image", "image": "test/image" }]
-		}`, testapi.Version()))
-	defer os.Remove(file.Name())
-
-	ch := make(chan interface{})
-	NewSourceFile(file.Name(), "localhost", time.Millisecond, ch)
-	select {
-	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		if update.Pods[0].UID == "" {
-			t.Errorf("Unexpected UID: %s", update.Pods[0].UID)
-		}
-
-	case <-time.After(time.Second):
-		t.Errorf("Expected update, timeout instead")
 	}
 }
 
