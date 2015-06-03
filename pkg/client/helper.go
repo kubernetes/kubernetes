@@ -18,6 +18,7 @@ package client
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -164,6 +165,34 @@ func NewOrDie(c *Config) *Client {
 		panic(err)
 	}
 	return client
+}
+
+// InClusterConfig returns a config object which uses the service account
+// kubernetes gives to pods. It's intended for clients that expect to be
+// running inside a pod running on kuberenetes. It will return an error if
+// called from a process not running in a kubernetes environment.
+func InClusterConfig() (*Config, error) {
+	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+	if err != nil {
+		return nil, err
+	}
+	return &Config{
+		// TODO: switch to using cluster DNS.
+		Host:        "https://" + net.JoinHostPort(os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")),
+		Version:     "v1beta3",
+		BearerToken: string(token),
+		// TODO: package certs along with the token
+		Insecure: true,
+	}, nil
+}
+
+// NewInCluster is a shortcut for calling InClusterConfig() and then New().
+func NewInCluster() (*Client, error) {
+	cc, err := InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+	return New(cc)
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the

@@ -60,10 +60,10 @@ var _ = Describe("DNS", func() {
 		// All the names we need to be able to resolve.
 		// TODO: Spin up a separate test service and test that dns works for that service.
 		namesToResolve := []string{
-			"kubernetes-ro.default",
-			"kubernetes-ro.default.svc",
-			"kubernetes-ro.default.svc.cluster.local",
-			"kubernetes-ro.default.cluster.local",
+			"kubernetes.default",
+			"kubernetes.default.svc",
+			"kubernetes.default.svc.cluster.local",
+			"kubernetes.default.cluster.local",
 			"google.com",
 		}
 		// Added due to #8512. This is critical for GCE and GKE deployments.
