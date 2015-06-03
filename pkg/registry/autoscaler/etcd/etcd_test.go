@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -37,32 +38,33 @@ import (
 func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	helper := tools.NewEtcdHelper(fakeEtcdClient, latest.Codec)
+	helper := tools.NewEtcdHelper(fakeEtcdClient, latest.Codec, etcdtest.PathPrefix())
 	return fakeEtcdClient, helper
 }
 
-func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient, tools.EtcdHelper) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, tools.EtcdHelper) {
 	fakeEtcdClient, h := newHelper(t)
-	return NewREST(h), fakeEtcdClient, h
+	storage, statusStorage := NewStorage(h)
+	return storage, statusStorage, fakeEtcdClient, h
 }
 
-func validNewAutoScaler() *api.AutoScaler {
+func validNewAutoScaler(name string) *api.AutoScaler {
 	return &api.AutoScaler{
 		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
+			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.AutoScalerSpec{
 			TargetSelector:  map[string]string{"foo": "bar"},
-			MonitorSelector: map[string]string{"fizz": "buzz"},
+			MonitoringSources: []string{"fizz", "buzz"},
 		},
 	}
 }
 
 func TestCreate(t *testing.T) {
-	storage, fakeEtcdClient, _ := newStorage(t)
+	storage, _, fakeEtcdClient, _ := newStorage(t)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
-	autoScaler := validNewAutoScaler()
+	autoScaler := validNewAutoScaler("create-test")
 	autoScaler.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		//valid
@@ -75,9 +77,9 @@ func TestCreate(t *testing.T) {
 func TestCreateRegistryError(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
 	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage := NewREST(helper)
+	storage, _ := NewStorage(helper)
 
-	autoScaler := validNewAutoScaler()
+	autoScaler := validNewAutoScaler("foo")
 	_, err := storage.Create(api.NewDefaultContext(), autoScaler)
 	if err != fakeEtcdClient.Err {
 		t.Fatalf("unexpected error: %v", err)
@@ -85,16 +87,21 @@ func TestCreateRegistryError(t *testing.T) {
 }
 
 func TestCreateSetsFields(t *testing.T) {
+	ctx := api.NewDefaultContext()
 	fakeEtcdClient, helper := newHelper(t)
-	storage := NewREST(helper)
-	autoScaler := validNewAutoScaler()
-	_, err := storage.Create(api.NewDefaultContext(), autoScaler)
+	storage, _ := NewStorage(helper)
+	autoScaler := validNewAutoScaler("foo")
+	_, err := storage.Create(ctx, autoScaler)
 	if err != fakeEtcdClient.Err {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	actual := &api.AutoScaler{}
-	if err := helper.ExtractObj("/registry/autoScalers/default/foo", actual, false); err != nil {
+	key, err := storage.KeyFunc(ctx, "foo")
+	if err != nil {
+		t.Fatalf("unexpected key error: %v", err)
+	}
+	if err := helper.ExtractObj(key, actual, false); err != nil {
 		t.Fatalf("unexpected extraction error: %v", err)
 	}
 	if actual.Name != autoScaler.Name {
@@ -108,7 +115,7 @@ func TestCreateSetsFields(t *testing.T) {
 func TestListError(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
 	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage := NewREST(helper)
+	storage, _ := NewStorage(helper)
 	scalers, err := storage.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	if err != fakeEtcdClient.Err {
 		t.Fatalf("Expected %#v, Got %#v", fakeEtcdClient.Err, err)
@@ -119,15 +126,17 @@ func TestListError(t *testing.T) {
 }
 
 func TestListEmptyAutoScalerList(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
+	ctx := api.NewDefaultContext()
+	storage, _, fakeEtcdClient, _ := newStorage(t)
 	fakeEtcdClient.ChangeIndex = 1
-	fakeEtcdClient.Data["/registry/autoScalers"] = tools.EtcdResponseWithError{
+	key := storage.KeyRootFunc(ctx)
+	key = etcdtest.AddPrefix(key)
+	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: fakeEtcdClient.NewError(tools.EtcdErrorCodeNotFound),
 	}
 
-	storage := NewREST(helper)
-	scalers, err := storage.List(api.NewContext(), labels.Everything(), fields.Everything())
+	scalers, err := storage.List(ctx, labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Fatalf("Unexpected error: %#v", err)
 	}
@@ -140,10 +149,15 @@ func TestListEmptyAutoScalerList(t *testing.T) {
 }
 
 func TestListAutoScalerList(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
+	ctx := api.NewDefaultContext()
+	storage, _, fakeEtcdClient, _ := newStorage(t)
 	fakeEtcdClient.ChangeIndex = 1
-	autoScaler := validNewAutoScaler()
-	fakeEtcdClient.Data["/registry/autoScalers/default"] = tools.EtcdResponseWithError{
+
+	autoScaler := validNewAutoScaler("foo")
+
+	key := storage.KeyRootFunc(ctx)
+	key = etcdtest.AddPrefix(key)
+	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
@@ -155,8 +169,7 @@ func TestListAutoScalerList(t *testing.T) {
 		},
 	}
 
-	storage := NewREST(helper)
-	scalers, err := storage.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
+	scalers, err := storage.List(ctx, labels.Everything(), fields.Everything())
 	scalerList := scalers.(*api.AutoScalerList)
 
 	if err != nil {
@@ -171,17 +184,18 @@ func TestListAutoScalerList(t *testing.T) {
 }
 
 func TestListAutoScalerListSelection(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
+	ctx := api.NewDefaultContext()
+	storage, _, fakeEtcdClient, _ := newStorage(t)
+	fakeEtcdClient.ChangeIndex = 1
 
-	validScaler1 := validNewAutoScaler()
-	validScaler1.Name = "scaler1"
-	validScaler2 := validNewAutoScaler()
-	validScaler2.Name = "scaler2"
-	validScaler3 := validNewAutoScaler()
-	validScaler3.Name = "scaler3"
+	validScaler1 := validNewAutoScaler("scaler1")
+	validScaler2 := validNewAutoScaler("scaler2")
+	validScaler3 := validNewAutoScaler("scaler3")
 	validScaler3.ObjectMeta.Labels = map[string]string{"label": "test"}
 
-	fakeEtcdClient.Data["/registry/autoScalers/default"] = tools.EtcdResponseWithError{
+	key := storage.KeyRootFunc(ctx)
+	key = etcdtest.AddPrefix(key)
+	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
@@ -198,9 +212,6 @@ func TestListAutoScalerListSelection(t *testing.T) {
 			},
 		},
 	}
-
-	storage := NewREST(helper)
-	ctx := api.NewDefaultContext()
 
 	testCases := []struct {
 		name, label, field string
@@ -266,8 +277,8 @@ func TestListAutoScalerListSelection(t *testing.T) {
 }
 
 func TestAutoScalerDecode(t *testing.T) {
-	storage := NewREST(tools.EtcdHelper{})
-	expected := validNewAutoScaler()
+	storage, _ := NewStorage(tools.EtcdHelper{})
+	expected := validNewAutoScaler("foo")
 	body, err := latest.Codec.Encode(expected)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -284,10 +295,17 @@ func TestAutoScalerDecode(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	expect := validNewAutoScaler()
+	expect := validNewAutoScaler("foo")
 
-	fakeEtcdClient, helper := newHelper(t)
-	fakeEtcdClient.Data["/registry/autoScalers/test/foo"] = tools.EtcdResponseWithError{
+	storage, _, fakeEtcdClient, _ := newStorage(t)
+	ctx := api.NewDefaultContext()
+	key, err := storage.KeyFunc(api.WithNamespace(ctx, "test"), "foo")
+	if err != nil {
+		t.Fatalf("unexpected key error: %v", err)
+	}
+
+	key = etcdtest.AddPrefix(key)
+	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Value: runtime.EncodeOrDie(latest.Codec, expect),
@@ -295,8 +313,7 @@ func TestGet(t *testing.T) {
 		},
 	}
 
-	storage := NewREST(helper)
-	obj, err := storage.Get(api.WithNamespace(api.NewContext(), "test"), "foo")
+	obj, err := storage.Get(api.WithNamespace(ctx, "test"), "foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -308,10 +325,17 @@ func TestGet(t *testing.T) {
 }
 
 func TestUpdateWithConflictingNamespace(t *testing.T) {
-	expect := validNewAutoScaler()
+	expect := validNewAutoScaler("foo")
 
-	fakeEtcdClient, helper := newHelper(t)
-	fakeEtcdClient.Data["/registry/autoScalers/default/foo"] = tools.EtcdResponseWithError{
+	storage, _, fakeEtcdClient, _ := newStorage(t)
+	ctx := api.NewDefaultContext()
+	key, err := storage.KeyFunc(ctx, "foo")
+	if err != nil {
+		t.Fatalf("unexpected key error: %v", err)
+	}
+
+	key = etcdtest.AddPrefix(key)
+	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Value:         runtime.EncodeOrDie(latest.Codec, expect),
@@ -319,10 +343,9 @@ func TestUpdateWithConflictingNamespace(t *testing.T) {
 			},
 		},
 	}
-	storage := NewREST(helper)
 	expect.Namespace = "not-default"
 	expect.ResourceVersion = "1"
-	obj, created, err := storage.Update(api.NewDefaultContext(), expect)
+	obj, created, err := storage.Update(ctx, expect)
 
 	if obj != nil || created {
 		t.Error("Expected a nil object, but we got a value or created")
@@ -335,10 +358,17 @@ func TestUpdateWithConflictingNamespace(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	expect := validNewAutoScaler()
+	expect := validNewAutoScaler("foo")
 
-	fakeEtcdClient, helper := newHelper(t)
-	fakeEtcdClient.Data["/registry/autoScalers/default/foo"] = tools.EtcdResponseWithError{
+	storage, _, fakeEtcdClient, _ := newStorage(t)
+	ctx := api.NewDefaultContext()
+	key, err := storage.KeyFunc(ctx, "foo")
+	if err != nil {
+		t.Fatalf("unexpected key error: %v", err)
+	}
+
+	key = etcdtest.AddPrefix(key)
+	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Value:         runtime.EncodeOrDie(latest.Codec, expect),
@@ -346,19 +376,17 @@ func TestDelete(t *testing.T) {
 			},
 		},
 	}
-	storage := NewREST(helper)
-	result, err := storage.Delete(api.NewDefaultContext(), expect.Name)
+	result, err := storage.Delete(ctx, expect.Name, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.(*api.Status).Status != api.StatusSuccess {
-		t.Errorf("expected success status but got: %v", result)
+	if result == nil {
+		t.Fatalf("got no deleted object where one was expected")
 	}
 }
 
 func TestWatch(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
-	storage := NewREST(helper)
+	storage, _, fakeEtcdClient, _ := newStorage(t)
 	watching, err := storage.Watch(api.NewDefaultContext(), labels.Everything(), fields.Everything(), "1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -380,8 +408,7 @@ func TestWatch(t *testing.T) {
 }
 
 func TestWatchWithSelectorMatch(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
-	storage := NewREST(helper)
+	storage, _, fakeEtcdClient, _ := newStorage(t)
 	watching, err := storage.Watch(api.NewDefaultContext(),
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
 		fields.Everything(),
@@ -391,7 +418,7 @@ func TestWatchWithSelectorMatch(t *testing.T) {
 	}
 	fakeEtcdClient.WaitForWatchCompletion()
 
-	autoScaler := validNewAutoScaler()
+	autoScaler := validNewAutoScaler("foo")
 	autoScaler.Labels = map[string]string{"name": "foo"}
 	encoded, _ := latest.Codec.Encode(autoScaler)
 	fakeEtcdClient.WatchResponse <- &etcd.Response{
@@ -414,8 +441,7 @@ func TestWatchWithSelectorMatch(t *testing.T) {
 }
 
 func TestWatchWithSelectorNoMatch(t *testing.T) {
-	fakeEtcdClient, helper := newHelper(t)
-	storage := NewREST(helper)
+	storage, _, fakeEtcdClient, _ := newStorage(t)
 	watching, err := storage.Watch(api.NewDefaultContext(),
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
 		fields.Everything(),
@@ -425,7 +451,7 @@ func TestWatchWithSelectorNoMatch(t *testing.T) {
 	}
 	fakeEtcdClient.WaitForWatchCompletion()
 
-	autoScaler := validNewAutoScaler()
+	autoScaler := validNewAutoScaler("foo")
 	encoded, _ := latest.Codec.Encode(autoScaler)
 	fakeEtcdClient.WatchResponse <- &etcd.Response{
 		Action: "create",

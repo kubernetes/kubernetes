@@ -2164,9 +2164,11 @@ type AutoScaler struct {
 
 // AutoScalerStatus provides the status of an auto-scaler.
 type AutoScalerStatus struct {
-	// TODO: open for discussion on what meaningful information can be reported in the status
-	// The status may return the replica count here but we may want more information
-	// such as if the count reflects a threshold being passed.
+	// Last autoscaler action trigger.
+	LastActionTrigger AutoScaleThreshold `json:"lastActionTrigger,omitempty"`
+
+	// Timestamp of the last autoscaler action.
+	LastActionTimestamp util.Time `json:"lastActionTimestamp,omitempty"`
 }
 
 // AutoScalerSpec defines the auto-scaler targets and thresholds.
@@ -2176,21 +2178,20 @@ type AutoScalerSpec struct {
 
 	// MaxAutoScaleCount defines the max replicas that the auto-scaler can use.  This value must be
 	// >= MinAutoScaleCount.
-	MaxAutoScaleCount int64 `json:"maxAutoScaleCount,omitempty"`
+	MaxAutoScaleCount int `json:"maxAutoScaleCount,omitempty"`
 
 	// MinAutoScaleCount defines the minimum number replicas that the auto-scaler can reduce to,
 	// 0 means that the application is allowed to idle.
-	MinAutoScaleCount int64 `json:"minAutoScaleCount,omitempty"`
+	MinAutoScaleCount int `json:"minAutoScaleCount,omitempty"`
 
 	// TargetSelector provides the resizeable target(s).  Right now this is a ReplicationController
 	// in the future it could be a job or any resource that implements resize.  If multiple targets
 	// are resolved by the selector the auto-scaler will resize the largest one.
 	TargetSelector map[string]string `json:"targetSelector,omitempty"`
 
-	// MonitorSelector defines a set of resources that the auto-scaler is monitoring
-	// (replication controllers).  Monitored objects are used by thresholds to examine
-	// statistics.  Example: get statistic X for object Y (the monitored object) to see if threshold is passed.
-	MonitorSelector map[string]string `json:"monitorSelector,omitempty"`
+	// MonitoringSources defines a set of sources that the auto-scaler
+	// uses to examine if thresholds are (b)reached.
+	MonitoringSources []string `json:"monitoringSources,omitempty"`
 }
 
 // AutoScaleThreshold is a behavior based on statistics used to drive the auto-scaler in scaling decisions.
@@ -2198,8 +2199,22 @@ type AutoScaleThreshold struct {
 	// Type is the type of threshold being used, intention or value.
 	Type AutoScaleThresholdType `json:"type,omitempty"`
 
-	// IntentionConfig holds the config for intention based thresholds.
-	IntentionConfig AutoScaleIntentionThresholdConfig `json:"intentionConfig,omitempty"`
+	// Intentions holds the config for intention based thresholds.
+	// All the thresholds must be (b)reached for the auto-scale action
+	// to be taken. This allows defining more complex conditions ala:
+	//    scale up if MaxRPS > 50 AND ResponseTime > 200 ms
+	// Aside: To define an action that triggers on any one of the
+	//        thresholds getting (b)reached, this can be achieved by
+	//        defining multiple AutoScaleThresholds.
+	//        Example:  scale up if MaxRPS > 30
+	//            [OR]  scale up if ResponseTime > 200ms
+	Intentions []AutoScaleIntentionThresholdConfig `json:"intentions,omitempty"`
+
+	// ActionType holds the auto-scaler action to take when the threshold is (b)reached.
+	ActionType AutoScaleActionType `json:"action,omitempty"`
+
+	// How much to scale up/down by.
+	ScaleBy int `json:"scaleBy,omitempty"`
 }
 
 // AutoScaleIntentionThresholdConfig holds configuration for intention based thresholds.
@@ -2211,7 +2226,14 @@ type AutoScaleIntentionThresholdConfig struct {
 	// Value is intention dependent in terms of above, below, equal and represents
 	// the value to check against.
 	Value float32 `json:"value,omitempty"`
+
+	// Duration is the time interval (in seconds) for which we want to
+	// compare the intention threshold value.
+	Duration int `json:"duration,omitempty"`
 }
+
+// AutoScaleActionType defines the action to take when a condition is reached.
+type AutoScaleActionType string
 
 // AutoScaleThresholdType is either intention based or value based.
 type AutoScaleThresholdType string
@@ -2222,11 +2244,34 @@ type AutoScaleIntentionType string
 
 // Constants for auto-scalers and any auto-scaling child types like intentions
 const (
+	// AutoScaleActionType is used for defining actions to take when thresholds are (b)reached.
+	AutoScaleActionTypeNone      AutoScaleActionType = ""
+	AutoScaleActionTypeScaleUp   AutoScaleActionType = "ScaleUp"
+	AutoScaleActionTypeScaleDown AutoScaleActionType = "ScaleDown"
+
 	// AutoScaleThresholdTypeIntention is used when defining an intention based threshold.
 	AutoScaleThresholdTypeIntention AutoScaleThresholdType = "Intention"
 
-	// TODO: AutoScaleIntentionType types
-	// example: AutoScaleIntentionTypeMaxRPS AutoScaleIntentionType = "MaxRPS"
+	// AutoScale based on requests per second.
+	AutoScaleIntentionTypeRequestsPerSecond AutoScaleIntentionType = "RequestsPerSecond"
+
+	// AutoScale based on cpu usage and load average.
+	AutoScaleIntentionTypeCpuUsage    AutoScaleIntentionType = "CpuUsage"
+	AutoScaleIntentionTypeLoadAverage AutoScaleIntentionType = "LoadAverage"
+
+	// AutoScale based on memory usage.
+	AutoScaleIntentionTypeMemoryUsage AutoScaleIntentionType = "MemoryUsage"
+
+	// TODO: AutoScale based on disk usage.
+	// AutoScaleIntentionTypeDiskIoTime AutoScaleIntentionType = "DiskIoTime"
+	// AutoScaleIntentionTypeDiskIoWaitTime AutoScaleIntentionType = "DiskIoWaitTime"
+
+	// TODO: AutoScale based on network bandwidth usage.
+	// AutoScaleIntentionTypeNetworkRxBytes AutoScaleIntentionType = "NetworkRxBytes"
+	// AutoScaleIntentionTypeNetworkTxBytes AutoScaleIntentionType = "NetworkTxBytes"
+
+	// TODO: Add AutoScale based on filesystem usage.
+	// AutoScaleIntentionTypeFileSystemUsage AutoScaleIntentionType = "FileSystemUsage"
 )
 
 // AutoScalerList is a list of AutoScaler items

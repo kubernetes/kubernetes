@@ -18,10 +18,9 @@ package autoscaler
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -41,26 +40,14 @@ type Registry interface {
 	DeleteAutoScaler(ctx api.Context, autoScalerID string) error
 }
 
-// Storage is an interface for a standard REST Storage backend
-// TODO: move me somewhere common
-type Storage interface {
-	apiserver.RESTDeleter
-	apiserver.RESTLister
-	apiserver.RESTGetter
-	apiserver.ResourceWatcher
-
-	Create(ctx api.Context, obj runtime.Object) (runtime.Object, error)
-	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
-}
-
 // storage puts strong typing around storage calls
 type storage struct {
-	Storage
+	rest.StandardStorage
 }
 
 // NewRegistry returns a new Registry interface for the given Storage. Any mismatched
 // types will panic.
-func NewRegistry(s Storage) Registry {
+func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
@@ -95,6 +82,6 @@ func (s *storage) UpdateAutoScaler(ctx api.Context, autoScaler *api.AutoScaler) 
 }
 
 func (s *storage) DeleteAutoScaler(ctx api.Context, id string) error {
-	_, err := s.Delete(ctx, id)
+	_, err := s.Delete(ctx, id, nil)
 	return err
 }

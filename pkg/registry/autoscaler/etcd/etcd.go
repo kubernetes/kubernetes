@@ -25,77 +25,60 @@ import (
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// rest implements a RESTStorage for pods against etcd
+// rest implements a RESTStorage for autoscalers against etcd
 type REST struct {
+	*etcdgeneric.Etcd
+}
+
+// NewStorage returns RESTStorage objects that will work against AutoScalers.
+func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
+	prefix := "/autoScalers"
+
+	store := &etcdgeneric.Etcd{
+		NewFunc:     func() runtime.Object { return &api.AutoScaler{} },
+		NewListFunc: func() runtime.Object { return &api.AutoScalerList{} },
+		KeyRootFunc: func(ctx api.Context) string {
+			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
+		},
+		KeyFunc: func(ctx api.Context, name string) (string, error) {
+			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
+		},
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*api.AutoScaler).Name, nil
+		},
+		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+			return autoscaler.MatchAutoScaler(label, field)
+		},
+		CreateStrategy: autoscaler.AutoScalers,
+		UpdateStrategy: autoscaler.AutoScalers,
+		EndpointName:   "autoScalers",
+
+		Helper: h,
+	}
+
+	store.ReturnDeletedObject = true
+
+	statusStore := *store
+	statusStore.UpdateStrategy = autoscaler.AutoScalers
+
+	return &REST{store}, &StatusREST{store: &statusStore}
+}
+
+
+// StatusREST implements the REST endpoint for changing the status of an
+// autoscaler.
+type StatusREST struct {
 	store *etcdgeneric.Etcd
 }
 
-func NewREST(h tools.EtcdHelper) *REST {
-	prefix := "/registry/autoScalers"
-	return &REST{
-		store: &etcdgeneric.Etcd{
-			NewFunc:     func() runtime.Object { return &api.AutoScaler{} },
-			NewListFunc: func() runtime.Object { return &api.AutoScalerList{} },
-			KeyRootFunc: func(ctx api.Context) string {
-				return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
-			},
-			KeyFunc: func(ctx api.Context, name string) (string, error) {
-				return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
-			},
-			ObjectNameFunc: func(obj runtime.Object) (string, error) {
-				return obj.(*api.AutoScaler).Name, nil
-			},
-			PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-				return autoscaler.MatchAutoScaler(label, field)
-			},
-			CreateStrategy: autoscaler.AutoScalers,
-			UpdateStrategy: autoscaler.AutoScalers,
-			EndpointName:   "autoScalers",
-
-			Helper: h,
-		},
-	}
-}
-
 // New returns a new object
-func (r *REST) New() runtime.Object {
-	return r.store.NewFunc()
+func (s *StatusREST) New() runtime.Object {
+	return s.store.NewFunc()
 }
 
-// NewList returns a new list object
-func (r *REST) NewList() runtime.Object {
-	return r.store.NewListFunc()
-}
-
-// List obtains a list of autoscalers with labels that match selector.
-func (r *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	return r.store.List(ctx, label, field)
-}
-
-// Watch begins watching for new, changed, or deleted autoscalers.
-func (r *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return r.store.Watch(ctx, label, field, resourceVersion)
-}
-
-// Get gets a specific autoscalers specified by its ID.
-func (r *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	return r.store.Get(ctx, name)
-}
-
-// Create creates a autoscalers based on a specification.
-func (r *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	return r.store.Create(ctx, obj)
-}
-
-// Update changes a autoscalers specification.
-func (r *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, obj)
-}
-
-// Delete deletes an existing autoscalers specified by its ID.
-func (r *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
-	return r.store.Delete(ctx, name)
+// Update changes an autoscalers status.
+func (s *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return s.store.Update(ctx, obj)
 }

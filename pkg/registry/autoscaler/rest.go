@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 // autoScalerStrategy implements behavior for AutoScalers
@@ -43,6 +43,19 @@ func (autoScalerStrategy) NamespaceScoped() bool {
 	return true
 }
 
+// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+func (autoScalerStrategy) PrepareForCreate(obj runtime.Object) {
+	autoScaler := obj.(*api.AutoScaler)
+	autoScaler.Status = api.AutoScalerStatus{}
+}
+
+// PrepareForUpdate sets the Status field which is not allowed to be set by end users on update.
+func (autoScalerStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newAs := obj.(*api.AutoScaler)
+	oldAs := old.(*api.AutoScaler)
+	newAs.Status = oldAs.Status
+}
+
 // ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
 func (autoScalerStrategy) ResetBeforeCreate(obj runtime.Object) {
 	autoScaler := obj.(*api.AutoScaler)
@@ -50,7 +63,7 @@ func (autoScalerStrategy) ResetBeforeCreate(obj runtime.Object) {
 }
 
 // Validate validates a new AutoScalers.
-func (autoScalerStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+func (autoScalerStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	autoScaler := obj.(*api.AutoScaler)
 	return validation.ValidateAutoScaler(autoScaler)
 }
@@ -61,7 +74,7 @@ func (autoScalerStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate validates AutoScalers during an update
-func (autoScalerStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+func (autoScalerStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateAutoScalerUpdate(old.(*api.AutoScaler), obj.(*api.AutoScaler))
 }
 

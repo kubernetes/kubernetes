@@ -177,3 +177,7 @@ func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
 func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
 	return &FakeComponentStatuses{Fake: c}
 }
+
+func (c *Fake) AutoScalers(namespace string) client.AutoScalerInterface {
+	return &FakeAutoScalers{Fake: c, Namespace: namespace}
+}

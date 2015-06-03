@@ -35,6 +35,126 @@ func convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolu
 	return nil
 }
 
+func convert_api_AutoScaleIntentionThresholdConfig_To_v1_AutoScaleIntentionThresholdConfig(in *api.AutoScaleIntentionThresholdConfig, out *AutoScaleIntentionThresholdConfig, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.AutoScaleIntentionThresholdConfig))(in)
+	}
+	out.Intent = AutoScaleIntentionType(in.Intent)
+	out.Value = in.Value
+	out.Duration = in.Duration
+	return nil
+}
+
+func convert_api_AutoScaleThreshold_To_v1_AutoScaleThreshold(in *api.AutoScaleThreshold, out *AutoScaleThreshold, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.AutoScaleThreshold))(in)
+	}
+	out.Type = AutoScaleThresholdType(in.Type)
+	if in.Intentions != nil {
+		out.Intentions = make([]AutoScaleIntentionThresholdConfig, len(in.Intentions))
+		for i := range in.Intentions {
+			if err := convert_api_AutoScaleIntentionThresholdConfig_To_v1_AutoScaleIntentionThresholdConfig(&in.Intentions[i], &out.Intentions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Intentions = nil
+	}
+	out.ActionType = AutoScaleActionType(in.ActionType)
+	out.ScaleBy = in.ScaleBy
+	return nil
+}
+
+func convert_api_AutoScaler_To_v1_AutoScaler(in *api.AutoScaler, out *AutoScaler, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.AutoScaler))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_AutoScalerSpec_To_v1_AutoScalerSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_api_AutoScalerStatus_To_v1_AutoScalerStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_AutoScalerList_To_v1_AutoScalerList(in *api.AutoScalerList, out *AutoScalerList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.AutoScalerList))(in)
+	}
+	if err := convert_api_TypeMeta_To_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_api_ListMeta_To_v1_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]AutoScaler, len(in.Items))
+		for i := range in.Items {
+			if err := convert_api_AutoScaler_To_v1_AutoScaler(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_api_AutoScalerSpec_To_v1_AutoScalerSpec(in *api.AutoScalerSpec, out *AutoScalerSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.AutoScalerSpec))(in)
+	}
+	if in.Thresholds != nil {
+		out.Thresholds = make([]AutoScaleThreshold, len(in.Thresholds))
+		for i := range in.Thresholds {
+			if err := convert_api_AutoScaleThreshold_To_v1_AutoScaleThreshold(&in.Thresholds[i], &out.Thresholds[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Thresholds = nil
+	}
+	out.MaxAutoScaleCount = in.MaxAutoScaleCount
+	out.MinAutoScaleCount = in.MinAutoScaleCount
+	if in.TargetSelector != nil {
+		out.TargetSelector = make(map[string]string)
+		for key, val := range in.TargetSelector {
+			out.TargetSelector[key] = val
+		}
+	} else {
+		out.TargetSelector = nil
+	}
+	if in.MonitoringSources != nil {
+		out.MonitoringSources = make([]string, len(in.MonitoringSources))
+		for i := range in.MonitoringSources {
+			out.MonitoringSources[i] = in.MonitoringSources[i]
+		}
+	} else {
+		out.MonitoringSources = nil
+	}
+	return nil
+}
+
+func convert_api_AutoScalerStatus_To_v1_AutoScalerStatus(in *api.AutoScalerStatus, out *AutoScalerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.AutoScalerStatus))(in)
+	}
+	if err := convert_api_AutoScaleThreshold_To_v1_AutoScaleThreshold(&in.LastActionTrigger, &out.LastActionTrigger, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LastActionTimestamp, &out.LastActionTimestamp, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_api_Binding_To_v1_Binding(in *api.Binding, out *Binding, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.Binding))(in)
@@ -2300,6 +2420,134 @@ func convert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolu
 	return nil
 }
 
+func convert_v1_AutoScaleIntentionThresholdConfig_To_api_AutoScaleIntentionThresholdConfig(in *AutoScaleIntentionThresholdConfig, out *api.AutoScaleIntentionThresholdConfig, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*AutoScaleIntentionThresholdConfig))(in)
+	}
+	out.Intent = api.AutoScaleIntentionType(in.Intent)
+	out.Value = in.Value
+	out.Duration = in.Duration
+	return nil
+}
+
+func convert_v1_AutoScaleThreshold_To_api_AutoScaleThreshold(in *AutoScaleThreshold, out *api.AutoScaleThreshold, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*AutoScaleThreshold))(in)
+	}
+	out.Type = api.AutoScaleThresholdType(in.Type)
+	if in.Intentions != nil {
+		out.Intentions = make([]api.AutoScaleIntentionThresholdConfig, len(in.Intentions))
+		for i := range in.Intentions {
+			if err := convert_v1_AutoScaleIntentionThresholdConfig_To_api_AutoScaleIntentionThresholdConfig(&in.Intentions[i], &out.Intentions[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Intentions = nil
+	}
+	out.ActionType = api.AutoScaleActionType(in.ActionType)
+	out.ScaleBy = in.ScaleBy
+	return nil
+}
+
+func convert_v1_AutoScaler_To_api_AutoScaler(in *AutoScaler, out *api.AutoScaler, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*AutoScaler))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if in.Labels != nil {
+		out.Labels = make(map[string]string)
+		for key, val := range in.Labels {
+			out.Labels[key] = val
+		}
+	} else {
+		out.Labels = nil
+	}
+	if err := convert_v1_AutoScalerSpec_To_api_AutoScalerSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := convert_v1_AutoScalerStatus_To_api_AutoScalerStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1_AutoScalerList_To_api_AutoScalerList(in *AutoScalerList, out *api.AutoScalerList, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*AutoScalerList))(in)
+	}
+	if err := convert_v1_TypeMeta_To_api_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := convert_v1_ListMeta_To_api_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]api.AutoScaler, len(in.Items))
+		for i := range in.Items {
+			if err := convert_v1_AutoScaler_To_api_AutoScaler(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convert_v1_AutoScalerSpec_To_api_AutoScalerSpec(in *AutoScalerSpec, out *api.AutoScalerSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*AutoScalerSpec))(in)
+	}
+	if in.Thresholds != nil {
+		out.Thresholds = make([]api.AutoScaleThreshold, len(in.Thresholds))
+		for i := range in.Thresholds {
+			if err := convert_v1_AutoScaleThreshold_To_api_AutoScaleThreshold(&in.Thresholds[i], &out.Thresholds[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Thresholds = nil
+	}
+	out.MaxAutoScaleCount = in.MaxAutoScaleCount
+	out.MinAutoScaleCount = in.MinAutoScaleCount
+	if in.TargetSelector != nil {
+		out.TargetSelector = make(map[string]string)
+		for key, val := range in.TargetSelector {
+			out.TargetSelector[key] = val
+		}
+	} else {
+		out.TargetSelector = nil
+	}
+	if in.MonitoringSources != nil {
+		out.MonitoringSources = make([]string, len(in.MonitoringSources))
+		for i := range in.MonitoringSources {
+			out.MonitoringSources[i] = in.MonitoringSources[i]
+		}
+	} else {
+		out.MonitoringSources = nil
+	}
+	return nil
+}
+
+func convert_v1_AutoScalerStatus_To_api_AutoScalerStatus(in *AutoScalerStatus, out *api.AutoScalerStatus, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*AutoScalerStatus))(in)
+	}
+	if err := convert_v1_AutoScaleThreshold_To_api_AutoScaleThreshold(&in.LastActionTrigger, &out.LastActionTrigger, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.LastActionTimestamp, &out.LastActionTimestamp, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1_Binding_To_api_Binding(in *Binding, out *api.Binding, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*Binding))(in)
@@ -4557,6 +4805,12 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.Volu
 func init() {
 	err := api.Scheme.AddGeneratedConversionFuncs(
 		convert_api_AWSElasticBlockStoreVolumeSource_To_v1_AWSElasticBlockStoreVolumeSource,
+		convert_api_AutoScaleIntentionThresholdConfig_To_v1_AutoScaleIntentionThresholdConfig,
+		convert_api_AutoScaleThreshold_To_v1_AutoScaleThreshold,
+		convert_api_AutoScalerList_To_v1_AutoScalerList,
+		convert_api_AutoScalerSpec_To_v1_AutoScalerSpec,
+		convert_api_AutoScalerStatus_To_v1_AutoScalerStatus,
+		convert_api_AutoScaler_To_v1_AutoScaler,
 		convert_api_Binding_To_v1_Binding,
 		convert_api_Capabilities_To_v1_Capabilities,
 		convert_api_ComponentCondition_To_v1_ComponentCondition,
@@ -4670,6 +4924,12 @@ func init() {
 		convert_api_VolumeSource_To_v1_VolumeSource,
 		convert_api_Volume_To_v1_Volume,
 		convert_v1_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
+		convert_v1_AutoScaleIntentionThresholdConfig_To_api_AutoScaleIntentionThresholdConfig,
+		convert_v1_AutoScaleThreshold_To_api_AutoScaleThreshold,
+		convert_v1_AutoScalerList_To_api_AutoScalerList,
+		convert_v1_AutoScalerSpec_To_api_AutoScalerSpec,
+		convert_v1_AutoScalerStatus_To_api_AutoScalerStatus,
+		convert_v1_AutoScaler_To_api_AutoScaler,
 		convert_v1_Binding_To_api_Binding,
 		convert_v1_Capabilities_To_api_Capabilities,
 		convert_v1_ComponentCondition_To_api_ComponentCondition,

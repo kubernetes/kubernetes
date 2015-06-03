@@ -49,6 +49,116 @@ func deepCopy_v1_AWSElasticBlockStoreVolumeSource(in AWSElasticBlockStoreVolumeS
 	return nil
 }
 
+func deepCopy_v1_AutoScaleIntentionThresholdConfig(in AutoScaleIntentionThresholdConfig, out *AutoScaleIntentionThresholdConfig, c *conversion.Cloner) error {
+	out.Intent = in.Intent
+	out.Value = in.Value
+	out.Duration = in.Duration
+	return nil
+}
+
+func deepCopy_v1_AutoScaleThreshold(in AutoScaleThreshold, out *AutoScaleThreshold, c *conversion.Cloner) error {
+	out.Type = in.Type
+	if in.Intentions != nil {
+		out.Intentions = make([]AutoScaleIntentionThresholdConfig, len(in.Intentions))
+		for i := range in.Intentions {
+			if err := deepCopy_v1_AutoScaleIntentionThresholdConfig(in.Intentions[i], &out.Intentions[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Intentions = nil
+	}
+	out.ActionType = in.ActionType
+	out.ScaleBy = in.ScaleBy
+	return nil
+}
+
+func deepCopy_v1_AutoScaler(in AutoScaler, out *AutoScaler, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		return err
+	}
+	if in.Labels != nil {
+		out.Labels = make(map[string]string)
+		for key, val := range in.Labels {
+			out.Labels[key] = val
+		}
+	} else {
+		out.Labels = nil
+	}
+	if err := deepCopy_v1_AutoScalerSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_AutoScalerStatus(in.Status, &out.Status, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deepCopy_v1_AutoScalerList(in AutoScalerList, out *AutoScalerList, c *conversion.Cloner) error {
+	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := deepCopy_v1_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]AutoScaler, len(in.Items))
+		for i := range in.Items {
+			if err := deepCopy_v1_AutoScaler(in.Items[i], &out.Items[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_AutoScalerSpec(in AutoScalerSpec, out *AutoScalerSpec, c *conversion.Cloner) error {
+	if in.Thresholds != nil {
+		out.Thresholds = make([]AutoScaleThreshold, len(in.Thresholds))
+		for i := range in.Thresholds {
+			if err := deepCopy_v1_AutoScaleThreshold(in.Thresholds[i], &out.Thresholds[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Thresholds = nil
+	}
+	out.MaxAutoScaleCount = in.MaxAutoScaleCount
+	out.MinAutoScaleCount = in.MinAutoScaleCount
+	if in.TargetSelector != nil {
+		out.TargetSelector = make(map[string]string)
+		for key, val := range in.TargetSelector {
+			out.TargetSelector[key] = val
+		}
+	} else {
+		out.TargetSelector = nil
+	}
+	if in.MonitoringSources != nil {
+		out.MonitoringSources = make([]string, len(in.MonitoringSources))
+		for i := range in.MonitoringSources {
+			out.MonitoringSources[i] = in.MonitoringSources[i]
+		}
+	} else {
+		out.MonitoringSources = nil
+	}
+	return nil
+}
+
+func deepCopy_v1_AutoScalerStatus(in AutoScalerStatus, out *AutoScalerStatus, c *conversion.Cloner) error {
+	if err := deepCopy_v1_AutoScaleThreshold(in.LastActionTrigger, &out.LastActionTrigger, c); err != nil {
+		return err
+	}
+	if err := deepCopy_util_Time(in.LastActionTimestamp, &out.LastActionTimestamp, c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func deepCopy_v1_Binding(in Binding, out *Binding, c *conversion.Cloner) error {
 	if err := deepCopy_v1_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
@@ -2095,6 +2205,12 @@ func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		deepCopy_resource_Quantity,
 		deepCopy_v1_AWSElasticBlockStoreVolumeSource,
+		deepCopy_v1_AutoScaleIntentionThresholdConfig,
+		deepCopy_v1_AutoScaleThreshold,
+		deepCopy_v1_AutoScaler,
+		deepCopy_v1_AutoScalerList,
+		deepCopy_v1_AutoScalerSpec,
+		deepCopy_v1_AutoScalerStatus,
 		deepCopy_v1_Binding,
 		deepCopy_v1_Capabilities,
 		deepCopy_v1_ComponentCondition,

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta2
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -45,49 +45,9 @@ import (
 //     or more simply:
 //         DNS_LABEL(\.DNS_LABEL)*
 
-// ContainerManifest corresponds to the Container Manifest format, documented at:
-// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
-// This is used as the representation of Kubernetes workloads.
-type ContainerManifest struct {
-	// Required: This must be a supported version string, such as "v1beta1".
-	Version string `json:"version" description:"manifest version; must be v1beta1"`
-	// Required: This must be a DNS_SUBDOMAIN.
-	// TODO: ID on Manifest is deprecated and will be removed in the future.
-	ID string `json:"id" description:"manifest name; must be a DNS_SUBDOMAIN; cannot be updated"`
-	// TODO: UUID on Manifext is deprecated in the future once we are done
-	// with the API refactory. It is required for now to determine the instance
-	// of a Pod.
-	UUID          types.UID     `json:"uuid,omitempty" description:"manifest UUID, populated by the system, read-only"`
-	Volumes       []Volume      `json:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod"`
-	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod; containers cannot currently be added or removed"`
-	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
-	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
-	// Value must be non-negative integer. The value zero indicates delete immediately.
-	// If this value is nil, the default grace period will be used instead.
-	// The grace period is the duration in seconds after the processes running in the pod are sent
-	// a termination signal and the time when the processes are forcibly halted with a kill signal.
-	// Set this value longer than the expected cleanup time for your process.
-	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" description:"optional duration in seconds the pod needs to terminate gracefully; may be decreased in delete request; value must be non-negative integer; the value zero indicates delete immediately; if this value is not set, the default grace period will be used instead; the grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal; set this value longer than the expected cleanup time for your process"`
-	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
-	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
-	// Uses the host's network namespace. If this option is set, the ports that will be
-	// used must be specified.
-	// Optional: Default to false.
-	HostNetwork bool `json:"hostNetwork,omitempty" description:"host networking requested for this pod"`
-}
-
-// ContainerManifestList is used to communicate container manifests to kubelet.
-type ContainerManifestList struct {
-	TypeMeta `json:",inline"`
-	Items    []ContainerManifest `json:"items" description:"list of pod container manifests"`
-}
-
-const (
-	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
-	TerminationMessagePathDefault string = "/dev/termination-log"
-)
-
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
+//
+// http://docs.k8s.io/volumes.md
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
 	// a unique name.
@@ -100,6 +60,8 @@ type Volume struct {
 
 // VolumeSource represents the source location of a volume to mount.
 // Only one of its members may be specified.
+//
+// http://docs.k8s.io/volumes.md#types-of-volumes
 type VolumeSource struct {
 	// HostDir represents a pre-existing directory on the host machine that is directly
 	// exposed to the container. This is generally used for system agents or other privileged
@@ -109,18 +71,18 @@ type VolumeSource struct {
 	HostDir *HostPathVolumeSource `json:"hostDir" description:"pre-existing host file or directory; generally for privileged system daemons or other agents tied to the host"`
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
 	EmptyDir *EmptyDirVolumeSource `json:"emptyDir" description:"temporary directory that shares a pod's lifetime"`
-	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
+	// A persistent disk that is mounted to the
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource attached to the host machine on demand"`
-	// AWSElasticBlockStore represents an AWS Disk resource that is attached to a
+	// An AWS persistent disk that is mounted to the
 	// kubelet's host machine and then exposed to the pod.
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore" description:"AWS disk resource attached to the host machine on demand"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepoVolumeSource `json:"gitRepo" description:"git repository at a particular revision"`
-	// Secret represents a secret to populate the volume with
-	Secret *SecretVolumeSource `json:"secret" description:"secret to populate volume with"`
+	// Secret is a secret to populate the volume with
+	Secret *SecretVolumeSource `json:"secret" description:"secret to populate volume"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
-	NFS *NFSVolumeSource `json:"nfs" description:"NFS volume that will be mounted in the host machine "`
+	NFS *NFSVolumeSource `json:"nfs" description:"NFS volume that will be mounted in the host machine"`
 	// ISCSI represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	ISCSI *ISCSIVolumeSource `json:"iscsi" description:"iSCSI disk attached to host machine on demand"`
@@ -136,7 +98,7 @@ type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource provisioned by an admin"`
-	// AWSElasticBlockStore represents an AWS EBS volume that is attached to a
+	// AWSElasticBlockStore represents an AWS Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore" description:"AWS disk resource provisioned by an admin"`
 	// HostPath represents a directory on the host.
@@ -174,7 +136,9 @@ type PersistentVolumeSpec struct {
 	PersistentVolumeSource `json:",inline" description:"the actual volume backing the persistent volume"`
 	// AccessModes contains all ways the volume can be mounted
 	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"all ways the volume can be mounted"`
-	// ClaimRef is a non-binding reference to the claim bound to this volume
+	// ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
+	// ClaimRef is expected to be non-nil when bound.
+	// claim.VolumeName is the authoritative bind between PV and PVC.
 	ClaimRef *ObjectReference `json:"claimRef,omitempty" description:"when bound, a reference to the bound claim"`
 }
 
@@ -259,10 +223,15 @@ const (
 )
 
 // HostPathVolumeSource represents bare host directory volume.
+//
+// http://docs.k8s.io/volumes.md#hostdir
 type HostPathVolumeSource struct {
 	Path string `json:"path" description:"path of the directory on the host"`
 }
 
+// Represents an empty directory volume.
+//
+// http://docs.k8s.io/volumes.md#emptydir
 type EmptyDirVolumeSource struct {
 	// Optional: what type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
@@ -277,6 +246,15 @@ const (
 	StorageTypeMemory  StorageType = "Memory" // use memory (tmpfs)
 )
 
+// SecretVolumeSource adapts a Secret into a VolumeSource
+//
+// http://docs.k8s.io/design/secrets.md
+type SecretVolumeSource struct {
+	// Reference to a Secret to use.  Only the ID field of this reference is used; a
+	// secret can only be used by pods in its namespace.
+	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
+}
+
 // Protocol defines network protocols supported for things like conatiner ports.
 type Protocol string
 
@@ -287,11 +265,29 @@ const (
 	ProtocolUDP Protocol = "UDP"
 )
 
+// ContainerPort represents a network port in a single container.
+type ContainerPort struct {
+	// Optional: If specified, this must be a DNS_LABEL.  Each named port
+	// in a pod must have a unique name.
+	Name string `json:"name,omitempty" description:"name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"`
+	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
+	// If HostNetwork is specified, this must match ContainerPort.
+	HostPort int `json:"hostPort,omitempty" description:"number of port to expose on the host; most containers do not need this"`
+	// Required: This must be a valid port number, 0 < x < 65536.
+	ContainerPort int `json:"containerPort" description:"number of port to expose on the pod's IP address"`
+	// Optional: Defaults to "TCP".
+	Protocol Protocol `json:"protocol,omitempty" description:"protocol for port; must be UDP or TCP; TCP if unspecified"`
+	// Optional: What host IP to bind the external port to.
+	HostIP string `json:"hostIP,omitempty" description:"host IP to bind the port to"`
+}
+
 // GCEPersistentDiskVolumeSource represents a Persistent Disk resource in Google Compute Engine.
 //
 // A GCE PD must exist and be formatted before mounting to a container.
 // The disk must also be in the same GCE project and zone as the kubelet.
 // A GCE PD can only be mounted as read/write once.
+//
+// http://docs.k8s.io/volumes.md#gcepersistentdisk
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
 	PDName string `json:"pdName" description:"unique name of the PD resource in GCE"`
@@ -305,25 +301,6 @@ type GCEPersistentDiskVolumeSource struct {
 	// If omitted, kubelet will attempt to mount the device name.
 	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field 0 or empty.
 	Partition int `json:"partition,omitempty" description:"partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted"`
-	// Optional: Defaults to false (read/write). ReadOnly here will force
-	// the ReadOnly setting in VolumeMounts.
-	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`
-}
-
-// A ISCSI Disk can only be mounted as read/write once.
-type ISCSIVolumeSource struct {
-	// Required: iSCSI target portal
-	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
-	TargetPortal string `json:"targetPortal,omitempty" description:"iSCSI target portal"`
-	// Required:  target iSCSI Qualified Name
-	IQN string `json:"iqn,omitempty" description:"iSCSI Qualified Name"`
-	// Required: iSCSI target lun number
-	Lun int `json:"lun,omitempty" description:"iscsi target lun number"`
-	// Required: Filesystem type to mount.
-	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs"
-	// TODO: how do we prevent errors in the filesystem from compromising the machine
-	FSType string `json:"fsType,omitempty" description:"file system type to mount, such as ext4, xfs, ntfs"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`
@@ -360,52 +337,54 @@ type GitRepoVolumeSource struct {
 	Revision string `json:"revision" description:"commit hash for the specified revision"`
 }
 
-// SecretVolumeSource adapts a Secret into a VolumeSource
-type SecretVolumeSource struct {
-	// Reference to a Secret to use.  Only the ID field of this reference is used; a
-	// secret can only be used by pods in its namespace.
-	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
+// A ISCSI Disk can only be mounted as read/write once.
+type ISCSIVolumeSource struct {
+	// Required: iSCSI target portal
+	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
+	TargetPortal string `json:"targetPortal,omitempty" description:"iSCSI target portal"`
+	// Required:  target iSCSI Qualified Name
+	IQN string `json:"iqn,omitempty" description:"iSCSI Qualified Name"`
+	// Required: iSCSI target lun number
+	Lun int `json:"lun,omitempty" description:"iscsi target lun number"`
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType string `json:"fsType,omitempty" description:"file system type to mount, such as ext4, xfs, ntfs"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`
 }
 
-// ContainerPort represents a network port in a single container
-type ContainerPort struct {
-	// Optional: If specified, this must be a DNS_LABEL.  Each named port
-	// in a pod must have a unique name.
-	Name string `json:"name,omitempty" description:"name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"`
-	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
-	// If HostNetwork is specified, this must match ContainerPort.
-	HostPort int `json:"hostPort,omitempty" description:"number of port to expose on the host; most containers do not need this"`
-	// Required: This must be a valid port number, 0 < x < 65536.
-	ContainerPort int `json:"containerPort" description:"number of port to expose on the pod's IP address"`
-	// Optional: Defaults to "TCP".
-	Protocol Protocol `json:"protocol,omitempty" description:"protocol for port; must be UDP or TCP; TCP if unspecified"`
-	// Optional: What host IP to bind the external port to.
-	HostIP string `json:"hostIP,omitempty" description:"host IP to bind the port to"`
+// GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod
+type GlusterfsVolumeSource struct {
+	// Required: EndpointsName is the endpoint name that details Glusterfs topology
+	EndpointsName string `json:"endpoints" description:"gluster hosts endpoints name"`
+
+	// Required: Path is the Glusterfs volume path
+	Path string `json:"path" description:"path to gluster volume"`
+
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the Glusterfs volume to be mounted with read-only permissions
+	ReadOnly bool `json:"readOnly,omitempty" description:"glusterfs volume to be mounted with read-only permissions"`
 }
 
 // VolumeMount describes a mounting of a Volume within a container.
+//
+// http://docs.k8s.io/volumes.md
 type VolumeMount struct {
 	// Required: This must match the Name of a Volume [above].
 	Name string `json:"name" description:"name of the volume to mount"`
 	// Optional: Defaults to false (read-write).
 	ReadOnly bool `json:"readOnly,omitempty" description:"mounted read-only if true, read-write otherwise (false or unspecified)"`
 	// Required.
-	// Exactly one of the following must be set.  If both are set, prefer MountPath.
-	// DEPRECATED: Path will be removed in a future version of the API.
-	MountPath string `json:"mountPath" description:"path within the container at which the volume should be mounted; overrides path"`
-	Path      string `json:"path,omitempty" description:"path within the container at which the volume should be mounted; deprecated"`
-	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
-	// DEPRECATED: MountType will be removed in a future version of the API.
-	MountType string `json:"mountType,omitempty" description:"LOCAL or HOST; defaults to LOCAL; deprecated"`
+	MountPath string `json:"mountPath" description:"path within the container at which the volume should be mounted"`
 }
 
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
-	// Exactly one of the following must be set.  If both are set, prefer Name.
-	// DEPRECATED: EnvVar.Key will be removed in a future version of the API.
 	Name string `json:"name" description:"name of the environment variable; must be a C_IDENTIFIER"`
-	Key  string `json:"key,omitempty" description:"name of the environment variable; must be a C_IDENTIFIER; deprecated - use name instead"`
 	// Optional: No more than one of the following may be set.
 	// Optional: Defaults to ""
 	Value string `json:"value,omitempty" description:"value of the environment variable; defaults to empty string"`
@@ -421,13 +400,15 @@ type EnvVarSource struct {
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
 type ObjectFieldSelector struct {
-	// Optional: Version of the schema the FieldPath is written in terms of, defaults to "v1beta1"
-	APIVersion string `json:"apiVersion,omitempty" description:"version of the schema that fieldPath is written in terms of; defaults to v1beta1"`
+	// Optional: Version of the schema the FieldPath is written in terms of, defaults to "v1beta2"
+	APIVersion string `json:"apiVersion,omitempty" description:"version of the schema that fieldPath is written in terms of; defaults to v1beta2"`
 	// Required: Path of the field to select in the specified API version
 	FieldPath string `json:"fieldPath" description:"path of the field to select in the specified API version"`
 }
 
 // HTTPGetAction describes an action based on HTTP Get requests.
+//
+// http://docs.k8s.io/container-environment.md#hook-handler-implementations
 type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `json:"path,omitempty" description:"path to access on the HTTP server"`
@@ -438,18 +419,21 @@ type HTTPGetAction struct {
 }
 
 // TCPSocketAction describes an action based on opening a socket
+//
+// http://docs.k8s.io/container-environment.md#hook-handler-implementations
 type TCPSocketAction struct {
 	// Required: Port to connect to.
 	Port util.IntOrString `json:"port,omitempty" description:"number of name of the port to access on the container"`
 }
 
 // ExecAction describes a "run in container" action.
+//
+// http://docs.k8s.io/container-environment.md#hook-handler-implementations
 type ExecAction struct {
 	// Command is the command line to execute inside the container, the working directory for the
 	// command  is root ('/') in the container's filesystem.  The command is simply exec'd, it is
 	// not run inside a shell, so traditional shell instructions ('|', etc) won't work.  To use
 	// a shell, you need to explicitly call out to that shell.
-	// A return code of zero is treated as 'Healthy', non-zero is 'Unhealthy'
 	Command []string `json:"command,omitempty" description:"command line to execute inside the container; working directory for the command is root ('/') in the container's file system; the command is exec'd, not run inside a shell; exit status of 0 is treated as live/healthy and non-zero is unhealthy"`
 }
 
@@ -469,6 +453,8 @@ type LivenessProbe struct {
 }
 
 // PullPolicy describes a policy for if/when to pull a container image
+//
+// http://docs.k8s.io/images.md#preloading-images
 type PullPolicy string
 
 const (
@@ -484,6 +470,8 @@ const (
 type CapabilityType string
 
 // Capabilities represent POSIX capabilities that can be added or removed to a running container.
+//
+// http://docs.k8s.io/containers.md#capabilities
 type Capabilities struct {
 	// Added capabilities
 	Add []CapabilityType `json:"add,omitempty" description:"added capabilities"`
@@ -502,6 +490,8 @@ type ResourceRequirements struct {
 }
 
 // Container represents a single container that is expected to be run on the host.
+//
+//
 type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
 	// have a unique name.
@@ -537,8 +527,15 @@ type Container struct {
 	SecurityContext *SecurityContext `json:"securityContext,omitempty" description:"security options the pod should run with"`
 }
 
+const (
+	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
+	TerminationMessagePathDefault string = "/dev/termination-log"
+)
+
 // Handler defines a specific action that should be taken
 // TODO: pass structured data to these actions, and document that data here.
+//
+// http://docs.k8s.io/container-environment.md#hook-handler-implementations
 type Handler struct {
 	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
@@ -553,6 +550,8 @@ type Handler struct {
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
+//
+// http://docs.k8s.io/container-environment.md#hook-details
 type Lifecycle struct {
 	// PostStart is called immediately after a container is created.  If the handler fails, the container
 	// is terminated and restarted.
@@ -568,7 +567,7 @@ type Lifecycle struct {
 type TypeMeta struct {
 	Kind              string    `json:"kind,omitempty" description:"kind of object, in CamelCase; cannot be updated"`
 	ID                string    `json:"id,omitempty" description:"name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"`
-	UID               types.UID `json:"uid,omitempty" description:"unique UUID across space and time; populated by the system, read-only; cannot be updated"`
+	UID               types.UID `json:"uid,omitempty" description:"unique UUID across space and time; populated by the system, read-only"`
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" description:"RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"`
 	SelfLink          string    `json:"selfLink,omitempty" description:"URL for the object; populated by the system, read-only"`
 	ResourceVersion   uint64    `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"`
@@ -618,6 +617,8 @@ const (
 )
 
 // PodStatus represents a status of a pod.
+//
+// http://docs.k8s.io/pod-states.md
 type PodStatus string
 
 // These are the valid statuses of pods.
@@ -626,7 +627,7 @@ const (
 	PodWaiting PodStatus = "Waiting"
 	// PodRunning means that the pod is up and running.
 	PodRunning PodStatus = "Running"
-	// PodTerminated means that the pod has stopped with error(s)
+	// PodTerminated means that the pod has stopped.
 	PodTerminated PodStatus = "Terminated"
 	// PodUnknown means that we failed to obtain info about the pod.
 	PodUnknown PodStatus = "Unknown"
@@ -706,14 +707,14 @@ type PodContainerInfo struct {
 
 type RestartPolicyAlways struct{}
 
-// TODO(dchen1107): Define what kinds of failures should restart
+// TODO(dchen1107): Define what kinds of failures should restart.
 // TODO(dchen1107): Decide whether to support policy knobs, and, if so, which ones.
 type RestartPolicyOnFailure struct{}
 
 type RestartPolicyNever struct{}
 
 type RestartPolicy struct {
-	// Only one of the following restart policy may be specified.
+	// Only one of the following restart policies may be specified.
 	// If none of the following policies is specified, the default one
 	// is RestartPolicyAlways.
 	Always    *RestartPolicyAlways    `json:"always,omitempty" description:"always restart the container after termination"`
@@ -750,6 +751,8 @@ type PodList struct {
 }
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
+//
+// http://docs.k8s.io/pods.md
 type Pod struct {
 	TypeMeta     `json:",inline"`
 	Labels       map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize pods; may match selectors of replication controllers and services"`
@@ -775,6 +778,8 @@ type ReplicationControllerList struct {
 }
 
 // ReplicationController represents the configuration of a replication controller.
+//
+// http://docs.k8s.io/replication-controller.md
 type ReplicationController struct {
 	TypeMeta     `json:",inline"`
 	DesiredState ReplicationControllerState `json:"desiredState,omitempty" description:"specification of the desired state of the replication controller"`
@@ -783,6 +788,8 @@ type ReplicationController struct {
 }
 
 // PodTemplate holds the information used for creating pods.
+//
+// http://docs.k8s.io/replication-controller.md#pod-template
 type PodTemplate struct {
 	DesiredState   PodState          `json:"desiredState,omitempty" description:"specification of the desired state of pods created from this template"`
 	ServiceAccount string            `json:"serviceAccount,omitempty" description:"the name of the ServiceAccount to use to run this pod"`
@@ -817,6 +824,8 @@ type ServiceList struct {
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
+//
+// http://docs.k8s.io/services.md
 type Service struct {
 	TypeMeta `json:",inline"`
 
@@ -999,6 +1008,8 @@ type NodeSystemInfo struct {
 }
 
 // NodeStatus is information about the current status of a node.
+//
+// http://docs.k8s.io/node.md#node-status
 type NodeStatus struct {
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty" description:"node phase is the current lifecycle phase of the node"`
@@ -1019,6 +1030,9 @@ type NodeInfo struct {
 	NodeSystemInfo `json:",inline,omitempty" description:"node identity is a set of ids/uuids to uniquely identify the node"`
 }
 
+// Described the current lifecycle phase of a node.
+//
+// http://docs.k8s.io/node.md#node-phase
 type NodePhase string
 
 // These are the valid phases of node.
@@ -1031,6 +1045,9 @@ const (
 	NodeTerminated NodePhase = "Terminated"
 )
 
+// Describes the condition of a running node.
+//
+// http://docs.k8s.io/node.md#node-condition
 type NodeConditionKind string
 
 // These are valid conditions of node. Currently, we don't have enough information to decide
@@ -1046,6 +1063,9 @@ const (
 	NodeSchedulable NodeConditionKind = "Schedulable"
 )
 
+// Described the conditions of a running node.
+//
+// http://docs.k8s.io/node.md#node-condition
 type NodeCondition struct {
 	Kind               NodeConditionKind `json:"kind" description:"kind of the condition, current kinds: Reachable, Ready, Schedulable"`
 	Status             ConditionStatus   `json:"status" description:"status of the condition, one of Full, None, Unknown"`
@@ -1070,7 +1090,8 @@ type NodeAddress struct {
 }
 
 // NodeResources represents resources on a Kubernetes system node
-// see http://docs.k8s.io/resources.md for more details.
+//
+// http://docs.k8s.io/resources.md
 type NodeResources struct {
 	// Capacity represents the available resources.
 	Capacity ResourceList `json:"capacity,omitempty" description:"resource capacity of a node represented as a map of resource name to quantity of resource"`
@@ -1091,6 +1112,8 @@ type ResourceList map[ResourceName]util.IntOrString
 
 // Minion is a worker node in Kubernetenes.
 // The name of the minion according to etcd is in ID.
+//
+// http://docs.k8s.io/node.md#node-condition
 type Minion struct {
 	TypeMeta `json:",inline"`
 	// DEPRECATED: Use Status.Addresses instead.
@@ -1113,10 +1136,7 @@ type Minion struct {
 // MinionList is a list of minions.
 type MinionList struct {
 	TypeMeta `json:",inline"`
-	// DEPRECATED: the below Minions is due to a naming mistake and
-	// will be replaced with Items in the future.
-	Minions []Minion `json:"minions,omitempty" description:"list of nodes; deprecated"`
-	Items   []Minion `json:"items" description:"list of nodes"`
+	Items    []Minion `json:"items" description:"list of nodes"`
 }
 
 type FinalizerName string
@@ -1149,7 +1169,9 @@ const (
 )
 
 // A namespace provides a scope for Names.
-// Use of multiple namespaces is optional
+// Use of multiple namespaces is optional.
+//
+// http://docs.k8s.io/namespaces.md
 type Namespace struct {
 	TypeMeta `json:",inline"`
 
@@ -1252,8 +1274,8 @@ type PodProxyOptions struct {
 // import both.
 type Status struct {
 	TypeMeta `json:",inline"`
-	// One of: "Success" or "Failure".
-	Status string `json:"status,omitempty" description:"status of the operation; either Success, or Failure"`
+	// One of: "Success" or "Failure"
+	Status string `json:"status,omitempty" description:"status of the operation; either Success or Failure"`
 	// A human-readable description of the status of this operation.
 	Message string `json:"message,omitempty" description:"human-readable description of the status of this operation"`
 	// A machine-readable description of why this operation is in the
@@ -1331,6 +1353,19 @@ const (
 	// conflict.
 	// Status code 409
 	StatusReasonConflict StatusReason = "Conflict"
+
+	// StatusReasonInvalid means the requested create or update operation cannot be
+	// completed due to invalid data provided as part of the request. The client may
+	// need to alter the request. When set, the client may use the StatusDetails
+	// message field as a summary of the issues encountered.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the invalid resource
+	//   "id"   string - the identifier of the invalid resource
+	//   "causes"      - one or more StatusCause entries indicating the data in the
+	//                   provided resource that was invalid.  The code, message, and
+	//                   field attributes will be set.
+	// Status code 422
+	StatusReasonInvalid StatusReason = "Invalid"
 
 	// StatusReasonServerTimeout means the server can be reached and understood the request,
 	// but cannot complete the action in a reasonable time. The client should retry the request.
@@ -1415,6 +1450,8 @@ type SerializedReference struct {
 
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
+//
+// http://docs.k8s.io/pod-states.md#events
 type Event struct {
 	TypeMeta `json:",inline"`
 
@@ -1444,6 +1481,7 @@ type Event struct {
 	// Optional. The component reporting this event. Should be a short machine understandable string.
 	// TODO: provide exact specification for format.
 	Source string `json:"source,omitempty" description:"component reporting this event; short machine understandable string"`
+
 	// Host name on which the event is generated.
 	Host string `json:"host,omitempty" description:"host name on which this event was generated"`
 
@@ -1468,6 +1506,45 @@ type EventList struct {
 	Items    []Event `json:"items" description:"list of events"`
 }
 
+// ContainerManifest corresponds to the Container Manifest format, documented at:
+// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
+// This is used as the representation of Kubernetes workloads.
+// DEPRECATED: Replaced with Pod
+type ContainerManifest struct {
+	// Required: This must be a supported version string, such as "v1beta1".
+	Version string `json:"version" description:"manifest version; must be v1beta1"`
+	// Required: This must be a DNS_SUBDOMAIN.
+	// TODO: ID on Manifest is deprecated and will be removed in the future.
+	ID string `json:"id" description:"manifest name; must be a DNS_SUBDOMAIN; cannot be updated"`
+	// TODO: UUID on Manifext is deprecated in the future once we are done
+	// with the API refactory. It is required for now to determine the instance
+	// of a Pod.
+	UUID          types.UID     `json:"uuid,omitempty" description:"manifest UUID; cannot be updated"`
+	Volumes       []Volume      `json:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod"`
+	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed"`
+	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
+	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
+	// Value must be non-negative integer. The value zero indicates delete immediately.
+	// If this value is nil, the default grace period will be used instead.
+	// The grace period is the duration in seconds after the processes running in the pod are sent
+	// a termination signal and the time when the processes are forcibly halted with a kill signal.
+	// Set this value longer than the expected cleanup time for your process.
+	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" description:"optional duration in seconds the pod needs to terminate gracefully; may be decreased in delete request; value must be non-negative integer; the value zero indicates delete immediately; if this value is not set, the default grace period will be used instead; the grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal; set this value longer than the expected cleanup time for your process"`
+	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
+	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
+	// Uses the host's network namespace. If this option is set, the ports that will be
+	// used must be specified.
+	// Optional: Default to false.
+	HostNetwork bool `json:"hostNetwork,omitempty" description:"host networking requested for this pod"`
+}
+
+// ContainerManifestList is used to communicate container manifests to kubelet.
+// DEPRECATED: Replaced with PodList
+type ContainerManifestList struct {
+	TypeMeta `json:",inline"`
+	Items    []ContainerManifest `json:"items" description:"list of pod container manifests"`
+}
+
 // Backported from v1beta3 to replace ContainerManifest
 
 // DNSPolicy defines how a pod's DNS will be configured.
@@ -1490,7 +1567,6 @@ type PodSpec struct {
 	// Required: there must be at least one container in a pod.
 	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod; containers cannot currently be added or removed; there must be at least one container in a Pod"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
-	//	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
@@ -1590,7 +1666,6 @@ type ResourceQuotaStatus struct {
 type ResourceQuota struct {
 	TypeMeta `json:",inline"`
 	Labels   map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize resource quotas"`
-
 	// Spec defines the desired quota
 	Spec ResourceQuotaSpec `json:"spec,omitempty" description:"spec defines the desired quota"`
 
@@ -1606,7 +1681,7 @@ type ResourceQuotaList struct {
 	Items []ResourceQuota `json:"items" description:"items is a list of ResourceQuota objects"`
 }
 
-// NFSVolumeSource represents an NFS Mount that lasts the lifetime of a pod
+// NFSVolumeSource represents an NFS mount that lasts the lifetime of a pod
 type NFSVolumeSource struct {
 	// Server is the hostname or IP address of the NFS server
 	Server string `json:"server" description:"the hostname or IP address of the NFS server"`
@@ -1615,12 +1690,14 @@ type NFSVolumeSource struct {
 	Path string `json:"path" description:"the path that is exported by the NFS server"`
 
 	// Optional: Defaults to false (read/write). ReadOnly here will force
-	// the NFS export to be mounted as read-only permissions
+	// the NFS export to be mounted with read-only permissions
 	ReadOnly bool `json:"readOnly,omitempty" description:"forces the NFS export to be mounted with read-only permissions"`
 }
 
 // Secret holds secret data of a certain type.  The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
+//
+// http://docs.k8s.io/design/secrets.md
 type Secret struct {
 	TypeMeta `json:",inline"`
 
@@ -1661,19 +1738,6 @@ type SecretList struct {
 	TypeMeta `json:",inline"`
 
 	Items []Secret `json:"items" description:"items is a list of secret objects"`
-}
-
-// GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod
-type GlusterfsVolumeSource struct {
-	// Required: EndpointsName is the endpoint name that details Glusterfs topology
-	EndpointsName string `json:"endpoints" description:"gluster hosts endpoints name"`
-
-	// Required: Path is the Glusterfs volume path
-	Path string `json:"path" description:"path to gluster volume"`
-
-	// Optional: Defaults to false (read/write). ReadOnly here will force
-	// the Glusterfs volume to be mounted with read-only permissions
-	ReadOnly bool `json:"readOnly,omitempty" description:"Glusterfs volume to be mounted with read-only permissions"`
 }
 
 // Type and constants for component health validation.
@@ -1809,7 +1873,7 @@ type AutoScaleThreshold struct {
 	//            [OR]  scale up if ResponseTime > 200ms
 	Intentions []AutoScaleIntentionThresholdConfig `json:"intentions,omitempty"`
 
-	// Action holds the auto-scaler action to take when the threshold is (b)reached.
+	// ActionType holds the auto-scaler action to take when the threshold is (b)reached.
 	ActionType AutoScaleActionType `json:"action,omitempty"`
 
 	// How much to scale up/down by.

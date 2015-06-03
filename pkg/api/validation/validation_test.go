@@ -3576,7 +3576,7 @@ func TestValidateAutoScaler(t *testing.T) {
 			},
 			Spec: api.AutoScalerSpec{
 				TargetSelector:  map[string]string{"name": "test"},
-				MonitorSelector: map[string]string{"name": "test"},
+				MonitoringSources: []string{"test"},
 			},
 		}
 	}
@@ -3586,7 +3586,7 @@ func TestValidateAutoScaler(t *testing.T) {
 		noMetaNamespace        = validAutoScaler()
 		noTargetSelector       = validAutoScaler()
 		badMinMax              = validAutoScaler()
-		noMonitorSelector      = validAutoScaler()
+		noMonitoringSources    = validAutoScaler()
 		invalidIntentThreshold = validAutoScaler()
 		validIntentThreshold   = validAutoScaler()
 	)
@@ -3596,19 +3596,21 @@ func TestValidateAutoScaler(t *testing.T) {
 	noTargetSelector.Spec.TargetSelector = make(map[string]string, 0)
 	badMinMax.Spec.MinAutoScaleCount = 1
 	badMinMax.Spec.MaxAutoScaleCount = 0
-	noMonitorSelector.Spec.MonitorSelector = make(map[string]string, 0)
+	noMonitoringSources.Spec.MonitoringSources = make([]string, 0)
 	invalidIntentThreshold.Spec.Thresholds = []api.AutoScaleThreshold{
 		{
-			Type:            api.AutoScaleThresholdTypeIntention,
-			IntentionConfig: api.AutoScaleIntentionThresholdConfig{},
+			Type:       api.AutoScaleThresholdTypeIntention,
+			Intentions: []api.AutoScaleIntentionThresholdConfig{api.AutoScaleIntentionThresholdConfig{}},
 		},
 	}
 	validIntentThreshold.Spec.Thresholds = []api.AutoScaleThreshold{
 		{
 			Type: api.AutoScaleThresholdTypeIntention,
-			IntentionConfig: api.AutoScaleIntentionThresholdConfig{
+			Intentions: []api.AutoScaleIntentionThresholdConfig{api.AutoScaleIntentionThresholdConfig{
 				Intent: "test",
-			},
+			}},
+			ActionType: api.AutoScaleActionTypeScaleUp,
+			ScaleBy: 1,
 		},
 	}
 
@@ -3621,7 +3623,7 @@ func TestValidateAutoScaler(t *testing.T) {
 		"noMetaNamespace":        {1, noMetaNamespace},
 		"noTargetSelector":       {1, noTargetSelector},
 		"badMinMax":              {1, badMinMax},
-		"noMonitorSelector":      {1, noMonitorSelector},
+		"noMonitoringSources":    {1, noMonitoringSources},
 		"invalidIntentThreshold": {1, invalidIntentThreshold},
 		"validIntentThreshold":   {0, validIntentThreshold},
 	}

@@ -55,14 +55,14 @@ func TestMatchAutoScaler(t *testing.T) {
 	}
 
 	//invalid label match
-	labelSelector, _ := labels.ParseSelector("labelTest=foo")
+	labelSelector, _ := labels.Parse("labelTest=foo")
 	matcher = MatchAutoScaler(labelSelector, fields.Everything())
 	if match, _ := matcher.Matches(autoScaler); match {
 		t.Errorf("Did not expect match")
 	}
 
 	//valid label match
-	labelSelector, _ = labels.ParseSelector("labelTest=bar")
+	labelSelector, _ = labels.Parse("labelTest=bar")
 	matcher = MatchAutoScaler(labelSelector, fields.Everything())
 	if match, _ := matcher.Matches(autoScaler); !match {
 		t.Errorf("Expected match")

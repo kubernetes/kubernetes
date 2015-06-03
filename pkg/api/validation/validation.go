@@ -1744,7 +1744,7 @@ func ValidateAutoScalerSpec(spec *api.AutoScalerSpec) errs.ValidationErrorList {
 
 	//must have a target selector
 	if len(spec.TargetSelector) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("targetSelector", spec.TargetSelector))
+		allErrs = append(allErrs, errs.NewFieldRequired("targetSelector"))
 	}
 
 	//min can't be greater than max
@@ -1752,9 +1752,9 @@ func ValidateAutoScalerSpec(spec *api.AutoScalerSpec) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldInvalid("minAutoScaleCount", spec.MinAutoScaleCount, "minAutoScaleCount cannot be greater than maxAutoScaleCount"))
 	}
 
-	//must have a monitor selector
-	if len(spec.MonitorSelector) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("monitorSelector", spec.MonitorSelector))
+	//must have a monitoring sources
+	if len(spec.MonitoringSources) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("monitoringSources"))
 	}
 
 	//check all thresholds
@@ -1771,27 +1771,52 @@ func ValidateAutoScaleThreshold(t *api.AutoScaleThreshold) errs.ValidationErrorL
 
 	switch t.Type {
 	case api.AutoScaleThresholdTypeIntention:
-		allErrs = append(allErrs, validateIntentionThreshold(t).Prefix("intentionConfig")...)
+		// check intentions
+		for _, i := range t.Intentions {
+			allErrs = append(allErrs, validateIntentionThreshold(&i).Prefix("intentions")...)
+		}
 	default:
 		if len(t.Type) == 0 {
-			allErrs = append(allErrs, errs.NewFieldRequired("type", t.Type))
+			allErrs = append(allErrs, errs.NewFieldRequired("type"))
 		} else {
 			allErrs = append(allErrs, errs.NewFieldInvalid("type", t.Type, "invalid threshold type"))
 		}
+	}
+
+	switch t.ActionType {
+	case api.AutoScaleActionTypeNone:
+		// ok.
+	case api.AutoScaleActionTypeScaleUp:
+		// ok.
+	case api.AutoScaleActionTypeScaleDown:
+		// ok.
+	default:
+		allErrs = append(allErrs, errs.NewFieldInvalid("actionType", t.ActionType, "invalid action type"))
+	}
+
+	// scaleBy needs to be positive - do we need to set an upper range?
+	if t.ScaleBy < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("scaleBy", t.ScaleBy, "scaleBy cannot be less than 0"))
 	}
 
 	return allErrs
 }
 
 // validateIntentionThreshold ensures required fields for intention based thresholds are set
-func validateIntentionThreshold(t *api.AutoScaleThreshold) errs.ValidationErrorList {
+func validateIntentionThreshold(t *api.AutoScaleIntentionThresholdConfig) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	if len(t.IntentionConfig.Intent) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("intent", t.IntentionConfig.Intent))
+	if len(t.Intent) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("intent"))
 	}
 
 	//TODO validate value of intent
+
+	// duration cannot be negative (0 means last value - otherwise its
+	// the duration in seconds).
+	if t.Duration < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("duration", t.Duration, "duration cannot be less than 0"))
+	}
 
 	return allErrs
 }
