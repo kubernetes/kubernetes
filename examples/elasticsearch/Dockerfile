@@ -7,9 +7,10 @@ RUN apt-get update && \
 RUN cd / && \
     curl -O https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.5.2.tar.gz && \
     tar xf elasticsearch-1.5.2.tar.gz && \
+    mv elasticsearch-1.5.2 /elasticsearch && \
     rm elasticsearch-1.5.2.tar.gz
 
-COPY elasticsearch.yml /elasticsearch-1.5.2/config/elasticsearch.yml
+COPY elasticsearch.yml /elasticsearch/config/elasticsearch.yml
 COPY run.sh /
 COPY elasticsearch_discovery /
 
