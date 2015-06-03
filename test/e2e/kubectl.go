@@ -53,7 +53,7 @@ var _ = Describe("Kubectl client", func() {
 		var err error
 		c, err = loadClient()
 		expectNoError(err)
-		testingNs, err = createTestingNS("Kubectl client", c)
+		testingNs, err = createTestingNS("kubectl", c)
 		ns = testingNs.Name
 		Expect(err).NotTo(HaveOccurred())
 	})
