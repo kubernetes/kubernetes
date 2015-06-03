@@ -31,6 +31,6 @@ func (unsupportedContainerManager) Start() error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
-func newContainerManager(dockerDaemonContainer string) (containerManager, error) {
+func newContainerManager(dockerDaemonContainer, systemContainer string) (containerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

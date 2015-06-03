@@ -139,6 +139,7 @@ func NewMainKubelet(
 	containerRuntime string,
 	mounter mount.Interface,
 	dockerDaemonContainer string,
+	systemContainer string,
 	configureCBR0 bool,
 	pods int) (*Kubelet, error) {
 	if rootDirectory == "" {
@@ -146,6 +147,9 @@ func NewMainKubelet(
 	}
 	if resyncInterval <= 0 {
 		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
+	}
+	if systemContainer != "" && cgroupRoot == "" {
+		return nil, fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 	}
 	dockerClient = dockertools.NewInstrumentedDockerInterface(dockerClient)
 
@@ -295,7 +299,9 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
 
-	containerManager, err := newContainerManager(dockerDaemonContainer)
+	// Setup container manager, can fail if the devices hierarchy is not mounted
+	// (it is required by Docker however).
+	containerManager, err := newContainerManager(dockerDaemonContainer, systemContainer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the Container Manager: %v", err)
 	}
