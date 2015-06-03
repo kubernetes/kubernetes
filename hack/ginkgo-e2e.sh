@@ -60,13 +60,6 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
       auth_config=(
       "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
       )
-      if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-        # gcloud doesn't override the current-context, so we explicitly set it
-        detect-project &> /dev/null
-        auth_config+=(
-          "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
-        )
-      fi
     fi
 else
   echo "Conformance Test.  No cloud-provider-specific preparation."
