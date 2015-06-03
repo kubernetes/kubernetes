@@ -83,10 +83,9 @@ var _ = Describe("Load capacity", func() {
 		// Verify latency metrics
 		// TODO: Update threshold to 1s once we reach this goal
 		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
-		_, err := HighLatencyRequests(c, 5*time.Second, util.NewStringSet("events"))
-		expectNoError(err)
-		// TODO: uncomment the following line once the test is stable
-		// Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
+		expectNoError(err, "Too many instances metrics above the threshold")
+		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
 
 	type Load struct {
@@ -156,6 +155,9 @@ func playWithRC(c *client.Client, wg *sync.WaitGroup, ns, name string, size int)
 		// Scale RC to a random size between 0.5x and 1.5x of the original size.
 		newSize := uint(rand.Intn(size+1) + size/2)
 		expectNoError(ScaleRC(c, ns, name, newSize), fmt.Sprintf("scaling rc %s in namespace %s", name, ns))
+		// List all pods within this RC.
+		_, err := c.Pods(ns).List(labels.SelectorFromSet(labels.Set(map[string]string{"name": name})), fields.Everything())
+		expectNoError(err, fmt.Sprintf("listing pods from rc %v in namespace %v", name, ns))
 		// With probability 0.1 remove this RC.
 		if rand.Intn(10) == 0 {
 			expectNoError(DeleteRC(c, ns, name), fmt.Sprintf("deleting rc %s in namespace %s", name, ns))
