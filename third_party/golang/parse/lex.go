@@ -15,18 +15,15 @@ type Pos int
 
 const (
 	itemError itemType = iota
-	itemDot            //"." the start of a jq expression
-	itemText           //text value of jq item
+	itemDot
+	itemText
 	itemField          // alphanumeric identifier starting with '.'
 	itemEOF
 	itemKeyword
 	itemLeftDelim  // left action delimiter
 	itemRightDelim // Right action delimiter
+	itemString     // quoted string (includes quotes)
 )
-
-var key = map[string]itemType{
-	".": itemDot,
-}
 
 // item represents a token or text string returned from the scanner.
 type item struct {
@@ -195,6 +192,8 @@ func lexInsideAction(l *lexer) stateFn {
 	switch r := l.next(); {
 	case r == eof || isEndOfLine(r):
 		return l.errorf("unclosed action")
+	case r=='"':
+		return lexQuote
 	case r == '.':
 		l.emit(itemDot)
 		return lexField
@@ -225,6 +224,27 @@ func lexField(l *lexer) stateFn {
 	l.emit(itemField)
 	return lexInsideAction
 }
+
+// lexQuote scans a quoted string.
+func lexQuote(l *lexer) stateFn {
+	Loop:
+	for {
+		switch l.next() {
+		case '\\':
+			if r := l.next(); r != eof && r != '\n' {
+				break
+			}
+			fallthrough
+		case eof, '\n':
+			return l.errorf("unterminated quoted string")
+		case '"':
+			break Loop
+		}
+	}
+	l.emit(itemString)
+	return lexInsideAction
+}
+
 
 // isSpace reports whether r is a space character.
 func isSpace(r rune) bool {

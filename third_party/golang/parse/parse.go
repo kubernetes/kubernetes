@@ -151,6 +151,8 @@ func (t *Tree) Parse(text string) error {
 			t.cur.append(newNode)
 		case itemText:
 			t.cur.append(newText(item.pos, item.val))
+		case itemString:
+			t.cur.append(newText(item.pos, item.val[1:len(item.val)-1]))
 		case itemEOF:
 			eof = true
 		}

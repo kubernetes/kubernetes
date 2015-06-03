@@ -83,3 +83,23 @@ func TestNestedDict(t *testing.T) {
 		t.Errorf("expect to get %s, got %s", expect, out)
 	}
 }
+
+func TestQuote(t *testing.T) {
+	text := `hello ${"${"}`
+	j := New("quote")
+	err := j.Parse(text)
+	if err != nil {
+		t.Errorf("parse quote %s error %v", text, err)
+	}
+	buf := new(bytes.Buffer)
+	err = j.Execute(buf, nil)
+	if err != nil {
+		t.Errorf("execute quote error %v", err)
+	}
+	out := buf.String()
+	expect := "hello ${"
+	if out != expect {
+		t.Errorf("expect to get %s, got %s", text, expect)
+	}
+
+}
