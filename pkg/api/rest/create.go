@@ -59,6 +59,8 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 	} else {
 		objectMeta.Namespace = api.NamespaceNone
 	}
+	objectMeta.DeletionTimestamp = nil
+	objectMeta.DeletionGracePeriodSeconds = nil
 	strategy.PrepareForCreate(obj)
 	api.FillObjectMetaSystemFields(ctx, objectMeta)
 	api.GenerateName(strategy, objectMeta)

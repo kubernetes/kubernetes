@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -161,13 +162,24 @@ func (s *statusManager) syncBatch() error {
 	}
 	// TODO: make me easier to express from client code
 	statusPod, err = s.kubeClient.Pods(statusPod.Namespace).Get(statusPod.Name)
+	if errors.IsNotFound(err) {
+		glog.V(3).Infof("Pod %q was deleted on the server", pod.Name)
+		return nil
+	}
 	if err == nil {
 		statusPod.Status = status
-		_, err = s.kubeClient.Pods(pod.Namespace).UpdateStatus(statusPod)
 		// TODO: handle conflict as a retry, make that easier too.
+		statusPod, err = s.kubeClient.Pods(pod.Namespace).UpdateStatus(statusPod)
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully", kubeletUtil.FormatPodName(pod))
-			return nil
+
+			if statusPod.DeletionTimestamp == nil || !allTerminated(statusPod.Status.ContainerStatuses) {
+				return nil
+			}
+			if err := s.kubeClient.Pods(statusPod.Namespace).Delete(statusPod.Name, api.NewDeleteOptions(0)); err == nil {
+				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", statusPod.Name)
+				return nil
+			}
 		}
 	}
 
@@ -180,4 +192,15 @@ func (s *statusManager) syncBatch() error {
 	// changes on the node should trigger updates.
 	go s.DeletePodStatus(podFullName)
 	return fmt.Errorf("error updating status for pod %q: %v", kubeletUtil.FormatPodName(pod), err)
+}
+
+// allTerminated returns true if every status is terminated, or the status list
+// is empty.
+func allTerminated(statuses []api.ContainerStatus) bool {
+	for _, status := range statuses {
+		if status.State.Terminated == nil {
+			return false
+		}
+	}
+	return true
 }

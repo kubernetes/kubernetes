@@ -43,7 +43,7 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectResta
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		By("deleting the pod")
-		c.Pods(ns).Delete(podDescr.Name, nil)
+		c.Pods(ns).Delete(podDescr.Name, api.NewDeleteOptions(0))
 	}()
 
 	// Wait until the pod is not pending. (Here we need to check for something other than
@@ -86,15 +86,14 @@ func runLivenessTest(c *client.Client, ns string, podDescr *api.Pod, expectResta
 func testHostIP(c *client.Client, ns string, pod *api.Pod) {
 	podClient := c.Pods(ns)
 	By("creating pod")
-	defer podClient.Delete(pod.Name, nil)
-	_, err := podClient.Create(pod)
-	if err != nil {
+	defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+	if _, err := podClient.Create(pod); err != nil {
 		Failf("Failed to create pod: %v", err)
 	}
 	By("ensuring that pod is running and has a hostIP")
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
-	err = waitForPodRunningInNamespace(c, pod.Name, ns)
+	err := waitForPodRunningInNamespace(c, pod.Name, ns)
 	Expect(err).NotTo(HaveOccurred())
 	// Try to make sure we get a hostIP for each pod.
 	hostIPTimeout := 2 * time.Minute
@@ -222,7 +221,7 @@ var _ = Describe("Pods", func() {
 		// We call defer here in case there is a problem with
 		// the test so we can ensure that we clean up after
 		// ourselves
-		defer podClient.Delete(pod.Name, nil)
+		defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		_, err = podClient.Create(pod)
 		if err != nil {
 			Failf("Failed to create pod: %v", err)
@@ -235,7 +234,7 @@ var _ = Describe("Pods", func() {
 		}
 		Expect(len(pods.Items)).To(Equal(1))
 
-		By("veryfying pod creation was observed")
+		By("verifying pod creation was observed")
 		select {
 		case event, _ := <-w.ResultChan():
 			if event.Type != watch.Added {
@@ -245,7 +244,7 @@ var _ = Describe("Pods", func() {
 			Fail("Timeout while waiting for pod creation")
 		}
 
-		By("deleting the pod")
+		By("deleting the pod gracefully")
 		if err := podClient.Delete(pod.Name, nil); err != nil {
 			Failf("Failed to delete pod: %v", err)
 		}
@@ -253,11 +252,13 @@ var _ = Describe("Pods", func() {
 		By("verifying pod deletion was observed")
 		deleted := false
 		timeout := false
+		var lastPod *api.Pod
 		timer := time.After(podStartTimeout)
 		for !deleted && !timeout {
 			select {
 			case event, _ := <-w.ResultChan():
 				if event.Type == watch.Deleted {
+					lastPod = event.Object.(*api.Pod)
 					deleted = true
 				}
 			case <-timer:
@@ -267,6 +268,9 @@ var _ = Describe("Pods", func() {
 		if !deleted {
 			Fail("Failed to observe pod deletion")
 		}
+
+		Expect(lastPod.DeletionTimestamp).ToNot(BeNil())
+		Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(BeZero())
 
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
@@ -312,7 +316,7 @@ var _ = Describe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		defer func() {
 			By("deleting the pod")
-			podClient.Delete(pod.Name, nil)
+			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
 		pod, err := podClient.Create(pod)
 		if err != nil {
@@ -376,7 +380,7 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
-		defer framework.Client.Pods(framework.Namespace.Name).Delete(serverPod.Name, nil)
+		defer framework.Client.Pods(framework.Namespace.Name).Delete(serverPod.Name, api.NewDeleteOptions(0))
 		_, err := framework.Client.Pods(framework.Namespace.Name).Create(serverPod)
 		if err != nil {
 			Failf("Failed to create serverPod: %v", err)
@@ -600,7 +604,7 @@ var _ = Describe("Pods", func() {
 				// We call defer here in case there is a problem with
 				// the test so we can ensure that we clean up after
 				// ourselves
-				podClient.Delete(pod.Name)
+				podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 			}()
 
 			By("waiting for the pod to start running")
@@ -673,7 +677,7 @@ var _ = Describe("Pods", func() {
 				// We call defer here in case there is a problem with
 				// the test so we can ensure that we clean up after
 				// ourselves
-				podClient.Delete(pod.Name)
+				podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 			}()
 
 			By("waiting for the pod to start running")
