@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("EmptyDir volumes", func() {
+var _ = Describe("emptyDir", func() {
 	f := NewFramework("emptydir")
 
 	It("volume on tmpfs should have the correct mode", func() {
