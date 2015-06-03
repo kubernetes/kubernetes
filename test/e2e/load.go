@@ -44,7 +44,7 @@ const (
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
 // -t/--test flag or ginkgo.focus flag.
-var _ = Describe("Load", func() {
+var _ = Describe("Load capacity", func() {
 	var c *client.Client
 	var nodeCount int
 	var ns string

@@ -28,7 +28,7 @@ import (
 var _ = Describe("Shell", func() {
 	defer GinkgoRecover()
 
-	It(fmt.Sprintf("tests that services.sh passes"), func() {
+	It(fmt.Sprintf("should pass tests for services.sh"), func() {
 		// The services script only works on gce/gke
 		if !providerIs("gce", "gke") {
 			By(fmt.Sprintf("Skipping Shell test services.sh, which is only supported for provider gce and gke (not %s)",
