@@ -23,8 +23,11 @@ import (
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 )
 
+const dashboardPath = "/static/app/#/dashboard/"
+
 type MuxInterface interface {
 	Handle(pattern string, handler http.Handler)
+	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
 func InstallSupport(mux MuxInterface, enableSwaggerSupport bool) {
@@ -38,6 +41,10 @@ func InstallSupport(mux MuxInterface, enableSwaggerSupport bool) {
 	fileServer := http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, Prefix: "www"})
 	prefix := "/static/"
 	mux.Handle(prefix, http.StripPrefix(prefix, fileServer))
+	prefix = "/ui/"
+	mux.HandleFunc(prefix, func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, dashboardPath, http.StatusTemporaryRedirect)
+	})
 
 	if enableSwaggerSupport {
 		// Expose files in third_party/swagger-ui/ on <host>/swagger-ui
