@@ -3350,10 +3350,23 @@ func TestValidateEndpoints(t *testing.T) {
 			},
 			errorType: "FieldValueRequired",
 		},
+		"Address is link-local": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{IP: "169.254.169.254"}},
+						Ports:     []api.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP"}},
+					},
+				},
+			},
+			errorType:   "FieldValueInvalid",
+			errorDetail: "link-local",
+		},
 	}
 
 	for k, v := range errorCases {
-		if errs := ValidateEndpoints(&v.endpoints); len(errs) == 0 || errs[0].(*errors.ValidationError).Type != v.errorType || errs[0].(*errors.ValidationError).Detail != v.errorDetail {
+		if errs := ValidateEndpoints(&v.endpoints); len(errs) == 0 || errs[0].(*errors.ValidationError).Type != v.errorType || !strings.Contains(errs[0].(*errors.ValidationError).Detail, v.errorDetail) {
 			t.Errorf("Expected error type %s with detail %s for %s, got %v", v.errorType, v.errorDetail, k, errs)
 		}
 	}

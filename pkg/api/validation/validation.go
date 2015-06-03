@@ -1592,10 +1592,23 @@ func validateEndpointSubsets(subsets []api.EndpointSubset) errs.ValidationErrorL
 	return allErrs
 }
 
+var linkLocalNet *net.IPNet
+
 func validateEndpointAddress(address *api.EndpointAddress) errs.ValidationErrorList {
+	if linkLocalNet == nil {
+		var err error
+		_, linkLocalNet, err = net.ParseCIDR("169.254.0.0/16")
+		if err != nil {
+			glog.Errorf("Failed to parse link-local CIDR: %v", err)
+		}
+	}
+
 	allErrs := errs.ValidationErrorList{}
 	if !util.IsValidIPv4(address.IP) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("ip", address.IP, "invalid IPv4 address"))
+	}
+	if linkLocalNet.Contains(net.ParseIP(address.IP)) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("ip", address.IP, "may not be in the link-local range (169.254.0.0/16)"))
 	}
 	return allErrs
 }
