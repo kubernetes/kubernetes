@@ -27,8 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 KUBE_OLD_API_VERSION=${KUBE_OLD_API_VERSION:-"v1beta3"}
 # The api version in which our etcd objects should be converted to.
 # The new api version
-# TODO change this to v1 when it's ready.
-KUBE_NEW_API_VERSION=${KUBE_NEW_API_VERSION:-"v1beta3"}
+KUBE_NEW_API_VERSION=${KUBE_NEW_API_VERSION:-"v1"}
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-4001}
