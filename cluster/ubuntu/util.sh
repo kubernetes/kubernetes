@@ -124,10 +124,10 @@ function verify-cluster {
     if [ "${roles[${ii}]}" == "a" ]; then
       verify-master 
     elif [ "${roles[${ii}]}" == "i" ]; then
-      verify-minion $i
+      verify-node $i
     elif [ "${roles[${ii}]}" == "ai" ]; then
       verify-master
-      verify-minion $i
+      verify-node $i
     else
       echo "unsupported role for ${i}. please check"
       exit 1
@@ -163,7 +163,7 @@ function verify-master(){
 
 }
 
-function verify-minion(){
+function verify-node(){
   # verify minion has all required daemons
   echo "Validating ${1}"
   local -a required_daemon=("kube-proxy" "kubelet" "docker")
@@ -293,7 +293,7 @@ function detect-master {
 #   nodes
 # Vars set:
 #   KUBE_NODE_IP_ADDRESS (array)
-function detect-minions {
+function detect-nodes {
   KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
@@ -336,7 +336,7 @@ function kube-up {
     if [ "${roles[${ii}]}" == "a" ]; then
       provision-master 
     elif [ "${roles[${ii}]}" == "i" ]; then
-      provision-minion $i 
+      provision-node $i 
     elif [ "${roles[${ii}]}" == "ai" ]; then
       provision-masterandminion
     else
@@ -372,7 +372,7 @@ function provision-master() {
                             sudo service etcd start;"
 }
 
-function provision-minion() {
+function provision-node() {
     # copy the binaries and scripts to the ~/kube directory on the minion
     echo "Deploying minion on machine ${1#*@}"
     echo

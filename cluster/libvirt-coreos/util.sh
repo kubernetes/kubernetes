@@ -49,7 +49,7 @@ function detect-master {
 }
 
 # Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
-function detect-minions {
+function detect-nodes {
   KUBE_NODE_IP_ADDRESSES=("${NODE_IPS[@]}")
 }
 
@@ -199,7 +199,7 @@ function wait-cluster-readiness {
 # Instantiate a kubernetes cluster
 function kube-up {
   detect-master
-  detect-minions
+  detect-nodes
   get-password
   initialize-pool keep_base_image
   initialize-network

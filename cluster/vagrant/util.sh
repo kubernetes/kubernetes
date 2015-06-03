@@ -26,7 +26,7 @@ function detect-master () {
 }
 
 # Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
-function detect-minions {
+function detect-nodes {
   echo "Minions already detected" 1>&2
   KUBE_NODE_IP_ADDRESSES=("${NODE_IPS[@]}")
 }
@@ -161,7 +161,7 @@ function create-provision-scripts {
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
       echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
-      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
+      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-node.sh"
       grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
   done
@@ -320,7 +320,7 @@ function find-vagrant-name-by-ip {
 }
 
 # Find the vagrant machine name based on the host name of the minion
-function find-vagrant-name-by-minion-name {
+function find-vagrant-name-by-node-name {
   local ip="$1"
   if [[ "$ip" == "${INSTANCE_PREFIX}-master" ]]; then
     echo "master"
@@ -343,7 +343,7 @@ function ssh-to-node {
   local machine
 
   machine=$(find-vagrant-name-by-ip $node) || true
-  [[ -n ${machine-} ]] || machine=$(find-vagrant-name-by-minion-name $node) || true
+  [[ -n ${machine-} ]] || machine=$(find-vagrant-name-by-node-name $node) || true
   [[ -n ${machine-} ]] || {
     echo "Cannot find machine to ssh to: $1"
     return 1

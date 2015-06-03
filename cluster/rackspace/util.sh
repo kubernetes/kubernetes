@@ -190,7 +190,7 @@ ${MASTER_NAME}"
   $MASTER_BOOT_CMD
 }
 
-rax-boot-minions() {
+rax-boot-nodes() {
 
   cp $(dirname $0)/rackspace/cloud-config/minion-cloud-config.yaml \
   ${KUBE_TEMP}/minion-cloud-config.yaml
@@ -244,7 +244,7 @@ rax-nova-network() {
   fi
 }
 
-detect-minions() {
+detect-nodes() {
   KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local minion_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
@@ -317,7 +317,7 @@ kube-up() {
 
   rax-boot-master
 
-  rax-boot-minions
+  rax-boot-nodes
 
   FAIL=0
   for job in `jobs -p`
@@ -357,7 +357,7 @@ kube-up() {
   # Don't bail on errors, we want to be able to print some info.
   set +e
 
-  detect-minions
+  detect-nodes
 
   echo "All minions may not be online yet, this is okay."
   echo

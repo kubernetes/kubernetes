@@ -214,7 +214,7 @@ function upload-server-tars() {
 #   ZONE
 # Vars set:
 #
-function detect-minions () {
+function detect-nodes () {
     if [[ -z "$AZ_CS" ]]; then
         verify-prereqs
     fi

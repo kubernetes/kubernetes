@@ -238,7 +238,7 @@ function upload-server-tars() {
 #   NODE_INSTANCE_PREFIX
 # Vars set:
 #   NODE_NAMES
-function detect-minion-names {
+function detect-node-names {
   detect-project
   NODE_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
     --zone "${ZONE}" instances --group "${NODE_INSTANCE_PREFIX}-group" list \
@@ -251,7 +251,7 @@ function detect-minion-names {
 # Assumed vars:
 #   NODE_INSTANCE_PREFIX
 #   NUM_NODES
-function wait-for-minions-to-run {
+function wait-for-nodes-to-run {
   detect-project
   local running_minions=0
   while [[ "${NUM_NODES}" != "${running_minions}" ]]; do
@@ -271,9 +271,9 @@ function wait-for-minions-to-run {
 # Vars set:
 #   NODE_NAMES
 #   KUBE_NODE_IP_ADDRESSES (array)
-function detect-minions () {
+function detect-nodes () {
   detect-project
-  detect-minion-names
+  detect-node-names
   KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
@@ -666,8 +666,8 @@ function kube-up {
   # TODO: this should be true when the above create managed-instance-group
   # command returns, but currently it returns before the instances come up due
   # to gcloud's deficiency.
-  wait-for-minions-to-run
-  detect-minion-names
+  wait-for-nodes-to-run
+  detect-node-names
   detect-master
 
   echo "Waiting for cluster initialization."
@@ -859,7 +859,7 @@ function prepare-push() {
   ensure-temp-dir
   detect-project
   detect-master
-  detect-minion-names
+  detect-node-names
   get-password
   get-bearer-token
 

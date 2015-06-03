@@ -56,7 +56,7 @@ function kube-up() {
     # Sleep due to juju bug http://pad.lv/1432759
     sleep-status
     detect-master
-    detect-minions
+    detect-nodes
 }
 
 function kube-down() {
@@ -77,7 +77,7 @@ function detect-master() {
     echo "Kubernetes master: " ${KUBERNETES_MASTER}
 }
 
-function detect-minions() {
+function detect-nodes() {
     # Run the Juju command that gets the minion private IP addresses.
     local ipoutput
     ipoutput=$(juju run --service kubernetes "unit-get private-address" --format=json)

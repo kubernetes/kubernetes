@@ -220,9 +220,9 @@ function detect-master() {
 #   none
 # Vars set:
 #   NODE_NAMES
-function detect-minions() {
-  echo "... in detect-minions()" >&2
-  detect-minion-names
+function detect-nodes() {
+  echo "... in detect-nodes()" >&2
+  detect-node-names
 }
 
 # Detect minions created in the minion group
@@ -231,7 +231,7 @@ function detect-minions() {
 #   none
 # Vars set:
 #   NODE_NAMES
-function detect-minion-names {
+function detect-node-names {
   detect-project
   GROUP_NAME=($(gcloud preview --project "${PROJECT}" instance-groups \
     --zone "${ZONE}" list | grep -o "k8s-${CLUSTER_NAME}-.\{8\}-group"))

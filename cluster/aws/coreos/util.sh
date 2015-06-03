@@ -16,7 +16,7 @@
 
 # A library of helper functions for CoreOS.
 
-function detect-minion-image (){
+function detect-node-image (){
   if [[ -z "${KUBE_NODE_IMAGE-}" ]]; then
     KUBE_NODE_IMAGE=$(curl -s -L http://${COREOS_CHANNEL}.release.core-os.net/amd64-usr/current/coreos_production_ami_all.json | python -c "import json,sys;obj=json.load(sys.stdin);print filter(lambda t: t['name']=='${AWS_REGION}', obj['amis'])[0]['hvm']")
   fi
@@ -26,7 +26,7 @@ function detect-minion-image (){
   fi
 }
 
-function generate-minion-user-data() {
+function generate-node-user-data() {
   i=$1
   NODE_PRIVATE_IP=$INTERNAL_IP_BASE.1${i}
   NODE_IP_RANGE=${NODE_IP_RANGES[$i]}
@@ -52,7 +52,7 @@ function generate-minion-user-data() {
 EOF
 }
 
-function check-minion() {
+function check-node() {
   echo "working"
 }
 

@@ -125,7 +125,7 @@ function upgrade-nodes() {
   local sanitized_version=$(echo ${KUBE_VERSION} | sed s/"\."/-/g)
   echo "== Upgrading nodes to ${KUBE_VERSION}. =="
 
-  detect-minion-names
+  detect-node-names
 
   # TODO(mbforbes): Refactor setting scope flags.
   local -a scope_flags=()

@@ -114,7 +114,7 @@ function detect-master () {
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
 
-function detect-minions () {
+function detect-nodes () {
   KUBE_NODE_IP_ADDRESSES=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local minion_ip
@@ -437,7 +437,7 @@ function kube-up {
   get-tokens
 
   detect-image
-  detect-minion-image
+  detect-node-image
 
   find-release-tars
 
@@ -619,7 +619,7 @@ function kube-up {
   NODE_IDS=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     echo "Starting Minion (${NODE_NAMES[$i]})"
-    generate-minion-user-data $i > "${KUBE_TEMP}/minion-user-data-${i}"
+    generate-node-user-data $i > "${KUBE_TEMP}/minion-user-data-${i}"
 
     local public_ip_option
     if [[ "${ENABLE_NODE_PUBLIC_IP}" == "true" ]]; then
@@ -669,7 +669,7 @@ function kube-up {
   fi
 
   detect-master > $LOG
-  detect-minions > $LOG
+  detect-nodes > $LOG
 
   # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to
   # make sure that everything is well configured.
@@ -733,7 +733,7 @@ function kube-up {
         local minion_name=${NODE_NAMES[$i]}
         local minion_ip=${KUBE_NODE_IP_ADDRESSES[$i]}
         echo -n Attempt "$(($attempt+1))" to check Docker on node "${minion_name} @ ${minion_ip}" ...
-        local output=`check-minion ${minion_name} ${minion_ip}`
+        local output=`check-node ${minion_name} ${minion_ip}`
         echo $output
         if [[ "${output}" != "working" ]]; then
           if (( attempt > 9 )); then

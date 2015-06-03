@@ -299,7 +299,7 @@ function verify_from_container() {
 trap do_teardown EXIT
 
 # Get node IP addresses and pick one as our test point.
-detect-minions
+detect-nodes
 test_node="${NODE_NAMES[0]}"
 master="${MASTER_NAME}"
 
