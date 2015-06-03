@@ -174,6 +174,144 @@ func TestMerge(t *testing.T) {
 				},
 			},
 		},
+		{
+			kind: "Pod",
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			fragment: `{ "apiVersion": "v1" }`,
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+		},
+		/* TODO: uncomment this test once Merge is updated to use
+		strategic-merge-patch. See #844.
+		{
+			kind: "Pod",
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						api.Container{
+							Name:  "c1",
+							Image: "red-image",
+						},
+						api.Container{
+							Name:  "c2",
+							Image: "blue-image",
+						},
+					},
+				},
+			},
+			fragment: `{ "apiVersion": "v1", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`,
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						api.Container{
+							Name:  "c1",
+							Image: "green-image",
+						},
+						api.Container{
+							Name:  "c2",
+							Image: "blue-image",
+						},
+					},
+				},
+			},
+		}, */
+		{
+			kind: "Pod",
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			fragment: `{ "apiVersion": "v1", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`,
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Volumes: []api.Volume{
+						{
+							Name:         "v1",
+							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+						},
+						{
+							Name:         "v2",
+							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+						},
+					},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+		},
+		{
+			kind:      "Pod",
+			obj:       &api.Pod{},
+			fragment:  "invalid json",
+			expected:  &api.Pod{},
+			expectErr: true,
+		},
+		{
+			kind:      "Service",
+			obj:       &api.Service{},
+			fragment:  `{ "apiVersion": "badVersion" }`,
+			expectErr: true,
+		},
+		{
+			kind: "Service",
+			obj: &api.Service{
+				Spec: api.ServiceSpec{},
+			},
+			fragment: `{ "apiVersion": "v1", "spec": { "ports": [ { "port": 0 } ] } }`,
+			expected: &api.Service{
+				Spec: api.ServiceSpec{
+					SessionAffinity: "None",
+					Type:            api.ServiceTypeClusterIP,
+					Ports: []api.ServicePort{
+						{
+							Protocol: api.ProtocolTCP,
+							Port:     0,
+						},
+					},
+				},
+			},
+		},
+		{
+			kind: "Service",
+			obj: &api.Service{
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"version": "v1",
+					},
+				},
+			},
+			fragment: `{ "apiVersion": "v1", "spec": { "selector": { "version": "v2" } } }`,
+			expected: &api.Service{
+				Spec: api.ServiceSpec{
+					SessionAffinity: "None",
+					Type:            api.ServiceTypeClusterIP,
+					Selector: map[string]string{
+						"version": "v2",
+					},
+				},
+			},
+		},
 	}
 
 	for i, test := range tests {
