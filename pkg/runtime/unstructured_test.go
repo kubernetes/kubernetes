@@ -29,6 +29,8 @@ func TestDecodeUnstructured(t *testing.T) {
 			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
 			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: "v1beta3"}, RawJSON: []byte(`{"kind":"Pod","apiVersion":"v1beta3","metadata":{"name":"test"}}`)},
 			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "", APIVersion: "v1beta3"}, RawJSON: []byte(`{"kind":"Pod","apiVersion":"v1beta3","metadata":{"name":"test"}}`)},
+			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: "v1"}, RawJSON: []byte(`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"test"}}`)},
+			&runtime.Unknown{TypeMeta: runtime.TypeMeta{Kind: "", APIVersion: "v1"}, RawJSON: []byte(`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"test"}}`)},
 			&runtime.Unstructured{TypeMeta: runtime.TypeMeta{Kind: "Foo", APIVersion: "Bar"}, Object: map[string]interface{}{"test": "value"}},
 		},
 	}
