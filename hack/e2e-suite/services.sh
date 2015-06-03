@@ -22,13 +22,11 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-: ${NAMESPACE:="services-test-${RANDOM}"}
 : ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
-: ${RAW_KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
-: ${KUBECTL:="${RAW_KUBECTL} --namespace=${NAMESPACE}"}
+: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
-export NAMESPACE RAW_KUBECTL KUBECTL KUBE_CONFIG_FILE
+export KUBECTL KUBE_CONFIG_FILE
 
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
@@ -41,9 +39,7 @@ function error() {
 }
 
 function sort_args() {
-  [ $# == 0 ] && return
-  a=($(printf "%s\n" "$@" | sort -n))
-  echo "${a[*]}"
+  printf "%s\n" "$@" | sort -n | tr '\n\r' ' ' | sed 's/  */ /g'
 }
 
 # Join args $2... with $1 between them.
@@ -62,20 +58,10 @@ function join() {
 
 svcs_to_clean=()
 function do_teardown() {
-  ${RAW_KUBECTL} delete namespace "${NAMESPACE}"
-}
-
-function make_namespace() {
-  echo "Making namespace '${NAMESPACE}'"
-  ${RAW_KUBECTL} create -f - << __EOF__
-{
-    "kind": "Namespace",
-    "apiVersion": "v1beta3",
-    "metadata": {
-        "name": "${NAMESPACE}"
-    }
-}
-__EOF__
+  local svc
+  for svc in "${svcs_to_clean[@]:+${svcs_to_clean[@]}}"; do
+    stop_service "${svc}"
+  done
 }
 
 # Args:
@@ -84,7 +70,7 @@ __EOF__
 #   $3: service replica count
 #   $4: public IPs (optional, string e.g. "1.2.3.4 5.6.7.8")
 function start_service() {
-  echo "Starting service '${NAMESPACE}/$1' on port $2 with $3 replicas"
+  echo "Starting service '$1' on port $2 with $3 replicas"
   svcs_to_clean+=("$1")
   ${KUBECTL} create -f - << __EOF__
 {
@@ -92,7 +78,7 @@ function start_service() {
   "apiVersion": "v1beta3",
   "metadata": {
     "name": "$1",
-    "namespace": "${NAMESPACE}",
+    "namespace": "default",
     "labels": {
       "name": "$1"
     }
@@ -138,7 +124,7 @@ __EOF__
   "apiVersion": "v1beta3",
   "metadata": {
     "name": "$1",
-    "namespace": "${NAMESPACE}",
+    "namespace": "default",
     "labels": {
       "name": "$1"
     }
@@ -232,28 +218,30 @@ function wait_for_pods() {
 #   $2: service IP
 #   $3: service port
 #   $4: pod count
-#   $5: pod IDs (sorted)
+#   $5: pod IDs
 function wait_for_service_up() {
   local i
   local found_pods
-  echo "waiting for $1 at $2:$3"
-  for i in $(seq 1 5); do
+  for i in $(seq 1 20); do
     results=($(ssh-to-node "${test_node}" "
         set -e;
-        for i in $(seq -s' ' 1 $(($4*3))); do
+        for i in $(seq -s' ' 1 $4); do
           curl -s --connect-timeout 1 http://$2:$3;
           echo;
-        done | sort -n | uniq
+        done | sort | uniq
         "))
 
     found_pods=$(sort_args "${results[@]:+${results[@]}}")
+    echo "Checking if ${found_pods} == ${5}"
     if [[ "${found_pods}" == "$5" ]]; then
-      return
+      break
     fi
-    echo "expected '$5', got '${found_pods}': will try again"
-    sleep 3  # wait for endpoints to propagate
+    echo "Waiting for endpoints to propagate"
+    sleep 3
   done
-  error "$1: failed to verify portal from host"
+  if [[ "${found_pods}" != "$5" ]]; then
+    error "Endpoints did not propagate in time"
+  fi
 }
 
 # Args:
@@ -276,26 +264,35 @@ function wait_for_service_down() {
 #   $2: service IP
 #   $3: service port
 #   $4: pod count
-#   $5: pod IDs (sorted)
+#   $5: pod IDs
 function verify_from_container() {
-  echo "waiting for $1 at $2:$3"
   results=($(ssh-to-node "${test_node}" "
       set -e;
       sudo docker pull busybox >/dev/null;
       sudo docker run busybox sh -c '
-          for i in $(seq -s' ' 1 $(($4*3))); do
-            if wget -q -T 3 -O - http://$2:$3; then
-              echo
-            else
+          for i in $(seq -s' ' 1 $4); do
+            ok=false
+            for j in $(seq -s' ' 1 10); do
+              if wget -q -T 5 -O - http://$2:$3; then
+                echo
+                ok=true
+                break
+              fi
+              sleep 1
+            done
+            if [[ \${ok} == false ]]; then
               exit 1
             fi
           done
-      '" | sort -r -n | uniq)) \
+      '")) \
       || error "testing $1 VIP from container failed"
   found_pods=$(sort_args "${results[@]}")
   if [[ "${found_pods}" != "$5" ]]; then
-    echo "expected '$5', got '${found_pods}'"
-    error "$1: failed to verify VIP from container"
+    error -e "$1 VIP failed from container, expected:\n
+        $(printf '\t%s\n' $5)\n
+        got:\n
+        $(printf '\t%s\n' ${found_pods})
+        "
   fi
 }
 
@@ -306,17 +303,14 @@ detect-minions
 test_node="${MINION_NAMES[0]}"
 master="${MASTER_NAME}"
 
-# Make our namespace
-make_namespace
-
 # Launch some pods and services.
-svc1_name="service1"
+svc1_name="service-${RANDOM}"
 svc1_port=80
 svc1_count=3
 svc1_publics="192.168.1.1 192.168.1.2"
 start_service "${svc1_name}" "${svc1_port}" "${svc1_count}" "${svc1_publics}"
 
-svc2_name="service2"
+svc2_name="service-${RANDOM}"
 svc2_port=80
 svc2_count=3
 start_service "${svc2_name}" "${svc2_port}" "${svc2_count}"
@@ -420,6 +414,7 @@ echo "Manually removing iptables rules"
 # Remove both the new and old style chains, in case we're testing on an old kubelet
 ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PORTALS-HOST || true"
 ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true"
+ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PROXY || true"
 echo "Verifying the VIPs from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
     "${svc3_count}" "${svc3_pods}"
