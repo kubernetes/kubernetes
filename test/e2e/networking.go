@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("New networking", func() {
+var _ = Describe("NetworkingNew", func() {
 	f := NewFramework("nettestnew")
 
 	var svcname = "nettest"
@@ -244,7 +244,7 @@ func LaunchNetTestPodPerNode(f *Framework, nodes *api.NodeList, name, version st
 	return podNames
 }
 
-var _ = Describe("Old networking", func() {
+var _ = Describe("Networking", func() {
 	f := NewFramework("nettest")
 
 	var svcname = "nettest"

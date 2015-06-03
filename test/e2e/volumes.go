@@ -192,7 +192,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	Expect(body).To(ContainSubstring(expectedContent))
 }
 
-var _ = Describe("Volumes", func() {
+var _ = Describe("Volume", func() {
 	clean := true // If 'false', the test won't clear its namespace (and pods and services) upon completion. Useful for debugging.
 
 	// filled in BeforeEach
