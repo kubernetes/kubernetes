@@ -49,7 +49,7 @@ const RetryAfter = "1"
 // IsReadOnlyReq() is true for any (or at least many) request which has no observable
 // side effects on state of apiserver (though there may be internal side effects like
 // caching and logging).
-func IsReadOnlyReq(req http.Request) bool {
+func IsReadOnlyReq(req *http.Request) bool {
 	if req.Method == "GET" {
 		// TODO: add OPTIONS and HEAD if we ever support those.
 		return true
@@ -60,7 +60,7 @@ func IsReadOnlyReq(req http.Request) bool {
 // ReadOnly passes all GET requests on to handler, and returns an error on all other requests.
 func ReadOnly(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if IsReadOnlyReq(*req) {
+		if IsReadOnlyReq(req) {
 			handler.ServeHTTP(w, req)
 			return
 		}
@@ -69,9 +69,11 @@ func ReadOnly(handler http.Handler) http.Handler {
 	})
 }
 
-// MaxInFlight limits the number of in-flight requests to buffer size of the passed in channel.
-func MaxInFlightLimit(c chan bool, longRunningRequestRE *regexp.Regexp, handler http.Handler) http.Handler {
-	if c == nil {
+// MaxInFlight limits the number of in-flight requests to buffer size of the
+// passed in channels; read-only and read-write requests are limited
+// separately.
+func MaxInFlightLimit(ro, rw chan bool, longRunningRequestRE *regexp.Regexp, handler http.Handler) http.Handler {
+	if ro == nil && rw == nil {
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +81,10 @@ func MaxInFlightLimit(c chan bool, longRunningRequestRE *regexp.Regexp, handler 
 			// Skip tracking long running events.
 			handler.ServeHTTP(w, r)
 			return
+		}
+		c := ro
+		if IsReadOnlyReq(r) {
+			c = rw
 		}
 		select {
 		case c <- true:
@@ -201,7 +207,7 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 		}
 	}
 
-	attribs.ReadOnly = IsReadOnlyReq(*req)
+	attribs.ReadOnly = IsReadOnlyReq(req)
 
 	apiRequestInfo, _ := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 

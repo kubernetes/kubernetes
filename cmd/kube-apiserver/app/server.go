@@ -399,9 +399,11 @@ func (s *APIServer) Run(_ []string) error {
 
 	// See the flag commentary to understand our assumptions when opening the read-only and read-write ports.
 
-	var sem chan bool
-	if s.MaxRequestsInFlight > 0 {
-		sem = make(chan bool, s.MaxRequestsInFlight)
+	var semRO, semRW chan bool
+	if s.MaxRequestsInFlight > 4 {
+		// Give read requests more, because reads are more common than writes
+		semRO = make(chan bool, s.MaxRequestsInFlight*3/4)
+		semRW = make(chan bool, s.MaxRequestsInFlight*1/4)
 	}
 
 	longRunningRE := regexp.MustCompile(s.LongRunningRequestRE)
@@ -411,7 +413,7 @@ func (s *APIServer) Run(_ []string) error {
 		rl := util.NewTokenBucketRateLimiter(s.APIRate, s.APIBurst)
 		readOnlyServer := &http.Server{
 			Addr:           roLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, m.InsecureHandler)))),
+			Handler:        apiserver.MaxInFlightLimit(semRO, semRW, longRunningRE, apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, m.InsecureHandler)))),
 			ReadTimeout:    ReadWriteTimeout,
 			WriteTimeout:   ReadWriteTimeout,
 			MaxHeaderBytes: 1 << 20,
@@ -431,7 +433,7 @@ func (s *APIServer) Run(_ []string) error {
 	if secureLocation != "" {
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(m.Handler)),
+			Handler:        apiserver.MaxInFlightLimit(semRO, semRW, longRunningRE, apiserver.RecoverPanics(m.Handler)),
 			ReadTimeout:    ReadWriteTimeout,
 			WriteTimeout:   ReadWriteTimeout,
 			MaxHeaderBytes: 1 << 20,
