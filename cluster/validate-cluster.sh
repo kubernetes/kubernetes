@@ -58,7 +58,9 @@ while true; do
   fi
 done
 echo "Found ${found} nodes."
-cat -n "${MINIONS_FILE}"
+echo -n "        "
+head -n 1 "${MINIONS_FILE}"
+tail -n +2 "${MINIONS_FILE}" | cat -n
 
 attempt=0
 while true; do
