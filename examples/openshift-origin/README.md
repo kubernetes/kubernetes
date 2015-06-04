@@ -84,7 +84,7 @@ Ensure you have a valid PUBLIC_IP address before continuing in the example.
 We now need to run a command on your host to generate a proper OpenShift configuration.  To do this, we will volume mount the configuration directory that holds your Kubernetes kubeconfig file from the prior step.
 
 ```shell
-docker run --privileged -v ${OPENSHIFT_CONFIG}:/config openshift/origin start master --write-config=/config --kubeconfig=/config/kubeconfig --master=https://localhost:8443 --public-master=https://${PUBLIC_IP}:8443
+docker run --privileged -v ${OPENSHIFT_CONFIG}:/config openshift/origin start master --write-config=/config --kubeconfig='/config/kubeconfig' --master='https://localhost:8443' --public-master='https://${PUBLIC_IP}:8443'
 ```
 
 You should now see a number of certificates minted in your configuration directory, as well as a master-config.yaml file that tells the OpenShift master how to execute.  In the next step, we will bundle this into a Kubernetes Secret that our OpenShift master pod will consume.
@@ -98,7 +98,7 @@ OpenShift includes an experimental command to make this easier.
 First, update the ownership for the files previously generated:
 
 ```
-$ sudo -E chown ${USER} -R ${OPENSHIFT_CONFIG}
+$ sudo -E chown -R ${USER} ${OPENSHIFT_CONFIG}
 ```
 
 Then run the following command to collapse them into a Kubernetes secret.
