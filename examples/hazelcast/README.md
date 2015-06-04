@@ -78,7 +78,7 @@ spec:
         - resources:
             limits:
               cpu: 1
-          image: quay.io/pires/hazelcast-kubernetess:0.3.1
+          image: quay.io/pires/hazelcast-kubernetes:0.3.1
           name: hazelcast
           env:
           - name: "DNS_DOMAIN"
