@@ -67,7 +67,7 @@ var _ = Describe("Downward API", func() {
 								Name: "POD_NAME",
 								ValueFrom: &api.EnvVarSource{
 									FieldRef: &api.ObjectFieldSelector{
-										APIVersion: "v1beta3",
+										APIVersion: "v1",
 										FieldPath:  "metadata.name",
 									},
 								},
@@ -76,7 +76,7 @@ var _ = Describe("Downward API", func() {
 								Name: "POD_NAMESPACE",
 								ValueFrom: &api.EnvVarSource{
 									FieldRef: &api.ObjectFieldSelector{
-										APIVersion: "v1beta3",
+										APIVersion: "v1",
 										FieldPath:  "metadata.namespace",
 									},
 								},
