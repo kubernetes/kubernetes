@@ -162,7 +162,6 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:      admit.NewAlwaysAdmit(),
 		ReadWritePort:         portNumber,
-		ReadOnlyPort:          portNumber,
 		PublicAddress:         publicAddress,
 		CacheTimeout:          2 * time.Second,
 		EnableV1:              true,
@@ -704,15 +703,12 @@ func runMasterServiceTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("unexpected error listing services: %v", err)
 	}
-	var foundRW, foundRO bool
+	var foundRW bool
 	found := util.StringSet{}
 	for i := range svcList.Items {
 		found.Insert(svcList.Items[i].Name)
 		if svcList.Items[i].Name == "kubernetes" {
 			foundRW = true
-		}
-		if svcList.Items[i].Name == "kubernetes-ro" {
-			foundRO = true
 		}
 	}
 	if foundRW {
@@ -725,20 +721,7 @@ func runMasterServiceTest(client *client.Client) {
 		}
 	} else {
 		glog.Errorf("no RW service found: %v", found)
-	}
-	if foundRO {
-		ep, err := client.Endpoints(api.NamespaceDefault).Get("kubernetes-ro")
-		if err != nil {
-			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
-		}
-		if countEndpoints(ep) == 0 {
-			glog.Fatalf("no endpoints for kubernetes service: %v", ep)
-		}
-	} else {
-		glog.Errorf("no RO service found: %v", found)
-	}
-	if !foundRW || !foundRO {
-		glog.Fatalf("Kubernetes service test failed: %v", found)
+		glog.Fatal("Kubernetes service test failed")
 	}
 	glog.Infof("Master service test passed.")
 }
@@ -851,7 +834,7 @@ func runServiceTest(client *client.Client) {
 	for _, svc := range svcList.Items {
 		names.Insert(fmt.Sprintf("%s/%s", svc.Namespace, svc.Name))
 	}
-	if !names.HasAll("default/kubernetes", "default/kubernetes-ro", "default/service1", "default/service2", "other/service1") {
+	if !names.HasAll("default/kubernetes", "default/service1", "default/service2", "other/service1") {
 		glog.Fatalf("Unexpected service list: %#v", names)
 	}
 

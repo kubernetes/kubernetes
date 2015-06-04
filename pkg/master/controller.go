@@ -60,10 +60,6 @@ type Controller struct {
 	ServicePort       int
 	PublicServicePort int
 
-	ReadOnlyServiceIP         net.IP
-	ReadOnlyServicePort       int
-	PublicReadOnlyServicePort int
-
 	runner *util.Runner
 }
 
@@ -87,11 +83,8 @@ func (c *Controller) Start() {
 	if err := c.UpdateKubernetesService(); err != nil {
 		glog.Errorf("Unable to perform initial Kubernetes service initialization: %v", err)
 	}
-	if err := c.UpdateKubernetesROService(); err != nil {
-		glog.Errorf("Unable to perform initial Kubernetes RO service initialization: %v", err)
-	}
 
-	c.runner = util.NewRunner(c.RunKubernetesService, c.RunKubernetesROService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
+	c.runner = util.NewRunner(c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
 	c.runner.Start()
 }
 
@@ -118,34 +111,6 @@ func (c *Controller) UpdateKubernetesService() error {
 			return err
 		}
 		if err := c.SetEndpoints("kubernetes", c.PublicIP, c.PublicServicePort); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// RunKubernetesROService periodically updates the kubernetes RO service
-func (c *Controller) RunKubernetesROService(ch chan struct{}) {
-	util.Until(func() {
-		if err := c.UpdateKubernetesROService(); err != nil {
-			util.HandleError(fmt.Errorf("unable to sync kubernetes RO service: %v", err))
-		}
-	}, c.EndpointInterval, ch)
-}
-
-// UpdateKubernetesROService attempts to update the default Kube read-only service.
-func (c *Controller) UpdateKubernetesROService() error {
-	// Update service & endpoint records.
-	// TODO: when it becomes possible to change this stuff,
-	// stop polling and start watching.
-	if err := c.CreateNamespaceIfNeeded(api.NamespaceDefault); err != nil {
-		return err
-	}
-	if c.ReadOnlyServiceIP != nil {
-		if err := c.CreateMasterServiceIfNeeded("kubernetes-ro", c.ReadOnlyServiceIP, c.ReadOnlyServicePort); err != nil {
-			return err
-		}
-		if err := c.SetEndpoints("kubernetes-ro", c.PublicIP, c.PublicReadOnlyServicePort); err != nil {
 			return err
 		}
 	}
