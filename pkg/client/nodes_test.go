@@ -28,9 +28,6 @@ import (
 )
 
 func getNodesResourceName() string {
-	if api.PreV1Beta3(testapi.Version()) {
-		return "minions"
-	}
 	return "nodes"
 }
 

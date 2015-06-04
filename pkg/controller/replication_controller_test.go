@@ -166,9 +166,6 @@ func validateSyncReplication(t *testing.T, fakePodControl *FakePodControl, expec
 }
 
 func replicationControllerResourceName() string {
-	if api.PreV1Beta3(testapi.Version()) {
-		return "replicationControllers"
-	}
 	return "replicationcontrollers"
 }
 
@@ -193,7 +190,7 @@ func makeTestServer(t *testing.T, namespace, name string, podResponse, controlle
 	mux := http.NewServeMux()
 	mux.Handle(testapi.ResourcePath("pods", namespace, ""), &fakePodHandler)
 	mux.Handle(testapi.ResourcePath(replicationControllerResourceName(), "", ""), &fakeControllerHandler)
-	if !api.PreV1Beta3(testapi.Version()) && namespace != "" {
+	if namespace != "" {
 		mux.Handle(testapi.ResourcePath(replicationControllerResourceName(), namespace, ""), &fakeControllerHandler)
 	}
 	if name != "" {

@@ -28,9 +28,6 @@ import (
 )
 
 func getResourceQuotasResoureName() string {
-	if api.PreV1Beta3(testapi.Version()) {
-		return "resourceQuotas"
-	}
 	return "resourcequotas"
 }
 
