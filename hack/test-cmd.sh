@@ -124,7 +124,7 @@ for version in "${kube_api_versions[@]}"; do
       -s "http://127.0.0.1:${API_PORT}"
       --match-server-version
     )
-    [ "$(kubectl get nodes -t '{{ .apiVersion }}' "${kube_flags[@]}")" == "v1beta3" ]
+    [ "$(kubectl get nodes -t '{{ .apiVersion }}' "${kube_flags[@]}")" == "v1" ]
   else
     kube_flags=(
       -s "http://127.0.0.1:${API_PORT}"

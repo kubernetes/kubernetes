@@ -672,7 +672,7 @@ func TestUpdateWithRetries(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/api/"+latest.Version+"/namespaces/default/replicationcontrollers/rc" && m == "PUT":
+			case p == testapi.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
 				update := updates[0]
 				updates = updates[1:]
 				// We should always get an update with a valid rc even when the get fails. The rc should always
@@ -685,7 +685,7 @@ func TestUpdateWithRetries(t *testing.T) {
 					delete(c.Spec.Selector, "baz")
 				}
 				return update, nil
-			case p == "/api/"+latest.Version+"/namespaces/default/replicationcontrollers/rc" && m == "GET":
+			case p == testapi.ResourcePath("replicationcontrollers", "default", "rc") && m == "GET":
 				get := gets[0]
 				gets = gets[1:]
 				return get, nil
@@ -695,7 +695,7 @@ func TestUpdateWithRetries(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &client.Config{Version: latest.Version}
+	clientConfig := &client.Config{Version: testapi.Version()}
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 
