@@ -2551,7 +2551,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
-			Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"}},
+			Addresses: []api.NodeAddress{{Type: api.NodeInternalIP, Address: "127.0.0.1"}},
 		},
 	}
 
@@ -2648,7 +2648,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
-			Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"}},
+			Addresses: []api.NodeAddress{{Type: api.NodeInternalIP, Address: "127.0.0.1"}},
 		},
 	}
 
@@ -2734,7 +2734,7 @@ func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
 				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 				api.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
-			Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.1"}},
+			Addresses: []api.NodeAddress{{Type: api.NodeInternalIP, Address: "127.0.0.1"}},
 		},
 	}
 
