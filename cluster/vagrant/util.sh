@@ -139,9 +139,10 @@ function create-provision-scripts {
     echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
     echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
+    echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
     echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
-    grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
@@ -150,6 +151,7 @@ function create-provision-scripts {
       echo "MASTER_NAME='${MASTER_NAME}'"
       echo "MASTER_IP='${MASTER_IP}'"
       echo "MINION_NAMES=(${MINION_NAMES[@]})"
+      echo "MINION_NAME=(${MINION_NAMES[$i]})"
       echo "MINION_IPS=(${MINION_IPS[@]})"
       echo "MINION_IP='${MINION_IPS[$i]}'"
       echo "MINION_ID='$i'"
@@ -161,8 +163,8 @@ function create-provision-scripts {
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
       echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
-      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
-      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
   done
 }

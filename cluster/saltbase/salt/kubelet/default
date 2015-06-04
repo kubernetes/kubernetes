@@ -26,8 +26,9 @@
 # the debugging handlers (/run and /exec) to prevent arbitrary code execution on
 # the master.
 # TODO(roberthbailey): Make this configurable via an env var in config-default.sh
+
 {% set debugging_handlers = "--enable-debugging-handlers=true" -%}
-{% if grains.cloud == 'gce' -%}
+{% if grains.cloud in ['gce', 'vagrant'] -%}
   {% if grains['roles'][0] == 'kubernetes-master' -%}
     {% set api_servers_with_port = "" -%}
     {% set debugging_handlers = "--enable-debugging-handlers=false" -%}

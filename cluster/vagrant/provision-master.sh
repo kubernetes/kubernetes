@@ -17,6 +17,19 @@
 # exit on any error
 set -e
 
+# Set the host name explicitly
+# See: https://github.com/mitchellh/vagrant/issues/2430
+hostnamectl set-hostname ${MASTER_NAME}
+
+# Workaround to vagrant inability to guess interface naming sequence
+# Tell system to abandon the new naming scheme and use eth* instead
+rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
+
+# Disable network interface being managed by Network Manager (needed for Fedora 21+)
+NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
+sed -i 's/^NM_CONTROLLED=no/#NM_CONTROLLED=no/' ${NETWORK_CONF_PATH}ifcfg-eth1
+systemctl restart network
+
 function release_not_found() {
   echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
   echo "are running from a clone of the git repo, please run ./build/release.sh." >&2
@@ -56,6 +69,10 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
   fi
 done
 echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
+echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
+
+# Configure the openvswitch network
+provision-network
 
 # Update salt configuration
 mkdir -p /etc/salt/minion.d
@@ -81,6 +98,7 @@ grains:
   roles:
     - kubernetes-master
   runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
+  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
 EOF
 
 mkdir -p /srv/salt-overlay/pillar
@@ -147,6 +165,11 @@ if [[ ! -f "${known_tokens_file}" ]]; then
   mkdir -p /srv/salt-overlay/salt/kubelet
   kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
   (umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
+  kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+  # Make a kubeconfig file with the token.
+  (umask 077;
+  cat > "${kubelet_kubeconfig_file}" <<EOF
+)
 
   mkdir -p /srv/salt-overlay/salt/kube-proxy
   kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
