@@ -55,7 +55,7 @@ func TestMerge(t *testing.T) {
 			},
 		},
 		/* TODO: uncomment this test once Merge is updated to use
-		strategic-merge-patch. See #844.
+		strategic-merge-patch. See #8449.
 		{
 			kind: "Pod",
 			obj: &api.Pod{
@@ -193,7 +193,7 @@ func TestMerge(t *testing.T) {
 			},
 		},
 		/* TODO: uncomment this test once Merge is updated to use
-		strategic-merge-patch. See #844.
+		strategic-merge-patch. See #8449.
 		{
 			kind: "Pod",
 			obj: &api.Pod{
