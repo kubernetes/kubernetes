@@ -67,7 +67,7 @@ func TestAddOrUpdateEventExisting(t *testing.T) {
 			Name:       "anOkName",
 			Namespace:  "someNamespace",
 			UID:        "C934D3234CD0242",
-			APIVersion: "v1beta2",
+			APIVersion: "version",
 		},
 		Source: api.EventSource{
 			Component: "kubelet",
@@ -88,7 +88,7 @@ func TestAddOrUpdateEventExisting(t *testing.T) {
 			Name:       "anOkName",
 			Namespace:  "someNamespace",
 			UID:        "C934D3234CD0242",
-			APIVersion: "v1beta2",
+			APIVersion: "version",
 		},
 		Source: api.EventSource{
 			Component: "kubelet",
@@ -119,7 +119,7 @@ func TestGetEventNoExisting(t *testing.T) {
 			Name:       "iAmAController",
 			Namespace:  "IHaveANamespace",
 			UID:        "9039D34AFBCDA42",
-			APIVersion: "v1beta3",
+			APIVersion: "version",
 		},
 		Source: api.EventSource{
 			Component: "kubelet",
