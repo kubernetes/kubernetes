@@ -8,7 +8,7 @@ app.controller('GroupCtrl', [
   '$route',
   '$interval',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$rootScope',
   '$location',
   'lodash',

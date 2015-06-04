@@ -6,7 +6,7 @@
 app.controller('ListReplicationControllersCtrl', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$location',
   function($scope, $routeParams, k8sApi, $location) {
     'use strict';

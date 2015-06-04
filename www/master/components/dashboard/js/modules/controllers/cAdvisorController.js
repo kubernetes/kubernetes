@@ -3,7 +3,7 @@
 app.controller('cAdvisorController', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   'lodash',
   'cAdvisorService',
   '$q',

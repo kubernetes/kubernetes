@@ -7,7 +7,7 @@ app.controller('PodCtrl', [
   '$scope',
   '$interval',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$rootScope',
   function($scope, $interval, $routeParams, k8sApi, $rootScope) {
     'use strict';

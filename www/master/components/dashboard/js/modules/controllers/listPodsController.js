@@ -3,7 +3,7 @@
 app.controller('ListPodsCtrl', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   'lodash',
   '$location',
   function($scope, $routeParams, k8sApi, lodash, $location) {
