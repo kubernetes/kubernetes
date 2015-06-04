@@ -30,10 +30,11 @@ import (
 	"time"
 
 	"code.google.com/p/gcfg"
-	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/aws/credentials"
-	"github.com/awslabs/aws-sdk-go/service/ec2"
-	"github.com/awslabs/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/elb"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
@@ -1294,8 +1295,8 @@ func (s *AWSCloud) describeLoadBalancer(region, name string) (*elb.LoadBalancerD
 
 	response, err := elbClient.DescribeLoadBalancers(request)
 	if err != nil {
-		if awsError := aws.Error(err); awsError != nil {
-			if awsError.Code == "LoadBalancerNotFound" {
+		if awsError, ok := err.(awserr.Error); ok {
+			if awsError.Code() == "LoadBalancerNotFound" {
 				return nil, nil
 			}
 		}
