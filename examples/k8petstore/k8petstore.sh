@@ -46,173 +46,187 @@ function create {
 
 cat << EOF > fe-rc.json
 {
-  "id": "fectrl",
   "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "fectrl",
+    "labels": {"name": "frontend"}
+  },
+  "spec": {
     "replicas": $FE,
-    "replicaSelector": {"name": "frontend"},
-    "podTemplate": {
-      "desiredState": {
-         "manifest": {
-           "version": "v1beta1",
-           "id": "frontendCcontroller",
-           "containers": [{
-             "name": "frontend-go-restapi",
-             "image": "jayunit100/k8-petstore-web-server:$VERSION"
+    "selector": {"name": "frontend"},
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "frontend",
+          "uses": "redis-master"
+        }
+      },
+      "spec": {
+         "containers": [{
+           "name": "frontend-go-restapi",
+           "image": "jayunit100/k8-petstore-web-server:$VERSION"
          }]
-         }
-       },
-       "labels": {
-         "name": "frontend",
-         "uses": "redis-master"
-       }
-      }},
-  "labels": {"name": "frontend"}
+      }
+    }
+  }
 }
 EOF
 
 cat << EOF > bps-load-gen-rc.json
 {
-  "id": "bpsloadgenrc",
   "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "bpsloadgenrc",
+    "labels": {"name": "bpsLoadGenController"}
+  },
+  "spec": {
     "replicas": $LG,
-    "replicaSelector": {"name": "bps"},
-    "podTemplate": {
-      "desiredState": {
-         "manifest": {
-           "version": "v1beta1",
-           "id": "bpsLoadGenController",
-           "containers": [{
-             "name": "bps",
-             "image": "jayunit100/bigpetstore-load-generator",
-             "command": ["sh","-c","/opt/PetStoreLoadGenerator-1.0/bin/PetStoreLoadGenerator http://\$FRONTEND_SERVICE_HOST:3000/rpush/k8petstore/ 4 4 1000 123"]
-         }]
-         }
-       },
-       "labels": {
-         "name": "bps",
-         "uses": "frontend"
+    "selector": {"name": "bps"},
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "bps",
+          "uses": "frontend"
         }
-      }},
-  "labels": {"name": "bpsLoadGenController"}
+      },
+      "spec": {
+        "containers": [{
+           "name": "bps",
+           "image": "jayunit100/bigpetstore-load-generator",
+           "command": ["sh","-c","/opt/PetStoreLoadGenerator-1.0/bin/PetStoreLoadGenerator http://\$FRONTEND_SERVICE_HOST:3000/rpush/k8petstore/ 4 4 1000 123"]
+        }]
+      }
+    }
+  }
 }
 EOF
 
 cat << EOF > fe-s.json
 {
-  "id": "frontend",
   "kind": "Service",
-  "apiVersion": "v1beta1",
-  "port": 3000,
-  "containerPort": 3000,
-  "publicIPs":["$PUBLIC_IP","10.1.4.89"],
-  "selector": {
-    "name": "frontend"
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "frontend",
+    "labels": {
+      "name": "frontend"
+    }
   },
-  "labels": {
-    "name": "frontend"
+  "spec": {
+    "ports": [{
+      "port": 3000
+    }],
+    "publicIPs":["$PUBLIC_IP","10.1.4.89"],
+    "selector": {
+      "name": "frontend"
+    }
   }
 }
 EOF
 
 cat << EOF > rm.json
 {
-  "id": "redismaster",
   "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "redismaster",
-      "containers": [{
-        "name": "master",
-        "image": "jayunit100/k8-petstore-redis-master:$VERSION",
-        "ports": [{
-          "containerPort": 6379,
-          "hostPort": 6379
-        }]
-      }]
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "redismaster",
+    "labels": {
+      "name": "redis-master"
     }
   },
-  "labels": {
-    "name": "redis-master"
+  "spec": {
+    "containers": [{
+      "name": "master",
+      "image": "jayunit100/k8-petstore-redis-master:$VERSION",
+      "ports": [{
+        "containerPort": 6379
+      }]
+    }]
   }
 }
 EOF
 
 cat << EOF > rm-s.json
 {
-  "id": "redismaster",
   "kind": "Service",
-  "apiVersion": "v1beta1",
-  "port": 6379,
-  "containerPort": 6379,
-  "selector": {
-    "name": "redis-master"
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "redismaster",
+    "labels": {
+      "name": "redis-master"
+    }
   },
-  "labels": {
-    "name": "redis-master"
+  "spec": {
+    "ports": [{
+      "port": 6379
+    }],
+    "selector": {
+      "name": "redis-master"
+    }
   }
 }
 EOF
 
 cat << EOF > rs-s.json
 {
-  "id": "redisslave",
   "kind": "Service",
-  "apiVersion": "v1beta1",
-  "port": 6379,
-  "containerPort": 6379,
-  "labels": {
-    "name": "redisslave"
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "redisslave",
+    "labels": {
+      "name": "redisslave"
+    }
   },
-  "selector": {
-    "name": "redisslave"
+  "spec": {
+    "ports": [{
+      "port": 6379
+    }],
+    "selector": {
+      "name": "redisslave"
+    }
   }
 }
 EOF
 
 cat << EOF > slave-rc.json
 {
-  "id": "redissc",
   "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "redissc",
+    "labels": {"name": "redisslave"}
+  },
+  "spec": {
     "replicas": $SLAVE,
-    "replicaSelector": {"name": "redisslave"},
-    "podTemplate": {
-      "desiredState": {
-         "manifest": {
-           "version": "v1beta1",
-           "id": "redissc",
-           "containers": [{
-             "name": "slave",
-             "image": "jayunit100/k8-petstore-redis-slave:$VERSION",
-             "ports": [{"containerPort": 6379, "hostPort": 6380}]
-           }]
-         }
+    "selector": {"name": "redisslave"},
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "redisslave",
+          "uses": "redis-master"
+        }
       },
-      "labels": {
-        "name": "redisslave",
-        "uses": "redis-master"
+      "spec": {
+         "containers": [{
+           "name": "slave",
+           "image": "jayunit100/k8-petstore-redis-slave:$VERSION",
+           "ports": [{"containerPort": 6379}]
+         }]
       }
     }
-  },
-  "labels": {"name": "redisslave"}
+  }
 }
 EOF
-$kubectl create -f rm.json --api-version=v1beta1 --namespace=$NS
-$kubectl create -f rm-s.json --api-version=v1beta1 --namespace=$NS
+$kubectl create -f rm.json --namespace=$NS
+$kubectl create -f rm-s.json --namespace=$NS
 sleep 3 # precaution to prevent fe from spinning up too soon.
-$kubectl create -f slave-rc.json --api-version=v1beta1 --namespace=$NS
-$kubectl create -f rs-s.json --api-version=v1beta1 --namespace=$NS
+$kubectl create -f slave-rc.json --namespace=$NS
+$kubectl create -f rs-s.json --namespace=$NS
 sleep 3 # see above comment.
-$kubectl create -f fe-rc.json --api-version=v1beta1 --namespace=$NS
-$kubectl create -f fe-s.json --api-version=v1beta1 --namespace=$NS
-$kubectl create -f bps-load-gen-rc.json --api-version=v1beta1 --namespace=$NS
+$kubectl create -f fe-rc.json --namespace=$NS
+$kubectl create -f fe-s.json --namespace=$NS
+$kubectl create -f bps-load-gen-rc.json --namespace=$NS
 }
 
 function pollfor {
