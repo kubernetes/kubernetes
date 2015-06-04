@@ -75,7 +75,7 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
-	return admission.NewForbidden(a, fmt.Errorf("Namespace %s is terminating", a.GetNamespace()))
+	return admission.NewForbidden(a, fmt.Errorf("Unable to create new content in namespace %s because it is being terminated.", a.GetNamespace()))
 }
 
 // NewLifecycle creates a new namespace lifecycle admission control handler
