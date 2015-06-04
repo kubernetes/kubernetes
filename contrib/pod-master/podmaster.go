@@ -42,6 +42,7 @@ type Config struct {
 	src         string
 	dest        string
 	sleep       time.Duration
+	lastLease   time.Time
 }
 
 // runs the election loop. never returns.
@@ -50,7 +51,13 @@ func (c *Config) leaseAndUpdateLoop(etcdClient *etcd.Client) {
 		master, err := c.acquireOrRenewLease(etcdClient)
 		if err != nil {
 			glog.Errorf("Error in master election: %v", err)
-			continue
+			if uint64(time.Now().Sub(c.lastLease).Seconds()) < c.ttl {
+				continue
+			}
+			// Our lease has expired due to our own accounting, pro-actively give it
+			// up, even if we couldn't contact etcd.
+			glog.Infof("Too much time has elapsed, giving up lease.")
+			master = false
 		}
 		if err := c.update(master); err != nil {
 			glog.Errorf("Error updating files: %v", err)
@@ -64,13 +71,17 @@ func (c *Config) leaseAndUpdateLoop(etcdClient *etcd.Client) {
 // TODO: use the master election utility once it is merged in.
 func (c *Config) acquireOrRenewLease(etcdClient *etcd.Client) (bool, error) {
 	result, err := etcdClient.Get(c.key, false, false)
-	if tools.IsEtcdNotFound(err) {
-		// there is no current master, try to become master, create will fail if the key already exists
-		_, err := etcdClient.Create(c.key, c.whoami, c.ttl)
-		if err != nil {
-			return false, err
+	if err != nil {
+		if tools.IsEtcdNotFound(err) {
+			// there is no current master, try to become master, create will fail if the key already exists
+			_, err := etcdClient.Create(c.key, c.whoami, c.ttl)
+			if err != nil {
+				return false, err
+			}
+			c.lastLease = time.Now()
+			return true, nil
 		}
-		return true, nil
+		return false, err
 	}
 	if result.Node.Value == c.whoami {
 		glog.Infof("key already exists, we are the master (%s)", result.Node.Value)
@@ -81,6 +92,7 @@ func (c *Config) acquireOrRenewLease(etcdClient *etcd.Client) (bool, error) {
 				return false, err
 			}
 		}
+		c.lastLease = time.Now()
 		return true, nil
 	}
 	glog.Infof("key already exists, the master is %s, sleeping.", result.Node.Value)
@@ -97,6 +109,7 @@ func (c *Config) update(master bool) error {
 	switch {
 	case master && !exists:
 		return copyFile(c.src, c.dest)
+		// TODO: validate sha hash for the two files and overwrite if dest is different than src.
 	case !master && exists:
 		return os.Remove(c.dest)
 	}
