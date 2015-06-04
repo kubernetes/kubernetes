@@ -42,11 +42,9 @@ import (
 	"google.golang.org/cloud/compute/metadata"
 )
 
-const (
-	ProviderName             = "gce"
-	EXTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
-	INTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/ip"
-)
+const ProviderName = "gce"
+
+const EXTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
@@ -478,17 +476,15 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (gce *GCECloud) NodeAddresses(_ string) ([]api.NodeAddress, error) {
-	internalIP, err := gce.metadataAccess(INTERNAL_IP_METADATA_URL)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get internal IP: %v", err)
-	}
 	externalIP, err := gce.metadataAccess(EXTERNAL_IP_METADATA_URL)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get external IP: %v", err)
 	}
+
 	return []api.NodeAddress{
-		{Type: api.NodeInternalIP, Address: internalIP},
 		{Type: api.NodeExternalIP, Address: externalIP},
+		// TODO(mbforbes): Remove NodeLegacyHostIP once v1beta1 is removed.
+		{Type: api.NodeLegacyHostIP, Address: externalIP},
 	}, nil
 }
 
