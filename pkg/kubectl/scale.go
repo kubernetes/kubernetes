@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/golang/glog"
 )
 
 // ScalePrecondition describes a condition that must be true for the scale to take place
@@ -219,7 +220,7 @@ func ControllerHasDesiredReplicas(client client.Interface, rc *api.ReplicationCo
 	if rc.Status.Replicas == rc.Spec.Replicas {
 		return nil
 	}
-
+	interval := time.NewTicker(3 * time.Second)
 	notify := make(chan struct{})
 	stopCh := make(chan struct{})
 
@@ -245,10 +246,24 @@ out:
 	for {
 		select {
 		case <-notify:
-			if len(store.List()) == rc.Spec.Replicas {
+			status := len(store.List())
+			glog.V(3).Infof("Pod notification for rc/%s, has %d replicas, needs %d", rc.Name, status, rc.Spec.Replicas)
+			if status == rc.Spec.Replicas {
+				glog.V(3).Info("Breaking out via pod notifications...")
+				break out
+			}
+		case <-interval.C:
+			rc, err := client.ReplicationControllers(rc.Namespace).Get(rc.Name)
+			if err != nil {
+				return err
+			}
+			glog.V(3).Infof("Polling rc/%s, has %d replicas, needs %d", rc.Name, rc.Status.Replicas, rc.Spec.Replicas)
+			if rc.Status.Replicas == rc.Spec.Replicas {
+				glog.V(3).Info("Breaking out via polling...")
 				break out
 			}
 		case <-time.After(timeout):
+			glog.V(3).Infof("rc/%s timed out.", rc.Name)
 			break out
 		}
 	}
