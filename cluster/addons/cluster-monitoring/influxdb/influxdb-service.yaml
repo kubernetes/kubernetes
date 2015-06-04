@@ -1,9 +1,10 @@
 apiVersion: v1beta3
 kind: Service
-metadata: 
-  labels: 
-    name: influxGrafana
+metadata:
   name: monitoring-influxdb
+  namespace: default 
+  labels: 
+    k8s-app: influxGrafana
 spec: 
   ports: 
     - name: http
@@ -13,5 +14,5 @@ spec:
       port: 8086
       targetPort: 8086
   selector: 
-    name: influxGrafana
+    k8s-app: influxGrafana
 

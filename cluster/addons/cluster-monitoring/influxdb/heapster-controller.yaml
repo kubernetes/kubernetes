@@ -1,18 +1,22 @@
 apiVersion: v1beta3
 kind: ReplicationController
-metadata: 
+metadata:
+  name: monitoring-heapster-v1
+  namespace: default 
   labels: 
-    name: heapster
+    k8s-app: heapster
+    version: v1
     kubernetes.io/cluster-service: "true"
-  name: monitoring-heapster-controller
 spec: 
   replicas: 1
   selector: 
-    name: heapster
+    k8s-app: heapster
+    version: v1
   template: 
     metadata: 
       labels: 
-        name: heapster
+        k8s-app: heapster
+        version: v1
         kubernetes.io/cluster-service: "true"
     spec: 
       containers: 
