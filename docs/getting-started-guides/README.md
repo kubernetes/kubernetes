@@ -39,7 +39,7 @@ Docker Multi Node        | Flannel| N/A    | local       | [docs](docker-multino
 Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Community (@preillyme)                     |
 libvirt/KVM    | CoreOS       | CoreOS | libvirt/KVM | [docs](../../docs/getting-started-guides/libvirt-coreos.md) | Community (@lhuard1A)   |
 oVirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Community (@simon3z)         |
-Rackspace      | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/rackspace.md)     | Community (@doublerr)         | use k8s version 0.16.2
+Rackspace      | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/rackspace.md)     | Community (@doublerr)         | use k8s version 0.18.0
 
 
 *Note*: The above table is ordered by version test/used in notes followed by support level.

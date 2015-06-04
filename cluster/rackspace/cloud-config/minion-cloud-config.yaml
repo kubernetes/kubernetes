@@ -26,13 +26,30 @@ write_files:
       else
         echo "kubernetes release found. Skipping download."
       fi
-  - path: /run/setup-auth.sh
+  - path: /run/config-kubelet.sh
     permissions: 0755
     content: |
       #!/bin/bash -e
       set -x
       /usr/bin/mkdir -p /var/lib/kubelet
-      /bin/echo  "{\"BearerToken\": \"KUBELET_TOKEN\", \"Insecure\": true }" > /var/lib/kubelet/kubernetes_auth
+      cat > /var/lib/kubelet/kubeconfig << EOF
+      apiVersion: v1
+      kind: Config
+      users:
+      - name: kubelet
+        user:
+          token: KUBELET_TOKEN
+      clusters:
+      - name: local
+        cluster:
+          insecure-skip-tls-verify: true
+      contexts:
+      - context:
+          cluster: local
+          user: kubelet
+        name: service-account-context
+      current-context: service-account-context
+      EOF
   - path: /run/config-kube-proxy.sh
     permissions: 0755
     content: |
@@ -128,7 +145,7 @@ coreos:
         Requires=download-release.service
         [Service]
         EnvironmentFile=/run/kubelet/apiservers.env
-        ExecStartPre=/run/setup-auth.sh
+        ExecStartPre=/run/config-kubelet.sh
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kubelet /opt/bin/kubelet
         ExecStart=/opt/bin/kubelet \
         --address=$private_ipv4 \

@@ -180,7 +180,6 @@ rax-boot-master() {
 --meta ${MASTER_TAG} \
 --meta ETCD=${DISCOVERY_ID} \
 --user-data ${KUBE_TEMP}/master-cloud-config.yaml \
---file /var/lib/kube-apiserver/known_tokens.csv=${KUBE_TEMP}/known_tokens.csv \
 --config-drive true \
 --nic net-id=${NETWORK_UUID} \
 ${MASTER_NAME}"
@@ -209,6 +208,7 @@ rax-boot-minions() {
         -e "s|INDEX|$((i + 1))|g" \
         -e "s|KUBELET_TOKEN|${KUBELET_TOKEN}|" \
         -e "s|KUBE_NETWORK|${KUBE_NETWORK}|" \
+        -e "s|KUBELET_TOKEN|${KUBELET_TOKEN}|" \
         -e "s|KUBE_PROXY_TOKEN|${KUBE_PROXY_TOKEN}|" \
         -e "s|LOGGING_DESTINATION|${LOGGING_DESTINATION:-}|" \
     $(dirname $0)/rackspace/cloud-config/minion-cloud-config.yaml > $KUBE_TEMP/minion-cloud-config-$(($i + 1)).yaml
@@ -316,8 +316,15 @@ kube-up() {
   prep_known_tokens
 
   rax-boot-master
-
   rax-boot-minions
+
+  detect-master
+
+  # TODO look for a better way to get the known_tokens to the master. This is needed over file injection since the files were too large on a 4 node cluster.
+  $(scp -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} ${KUBE_TEMP}/known_tokens.csv core@${KUBE_MASTER_IP}:known_tokens.csv)
+  $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo mv /home/core/known_tokens.csv /var/lib/kube-apiserver/known_tokens.csv)
+  $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo chown root.root /var/lib/kube-apiserver/known_tokens.csv)
+  $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo systemctl restart kube-apiserver)
 
   FAIL=0
   for job in `jobs -p`
@@ -328,8 +335,6 @@ kube-up() {
     echo "${FAIL} commands failed.  Exiting."
     exit 2
   fi
-
-  detect-master
 
   echo "Waiting for cluster initialization."
   echo

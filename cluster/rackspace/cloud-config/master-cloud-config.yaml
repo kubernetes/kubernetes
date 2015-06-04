@@ -85,7 +85,6 @@ coreos:
         [Service]
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-apiserver /opt/bin/kube-apiserver
         ExecStartPre=/usr/bin/mkdir -p /var/lib/kube-apiserver
-        ExecStartPre=/usr/bin/cp /media/configdrive/openstack/content/0000 /var/lib/kube-apiserver/known_tokens.csv
         ExecStart=/opt/bin/kube-apiserver \
         --address=127.0.0.1 \
         --cloud_provider=rackspace \
@@ -147,26 +146,6 @@ coreos:
         --master=127.0.0.1:8080
         Restart=always
         RestartSec=5
-    - name: kube-register.service
-      command: start
-      content: |
-        [Unit]
-        Description=Kubernetes Registration Service
-        Documentation=https://github.com/kelseyhightower/kube-register
-        Requires=kube-apiserver.service
-        After=kube-apiserver.service
-        Requires=fleet.service
-        After=fleet.service
-        [Service]
-        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-register -z /opt/bin/kube-register https://github.com/kelseyhightower/kube-register/releases/download/v0.0.3/kube-register-0.0.3-linux-amd64
-        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register
-        ExecStart=/opt/bin/kube-register \
-        --api-endpoint=http://127.0.0.1:8080 \
-        --fleet-endpoint=unix:///var/run/fleet.sock \
-        --healthz-port=10248 \
-        --metadata=kubernetes_role=minion
-        Restart=always
-        RestartSec=10
     #Running nginx service with --net="host" is a necessary evil until running all k8s services in docker.
     - name: kubernetes-nginx.service
       command: start
