@@ -136,8 +136,9 @@ func (cm *containerManagerImpl) Start() error {
 	go util.Until(func() {
 		for _, cont := range cm.systemContainers {
 			if cont.ensureStateFunc != nil {
-				err := cont.ensureStateFunc(cont.manager)
-				glog.Warningf("[ContainerManager] Failed to ensure state of %q: %v", cont.name, err)
+				if err := cont.ensureStateFunc(cont.manager); err != nil {
+					glog.Warningf("[ContainerManager] Failed to ensure state of %q: %v", cont.name, err)
+				}
 			}
 		}
 	}, time.Minute, util.NeverStop)
@@ -227,7 +228,7 @@ func ensureSystemContainer(rootContainer *fs.Manager, manager *fs.Manager) error
 
 		allPids, err := rootContainer.GetPids()
 		if err != nil {
-			errs = append(errs, fmt.Errorf("Failed to list PIDs for root: %v", err))
+			errs = append(errs, fmt.Errorf("failed to list PIDs for root: %v", err))
 			continue
 		}
 
