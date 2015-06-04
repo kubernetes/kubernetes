@@ -389,17 +389,10 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 
 // init initializes master.
 func (m *Master) init(c *Config) {
-	// TODO: make initialization of the helper part of the Master, and allow some storage
-	// objects to have a newer storage version than the user's default.
-	newerHelper, err := NewEtcdHelper(c.EtcdHelper.Client, "v1beta3", DefaultEtcdPathPrefix)
-	if err != nil {
-		glog.Fatalf("Unable to setup storage for v1beta3: %v", err)
-	}
-
 	podStorage := podetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
 	podRegistry := pod.NewRegistry(podStorage.Pod)
 
-	podTemplateStorage := podtemplateetcd.NewREST(newerHelper)
+	podTemplateStorage := podtemplateetcd.NewREST(c.EtcdHelper)
 
 	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
 	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
