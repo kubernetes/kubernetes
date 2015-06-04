@@ -416,20 +416,7 @@ func TestTemplateStrings(t *testing.T) {
 	}
 	// The point of this test is to verify that the below template works. If you change this
 	// template, you need to update hack/e2e-suite/update.sh.
-	tmpl := ``
-	if api.PreV1Beta3(testapi.Version()) {
-		tmpl = `{{exists . "currentState" "info" "foo" "state" "running"}}`
-		useThisToDebug := `
-a: {{exists . "currentState"}}
-b: {{exists . "currentState" "info"}}
-c: {{exists . "currentState" "info" "foo"}}
-d: {{exists . "currentState" "info" "foo" "state"}}
-e: {{exists . "currentState" "info" "foo" "state" "running"}}
-f: {{exists . "currentState" "info" "foo" "state" "running" "startedAt"}}`
-		_ = useThisToDebug // don't complain about unused var
-	} else {
-		tmpl = `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
-	}
+	tmpl := `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
 	p, err := NewTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)

@@ -28,9 +28,6 @@ import (
 )
 
 func getPersistentVolumesResoureName() string {
-	if api.PreV1Beta3(testapi.Version()) {
-		return "persistentVolumes"
-	}
 	return "persistentvolumes"
 }
 

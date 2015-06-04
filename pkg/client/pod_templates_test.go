@@ -31,10 +31,6 @@ func getPodTemplatesResoureName() string {
 }
 
 func TestPodTemplateCreate(t *testing.T) {
-	if api.PreV1Beta3(testapi.Version()) {
-		return
-	}
-
 	ns := api.NamespaceDefault
 	podTemplate := api.PodTemplate{
 		ObjectMeta: api.ObjectMeta{
@@ -58,10 +54,6 @@ func TestPodTemplateCreate(t *testing.T) {
 }
 
 func TestPodTemplateGet(t *testing.T) {
-	if api.PreV1Beta3(testapi.Version()) {
-		return
-	}
-
 	ns := api.NamespaceDefault
 	podTemplate := &api.PodTemplate{
 		ObjectMeta: api.ObjectMeta{
@@ -85,10 +77,6 @@ func TestPodTemplateGet(t *testing.T) {
 }
 
 func TestPodTemplateList(t *testing.T) {
-	if api.PreV1Beta3(testapi.Version()) {
-		return
-	}
-
 	ns := api.NamespaceDefault
 	podTemplateList := &api.PodTemplateList{
 		Items: []api.PodTemplate{
@@ -114,10 +102,6 @@ func TestPodTemplateList(t *testing.T) {
 }
 
 func TestPodTemplateUpdate(t *testing.T) {
-	if api.PreV1Beta3(testapi.Version()) {
-		return
-	}
-
 	ns := api.NamespaceDefault
 	podTemplate := &api.PodTemplate{
 		ObjectMeta: api.ObjectMeta{
@@ -136,10 +120,6 @@ func TestPodTemplateUpdate(t *testing.T) {
 }
 
 func TestPodTemplateDelete(t *testing.T) {
-	if api.PreV1Beta3(testapi.Version()) {
-		return
-	}
-
 	ns := api.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getPodTemplatesResoureName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
@@ -150,10 +130,6 @@ func TestPodTemplateDelete(t *testing.T) {
 }
 
 func TestPodTemplateWatch(t *testing.T) {
-	if api.PreV1Beta3(testapi.Version()) {
-		return
-	}
-
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
