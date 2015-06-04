@@ -10884,7 +10884,7 @@
      },
      "restartPolicy": {
       "type": "string",
-      "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever; defaults to RestartPolicyAlways"
+      "description": "restart policy for all containers within the pod; one of Always, OnFailure, Never; defaults to Always"
      },
      "terminationGracePeriodSeconds": {
       "type": "integer",
