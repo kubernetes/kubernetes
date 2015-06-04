@@ -356,11 +356,11 @@ func (s *APIServer) Run(_ []string) error {
 			}
 		}
 	}
-
 	var installSSH master.InstallSSHKey
-	instances, supported := cloud.Instances()
-	if supported {
-		installSSH = instances.AddSSHKeyToAllInstances
+	if cloud != nil {
+		if instances, supported := cloud.Instances(); supported {
+			installSSH = instances.AddSSHKeyToAllInstances
+		}
 	}
 	config := &master.Config{
 		EtcdHelper:             helper,

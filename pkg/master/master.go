@@ -28,6 +28,7 @@ import (
 	rt "runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
@@ -210,6 +211,7 @@ type Master struct {
 
 	// Used for secure proxy
 	tunnels       util.SSHTunnelList
+	tunnelsLock   sync.Mutex
 	installSSHKey InstallSSHKey
 }
 
@@ -340,7 +342,7 @@ func New(c *Config) *Master {
 		serviceReadWriteIP:  serviceReadWriteIP,
 		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
 		serviceReadWritePort: 443,
-		
+
 		installSSHKey: c.InstallSSHKey,
 	}
 
@@ -764,6 +766,8 @@ func findExternalAddress(node *api.Node) (string, error) {
 }
 
 func (m *Master) Dial(net, addr string) (net.Conn, error) {
+	m.tunnelsLock.Lock()
+	defer m.tunnelsLock.Unlock()
 	return m.tunnels.Dial(net, addr)
 }
 
@@ -771,6 +775,7 @@ func (m *Master) needToReplaceTunnels(addrs []string) bool {
 	if len(m.tunnels) != len(addrs) {
 		return true
 	}
+	// TODO (cjcullen): This doesn't need to be n^2
 	for ix := range addrs {
 		if !m.tunnels.Has(addrs[ix]) {
 			return true
@@ -797,6 +802,7 @@ func (m *Master) getNodeAddresses() ([]string, error) {
 }
 
 func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {
+	glog.Infof("replacing tunnels. New addrs: %v", newAddrs)
 	tunnels, err := util.MakeSSHTunnels(user, keyfile, newAddrs)
 	if err != nil {
 		return err
@@ -810,6 +816,8 @@ func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {
 }
 
 func (m *Master) loadTunnels(user, keyfile string) error {
+	m.tunnelsLock.Lock()
+	defer m.tunnelsLock.Unlock()
 	addrs, err := m.getNodeAddresses()
 	if err != nil {
 		return err
@@ -819,10 +827,13 @@ func (m *Master) loadTunnels(user, keyfile string) error {
 	}
 	// TODO: This is going to unnecessarily close connections to unchanged nodes.
 	// See comment about using Watch above.
+	glog.Info("found different nodes. Need to replace tunnels")
 	return m.replaceTunnels(user, keyfile, addrs)
 }
 
 func (m *Master) refreshTunnels(user, keyfile string) error {
+	m.tunnelsLock.Lock()
+	defer m.tunnelsLock.Unlock()
 	addrs, err := m.getNodeAddresses()
 	if err != nil {
 		return err
@@ -842,6 +853,7 @@ func (m *Master) setupSecureProxy(user, keyfile string) {
 			if len(m.tunnels) == 0 {
 				sleep = time.Second
 			} else {
+				// tunnels could lag behind current set of nodes
 				sleep = time.Minute
 			}
 			time.Sleep(sleep)
@@ -851,10 +863,10 @@ func (m *Master) setupSecureProxy(user, keyfile string) {
 	// TODO: could make this more controller-ish
 	go func() {
 		for {
+			time.Sleep(5 * time.Minute)
 			if err := m.refreshTunnels(user, keyfile); err != nil {
 				glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
 			}
-			time.Sleep(5 * time.Minute)
 		}
 	}()
 }
@@ -875,6 +887,5 @@ func (m *Master) generateSSHKey(user, keyfile string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("FOO: %s", data)
 	return m.installSSHKey(user, data)
 }

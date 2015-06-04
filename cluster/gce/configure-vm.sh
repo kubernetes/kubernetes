@@ -487,16 +487,18 @@ grains:
   cbr-cidr: ${MASTER_IP_RANGE}
   cloud: gce
 EOF
-  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]]; then
+  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]] && ! [[ -z "${NODE_NETWORK:-}" ]] ; then
     cat <<EOF >/etc/gce.conf
 [global]
 token-url = ${TOKEN_URL}
 project-id = ${PROJECT_ID}
+network-name = ${NODE_NETWORK}
 EOF
     EXTERNAL_IP=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   cloud_config: /etc/gce.conf
   advertise_address: '${EXTERNAL_IP}'
+  proxy_ssh_user: '${INSTANCE_PREFIX}'
 EOF
   fi
 }

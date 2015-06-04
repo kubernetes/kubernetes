@@ -17,7 +17,6 @@ limitations under the License.
 package gce_cloud
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -55,9 +54,7 @@ type GCECloud struct {
 	projectID        string
 	zone             string
 	instanceID       string
-
-	// We assume here that nodes and master are in the same network. TODO(cjcullen) Fix it.
-	networkName string
+	networkName      string
 
 	// Used for accessing the metadata server
 	metadataAccess func(string) (string, error)
@@ -65,8 +62,9 @@ type GCECloud struct {
 
 type Config struct {
 	Global struct {
-		TokenURL  string `gcfg:"token-url"`
-		ProjectID string `gcfg:"project-id"`
+		TokenURL    string `gcfg:"token-url"`
+		ProjectID   string `gcfg:"project-id"`
+		NetworkName string `gcfg:"network-name"`
 	}
 }
 
@@ -155,10 +153,16 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	if config != nil {
 		var cfg Config
 		if err := gcfg.ReadInto(&cfg, config); err != nil {
+			glog.Errorf("Couldn't read config: %v", err)
 			return nil, err
 		}
-		if cfg.Global.ProjectID != "" && cfg.Global.TokenURL != "" {
+		if cfg.Global.ProjectID != "" {
 			projectID = cfg.Global.ProjectID
+		}
+		if cfg.Global.NetworkName != "" {
+			networkName = cfg.Global.NetworkName
+		}
+		if cfg.Global.TokenURL != "" {
 			tokenSource = newAltTokenSource(cfg.Global.TokenURL)
 		}
 	}
@@ -485,11 +489,11 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 	if err != nil {
 		return err
 	}
-	keyData = bytes.TrimSpace(keyData)
+	keyString := fmt.Sprintf("%s:%s %s@%s", user, strings.TrimSpace(string(keyData)), user, hostname)
 	found := false
 	for _, item := range project.CommonInstanceMetadata.Items {
 		if item.Key == "sshKeys" {
-			item.Value = fmt.Sprintf("%s\n%s:%s %s@%s", item.Value, user, string(keyData), user, hostname)
+			item.Value = addKey(item.Value, keyString)
 			found = true
 			break
 		}
@@ -500,7 +504,7 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 		project.CommonInstanceMetadata.Items = append(project.CommonInstanceMetadata.Items,
 			&compute.MetadataItems{
 				Key:   "sshKeys",
-				Value: fmt.Sprint("%s:%s %s@%s", user, string(keyData), user, hostname),
+				Value: keyString,
 			})
 	}
 	op, err := gce.service.Projects.SetCommonInstanceMetadata(gce.projectID, project.CommonInstanceMetadata).Do()
@@ -508,6 +512,14 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 		return err
 	}
 	return gce.waitForGlobalOp(op)
+}
+
+func addKey(metadataBefore, keyString string) string {
+	if strings.Contains(metadataBefore, keyString) {
+		// We've already added this key
+		return metadataBefore
+	}
+	return metadataBefore + "\n" + keyString
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.

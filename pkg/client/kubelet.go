@@ -51,7 +51,6 @@ type HTTPKubeletClient struct {
 }
 
 func MakeTransport(config *KubeletConfig) (http.RoundTripper, error) {
-
 	cfg := &Config{TLSClientConfig: config.TLSClientConfig}
 	if config.EnableHttps {
 		hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
@@ -63,17 +62,14 @@ func MakeTransport(config *KubeletConfig) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	var transport http.RoundTripper
 	if config.Dial != nil || tlsConfig != nil {
-		transport = &http.Transport{
+		return &http.Transport{
 			Dial:            config.Dial,
 			TLSClientConfig: tlsConfig,
-		}
+		}, nil
 	} else {
-		transport = http.DefaultTransport
+		return http.DefaultTransport, nil
 	}
-	return transport, nil
 }
 
 // TODO: this structure is questionable, it should be using client.Config and overriding defaults.

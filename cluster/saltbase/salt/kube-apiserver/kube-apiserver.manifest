@@ -23,6 +23,11 @@
   {% set advertise_address = "--advertise-address=" + grains.advertise_address -%}
 {% endif -%}
 
+{% set proxy_ssh_options = "" -%}
+{% if grains.proxy_ssh_user is defined -%}
+  {% set proxy_ssh_options = "--ssh-user=" + grains.proxy_ssh_user + " --ssh-keyfile=/sshproxy/.sshkeyfile" -%}
+{% endif -%}
+
 {% set address = "--address=127.0.0.1" -%}
 
 {% set cluster_name = "" -%}
@@ -81,7 +86,7 @@
 {% endif -%}
 
 {% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
-{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure_port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " --ssh-user=root --ssh-keyfile=/.sshkeyfile"-%}
+{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure_port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
 
 {
 "apiVersion": "v1beta3",
@@ -137,7 +142,10 @@
         "readOnly": true},
         { "name": "etcpkitls",
         "mountPath": "/etc/pki/tls",
-        "readOnly": true}
+        "readOnly": true},
+        { "name": "sshproxy",
+        "mountPath": "/sshproxy",
+        "readOnly": false}
       ]
     }
 ],
@@ -182,6 +190,9 @@
   { "name": "etcpkitls",
     "hostPath": {
         "path": "/etc/pki/tls"}
+  },
+  { "name": "sshproxy",
+    "emptyDir": {}
   }
 ]
 }}

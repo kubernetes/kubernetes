@@ -80,30 +80,6 @@ func (s *SSHTunnel) Dial(network, address string) (net.Conn, error) {
 	return s.client.Dial(network, address)
 }
 
-func (s *SSHTunnel) Listen(remoteHost, localPort, remotePort string) error {
-	var err error
-	s.sock, err = net.Listen("tcp", net.JoinHostPort("localhost", localPort))
-	if err != nil {
-		return err
-	}
-	s.running = true
-	for s.running {
-		conn, err := s.sock.Accept()
-		if err != nil {
-			if s.running {
-				glog.Errorf("Error listening for ssh tunnel to %s (%v)", remoteHost, err)
-			} else {
-				glog.V(4).Infof("Error listening for ssh tunnel to %s (%v), this is likely due to the tunnel shutting down.", remoteHost, err)
-			}
-			continue
-		}
-		if err := s.tunnel(conn, remoteHost, remotePort); err != nil {
-			glog.Errorf("Error starting tunnel: %v", err)
-		}
-	}
-	return nil
-}
-
 func (s *SSHTunnel) tunnel(conn net.Conn, remoteHost, remotePort string) error {
 	tunnel, err := s.client.Dial("tcp", net.JoinHostPort(remoteHost, remotePort))
 	if err != nil {
@@ -114,16 +90,8 @@ func (s *SSHTunnel) tunnel(conn net.Conn, remoteHost, remotePort string) error {
 	return nil
 }
 
-func (s *SSHTunnel) StopListening() error {
-	// TODO: try to shutdown copying here?
-	s.running = false
-	if err := s.sock.Close(); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *SSHTunnel) Close() error {
+	glog.Infof("Closing tunnel for host: %q", s.Host)
 	if err := s.client.Close(); err != nil {
 		return err
 	}
