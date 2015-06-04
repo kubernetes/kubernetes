@@ -1295,7 +1295,7 @@ func (s *AWSCloud) describeLoadBalancer(region, name string) (*elb.LoadBalancerD
 
 	response, err := elbClient.DescribeLoadBalancers(request)
 	if err != nil {
-		if awsError := err.(awserr.Error); awsError != nil {
+		if awsError, ok := err.(awserr.Error); ok {
 			if awsError.Code() == "LoadBalancerNotFound" {
 				return nil, nil
 			}
