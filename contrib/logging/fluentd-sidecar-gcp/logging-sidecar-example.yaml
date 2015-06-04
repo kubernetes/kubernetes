@@ -13,7 +13,7 @@ spec:
     - name: log-storage
       mountPath: /var/log
   - name: sidecar-log-collector
-    image: gcr.io/google_containers/fluentd-sidecar-gcp:1.0
+    image: gcr.io/google_containers/fluentd-sidecar-gcp:1.1
     env:
     - name: FILES_TO_COLLECT
       value: "/mnt/log/synthetic-count.log /mnt/log/synthetic-dates.log"
