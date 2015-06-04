@@ -38,9 +38,24 @@ $ kubectl proxy --api-prefix=/k8s-api`
 
 func NewCmdProxy(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
-		Short:   "Run a proxy to the Kubernetes API server",
-		Long:    `Run a proxy to the Kubernetes API server. `,
+		Use:   "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
+		Short: "Run a proxy to the Kubernetes API server",
+		Long: `To proxy all of the kubernetes api and nothing else, use:
+
+kubectl proxy --api-prefix=/
+
+To proxy only part of the kubernetes api and also some static files:
+
+kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
+
+The above lets you 'curl localhost:8001/api/v1/pods'.
+
+To proxy the entire kubernetes api at a different root, use:
+
+kubectl proxy --api-prefix=/custom/
+
+The above lets you 'curl localhost:8001/custom/api/v1/pods'
+`,
 		Example: proxy_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunProxy(f, out, cmd)
