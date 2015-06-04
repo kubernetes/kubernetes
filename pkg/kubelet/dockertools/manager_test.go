@@ -38,7 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	uexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 type fakeHTTP struct {
@@ -876,7 +876,7 @@ func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, p
 
 func TestSyncPodCreateNetAndContainer(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
-	dm.PodInfraContainerImage = "custom_image_name"
+	dm.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -921,10 +921,10 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 
 func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
-	dm.PodInfraContainerImage = "custom_image_name"
-	puller := dm.Puller.(*FakeDockerPuller)
+	dm.podInfraContainerImage = "custom_image_name"
+	puller := dm.puller.(*FakeDockerPuller)
 	puller.HasImages = []string{}
-	dm.PodInfraContainerImage = "custom_image_name"
+	dm.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -1282,9 +1282,9 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 
 func TestSyncPodWithPullPolicy(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
-	puller := dm.Puller.(*FakeDockerPuller)
+	puller := dm.puller.(*FakeDockerPuller)
 	puller.HasImages = []string{"existing_one", "want:latest"}
-	dm.PodInfraContainerImage = "custom_image_name"
+	dm.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 
 	pod := &api.Pod{
@@ -1649,7 +1649,7 @@ func TestGetPodPullImageFailureReason(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
 	// Initialize the FakeDockerPuller so that it'd try to pull non-existent
 	// images.
-	puller := dm.Puller.(*FakeDockerPuller)
+	puller := dm.puller.(*FakeDockerPuller)
 	puller.HasImages = []string{}
 	// Inject the pull image failure error.
 	failureReason := "pull image faiulre"

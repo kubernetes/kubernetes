@@ -41,7 +41,7 @@ func NewFakeDockerManager(
 
 	dm := NewDockerManager(client, recorder, readinessManager, containerRefManager, podInfraContainerImage, qps,
 		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, runtimeHooks, &NativeExecHandler{})
-	dm.Puller = &FakeDockerPuller{}
+	dm.puller = &FakeDockerPuller{}
 	dm.prober = prober.New(nil, readinessManager, containerRefManager, recorder)
 	return dm
 }
