@@ -225,7 +225,7 @@ runTests() {
   # Pre-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create "${kube_flags[@]}" -f examples/limitrange/valid-pod.json
+  kubectl create "${kube_flags[@]}" -f examples/limitrange/valid-pod.yaml
   # Post-condition: valid-pod POD is running
   kubectl get "${kube_flags[@]}" pods -o json
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
@@ -258,7 +258,7 @@ runTests() {
   # Pre-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  kubectl delete -f examples/limitrange/valid-pod.yaml "${kube_flags[@]}"
   # Post-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -266,7 +266,7 @@ runTests() {
   # Pre-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  kubectl create -f examples/limitrange/valid-pod.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
@@ -282,7 +282,7 @@ runTests() {
   # Pre-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  kubectl create -f examples/limitrange/valid-pod.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
@@ -314,7 +314,7 @@ runTests() {
   # Pre-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  kubectl create -f examples/limitrange/valid-pod.yaml "${kube_flags[@]}"
   kubectl create -f examples/redis/redis-proxy.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod and redis-proxy PODs are running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-proxy:valid-pod:'
@@ -331,7 +331,7 @@ runTests() {
   # Pre-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  kubectl create -f examples/limitrange/valid-pod.yaml "${kube_flags[@]}"
   kubectl create -f examples/redis/redis-proxy.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod and redis-proxy PODs are running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-proxy:valid-pod:'
@@ -348,7 +348,7 @@ runTests() {
   # Pre-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  kubectl create -f examples/limitrange/valid-pod.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
@@ -372,7 +372,7 @@ runTests() {
   # Pre-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  kubectl create -f examples/limitrange/valid-pod.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
@@ -438,7 +438,7 @@ runTests() {
   # Pre-condition: no POD is running
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create "${kube_flags[@]}" --namespace=other -f examples/limitrange/valid-pod.json
+  kubectl create "${kube_flags[@]}" --namespace=other -f examples/limitrange/valid-pod.yaml
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
@@ -630,7 +630,7 @@ __EOF__
   # Post-condition: service exists
   kube::test::get_object_assert 'service frontend-2' "{{$port_field}}" '443'
   # Command
-  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  kubectl create -f examples/limitrange/valid-pod.yaml "${kube_flags[@]}"
   kubectl expose pod valid-pod --port=444 --name=frontend-3 "${kube_flags[@]}"
   # Post-condition: service exists
   kube::test::get_object_assert 'service frontend-3' "{{$port_field}}" '444'
