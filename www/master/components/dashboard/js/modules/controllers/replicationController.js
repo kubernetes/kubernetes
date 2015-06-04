@@ -22,7 +22,7 @@ ReplicationController.prototype.handleError = function(data, status, headers, co
 app.controller('ReplicationControllerCtrl', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   function($scope, $routeParams, k8sApi) {
     $scope.controller = new ReplicationController();
     $scope.controller.k8sApi = k8sApi;

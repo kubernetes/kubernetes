@@ -7,7 +7,7 @@ app.controller('ListServicesCtrl', [
   '$scope',
   '$interval',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$rootScope',
   '$location',
   function($scope, $interval, $routeParams, k8sApi, $rootScope, $location) {

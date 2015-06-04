@@ -2,8 +2,7 @@ angular.module("kubernetesApp.config", [])
 
 .constant("ENV", {
 	"/": {
-		"k8sApiServer": "/api/v1beta2",
-		"k8sApiv1beta3Server": "/api/v1beta3",
+		"k8sApiServer": "/api/v1beta3",
 		"k8sDataServer": "/cluster",
 		"k8sDataPollMinIntervalSec": 10,
 		"k8sDataPollMaxIntervalSec": 120,

@@ -200,8 +200,7 @@ angular.module("kubernetesApp.config", [])
 
 .constant("ENV", {
 	"/": {
-		"k8sApiServer": "/api/v1beta2",
-		"k8sApiv1beta3Server": "/api/v1beta3",
+		"k8sApiServer": "/api/v1beta3",
 		"k8sDataServer": "/cluster",
 		"k8sDataPollMinIntervalSec": 10,
 		"k8sDataPollMaxIntervalSec": 120,
@@ -572,51 +571,6 @@ app.provider('k8sApi',
              function() {
 
                var urlBase = '';
-
-               this.setUrlBase = function(value) { urlBase = value; };
-
-               var _get = function($http, baseUrl, query) {
-                 var _fullUrl = baseUrl;
-                 if (query !== undefined) {
-                   _fullUrl += '/' + query;
-                 }
-
-                 return $http.get(_fullUrl);
-               };
-
-               this.$get = ["$http", "$q", function($http, $q) {
-                 var api = {};
-
-                 api.getUrlBase = function() { return urlBase; };
-
-                 api.getPods = function(query) { return _get($http, urlBase + '/pods', query); };
-
-                 api.getMinions = function(query) { return _get($http, urlBase + '/nodes', query); };
-
-                 api.getNodes = api.getMinions;
-
-                 api.getServices = function(query) { return _get($http, urlBase + '/services', query); };
-
-                 api.getReplicationControllers = function(query) {
-                   return _get($http, urlBase + '/replicationControllers', query)
-                 };
-
-                 api.getEvents = function(query) { return _get($http, urlBase + '/events', query); };
-
-                 return api;
-               }];
-             })
-    .config(["k8sApiProvider", "ENV", function(k8sApiProvider, ENV) {
-      if (ENV && ENV['/'] && ENV['/']['k8sApiServer']) {
-        var proxy = ENV['/']['cAdvisorProxy'] || '';
-        k8sApiProvider.setUrlBase(proxy + ENV['/']['k8sApiServer']);
-      }
-    }]);
-
-app.provider('k8sv1Beta3Api',
-             function() {
-
-               var urlBase = '';
                var _namespace = 'default';
 
                this.setUrlBase = function(value) { urlBase = value; };
@@ -656,10 +610,9 @@ app.provider('k8sv1Beta3Api',
                  return api;
                }];
              })
-    .config(["k8sv1Beta3ApiProvider", "ENV", function(k8sv1Beta3ApiProvider, ENV) {
-      if (ENV && ENV['/'] && ENV['/']['k8sApiv1beta3Server']) {
-        var proxy = ENV['/']['cAdvisorProxy'] || '';
-        k8sv1Beta3ApiProvider.setUrlBase(proxy + ENV['/']['k8sApiv1beta3Server']);
+    .config(["k8sApiProvider", "ENV", function(k8sApiProvider, ENV) {
+      if (ENV && ENV['/'] && ENV['/']['k8sApiServer']) {
+        k8sApiProvider.setUrlBase(ENV['/']['k8sApiServer']);
       }
     }]);
 
@@ -860,7 +813,7 @@ app.provider('k8sv1Beta3Api',
 app.controller('cAdvisorController', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   'lodash',
   'cAdvisorService',
   '$q',
@@ -1059,7 +1012,7 @@ app.controller('GroupCtrl', [
   '$route',
   '$interval',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$rootScope',
   '$location',
   'lodash',
@@ -1309,7 +1262,7 @@ angular.module('kubernetesApp.components.dashboard', [])
 app.controller('ListEventsCtrl', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$location',
   '$filter',
   function($scope, $routeParams, k8sApi, $location, $filter) {
@@ -1395,7 +1348,7 @@ app.controller('ListEventsCtrl', [
 app.controller('ListMinionsCtrl', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$location',
   function($scope, $routeParams, k8sApi, $location) {
     'use strict';
@@ -1465,7 +1418,7 @@ app.controller('ListMinionsCtrl', [
 app.controller('ListPodsCtrl', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   'lodash',
   '$location',
   function($scope, $routeParams, k8sApi, lodash, $location) {
@@ -1600,7 +1553,7 @@ app.controller('ListPodsCtrl', [
 app.controller('ListReplicationControllersCtrl', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$location',
   function($scope, $routeParams, k8sApi, $location) {
     'use strict';
@@ -1697,7 +1650,7 @@ app.controller('ListServicesCtrl', [
   '$scope',
   '$interval',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$rootScope',
   '$location',
   function($scope, $interval, $routeParams, k8sApi, $rootScope, $location) {
@@ -1806,7 +1759,7 @@ app.controller('NodeCtrl', [
   '$scope',
   '$interval',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$rootScope',
   function($scope, $interval, $routeParams, k8sApi, $rootScope) {
     'use strict';
@@ -1840,7 +1793,7 @@ app.controller('PodCtrl', [
   '$scope',
   '$interval',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$rootScope',
   function($scope, $interval, $routeParams, k8sApi, $rootScope) {
     'use strict';
@@ -1889,7 +1842,7 @@ ReplicationController.prototype.handleError = function(data, status, headers, co
 app.controller('ReplicationControllerCtrl', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   function($scope, $routeParams, k8sApi) {
     $scope.controller = new ReplicationController();
     $scope.controller.k8sApi = k8sApi;
@@ -1926,7 +1879,7 @@ ServiceController.prototype.handleError = function(data, status, headers, config
 app.controller('ServiceCtrl', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$location',
   function($scope, $routeParams, k8sApi, $location) {
     $scope.controller = new ServiceController();

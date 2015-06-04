@@ -6,7 +6,7 @@
 app.controller('ListEventsCtrl', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$location',
   '$filter',
   function($scope, $routeParams, k8sApi, $location, $filter) {

@@ -22,7 +22,7 @@ ServiceController.prototype.handleError = function(data, status, headers, config
 app.controller('ServiceCtrl', [
   '$scope',
   '$routeParams',
-  'k8sv1Beta3Api',
+  'k8sApi',
   '$location',
   function($scope, $routeParams, k8sApi, $location) {
     $scope.controller = new ServiceController();
