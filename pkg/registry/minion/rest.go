@@ -33,7 +33,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
-	nodeutil "github.com/GoogleCloudPlatform/kubernetes/pkg/util/node"
 )
 
 // nodeStrategy implements behavior for nodes
@@ -142,16 +141,13 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 		return nil, nil, err
 	}
 	node := nodeObj.(*api.Node)
-	hostIP, err := nodeutil.GetNodeHostIP(node)
-	if err != nil {
-		return nil, nil, err
-	}
+	host := node.Name // TODO: use node's IP, don't expect the name to resolve.
 
 	if portReq != "" {
-		return &url.URL{Host: net.JoinHostPort(hostIP.String(), portReq)}, nil, nil
+		return &url.URL{Host: net.JoinHostPort(host, portReq)}, nil, nil
 	}
 
-	scheme, port, transport, err := connection.GetConnectionInfo(hostIP.String())
+	scheme, port, transport, err := connection.GetConnectionInfo(host)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -159,7 +155,7 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 	return &url.URL{
 			Scheme: scheme,
 			Host: net.JoinHostPort(
-				hostIP.String(),
+				host,
 				strconv.FormatUint(uint64(port), 10),
 			),
 		},

@@ -48,7 +48,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	nodeutil "github.com/GoogleCloudPlatform/kubernetes/pkg/util/node"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -288,7 +287,7 @@ func (s *KubeletServer) Run(_ []string) error {
 	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
 		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
 		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
-		if err := util.GenerateSelfSignedCert(nodeutil.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
+		if err := util.GenerateSelfSignedCert(util.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
 			return fmt.Errorf("unable to generate self signed cert: %v", err)
 		}
 		glog.V(4).Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
@@ -545,7 +544,7 @@ func SimpleKubelet(client *client.Client,
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
-	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
+	kcfg.Hostname = util.GetHostname(kcfg.HostnameOverride)
 	eventBroadcaster := record.NewBroadcaster()
 	kcfg.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet", Host: kcfg.Hostname})
 	eventBroadcaster.StartLogging(glog.Infof)
