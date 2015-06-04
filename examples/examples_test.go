@@ -291,7 +291,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-sentinel-service":    &api.Service{},
 		},
 		"../examples/resourcequota": {
-			"resource-quota": &api.ResourceQuota{},
+			"namespace": &api.Namespace{},
+			"limits":    &api.LimitRange{},
+			"quota":     &api.ResourceQuota{},
 		},
 		"../examples/rethinkdb": {
 			"admin-pod":      &api.Pod{},
