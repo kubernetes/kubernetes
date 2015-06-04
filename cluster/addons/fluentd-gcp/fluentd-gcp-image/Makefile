@@ -5,8 +5,11 @@
 
 .PHONY:	build push
 
+# By default, pushes to a githash.  To override:
+# make push TAG=<version>
+# Next TAG=1.7
 
-TAG = 1.6
+TAG = $(shell git log -1 --format="format:%H")
 
 build:
 	docker build -t gcr.io/google_containers/fluentd-gcp:$(TAG) .

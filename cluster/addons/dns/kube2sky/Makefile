@@ -4,7 +4,12 @@
 
 .PHONY: all kube2sky container push clean test
 
-TAG = 1.8
+# By default, pushes to a githash.  To override:
+# make push TAG=<version>
+# Next TAG=1.9
+
+TAG = $(shell git log -1 --format="format:%H")
+
 PREFIX = gcr.io/google_containers
 
 all: container

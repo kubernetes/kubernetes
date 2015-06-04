@@ -1,7 +1,10 @@
 all: push
 
-# Set this to the *next* version to prevent accidentally overwriting the existing image.
-TAG = 1.5
+# By default, pushes to a githash.  To override:
+# make push TAG=<version>
+# Next tag is 1.5
+
+TAG = $(shell git log -1 --format="format:%H")
 
 webserver: webserver.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./webserver.go

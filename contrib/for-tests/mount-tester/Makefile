@@ -1,6 +1,10 @@
 all: push
 
-TAG = 0.1
+# By default, pushes to a githash.  To override:
+# make push TAG=<version>
+# Next TAG is 0.2
+
+TAG = $(shell git log -1 --format="format:%H")
 
 mt: mt.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./mt.go
