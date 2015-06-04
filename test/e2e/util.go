@@ -980,7 +980,7 @@ func DeleteRC(c *client.Client, ns, name string) error {
 		return err
 	}
 	startTime := time.Now()
-	_, err = reaper.Stop(ns, name, api.NewDeleteOptions(0))
+	_, err = reaper.Stop(ns, name, 0, api.NewDeleteOptions(0))
 	deleteRCTime := time.Now().Sub(startTime)
 	Logf("Deleting RC took: %v", deleteRCTime)
 	return err
