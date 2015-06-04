@@ -53,7 +53,6 @@ kube::log::status "Starting kube-apiserver"
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --public_address_override="127.0.0.1" \
   --kubelet_port=${KUBELET_PORT} \
-  --runtime_config=api/v1 \
   --runtime_config=api/legacy=false \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!

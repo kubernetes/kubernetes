@@ -282,8 +282,10 @@ func (s *APIServer) Run(_ []string) error {
 	disableV1beta3 := disableAllAPIs
 	disableV1beta3 = !s.getRuntimeConfigValue("api/v1beta3", !disableV1beta3)
 
-	// V1 is disabled by default. Users can enable it using "api/v1={true}".
-	_, enableV1 := s.RuntimeConfig["api/v1"]
+	// "api/v1={true|false} allows users to enable/disable v1 API.
+	// This takes preference over api/all and api/legacy, if specified.
+	disableV1 := disableAllAPIs
+	disableV1 = !s.getRuntimeConfigValue("api/v1", !disableV1)
 
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
@@ -371,7 +373,7 @@ func (s *APIServer) Run(_ []string) error {
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
 		DisableV1Beta3:         disableV1beta3,
-		EnableV1:               enableV1,
+		DisableV1:              disableV1,
 		MasterServiceNamespace: s.MasterServiceNamespace,
 		ClusterName:            s.ClusterName,
 		ExternalHost:           s.ExternalHost,
