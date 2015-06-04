@@ -70,9 +70,6 @@ func TestInterfacesFor(t *testing.T) {
 }
 
 func TestRESTMapper(t *testing.T) {
-	if v, k, err := RESTMapper.VersionAndKindForResource("replicationControllers"); err != nil || v != "v1beta3" || k != "ReplicationController" {
-		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
-	}
 	if v, k, err := RESTMapper.VersionAndKindForResource("replicationcontrollers"); err != nil || v != "v1beta3" || k != "ReplicationController" {
 		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
 	}
