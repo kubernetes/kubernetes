@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -91,11 +92,10 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 		fuzzInternalObject(t, "v1beta3", item, seed)
 		roundTrip(t, v1beta3.Codec, item)
 	}
-}
-
-func roundTripAll(t *testing.T, item runtime.Object) {
-	seed := rand.Int63()
-	roundTrip(t, v1beta3.Codec, fuzzInternalObject(t, "v1beta3", item, seed))
+	if !set.Has("v1") {
+		fuzzInternalObject(t, "v1", item, seed)
+		roundTrip(t, v1.Codec, item)
+	}
 }
 
 // For debugging problems
