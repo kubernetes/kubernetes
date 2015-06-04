@@ -3,7 +3,7 @@
 app.controller('cAdvisorController', [
   '$scope',
   '$routeParams',
-  'k8sApi',
+  'k8sv1Beta3Api',
   'lodash',
   'cAdvisorService',
   '$q',
@@ -20,19 +20,22 @@ app.controller('cAdvisorController', [
       k8sApi.getMinions().success(angular.bind(this, function(res) {
         $scope.minions = res;
         // console.log(res);
-        var promises = lodash.map(res.items, function(m) { return cAdvisorService.getDataForMinion(m.id); });
+        var promises = lodash.map(res.items, function(m) { return cAdvisorService.getDataForMinion(m.metadata.name); });
 
         $q.all(promises).then(
             function(dataArray) {
               lodash.each(dataArray, function(data, i) {
                 var m = res.items[i];
 
-                var maxData = maxMemCpuInfo(m.id, data.memoryData, data.cpuData, data.filesystemData);
+                var maxData = maxMemCpuInfo(m.metadata.name, data.memoryData, data.cpuData, data.filesystemData);
 
                 // console.log("maxData", maxData);
+                var hostname = "";
+                if(m.status.addresses)
+                  hostname = m.status.addresses[0].address;
 
-                $scope.activeMinionDataById[m.id] =
-                    transformMemCpuInfo(data.memoryData, data.cpuData, data.filesystemData, maxData, m.hostIP)
+                $scope.activeMinionDataById[m.metadata.name] =
+                    transformMemCpuInfo(data.memoryData, data.cpuData, data.filesystemData, maxData, hostname);
               });
 
             },
@@ -44,11 +47,6 @@ app.controller('cAdvisorController', [
         $scope.loading = false;
       })).error(angular.bind(this, this.handleError));
     };
-
-    function getcAdvisorDataForMinion(m) {
-      var p = cAdvisorService.getDataForMinion(m.hostIP);
-      return p;
-    }
 
     function handleError(data, status, headers, config) {
       // console.log("Error (" + status + "): " + data);
