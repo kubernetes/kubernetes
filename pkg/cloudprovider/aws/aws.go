@@ -806,6 +806,16 @@ func getResourcesByInstanceType(instanceType string) (*api.NodeResources, error)
 	case "hs1.8xlarge":
 		return makeNodeResources("hs1", 35, 117)
 
+		// d2: Dense instances (next-gen of hs1)
+	case "d2.xlarge":
+		return makeNodeResources("d2", 14, 30.5)
+	case "d2.2xlarge":
+		return makeNodeResources("d2", 28, 61)
+	case "d2.4xlarge":
+		return makeNodeResources("d2", 56, 122)
+	case "d2.8xlarge":
+		return makeNodeResources("d2", 116, 244)
+
 		// m1: General purpose
 	case "m1.small":
 		return makeNodeResources("m1", 1, 1.7)
