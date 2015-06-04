@@ -129,7 +129,7 @@ func MatchNode(label labels.Selector, field fields.Selector) generic.Matcher {
 	}
 }
 
-// ResourceLocation returns a URL to which one can send traffic for the specified node.
+// ResourceLocation returns an URL and transport which one can use to send traffic for the specified node.
 func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGetter, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
 	name, portReq, valid := util.SplitPort(id)
 	if !valid {
@@ -143,13 +143,13 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 	node := nodeObj.(*api.Node)
 	host := node.Name // TODO: use node's IP, don't expect the name to resolve.
 
-	if portReq != "" {
-		return &url.URL{Host: net.JoinHostPort(host, portReq)}, nil, nil
-	}
-
 	scheme, port, transport, err := connection.GetConnectionInfo(host)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if portReq != "" {
+		return &url.URL{Scheme: scheme, Host: net.JoinHostPort(host, portReq)}, transport, nil
 	}
 
 	return &url.URL{
