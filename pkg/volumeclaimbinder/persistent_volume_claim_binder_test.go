@@ -234,6 +234,83 @@ func TestBindingWithExamples(t *testing.T) {
 	}
 }
 
+func TestMissingFromIndex(t *testing.T) {
+	api.ForTesting_ReferencesAllowBlankSelfLinks = true
+	o := testclient.NewObjects(api.Scheme, api.Scheme)
+	if err := testclient.AddObjectsFromPath("../../examples/persistent-volumes/claims/claim-01.yaml", o, api.Scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := testclient.AddObjectsFromPath("../../examples/persistent-volumes/volumes/local-01.yaml", o, api.Scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+
+	pv, err := client.PersistentVolumes().Get("any")
+	if err != nil {
+		t.Error("Unexpected error getting PV from client: %v", err)
+	}
+
+	claim, error := client.PersistentVolumeClaims("ns").Get("any")
+	if error != nil {
+		t.Errorf("Unexpected error getting PVC from client: %v", err)
+	}
+
+	volumeIndex := NewPersistentVolumeOrderedIndex()
+	mockClient := &mockBinderClient{
+		volume: pv,
+		claim:  claim,
+	}
+
+	// the default value of the PV is Pending.
+	// if has previously been processed by the binder, it's status in etcd would be Available.
+	// Only Pending volumes were being indexed and made ready for claims.
+	pv.Status.Phase = api.VolumeAvailable
+
+	// adds the volume to the index, making the volume available
+	syncVolume(volumeIndex, mockClient, pv)
+	if pv.Status.Phase != api.VolumeAvailable {
+		t.Errorf("Expected phase %s but got %s", api.VolumeBound, pv.Status.Phase)
+	}
+
+	// an initial sync for a claim will bind it to an unbound volume, triggers state change
+	err = syncClaim(volumeIndex, mockClient, claim)
+	if err != nil {
+		t.Fatalf("Expected Clam to be bound, instead got an error: %+v\n", err)
+	}
+
+	// state change causes another syncClaim to update statuses
+	syncClaim(volumeIndex, mockClient, claim)
+	// claim updated volume's status, causing an update and syncVolume call
+	syncVolume(volumeIndex, mockClient, pv)
+
+	if pv.Spec.ClaimRef == nil {
+		t.Errorf("Expected ClaimRef but got nil for pv.Status.ClaimRef: %+v\n", pv)
+	}
+
+	if pv.Status.Phase != api.VolumeBound {
+		t.Errorf("Expected phase %s but got %s", api.VolumeBound, pv.Status.Phase)
+	}
+
+	if claim.Status.Phase != api.ClaimBound {
+		t.Errorf("Expected phase %s but got %s", api.ClaimBound, claim.Status.Phase)
+	}
+	if len(claim.Status.AccessModes) != len(pv.Spec.AccessModes) {
+		t.Errorf("Expected phase %s but got %s", api.ClaimBound, claim.Status.Phase)
+	}
+	if claim.Status.AccessModes[0] != pv.Spec.AccessModes[0] {
+		t.Errorf("Expected access mode %s but got %s", claim.Status.AccessModes[0], pv.Spec.AccessModes[0])
+	}
+
+	// pretend the user deleted their claim
+	mockClient.claim = nil
+	syncVolume(volumeIndex, mockClient, pv)
+
+	if pv.Status.Phase != api.VolumeReleased {
+		t.Errorf("Expected phase %s but got %s", api.VolumeReleased, pv.Status.Phase)
+	}
+}
+
 type mockBinderClient struct {
 	volume *api.PersistentVolume
 	claim  *api.PersistentVolumeClaim

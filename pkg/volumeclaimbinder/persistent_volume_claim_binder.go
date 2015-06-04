@@ -158,6 +158,14 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 
 	// available volumes await a claim
 	case api.VolumeAvailable:
+		// TODO:  remove api.VolumePending phase altogether
+		_, exists, err := volumeIndex.Get(volume)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			volumeIndex.Add(volume)
+		}
 		if volume.Spec.ClaimRef != nil {
 			_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
 			if err == nil {
