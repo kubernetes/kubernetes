@@ -25,6 +25,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
 func TestFileServing(t *testing.T) {
@@ -102,5 +104,57 @@ func TestAPIRequests(t *testing.T) {
 		if w.Body.String() != want {
 			t.Errorf("%d: response body = %q; want %q", i, w.Body.String(), want)
 		}
+	}
+}
+
+func TestPathHandling(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, r.URL.Path)
+	}))
+	defer ts.Close()
+
+	table := []struct {
+		prefix     string
+		reqPath    string
+		expectPath string
+	}{
+		{"/api/", "/metrics", "404 page not found\n"},
+		{"/api/", "/api/metrics", "/api/metrics"},
+		{"/api/", "/api/v1/pods/", "/api/v1/pods/"},
+		{"/", "/metrics", "/metrics"},
+		{"/", "/api/v1/pods/", "/api/v1/pods/"},
+		{"/custom/", "/metrics", "404 page not found\n"},
+		{"/custom/", "/api/metrics", "404 page not found\n"},
+		{"/custom/", "/api/v1/pods/", "404 page not found\n"},
+		{"/custom/", "/custom/api/metrics", "/api/metrics"},
+		{"/custom/", "/custom/api/v1/pods/", "/api/v1/pods/"},
+	}
+
+	cc := &client.Config{
+		Host: ts.URL,
+	}
+
+	for _, item := range table {
+		func() {
+			p, err := NewProxyServer("", item.prefix, "/not/used/for/this/test", cc)
+			if err != nil {
+				t.Fatalf("%#v: %v", item, err)
+			}
+			pts := httptest.NewServer(p.mux)
+			defer pts.Close()
+
+			r, err := http.Get(pts.URL + item.reqPath)
+			if err != nil {
+				t.Fatalf("%#v: %v", item, err)
+			}
+			body, err := ioutil.ReadAll(r.Body)
+			r.Body.Close()
+			if err != nil {
+				t.Fatalf("%#v: %v", item, err)
+			}
+			if e, a := item.expectPath, string(body); e != a {
+				t.Errorf("%#v: Wanted %q, got %q", item, e, a)
+			}
+		}()
 	}
 }

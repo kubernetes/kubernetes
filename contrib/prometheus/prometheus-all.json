@@ -73,9 +73,9 @@
                     },
                     {
                         "name": "kubectl",
-                        "image": "gcr.io/google_containers/kubectl:v0.18.0-120-gaeb4ac55ad12b1-dirty",
+                        "image": "gcr.io/google_containers/kubectl:v0.18.0-350-gfb3305edcf6c1a",
                         "args": [
-                            "proxy", "-p", "8001"
+                            "proxy", "-p", "8001", "--api-prefix=/"
                         ]
                     }
                 ],
