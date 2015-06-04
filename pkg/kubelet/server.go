@@ -24,6 +24,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"net/url"
 	"path"
 	"strconv"
@@ -146,6 +147,10 @@ func (s *Server) InstallDebuggingHandlers() {
 	s.mux.HandleFunc("/logs/", s.handleLogs)
 	s.mux.HandleFunc("/containerLogs/", s.handleContainerLogs)
 	s.mux.Handle("/metrics", prometheus.Handler())
+
+	s.mux.HandleFunc("/debug/pprof/", pprof.Index)
+	s.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	s.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 }
 
 // error serializes an error object into an HTTP response.
