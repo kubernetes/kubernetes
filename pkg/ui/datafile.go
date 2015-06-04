@@ -1592,7 +1592,7 @@ func www_app_assets_css_app_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37661, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 37661, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1609,7 +1609,7 @@ func www_app_assets_img_docarrow_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/docArrow.png", size: 373, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/docArrow.png", size: 373, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1630,7 +1630,7 @@ func www_app_assets_img_ic_arrow_drop_down_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1432773208, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1672,7 +1672,7 @@ func www_app_assets_img_ic_arrow_drop_up_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_up_24px.svg", size: 795, mode: os.FileMode(420), modTime: time.Unix(1432773208, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_up_24px.svg", size: 795, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1689,7 +1689,7 @@ func www_app_assets_img_ic_keyboard_arrow_left_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_left_24px.svg", size: 151, mode: os.FileMode(420), modTime: time.Unix(1432773208, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_left_24px.svg", size: 151, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1706,7 +1706,7 @@ func www_app_assets_img_ic_keyboard_arrow_right_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_right_24px.svg", size: 149, mode: os.FileMode(420), modTime: time.Unix(1432773208, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_right_24px.svg", size: 149, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1723,7 +1723,7 @@ func www_app_assets_img_icons_arrow_back_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/arrow-back.png", size: 635, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/arrow-back.png", size: 635, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1740,7 +1740,7 @@ func www_app_assets_img_icons_favicon_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/favicon.png", size: 1663, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/favicon.png", size: 1663, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1757,7 +1757,7 @@ func www_app_assets_img_icons_ic_arrow_forward_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_arrow_forward_24px.svg", size: 158, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_arrow_forward_24px.svg", size: 158, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1774,7 +1774,7 @@ func www_app_assets_img_icons_ic_cancel_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_cancel_24px.svg", size: 276, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_cancel_24px.svg", size: 276, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1791,7 +1791,7 @@ func www_app_assets_img_icons_ic_close_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1821,7 +1821,7 @@ func www_app_assets_img_icons_ic_menu_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu.svg", size: 791, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu.svg", size: 791, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1861,7 +1861,7 @@ func www_app_assets_img_icons_ic_menu_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu_24px.svg", size: 841, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu_24px.svg", size: 841, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1878,7 +1878,7 @@ func www_app_assets_img_icons_list_control_down_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/list_control_down.png", size: 309, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/list_control_down.png", size: 309, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1900,7 +1900,7 @@ func www_app_assets_img_kubernetes_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/kubernetes.svg", size: 11663, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/kubernetes.svg", size: 11663, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1917,7 +1917,7 @@ func www_app_assets_js_gitkeep() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/.gitkeep", size: 0, mode: os.FileMode(420), modTime: time.Unix(1432754009, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/.gitkeep", size: 0, mode: os.FileMode(420), modTime: time.Unix(1433377532, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2784,7 +2784,7 @@ app.provider('k8sv1Beta3Api',
 app.controller('cAdvisorController', [
   '$scope',
   '$routeParams',
-  'k8sApi',
+  'k8sv1Beta3Api',
   'lodash',
   'cAdvisorService',
   '$q',
@@ -2801,19 +2801,22 @@ app.controller('cAdvisorController', [
       k8sApi.getMinions().success(angular.bind(this, function(res) {
         $scope.minions = res;
         // console.log(res);
-        var promises = lodash.map(res.items, function(m) { return cAdvisorService.getDataForMinion(m.id); });
+        var promises = lodash.map(res.items, function(m) { return cAdvisorService.getDataForMinion(m.metadata.name); });
 
         $q.all(promises).then(
             function(dataArray) {
               lodash.each(dataArray, function(data, i) {
                 var m = res.items[i];
 
-                var maxData = maxMemCpuInfo(m.id, data.memoryData, data.cpuData, data.filesystemData);
+                var maxData = maxMemCpuInfo(m.metadata.name, data.memoryData, data.cpuData, data.filesystemData);
 
                 // console.log("maxData", maxData);
+                var hostname = "";
+                if(m.status.addresses)
+                  hostname = m.status.addresses[0].address;
 
-                $scope.activeMinionDataById[m.id] =
-                    transformMemCpuInfo(data.memoryData, data.cpuData, data.filesystemData, maxData, m.hostIP)
+                $scope.activeMinionDataById[m.metadata.name] =
+                    transformMemCpuInfo(data.memoryData, data.cpuData, data.filesystemData, maxData, hostname);
               });
 
             },
@@ -2825,11 +2828,6 @@ app.controller('cAdvisorController', [
         $scope.loading = false;
       })).error(angular.bind(this, this.handleError));
     };
-
-    function getcAdvisorDataForMinion(m) {
-      var p = cAdvisorService.getDataForMinion(m.hostIP);
-      return p;
-    }
 
     function handleError(data, status, headers, config) {
       // console.log("Error (" + status + "): " + data);
@@ -4678,7 +4676,7 @@ func www_app_assets_js_app_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 93220, mode: os.FileMode(420), modTime: time.Unix(1432833385, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 93271, mode: os.FileMode(420), modTime: time.Unix(1433398106, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4720,7 +4718,7 @@ func www_app_assets_js_base_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(420), modTime: time.Unix(1432833385, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(420), modTime: time.Unix(1433398106, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4737,7 +4735,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_18px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4758,7 +4756,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_24px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4775,7 +4773,7 @@ func www_app_components_dashboard_img_icons_ic_close_18px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4792,7 +4790,7 @@ func www_app_components_dashboard_img_icons_ic_close_24px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4874,7 +4872,7 @@ func www_app_components_dashboard_manifest_json() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4891,7 +4889,7 @@ func www_app_components_dashboard_pages_footer_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4934,7 +4932,7 @@ func www_app_components_dashboard_pages_header_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4958,7 +4956,7 @@ func www_app_components_dashboard_pages_home_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4975,7 +4973,7 @@ func www_app_components_dashboard_protractor_smoke_spec_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/protractor/smoke.spec.js", size: 2616, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/protractor/smoke.spec.js", size: 2616, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4992,7 +4990,7 @@ func www_app_components_dashboard_test_controllers_header_spec_js() (*asset, err
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/test/controllers/header.spec.js", size: 1293, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/test/controllers/header.spec.js", size: 1293, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5043,7 +5041,7 @@ func www_app_components_dashboard_views_groups_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5067,7 +5065,7 @@ func www_app_components_dashboard_views_listevents_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5091,7 +5089,7 @@ func www_app_components_dashboard_views_listminions_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5115,7 +5113,7 @@ func www_app_components_dashboard_views_listpods_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5191,7 +5189,7 @@ func www_app_components_dashboard_views_listpodscards_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5225,7 +5223,7 @@ func www_app_components_dashboard_views_listpodsvisualizer_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5249,7 +5247,7 @@ func www_app_components_dashboard_views_listreplicationcontrollers_html() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5273,7 +5271,7 @@ func www_app_components_dashboard_views_listservices_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5379,7 +5377,7 @@ func www_app_components_dashboard_views_node_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 2307, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 2307, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5388,7 +5386,7 @@ var _www_app_components_dashboard_views_partials_cadvisor_html = []byte(`<div cl
   <div class="server-overview">
     <md-content layout="row" layout-wrap>
       <div flex-sm="100" flex-md="50" flex-lg="33" flex-gt-lg="25" class="chart_area" ng-repeat="minion in minions.items">
-        <d3-minion-bar-gauge data="activeMinionDataById[minion.id]" class="concentric" graph-width="325" graph-height="325" thickness=18 />
+        <d3-minion-bar-gauge data="activeMinionDataById[minion.metadata.name]" class="concentric" graph-width="325" graph-height="325" thickness=18 />
       </div>
     </md-content>
   </div>
@@ -5405,7 +5403,7 @@ func www_app_components_dashboard_views_partials_cadvisor_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 443, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 454, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5442,7 +5440,7 @@ func www_app_components_dashboard_views_partials_groupbox_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5501,7 +5499,7 @@ func www_app_components_dashboard_views_partials_groupitem_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2213, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2213, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5551,7 +5549,7 @@ func www_app_components_dashboard_views_partials_podtilesbyname_html() (*asset, 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5601,7 +5599,7 @@ func www_app_components_dashboard_views_partials_podtilesbyserver_html() (*asset
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5732,7 +5730,7 @@ func www_app_components_dashboard_views_pod_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 4149, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 4149, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5849,7 +5847,7 @@ func www_app_components_dashboard_views_replication_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 3207, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 3207, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5980,7 +5978,7 @@ func www_app_components_dashboard_views_service_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 3539, mode: os.FileMode(420), modTime: time.Unix(1432833389, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 3539, mode: os.FileMode(420), modTime: time.Unix(1433398110, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6057,7 +6055,7 @@ func www_app_index_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/index.html", size: 2315, mode: os.FileMode(420), modTime: time.Unix(1432773208, 0)}
+	info := bindata_file_info{name: "www/app/index.html", size: 2315, mode: os.FileMode(420), modTime: time.Unix(1433377532, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6074,7 +6072,7 @@ func www_app_vendor_gitkeep() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/vendor/.gitkeep", size: 0, mode: os.FileMode(420), modTime: time.Unix(1432754009, 0)}
+	info := bindata_file_info{name: "www/app/vendor/.gitkeep", size: 0, mode: os.FileMode(420), modTime: time.Unix(1433377532, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6091,7 +6089,7 @@ func www_app_vendor_angular_json_human_dist_angular_json_human_css() (*asset, er
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/vendor/angular-json-human/dist/angular-json-human.css", size: 1151, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/vendor/angular-json-human/dist/angular-json-human.css", size: 1151, mode: os.FileMode(420), modTime: time.Unix(1433375414, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6113,7 +6111,7 @@ func www_app_vendor_angular_material_angular_material_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/vendor/angular-material/angular-material.css", size: 159606, mode: os.FileMode(420), modTime: time.Unix(1432754009, 0)}
+	info := bindata_file_info{name: "www/app/vendor/angular-material/angular-material.css", size: 159606, mode: os.FileMode(420), modTime: time.Unix(1433377532, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6134,7 +6132,7 @@ func www_app_vendor_d3_d3_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/vendor/d3/d3.min.js", size: 151123, mode: os.FileMode(420), modTime: time.Unix(1432754009, 0)}
+	info := bindata_file_info{name: "www/app/vendor/d3/d3.min.js", size: 151123, mode: os.FileMode(420), modTime: time.Unix(1433377532, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6151,7 +6149,7 @@ func www_app_views_partials_404_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/404.html", size: 60, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/404.html", size: 60, mode: os.FileMode(420), modTime: time.Unix(1433375381, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6182,7 +6180,7 @@ func www_app_views_partials_kubernetes_ui_menu_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/kubernetes-ui-menu.tmpl.html", size: 710, mode: os.FileMode(420), modTime: time.Unix(1432754009, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/kubernetes-ui-menu.tmpl.html", size: 710, mode: os.FileMode(420), modTime: time.Unix(1433377532, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6244,7 +6242,7 @@ func www_app_views_partials_md_table_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 2819, mode: os.FileMode(420), modTime: time.Unix(1432773208, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 2819, mode: os.FileMode(420), modTime: time.Unix(1433377532, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6275,7 +6273,7 @@ func www_app_views_partials_menu_toggle_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/menu-toggle.tmpl.html", size: 617, mode: os.FileMode(420), modTime: time.Unix(1432754009, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/menu-toggle.tmpl.html", size: 617, mode: os.FileMode(420), modTime: time.Unix(1433377532, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
