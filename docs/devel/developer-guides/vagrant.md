@@ -9,7 +9,7 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
    2. [VMWare Fusion](https://www.vmware.com/products/fusion/) version 5 or greater as well as the appropriate [Vagrant VMWare Fusion provider](https://www.vagrantup.com/vmware)
    3. [VMWare Workstation](https://www.vmware.com/products/workstation/) version 9 or greater as well as the [Vagrant VMWare Workstation provider](https://www.vagrantup.com/vmware)
    4. [Parallels Desktop](https://www.parallels.com/products/desktop/) version 9 or greater as well as the [Vagrant Parallels provider](https://parallels.github.io/vagrant-parallels/)
-3. Get or build a [binary release](../../getting-started-guides/binary_release.md)
+3. Get or build a [binary release](/docs/getting-started-guides/binary_release.md)
 
 ### Setup
 
@@ -242,7 +242,7 @@ myNginx   nginx              name=my-nginx   3
 ```
 
 We did not start any services, hence there are none listed. But we see three replicas displayed properly.
-Check the [guestbook](../../examples/guestbook/README.md) application to learn how to create a service.
+Check the [guestbook](/examples/guestbook/README.md) application to learn how to create a service.
 You can already play with scaling the replicas with:
 
 ```sh
