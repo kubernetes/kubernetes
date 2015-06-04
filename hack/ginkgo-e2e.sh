@@ -104,6 +104,6 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --cluster-tag="${CLUSTER_ID:-}" \
   --repo-root="${KUBE_VERSION_ROOT}" \
   --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
-  --num-nodes="${NUM_MINIONS:-}" \
+  --num-nodes="${NUM_NODES:-}" \
   ${E2E_REPORT_DIR+"--report-dir=${E2E_REPORT_DIR}"} \
   "${@:-}"

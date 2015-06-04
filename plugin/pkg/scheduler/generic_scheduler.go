@@ -55,8 +55,8 @@ type genericScheduler struct {
 	randomLock   sync.Mutex
 }
 
-func (g *genericScheduler) Schedule(pod *api.Pod, minionLister algorithm.MinionLister) (string, error) {
-	minions, err := minionLister.List()
+func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeLister) (string, error) {
+	minions, err := nodeLister.List()
 	if err != nil {
 		return "", err
 	}
@@ -69,7 +69,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, minionLister algorithm.MinionL
 		return "", err
 	}
 
-	priorityList, err := prioritizeNodes(pod, g.pods, g.prioritizers, algorithm.FakeMinionLister(filteredNodes))
+	priorityList, err := prioritizeNodes(pod, g.pods, g.prioritizers, algorithm.FakeNodeLister(filteredNodes))
 	if err != nil {
 		return "", err
 	}
@@ -137,13 +137,13 @@ func findNodesThatFit(pod *api.Pod, podLister algorithm.PodLister, predicateFunc
 // Each priority function can also have its own weight
 // The minion scores returned by the priority function are multiplied by the weights to get weighted scores
 // All scores are finally combined (added) to get the total weighted scores of all minions
-func prioritizeNodes(pod *api.Pod, podLister algorithm.PodLister, priorityConfigs []algorithm.PriorityConfig, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func prioritizeNodes(pod *api.Pod, podLister algorithm.PodLister, priorityConfigs []algorithm.PriorityConfig, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
 	result := algorithm.HostPriorityList{}
 
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
 	if len(priorityConfigs) == 0 {
-		return EqualPriority(pod, podLister, minionLister)
+		return EqualPriority(pod, podLister, nodeLister)
 	}
 
 	combinedScores := map[string]int{}
@@ -154,7 +154,7 @@ func prioritizeNodes(pod *api.Pod, podLister algorithm.PodLister, priorityConfig
 			continue
 		}
 		priorityFunc := priorityConfig.Function
-		prioritizedList, err := priorityFunc(pod, podLister, minionLister)
+		prioritizedList, err := priorityFunc(pod, podLister, nodeLister)
 		if err != nil {
 			return algorithm.HostPriorityList{}, err
 		}
@@ -181,8 +181,8 @@ func getBestHosts(list algorithm.HostPriorityList) []string {
 }
 
 // EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
-func EqualPriority(_ *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
-	nodes, err := minionLister.List()
+func EqualPriority(_ *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+	nodes, err := nodeLister.List()
 	if err != nil {
 		fmt.Errorf("failed to list nodes: %v", err)
 		return []algorithm.HostPriority{}, err

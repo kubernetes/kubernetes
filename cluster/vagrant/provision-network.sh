@@ -33,8 +33,8 @@ set -e
 
 # Only do this operation if the bridge is not defined
 ifconfig | grep -q kbr0 || {
-  CONTAINER_SUBNETS=(${MASTER_CONTAINER_SUBNET} ${MINION_CONTAINER_SUBNETS[@]})
-  CONTAINER_IPS=(${MASTER_IP} ${MINION_IPS[@]})
+  CONTAINER_SUBNETS=(${MASTER_CONTAINER_SUBNET} ${NODE_CONTAINER_SUBNETS[@]})
+  CONTAINER_IPS=(${MASTER_IP} ${NODE_IPS[@]})
 
   # Stop docker before making these updates
   systemctl stop docker

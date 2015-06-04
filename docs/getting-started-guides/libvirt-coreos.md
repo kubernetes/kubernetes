@@ -94,7 +94,7 @@ cluster/kube-up.sh
 
 The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
-The `NUM_MINIONS` environment variable may be set to specify the number of minions to start. If it is not set, the number of minions defaults to 3.
+The `NUM_NODES` environment variable may be set to specify the number of minions to start. If it is not set, the number of minions defaults to 3.
 
 The `KUBE_PUSH` environment variable may be set to specify which kubernetes binaries must be deployed on the cluster. Its possible values are:
 
@@ -150,7 +150,7 @@ export KUBERNETES_PROVIDER=libvirt-coreos
 Bring up a libvirt-CoreOS cluster of 5 minions
 
 ```
-NUM_MINIONS=5 cluster/kube-up.sh
+NUM_NODES=5 cluster/kube-up.sh
 ```
 
 Destroy the libvirt-CoreOS cluster

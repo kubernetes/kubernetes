@@ -27,7 +27,7 @@ It is not a bad idea to set AWS_S3_BUCKET to something more human friendly.
 
 AWS_S3_REGION is useful for people that want to control their data location, because of regulatory restrictions for example.
 
-**MASTER_SIZE**, **MINION_SIZE**
+**MASTER_SIZE**, **NODE_SIZE**
 
 The instance type to use for creating the master/minion.  Defaults to t2.micro.
 
@@ -35,10 +35,10 @@ For production usage, we recommend bigger instances, for example:
 
 ```
 export MASTER_SIZE=c4.large
-export MINION_SIZE=r3.large
+export NODE_SIZE=r3.large
 ```
 
-**KUBE_ENABLE_MINION_PUBLIC_IP**
+**KUBE_ENABLE_NODE_PUBLIC_IP**
 
 Should a public IP automatically assigned to the minions? "true" or "false"  
 Defaults to: "true"

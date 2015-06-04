@@ -162,7 +162,7 @@ func TestServiceSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		serviceSpread := ServiceSpread{serviceLister: algorithm.FakeServiceLister(test.services)}
-		list, err := serviceSpread.CalculateSpreadPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeMinionLister(makeNodeList(test.nodes)))
+		list, err := serviceSpread.CalculateSpreadPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -330,7 +330,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		zoneSpread := ServiceAntiAffinity{serviceLister: algorithm.FakeServiceLister(test.services), label: "zone"}
-		list, err := zoneSpread.CalculateAntiAffinityPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeMinionLister(makeLabeledMinionList(test.nodes)))
+		list, err := zoneSpread.CalculateAntiAffinityPriority(test.pod, algorithm.FakePodLister(test.pods), algorithm.FakeNodeLister(makeLabeledNodeList(test.nodes)))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -343,7 +343,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 	}
 }
 
-func makeLabeledMinionList(nodeMap map[string]map[string]string) (result api.NodeList) {
+func makeLabeledNodeList(nodeMap map[string]map[string]string) (result api.NodeList) {
 	nodes := []api.Node{}
 	for nodeName, labels := range nodeMap {
 		nodes = append(nodes, api.Node{ObjectMeta: api.ObjectMeta{Name: nodeName, Labels: labels}})

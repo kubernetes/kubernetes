@@ -59,7 +59,7 @@ cd "${KUBE_ROOT}"
 echo All verbose output will be redirected to $logfile, use --logfile option to change.
 
 printf "Start the cluster with 2 minions .. "
-export NUM_MINIONS=2
+export NUM_NODES=2
 export KUBERNETES_PROVIDER=vagrant
 
 (cluster/kube-up.sh >>"$logfile" 2>&1) || true

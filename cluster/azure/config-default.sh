@@ -26,14 +26,14 @@ AZ_CS="" # is set in azure/util.sh verify-prereqs
 AZ_SSH_KEY=$HOME/.ssh/azure_rsa
 AZ_SSH_CERT=$HOME/.ssh/azure.pem
 
-NUM_MINIONS=4
+NUM_NODES=4
 
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
-MINION_TAG="${INSTANCE_PREFIX}-minion"
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
-MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
-MINION_SCOPES=""
+NODE_TAG="${INSTANCE_PREFIX}-node"
+NODE_NAMES=($(eval echo ${INSTANCE_PREFIX}-node-{1..${NUM_NODES}}))
+NODE_IP_RANGES=($(eval echo "10.244.{1..${NUM_NODES}}.0/24"))
+NODE_SCOPES=""
 
 SERVICE_CLUSTER_IP_RANGE="10.250.0.0/16"  # formerly PORTAL_NET
 

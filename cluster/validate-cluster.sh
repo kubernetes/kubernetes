@@ -24,8 +24,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
-MINIONS_FILE=/tmp/minions-$$
-trap 'rm -rf "${MINIONS_FILE}"' EXIT
+NODES_FILE=/tmp/minions-$$
+trap 'rm -rf "${NODES_FILE}"' EXIT
 
 # Make several attempts to deal with slow cluster birth.
 attempt=0
@@ -33,32 +33,32 @@ while true; do
   # The "kubectl get nodes" output is three columns like this:
   #
   #     NAME                     LABELS    STATUS
-  #     kubernetes-minion-03nb   <none>    Ready
+  #     kubernetes-node-03nb   <none>    Ready
   #
   # Echo the output, strip the first line, then gather 2 counts:
   #  - Total number of nodes.
   #  - Number of "ready" nodes.
-  "${KUBE_ROOT}/cluster/kubectl.sh" get nodes > "${MINIONS_FILE}" || true
-  found=$(cat "${MINIONS_FILE}" | sed '1d' | grep -c .) || true
-  ready=$(cat "${MINIONS_FILE}" | sed '1d' | awk '{print $NF}' | grep -c '^Ready') || true
+  "${KUBE_ROOT}/cluster/kubectl.sh" get nodes > "${NODES_FILE}" || true
+  found=$(cat "${NODES_FILE}" | sed '1d' | grep -c .) || true
+  ready=$(cat "${NODES_FILE}" | sed '1d' | awk '{print $NF}' | grep -c '^Ready') || true
 
-  if (( ${found} == "${NUM_MINIONS}" )) && (( ${ready} == "${NUM_MINIONS}")); then
+  if (( ${found} == "${NUM_NODES}" )) && (( ${ready} == "${NUM_NODES}")); then
     break
   else
     # Set the timeout to ~10minutes (40 x 15 second) to avoid timeouts for 100-node clusters.
     if (( attempt > 40 )); then
-      echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${NUM_MINIONS}. Your cluster may not be working.${color_norm}"
-      cat -n "${MINIONS_FILE}"
+      echo -e "${color_red}Detected ${ready} ready nodes, found ${found} nodes out of expected ${NUM_NODES}. Your cluster may not be working.${color_norm}"
+      cat -n "${NODES_FILE}"
       exit 2
 		else
-      echo -e "${color_yellow}Waiting for ${NUM_MINIONS} ready nodes. ${ready} ready nodes, ${found} registered. Retrying.${color_norm}"
+      echo -e "${color_yellow}Waiting for ${NUM_NODES} ready nodes. ${ready} ready nodes, ${found} registered. Retrying.${color_norm}"
     fi
     attempt=$((attempt+1))
     sleep 15
   fi
 done
 echo "Found ${found} nodes."
-cat -n "${MINIONS_FILE}"
+cat -n "${NODES_FILE}"
 
 attempt=0
 while true; do

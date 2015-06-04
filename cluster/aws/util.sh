@@ -114,19 +114,19 @@ function detect-master () {
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
 
-function detect-minions () {
-  KUBE_MINION_IP_ADDRESSES=()
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+function detect-nodes () {
+  KUBE_NODE_IP_ADDRESSES=()
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local minion_ip
-    if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
-      minion_ip=$(get_instance_public_ip ${MINION_NAMES[$i]})
+    if [[ "${ENABLE_NODE_PUBLIC_IP}" == "true" ]]; then
+      minion_ip=$(get_instance_public_ip ${NODE_NAMES[$i]})
     else
-      minion_ip=$(get_instance_private_ip ${MINION_NAMES[$i]})
+      minion_ip=$(get_instance_private_ip ${NODE_NAMES[$i]})
     fi
-    echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
-    KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+    echo "Found ${NODE_NAMES[$i]} at ${minion_ip}"
+    KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
   done
-  if [[ -z "$KUBE_MINION_IP_ADDRESSES" ]]; then
+  if [[ -z "$KUBE_NODE_IP_ADDRESSES" ]]; then
     echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
@@ -372,9 +372,9 @@ function ensure-iam-profiles {
     echo "Creating master IAM profile: ${IAM_PROFILE_MASTER}"
     create-iam-profile ${IAM_PROFILE_MASTER}
   }
-  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_MINION} || {
-    echo "Creating minion IAM profile: ${IAM_PROFILE_MINION}"
-    create-iam-profile ${IAM_PROFILE_MINION}
+  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_NODE} || {
+    echo "Creating minion IAM profile: ${IAM_PROFILE_NODE}"
+    create-iam-profile ${IAM_PROFILE_NODE}
   }
 }
 
@@ -437,7 +437,7 @@ function kube-up {
   get-tokens
 
   detect-image
-  detect-minion-image
+  detect-node-image
 
   find-release-tars
 
@@ -518,7 +518,7 @@ function kube-up {
     echo "cd /var/cache/kubernetes-install"
     echo "readonly SALT_MASTER='${MASTER_INTERNAL_IP}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
-    echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
+    echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-node'"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     echo "readonly ZONE='${ZONE}'"
@@ -616,22 +616,22 @@ function kube-up {
     sleep 10
   done
 
-  MINION_IDS=()
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    echo "Starting Minion (${MINION_NAMES[$i]})"
-    generate-minion-user-data $i > "${KUBE_TEMP}/minion-user-data-${i}"
+  NODE_IDS=()
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+    echo "Starting Minion (${NODE_NAMES[$i]})"
+    generate-node-user-data $i > "${KUBE_TEMP}/minion-user-data-${i}"
 
     local public_ip_option
-    if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
+    if [[ "${ENABLE_NODE_PUBLIC_IP}" == "true" ]]; then
       public_ip_option="--associate-public-ip-address"
     else
       public_ip_option="--no-associate-public-ip-address"
     fi
 
     minion_id=$($AWS_CMD run-instances \
-      --image-id $KUBE_MINION_IMAGE \
-      --iam-instance-profile Name=$IAM_PROFILE_MINION \
-      --instance-type $MINION_SIZE \
+      --image-id $KUBE_NODE_IMAGE \
+      --iam-instance-profile Name=$IAM_PROFILE_NODE \
+      --instance-type $NODE_SIZE \
       --subnet-id $SUBNET_ID \
       --private-ip-address $INTERNAL_IP_BASE.1${i} \
       --key-name kubernetes \
@@ -639,24 +639,24 @@ function kube-up {
       ${public_ip_option} \
       --user-data "file://${KUBE_TEMP}/minion-user-data-${i}" | json_val '["Instances"][0]["InstanceId"]')
 
-    add-tag $minion_id Name ${MINION_NAMES[$i]}
-    add-tag $minion_id Role $MINION_TAG
+    add-tag $minion_id Name ${NODE_NAMES[$i]}
+    add-tag $minion_id Role $NODE_TAG
     add-tag $minion_id KubernetesCluster ${CLUSTER_ID}
 
-    MINION_IDS[$i]=$minion_id
+    NODE_IDS[$i]=$minion_id
   done
 
   # Add routes to minions
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     # We are not able to add a route to the instance until that instance is in "running" state.
     # This is quite an ugly solution to this problem. In Bash 4 we could use assoc. arrays to do this for
     # all instances at once but we can't be sure we are running Bash 4.
-    minion_id=${MINION_IDS[$i]}
+    minion_id=${NODE_IDS[$i]}
     wait-for-instance-running $minion_id
-    echo "Minion ${MINION_NAMES[$i]} running"
+    echo "Minion ${NODE_NAMES[$i]} running"
     sleep 10
     $AWS_CMD modify-instance-attribute --instance-id $minion_id --source-dest-check '{"Value": false}' > $LOG
-    $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MINION_IP_RANGES[$i]} --instance-id $minion_id > $LOG
+    $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${NODE_IP_RANGES[$i]} --instance-id $minion_id > $LOG
   done
 
   FAIL=0
@@ -669,7 +669,7 @@ function kube-up {
   fi
 
   detect-master > $LOG
-  detect-minions > $LOG
+  detect-nodes > $LOG
 
   # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to
   # make sure that everything is well configured.
@@ -726,14 +726,14 @@ function kube-up {
 
   # Basic sanity checking
   local rc # Capture return code without exiting because of errexit bash option
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
       # Make sure docker is installed and working.
       local attempt=0
       while true; do
-        local minion_name=${MINION_NAMES[$i]}
-        local minion_ip=${KUBE_MINION_IP_ADDRESSES[$i]}
+        local minion_name=${NODE_NAMES[$i]}
+        local minion_ip=${KUBE_NODE_IP_ADDRESSES[$i]}
         echo -n Attempt "$(($attempt+1))" to check Docker on node "${minion_name} @ ${minion_ip}" ...
-        local output=`check-minion ${minion_name} ${minion_ip}`
+        local output=`check-node ${minion_name} ${minion_ip}`
         echo $output
         if [[ "${output}" != "working" ]]; then
           if (( attempt > 9 )); then

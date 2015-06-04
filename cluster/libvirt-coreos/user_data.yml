@@ -57,7 +57,7 @@ coreos:
         Name=cbr0
 
         [Network]
-        Address=${MINION_CONTAINER_SUBNETS[$i]}
+        Address=${NODE_CONTAINER_SUBNETS[$i]}
 
         [Route]
         Destination=${CONTAINER_SUBNET}

@@ -33,8 +33,8 @@ EOF
 
 hostnamef=$(uname -n)
 apt-get install -y ipcalc
-netmask=$(ipcalc $MINION_IP_RANGE | grep Netmask | awk '{ print $2 }')
-network=$(ipcalc $MINION_IP_RANGE | grep Address | awk '{ print $2 }')
+netmask=$(ipcalc $NODE_IP_RANGE | grep Netmask | awk '{ print $2 }')
+network=$(ipcalc $NODE_IP_RANGE | grep Address | awk '{ print $2 }')
 cbrstring="$network $netmask"
 
 # Our minions will have a pool role to distinguish them from the master.
@@ -42,7 +42,7 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-pool
-  cbr-cidr: $MINION_IP_RANGE
+  cbr-cidr: $NODE_IP_RANGE
   cloud: azure
   hostnamef: $hostnamef
   cbr-string: $cbrstring

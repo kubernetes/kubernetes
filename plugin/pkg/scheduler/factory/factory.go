@@ -206,9 +206,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	return &scheduler.Config{
 		Modeler: f.modeler,
 		// The scheduler only needs to consider schedulable nodes.
-		MinionLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
-		Algorithm:    algo,
-		Binder:       &binder{f.Client},
+		NodeLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
+		Algorithm:  algo,
+		Binder:     &binder{f.Client},
 		NextPod: func() *api.Pod {
 			pod := f.PodQueue.Pop().(*api.Pod)
 			glog.V(2).Infof("About to try and schedule pod %v", pod.Name)

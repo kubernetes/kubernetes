@@ -301,8 +301,8 @@ function verify_from_container() {
 trap do_teardown EXIT
 
 # Get node IP addresses and pick one as our test point.
-detect-minions
-test_node="${MINION_NAMES[0]}"
+detect-nodes
+test_node="${NODE_NAMES[0]}"
 master="${MASTER_NAME}"
 
 # Make our namespace

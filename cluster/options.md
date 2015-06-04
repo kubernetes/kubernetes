@@ -8,7 +8,7 @@ These options apply across providers.  There are additional documents for option
 
 This is a work-in-progress; not all options are documented yet!
 
-**NUM_MINIONS**
+**NUM_NODES**
 
 The number of minion instances to create.  Most providers default this to 4.
 
