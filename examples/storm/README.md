@@ -27,10 +27,10 @@ instructions for your platform.
 
 ## Step One: Start your ZooKeeper service
 
-ZooKeeper is a distributed coordination service that Storm uses as a
+ZooKeeper is a distributed coordination [service](../../docs/services.md) that Storm uses as a
 bootstrap and for state storage.
 
-Use the [`examples/storm/zookeeper.json`](zookeeper.json) file to create a pod running
+Use the [`examples/storm/zookeeper.json`](zookeeper.json) file to create a [pod](../../docs/pods.md) running
 the ZooKeeper service.
 
 ```shell
@@ -114,7 +114,7 @@ The Storm workers need both the ZooKeeper and Nimbus services to be
 running.
 
 Use the [`examples/storm/storm-worker-controller.json`](storm-worker-controller.json) file to create a
-ReplicationController that manages the worker pods.
+[replication controller](../../docs/replication-controller.md) that manages the worker pods.
 
 ```shell
 $ kubectl create -f examples/storm/storm-worker-controller.json
@@ -147,7 +147,7 @@ Node count: 13
 
 There should be one client from the Nimbus service and one per
 worker. Ideally, you should get ```stat``` output from ZooKeeper
-before and after creating the ReplicationController.
+before and after creating the replication controller.
 
 (Pull requests welcome for alternative ways to validate the workers)
 

@@ -15,11 +15,11 @@ limitations under the License.
 
 -->
 # Live update example
-This example demonstrates the usage of Kubernetes to perform a live update on a running group of pods.
+This example demonstrates the usage of Kubernetes to perform a live update on a running group of [pods](../../docs/pods.md).
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes-new#contents):
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides):
 
 ```bash
 $ cd kubernetes
@@ -65,7 +65,7 @@ $ ./cluster/kubectl.sh rolling-update update-demo-nautilus --update-period=10s -
 ```
 The rolling-update command in kubectl will do 2 things:
 
-1. Create a new replication controller with a pod template that uses the new image (`gcr.io/google_containers/update-demo:kitten`)
+1. Create a new [replication controller](../../docs/replication-controller.md) with a pod template that uses the new image (`gcr.io/google_containers/update-demo:kitten`)
 2. Scale the old and new replication controllers until the new controller replaces the old. This will kill the current pods one at a time, spinnning up new ones to replace them.
 
 Watch the [demo website](http://localhost:8001/static/index.html), it will update one pod every 10 seconds until all of the pods have the new image.
