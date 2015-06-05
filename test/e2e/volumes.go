@@ -79,7 +79,7 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 	serverPod := &api.Pod{
 		TypeMeta: api.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: "v1beta3",
+			APIVersion: "v1",
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: config.prefix + "-server",
@@ -137,7 +137,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	clientPod := &api.Pod{
 		TypeMeta: api.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: "v1beta3",
+			APIVersion: "v1",
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: config.prefix + "-client",
@@ -282,7 +282,7 @@ var _ = Describe("Volumes", func() {
 			endpoints := api.Endpoints{
 				TypeMeta: api.TypeMeta{
 					Kind:       "Endpoints",
-					APIVersion: "v1beta3",
+					APIVersion: "v1",
 				},
 				ObjectMeta: api.ObjectMeta{
 					Name: config.prefix + "-server",
