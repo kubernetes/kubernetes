@@ -60,8 +60,8 @@ var _ = Describe("Density", func() {
 		ns = nsForTesting.Name
 		expectNoError(err)
 		uuid = string(util.NewUUID())
-		expectNoError(os.Mkdir(uuid, 0777))
-		expectNoError(writePerfData(c, uuid, "before"))
+		expectNoError(os.Mkdir(fmt.Sprintf("/tmp/%s", uuid), 0777))
+		expectNoError(writePerfData(c, fmt.Sprintf("/tmp/%s", uuid), "before"))
 	})
 
 	AfterEach(func() {
@@ -81,7 +81,7 @@ var _ = Describe("Density", func() {
 			Failf("Couldn't delete ns %s", err)
 		}
 
-		expectNoError(writePerfData(c, uuid, "after"))
+		expectNoError(writePerfData(c, fmt.Sprintf("/tmp/%s", uuid), "after"))
 
 		// Verify latency metrics
 		// TODO: Update threshold to 1s once we reach this goal
@@ -122,7 +122,7 @@ var _ = Describe("Density", func() {
 		It(name, func() {
 			totalPods := itArg.podsPerMinion * minionCount
 			RCName = "density" + strconv.Itoa(totalPods) + "-" + uuid
-			fileHndl, err := os.Create(fmt.Sprintf("%s/pod_states.csv", uuid))
+			fileHndl, err := os.Create(fmt.Sprintf("/tmp/%s/pod_states.csv", uuid))
 			expectNoError(err)
 			defer fileHndl.Close()
 
