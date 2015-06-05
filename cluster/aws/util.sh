@@ -193,6 +193,37 @@ function detect-image () {
   fi
 }
 
+# Computes the AWS fingerprint for a public key file ($1)
+# $1: path to public key file
+# Note that this is a different hash from the OpenSSH hash.
+# But AWS gives us this public key hash in the describe keys output, so we should stick with this format.
+# Hopefully this will be done by the aws cli tool one day: https://github.com/aws/aws-cli/issues/191
+function get-aws-fingerprint {
+  local -r pubkey_path=$1
+  ssh-keygen -f ${pubkey_path} -e -m PKCS8  | openssl pkey -pubin -outform DER | openssl md5 -c | sed -e 's/(stdin)= //g'
+}
+
+# Import an SSH public key to AWS.
+# Ignores duplicate names; recommended to use a name that includes the public key hash.
+# $1 name
+# $2 public key path
+function import-public-key {
+  local -r name=$1
+  local -r path=$2
+
+  local ok=1
+  local output=""
+  output=$($AWS_CMD import-key-pair --key-name ${name} --public-key-material "file://${path}" 2>&1) || ok=0
+  if [[ ${ok} == 0 ]]; then
+    # Idempotency: ignore if duplicate name
+    if [[ "${output}" != *"InvalidKeyPair.Duplicate"* ]]; then
+      echo "Error importing public key"
+      echo "Output: ${output}"
+      exit 1
+    fi
+  fi
+}
+
 # Verify prereqs
 function verify-prereqs {
   if [[ "$(which aws)" == "" ]]; then
@@ -458,7 +489,11 @@ function kube-up {
     ssh-keygen -f "$AWS_SSH_KEY" -N ''
   fi
 
-  $AWS_CMD import-key-pair --key-name kubernetes --public-key-material "file://$AWS_SSH_KEY.pub" > $LOG 2>&1 || true
+  AWS_SSH_KEY_FINGERPRINT=$(get-aws-fingerprint ${AWS_SSH_KEY}.pub)
+  echo "Using SSH key with (AWS) fingerprint: ${AWS_SSH_KEY_FINGERPRINT}"
+  AWS_SSH_KEY_NAME="kubernetes-${AWS_SSH_KEY_FINGERPRINT//:/}"
+
+  import-public-key ${AWS_SSH_KEY_NAME} ${AWS_SSH_KEY}.pub
 
   VPC_ID=$(get_vpc_id)
 
@@ -558,7 +593,7 @@ function kube-up {
     --instance-type $MASTER_SIZE \
     --subnet-id $SUBNET_ID \
     --private-ip-address $MASTER_INTERNAL_IP \
-    --key-name kubernetes \
+    --key-name ${AWS_SSH_KEY_NAME} \
     --security-group-ids $SEC_GROUP_ID \
     --associate-public-ip-address \
     --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
@@ -639,7 +674,7 @@ function kube-up {
       --instance-type $MINION_SIZE \
       --subnet-id $SUBNET_ID \
       --private-ip-address $INTERNAL_IP_BASE.1${i} \
-      --key-name kubernetes \
+      --key-name ${AWS_SSH_KEY_NAME} \
       --security-group-ids $SEC_GROUP_ID \
       ${public_ip_option} \
       --user-data "file://${KUBE_TEMP}/minion-user-data-${i}" | json_val '["Instances"][0]["InstanceId"]')
