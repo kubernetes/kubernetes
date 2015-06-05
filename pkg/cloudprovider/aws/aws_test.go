@@ -336,7 +336,15 @@ func (ec2 *FakeEC2) CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (*ec2.Cre
 	panic("Not implemented")
 }
 
+func (ec2 *FakeEC2) DeleteSecurityGroup(*ec2.DeleteSecurityGroupInput) (*ec2.DeleteSecurityGroupOutput, error) {
+	panic("Not implemented")
+}
+
 func (ec2 *FakeEC2) AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (*ec2.RevokeSecurityGroupIngressOutput, error) {
 	panic("Not implemented")
 }
 
@@ -345,6 +353,10 @@ func (ec2 *FakeEC2) DescribeVPCs(*ec2.DescribeVPCsInput) ([]*ec2.VPC, error) {
 }
 
 func (ec2 *FakeEC2) DescribeSubnets(*ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
 	panic("Not implemented")
 }
 
