@@ -75,7 +75,7 @@ build default certificates.
 Grab the public IP address of the service we previously created.
 
 ```shell
-$ export PUBLIC_IP=$(cluster/kubectl.sh get services openshift --template="{{ index .spec.publicIPs 0 }}")
+$ export PUBLIC_IP=$(cluster/kubectl.sh get services openshift --template="{{ index .status.loadBalancer.ingress 0 \"ip\" }}")
 $ echo $PUBLIC_IP
 ```
 
