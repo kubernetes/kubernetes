@@ -37,7 +37,7 @@ write_files:
     permissions: '0755'
     owner: root
     content: |
-      apiVersion: v1beta3
+      apiVersion: v1
       kind: Pod
       metadata:
         name: fluentd-elasticsearch

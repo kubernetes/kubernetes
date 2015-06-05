@@ -25,7 +25,7 @@ field is the version of the API schema that the `fieldPath` is written in terms 
 This is an example of a pod that consumes its name and namespace via the downward API:
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   name: dapi-test-pod

@@ -348,7 +348,7 @@ No other variables are defined.
 Notice the `$(var)` syntax.
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   name: expansion-pod
@@ -366,7 +366,7 @@ spec:
 #### In a pod: building a URL using downward API
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   name: expansion-pod

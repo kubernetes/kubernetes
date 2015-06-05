@@ -3,7 +3,7 @@ This document describes the current state of Volumes in kubernetes.  Familiarity
 
 A Volume is a directory, possibly with some data in it, which is accessible to a Container. Kubernetes Volumes are similar to but not the same as [Docker Volumes](https://docs.docker.com/userguide/dockervolumes/).
 
-A Pod specifies which Volumes its containers need in its [spec.volumes](http://kubernetes.io/third_party/swagger-ui/#!/v1beta3/createPod) property.
+A Pod specifies which Volumes its containers need in its [spec.volumes](http://kubernetes.io/third_party/swagger-ui/#!/v1/createPod) property.
 
 A process in a Container sees a filesystem view composed from two sources: a single Docker image and zero or more Volumes.  A [Docker image](https://docs.docker.com/userguide/dockerimages/) is at the root of the file hierarchy.  Any Volumes are mounted at points on the Docker image;  Volumes do not mount on other Volumes and do not have hard links to other Volumes.  Each container in the Pod independently specifies where on its image to mount each Volume.  This is specified in each container's VolumeMounts property.
 
@@ -61,7 +61,7 @@ gcloud compute disks create --size=500GB --zone=us-central1-a my-data-disk
 
 #### GCE PD Example configuration:
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   name: testpd

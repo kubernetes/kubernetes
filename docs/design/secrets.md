@@ -394,7 +394,7 @@ To create a pod that uses an ssh key stored as a secret, we first need to create
 ```json
 {
   "kind": "Secret",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "ssh-key-secret"
   },
@@ -414,7 +414,7 @@ Now we can create a pod which references the secret with the ssh key and consume
 ```json
 {
   "kind": "Pod",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "secret-test-pod",
     "labels": {
@@ -464,12 +464,12 @@ The secrets:
 
 ```json
 {
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "kind": "List",
   "items":
   [{
     "kind": "Secret",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
       "name": "prod-db-secret"
     },
@@ -480,7 +480,7 @@ The secrets:
   },
   {
     "kind": "Secret",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
       "name": "test-db-secret"
     },
@@ -496,12 +496,12 @@ The pods:
 
 ```json
 {
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "kind": "List",
   "items":
   [{
     "kind": "Pod",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
       "name": "prod-db-client-pod",
       "labels": {
@@ -534,7 +534,7 @@ The pods:
   },
   {
     "kind": "Pod",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
       "name": "test-db-client-pod",
       "labels": {

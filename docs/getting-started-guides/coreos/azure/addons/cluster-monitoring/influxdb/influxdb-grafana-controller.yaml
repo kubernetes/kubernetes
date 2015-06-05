@@ -1,4 +1,4 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata: 
   labels: 
@@ -27,7 +27,7 @@ spec:
           name: grafana
           env: 
             - name: INFLUXDB_EXTERNAL_URL
-              value: /api/v1beta3/proxy/namespaces/default/services/monitoring-grafana/db/
+              value: /api/v1/proxy/namespaces/default/services/monitoring-grafana/db/
             - name: INFLUXDB_HOST
               value: monitoring-influxdb
             - name: INFLUXDB_PORT

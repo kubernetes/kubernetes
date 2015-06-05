@@ -63,7 +63,7 @@ For example, if you try to create a node from the following content:
 ```json
 {
   "kind": "Node",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "10.240.79.157",
     "labels": {
@@ -132,7 +132,7 @@ node, but will not affect any existing pods on the node.  This is useful as a
 preparatory step before a node reboot, etc.  For example, to mark a node
 unschedulable, run this command:
 ```
-kubectl update nodes 10.1.2.3 --patch='{"apiVersion": "v1beta3", "unschedulable": true}'
+kubectl update nodes 10.1.2.3 --patch='{"apiVersion": "v1", "unschedulable": true}'
 ```
 
 

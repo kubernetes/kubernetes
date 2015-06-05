@@ -41,7 +41,7 @@ port 9376 and carry a label "app=MyApp".
 ```json
 {
     "kind": "Service",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
         "name": "my-service"
     },
@@ -62,7 +62,7 @@ port 9376 and carry a label "app=MyApp".
 
 This specification will create a new `Service` object named "my-service" which
 targets TCP port 9376 on any `Pod` with the "app=MyApp" label.  This `Service`
-will also be assigned an IP address (sometimes called the "portal IP"), which
+will also be assigned an IP address (sometimes called the "cluster IP"), which
 is used by the service proxies (see below).  The `Service`'s selector will be
 evaluated continuously and the results will be posted in an `Endpoints` object
 also named "my-service".
@@ -96,7 +96,7 @@ In any of these scenarios you can define a service without a selector:
 ```json
 {
     "kind": "Service",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
         "name": "my-service"
     },
@@ -118,7 +118,7 @@ created. You can manually map the service to your own specific endpoints:
 ```json
 {
     "kind": "Endpoints",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
         "name": "my-service"
     },
@@ -174,7 +174,7 @@ disambiguated.  For example:
 ```json
 {
     "kind": "Service",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
         "name": "my-service"
     },
@@ -203,14 +203,13 @@ disambiguated.  For example:
 ## Choosing your own IP address
 
 A user can specify their own cluster IP address as part of a `Service` creation
-request.  To do this, set the `spec.clusterIP` field (called `portalIP` in
-v1beta3 and earlier APIs). For example, if they already have an existing DNS
-entry that they wish to replace, or legacy systems that are configured for a
-specific IP address and difficult to re-configure.  The IP address that a user
-chooses must be a valid IP address and within the service_cluster_ip_range CIDR
-range that is specified by flag to the API server.  If the IP address value is
-invalid, the apiserver returns a 422 HTTP status code to indicate that the
-value is invalid.
+request.  To do this, set the `spec.clusterIP` field. For example, if they
+already have an existing DNS entry that they wish to replace, or legacy systems
+that are configured for a specific IP address and difficult to re-configure.
+The IP address that a user chooses must be a valid IP address and within the
+service_cluster_ip_range CIDR range that is specified by flag to the API server.
+If the IP address value is invalid, the apiserver returns a 422 HTTP status code
+to indicate that the value is invalid.
 
 ### Why not use round-robin DNS?
 
@@ -280,7 +279,7 @@ records.
 
 Sometimes you don't need or want load-balancing and a single service IP.  In
 this case, you can create "headless" services by specifying `"None"` for the
-cluster IP (`spec.clusterIP` or `spec.portalIP` in v1beta3 and earlier APIs).
+cluster IP (`spec.clusterIP`).
 For such `Service`s, a cluster IP is not allocated and service-specific
 environment variables for `Pod`s are not created.  DNS is configured to return
 multiple A records (addresses) for the `Service` name, which point directly to
@@ -304,7 +303,7 @@ address.  Kubernetes supports two ways of doing this: `NodePort`s and
 Every `Service` has a `Type` field which defines how the `Service` can be
 accessed.  Valid values for this field are:
 
-   * `ClusterIP`: use a cluster-internal IP (portal) only - this is the default
+   * `ClusterIP`: use a cluster-internal IP only - this is the default
    * `NodePort`: use a cluster IP, but also expose the service on a port on each
      node of the cluster (the same port on each)
    * `LoadBalancer`: use a ClusterIP and a NodePort, but also ask the cloud
@@ -336,7 +335,7 @@ information about the provisioned balancer will be published in the `Service`'s
 ```json
 {
     "kind": "Service",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
         "name": "my-service"
     },
@@ -352,7 +351,7 @@ information about the provisioned balancer will be published in the `Service`'s
                 "nodePort": 30061
             }
         ],
-        "portalIP": "10.0.171.239",
+        "clusterIP": "10.0.171.239",
         "type": "LoadBalancer"
     },
     "status": {

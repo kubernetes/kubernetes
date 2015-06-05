@@ -40,7 +40,7 @@ $ kubectl run nginx --image=nginx --replicas=5
 $ kubectl run nginx --image=nginx --dry-run
 
 // Start a single instance of nginx, but overload the spec of the replication controller with a partial set of values parsed from JSON.
-$ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1beta3", "spec": { ... } }'`
+$ kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'`
 )
 
 func NewCmdRun(f *cmdutil.Factory, out io.Writer) *cobra.Command {

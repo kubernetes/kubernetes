@@ -17,8 +17,8 @@ As of Kubernetes 0.11, when you create a cluster the console output reports the 
 a URL for a [Kibana](http://www.elasticsearch.org/overview/kibana/) dashboard viewer for the logs that have been ingested
 into Elasticsearch.
 ```
-Elasticsearch is running at https://104.197.10.10/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging
-Kibana is running at https://104.197.10.10/api/v1beta3/proxy/namespaces/default/services/kibana-logging
+Elasticsearch is running at https://104.197.10.10/api/v1/proxy/namespaces/default/services/elasticsearch-logging
+Kibana is running at https://104.197.10.10/api/v1/proxy/namespaces/default/services/kibana-logging
 ```
 Visiting the Kibana dashboard URL in a browser should give a display like this:
 ![Kibana](kibana.png)
@@ -27,7 +27,7 @@ To learn how to query, filter etc. using Kibana you might like to look at this [
 
 You can check to see if any logs are being ingested into Elasticsearch by curling against its URL. You will need to provide the username and password that was generated when your cluster was created. This can be found in the `kubernetes_auth` file for your cluster.
 ```
-$ curl -k -u admin:Drt3KdRGnoQL6TQM https://130.211.152.93/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/_search?size=10
+$ curl -k -u admin:Drt3KdRGnoQL6TQM https://130.211.152.93/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_search?size=10
 ```
 A [demonstration](../examples/logging-demo/README.md) of two synthetic logging sources can be used
 to check that logging is working correctly.

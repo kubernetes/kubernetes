@@ -96,7 +96,7 @@ We'll follow the aws-coreos example. Create a pod manifest: `pod.json`
 
 ```
 {
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "kind": "Pod",
   "metadata": {
     "name": "hello",

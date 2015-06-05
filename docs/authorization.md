@@ -30,7 +30,7 @@ A request has 4 attributes that can be considered for authorization:
   - whether the request is readonly (GETs are readonly)
   - what resource is being accessed 
     - applies only to the API endpoints, such as 
-        `/api/v1beta3/namespaces/default/pods`.  For miscellaneous endpoints, like `/version`, the
+        `/api/v1/namespaces/default/pods`.  For miscellaneous endpoints, like `/version`, the
         resource is the empty string.
   - the namespace of the object being access, or the empty string if the
         endpoint does not support namespaced objects.

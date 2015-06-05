@@ -32,22 +32,22 @@ To retrieve the address of the Kubernetes master cluster and the proxy URLs for 
 $ kubectl cluster-info
 
   Kubernetes master is running at https://104.197.5.247
-  elasticsearch-logging is running at https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging
-  kibana-logging is running at https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/kibana-logging
-  kube-dns is running at https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/kube-dns
-  grafana is running at https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/monitoring-grafana
-  heapster is running at https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/monitoring-heapster
+  elasticsearch-logging is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging
+  kibana-logging is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/kibana-logging
+  kube-dns is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/kube-dns
+  grafana is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/monitoring-grafana
+  heapster is running at https://104.197.5.247/api/v1/proxy/namespaces/default/services/monitoring-heapster
 ```
 
-**Note**: Currently, adding trailing forward slashes '.../' to proxy URLs is required, for example: `https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/`.
+**Note**: Currently, adding trailing forward slashes '.../' to proxy URLs is required, for example: `https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/`.
 
 #### Manually constructing proxy URLs
 As mentioned above, you use the `kubectl cluster-info` command to retrieve the service's proxy URL. To create proxy URLs that include service endpoints, suffixes, and parameters, you simply append to the service's proxy URL:  
 `http://`*`kubernetes_master_address`*`/`*`service_path`*`/`*`service_name`*`/`*`service_endpoint-suffix-parameter`*
 ##### Examples
- * To access the Elasticsearch service endpoint `_search?q=user:kimchy`, you would use:   `http://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/_search?q=user:kimchy`
+ * To access the Elasticsearch service endpoint `_search?q=user:kimchy`, you would use:   `http://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_search?q=user:kimchy`
 
- * To access the Elasticsearch cluster health information `_cluster/health?pretty=true`, you would use:   `https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/_cluster/health?pretty=true`
+ * To access the Elasticsearch cluster health information `_cluster/health?pretty=true`, you would use:   `https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_cluster/health?pretty=true`
   ```
   {
 	 "cluster_name" : "kubernetes_logging",
@@ -79,10 +79,10 @@ Run `curl` commands using the following formats:
 For example, to get status information about the Elasticsearch logging service, you would run one of the following commands:
 
  * Basic authentication:
-`$ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/`
+`$ curl -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/`
 
  * Token authentication:
-`$ curl -k -H "Authorization: Bearer cvIH2BYtNS85QG0KSLHgl5Oba4YNQOrx" https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/`
+`$ curl -k -H "Authorization: Bearer cvIH2BYtNS85QG0KSLHgl5Oba4YNQOrx" https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/`
 
 The result for either authentication method:
 ```
@@ -104,7 +104,7 @@ The result for either authentication method:
 #### Using web browsers
 In a web browser, navigate to the proxy URL and then enter your username and password when prompted. For example, you would copy and paste the following proxy URL into the address bar of your browser:
 ```
-https://104.197.5.247/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging/
+https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/
 ```
 
 ## <a name="redirect"></a>Requesting redirects
@@ -123,7 +123,7 @@ To request a redirect and then verify the address that gets returned, let's run 
 
 To request a redirect for the Elasticsearch service, we can run the following `curl` command:
 ```
-user@oban:~$ curl -L -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging/
+user@oban:~$ curl -L -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1/redirect/namespaces/default/services/elasticsearch-logging/
 {
   "status" : 200,
   "name" : "Skin",
@@ -140,9 +140,9 @@ user@oban:~$ curl -L -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1be
 ```
 **Note**: We use the `-L` flag in the request so that `curl` follows the returned redirect address and retrieves the Elasticsearch service information.
 
-If we examine the actual redirect header (instead run the same `curl` command with `-v`), we see that the request to `https://104.197.5.247/api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging/` is redirected to `http://10.244.2.7:9200`:
+If we examine the actual redirect header (instead run the same `curl` command with `-v`), we see that the request to `https://104.197.5.247/api/v1/redirect/namespaces/default/services/elasticsearch-logging/` is redirected to `http://10.244.2.7:9200`:
 ```
-user@oban:~$ curl -v -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging/
+user@oban:~$ curl -v -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1/redirect/namespaces/default/services/elasticsearch-logging/
 * About to connect() to 104.197.5.247 port 443 (#0)
 *   Trying 104.197.5.247...
 * connected
@@ -168,7 +168,7 @@ user@oban:~$ curl -v -k -u admin:4mty0Vl9nNFfwLJz https://104.197.5.247/api/v1be
 * 	 issuer: CN=104.197.5.247@1425498024
 * 	 SSL certificate verify result: unable to get local issuer certificate (20), continuing anyway.
 * Server auth using Basic with user 'admin'
-> GET /api/v1beta3/redirect/namespaces/default/services/elasticsearch-logging HTTP/1.1
+> GET /api/v1/redirect/namespaces/default/services/elasticsearch-logging HTTP/1.1
 > Authorization: Basic YWRtaW46M210eTBWbDluTkZmd0xKeg==
 > User-Agent: curl/7.26.0
 > Host: 104.197.5.247

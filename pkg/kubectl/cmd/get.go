@@ -48,7 +48,7 @@ $ kubectl get replicationcontroller web
 $ kubectl get -o json pod web-pod-13je7
 
 // Return only the phase value of the specified pod.
-$ kubectl get -o template web-pod-13je7 --template={{.status.phase}} --api-version=v1beta3
+$ kubectl get -o template web-pod-13je7 --template={{.status.phase}} --api-version=v1
 
 // List all replication controllers and services together in ps output format.
 $ kubectl get rc,services
