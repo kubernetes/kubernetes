@@ -57,30 +57,30 @@ type AWSServices interface {
 
 // TODO: Should we rename this to AWS (EBS & ELB are not technically part of EC2)
 // Abstraction over EC2, to allow mocking/other implementations
+// Note that the DescribeX functions return a list, so callers don't need to deal with paging
 type EC2 interface {
 	// Query EC2 for instances matching the filter
-	Instances(instanceIds []string, filter *ec2InstanceFilter) (instances []*ec2.Instance, err error)
+	DescribeInstances(request *ec2.DescribeInstancesInput) ([]*ec2.Instance, error)
 
 	// Attach a volume to an instance
 	AttachVolume(volumeID, instanceId, mountDevice string) (resp *ec2.VolumeAttachment, err error)
 	// Detach a volume from an instance it is attached to
 	DetachVolume(request *ec2.DetachVolumeInput) (resp *ec2.VolumeAttachment, err error)
 	// Lists volumes
-	Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.DescribeVolumesOutput, err error)
+	DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.Volume, error)
 	// Create an EBS volume
 	CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error)
 	// Delete an EBS volume
 	DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput, err error)
 
-	DescribeSecurityGroups(groupIds []string, filterName string, filterVPCId string) ([]*ec2.SecurityGroup, error)
+	DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error)
 
-	// TODO(justinsb): Make all of these into pass-through methods, now that we have a much better binding
 	CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (*ec2.CreateSecurityGroupOutput, error)
 	AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error)
 
-	DescribeVPCs(*ec2.DescribeVPCsInput) (*ec2.DescribeVPCsOutput, error)
+	DescribeVPCs(*ec2.DescribeVPCsInput) ([]*ec2.VPC, error)
 
-	DescribeSubnets(*ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error)
+	DescribeSubnets(*ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error)
 }
 
 // This is a simple pass-through of the ELB client interface, which allows for testing
@@ -143,20 +143,6 @@ type AWSCloudConfig struct {
 
 		KubernetesClusterTag string
 	}
-}
-
-// Similar to ec2.Filter, but the filter values can be read from tests
-// (ec2.Filter only has private members)
-type ec2InstanceFilter struct {
-	PrivateDNSName string
-}
-
-// True if the passed instance matches the filter
-func (f *ec2InstanceFilter) Matches(instance *ec2.Instance) bool {
-	if f.PrivateDNSName != "" && orEmpty(instance.PrivateDNSName) != f.PrivateDNSName {
-		return false
-	}
-	return true
 }
 
 // awsSdkEC2 is an implementation of the EC2 interface, backed by aws-sdk-go
@@ -240,39 +226,29 @@ func newEc2Filter(name string, value string) *ec2.Filter {
 }
 
 // Implementation of EC2.Instances
-func (self *awsSdkEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (resp []*ec2.Instance, err error) {
-	var filters []*ec2.Filter
-	if filter != nil && filter.PrivateDNSName != "" {
-		filters = []*ec2.Filter{
-			newEc2Filter("private-dns-name", filter.PrivateDNSName),
-		}
-	}
-
-	fetchedInstances := []*ec2.Instance{}
+func (self *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*ec2.Instance, error) {
+	// Instances are paged
+	results := []*ec2.Instance{}
 	var nextToken *string
 
 	for {
-		res, err := self.ec2.DescribeInstances(&ec2.DescribeInstancesInput{
-			InstanceIDs: stringPointerArray(instanceIds),
-			Filters:     filters,
-			NextToken:   nextToken,
-		})
-
+		response, err := self.ec2.DescribeInstances(request)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error listing AWS instances: %v", err)
 		}
 
-		for _, reservation := range res.Reservations {
-			fetchedInstances = append(fetchedInstances, reservation.Instances...)
+		for _, reservation := range response.Reservations {
+			results = append(results, reservation.Instances...)
 		}
 
-		nextToken = res.NextToken
+		nextToken = response.NextToken
 		if isNilOrEmpty(nextToken) {
 			break
 		}
+		request.NextToken = nextToken
 	}
 
-	return fetchedInstances, nil
+	return results, nil
 }
 
 type awsSdkMetadata struct {
@@ -307,36 +283,16 @@ func (self *awsSdkMetadata) GetMetaData(key string) ([]byte, error) {
 }
 
 // Implements EC2.DescribeSecurityGroups
-func (s *awsSdkEC2) DescribeSecurityGroups(securityGroupIds []string, filterName string, filterVPCId string) ([]*ec2.SecurityGroup, error) {
-	filters := []*ec2.Filter{}
-	if filterName != "" {
-		filters = append(filters, newEc2Filter("group-name", filterName))
-	}
-	if filterVPCId != "" {
-		filters = append(filters, newEc2Filter("vpc-id", filterVPCId))
-	}
-
-	request := &ec2.DescribeSecurityGroupsInput{}
-	if len(securityGroupIds) != 0 {
-		request.GroupIDs = []*string{}
-		for _, securityGroupId := range securityGroupIds {
-			request.GroupIDs = append(request.GroupIDs, &securityGroupId)
-		}
-	}
-	if len(filters) != 0 {
-		request.Filters = filters
-	}
-
+func (s *awsSdkEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
+	// Security groups are not paged
 	response, err := s.ec2.DescribeSecurityGroups(request)
 	if err != nil {
-		glog.Error("error describing groups: ", err)
-		return nil, err
+		return nil, fmt.Errorf("error listing AWS security groups: %v", err)
 	}
 	return response.SecurityGroups, nil
 }
 
 func (s *awsSdkEC2) AttachVolume(volumeID, instanceId, device string) (resp *ec2.VolumeAttachment, err error) {
-
 	request := ec2.AttachVolumeInput{
 		Device:     &device,
 		InstanceID: &instanceId,
@@ -349,11 +305,28 @@ func (s *awsSdkEC2) DetachVolume(request *ec2.DetachVolumeInput) (*ec2.VolumeAtt
 	return s.ec2.DetachVolume(request)
 }
 
-func (s *awsSdkEC2) Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.DescribeVolumesOutput, err error) {
-	request := ec2.DescribeVolumesInput{
-		VolumeIDs: stringPointerArray(volumeIDs),
+func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.Volume, error) {
+	// Volumes are paged
+	results := []*ec2.Volume{}
+	var nextToken *string
+
+	for {
+		response, err := s.ec2.DescribeVolumes(request)
+
+		if err != nil {
+			return nil, fmt.Errorf("error listing AWS volumes: %v", err)
+		}
+
+		results = append(results, response.Volumes...)
+
+		nextToken = response.NextToken
+		if isNilOrEmpty(nextToken) {
+			break
+		}
+		request.NextToken = nextToken
 	}
-	return s.ec2.DescribeVolumes(&request)
+
+	return results, nil
 }
 
 func (s *awsSdkEC2) CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error) {
@@ -365,12 +338,22 @@ func (s *awsSdkEC2) DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput,
 	return s.ec2.DeleteVolume(&request)
 }
 
-func (s *awsSdkEC2) DescribeVPCs(request *ec2.DescribeVPCsInput) (*ec2.DescribeVPCsOutput, error) {
-	return s.ec2.DescribeVPCs(request)
+func (s *awsSdkEC2) DescribeVPCs(request *ec2.DescribeVPCsInput) ([]*ec2.VPC, error) {
+	// VPCs are not paged
+	response, err := s.ec2.DescribeVPCs(request)
+	if err != nil {
+		return nil, fmt.Errorf("error listing AWS VPCs: %v", err)
+	}
+	return response.VPCs, nil
 }
 
-func (s *awsSdkEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error) {
-	return s.ec2.DescribeSubnets(request)
+func (s *awsSdkEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
+	// Subnets are not paged
+	response, err := s.ec2.DescribeSubnets(request)
+	if err != nil {
+		return nil, fmt.Errorf("error listing AWS subnets: %v", err)
+	}
+	return response.Subnets, nil
 }
 
 func (s *awsSdkEC2) CreateSecurityGroup(request *ec2.CreateSecurityGroupInput) (*ec2.CreateSecurityGroupOutput, error) {
@@ -597,10 +580,15 @@ func (aws *AWSCloud) InstanceID(name string) (string, error) {
 
 // Return the instances matching the relevant private dns name.
 func (s *AWSCloud) getInstanceByDnsName(name string) (*ec2.Instance, error) {
-	f := &ec2InstanceFilter{}
-	f.PrivateDNSName = name
+	filters := []*ec2.Filter{
+		newEc2Filter("private-dns-name", name),
+	}
+	filters = s.addFilters(filters)
+	request := &ec2.DescribeInstancesInput{
+		Filters: filters,
+	}
 
-	instances, err := s.ec2.Instances(nil, f)
+	instances, err := s.ec2.DescribeInstances(request)
 	if err != nil {
 		return nil, err
 	}
@@ -650,8 +638,14 @@ func isAlive(instance *ec2.Instance) bool {
 }
 
 // Return a list of instances matching regex string.
-func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
-	instances, err := aws.ec2.Instances(nil, nil)
+func (s *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
+	filters := []*ec2.Filter{}
+	filters = s.addFilters(filters)
+	request := &ec2.DescribeInstancesInput{
+		Filters: filters,
+	}
+
+	instances, err := s.ec2.DescribeInstances(request)
 	if err != nil {
 		return []string{}, err
 	}
@@ -930,9 +924,14 @@ func (self *awsInstance) getInstanceType() *awsInstanceType {
 
 // Gets the full information about this instance from the EC2 API
 func (self *awsInstance) getInfo() (*ec2.Instance, error) {
-	instances, err := self.ec2.Instances([]string{self.awsID}, nil)
+	instanceID := self.awsID
+	request := &ec2.DescribeInstancesInput{
+		InstanceIDs: []*string{&instanceID},
+	}
+
+	instances, err := self.ec2.DescribeInstances(request)
 	if err != nil {
-		return nil, fmt.Errorf("error querying ec2 for instance info: %v", err)
+		return nil, err
 	}
 	if len(instances) == 0 {
 		return nil, fmt.Errorf("no instances found for instance: %s", self.awsID)
@@ -1061,17 +1060,23 @@ func newAWSDisk(ec2 EC2, name string) (*awsDisk, error) {
 
 // Gets the full information about this volume from the EC2 API
 func (self *awsDisk) getInfo() (*ec2.Volume, error) {
-	resp, err := self.ec2.Volumes([]string{self.awsID}, nil)
+	volumeID := self.awsID
+
+	request := &ec2.DescribeVolumesInput{
+		VolumeIDs: []*string{&volumeID},
+	}
+
+	volumes, err := self.ec2.DescribeVolumes(request)
 	if err != nil {
 		return nil, fmt.Errorf("error querying ec2 for volume info: %v", err)
 	}
-	if len(resp.Volumes) == 0 {
+	if len(volumes) == 0 {
 		return nil, fmt.Errorf("no volumes found for volume: %s", self.awsID)
 	}
-	if len(resp.Volumes) > 1 {
+	if len(volumes) > 1 {
 		return nil, fmt.Errorf("multiple volumes found for volume: %s", self.awsID)
 	}
-	return resp.Volumes[0], nil
+	return volumes[0], nil
 }
 
 func (self *awsDisk) waitForAttachmentStatus(status string) error {
@@ -1259,6 +1264,9 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 
 // Implements Volumes.CreateVolume
 func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
+	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
+	// This is only used for testing right now
+
 	request := &ec2.CreateVolumeInput{}
 	request.AvailabilityZone = &aws.availabilityZone
 	volSize := (int64(volumeOptions.CapacityMB) + 1023) / 1024
@@ -1340,20 +1348,16 @@ func (self *AWSCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 func (self *AWSCloud) findVPC() (*ec2.VPC, error) {
 	request := &ec2.DescribeVPCsInput{}
 
-	// TODO: How do we want to identify our VPC?  Issue #6006
 	name := "kubernetes-vpc"
-	request.Filters = []*ec2.Filter{newEc2Filter("tag:Name", name)}
+	filters := []*ec2.Filter{newEc2Filter("tag:Name", name)}
+	request.Filters = self.addFilters(filters)
 
-	response, err := self.ec2.DescribeVPCs(request)
+	vpcs, err := self.ec2.DescribeVPCs(request)
 	if err != nil {
 		glog.Error("error listing VPCs", err)
 		return nil, err
 	}
 
-	vpcs := response.VPCs
-	if err != nil {
-		return nil, err
-	}
 	if len(vpcs) == 0 {
 		return nil, nil
 	}
@@ -1367,7 +1371,11 @@ func (self *AWSCloud) findVPC() (*ec2.VPC, error) {
 // Returns true iff changes were made
 // The security group must already exist
 func (s *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, sourceIp string, ports []*api.ServicePort) (bool, error) {
-	groups, err := s.ec2.DescribeSecurityGroups([]string{securityGroupId}, "", "")
+	describeSecurityGroupsRequest := &ec2.DescribeSecurityGroupsInput{
+		GroupIDs: []*string{&securityGroupId},
+	}
+	// No filters as querying by id
+	groups, err := s.ec2.DescribeSecurityGroups(describeSecurityGroupsRequest)
 	if err != nil {
 		glog.Warning("error retrieving security group", err)
 		return false, err
@@ -1424,6 +1432,8 @@ func (s *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, sourceIp st
 		return false, nil
 	}
 
+	glog.V(2).Infof("Adding security group ingress: %s %v", securityGroupId, newPermissions)
+
 	request := &ec2.AuthorizeSecurityGroupIngressInput{}
 	request.GroupID = &securityGroupId
 	request.IPPermissions = newPermissions
@@ -1477,16 +1487,17 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 		request := &ec2.DescribeSubnetsInput{}
 		filters := []*ec2.Filter{}
 		filters = append(filters, newEc2Filter("vpc-id", orEmpty(vpc.VPCID)))
+		filters = s.addFilters(filters)
 		request.Filters = filters
 
-		response, err := s.ec2.DescribeSubnets(request)
+		subnets, err := s.ec2.DescribeSubnets(request)
 		if err != nil {
 			glog.Error("error describing subnets: ", err)
 			return nil, err
 		}
 
 		//	zones := []string{}
-		for _, subnet := range response.Subnets {
+		for _, subnet := range subnets {
 			subnetIds = append(subnetIds, subnet.SubnetID)
 			if !strings.HasPrefix(orEmpty(subnet.AvailabilityZone), region) {
 				glog.Error("found AZ that did not match region", orEmpty(subnet.AvailabilityZone), " vs ", region)
@@ -1497,9 +1508,9 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 	}
 
 	// Build the load balancer itself
-	var loadBalancerName, dnsName *string
+	var loadBalancer *elb.LoadBalancerDescription
 	{
-		loadBalancer, err := s.describeLoadBalancer(region, name)
+		loadBalancer, err = s.describeLoadBalancer(region, name)
 		if err != nil {
 			return nil, err
 		}
@@ -1529,8 +1540,6 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 
 			createRequest.Listeners = listeners
 
-			// TODO: Should we use a better identifier (the kubernetes uuid?)
-
 			// We are supposed to specify one subnet per AZ.
 			// TODO: What happens if we have more than one subnet per AZ?
 			createRequest.Subnets = subnetIds
@@ -1539,8 +1548,13 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 			sgDescription := "Security group for Kubernetes ELB " + name
 
 			{
-				// TODO: Should we do something more reliable ?? .Where("tag:kubernetes-id", kubernetesId)
-				securityGroups, err := s.ec2.DescribeSecurityGroups(nil, sgName, orEmpty(vpc.VPCID))
+				describeSecurityGroupsRequest := &ec2.DescribeSecurityGroupsInput{}
+				filters := []*ec2.Filter{
+					newEc2Filter("group-name", sgName),
+					newEc2Filter("vpc-id", orEmpty(vpc.VPCID)),
+				}
+				describeSecurityGroupsRequest.Filters = s.addFilters(filters)
+				securityGroups, err := s.ec2.DescribeSecurityGroups(describeSecurityGroupsRequest)
 				if err != nil {
 					return nil, err
 				}
@@ -1575,22 +1589,18 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 				createRequest.SecurityGroups = []*string{securityGroupId}
 			}
 
-			glog.Info("Creating load balancer with name: ", createRequest.LoadBalancerName)
-			createResponse, err := elbClient.CreateLoadBalancer(createRequest)
+			loadBalancer, err = s.describeLoadBalancer(region, name)
 			if err != nil {
+				glog.Warning("Unable to retrieve load balancer immediately after creation")
 				return nil, err
 			}
-			dnsName = createResponse.DNSName
-			loadBalancerName = createRequest.LoadBalancerName
 		} else {
 			// TODO: Verify that load balancer configuration matches?
-			dnsName = loadBalancer.DNSName
-			loadBalancerName = loadBalancer.LoadBalancerName
 		}
 	}
 
 	registerRequest := &elb.RegisterInstancesWithLoadBalancerInput{}
-	registerRequest.LoadBalancerName = loadBalancerName
+	registerRequest.LoadBalancerName = loadBalancer.LoadBalancerName
 	for _, instance := range instances {
 		registerInstance := &elb.Instance{}
 		registerInstance.InstanceID = instance.InstanceID
@@ -1601,14 +1611,15 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 	if err != nil {
 		// TODO: Is it better to delete the load balancer entirely?
 		glog.Warningf("Error registering instances with load-balancer %s: %v", name, err)
+		return nil, err
 	}
 
 	glog.V(1).Infof("Updated instances registered with load-balancer %s: %v", name, registerResponse.Instances)
-	glog.V(1).Infof("Loadbalancer %s has DNS name %s", name, dnsName)
+	glog.V(1).Infof("Loadbalancer %s has DNS name %s", name, orEmpty(loadBalancer.DNSName))
 
 	// TODO: Wait for creation?
 
-	status := toStatus(loadBalancerName, dnsName)
+	status := toStatus(loadBalancer)
 	return status, nil
 }
 
@@ -1623,16 +1634,16 @@ func (s *AWSCloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerSta
 		return nil, false, nil
 	}
 
-	status := toStatus(lb.LoadBalancerName, lb.DNSName)
+	status := toStatus(lb)
 	return status, true, nil
 }
 
-func toStatus(loadBalancerName *string, dnsName *string) *api.LoadBalancerStatus {
+func toStatus(lb *elb.LoadBalancerDescription) *api.LoadBalancerStatus {
 	status := &api.LoadBalancerStatus{}
 
-	if !isNilOrEmpty(dnsName) {
+	if !isNilOrEmpty(lb.DNSName) {
 		var ingress api.LoadBalancerIngress
-		ingress.Hostname = *dnsName
+		ingress.Hostname = orEmpty(lb.DNSName)
 		status.Ingress = []api.LoadBalancerIngress{ingress}
 	}
 
@@ -1755,4 +1766,13 @@ func (a *AWSCloud) getInstancesByDnsNames(names []string) ([]*ec2.Instance, erro
 		instances = append(instances, instance)
 	}
 	return instances, nil
+}
+
+// Add additional filters, to match on our tags
+// This lets us run multiple k8s clusters in a single EC2 AZ
+func (s *AWSCloud) addFilters(filters []*ec2.Filter) []*ec2.Filter {
+	for k, v := range s.filterTags {
+		filters = append(filters, newEc2Filter("tag:"+k, v))
+	}
+	return filters
 }
