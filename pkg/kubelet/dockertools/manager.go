@@ -1006,6 +1006,10 @@ func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin
 	return dm.execHandler.ExecInContainer(dm.client, container, cmd, stdin, stdout, stderr, tty)
 }
 
+func noPodInfraContainerError(podName, podNamespace string) error {
+	return fmt.Errorf("cannot find pod infra container in pod %q", kubecontainer.BuildPodFullName(podName, podNamespace))
+}
+
 // PortForward executes socat in the pod's network namespace and copies
 // data between stream (representing the user's local connection on their
 // computer) and the specified port in the container.
@@ -1017,7 +1021,7 @@ func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin
 func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	podInfraContainer := pod.FindContainerByName(PodInfraContainerName)
 	if podInfraContainer == nil {
-		return fmt.Errorf("cannot find pod infra container in pod %q", kubecontainer.BuildPodFullName(pod.Name, pod.Namespace))
+		return noPodInfraContainerError(pod.Name, pod.Namespace)
 	}
 	container, err := dm.client.InspectContainer(string(podInfraContainer.ID))
 	if err != nil {

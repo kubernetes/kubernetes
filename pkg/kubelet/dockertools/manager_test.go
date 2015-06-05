@@ -1914,3 +1914,26 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		t.Errorf("Wrong stopped container, expected: bar, get: %q", dockerName.ContainerName)
 	}
 }
+
+func TestPortForwardNoSuchContainer(t *testing.T) {
+	dm, _ := newTestDockerManager()
+
+	podName, podNamespace := "podName", "podNamespace"
+	err := dm.PortForward(
+		&kubecontainer.Pod{
+			ID:         "podID",
+			Name:       podName,
+			Namespace:  podNamespace,
+			Containers: nil,
+		},
+		5000,
+		nil,
+	)
+	if err == nil {
+		t.Fatal("unexpected non-error")
+	}
+	expectedErr := noPodInfraContainerError(podName, podNamespace)
+	if !reflect.DeepEqual(err, expectedErr) {
+		t.Fatalf("expected %v, but saw %v", expectedErr, err)
+	}
+}
