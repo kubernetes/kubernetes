@@ -19,14 +19,14 @@ create_token() {
   echo $(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
 }
 
-get_token_from_csv() {
+get_tokens_from_csv() {
   KUBE_BEARER_TOKEN=$(awk -F, '/admin/ {print $1}' ${KUBE_TEMP}/${1}_tokens.csv)
   KUBELET_TOKEN=$(awk -F, '/kubelet/ {print $1}' ${KUBE_TEMP}/${1}_tokens.csv)
   KUBE_PROXY_TOKEN=$(awk -F, '/kube_proxy/ {print $1}' ${KUBE_TEMP}/${1}_tokens.csv)
 }
 
 generate_admin_token() {
-  echo "$(create_token),admin,admin" >> ${KUBE_TEMP}/${1}_tokens.csv
+  echo "$(create_token),admin,admin" >> ${KUBE_TEMP}/known_tokens.csv
 }
 
 # Creates a csv file each time called (i.e one per kubelet).
