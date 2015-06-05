@@ -6,7 +6,7 @@
 may be a VM or physical machine, depending on the cluster. Each node has
 the services necessary to run [Pods](pods.md) and be managed from the master
 systems. The services include docker, kubelet and network proxy. See
-[The Kubernetes Node](../DESIGN.md#the-kubernetes-node) section in design
+[The Kubernetes Node](design/architecture.md#the-kubernetes-node) section in design
 doc for more details.
 
 ## Node Status
