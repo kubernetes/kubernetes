@@ -31,6 +31,7 @@ function generate-minion-user-data {
   echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
   echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
   echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
+  echo "readonly DOCKER_STORAGE='${DOCKER_STORAGE:-}'"
   grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
   grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
   grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"

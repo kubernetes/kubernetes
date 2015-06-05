@@ -50,5 +50,24 @@ Please note: Do not set this to "false" unless you...
 - ... already configured a route for "YOUR_IP/32" to an AWS internet gateway (for the master instance to reach your
   client directly during setup)
 
+## DOCKER_STORAGE
+
+Choose the docker storage driver to use.  This is an advanced option; most people should leave it as the default aufs
+for parity with GCE.
+
+Supported values: btrfs, aufs, devicemapper, aufs-nolvm
+
+This will also configure your ephemeral storage in a compatible way, and your Docker containers
+will run on this storage if available, as typically the root disk is comparatively small.
+
+* `btrfs` will combine your ephemeral disks into a btrfs volume.  This is a good option if you have a recent kernel
+  with a reliable btrfs.
+* `aufs` uses the aufs driver, but also installs LVM to combine your disks. `aufs-nolvm` will not use LVM,
+ meaning that only your first ephemeral disk will be used.
+* `devicemapper` sets up LVM across all your ephemeral disks and sets Docker to drive it directly.  This is a
+  similar option to btrfs, but without relying on the btrfs filesystem.  Sadly, it does not work with most
+  configurations - see [this docker bug](https://github.com/docker/docker/issues/4036)
+
+If your machines don't have any ephemeral disks, this will default to the aufs driver on your root disk (with no LVM).
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/aws/options.md?pixel)]()
