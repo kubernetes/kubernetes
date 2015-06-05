@@ -184,9 +184,7 @@ func TestDockerConfigEntryJSONCompatibleEncode(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		toEncode := tt.input.ConvertToDockerConfigCompatible()
-
-		actual, err := json.Marshal(toEncode)
+		actual, err := json.Marshal(tt.input)
 		if err != nil {
 			t.Errorf("case %d: unexpected error: %v", i, err)
 		}
