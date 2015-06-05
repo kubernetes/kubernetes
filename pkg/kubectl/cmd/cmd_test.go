@@ -66,7 +66,8 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName("", "Type", &internalType{})
 	scheme.AddKnownTypeWithName("unlikelyversion", "Type", &externalType{})
-	scheme.AddKnownTypeWithName("v1beta1", "Type", &ExternalType2{})
+	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
+	scheme.AddKnownTypeWithName(testapi.Version(), "Type", &ExternalType2{})
 
 	codec := runtime.CodecFor(scheme, "unlikelyversion")
 	validVersion := testapi.Version()
