@@ -1,6 +1,6 @@
 # Elasticsearch/Kibana Logging Demonstration
-This directory contains two pod specifications which can be used as synthetic
-loggig sources. The pod specification in [synthetic_0_25lps.yaml](synthetic_0_25lps.yaml)
+This directory contains two [pod](../../docs/pods.md) specifications which can be used as synthetic
+logging sources. The pod specification in [synthetic_0_25lps.yaml](synthetic_0_25lps.yaml)
 describes a pod that just emits a log message once every 4 seconds:
 ```
 # This pod specification creates an instance of a synthetic logger. The logger
@@ -49,7 +49,7 @@ synthetic-logger-10lps-pod
 Visiting the Kibana dashboard should make it clear that logs are being collected from the two synthetic loggers:
 ![Synthetic loggers](synth-logger.png)
 
-You can report the running pods, replication controllers and services with another Makefile rule:
+You can report the running pods, [replication controllers](../../docs/replication-controller.md), and [services](../../docs/services.md) with another Makefile rule:
 ```
 $ make get
 ../../../kubectl.sh get pods

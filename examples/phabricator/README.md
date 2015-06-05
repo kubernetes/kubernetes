@@ -6,7 +6,7 @@ The example combines a web frontend and an external service that provides MySQL 
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have a basic understanding of kubernetes services and that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
+This example assumes that you have a basic understanding of kubernetes [services](../../docs/services.md) and that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides):
 
 ```shell
 $ cd kubernetes
@@ -21,7 +21,7 @@ In the remaining part of this example we will assume that your instance is named
 
 ### Step Two: Turn up the phabricator
 
-To start Phabricator server use the file [`examples/phabricator/phabricator-controller.json`](phabricator-controller.json) which describes a replication controller with a single pod running an Apache server with Phabricator PHP source:
+To start Phabricator server use the file [`examples/phabricator/phabricator-controller.json`](phabricator-controller.json) which describes a [replication controller](../../docs/replication-controller.md) with a single [pod](../../docs/pods.md) running an Apache server with Phabricator PHP source:
 
 ```js
 {
