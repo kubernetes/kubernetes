@@ -91,6 +91,20 @@ fi
 
 VERSION_FILE="${KUBE_ROOT}/pkg/version/base.go"
 
+RELEASE_DIR=release-${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
+echo "+++ Cloning documentation and examples into ${RELEASE_DIR}/..."
+mkdir ${RELEASE_DIR}
+cp -r docs ${RELEASE_DIR}/docs
+cp -r examples ${RELEASE_DIR}/examples
+
+# Update the docs to match this version.
+perl -pi -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" ${RELEASE_DIR}/docs/README.md
+perl -pi -e "s/HEAD/${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}/" ${RELEASE_DIR}/examples/README.md
+
+${KUBE_ROOT}/hack/run-gendocs.sh
+git add ${RELEASE_DIR}
+git commit -m "Cloning docs for ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+
 GIT_MINOR="${VERSION_MINOR}.${VERSION_PATCH}"
 echo "+++ Updating to ${NEW_VERSION}"
 "$SED" -r -i -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
