@@ -234,8 +234,11 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		},
 		func(pv *api.PersistentVolume, c fuzz.Continue) {
 			c.FuzzNoCustom(pv) // fuzz self without calling this function again
-			types := []api.PersistentVolumePhase{api.VolumePending, api.VolumeBound, api.VolumeReleased, api.VolumeAvailable}
+			types := []api.PersistentVolumePhase{api.VolumeAvailable, api.VolumePending, api.VolumeBound, api.VolumeReleased, api.VolumeFailed}
 			pv.Status.Phase = types[c.Rand.Intn(len(types))]
+			pv.Status.Message = c.RandString()
+			reclamationPolicies := []api.PersistentVolumeReclaimPolicy{api.PersistentVolumeReclaimRecycle, api.PersistentVolumeReclaimRetain}
+			pv.Spec.PersistentVolumeReclaimPolicy = reclamationPolicies[c.Rand.Intn(len(reclamationPolicies))]
 		},
 		func(pvc *api.PersistentVolumeClaim, c fuzz.Continue) {
 			c.FuzzNoCustom(pvc) // fuzz self without calling this function again
