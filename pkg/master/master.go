@@ -854,7 +854,7 @@ func (m *Master) setupSecureProxy(user, keyfile string) {
 				sleep = time.Second
 			} else {
 				// tunnels could lag behind current set of nodes
-				sleep = time.Minute
+				sleep = 10 * time.Second
 			}
 			time.Sleep(sleep)
 		}
