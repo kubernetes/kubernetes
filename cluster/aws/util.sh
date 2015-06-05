@@ -44,6 +44,9 @@ INTERNAL_IP_BASE=172.20.0
 MASTER_IP_SUFFIX=.9
 MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
 
+MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
+MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
+
 function json_val {
     python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
 }
@@ -102,6 +105,17 @@ function get_instance_private_ip {
     --query Reservations[].Instances[].NetworkInterfaces[0].PrivateIpAddress
 }
 
+# Gets a security group id, by name ($1)
+function get_security_group_id {
+  local name=$1
+  $AWS_CMD --output text describe-security-groups \
+           --filters Name=vpc-id,Values=${VPC_ID} \
+                     Name=group-name,Values=${name} \
+                     Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+           --query SecurityGroups[].GroupId \
+  | tr "\t" "\n"
+}
+
 function detect-master () {
   KUBE_MASTER=${MASTER_NAME}
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
@@ -129,6 +143,27 @@ function detect-minions () {
   if [[ -z "$KUBE_MINION_IP_ADDRESSES" ]]; then
     echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
+  fi
+}
+
+function detect-security-groups {
+  if [[ -z "${MASTER_SG_ID-}" ]]; then
+    MASTER_SG_ID=$(get_security_group_id "${MASTER_SG_NAME}")
+    if [[ -z "${MASTER_SG_ID}" ]]; then
+      echo "Could not detect Kubernetes master security group.  Make sure you've launched a cluster with 'kube-up.sh'"
+      exit 1
+    else
+      echo "Using master security group: ${MASTER_SG_NAME} ${MASTER_SG_ID}"
+    fi
+  fi
+  if [[ -z "${MINION_SG_ID-}" ]]; then
+    MINION_SG_ID=$(get_security_group_id "${MINION_SG_NAME}")
+    if [[ -z "${MINION_SG_ID}" ]]; then
+      echo "Could not detect Kubernetes minion security group.  Make sure you've launched a cluster with 'kube-up.sh'"
+      exit 1
+    else
+      echo "Using minion security group: ${MINION_SG_NAME} ${MINION_SG_ID}"
+    fi
   fi
 }
 
@@ -218,6 +253,43 @@ function import-public-key {
     # Idempotency: ignore if duplicate name
     if [[ "${output}" != *"InvalidKeyPair.Duplicate"* ]]; then
       echo "Error importing public key"
+      echo "Output: ${output}"
+      exit 1
+    fi
+  fi
+}
+
+# Robustly try to create a security group, if it does not exist.
+# $1: The name of security group; will be created if not exists
+# $2: Description for security group (used if created)
+#
+# Note that this doesn't actually return the sgid; we need to re-query
+function create-security-group {
+  local -r name=$1
+  local -r description=$2
+
+  local sgid=$(get_security_group_id "${name}")
+  if [[ -z "$sgid" ]]; then
+	  echo "Creating security group ${name}."
+	  sgid=$($AWS_CMD create-security-group --group-name "${name}" --description "${description}" --vpc-id "${VPC_ID}" --query GroupId --output text)
+	  add-tag $sgid KubernetesCluster ${CLUSTER_ID}
+  fi
+}
+
+# Authorize ingress to a security group.
+# Attempts to be idempotent, though we end up checking the output looking for error-strings.
+# $1 group-id
+# $2.. arguments to pass to authorize-security-group-ingress
+function authorize-security-group-ingress {
+  local -r sgid=$1
+  shift
+  local ok=1
+  local output=""
+  output=$($AWS_CMD authorize-security-group-ingress --group-id "${sgid}" $@ 2>&1) || ok=0
+  if [[ ${ok} == 0 ]]; then
+    # Idempotency: ignore if duplicate rule
+    if [[ "${output}" != *"InvalidPermission.Duplicate"* ]]; then
+      echo "Error creating security group ingress rule"
       echo "Output: ${output}"
       exit 1
     fi
@@ -508,12 +580,13 @@ function kube-up {
 
   echo "Using VPC $VPC_ID"
 
-  SUBNET_ID=$($AWS_CMD describe-subnets | get_subnet_id $VPC_ID $ZONE)
+  SUBNET_ID=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_subnet_id $VPC_ID $ZONE)
   if [[ -z "$SUBNET_ID" ]]; then
     echo "Creating subnet."
     SUBNET_ID=$($AWS_CMD create-subnet --cidr-block $INTERNAL_IP_BASE.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
+    add-tag $SUBNET_ID KubernetesCluster ${CLUSTER_ID}
   else
-    EXISTING_CIDR=$($AWS_CMD describe-subnets | get_cidr $VPC_ID $ZONE)
+    EXISTING_CIDR=$($AWS_CMD describe-subnets --filters Name=tag:KubernetesCluster,Values=${CLUSTER_ID} | get_cidr $VPC_ID $ZONE)
     echo "Using existing CIDR $EXISTING_CIDR"
     INTERNAL_IP_BASE=${EXISTING_CIDR%.*}
     MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
@@ -540,17 +613,39 @@ function kube-up {
 
   echo "Using Route Table $ROUTE_TABLE_ID"
 
-  SEC_GROUP_ID=$($AWS_CMD --output text describe-security-groups \
-                          --filters Name=vpc-id,Values=$VPC_ID \
-                                    Name=group-name,Values=kubernetes-sec-group \
-                          --query SecurityGroups[].GroupId \
-                    | tr "\t" "\n")
-
-  if [[ -z "$SEC_GROUP_ID" ]]; then
-	  echo "Creating security group."
-	  SEC_GROUP_ID=$($AWS_CMD create-security-group --group-name kubernetes-sec-group --description kubernetes-sec-group --vpc-id $VPC_ID | json_val '["GroupId"]')
-	  $AWS_CMD authorize-security-group-ingress --group-id $SEC_GROUP_ID --protocol -1 --port all --cidr 0.0.0.0/0 > $LOG
+  # Create security groups
+  MASTER_SG_ID=$(get_security_group_id "${MASTER_SG_NAME}")
+  if [[ -z "${MASTER_SG_ID}" ]]; then
+    echo "Creating master security group."
+    create-security-group "${MASTER_SG_NAME}" "Kubernetes security group applied to master nodes"
   fi
+  MINION_SG_ID=$(get_security_group_id "${MINION_SG_NAME}")
+  if [[ -z "${MINION_SG_ID}" ]]; then
+    echo "Creating minion security group."
+    create-security-group "${MINION_SG_NAME}" "Kubernetes security group applied to minion nodes"
+  fi
+
+  detect-security-groups
+
+  # Masters can talk to master
+  authorize-security-group-ingress "${MASTER_SG_ID}" "--source-group ${MASTER_SG_ID} --protocol all"
+
+  # Minions can talk to minions
+  authorize-security-group-ingress "${MINION_SG_ID}" "--source-group ${MINION_SG_ID} --protocol all"
+
+  # Masters and minions can talk to each other
+  authorize-security-group-ingress "${MASTER_SG_ID}" "--source-group ${MINION_SG_ID} --protocol all"
+  authorize-security-group-ingress "${MINION_SG_ID}" "--source-group ${MASTER_SG_ID} --protocol all"
+
+  # TODO(justinsb): Would be fairly easy to replace 0.0.0.0/0 in these rules
+
+  # SSH is open to the world
+  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
+
+  # HTTPS to the master is allowed (for API access)
+  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
+
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
     echo "#! /bin/bash"
@@ -594,7 +689,7 @@ function kube-up {
     --subnet-id $SUBNET_ID \
     --private-ip-address $MASTER_INTERNAL_IP \
     --key-name ${AWS_SSH_KEY_NAME} \
-    --security-group-ids $SEC_GROUP_ID \
+    --security-group-ids ${MASTER_SG_ID} \
     --associate-public-ip-address \
     --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
   add-tag $master_id Name $MASTER_NAME
@@ -675,7 +770,7 @@ function kube-up {
       --subnet-id $SUBNET_ID \
       --private-ip-address $INTERNAL_IP_BASE.1${i} \
       --key-name ${AWS_SSH_KEY_NAME} \
-      --security-group-ids $SEC_GROUP_ID \
+      --security-group-ids ${MINION_SG_ID} \
       ${public_ip_option} \
       --user-data "file://${KUBE_TEMP}/minion-user-data-${i}" | json_val '["Instances"][0]["InstanceId"]')
 
@@ -847,22 +942,43 @@ function kube-down {
 
     echo "Deleting VPC: ${vpc_id}"
     default_sg_id=$($AWS_CMD --output text describe-security-groups \
-                             --filters Name=vpc-id,Values=${vpc_id} Name=group-name,Values=default \
+                             --filters Name=vpc-id,Values=${vpc_id} \
+                                       Name=group-name,Values=default \
                              --query SecurityGroups[].GroupId \
                     | tr "\t" "\n")
     sg_ids=$($AWS_CMD --output text describe-security-groups \
                       --filters Name=vpc-id,Values=${vpc_id} \
+                                Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
                       --query SecurityGroups[].GroupId \
              | tr "\t" "\n")
+    # First delete any inter-security group ingress rules
+    # (otherwise we get dependency violations)
     for sg_id in ${sg_ids}; do
       # EC2 doesn't let us delete the default security group
-      if [[ "${sg_id}" != "${default_sg_id}" ]]; then
-        $AWS_CMD delete-security-group --group-id ${sg_id} > $LOG
+      if [[ "${sg_id}" == "${default_sg_id}" ]]; then
+        continue
       fi
+
+      echo "Cleaning up security group: ${sg_id}"
+      other_sgids=$(aws ec2 describe-security-groups --group-id "${sg_id}" --query SecurityGroups[].IpPermissions[].UserIdGroupPairs[].GroupId --output text)
+      for other_sgid in ${other_sgids}; do
+        $AWS_CMD revoke-security-group-ingress --group-id "${sg_id}" --source-group "${other_sgid}" --protocol all > $LOG
+      done
+    done
+
+    for sg_id in ${sg_ids}; do
+      # EC2 doesn't let us delete the default security group
+      if [[ "${sg_id}" == "${default_sg_id}" ]]; then
+        continue
+      fi
+
+      echo "Deleting security group: ${sg_id}"
+      $AWS_CMD delete-security-group --group-id ${sg_id} > $LOG
     done
 
     subnet_ids=$($AWS_CMD --output text describe-subnets \
                           --filters Name=vpc-id,Values=${vpc_id} \
+                                    Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
                           --query Subnets[].SubnetId \
              | tr "\t" "\n")
     for subnet_id in ${subnet_ids}; do
@@ -940,12 +1056,25 @@ function test-build-release {
 # Assumed vars:
 #   Variables from config.sh
 function test-setup {
+  VPC_ID=$(get_vpc_id)
+  detect-security-groups
+
+  # Open up port 80 & 8080 so common containers on minions can be reached
+  # TODO(roberthbailey): Remove this once we are no longer relying on hostPorts.
+  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 80 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol tcp --port 8080 --cidr 0.0.0.0/0"
+
+  # Open up the NodePort range
+  # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
+  authorize-security-group-ingress "${MINION_SG_ID}" "--protocol all --port 30000-32767 --cidr 0.0.0.0/0"
+
   echo "test-setup complete"
 }
 
 # Execute after running tests to perform any required clean-up. This is called
 # from hack/e2e.go
 function test-teardown {
+  # (ingress rules will be deleted along with the security group)
   echo "Shutting down test cluster."
   "${KUBE_ROOT}/cluster/kube-down.sh"
 }

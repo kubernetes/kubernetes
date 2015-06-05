@@ -28,6 +28,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/golang/glog"
 )
 
 const TestClusterId = "clusterid.test"
@@ -234,23 +235,58 @@ type FakeEC2 struct {
 	aws *FakeAWSServices
 }
 
-func contains(haystack []string, needle string) bool {
+func contains(haystack []*string, needle string) bool {
 	for _, s := range haystack {
-		if needle == s {
+		// (deliberately panic if s == nil)
+		if needle == *s {
 			return true
 		}
 	}
 	return false
 }
 
-func (self *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (instances []*ec2.Instance, err error) {
+func instanceMatchesFilter(instance *ec2.Instance, filter *ec2.Filter) bool {
+	name := *filter.Name
+	if name == "private-dns-name" {
+		if instance.PrivateDNSName == nil {
+			return false
+		}
+		return contains(filter.Values, *instance.PrivateDNSName)
+	}
+	panic("Unknown filter name: " + name)
+}
+
+func (self *FakeEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*ec2.Instance, error) {
 	matches := []*ec2.Instance{}
 	for _, instance := range self.aws.instances {
-		if filter != nil && !filter.Matches(instance) {
-			continue
+		if request.InstanceIDs != nil {
+			if instance.InstanceID == nil {
+				glog.Warning("Instance with no instance id: ", instance)
+				continue
+			}
+
+			found := false
+			for _, instanceId := range request.InstanceIDs {
+				if *instanceId == *instance.InstanceID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
 		}
-		if instanceIds != nil && !contains(instanceIds, *instance.InstanceID) {
-			continue
+		if request.Filters != nil {
+			allMatch := true
+			for _, filter := range request.Filters {
+				if !instanceMatchesFilter(instance, filter) {
+					allMatch = false
+					break
+				}
+			}
+			if !allMatch {
+				continue
+			}
 		}
 		matches = append(matches, instance)
 	}
@@ -280,7 +316,7 @@ func (ec2 *FakeEC2) DetachVolume(request *ec2.DetachVolumeInput) (resp *ec2.Volu
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.DescribeVolumesOutput, err error) {
+func (ec2 *FakeEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.Volume, error) {
 	panic("Not implemented")
 }
 
@@ -292,7 +328,7 @@ func (ec2 *FakeEC2) DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput,
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeSecurityGroups(groupIds []string, filterName string, filterVpcId string) ([]*ec2.SecurityGroup, error) {
+func (ec2 *FakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
 	panic("Not implemented")
 }
 
@@ -300,15 +336,27 @@ func (ec2 *FakeEC2) CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (*ec2.Cre
 	panic("Not implemented")
 }
 
+func (ec2 *FakeEC2) DeleteSecurityGroup(*ec2.DeleteSecurityGroupInput) (*ec2.DeleteSecurityGroupOutput, error) {
+	panic("Not implemented")
+}
+
 func (ec2 *FakeEC2) AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeVPCs(*ec2.DescribeVPCsInput) (*ec2.DescribeVPCsOutput, error) {
+func (ec2 *FakeEC2) RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (*ec2.RevokeSecurityGroupIngressOutput, error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeSubnets(*ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error) {
+func (ec2 *FakeEC2) DescribeVPCs(*ec2.DescribeVPCsInput) ([]*ec2.VPC, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DescribeSubnets(*ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
 	panic("Not implemented")
 }
 
