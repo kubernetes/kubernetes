@@ -293,7 +293,7 @@ they desire, but leaves them freedom to do discovery in their own way.
 Applications can still use a self-registration pattern and adapters for other
 discovery systems could easily be built upon this API.
 
-## External services
+##<a name="external"></a>External services
 
 For some parts of your application (e.g. frontends) you may want to expose a
 Service onto an external (outside of your cluster, maybe public internet) IP
