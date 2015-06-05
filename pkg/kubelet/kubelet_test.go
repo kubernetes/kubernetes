@@ -448,62 +448,6 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 	return kubecontainer.HashContainer(container)
 }
 
-func TestSyncPodsWithTerminationLog(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	testKubelet.fakeCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorApiv2.FsInfo{}, nil)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-	container := api.Container{
-		Name: "bar",
-		TerminationMessagePath: "/dev/somepath",
-	}
-	fakeDocker.ContainerList = []docker.APIContainers{}
-	pods := []*api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:       "12345678",
-				Name:      "foo",
-				Namespace: "new",
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					container,
-				},
-			},
-		},
-	}
-	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
-		// Get pod status.
-		"list", "inspect_image",
-		// Create pod infra container.
-		"create", "start", "inspect_container",
-		// Create container.
-		"create", "start", "inspect_container",
-		// Get pod status.
-		"list", "inspect_container", "inspect_container",
-		// Get pods for deleting orphaned volumes.
-		"list",
-	})
-
-	fakeDocker.Lock()
-	parts := strings.Split(fakeDocker.Container.HostConfig.Binds[0], ":")
-	if !matchString(t, kubelet.getPodContainerDir("12345678", "bar")+"/k8s_bar\\.[a-f0-9]", parts[0]) {
-		t.Errorf("Unexpected host path: %s", parts[0])
-	}
-	if parts[1] != "/dev/somepath" {
-		t.Errorf("Unexpected container path: %s", parts[1])
-	}
-	fakeDocker.Unlock()
-}
-
 func matchString(t *testing.T, pattern, str string) bool {
 	match, err := regexp.MatchString(pattern, str)
 	if err != nil {

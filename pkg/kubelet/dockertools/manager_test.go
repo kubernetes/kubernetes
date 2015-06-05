@@ -19,7 +19,9 @@ package dockertools
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"regexp"
 	"sort"
@@ -84,8 +86,19 @@ type fakeOptionGenerator struct{}
 
 var _ kubecontainer.RunContainerOptionsGenerator = &fakeOptionGenerator{}
 
+var testPodContainerDir string
+
 func (*fakeOptionGenerator) GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*kubecontainer.RunContainerOptions, error) {
-	return &kubecontainer.RunContainerOptions{}, nil
+	var opts kubecontainer.RunContainerOptions
+	var err error
+	if len(container.TerminationMessagePath) != 0 {
+		testPodContainerDir, err = ioutil.TempDir("", "fooPodContainerDir")
+		if err != nil {
+			return nil, err
+		}
+		opts.PodContainerDir = testPodContainerDir
+	}
+	return &opts, nil
 }
 
 func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManager, *FakeDockerClient) {
@@ -1935,5 +1948,47 @@ func TestPortForwardNoSuchContainer(t *testing.T) {
 	expectedErr := noPodInfraContainerError(podName, podNamespace)
 	if !reflect.DeepEqual(err, expectedErr) {
 		t.Fatalf("expected %v, but saw %v", expectedErr, err)
+	}
+}
+
+func TestSyncPodWithTerminationLog(t *testing.T) {
+	dm, fakeDocker := newTestDockerManager()
+	container := api.Container{
+		Name: "bar",
+		TerminationMessagePath: "/dev/somepath",
+	}
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				container,
+			},
+		},
+	}
+
+	runSyncPod(t, dm, fakeDocker, pod)
+	verifyCalls(t, fakeDocker, []string{
+		// Create pod infra container.
+		"create", "start", "inspect_container",
+		// Create container.
+		"create", "start", "inspect_container",
+	})
+
+	defer os.Remove(testPodContainerDir)
+
+	fakeDocker.Lock()
+	defer fakeDocker.Unlock()
+
+	parts := strings.Split(fakeDocker.Container.HostConfig.Binds[0], ":")
+	if !matchString(t, testPodContainerDir+"/k8s_bar\\.[a-f0-9]", parts[0]) {
+		t.Errorf("Unexpected host path: %s", parts[0])
+	}
+	if parts[1] != "/dev/somepath" {
+		t.Errorf("Unexpected container path: %s", parts[1])
 	}
 }
