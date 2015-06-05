@@ -225,7 +225,7 @@ func setDefaults(c *Config) {
 		}
 		c.ServiceClusterIPRange = serviceClusterIPRange
 	}
-	if c.ServiceNodePortRange.Size == 0 {
+	if c.ServiceNodePortRange == nil {
 		// TODO: Currently no way to specify an empty range (do we need to allow this?)
 		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
 		// but then that breaks the strict nestedness of ServiceType.
