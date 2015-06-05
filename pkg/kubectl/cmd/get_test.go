@@ -147,34 +147,40 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 // api.Scheme, which may not have access to all objects, and not all objects are at the same
 // internal versioning scheme. This test verifies that two isolated schemes (Test, and api.Scheme)
 // can be conjoined into a single output object.
+//
+// The expected behavior of the `kubectl get` command is:
+// 1. objects using unrecognized schemes will always be returned using that scheme/version, "unlikelyversion" in this test;
+// 2. if the specified output-version is a recognized, valid Scheme, then the list should use that scheme, and otherwise it will default to the client version, latest.Version in this test;
+// 3a. if the specified output-version is a recognized, valid Scheme, in which the requested object (replicationcontroller) can be represented, then the object should be returned using that version;
+// 3b. otherwise if the specified output-version is unrecognized, but the requested object (replicationcontroller) is recognized by the client's codec, then it will be converted to the client version, latest.Version in this test.
 func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 	testCases := map[string]struct {
-		output string
-		list   string
-		obj1   string
-		obj2   string
+		outputVersion   string
+		listVersion     string
+		testtypeVersion string
+		rcVersion       string
 	}{
 		"handles specific version": {
-			output: "v1",
-			list:   "v1",
-			obj1:   "unlikelyversion",
-			obj2:   "v1",
+			outputVersion:   latest.Version,
+			listVersion:     latest.Version,
+			testtypeVersion: "unlikelyversion",
+			rcVersion:       latest.Version,
 		},
 		"handles second specific version": {
-			output: "unlikelyversion",
-			list:   "v1beta3",
-			obj1:   "unlikelyversion", // doesn't have v1beta3
-			obj2:   "v1beta3",         // version of the API response
+			outputVersion:   "unlikelyversion",
+			listVersion:     latest.Version,
+			testtypeVersion: "unlikelyversion",
+			rcVersion:       latest.Version, // see expected behavior 3b
 		},
 		"handles common version": {
-			output: "v1beta3",
-			list:   "v1beta3",
-			obj1:   "unlikelyversion", // because test scheme defaults to unlikelyversion
-			obj2:   "v1beta3",
+			outputVersion:   testapi.Version(),
+			listVersion:     testapi.Version(),
+			testtypeVersion: "unlikelyversion",
+			rcVersion:       testapi.Version(),
 		},
 	}
 	for k, test := range testCases {
-		apiCodec := runtime.CodecFor(api.Scheme, "v1beta3")
+		apiCodec := runtime.CodecFor(api.Scheme, testapi.Version())
 		regularClient := &client.FakeRESTClient{
 			Codec: apiCodec,
 			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
@@ -196,7 +202,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		cmd := NewCmdGet(f, buf)
 		cmd.SetOutput(buf)
 		cmd.Flags().Set("output", "json")
-		cmd.Flags().Set("output-version", test.output)
+		cmd.Flags().Set("output-version", test.outputVersion)
 		err := RunGet(f, buf, cmd, []string{"type/foo", "replicationcontrollers/foo"})
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", k, err)
@@ -207,14 +213,14 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 			t.Errorf("%s: unexpected error: %v\n%s", k, err, buf.String())
 			continue
 		}
-		if out["apiVersion"] != test.list {
+		if out["apiVersion"] != test.listVersion {
 			t.Errorf("%s: unexpected list: %#v", k, out)
 		}
 		arr := out["items"].([]interface{})
-		if arr[0].(map[string]interface{})["apiVersion"] != test.obj1 {
+		if arr[0].(map[string]interface{})["apiVersion"] != test.testtypeVersion {
 			t.Errorf("%s: unexpected list: %#v", k, out)
 		}
-		if arr[1].(map[string]interface{})["apiVersion"] != test.obj2 {
+		if arr[1].(map[string]interface{})["apiVersion"] != test.rcVersion {
 			t.Errorf("%s: unexpected list: %#v", k, out)
 		}
 	}
