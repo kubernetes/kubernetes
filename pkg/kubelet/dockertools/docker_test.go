@@ -22,6 +22,7 @@ import (
 	"hash/adler32"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -31,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/docker/docker/pkg/jsonmessage"
 	docker "github.com/fsouza/go-dockerclient"
 )
 
@@ -234,6 +236,40 @@ func TestPullWithNoSecrets(t *testing.T) {
 
 		if e, a := test.expectedImage, fakeClient.pulled[0]; e != a {
 			t.Errorf("%s: expected pull of %q, but got %q", test.imageName, e, a)
+		}
+	}
+}
+
+func TestPullWithJSONError(t *testing.T) {
+	tests := map[string]struct {
+		imageName     string
+		err           error
+		expectedError string
+	}{
+		"Json error": {
+			"ubuntu",
+			&jsonmessage.JSONError{Code: 50, Message: "Json error"},
+			"Json error",
+		},
+		"Bad gateway": {
+			"ubuntu",
+			&jsonmessage.JSONError{Code: 502, Message: "<!doctype html>\n<html class=\"no-js\" lang=\"\">\n    <head>\n  </head>\n    <body>\n   <h1>Oops, there was an error!</h1>\n        <p>We have been contacted of this error, feel free to check out <a href=\"http://status.docker.com/\">status.docker.com</a>\n           to see if there is a bigger issue.</p>\n\n    </body>\n</html>"},
+			"because the registry is temporarily unavailbe",
+		},
+	}
+	for i, test := range tests {
+		fakeKeyring := &credentialprovider.FakeKeyring{}
+		fakeClient := &FakeDockerClient{
+			Errors: map[string]error{"pull": test.err},
+		}
+		puller := &dockerPuller{
+			client:  fakeClient,
+			keyring: fakeKeyring,
+		}
+		err := puller.Pull(test.imageName, []api.Secret{})
+		if err == nil || !strings.Contains(err.Error(), test.expectedError) {
+			t.Errorf("%d: expect error %s, got : %s", i, test.expectedError, err)
+			continue
 		}
 	}
 }

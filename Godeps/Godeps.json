@@ -150,6 +150,11 @@
 			"Rev": "5ca80149b9d3f8b863af0e2bb6742e608603bd99"
 		},
 		{
+			"ImportPath": "github.com/docker/docker/pkg/jsonmessage",
+			"Comment": "v1.7.rc",
+			"Rev": "0cd6c05d8112e9246b734107d54e2855e3d5fec5"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/pkg/mount",
 			"Comment": "v1.4.1-1714-ged66853",
 			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
@@ -163,6 +168,11 @@
 			"ImportPath": "github.com/docker/docker/pkg/term",
 			"Comment": "v1.4.1-1714-ged66853",
 			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/timeutils",
+			"Comment": "v1.7.rc",
+			"Rev": "0cd6c05d8112e9246b734107d54e2855e3d5fec5"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/units",
