@@ -300,6 +300,26 @@ func waitForDefaultServiceAccountInNamespace(c *client.Client, namespace string)
 	return waitForServiceAccountInNamespace(c, namespace, "default", serviceAccountPoll, serviceAccountProvisionTimeout)
 }
 
+// waitForPersistentVolumePhase waits for a PersistentVolume to be in a specific phase or until timeout occurs, whichever comes first.
+func waitForPersistentVolumePhase(phase api.PersistentVolumePhase, c *client.Client, pvName string, poll, timeout time.Duration) error {
+	Logf("Waiting up to %v for PersistentVolume %s to have phase %s", timeout, pvName, phase)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		pv, err := c.PersistentVolumes().Get(pvName)
+		if err != nil {
+			Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, poll, err)
+			continue
+		} else {
+			if pv.Status.Phase == phase {
+				Logf("PersistentVolume %s found and phase=%s (%v)", pvName, phase, time.Since(start))
+				return nil
+			} else {
+				Logf("PersistentVolume %s found but phase is %s instead of %s.", pvName, pv.Status.Phase, phase)
+			}
+		}
+	}
+	return fmt.Errorf("PersistentVolume %s not in phase %s within %v", pvName, phase, timeout)
+}
+
 // createNS should be used by every test, note that we append a common prefix to the provided test name.
 // Please see NewFramework instead of using this directly.
 func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) {

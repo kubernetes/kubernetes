@@ -148,7 +148,8 @@ func TestPersistentVolumeStatusUpdate(t *testing.T) {
 			},
 		},
 		Status: api.PersistentVolumeStatus{
-			Phase: api.VolumeBound,
+			Phase:   api.VolumeBound,
+			Message: "foo",
 		},
 	}
 	c := &testClient{

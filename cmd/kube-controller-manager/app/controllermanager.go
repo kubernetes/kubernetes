@@ -234,6 +234,11 @@ func (s *CMServer) Run(_ []string) error {
 
 	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
 	pvclaimBinder.Run()
+	pvRecycler, err := volumeclaimbinder.NewPersistentVolumeRecycler(kubeClient, s.PVClaimBinderSyncPeriod, ProbeRecyclableVolumePlugins())
+	if err != nil {
+		glog.Fatalf("Failed to start persistent volume recycler: %+v", err)
+	}
+	pvRecycler.Run()
 
 	if len(s.ServiceAccountKeyFile) > 0 {
 		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)

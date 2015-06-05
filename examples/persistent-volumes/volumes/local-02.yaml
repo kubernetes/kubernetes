@@ -6,8 +6,9 @@ metadata:
     type: local
 spec:
   capacity:
-    storage: 5Gi
+    storage: 8Gi
   accessModes:
     - ReadWriteOnce
   hostPath:
     path: "/tmp/data02"
+  persistentVolumeReclaimPolicy: Recycle

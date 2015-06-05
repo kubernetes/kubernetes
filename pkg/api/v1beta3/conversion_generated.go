@@ -1216,6 +1216,7 @@ func convert_api_PersistentVolumeSpec_To_v1beta3_PersistentVolumeSpec(in *api.Pe
 	} else {
 		out.ClaimRef = nil
 	}
+	out.PersistentVolumeReclaimPolicy = PersistentVolumeReclaimPolicy(in.PersistentVolumeReclaimPolicy)
 	return nil
 }
 
@@ -1224,6 +1225,8 @@ func convert_api_PersistentVolumeStatus_To_v1beta3_PersistentVolumeStatus(in *ap
 		defaulting.(func(*api.PersistentVolumeStatus))(in)
 	}
 	out.Phase = PersistentVolumePhase(in.Phase)
+	out.Message = in.Message
+	out.Reason = in.Reason
 	return nil
 }
 
@@ -3275,6 +3278,7 @@ func convert_v1beta3_PersistentVolumeSpec_To_api_PersistentVolumeSpec(in *Persis
 	} else {
 		out.ClaimRef = nil
 	}
+	out.PersistentVolumeReclaimPolicy = api.PersistentVolumeReclaimPolicy(in.PersistentVolumeReclaimPolicy)
 	return nil
 }
 
@@ -3283,6 +3287,8 @@ func convert_v1beta3_PersistentVolumeStatus_To_api_PersistentVolumeStatus(in *Pe
 		defaulting.(func(*PersistentVolumeStatus))(in)
 	}
 	out.Phase = api.PersistentVolumePhase(in.Phase)
+	out.Message = in.Message
+	out.Reason = in.Reason
 	return nil
 }
 

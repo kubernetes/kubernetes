@@ -259,7 +259,7 @@ var resourceQuotaColumns = []string{"NAME"}
 var namespaceColumns = []string{"NAME", "LABELS", "STATUS"}
 var secretColumns = []string{"NAME", "TYPE", "DATA"}
 var serviceAccountColumns = []string{"NAME", "SECRETS"}
-var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM"}
+var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 
@@ -732,7 +732,7 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, withNamespace 
 	aQty := pv.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.Value()
 
-	_, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", name, formatLabels(pv.Labels), aSize, modesStr, pv.Status.Phase, claimRefUID)
+	_, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\n", name, formatLabels(pv.Labels), aSize, modesStr, pv.Status.Phase, claimRefUID, pv.Status.Reason)
 	return err
 }
 
