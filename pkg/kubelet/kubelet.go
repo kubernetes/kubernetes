@@ -1098,6 +1098,12 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
 	start := time.Now()
+	var firstSeenTime time.Time
+	if firstSeenTimeStr, ok := pod.Annotations[ConfigFirstSeenAnnotationKey]; !ok {
+		glog.V(3).Infof("First seen time not recorded for pod %q", pod.UID)
+	} else {
+		firstSeenTime = kubeletTypes.ConvertToTimestamp(firstSeenTimeStr).Get()
+	}
 
 	// Before returning, regenerate status and store it in the cache.
 	defer func() {
@@ -1115,9 +1121,9 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 				podToUpdate = mirrorPod
 			}
 			existingStatus, ok := kl.statusManager.GetPodStatus(podFullName)
-			if !ok || existingStatus.Phase == api.PodPending && status.Phase == api.PodRunning {
-				// TODO: Check the pod annotation instead of using `start`
-				metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(start))
+			if !ok || existingStatus.Phase == api.PodPending && status.Phase == api.PodRunning &&
+				!firstSeenTime.IsZero() {
+				metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
 			}
 			kl.statusManager.SetPodStatus(podToUpdate, status)
 		}
@@ -1175,6 +1181,12 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 
 	var podStatus api.PodStatus
 	if updateType == SyncPodCreate {
+		// This is the first time we are syncing the pod. Record the latency
+		// since kubelet first saw the pod if firstSeenTime is set.
+		if !firstSeenTime.IsZero() {
+			metrics.PodWorkerStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
+		}
+
 		podStatus = pod.Status
 		podStatus.StartTime = &util.Time{start}
 		kl.statusManager.SetPodStatus(pod, podStatus)

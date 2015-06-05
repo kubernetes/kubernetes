@@ -24,6 +24,7 @@ import (
 
 const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
 const ConfigMirrorAnnotationKey = "kubernetes.io/config.mirror"
+const ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
 
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int

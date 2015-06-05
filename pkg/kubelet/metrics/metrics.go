@@ -34,6 +34,7 @@ const (
 	ContainerManagerOperationsKey = "container_manager_latency_microseconds"
 	DockerOperationsKey           = "docker_operations_latency_microseconds"
 	DockerErrorsKey               = "docker_errors"
+	PodWorkerStartLatencyKey      = "pod_worker_start_latency_microseconds"
 )
 
 var (
@@ -81,6 +82,13 @@ var (
 		},
 		[]string{"operation_type"},
 	)
+	PodWorkerStartLatency = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      PodWorkerStartLatencyKey,
+			Help:      "Latency in microseconds from seeing a pod to starting a worker.",
+		},
+	)
 	DockerOperationsLatency = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
@@ -111,6 +119,7 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(DockerOperationsLatency)
 		prometheus.MustRegister(ContainerManagerLatency)
 		prometheus.MustRegister(SyncPodsLatency)
+		prometheus.MustRegister(PodWorkerStartLatency)
 		prometheus.MustRegister(ContainersPerPodCount)
 		prometheus.MustRegister(DockerErrors)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
