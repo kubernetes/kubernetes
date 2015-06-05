@@ -1971,7 +1971,7 @@ func deepCopy_api_StatusCause(in StatusCause, out *StatusCause, c *conversion.Cl
 }
 
 func deepCopy_api_StatusDetails(in StatusDetails, out *StatusDetails, c *conversion.Cloner) error {
-	out.ID = in.ID
+	out.Name = in.Name
 	out.Kind = in.Kind
 	if in.Causes != nil {
 		out.Causes = make([]StatusCause, len(in.Causes))
