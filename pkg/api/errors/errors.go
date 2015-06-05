@@ -95,7 +95,7 @@ func NewNotFound(kind, name string) error {
 		Reason: api.StatusReasonNotFound,
 		Details: &api.StatusDetails{
 			Kind: kind,
-			ID:   name,
+			Name: name,
 		},
 		Message: fmt.Sprintf("%s %q not found", kind, name),
 	}}
@@ -109,7 +109,7 @@ func NewAlreadyExists(kind, name string) error {
 		Reason: api.StatusReasonAlreadyExists,
 		Details: &api.StatusDetails{
 			Kind: kind,
-			ID:   name,
+			Name: name,
 		},
 		Message: fmt.Sprintf("%s %q already exists", kind, name),
 	}}
@@ -138,7 +138,7 @@ func NewForbidden(kind, name string, err error) error {
 		Reason: api.StatusReasonForbidden,
 		Details: &api.StatusDetails{
 			Kind: kind,
-			ID:   name,
+			Name: name,
 		},
 		Message: fmt.Sprintf("%s %q is forbidden: %v", kind, name, err),
 	}}
@@ -152,7 +152,7 @@ func NewConflict(kind, name string, err error) error {
 		Reason: api.StatusReasonConflict,
 		Details: &api.StatusDetails{
 			Kind: kind,
-			ID:   name,
+			Name: name,
 		},
 		Message: fmt.Sprintf("%s %q cannot be updated: %v", kind, name, err),
 	}}
@@ -176,7 +176,7 @@ func NewInvalid(kind, name string, errs fielderrors.ValidationErrorList) error {
 		Reason: api.StatusReasonInvalid,
 		Details: &api.StatusDetails{
 			Kind:   kind,
-			ID:     name,
+			Name:   name,
 			Causes: causes,
 		},
 		Message: fmt.Sprintf("%s %q is invalid: %v", kind, name, errors.NewAggregate(errs)),
@@ -215,7 +215,7 @@ func NewServerTimeout(kind, operation string, retryAfterSeconds int) error {
 		Reason: api.StatusReasonServerTimeout,
 		Details: &api.StatusDetails{
 			Kind:              kind,
-			ID:                operation,
+			Name:              operation,
 			RetryAfterSeconds: retryAfterSeconds,
 		},
 		Message: fmt.Sprintf("The %s operation against %s could not be completed at this time, please try again.", operation, kind),
@@ -314,7 +314,7 @@ func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, 
 		Reason: reason,
 		Details: &api.StatusDetails{
 			Kind: kind,
-			ID:   name,
+			Name: name,
 
 			Causes:            causes,
 			RetryAfterSeconds: retryAfterSeconds,

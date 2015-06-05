@@ -35,7 +35,7 @@ func TestErrorsToAPIStatus(t *testing.T) {
 			Message: "foo \"bar\" not found",
 			Details: &api.StatusDetails{
 				Kind: "foo",
-				ID:   "bar",
+				Name: "bar",
 			},
 		},
 		errors.NewAlreadyExists("foo", "bar"): {
@@ -45,7 +45,7 @@ func TestErrorsToAPIStatus(t *testing.T) {
 			Message: "foo \"bar\" already exists",
 			Details: &api.StatusDetails{
 				Kind: "foo",
-				ID:   "bar",
+				Name: "bar",
 			},
 		},
 		errors.NewConflict("foo", "bar", stderrs.New("failure")): {
@@ -55,7 +55,7 @@ func TestErrorsToAPIStatus(t *testing.T) {
 			Message: "foo \"bar\" cannot be updated: failure",
 			Details: &api.StatusDetails{
 				Kind: "foo",
-				ID:   "bar",
+				Name: "bar",
 			},
 		},
 	}

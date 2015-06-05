@@ -564,7 +564,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 				Status: api.StatusSuccess,
 				Code:   http.StatusOK,
 				Details: &api.StatusDetails{
-					ID:   name,
+					Name: name,
 					Kind: scope.Kind,
 				},
 			}
