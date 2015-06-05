@@ -13,7 +13,7 @@ $ hack/dev-build-and-up.sh
 
 ### Step One: Create two namespaces
 
-We'll see how cluster DNS works across multiple namespaces, first we need to create two namespaces:
+We'll see how cluster DNS works across multiple [namespaces](../../docs/namespaces.md), first we need to create two namespaces:
 
 ```shell
 $ cluster/kubectl.sh create -f examples/cluster-dns/namespace-dev.yaml
@@ -39,7 +39,7 @@ $ cluster/kubectl.sh config set-context prod --namespace=production --cluster=${
 
 ### Step Two: Create backend replication controller in each namespace
 
-Use the file [`examples/cluster-dns/dns-backend-rc.yaml`](dns-backend-rc.yaml) to create a backend server replication controller in each namespace.
+Use the file [`examples/cluster-dns/dns-backend-rc.yaml`](dns-backend-rc.yaml) to create a backend server [replication controller](../../docs/replication-controller.md) in each namespace.
 
 ```shell
 $ cluster/kubectl.sh config use-context dev
@@ -67,7 +67,7 @@ dns-backend   dns-backend    ddysher/dns-backend   name=dns-backend   1
 ### Step Three: Create backend service
 
 Use the file [`examples/cluster-dns/dns-backend-service.yaml`](dns-backend-service.yaml) to create
-a service for the backend server.
+a [service](../../docs/services.md) for the backend server.
 
 ```shell
 $ cluster/kubectl.sh config use-context dev
@@ -94,7 +94,7 @@ dns-backend   <none>    name=dns-backend   10.0.35.246   8000/TCP
 
 ### Step Four: Create client pod in one namespace
 
-Use the file [`examples/cluster-dns/dns-frontend-pod.yaml`](dns-frontend-pod.yaml) to create a client pod in dev namespace. The client pod will make a connection to backend and exit. Specifically, it tries to connect to address `http://dns-backend.development.kubernetes.local:8000`.
+Use the file [`examples/cluster-dns/dns-frontend-pod.yaml`](dns-frontend-pod.yaml) to create a client [pod](../../docs/pods.md) in dev namespace. The client pod will make a connection to backend and exit. Specifically, it tries to connect to address `http://dns-backend.development.kubernetes.local:8000`.
 
 ```shell
 $ cluster/kubectl.sh config use-context dev
