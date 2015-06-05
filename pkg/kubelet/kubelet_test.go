@@ -50,7 +50,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	cadvisorApiv2 "github.com/google/cadvisor/info/v2"
 )
@@ -2176,17 +2176,12 @@ func TestPortForward(t *testing.T) {
 	var port uint16 = 5000
 	stream := &fakeReadWriteCloser{}
 
-	podInfraContainerImage := "POD"
 	infraContainerID := "infra"
-	// TODO: Move this test to dockertools so that we don't have to do the hacky
-	// type assertion here.
-	dm := kubelet.containerRuntime.(*dockertools.DockerManager)
-	dm.PodInfraContainerImage = podInfraContainerImage
 
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    infraContainerID,
-			Names: []string{"/k8s_" + podInfraContainerImage + "_" + podName + "_" + podNamespace + "_12345678_42"},
+			Names: []string{"/k8s_POD" + "_" + podName + "_" + podNamespace + "_12345678_42"},
 		},
 		{
 			ID:    containerID,

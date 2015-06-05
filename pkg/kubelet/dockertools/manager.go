@@ -68,9 +68,8 @@ type DockerManager struct {
 	containerRefManager *kubecontainer.RefManager
 	os                  kubecontainer.OSInterface
 
-	// TODO(yifan): PodInfraContainerImage can be unexported once
-	// we move createPodInfraContainer into dockertools.
-	PodInfraContainerImage string
+	// The image name of the pod infra container.
+	podInfraContainerImage string
 	// reasonCache stores the failure reason of the last container creation
 	// and/or start in a string, keyed by <pod_UID>_<container_name>. The goal
 	// is to propagate this reason to the container status. This endeavor is
@@ -80,11 +79,9 @@ type DockerManager struct {
 	//      means that some entries may be recycled before a pod has been
 	//      deleted.
 	reasonCache stringCache
-	// TODO(yifan): We export this for testability, so when we have a fake
-	// container manager, then we can unexport this. Also at that time, we
-	// use the concrete type so that we can record the pull failure and eliminate
-	// the image checking in GetPodStatus().
-	Puller DockerPuller
+	// TODO(yifan): Record the pull failure so we can  eliminate the image checking
+	// in GetPodStatus()?
+	puller DockerPuller
 
 	// Root of the Docker runtime.
 	dockerRoot string
@@ -164,9 +161,9 @@ func NewDockerManager(
 		readinessManager:    readinessManager,
 		containerRefManager: containerRefManager,
 		os:                  osInterface,
-		PodInfraContainerImage: podInfraContainerImage,
+		podInfraContainerImage: podInfraContainerImage,
 		reasonCache:            reasonCache,
-		Puller:                 newDockerPuller(client, qps, burst),
+		puller:                 newDockerPuller(client, qps, burst),
 		dockerRoot:             dockerRoot,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
@@ -784,12 +781,12 @@ func (dm *DockerManager) ListImages() ([]kubecontainer.Image, error) {
 // TODO(vmarmol): Consider unexporting.
 // PullImage pulls an image from network to local storage.
 func (dm *DockerManager) PullImage(image kubecontainer.ImageSpec, secrets []api.Secret) error {
-	return dm.Puller.Pull(image.Image, secrets)
+	return dm.puller.Pull(image.Image, secrets)
 }
 
 // IsImagePresent checks whether the container image is already in the local storage.
 func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
-	return dm.Puller.IsImagePresent(image.Image)
+	return dm.puller.IsImagePresent(image.Image)
 }
 
 // Removes the specified image.
@@ -825,7 +822,7 @@ func (dm *DockerManager) podInfraContainerChanged(pod *api.Pod, podInfraContaine
 	}
 	expectedPodInfraContainer := &api.Container{
 		Name:  PodInfraContainerName,
-		Image: dm.PodInfraContainerImage,
+		Image: dm.podInfraContainerImage,
 		Ports: ports,
 	}
 	return podInfraContainer.Hash != kubecontainer.HashContainer(expectedPodInfraContainer), nil
@@ -1203,7 +1200,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 
 	container := &api.Container{
 		Name:  PodInfraContainerName,
-		Image: dm.PodInfraContainerImage,
+		Image: dm.podInfraContainerImage,
 		Ports: ports,
 	}
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)

@@ -24,7 +24,7 @@ import (
 	"time"
 
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 // ExecHandler knows how to execute a command in a running Docker container.

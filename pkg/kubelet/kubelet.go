@@ -2124,7 +2124,6 @@ func (kl *Kubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 
 // findContainer finds and returns the container with the given pod ID, full name, and container name.
 // It returns nil if not found.
-// TODO(yifan): Move this to runtime once the runtime interface has been all implemented.
 func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, containerName string) (*kubecontainer.Container, error) {
 	pods, err := kl.containerRuntime.GetPods(false)
 	if err != nil {
