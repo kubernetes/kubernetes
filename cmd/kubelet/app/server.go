@@ -284,23 +284,9 @@ func (s *KubeletServer) Run(_ []string) error {
 		return err
 	}
 
-	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
-		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
-		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
-		if err := util.GenerateSelfSignedCert(util.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
-			return fmt.Errorf("unable to generate self signed cert: %v", err)
-		}
-		glog.V(4).Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
-	}
-	tlsOptions := &kubelet.TLSOptions{
-		Config: &tls.Config{
-			// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability).
-			MinVersion: tls.VersionTLS10,
-			// Populate PeerCertificates in requests, but don't yet reject connections without certificates.
-			ClientAuth: tls.RequestClientCert,
-		},
-		CertFile: s.TLSCertFile,
-		KeyFile:  s.TLSPrivateKeyFile,
+	tlsOptions, err := s.InitializeTLS()
+	if err != nil {
+		return err
 	}
 
 	mounter := mount.New()
@@ -389,6 +375,30 @@ func (s *KubeletServer) Run(_ []string) error {
 
 	// run forever
 	select {}
+}
+
+// InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
+// certificate and key file are generated. Returns a configured kubelet.TLSOptions object.
+func (s *KubeletServer) InitializeTLS() (*kubelet.TLSOptions, error) {
+	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
+		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
+		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
+		if err := util.GenerateSelfSignedCert(util.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
+			return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
+		}
+		glog.V(4).Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
+	}
+	tlsOptions := &kubelet.TLSOptions{
+		Config: &tls.Config{
+			// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability).
+			MinVersion: tls.VersionTLS10,
+			// Populate PeerCertificates in requests, but don't yet reject connections without certificates.
+			ClientAuth: tls.RequestClientCert,
+		},
+		CertFile: s.TLSCertFile,
+		KeyFile:  s.TLSPrivateKeyFile,
+	}
+	return tlsOptions, nil
 }
 
 func (s *KubeletServer) authPathClientConfig(useDefaults bool) (*client.Config, error) {
