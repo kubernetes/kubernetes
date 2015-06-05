@@ -22,8 +22,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"time"
@@ -33,8 +31,6 @@ import (
 // the test needs privileged containers, which are disabled by default.
 // Run the test with "go run hack/e2e.go ... --ginkgo.focus=PersistentVolume"
 var _ = Describe("[Skipped] persistentVolumes", func() {
-	//		f := NewFramework("pv")
-
 	var c *client.Client
 	var ns string
 
@@ -81,8 +77,8 @@ var _ = Describe("[Skipped] persistentVolumes", func() {
 		pvc, err = c.PersistentVolumeClaims(ns).Create(pvc)
 		Expect(err).NotTo(HaveOccurred())
 
-		// allow the binder a chance to catch up
-		time.Sleep(20 * time.Second)
+		// allow the binder a chance to catch up.  should not be more than 20s.
+		waitForPersistentVolumePhase(api.VolumeBound, c, pv.Name, 1 * time.Second, 30 * time.Second)
 
 		pv, err = c.PersistentVolumes().Get(pv.Name)
 		Expect(err).NotTo(HaveOccurred())
@@ -94,8 +90,8 @@ var _ = Describe("[Skipped] persistentVolumes", func() {
 		err = c.PersistentVolumeClaims(ns).Delete(pvc.Name)
 		Expect(err).NotTo(HaveOccurred())
 
-		// allow the recycler a chance to catch up
-		time.Sleep(120 * time.Second)
+		// allow the recycler a chance to catch up.  it has to perform NFS scrub, which can be slow in e2e.
+		waitForPersistentVolumePhase(api.VolumeAvailable, c, pv.Name, 5 * time.Second, 300 * time.Second)
 
 		pv, err = c.PersistentVolumes().Get(pv.Name)
 		Expect(err).NotTo(HaveOccurred())
@@ -103,17 +99,20 @@ var _ = Describe("[Skipped] persistentVolumes", func() {
 			Failf("Expected PersistentVolume to be unbound, but found non-nil ClaimRef: %+v", pv)
 		}
 
-		// Now check that index.html from the NFS server was really removed
+		// The NFS Server pod we're using contains an index.html file
+		// Verify the file was really scrubbed from the volume
 		checkpod := makeCheckPod(ns, serverIP)
-		testContainerOutputInNamespace("the volume was scrubbed", c, checkpod, []string{"index.html does not exist"}, ns)
-
+		checkpod, err = c.Pods(checkpod.Namespace).Get(checkpod.Name)
+		Expect(err).NotTo(HaveOccurred())
+		err = waitForPodSuccessInNamespace(c, checkpod.Name, checkpod.Spec.Containers[0].Name, checkpod.Namespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 })
 
 func makePersistentVolume(serverIP string) *api.PersistentVolume {
 	return &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
-			Name: "nfs-" + string(util.NewUUID()),
+			GenerateName: "nfs-",
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
@@ -139,7 +138,7 @@ func makePersistentVolume(serverIP string) *api.PersistentVolume {
 func makePersistentVolumeClaim(ns string) *api.PersistentVolumeClaim {
 	return &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
-			Name:      "pvc-" + string(util.NewUUID()),
+			GenerateName:      "pvc-",
 			Namespace: ns,
 		},
 		Spec: api.PersistentVolumeClaimSpec{
@@ -166,15 +165,16 @@ func makeCheckPod(ns string, nfsserver string) *api.Pod {
 			APIVersion: "v1beta3",
 		},
 		ObjectMeta: api.ObjectMeta{
-			Name: "checker-" + string(util.NewUUID()),
+			GenerateName: "checker-",
+			Namespace: ns,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:    "checker-" + string(util.NewUUID()),
+					Name:    "scrub-checker",
 					Image:   "busybox",
 					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "test -e /mnt/index.html || echo 'index.html does not exist'"},
+					Args:    []string{"-c", "test ! -e /mnt/index.html || exit 1"},
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      "nfs-volume",
