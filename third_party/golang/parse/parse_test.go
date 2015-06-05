@@ -58,3 +58,25 @@ func TestParseQuote(t *testing.T) {
 		t.Errorf("expect ${, got %s", node.Text)
 	}
 }
+
+func TestParseArray(t *testing.T) {
+	tree, err := Parse("array", "hello ${[1..3]}")
+	if err != nil {
+		t.Errorf("parse quote error %v", err)
+	}
+	nodes := tree.Root.Nodes
+	if len(nodes) != 2 {
+		t.Errorf("expect two nodes, got %v", len(nodes))
+	}
+	if nodes[0].Type() != NodeText {
+		t.Errorf("expect NodeText, got %v", nodes[0])
+	}
+	if nodes[1].Type() != NodeList {
+		t.Errorf("expect NodeList, got %v", nodes[1])
+	}
+	nodes = nodes[1].(*ListNode).Nodes
+	node := nodes[0].(*ArrayNode)
+	if string(node.Range) != "1..3" {
+		t.Errorf("expect ${, got %s", node.Range)
+	}
+}

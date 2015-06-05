@@ -23,7 +23,7 @@ import (
 
 func TestPlainText(t *testing.T) {
 	text := "hello jsonpath"
-	j := New("plain")
+	j := NewJSONPath("plain")
 	err := j.Parse(text)
 	if err != nil {
 		t.Errorf("parse plain text %s error %v", text, err)
@@ -41,7 +41,7 @@ func TestPlainText(t *testing.T) {
 
 func TestVariable(t *testing.T) {
 	text := "hello ${.jsonpath}"
-	j := New("variable")
+	j := NewJSONPath("variable")
 	err := j.Parse(text)
 	if err != nil {
 		t.Errorf("parse variable %s error %v", text, err)
@@ -60,7 +60,7 @@ func TestVariable(t *testing.T) {
 
 func TestNestedDict(t *testing.T) {
 	text := "hello ${.jsonpath.title}"
-	j := New("nestedDict")
+	j := NewJSONPath("nestedDict")
 	err := j.Parse(text)
 	if err != nil {
 		t.Errorf("parse nested dict %s error %v", text, err)
@@ -86,7 +86,7 @@ func TestNestedDict(t *testing.T) {
 
 func TestQuote(t *testing.T) {
 	text := `hello ${"${"}`
-	j := New("quote")
+	j := NewJSONPath("quote")
 	err := j.Parse(text)
 	if err != nil {
 		t.Errorf("parse quote %s error %v", text, err)
@@ -99,7 +99,27 @@ func TestQuote(t *testing.T) {
 	out := buf.String()
 	expect := "hello ${"
 	if out != expect {
-		t.Errorf("expect to get %s, got %s", text, expect)
+		t.Errorf("expect to get %s, got %s", expect, out)
 	}
 
+}
+
+func TestArray(t *testing.T) {
+	text := "hello ${[1]}"
+	j := NewJSONPath("array")
+	err := j.Parse(text)
+	if err != nil {
+		t.Errorf("parse array %s error %v", text, err)
+	}
+	buf := new(bytes.Buffer)
+	testSlice := []string{"Monday", "Tudesday"}
+	err = j.Execute(buf, testSlice)
+	if err != nil {
+		t.Errorf("execute array error %v", err)
+	}
+	out := buf.String()
+	expect := "hello Tudesday"
+	if out != expect {
+		t.Errorf("expect to get %s, got %s", expect, out)
+	}
 }

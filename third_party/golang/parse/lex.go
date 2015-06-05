@@ -14,16 +14,30 @@ type itemType int
 type Pos int
 
 const (
-	itemError itemType = iota
+	itemArray      itemType = iota //array index range
 	itemDot
-	itemText
-	itemField          // alphanumeric identifier starting with '.'
 	itemEOF
+	itemError
+	itemField 	   // alphanumeric identifier starting with '.'
 	itemKeyword
 	itemLeftDelim  // left action delimiter
 	itemRightDelim // Right action delimiter
 	itemString     // quoted string (includes quotes)
+	itemText
 )
+
+var itemName = map[itemType]string{
+	itemArray:      "itemArray",
+	itemDot:        "itemDot",
+	itemEOF:        "itemEOF",
+	itemError:      "itemError",
+	itemField:      "itemFiled",
+	itemKeyword:    "itemKeyword",
+	itemLeftDelim:  "itemLeftDelim",
+	itemRightDelim: "itemRightDelim",
+	itemString:     "itemString",
+	itemText:       "itemText",
+}
 
 // item represents a token or text string returned from the scanner.
 type item struct {
@@ -33,17 +47,7 @@ type item struct {
 }
 
 func (i item) String() string {
-	switch {
-	case i.typ == itemEOF:
-		return "EOF"
-	case i.typ == itemError:
-		return i.val
-	case i.typ > itemKeyword:
-		return fmt.Sprintf("<%s>", i.val)
-	case len(i.val) > 10:
-		return fmt.Sprintf("%.10q...", i.val)
-	}
-	return fmt.Sprintf("%q", i.val)
+	return itemName[i.typ]
 }
 
 const eof = -1
@@ -192,7 +196,9 @@ func lexInsideAction(l *lexer) stateFn {
 	switch r := l.next(); {
 	case r == eof || isEndOfLine(r):
 		return l.errorf("unclosed action")
-	case r=='"':
+	case r == '[':
+		return lexArray
+	case r == '"':
 		return lexQuote
 	case r == '.':
 		l.emit(itemDot)
@@ -227,14 +233,9 @@ func lexField(l *lexer) stateFn {
 
 // lexQuote scans a quoted string.
 func lexQuote(l *lexer) stateFn {
-	Loop:
+Loop:
 	for {
 		switch l.next() {
-		case '\\':
-			if r := l.next(); r != eof && r != '\n' {
-				break
-			}
-			fallthrough
 		case eof, '\n':
 			return l.errorf("unterminated quoted string")
 		case '"':
@@ -245,6 +246,20 @@ func lexQuote(l *lexer) stateFn {
 	return lexInsideAction
 }
 
+// lexArray scans array index selection
+func lexArray(l *lexer) stateFn {
+Loop:
+	for {
+		switch l.next() {
+		case eof, '\n':
+			return l.errorf("unterminated quoted string")
+		case ']':
+			break Loop
+		}
+	}
+	l.emit(itemArray)
+	return lexInsideAction
+}
 
 // isSpace reports whether r is a space character.
 func isSpace(r rune) bool {

@@ -5,23 +5,12 @@ import (
 	"fmt"
 )
 
-var textFormat = "%s" // Changed to "%q" in tests for better error messages.
+// NodeType identifies the type of a parse tree node.
+type NodeType int
 
 type Node interface {
 	Type() NodeType
 	Copy() Node
-}
-
-// NodeType identifies the type of a parse tree node.
-type NodeType int
-
-func (p Pos) Position() Pos {
-	return p
-}
-
-// unexported keeps Node implementations local to the package.
-// All implementations embed Pos, so this takes care of it.
-func (Pos) unexported() {
 }
 
 // Type returns itself and provides an easy default implementation
@@ -32,6 +21,7 @@ func (t NodeType) Type() NodeType {
 
 const (
 	NodeText NodeType = iota
+	NodeArray
 	NodeList
 	NodeVariable
 )
@@ -90,7 +80,7 @@ func newText(pos Pos, text string) *TextNode {
 }
 
 func (t *TextNode) String() string {
-	return fmt.Sprintf(textFormat, t.Text)
+	return fmt.Sprintf("%s", t.Text)
 }
 
 func (t *TextNode) Copy() Node {
@@ -109,6 +99,20 @@ func newVariable(pos Pos, name string) *VariableNode {
 
 func (v *VariableNode) Copy() Node {
 	return &VariableNode{NodeType: NodeVariable, Pos: v.Pos, Name: v.Name}
+}
+
+type ArrayNode struct {
+	NodeType
+	Pos
+	Range string
+}
+
+func newArray(pos Pos, value string) *ArrayNode{
+	return &ArrayNode{NodeType: NodeArray, Pos: pos, Range: value}
+}
+
+func (v *ArrayNode) Copy() Node {
+	return &ArrayNode{NodeType: NodeArray, Pos: v.Pos, Range: v.Range}
 }
 
 type Tree struct {
@@ -140,6 +144,8 @@ func (t *Tree) Parse(text string) error {
 	for eof := false; eof != true; {
 		item := t.lex.nextItem()
 		switch item.typ {
+		case itemArray:
+			t.cur.append(newArray(item.pos, item.val[1:len(item.val)-1]))
 		case itemLeftDelim:
 			newNode := newList(item.pos)
 			t.cur.append(newNode)

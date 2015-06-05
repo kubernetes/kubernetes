@@ -38,3 +38,11 @@ func TestLexQuote(t *testing.T) {
 	expectVal := []string{"test ", "${", `"${"`, "}", ""}
 	compare(t, l, expectType, expectVal)
 }
+
+func TestLexArray(t *testing.T) {
+	text := `test ${[1..2]}`
+	l := lex("array", text, "${", "}")
+	expectType := []itemType{itemText, itemLeftDelim, itemArray, itemRightDelim, itemEOF}
+	expectVal := []string{"test ", "${", "[1..2]", "}", ""}
+	compare(t, l, expectType, expectVal)
+}

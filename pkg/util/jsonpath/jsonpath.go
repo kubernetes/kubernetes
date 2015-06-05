@@ -17,69 +17,113 @@ limitations under the License.
 package jsonpath
 
 import (
-	"errors"
-	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/parse"
-	"github.com/golang/glog"
+	"fmt"
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
+
+	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/parse"
+	"github.com/golang/glog"
 )
 
-type Jsonpath struct {
+type JSONPath struct {
 	name string
 	tree *parse.Tree
 }
 
-func New(n string) *Jsonpath {
-	return &Jsonpath{
+func NewJSONPath(n string) *JSONPath {
+	return &JSONPath{
 		name: n,
 	}
 }
 
-func (j *Jsonpath) Parse(text string) error {
-	var err error
+func (j *JSONPath) Parse(text string) (err error) {
 	j.tree, err = parse.Parse(j.name, text)
-	return err
+	return
 }
 
-func (j *Jsonpath) Execute(wr io.Writer, data interface{}) error {
+func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
 	value := reflect.ValueOf(data)
 	if j.tree == nil {
-		return errors.New(j.name + " is an incomplete jsonpath template")
+		return fmt.Errorf("%s is an incomplete jsonpath template", j.name)
 	}
-	j.walk(wr, value, j.tree.Root)
+	j.walkTree(wr, value)
 	return nil
 }
 
-func (j *Jsonpath) walk(wr io.Writer, value reflect.Value, node parse.Node) reflect.Value {
-	var text []byte
+// walkTree visit the parsed tree from root
+func (j *JSONPath) walkTree(wr io.Writer, value reflect.Value) {
+	for _, node := range j.tree.Root.Nodes {
+		j.walk(wr, value, node)
+	}
+}
+
+// walk visit subtree rooted at the gived node in DFS order
+func (j *JSONPath) walk(wr io.Writer, value reflect.Value, node parse.Node) reflect.Value {
 	switch node := node.(type) {
 	case *parse.ListNode:
-		curValue := value
-		for _, node := range node.Nodes {
-			curValue = j.walk(wr, curValue, node)
-		}
-		return value
+		return j.evalList(wr, value, node)
 	case *parse.TextNode:
-		text = node.Text
-		if _, err := wr.Write(text); err != nil {
-			glog.Errorf("%s", err)
-		}
-		return value
+		return j.evalText(wr, value, node)
 	case *parse.VariableNode:
-		value = j.evalVariable(wr, value, node.Name)
-		return value
-	default:
+		return j.evalVariable(wr, value, node)
+	case *parse.ArrayNode:
+		return j.evalArray(wr, value, node)
+	}
+	return reflect.Value{}
+}
+
+// evalText evaluate TextNode
+func (j *JSONPath) evalText(wr io.Writer, value reflect.Value, node *parse.TextNode) reflect.Value {
+	if _, err := wr.Write(node.Text); err != nil {
+		glog.Errorf("%s", err)
+	}
+	return reflect.Value{}
+}
+
+// evalText evaluate ListNode
+func (j *JSONPath) evalList(wr io.Writer, value reflect.Value, node *parse.ListNode) reflect.Value {
+	curValue := value
+	for _, node := range node.Nodes {
+		curValue = j.walk(wr, curValue, node)
+	}
+	text := j.evalToText(curValue)
+	if _, err := wr.Write(text); err != nil {
+		glog.Errorf("%s", err)
+	}
+	return value
+}
+
+// evalText evaluate ArrayNode
+func (j *JSONPath) evalArray(wr io.Writer, value reflect.Value, node *parse.ArrayNode) reflect.Value {
+	if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
+		glog.Errorf("%v is not array", value)
+	}
+	indexs := strings.Split(node.Range, ":")
+	if len(indexs) == 1 {
+		index, err := strconv.Atoi(indexs[0])
+		if err != nil {
+			glog.Errorf("parse range %s to integer", node.Range)
+		}
+		return value.Index(index)
+	} else {
+		glog.Errorf("only supprt single index now")
 		return reflect.Value{}
 	}
 }
 
-func (j *Jsonpath) evalVariable(wr io.Writer, value reflect.Value, name string) reflect.Value {
+// evalVariable evaluate VariableNode
+func (j *JSONPath) evalVariable(wr io.Writer, value reflect.Value, node *parse.VariableNode) reflect.Value {
+	return value.FieldByName(node.Name)
+}
+
+// evalToText translate reflect value to corresponding text
+func (j *JSONPath) evalToText(v reflect.Value) []byte {
 	var text string
-	v := value.FieldByName(name)
 	switch v.Kind() {
-	case reflect.Struct:
-		return v
+	case reflect.Invalid:
+		//pass
 	case reflect.Bool:
 		if variable := v.Bool(); variable {
 			text = "True"
@@ -95,10 +139,7 @@ func (j *Jsonpath) evalVariable(wr io.Writer, value reflect.Value, name string) 
 	case reflect.String:
 		text = v.String()
 	default:
-		glog.Errorf("%s is not a printable variable", name)
+		glog.Errorf("%v is not a printable", v)
 	}
-	if _, err := wr.Write([]byte(text)); err != nil {
-		glog.Errorf("%s", err)
-	}
-	return reflect.Value{}
+	return []byte(text)
 }
