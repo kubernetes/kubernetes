@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"github.com/golang/glog"
 )
 
 type FailedPredicateMap map[string]util.StringSet
@@ -40,11 +41,12 @@ var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
 // implementation of the error interface
 func (f *FitError) Error() string {
-	output := fmt.Sprintf("failed to find fit for pod, ")
+	predicates := util.NewStringSet()
 	for node, predicateList := range f.FailedPredicates {
-		output = output + fmt.Sprintf("Node %s: %s", node, strings.Join(predicateList.List(), ","))
+		predicates = predicates.Union(predicateList)
+		glog.Infof("failed to find fit for pod %v on node %s: %s", f.Pod.Name, node, strings.Join(predicateList.List(), ","))
 	}
-	return output
+	return fmt.Sprintf("For each of these fitness predicates, pod %v failed on at least one node: %v.", f.Pod.Name, strings.Join(predicates.List(), ","))
 }
 
 type genericScheduler struct {
