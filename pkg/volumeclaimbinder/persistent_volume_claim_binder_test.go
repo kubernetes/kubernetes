@@ -98,7 +98,7 @@ func TestExampleObjects(t *testing.T) {
 				Spec: api.PersistentVolumeSpec{
 					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Capacity: api.ResourceList{
-						api.ResourceName(api.ResourceStorage): resource.MustParse("5Gi"),
+						api.ResourceName(api.ResourceStorage): resource.MustParse("8Gi"),
 					},
 					PersistentVolumeSource: api.PersistentVolumeSource{
 						HostPath: &api.HostPathVolumeSource{
