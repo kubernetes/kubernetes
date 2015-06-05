@@ -175,7 +175,7 @@ iptables -nvL
 cat << EOF > apache.json
 {
   "kind": "Pod",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "fedoraapache",
     "labels": {

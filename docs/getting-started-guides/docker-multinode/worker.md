@@ -109,7 +109,7 @@ sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0
 On the master you created above, create a file named ```node.yaml``` make it's contents:
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Node
 metadata:
   name: ${NODE_IP}

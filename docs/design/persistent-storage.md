@@ -98,7 +98,7 @@ An administrator provisions storage by posting PVs to the API.  Various way to a
 POST:
 
 kind: PersistentVolume
-apiVersion: v1beta3
+apiVersion: v1
 metadata:
   name: pv0001
 spec:
@@ -128,7 +128,7 @@ The user must be within a namespace to create PVCs.
 
 POST: 
 kind: PersistentVolumeClaim
-apiVersion: v1beta3
+apiVersion: v1
 metadata:
   name: myclaim-1
 spec:
@@ -179,7 +179,7 @@ The claim holder owns the claim and its data for as long as the claim exists.  T
 POST: 
 
 kind: Pod
-apiVersion: v1beta3
+apiVersion: v1
 metadata:
   name: mypod
 spec:

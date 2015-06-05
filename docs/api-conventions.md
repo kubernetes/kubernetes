@@ -218,7 +218,7 @@ spec:
 ...and we POST that to the server (as JSON). Then let's say we want to *add* a container to this Pod.
 
 ```yaml
-PATCH /api/v1beta3/namespaces/default/pods/pod-name
+PATCH /api/v1/namespaces/default/pods/pod-name
 spec:
   containers:
     - name: log-tailer
@@ -461,9 +461,9 @@ The status object is encoded as JSON and provided as the body of the response.  
 
 **Example:**
 ```
-$ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https://10.240.122.184:443/api/v1beta3/namespaces/default/pods/grafana
+$ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https://10.240.122.184:443/api/v1/namespaces/default/pods/grafana
 
-> GET /api/v1beta3/namespaces/default/pods/grafana HTTP/1.1
+> GET /api/v1/namespaces/default/pods/grafana HTTP/1.1
 > User-Agent: curl/7.26.0
 > Host: 10.240.122.184
 > Accept: */*
@@ -477,13 +477,13 @@ $ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https:/
 < 
 {
   "kind": "Status",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {},
   "status": "Failure",
   "message": "pods \"grafana\" not found",
   "reason": "NotFound",
   "details": {
-    "id": "grafana",
+    "name": "grafana",
     "kind": "pods"
   },
   "code": 404
@@ -511,7 +511,7 @@ Possible values for the ```reason``` and ```details``` fields:
   * Details (optional):
     * `kind string`
       * The kind attribute of the unauthorized resource (on some operations may differ from the requested resource).
-    * `id   string`
+    * `name string`
       * The identifier of the unauthorized resource.
    * HTTP status code: `401 StatusUnauthorized`
 * `Forbidden`
@@ -519,7 +519,7 @@ Possible values for the ```reason``` and ```details``` fields:
   * Details (optional):
     * `kind string`
       * The kind attribute of the forbidden resource (on some operations may differ from the requested resource).
-    * `id   string`
+    * `name string`
       * The identifier of the forbidden resource.
 	 * HTTP status code: `403 StatusForbidden`
 * `NotFound`
@@ -527,7 +527,7 @@ Possible values for the ```reason``` and ```details``` fields:
   * Details (optional):
     * `kind string`
       * The kind attribute of the missing resource (on some operations may differ from the requested resource).
-    * `id   string`
+    * `name string`
       * The identifier of the missing resource.
   * HTTP status code: `404 StatusNotFound`
 * `AlreadyExists`
@@ -535,7 +535,7 @@ Possible values for the ```reason``` and ```details``` fields:
   * Details (optional):
     * `kind string`
       * The kind attribute of the conflicting resource.
-    * `id   string`
+    * `name string`
       * The identifier of the conflicting resource.
   * HTTP status code: `409 StatusConflict`
 * `Conflict`
@@ -546,7 +546,7 @@ Possible values for the ```reason``` and ```details``` fields:
   * Details (optional):
     * `kind string`
       * the kind attribute of the invalid resource
-    * `id   string`
+    * `name string`
       * the identifier of the invalid resource
     * `causes`
       * One or more `StatusCause` entries indicating the data in the provided resource that was invalid. The `reason`, `message`, and `field` attributes will be set.
@@ -560,7 +560,7 @@ Possible values for the ```reason``` and ```details``` fields:
     * Details (optional):
       * `kind string`
         * The kind attribute of the resource being acted on.
-      * `id   string`
+      * `name string`
         * The operation that is being attempted.
   * The server should set the `Retry-After` HTTP header and return `retryAfterSeconds` in the details field of the object. A value of `0` is the default.
   * Http status code: `504 StatusServerTimeout`

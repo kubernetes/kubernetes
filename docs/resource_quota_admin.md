@@ -54,7 +54,7 @@ Kubectl supports creating, updating, and viewing quotas
 $ kubectl namespace myspace
 $ cat <<EOF > quota.json
 {
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "kind": "ResourceQuota",
   "metadata": {
     "name": "quota",

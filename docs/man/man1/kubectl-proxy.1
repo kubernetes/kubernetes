@@ -166,7 +166,7 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
 $ kubectl proxy \-\-port=8011 \-\-www=./local/www/
 
 // Run a proxy to kubernetes apiserver, changing the api prefix to k8s\-api
-// This makes e.g. the pods api available at localhost:8011/k8s\-api/v1beta3/pods/
+// This makes e.g. the pods api available at localhost:8011/k8s\-api/v1/pods/
 $ kubectl proxy \-\-api\-prefix=/k8s\-api
 
 .fi

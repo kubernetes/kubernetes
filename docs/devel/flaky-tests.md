@@ -11,7 +11,7 @@ There is a testing image ```brendanburns/flake``` up on the docker hub.  We will
 
 Create a replication controller with the following config:
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: flakecontroller

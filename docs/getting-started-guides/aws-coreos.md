@@ -147,7 +147,7 @@ Create a pod manifest: `pod.json`
 
 ```json
 {
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "kind": "Pod",
   "metadata": {
     "name": "hello",

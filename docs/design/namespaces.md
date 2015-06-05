@@ -231,7 +231,7 @@ OpenShift creates a Namespace in Kubernetes
 
 ```
 {
-  "apiVersion":"v1beta3",
+  "apiVersion":"v1",
   "kind": "Namespace",
   "metadata": {
     "name": "development",
@@ -256,7 +256,7 @@ User deletes the Namespace in Kubernetes, and Namespace now has following state:
 
 ```
 {
-  "apiVersion":"v1beta3",
+  "apiVersion":"v1",
   "kind": "Namespace",
   "metadata": {
     "name": "development",
@@ -281,7 +281,7 @@ removing *kubernetes* from the list of finalizers:
 
 ```
 {
-  "apiVersion":"v1beta3",
+  "apiVersion":"v1",
   "kind": "Namespace",
   "metadata": {
     "name": "development",
@@ -309,7 +309,7 @@ This results in the following state:
 
 ```
 {
-  "apiVersion":"v1beta3",
+  "apiVersion":"v1",
   "kind": "Namespace",
   "metadata": {
     "name": "development",

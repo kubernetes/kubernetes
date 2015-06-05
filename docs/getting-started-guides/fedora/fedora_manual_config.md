@@ -98,7 +98,7 @@ done
 
 ```json
 {
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "kind": "Node",
     "metadata": {
         "name": "fed-node",
