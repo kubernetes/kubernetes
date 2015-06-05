@@ -331,7 +331,13 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 		Status: api.NamespaceStatus{},
 	}
 	_, err := c.Namespaces().Create(namespaceObj)
-	return namespaceObj, err
+	if err != nil {
+		return namespaceObj, err
+	}
+	if err := waitForDefaultServiceAccountInNamespace(c, namespaceObj.Name); err != nil {
+		return namespaceObj, err
+	}
+	return namespaceObj, nil
 }
 
 func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
