@@ -169,15 +169,12 @@ redis-slave    name=redis,role=slave    name=redis,role=slave    10.0.234.24    
 To play with the service itself, find the external IP of the load balancer:
 
 ```shell
-$ cluster/kubectl.sh get services guestbook -o template --template='{{index . "publicIPs"}}'
-current-context: "kubernetes-satnam_kubernetes"
-Running: cluster/../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubectl get services guestbook -o template --template='{{.spec.publicIPs}}'
-[104.154.63.66]$
-
+$ cluster/kubectl.sh get services guestbook -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}'
+104.154.63.66$
 ```
 and then visit port 3000 of that IP address e.g. `http://104.154.63.66:3000`.
 
-You may need to open the firewall for port 3000 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+**NOTE:** You may need to open the firewall for port 3000 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
 ```shell
 $ gcloud compute firewall-rules create --allow=tcp:3000 --target-tags=kubernetes-minion kubernetes-minion-3000
@@ -194,8 +191,6 @@ For details about limiting traffic to specific sources, see the [GCE firewall do
 You should delete the service which will remove any associated resources that were created e.g. load balancers, forwarding rules and target pools. All the resources (replication controllers and service) can be deleted with a single command:
 ```shell
 $ cluster/kubectl.sh delete -f examples/guestbook-go
-current-context: "kubernetes-satnam_kubernetes"
-Running: cluster/../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubectl delete -f examples/guestbook-go
 guestbook-controller
 guestbook
 redis-master-controller
