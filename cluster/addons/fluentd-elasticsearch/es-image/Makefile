@@ -1,7 +1,10 @@
 .PHONY:	elasticsearch_logging_discovery build push
 
-# Keep this one version ahead to help prevent accidental pushes.
-TAG = 1.4
+# By default, pushes to a githash.  To override:
+# make push TAG=<version>
+# Next TAG=1.4
+
+TAG = $(shell git log -1 --format="format:%H")
 
 build:	elasticsearch_logging_discovery
 	docker build -t gcr.io/google_containers/elasticsearch:$(TAG) .

@@ -1,6 +1,9 @@
 all: serve_hostname
 
-TAG = 1.1
+# By default, pushes to a githash.  To override:
+# make push TAG=<version>
+
+TAG = $(shell git log -1 --format="format:%H")
 
 serve_hostname: serve_hostname.go
 	CGO_ENABLED=0 go build -a -installsuffix cgo --ldflags '-w' ./serve_hostname.go

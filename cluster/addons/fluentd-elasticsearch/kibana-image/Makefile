@@ -1,6 +1,10 @@
 .PHONY:	build push
 
-TAG = 1.3
+# By default, pushes to a githash.  To override:
+# make push TAG=<version>
+# Next TAG=1.4
+
+TAG = $(shell git log -1 --format="format:%H")
 
 build:
 	docker build -t gcr.io/google_containers/kibana:$(TAG) .
