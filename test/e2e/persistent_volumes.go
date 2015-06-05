@@ -78,7 +78,7 @@ var _ = Describe("[Skipped] persistentVolumes", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// allow the binder a chance to catch up.  should not be more than 20s.
-		waitForPersistentVolumePhase(api.VolumeBound, c, pv.Name, 1 * time.Second, 30 * time.Second)
+		waitForPersistentVolumePhase(api.VolumeBound, c, pv.Name, 1*time.Second, 30*time.Second)
 
 		pv, err = c.PersistentVolumes().Get(pv.Name)
 		Expect(err).NotTo(HaveOccurred())
@@ -91,7 +91,7 @@ var _ = Describe("[Skipped] persistentVolumes", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// allow the recycler a chance to catch up.  it has to perform NFS scrub, which can be slow in e2e.
-		waitForPersistentVolumePhase(api.VolumeAvailable, c, pv.Name, 5 * time.Second, 300 * time.Second)
+		waitForPersistentVolumePhase(api.VolumeAvailable, c, pv.Name, 5*time.Second, 300*time.Second)
 
 		pv, err = c.PersistentVolumes().Get(pv.Name)
 		Expect(err).NotTo(HaveOccurred())
@@ -101,9 +101,9 @@ var _ = Describe("[Skipped] persistentVolumes", func() {
 
 		// The NFS Server pod we're using contains an index.html file
 		// Verify the file was really scrubbed from the volume
-		checkpod := makeCheckPod(ns, serverIP)
-		checkpod, err = c.Pods(checkpod.Namespace).Get(checkpod.Name)
-		Expect(err).NotTo(HaveOccurred())
+		podTemplate := makeCheckPod(ns, serverIP)
+		checkpod, err := c.Pods(ns).Create(podTemplate)
+		expectNoError(err, "Failed to create checker pod: %v", err)
 		err = waitForPodSuccessInNamespace(c, checkpod.Name, checkpod.Spec.Containers[0].Name, checkpod.Namespace)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -138,8 +138,8 @@ func makePersistentVolume(serverIP string) *api.PersistentVolume {
 func makePersistentVolumeClaim(ns string) *api.PersistentVolumeClaim {
 	return &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
-			GenerateName:      "pvc-",
-			Namespace: ns,
+			GenerateName: "pvc-",
+			Namespace:    ns,
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{
@@ -166,7 +166,7 @@ func makeCheckPod(ns string, nfsserver string) *api.Pod {
 		},
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "checker-",
-			Namespace: ns,
+			Namespace:    ns,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
