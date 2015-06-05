@@ -1,21 +1,21 @@
 apiVersion: v1beta3
 kind: ReplicationController
 metadata:
-  name: kube-dns-v2
+  name: kube-dns-v3
   namespace: default
   labels:
-    k8s-app: kube-dns-v2
+    k8s-app: kube-dns-v3
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: {{ pillar['dns_replicas'] }}
   selector:
     k8s-app: kube-dns
-    version: v2
+    version: v3
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v2
+        version: v3
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
@@ -30,7 +30,7 @@ spec:
         - -initial-cluster-token
         - skydns-etcd
       - name: kube2sky
-        image: gcr.io/google_containers/kube2sky:1.8
+        image: gcr.io/google_containers/kube2sky:1.9
         args:
         # command = "/kube2sky"
         - -domain={{ pillar['dns_domain'] }}
