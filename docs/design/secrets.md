@@ -122,7 +122,7 @@ We should consider what the best way to allow this is; there are a few different
 
 3.  Give secrets attributes that allow the user to express that the secret should be presented to
     the container as an environment variable.  The container's environment would contain the
-    desired values and the software in the container could use them without accomodation the
+    desired values and the software in the container could use them without accommodation the
     command or setup script.
 
 For our initial work, we will treat all secrets as files to narrow the problem space.  There will

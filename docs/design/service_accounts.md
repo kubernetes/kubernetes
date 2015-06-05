@@ -149,7 +149,7 @@ First, if it finds pods which have a `Pod.Spec.ServiceAccountUsername` but no `P
 then it copies in the referenced securityContext and secrets references for the corresponding `serviceAccount`.
 
 Second, if ServiceAccount definitions change, it may take some actions.
-**TODO**: decide what actions it takes when a serviceAccount defintion changes.  Does it stop pods, or just
+**TODO**: decide what actions it takes when a serviceAccount definition changes.  Does it stop pods, or just
 allow someone to list ones that out out of spec?  In general, people may want to customize this?
 
 Third, if a new namespace is created, it may create a new serviceAccount for that namespace.  This may include

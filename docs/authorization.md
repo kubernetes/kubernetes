@@ -30,7 +30,7 @@ A request has 4 attributes that can be considered for authorization:
   - whether the request is readonly (GETs are readonly)
   - what resource is being accessed 
     - applies only to the API endpoints, such as 
-        `/api/v1beta3/namespaces/default/pods`.  For miscelaneous endpoints, like `/version`, the
+        `/api/v1beta3/namespaces/default/pods`.  For miscellaneous endpoints, like `/version`, the
         resource is the empty string.
   - the namespace of the object being access, or the empty string if the
         endpoint does not support namespaced objects.
@@ -82,7 +82,7 @@ To permit an action Policy with an unset namespace applies regardless of namespa
 
 [Complete file example](../pkg/auth/authorizer/abac/example_policy_file.jsonl)
 
-## Plugin Developement
+## Plugin Development
 
 Other implementations can be developed fairly easily.
 The APIserver calls the Authorizer interface:

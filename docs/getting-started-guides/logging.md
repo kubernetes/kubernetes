@@ -16,7 +16,7 @@ export LOGGING_DESTINATION=elasticsearch
 
 This will instantiate a [Fluentd](http://www.fluentd.org/) instance on each node which will
 collect all the Dcoker container log files. The collected logs will
-be targetted at an [Elasticsearch](http://www.elasticsearch.org/) instance assumed to be running on the
+be targeted at an [Elasticsearch](http://www.elasticsearch.org/) instance assumed to be running on the
 local node and accepting log information on port 9200. This can be accomplished
 by writing a pod specification and service specification to define an
 Elasticsearch service (more information to follow shortly in the contrib directory).

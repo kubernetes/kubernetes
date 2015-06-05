@@ -28,7 +28,7 @@ any other etcd clusters that might exist, including the kubernetes master.
 ## Issues
 
 The skydns service is reachable directly from kubernetes nodes (outside
-of any container) and DNS resolution works if the skydns service is targetted
+of any container) and DNS resolution works if the skydns service is targeted
 explicitly. However, nodes are not configured to use the cluster DNS service or
 to search the cluster's DNS domain by default.  This may be resolved at a later
 time.

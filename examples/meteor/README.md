@@ -69,9 +69,9 @@ your cluster. Edit [`meteor-controller.json`](meteor-controller.json) and make s
 points to the container you just pushed to the Docker Hub or GCR.
 
 As you may know, Meteor uses MongoDB, and we'll need to provide it a
-persistant Kuberetes volume to store its data. See the [volumes
+persistent Kuberetes volume to store its data. See the [volumes
 documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md)
-for options. We're going to use Google Compute Engine persistant
+for options. We're going to use Google Compute Engine persistent
 disks. Create the MongoDB disk by running:
 ```
 gcloud compute disks create --size=200GB mongo-disk
@@ -140,7 +140,7 @@ documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/doc
 for more information.
 
 As mentioned above, the mongo container uses a volume which is mapped
-to a persistant disk by Kubernetes. In [`mongo-pod.json`](mongo-pod.json) the container
+to a persistent disk by Kubernetes. In [`mongo-pod.json`](mongo-pod.json) the container
 section specifies the volume:
 ```
         "volumeMounts": [
