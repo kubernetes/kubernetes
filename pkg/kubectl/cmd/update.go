@@ -115,6 +115,7 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			return err
 		}
 		info.Refresh(obj, true)
+		printObjectSpecificMessage(obj, out)
 		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
 		return nil
 	})

@@ -19,12 +19,15 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -102,6 +105,7 @@ func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList) err
 		}
 		count++
 		info.Refresh(obj, true)
+		printObjectSpecificMessage(info.Object, out)
 		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
 		return nil
 	})
@@ -112,4 +116,37 @@ func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList) err
 		return fmt.Errorf("no objects passed to create")
 	}
 	return nil
+}
+
+func printObjectSpecificMessage(obj runtime.Object, out io.Writer) {
+	switch obj := obj.(type) {
+	case *api.Service:
+		if obj.Spec.Type == api.ServiceTypeLoadBalancer {
+			msg := fmt.Sprintf(`
+			An external load-balanced service was created.  On many platforms (e.g. Google Compute Engine),
+			you will also need to explicitly open a Firewall rule for the service port(s) (%s) to serve traffic.
+
+			See https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/services-firewall.md for more details.
+			`, makePortsString(obj.Spec.Ports))
+			out.Write([]byte(msg))
+		}
+		if obj.Spec.Type == api.ServiceTypeNodePort {
+			msg := fmt.Sprintf(`
+				You have exposed your service on an external port on all nodes in your cluster.
+				If you want to expose this service to the external internet, you may need to set up
+				firewall rules for the service port(s) (%s) to serve traffic.
+				
+				See https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/services-firewall.md for more details.
+				`, makePortsString(obj.Spec.Ports))
+			out.Write([]byte(msg))
+		}
+	}
+}
+
+func makePortsString(ports []api.ServicePort) string {
+	pieces := make([]string, len(ports))
+	for ix := range ports {
+		pieces[ix] = fmt.Sprintf("%s:%d", strings.ToLower(string(ports[ix].Protocol)), ports[ix].Port)
+	}
+	return strings.Join(pieces, ",")
 }
