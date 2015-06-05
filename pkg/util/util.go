@@ -515,16 +515,13 @@ func ShortenString(str string, n int) string {
 	} else {
 		return str[:n]
 	}
+}
 
 func FileExists(filename string) (bool, error) {
-	file, err := os.Open(filename)
-	defer file.Close()
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		} else {
-			return false, err
-		}
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
 	}
 	return true, nil
 }

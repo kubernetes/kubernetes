@@ -220,9 +220,12 @@ mount-master-pd() {
   mkdir -p /mnt/master-pd/srv/kubernetes
   # Contains the cluster's initial config parameters and auth tokens
   mkdir -p /mnt/master-pd/srv/salt-overlay
+  # Directory for kube-apiserver to store SSH key (if necessary)
+  mkdir -p /mnt/master-pd/srv/sshproxy
 
   ln -s -f /mnt/master-pd/var/etcd /var/etcd
   ln -s -f /mnt/master-pd/srv/kubernetes /srv/kubernetes
+  ln -s -f /mnt/master-pd/srv/sshproxy /srv/sshproxy
   ln -s -f /mnt/master-pd/srv/salt-overlay /srv/salt-overlay
 
   # This is a bit of a hack to get around the fact that salt has to run after the

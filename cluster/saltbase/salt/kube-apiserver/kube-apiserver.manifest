@@ -25,7 +25,7 @@
 
 {% set proxy_ssh_options = "" -%}
 {% if grains.proxy_ssh_user is defined -%}
-  {% set proxy_ssh_options = "--ssh-user=" + grains.proxy_ssh_user + " --ssh-keyfile=/sshproxy/.sshkeyfile" -%}
+  {% set proxy_ssh_options = "--ssh-user=" + grains.proxy_ssh_user + " --ssh-keyfile=/srv/sshproxy/.sshkeyfile" -%}
 {% endif -%}
 
 {% set address = "--address=127.0.0.1" -%}
@@ -143,8 +143,8 @@
         { "name": "etcpkitls",
         "mountPath": "/etc/pki/tls",
         "readOnly": true},
-        { "name": "sshproxy",
-        "mountPath": "/sshproxy",
+        { "name": "srvsshproxy",
+        "mountPath": "/srv/sshproxy",
         "readOnly": false}
       ]
     }
@@ -191,8 +191,9 @@
     "hostPath": {
         "path": "/etc/pki/tls"}
   },
-  { "name": "sshproxy",
-    "emptyDir": {}
+  { "name": "srvsshproxy",
+    "hostPath": {
+        "path": "/srv/sshproxy"}
   }
 ]
 }}

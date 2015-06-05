@@ -91,7 +91,6 @@ func (s *SSHTunnel) tunnel(conn net.Conn, remoteHost, remotePort string) error {
 }
 
 func (s *SSHTunnel) Close() error {
-	glog.Infof("Closing tunnel for host: %q", s.Host)
 	if err := s.client.Close(); err != nil {
 		return err
 	}
@@ -183,6 +182,9 @@ func (l SSHTunnelList) Open() error {
 	return nil
 }
 
+// Close asynchronously closes all tunnels in the list after waiting for 1
+// minute. Tunnels will still be open upon this function's return, but should
+// no longer be used.
 func (l SSHTunnelList) Close() {
 	for ix := range l {
 		entry := l[ix]
