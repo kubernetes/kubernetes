@@ -17,8 +17,11 @@ spec:
         - resources:
             limits:
               cpu: 1
-          image: pires/hazelcast-k8s:0.2
+          image: quay.io/pires/hazelcast-kubernetes:0.3.1
           name: hazelcast
+          env:
+          - name: "DNS_DOMAIN"
+            value: "cluster.local"
           ports: 
             - containerPort: 5701
               name: hazelcast

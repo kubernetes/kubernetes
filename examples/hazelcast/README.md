@@ -52,7 +52,7 @@ $ kubectl create -f hazelcast-service.yaml
 ```
 
 ### Adding replicated nodes
-The real power of Kubernetes and Hazelcast lies in easily building a replicated, scalable Hazelcast cluster.
+The real power of Kubernetes and Hazelcast lies in easily building a replicated, resizable Hazelcast cluster.
 
 In Kubernetes a _Replication Controller_ is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
 
@@ -78,18 +78,23 @@ spec:
         - resources:
             limits:
               cpu: 1
-          image: pires/hazelcast-k8s:0.2
+          image: quay.io/pires/hazelcast-kubernetes:0.3.1
           name: hazelcast
+          env:
+          - name: "DNS_DOMAIN"
+            value: "cluster.local"
           ports: 
             - containerPort: 5701
               name: hazelcast
 ```
 
-There are a few things to note in this description.  First is that we are running the `pires/hazelcast-k8s` image, tag `0.2`.  This is a `busybox` installation with JRE 8.  However it also adds a custom [`application`](https://github.com/pires/hazelcast-kubernetes-bootstrapper) that finds any Hazelcast nodes in the cluster and bootstraps an Hazelcast instance accordingle.  The `HazelcastDiscoveryController` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later).
+There are a few things to note in this description.  First is that we are running the `quay.io/pires/hazelcast-kubernetes` image, tag `0.3.1`.  This is a `busybox` installation with JRE 8.  However it also adds a custom [`application`](https://github.com/pires/hazelcast-kubernetes-bootstrapper) that finds any Hazelcast nodes in the cluster and bootstraps an Hazelcast instance accordingle.  The `HazelcastDiscoveryController` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later).
 
 You may also note that we tell Kubernetes that the container exposes the `hazelcast` port.  Finally, we tell the cluster manager that we need 1 cpu core.
 
-The bulk of the replication controller config is actually identical to the Hazelcast pod declaration above, it simply gives the controller a recipe to use when creating new pods.  The other parts are the ```selector``` which contains the controller's selector query, and the ```replicas``` parameter which specifies the desired number of replicas, in this case 1.
+The bulk of the replication controller config is actually identical to the Hazelcast pod declaration above, it simply gives the controller a recipe to use when creating new pods.  The other parts are the `selector` which contains the controller's selector query, and the `replicas` parameter which specifies the desired number of replicas, in this case 1.
+
+Last but not least, we set `DNS_DOMAIN` environment variable according to your Kubernetes clusters DNS configuration.
 
 Create this controller:
 
@@ -140,9 +145,9 @@ Now if you list the pods in your cluster, you should see two hazelcast pods:
 $ kubectl get pods
 POD                 IP            CONTAINER(S)   IMAGE(S)              HOST                                 LABELS           STATUS    CREATED      MESSAGE
 hazelcast-pkyzd     10.244.90.3                                        e2e-test-minion-vj7k/104.197.8.214   name=hazelcast   Running   14 seconds
-                                  hazelcast      pires/hazelcast-k8s:0.2                                                         Running   2 seconds
-hazelcast-ulkws     10.244.66.2                                        e2e-test-minion-2x1f/146.148.62.37   name=hazelcast   Running   7 seconds
-                                  hazelcast      pires/hazelcast-k8s:0.2                                                         Running   6 seconds
+                                  hazelcast      quay.io/pires/hazelcast-kubernetes:0.3.1                                                         Running   2 seconds
+hazelcast-ulkws     10.244.66.2                                        e2e-test-minion-2x1f/146.148.62.37   name=hazelcast   Running   7 seconds    
+                                  hazelcast      quay.io/pires/hazelcast-kubernetes:0.3.1                                                         Running   6 seconds
 ```
 
 To prove that this all works, you can use the `log` command to examine the logs of one pod, for example:
@@ -152,7 +157,7 @@ $ kubectl log hazelcast-ulkws hazelcast
 2015-05-09 22:06:20.016  INFO 5 --- [           main] com.github.pires.hazelcast.Application   : Starting Application v0.2-SNAPSHOT on hazelcast-enyli with PID 5 (/bootstrapper.jar started by root in /)
 2015-05-09 22:06:20.071  INFO 5 --- [           main] s.c.a.AnnotationConfigApplicationContext : Refreshing org.springframework.context.annotation.AnnotationConfigApplicationContext@5424f110: startup date [Sat May 09 22:06:20 GMT 2015]; root of context hierarchy
 2015-05-09 22:06:21.511  INFO 5 --- [           main] o.s.j.e.a.AnnotationMBeanExporter        : Registering beans for JMX exposure on startup
-2015-05-09 22:06:21.549  INFO 5 --- [           main] c.g.p.h.HazelcastDiscoveryController     : Asking k8s registry at http://10.100.0.1:80..
+2015-05-09 22:06:21.549  INFO 5 --- [           main] c.g.p.h.HazelcastDiscoveryController     : Asking k8s registry at https://kubernetes.default.cluster.local..
 2015-05-09 22:06:22.031  INFO 5 --- [           main] c.g.p.h.HazelcastDiscoveryController     : Found 2 pods running Hazelcast.
 2015-05-09 22:06:22.176  INFO 5 --- [           main] c.h.instance.DefaultAddressPicker        : [LOCAL] [someGroup] [3.4.2] Interfaces is disabled, trying to pick one address from TCP-IP config addresses: [10.244.90.3, 10.244.66.2]
 2015-05-09 22:06:22.177  INFO 5 --- [           main] c.h.instance.DefaultAddressPicker        : [LOCAL] [someGroup] [3.4.2] Prefer IPv4 stack is true.
