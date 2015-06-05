@@ -1178,11 +1178,14 @@ func deepCopy_v1beta3_PersistentVolumeSpec(in PersistentVolumeSpec, out *Persist
 	} else {
 		out.ClaimRef = nil
 	}
+	out.PersistentVolumeReclaimPolicy = in.PersistentVolumeReclaimPolicy
 	return nil
 }
 
 func deepCopy_v1beta3_PersistentVolumeStatus(in PersistentVolumeStatus, out *PersistentVolumeStatus, c *conversion.Cloner) error {
 	out.Phase = in.Phase
+	out.Message = in.Message
+	out.Reason = in.Reason
 	return nil
 }
 

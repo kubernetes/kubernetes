@@ -17,7 +17,18 @@ limitations under the License.
 package volume
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+
+	"github.com/golang/glog"
 )
 
 func GetAccessModesAsString(modes []api.PersistentVolumeAccessMode) string {
@@ -50,4 +61,90 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 		}
 	}
 	return false
+}
+
+// ScrubPodVolumeAndWatchUntilCompletion is intended for use with volume Recyclers.  This function will
+// save the given Pod to the API and watch it until it completes, fails, or the pod's ActiveDeadlineSeconds is exceeded, whichever comes first.
+// An attempt to delete a scrubber pod is always attempted before returning.
+// 	pod - the pod designed by a volume plugin to scrub the volume's contents
+//	client - kube client for API operations.
+func ScrubPodVolumeAndWatchUntilCompletion(pod *api.Pod, kubeClient client.Interface) error {
+	return internalScrubPodVolumeAndWatchUntilCompletion(pod, newScrubberClient(kubeClient))
+}
+
+// same as above func comments, except 'scrubberClient' is a narrower pod API interface to ease testing
+func internalScrubPodVolumeAndWatchUntilCompletion(pod *api.Pod, scrubberClient scrubberClient) error {
+	glog.V(5).Infof("Creating scrubber pod for volume %s\n", pod.Name)
+	pod, err := scrubberClient.CreatePod(pod)
+	if err != nil {
+		return fmt.Errorf("Unexpected error creating a pod to scrub volume %s:  %+v\n", pod.Name, err)
+	}
+
+	defer scrubberClient.DeletePod(pod.Name, pod.Namespace)
+
+	nextPod := scrubberClient.WatchPod(pod.Name, pod.Namespace, pod.ResourceVersion)
+	for {
+		watchedPod := nextPod()
+		if watchedPod.Status.Phase == api.PodSucceeded {
+			// volume.Recycle() returns nil on success, else error
+			return nil
+		}
+		if watchedPod.Status.Phase == api.PodFailed {
+			// volume.Recycle() returns nil on success, else error
+			if watchedPod.Status.Message != "" {
+				return fmt.Errorf(watchedPod.Status.Message)
+			} else {
+				return fmt.Errorf("Pod failed, pod.Status.Message unknown.")
+			}
+		}
+	}
+}
+
+// scrubberClient abstracts access to a Pod by providing a narrower interface.
+// this makes it easier to mock a client for testing
+type scrubberClient interface {
+	CreatePod(pod *api.Pod) (*api.Pod, error)
+	GetPod(name, namespace string) (*api.Pod, error)
+	DeletePod(name, namespace string) error
+	WatchPod(name, namespace, resourceVersion string) func() *api.Pod
+}
+
+func newScrubberClient(client client.Interface) scrubberClient {
+	return &realScrubberClient{client}
+}
+
+type realScrubberClient struct {
+	client client.Interface
+}
+
+func (c *realScrubberClient) CreatePod(pod *api.Pod) (*api.Pod, error) {
+	return c.client.Pods(pod.Namespace).Create(pod)
+}
+
+func (c *realScrubberClient) GetPod(name, namespace string) (*api.Pod, error) {
+	return c.client.Pods(namespace).Get(name)
+}
+
+func (c *realScrubberClient) DeletePod(name, namespace string) error {
+	return c.client.Pods(namespace).Delete(name, nil)
+}
+
+func (c *realScrubberClient) WatchPod(name, namespace, resourceVersion string) func() *api.Pod {
+	fieldSelector, _ := fields.ParseSelector("metadata.name=" + name)
+
+	podLW := &cache.ListWatch{
+		ListFunc: func() (runtime.Object, error) {
+			return c.client.Pods(namespace).List(labels.Everything(), fieldSelector)
+		},
+		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
+			return c.client.Pods(namespace).Watch(labels.Everything(), fieldSelector, resourceVersion)
+		},
+	}
+	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
+	cache.NewReflector(podLW, &api.Pod{}, queue, 1*time.Minute).Run()
+
+	return func() *api.Pod {
+		obj := queue.Pop()
+		return obj.(*api.Pod)
+	}
 }

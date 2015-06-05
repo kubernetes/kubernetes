@@ -508,3 +508,11 @@ func GetClient(req *http.Request) string {
 	}
 	return "unknown"
 }
+
+func ShortenString(str string, n int) string {
+	if len(str) <= n {
+		return str
+	} else {
+		return str[:n]
+	}
+}

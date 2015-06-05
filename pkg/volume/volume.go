@@ -29,7 +29,7 @@ type Volume interface {
 	GetPath() string
 }
 
-// Builder interface provides method to set up/mount the volume.
+// Builder interface provides methods to set up/mount the volume.
 type Builder interface {
 	// Uses Interface to provide the path for Docker binds.
 	Volume
@@ -43,7 +43,7 @@ type Builder interface {
 	SetUpAt(dir string) error
 }
 
-// Cleaner interface provides method to cleanup/unmount the volumes.
+// Cleaner interface provides methods to cleanup/unmount the volumes.
 type Cleaner interface {
 	Volume
 	// TearDown unmounts the volume from a self-determined directory and
@@ -52,6 +52,14 @@ type Cleaner interface {
 	// TearDown unmounts the volume from the specified directory and
 	// removes traces of the SetUp procedure.
 	TearDownAt(dir string) error
+}
+
+// Recycler provides methods to reclaim the volume resource.
+type Recycler interface {
+	Volume
+	// Recycle reclaims the resource.  Calls to this method should block until the recycling task is complete.
+	// Any error returned indicates the volume has failed to be reclaimed.  A nil return indicates success.
+	Recycle() error
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {
