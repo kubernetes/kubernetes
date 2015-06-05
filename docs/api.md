@@ -28,13 +28,28 @@ Distinct API versions present more clear, consistent views of system resources a
 
 The [API and release versioning proposal](versioning.md) describes the current thinking on the API version evolution process.
 
-## v1beta1 and v1beta2 are deprecated; please move to v1beta3 ASAP
+## v1beta1, v1beta2, and v1beta3 are deprecated; please move to v1 ASAP
 
-As of April 1, 2015, the Kubernetes v1beta3 API has been enabled by default, and the v1beta1 and v1beta2 APIs are deprecated. v1beta3 should be considered the v1 release-candidate API, and the v1 API is expected to be substantially similar. As "pre-release" APIs, v1beta1, v1beta2, and v1beta3 will be eliminated once the v1 API is available, by the end of June 2015. 
+As of June 4, 2015, the Kubernetes v1 API has been enabled by default. The v1beta1 and v1beta2 APIs were deleted on June 1, 2015. v1beta3 is planned to be deleted on July 6, 2015.
 
-## v1beta3 conversion tips
+### v1 conversion tips (from v1beta3)
 
-We're working to convert all documentation and examples to v1beta3. Most examples already contain a v1beta3 subdirectory with the API objects translated to v1beta3. A simple [API conversion tool](cluster_management.md#switching-your-config-files-to-a-new-api-version) has been written to simplify the translation process. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec. 
+We're working to convert all documentation and examples to v1. A simple [API conversion tool](cluster_management.md#switching-your-config-files-to-a-new-api-version) has been written to simplify the translation process. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec.
+
+Changes to services are the most significant difference between v1beta3 and v1.
+* The `service.spec.portalIP` property is renamed to `service.spec.clusterIP`.
+* The `service.spec.createExternalLoadBalancer` property is removed. Specify `service.spec.type: "LoadBalancer"` to create an external load balancer instead.
+* The `service.spec.publicIPs` property is deprecated and now called `service.spec.deprecatedPublicIPs`. This property will be removed entirely when v1beta3 is removed. The vast majority of users of this field were using it to expose services on ports on the node. Those users should specify `service.spec.type: "NodePort"` instead. Read [External Services](services.md#external-services) for more info. If this is not sufficient for your use case, please file an issue or contact @thockin.
+
+Some other difference between v1beta3 and v1:
+* The `pod.spec.containers[*].privileged` and `pod.spec.containers[*].capabilities` properties are now nested under the `pod.spec.containers[*].securityContext` property. See [Security Contexts](security_context.md).
+* The `pod.spec.host` property is renamed to `pod.spec.nodeName`.
+* The `endpoints.subsets[*].addresses.IP` property is renamed to `endpoints.subsets[*].addresses.ip`.
+* The `pod.status.containerStatuses[*].state.termination` and `pod.status.containerStatuses[*].lastState.termination` properties are renamed to `pod.status.containerStatuses[*].state.terminated` and `pod.status.containerStatuses[*].state.terminated` respectively.
+* The `pod.status.Condition` property is renamed to `pod.status.conditions`.
+* The `status.details.id` property is renamed to `status.details.name`.
+
+### v1beta3 conversion tips (from v1beta1/2)
 
 Some important differences between v1beta1/2 and v1beta3:
 * The resource `id` is now called `name`.
