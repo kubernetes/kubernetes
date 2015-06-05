@@ -443,6 +443,46 @@ func (os *OpenStack) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return &LoadBalancer{network, compute, os.lbOpts}, true
 }
 
+func isNotFound(err error) bool {
+	e, ok := err.(*gophercloud.UnexpectedResponseCodeError)
+	return ok && e.Actual == http.StatusNotFound
+}
+
+func getPoolByName(client *gophercloud.ServiceClient, name string) (*pools.Pool, error) {
+	opts := pools.ListOpts{
+		Name: name,
+	}
+	pager := pools.List(client, opts)
+
+	poolList := make([]pools.Pool, 0, 1)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		p, err := pools.ExtractPools(page)
+		if err != nil {
+			return false, err
+		}
+		poolList = append(poolList, p...)
+		if len(poolList) > 1 {
+			return false, ErrMultipleResults
+		}
+		return true, nil
+	})
+	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	if len(poolList) == 0 {
+		return nil, ErrNotFound
+	} else if len(poolList) > 1 {
+		return nil, ErrMultipleResults
+	}
+
+	return &poolList[0], nil
+}
+
 func getVipByName(client *gophercloud.ServiceClient, name string) (*vips.VirtualIP, error) {
 	opts := vips.ListOpts{
 		Name: name,
@@ -463,6 +503,9 @@ func getVipByName(client *gophercloud.ServiceClient, name string) (*vips.Virtual
 		return true, nil
 	})
 	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 
@@ -564,15 +607,19 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		}
 	}
 
-	vip, err := vips.Create(lb.network, vips.CreateOpts{
+	createOpts := vips.CreateOpts{
 		Name:         name,
 		Description:  fmt.Sprintf("Kubernetes external service %s", name),
-		Address:      externalIP.String(),
 		Protocol:     "TCP",
 		ProtocolPort: ports[0].Port, //TODO: need to handle multi-port
 		PoolID:       pool.ID,
 		Persistence:  persistence,
-	}).Extract()
+	}
+	if !externalIP.IsUnspecified() {
+		createOpts.Address = externalIP.String()
+	}
+
+	vip, err := vips.Create(lb.network, createOpts).Extract()
 	if err != nil {
 		if mon != nil {
 			monitors.Delete(lb.network, mon.ID)
@@ -651,45 +698,53 @@ func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []strin
 func (lb *LoadBalancer) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	glog.V(4).Infof("EnsureTCPLoadBalancerDeleted(%v, %v)", name, region)
 
-	// TODO(#8352): Because we look up the pool using the VIP object, if the VIP
-	// is already gone we can't attempt to delete the pool. We should instead
-	// continue even if the VIP doesn't exist and attempt to delete the pool by
-	// name.
-	vip, vipErr := getVipByName(lb.network, name)
-	if vipErr == ErrNotFound {
-		return nil
-	} else if vipErr != nil {
-		return vipErr
-	}
-
-	// It's ok if the pool doesn't exist, as we may still need to delete the vip
-	// (although I don't believe the system should ever be in that state).
-	pool, poolErr := pools.Get(lb.network, vip.PoolID).Extract()
-	if poolErr != nil {
-		detailedErr, ok := poolErr.(*gophercloud.UnexpectedResponseCodeError)
-		if !ok || detailedErr.Actual != http.StatusNotFound {
-			return poolErr
-		}
-	}
-	poolExists := (poolErr == nil)
-
-	// We have to delete the VIP before the pool can be deleted, so we can't
-	// continue on if this fails.
-	// TODO(#8352): Only do this if the VIP exists once we can delete pools by
-	// name rather than by ID.
-	err := vips.Delete(lb.network, vip.ID).ExtractErr()
+	vip, err := getVipByName(lb.network, name)
 	if err != nil && err != ErrNotFound {
 		return err
 	}
 
-	// Ignore errors for everything following here
-
-	if poolExists {
-		for _, monId := range pool.MonitorIDs {
-			// TODO(#8352): Delete the monitor, don't just disassociate it.
-			pools.DisassociateMonitor(lb.network, pool.ID, monId)
+	// We have to delete the VIP before the pool can be deleted,
+	// so no point continuing if this fails.
+	if vip != nil {
+		err := vips.Delete(lb.network, vip.ID).ExtractErr()
+		if err != nil && !isNotFound(err) {
+			return err
 		}
-		pools.Delete(lb.network, pool.ID)
+	}
+
+	var pool *pools.Pool
+	if vip != nil {
+		pool, err = pools.Get(lb.network, vip.PoolID).Extract()
+		if err != nil && !isNotFound(err) {
+			return err
+		}
+	} else {
+		// The VIP is gone, but it is conceivable that a Pool
+		// still exists that we failed to delete on some
+		// previous occasion.  Make a best effort attempt to
+		// cleanup any pools with the same name as the VIP.
+		pool, err = getPoolByName(lb.network, name)
+		if err != nil && err != ErrNotFound {
+			return err
+		}
+	}
+
+	if pool != nil {
+		for _, monId := range pool.MonitorIDs {
+			_, err = pools.DisassociateMonitor(lb.network, pool.ID, monId).Extract()
+			if err != nil {
+				return err
+			}
+
+			err = monitors.Delete(lb.network, monId).ExtractErr()
+			if err != nil && !isNotFound(err) {
+				return err
+			}
+		}
+		err = pools.Delete(lb.network, pool.ID).ExtractErr()
+		if err != nil && !isNotFound(err) {
+			return err
+		}
 	}
 
 	return nil
