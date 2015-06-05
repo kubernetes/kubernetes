@@ -451,7 +451,8 @@ func describeSecret(secret *api.Secret) (string, error) {
 		fmt.Fprintf(out, "\nData\n====\n")
 		for k, v := range secret.Data {
 			switch {
-			case k == api.ServiceAccountTokenKey && secret.Type == api.SecretTypeServiceAccountToken:
+			case k == api.ServiceAccountTokenKey && secret.Type == api.SecretTypeServiceAccountToken,
+				k == api.DockerConfigKey && secret.Type == api.SecretTypeDockercfg:
 				fmt.Fprintf(out, "%s:\t%s\n", k, string(v))
 			default:
 				fmt.Fprintf(out, "%s:\t%d bytes\n", k, len(v))
