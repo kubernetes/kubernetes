@@ -770,107 +770,6 @@ func TestPrintHumanReadableService(t *testing.T) {
 	}
 }
 
-func TestInterpretContainerStatus(t *testing.T) {
-	tests := []struct {
-		status          *api.ContainerStatus
-		expectedState   string
-		expectedMessage string
-		expectErr       bool
-		name            string
-	}{
-		{
-			status: &api.ContainerStatus{
-				State: api.ContainerState{
-					Running: &api.ContainerStateRunning{},
-				},
-				Ready: true,
-			},
-			expectedState:   "Running",
-			expectedMessage: "",
-			name:            "basic",
-		},
-		{
-			status: &api.ContainerStatus{
-				State: api.ContainerState{
-					Running: &api.ContainerStateRunning{},
-				},
-				Ready: false,
-			},
-			expectedState:   "Running *not ready*",
-			expectedMessage: "",
-			name:            "basic not ready",
-		},
-		{
-			status: &api.ContainerStatus{
-				State: api.ContainerState{
-					Waiting: &api.ContainerStateWaiting{},
-				},
-				Ready: false,
-			},
-			expectedState:   "Waiting",
-			expectedMessage: "",
-			name:            "waiting not ready",
-		},
-		{
-			status: &api.ContainerStatus{
-				State: api.ContainerState{
-					Waiting: &api.ContainerStateWaiting{},
-				},
-				Ready: true,
-			},
-			expectedState:   "Waiting",
-			expectedMessage: "",
-			name:            "waiting",
-		},
-		{
-			status: &api.ContainerStatus{
-				State: api.ContainerState{
-					Terminated: &api.ContainerStateTerminated{
-						ExitCode: 3,
-					},
-				},
-				Ready: false,
-			},
-			expectedState:   "Terminated",
-			expectedMessage: "exit code 3",
-			name:            "terminated not ready",
-		},
-		{
-			status: &api.ContainerStatus{
-				State: api.ContainerState{
-					Terminated: &api.ContainerStateTerminated{
-						ExitCode: 5,
-						Reason:   "test reason",
-					},
-				},
-				Ready: true,
-			},
-			expectedState:   "Terminated",
-			expectedMessage: "exit code 5, reason: test reason",
-			name:            "terminated",
-		},
-	}
-
-	for _, test := range tests {
-		// TODO: test timestamp printing.
-		state, _, msg, err := interpretContainerStatus(test.status)
-		if test.expectErr && err == nil {
-			t.Errorf("unexpected non-error (%s)", test.name)
-			continue
-		}
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v (%s)", err, test.name)
-			continue
-		}
-		if state != test.expectedState {
-			t.Errorf("expected: %s, got: %s", test.expectedState, state)
-		}
-		if msg != test.expectedMessage {
-			t.Errorf("expected: %s, got: %s", test.expectedMessage, msg)
-		}
-	}
-}
-
 func TestPrintHumanReadableWithNamespace(t *testing.T) {
 	namespaceName := "testnamespace"
 	name := "test"
@@ -1048,5 +947,83 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 		} else if !test.printNamespace && matched {
 			t.Errorf("Expect printing object not to contain namespace: %v", test.obj)
 		}
+	}
+}
+
+func TestPrintPod(t *testing.T) {
+	tests := []struct {
+		pod    api.Pod
+		expect string
+	}{
+		{
+			// Test name, num of containers, restarts, container ready status
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "test1"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{RestartCount: 3},
+					},
+				},
+			},
+			"test1\t1/2\tpodPhase\t6\t",
+		},
+		{
+			// Test container error overwrites pod phase
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "test2"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "containerWaitingReason"}}, RestartCount: 3},
+					},
+				},
+			},
+			"test2\t1/2\tcontainerWaitingReason\t6\t",
+		},
+		{
+			// Test the same as the above but with Terminated state and the first container overwrites the rest
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "test3"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					ContainerStatuses: []api.ContainerStatus{
+						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "containerWaitingReason"}}, RestartCount: 3},
+						{State: api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "containerTerminatedReason"}}, RestartCount: 3},
+					},
+				},
+			},
+			"test3\t0/2\tcontainerWaitingReason\t6\t",
+		},
+		{
+			// Test ready is not enough for reporting running
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "test4"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{Ready: true, RestartCount: 3},
+					},
+				},
+			},
+			"test4\t1/2\tpodPhase\t6\t",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printPod(&test.pod, buf, false)
+		// We ignore time
+		if !strings.HasPrefix(buf.String(), test.expect) {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
 	}
 }
