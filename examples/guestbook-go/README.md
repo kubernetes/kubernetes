@@ -13,7 +13,7 @@ $ hack/dev-build-and-up.sh
 
 ### Step One: Turn up the redis master.
 
-Use the file `examples/guestbook-go/redis-master-controller.json` to create a replication controller which manages a single pod. The pod runs a redis key-value server in a container. Using a replication controller is the preferred way to launch long-running pods, even for 1 replica, so the pod will benefit from self-healing mechanism in kubernetes.
+Use the file `examples/guestbook-go/redis-master-controller.json` to create a [replication controller](../../docs/replication-controller.md) which manages a single [pod](../../docs/pods.md). The pod runs a redis key-value server in a container. Using a replication controller is the preferred way to launch long-running pods, even for 1 replica, so the pod will benefit from self-healing mechanism in kubernetes.
 
 Create the redis master replication controller in your Kubernetes cluster using the `kubectl` CLI:
 
@@ -50,7 +50,7 @@ d5c458dabe50        gurpartap/redis:latest                 "/usr/local/bin/redi 
 (Note that initial `docker pull` may take a few minutes, depending on network conditions.)
 
 ### Step Two: Turn up the master service.
-A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via environment variables or DNS. Services find the containers to load balance based on pod labels.
+A Kubernetes '[service](../../docs/services.md)' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via environment variables or DNS. Services find the containers to load balance based on pod labels.
 
 The pod that you created in Step One has the label `name=redis` and `role=master`. The selector field of the service determines which pods will receive the traffic sent to the service.  Use the file `examples/guestbook-go/redis-master-service.json` to create the service in the `kubectl` cli:
 
