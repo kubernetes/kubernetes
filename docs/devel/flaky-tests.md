@@ -33,7 +33,9 @@ spec:
 ```
 Note that we omit the labels and the selector fields of the replication controller, because they will be populated from the labels field of the pod template by default.
 
-```./cluster/kubectl.sh create -f controller.yaml```
+```
+kubectl create -f controller.yaml
+```
 
 This will spin up 24 instances of the test.  They will run to completion, then exit, and the kubelet will restart them, accumulating more and more runs of the test.
 You can examine the recent runs of the test by calling ```docker ps -a``` and looking for tasks that exited with non-zero exit codes. Unfortunately, docker ps -a only keeps around the exit status of the last 15-20 containers with the same image, so you have to check them frequently.
@@ -52,7 +54,7 @@ grep "Exited ([^0])" output.txt
 Eventually you will have sufficient runs for your purposes. At that point you can stop and delete the replication controller by running:
 
 ```sh
-./cluster/kubectl.sh stop replicationcontroller flakecontroller
+kubectl stop replicationcontroller flakecontroller
 ```
 
 If you do a final check for flakes with ```docker ps -a```, ignore tasks that exited -1, since that's what happens when you stop the replication controller.

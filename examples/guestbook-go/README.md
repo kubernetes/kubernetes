@@ -18,12 +18,12 @@ Use the file `examples/guestbook-go/redis-master-controller.json` to create a [r
 Create the redis master replication controller in your Kubernetes cluster using the `kubectl` CLI:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/guestbook-go/redis-master-controller.json
+$ kubectl create -f examples/guestbook-go/redis-master-controller.json
 ```
 
 Once that's up you can list the replication controllers in the cluster:
 ```shell
-$ cluster/kubectl.sh get rc
+$ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                            SELECTOR                     REPLICAS
 redis-master-controller                redis-master            gurpartap/redis                     name=redis,role=master       1
 ```
@@ -31,7 +31,7 @@ redis-master-controller                redis-master            gurpartap/redis  
 List pods in cluster to verify the master is running. You'll see a single redis master pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds).
 
 ```shell
-$ cluster/kubectl.sh get pods
+$ kubectl get pods
 POD                  IP           CONTAINER(S)   IMAGE(S)          HOST                                    LABELS                   STATUS    CREATED     MESSAGE
 redis-master-y06lj   10.244.3.4                                    kubernetes-minion-bz1p/104.154.61.231   name=redis,role=master   Running   8 seconds   
                                   redis-master   gurpartap/redis                                                                    Running   3 seconds  
@@ -55,9 +55,9 @@ A Kubernetes '[service](../../docs/services.md)' is a named load balancer that p
 The pod that you created in Step One has the label `name=redis` and `role=master`. The selector field of the service determines which pods will receive the traffic sent to the service.  Use the file `examples/guestbook-go/redis-master-service.json` to create the service in the `kubectl` cli:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/guestbook-go/redis-master-service.json
+$ kubectl create -f examples/guestbook-go/redis-master-service.json
 
-$ cluster/kubectl.sh get services
+$ kubectl get services
 NAME           LABELS                   SELECTOR                 IP(S)         PORT(S)
 redis-master   name=redis,role=master   name=redis,role=master   10.0.11.173   6379/TCP
 ```
@@ -70,9 +70,9 @@ Although the redis master is a single pod, the redis read slaves are a 'replicat
 Use the file `examples/guestbook-go/redis-slave-controller.json` to create the replication controller:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/guestbook-go/redis-slave-controller.json
+$ kubectl create -f examples/guestbook-go/redis-slave-controller.json
 
-$ cluster/kubectl.sh get rc
+$ kubectl get rc
 CONTROLLER     CONTAINER(S)   IMAGE(S)          SELECTOR                 REPLICAS
 redis-master   redis-master   gurpartap/redis   name=redis,role=master   1
 redis-slave    redis-slave    gurpartap/redis   name=redis,role=slave    2
@@ -87,7 +87,7 @@ redis-server --slaveof redis-master 6379
 Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
 
 ```shell
-$ cluster/kubectl.sh get pods
+$ kubectl get pods
 POD                  IP           CONTAINER(S)   IMAGE(S)          HOST                                     LABELS                   STATUS    CREATED      MESSAGE
 redis-master-y06lj   10.244.3.4                                    kubernetes-minion-bz1p/104.154.61.231    name=redis,role=master   Running   5 minutes
                                   redis-master   gurpartap/redis                                                                     Running   5 minutes
@@ -108,9 +108,9 @@ This time the selector for the service is `name=redis,role=slave`, because that 
 Now that you have created the service specification, create it in your cluster with the `kubectl` CLI:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/guestbook-go/redis-slave-service.json
+$ kubectl create -f examples/guestbook-go/redis-slave-service.json
 
-$ cluster/kubectl.sh get services
+$ kubectl get services
 NAME           LABELS                   SELECTOR                 IP(S)         PORT(S)
 redis-master   name=redis,role=master   name=redis,role=master   10.0.11.173   6379/TCP
 redis-slave    name=redis,role=slave    name=redis,role=slave    10.0.234.24   6379/TCP
@@ -123,9 +123,9 @@ This is a simple Go net/http ([negroni](https://github.com/codegangsta/negroni) 
 The pod is described in the file `examples/guestbook-go/guestbook-controller.json`. Using this file, you can turn up your guestbook with:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/guestbook-go/guestbook-controller.json
+$ kubectl create -f examples/guestbook-go/guestbook-controller.json
 
-$ cluster/kubectl.sh get replicationControllers
+$ kubectl get replicationControllers
 CONTROLLER     CONTAINER(S)   IMAGE(S)                  SELECTOR                 REPLICAS
 guestbook      guestbook      kubernetes/guestbook:v2   name=guestbook           3
 redis-master   redis-master   gurpartap/redis           name=redis,role=master   1
@@ -157,9 +157,9 @@ You will see a single redis master pod, two redis slaves, and three guestbook po
 Just like the others, you want a service to group your guestbook pods.  The service specification for the guestbook is in `examples/guestbook-go/guestbook-service.json`.  There's a twist this time - because we want it to be externally visible, we set the `createExternalLoadBalancer` flag on the service.
 
 ```shell
-$ cluster/kubectl.sh create -f examples/guestbook-go/guestbook-service.json
+$ kubectl create -f examples/guestbook-go/guestbook-service.json
 
-$ cluster/kubectl.sh get services
+$ kubectl get services
 NAME           LABELS                   SELECTOR                 IP(S)          PORT(S)
 guestbook      name=guestbook           name=guestbook           10.0.114.109   3000/TCP
 redis-master   name=redis,role=master   name=redis,role=master   10.0.11.173    6379/TCP
@@ -169,7 +169,7 @@ redis-slave    name=redis,role=slave    name=redis,role=slave    10.0.234.24    
 To play with the service itself, find the external IP of the load balancer:
 
 ```shell
-$ cluster/kubectl.sh get services guestbook -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}'
+$ kubectl get services guestbook -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}'
 104.154.63.66$
 ```
 and then visit port 3000 of that IP address e.g. `http://104.154.63.66:3000`.
@@ -190,7 +190,7 @@ For details about limiting traffic to specific sources, see the [GCE firewall do
 
 You should delete the service which will remove any associated resources that were created e.g. load balancers, forwarding rules and target pools. All the resources (replication controllers and service) can be deleted with a single command:
 ```shell
-$ cluster/kubectl.sh delete -f examples/guestbook-go
+$ kubectl delete -f examples/guestbook-go
 guestbook-controller
 guestbook
 redis-master-controller

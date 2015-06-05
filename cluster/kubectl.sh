@@ -18,6 +18,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "-=-=-=-=-=-=-=-=-=-="
+echo "NOTE:"
+echo "kubectl.sh is deprecated and will be removed soon."
+echo "please replace all usage with calls to the kubectl"
+echo "binary and ensure that it is in your PATH." 
+echo ""
+echo "Please see 'kubectl help config' for more details"
+echo "about configuring kubectl for your cluster."
+echo "-=-=-=-=-=-=-=-=-=-="
+
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 UTILS=${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh

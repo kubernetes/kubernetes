@@ -12,8 +12,6 @@ The web front end interacts with the redis master via javascript redis API calls
 
 This example requires a kubernetes cluster.  See the [Getting Started guides](../../docs/getting-started-guides) for how to get started.
 
-If you are running from source, replace commands such as `kubectl` below with calls to `cluster/kubectl.sh`.
-
 ### Step One: Fire up the redis master
 
 Note: This redis-master is *not* highly available.  Making it highly available would be a very interesting, but intricate exercise - redis doesn't actually support multi-master deployments at the time of this writing, so high availability would be a somewhat tricky thing to implement, and might involve periodic serialization to disk, and so on.
@@ -252,7 +250,7 @@ The service specification for the slaves is in `examples/guestbook/redis-slave-s
 }
 ```
 
-This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself as we've done here to make it easy to locate them with the `cluster/kubectl.sh get services -l "label=value"` command.
+This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself as we've done here to make it easy to locate them with the `kubectl get services -l "label=value"` command.
 
 Now that you have created the service specification, create it in your cluster by running:
 
@@ -431,7 +429,7 @@ redis-slave             name=redis-slave                          name=redis-sla
 
 ### A few Google Container Engine specifics for playing around with the services.
 
-In GCE, `cluster/kubectl.sh` automatically creates forwarding rule for services with `createExternalLoadBalancer`.
+In GCE, `kubectl` automatically creates forwarding rule for services with `createExternalLoadBalancer`.
 
 ```shell
 $ gcloud compute forwarding-rules list

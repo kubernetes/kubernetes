@@ -13,9 +13,8 @@ Currently, you can look at:
 
 Example from command line (the DNS lookup looks better from a web browser):
 ```
-$ alias kctl=../../../cluster/kubectl.sh
-$ kctl create -f pod.json
-$ kctl proxy &
+$ kubectl create -f pod.json
+$ kubectl proxy &
 Starting to serve on localhost:8001
 
 $ curl localhost:8001/api/v1beta3/proxy/namespaces/default/pods/explorer:8080/vars/

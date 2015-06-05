@@ -23,7 +23,7 @@ Once you have installed Ceph and new Kubernetes, you can create a pod based on m
 If Ceph authentication secret is provided, the secret should be first be base64 encoded, then encoded string is placed in a secret yaml. An example yaml is provided [here](secret/ceph-secret.yaml). Then post the secret through ```kubectl``` in the following command.
 
 ```console
-    # cluster/kubectl.sh create -f examples/rbd/secret/ceph-secret.yaml
+    # kubectl create -f examples/rbd/secret/ceph-secret.yaml
 ```	
 
 # Get started
@@ -31,8 +31,8 @@ If Ceph authentication secret is provided, the secret should be first be base64 
 Here are my commands:
 
 ```console
-    # cluster/kubectl.sh create -f examples/rbd/v1beta3/rbd.json
-    # cluster/kubectl.sh get pods
+    # kubectl create -f examples/rbd/v1beta3/rbd.json
+    # kubectl get pods
 ```
 
 On the Kubernetes host, I got these in mount output
