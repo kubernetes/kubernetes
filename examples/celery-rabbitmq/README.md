@@ -146,7 +146,7 @@ ENV C_FORCE_ROOT 1
 CMD ["/bin/bash", "/usr/local/bin/run.sh"]
 ```
 
-The celery\_conf.py contains the defintion of a simple Celery task that adds two numbers. This last line starts the Celery worker.
+The celery\_conf.py contains the definition of a simple Celery task that adds two numbers. This last line starts the Celery worker.
 
 **NOTE:** `ENV C_FORCE_ROOT 1` forces Celery to be run as the root user, which is *not* recommended in production!
 

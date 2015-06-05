@@ -513,7 +513,7 @@ When you go to localhost:8000, you might not see the page at all.  Testing it wi
 ```shell
    ==> default: curl: (56) Recv failure: Connection reset by peer
 ```
-This means the web frontend isn't up yet. Specifically, the  "reset by peer" message is occuring because you are trying to access the *right port*, but *nothing is bound* to that port yet. Wait a while, possibly about 2 minutes or more, depending on your set up. Also, run a *watch* on docker ps, to see if containers are cycling on and off or not starting.
+This means the web frontend isn't up yet. Specifically, the  "reset by peer" message is occurring because you are trying to access the *right port*, but *nothing is bound* to that port yet. Wait a while, possibly about 2 minutes or more, depending on your set up. Also, run a *watch* on docker ps, to see if containers are cycling on and off or not starting.
 
 ```watch 
 $> watch -n 1 docker ps

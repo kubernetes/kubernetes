@@ -151,7 +151,7 @@ redis-master   master         redis                                       name=r
 redis-slave    slave          kubernetes/redis-slave:v2                   name=redis-slave    4
 ```
 
-You now will have more instances of front-end Guestbook apps and Redis slaves; and, if you look up all pods labled `name=frontend`, you should see one running on each node.
+You now will have more instances of front-end Guestbook apps and Redis slaves; and, if you look up all pods labeled `name=frontend`, you should see one running on each node.
 
 ```
 core@kube-00 ~/guestbook-example $ kubectl get pods -l name=frontend

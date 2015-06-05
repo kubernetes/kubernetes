@@ -27,7 +27,7 @@ Non kubernetes defaults in the environment files
 
 Notes
 -----
-It may seem reasonable to use --option=${OPTION} in the .service file instead of only putting the command line option in the environment file.  However this results in the possiblity of daemons being called with --option= if the environment file does not define a value.  Whereas including the --option string inside the environment file means that nothing will be passed to the daemon.  So the daemon default will be used for things unset by the environment files.
+It may seem reasonable to use --option=${OPTION} in the .service file instead of only putting the command line option in the environment file.  However this results in the possibility of daemons being called with --option= if the environment file does not define a value.  Whereas including the --option string inside the environment file means that nothing will be passed to the daemon.  So the daemon default will be used for things unset by the environment files.
 
 While some command line options to the daemons use the default when passed an empty option some cause the daemon to fail to launch.  --allow_privileged= (without a value of true/false) will cause the kube-apiserver and kubelet to refuse to launch.
 

@@ -14,7 +14,7 @@ If you are new to kubernetes, and you haven't run guestbook yet,
 
 you might want to stop here and go back and run guestbook app first.  
 
-The guestbook tutorial will teach you alot about the basics of kubernetes, and we've tried not to be redundant here.
+The guestbook tutorial will teach you a lot about the basics of kubernetes, and we've tried not to be redundant here.
 
 ## Architecture of this SOA
 

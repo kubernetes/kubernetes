@@ -125,7 +125,7 @@ If the administrator wishes to create node objects manually, set kubelet flag
 The administrator can modify Node resources (regardless of the setting of `--register-node`).
 Modifications include setting labels on the Node, and marking it unschedulable.
 
-Labels on nodes can be used in conjuction with node selectors on pods to control scheduling.
+Labels on nodes can be used in conjunction with node selectors on pods to control scheduling.
 
 Making a node unscheduleable will prevent new pods from being scheduled to that
 node, but will not affect any existing pods on the node.  This is useful as a

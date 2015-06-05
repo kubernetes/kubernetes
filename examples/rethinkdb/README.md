@@ -80,7 +80,7 @@ rethinkdb-rc-1.16.0-manu6                                                       
 Admin
 -----
 
-You need a separate pod (which labled as role:admin) to access Web Admin UI
+You need a separate pod (labeled as role:admin) to access Web Admin UI
 
 ```shell
 kubectl create -f admin-pod.yaml
