@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -119,12 +120,14 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 
 func TestDescribeContainers(t *testing.T) {
 	testCases := []struct {
-		input            api.ContainerStatus
+		container        api.Container
+		status           api.ContainerStatus
 		expectedElements []string
 	}{
 		// Running state.
 		{
-			input: api.ContainerStatus{
+			container: api.Container{Name: "test", Image: "image"},
+			status: api.ContainerStatus{
 				Name: "test",
 				State: api.ContainerState{
 					Running: &api.ContainerStateRunning{
@@ -133,13 +136,13 @@ func TestDescribeContainers(t *testing.T) {
 				},
 				Ready:        true,
 				RestartCount: 7,
-				Image:        "image",
 			},
 			expectedElements: []string{"test", "State", "Running", "Ready", "True", "Restart Count", "7", "Image", "image", "Started"},
 		},
 		// Waiting state.
 		{
-			input: api.ContainerStatus{
+			container: api.Container{Name: "test", Image: "image"},
+			status: api.ContainerStatus{
 				Name: "test",
 				State: api.ContainerState{
 					Waiting: &api.ContainerStateWaiting{
@@ -148,13 +151,13 @@ func TestDescribeContainers(t *testing.T) {
 				},
 				Ready:        true,
 				RestartCount: 7,
-				Image:        "image",
 			},
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "Reason", "potato"},
 		},
 		// Terminated state.
 		{
-			input: api.ContainerStatus{
+			container: api.Container{Name: "test", Image: "image"},
+			status: api.ContainerStatus{
 				Name: "test",
 				State: api.ContainerState{
 					Terminated: &api.ContainerStateTerminated{
@@ -166,25 +169,52 @@ func TestDescribeContainers(t *testing.T) {
 				},
 				Ready:        true,
 				RestartCount: 7,
-				Image:        "image",
 			},
 			expectedElements: []string{"test", "State", "Terminated", "Ready", "True", "Restart Count", "7", "Image", "image", "Reason", "potato", "Started", "Finished", "Exit Code", "2"},
 		},
 		// No state defaults to waiting.
 		{
-			input: api.ContainerStatus{
+			container: api.Container{Name: "test", Image: "image"},
+			status: api.ContainerStatus{
 				Name:         "test",
 				Ready:        true,
 				RestartCount: 7,
-				Image:        "image",
 			},
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image"},
+		},
+		// Using limits.
+		{
+			container: api.Container{
+				Name:  "test",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Limits: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):     resource.MustParse("1000"),
+						api.ResourceName(api.ResourceMemory):  resource.MustParse("4G"),
+						api.ResourceName(api.ResourceStorage): resource.MustParse("20G"),
+					},
+				},
+			},
+			status: api.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"cpu", "1k", "memory", "4G", "storage", "20G"},
 		},
 	}
 
 	for i, testCase := range testCases {
 		out := new(bytes.Buffer)
-		describeContainers([]api.ContainerStatus{testCase.input}, out)
+		pod := api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{testCase.container},
+			},
+			Status: api.PodStatus{
+				ContainerStatuses: []api.ContainerStatus{testCase.status},
+			},
+		}
+		describeContainers(&pod, out)
 		output := out.String()
 		for _, expected := range testCase.expectedElements {
 			if !strings.Contains(output, expected) {
