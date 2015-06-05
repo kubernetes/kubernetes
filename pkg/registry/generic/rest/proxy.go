@@ -214,9 +214,37 @@ func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL) http.Roun
 		suffix += "/"
 	}
 	pathPrepend := strings.TrimSuffix(url.Path, suffix)
-	return &proxy.Transport{
+	internalTransport := &proxy.Transport{
 		Scheme:      scheme,
 		Host:        host,
 		PathPrepend: pathPrepend,
 	}
+	return &corsRemovingTransport{
+		RoundTripper: internalTransport,
+	}
+}
+
+// corsRemovingTransport is a wrapper for an internal transport. It removes CORS headers
+// from the internal response.
+type corsRemovingTransport struct {
+	http.RoundTripper
+}
+
+func (p *corsRemovingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := p.RoundTripper.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	removeCORSHeaders(resp)
+	return resp, nil
+
+}
+
+// removeCORSHeaders strip CORS headers sent from the backend
+// This should be called on all responses before returning
+func removeCORSHeaders(resp *http.Response) {
+	resp.Header.Del("Access-Control-Allow-Credentials")
+	resp.Header.Del("Access-Control-Allow-Headers")
+	resp.Header.Del("Access-Control-Allow-Methods")
+	resp.Header.Del("Access-Control-Allow-Origin")
 }
