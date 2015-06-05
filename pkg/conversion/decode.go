@@ -17,9 +17,10 @@ limitations under the License.
 package conversion
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+
+	json "github.com/pquerna/ffjson/ffjson"
 )
 
 // Decode converts a JSON string back into a pointer to an api object.

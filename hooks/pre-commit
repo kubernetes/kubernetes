@@ -87,6 +87,22 @@ else
 fi
 echo "${reset}"
 
+echo -ne "Checking for ffjson files that need updating..."
+if ! hack/verify-ffjson.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Some ffjson encodings are out of sync."
+  echo "To regenerate run:"
+  echo "  ffjson pkg/api/v1beta3/types.go"
+  echo "  ffjson pkg/api/v1/types.go"
+  echo "  ffjson pkg/api/types.go"
+  echo "  ffjson pkg/api/resource/quantity.go"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+
 echo -ne "Checking for docs that need updating... "
 if ! hack/verify-gendocs.sh > /dev/null; then
   echo "${red}ERROR!"

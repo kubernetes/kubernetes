@@ -43,6 +43,7 @@ import (
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
+	"github.com/pquerna/ffjson/ffjson"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -282,6 +283,7 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 		errorJSONFatal(err, codec, w)
 		return
 	}
+	// TODO: turn this off, this doubles our memory allocations (for no good in most cases)!
 	// PR #2243: Pretty-print JSON by default.
 	formatted := &bytes.Buffer{}
 	err = json.Indent(formatted, output, "", "  ")
@@ -292,6 +294,8 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	w.Write(formatted.Bytes())
+	// Hand the buffer back to the json encoding library
+	ffjson.Pool(output)
 }
 
 // errorJSON renders an error to the response. Returns the HTTP status code of the error.
