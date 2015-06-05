@@ -93,6 +93,7 @@ type TestContextType struct {
 	CloudConfig CloudConfig
 	KubectlPath string
 	OutputDir   string
+	prefix      string
 }
 
 var testContext TestContextType
