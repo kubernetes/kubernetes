@@ -364,7 +364,7 @@ func TestRollingUpdater_preserveCleanup(t *testing.T) {
 				t.Fatalf("unexpected call to delete %s/%s", namespace, name)
 				return nil
 			},
-			ControllerHasDesiredReplicasFn: func(rc *api.ReplicationController, timeout time.Duration) error {
+			ControllerHasDesiredReplicasFn: func(rc *api.ReplicationController, timeout time.Duration, wg *Wait) error {
 				return nil
 			},
 		},
@@ -813,7 +813,7 @@ type rollingUpdaterClientImpl struct {
 	UpdateReplicationControllerFn  func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
 	CreateReplicationControllerFn  func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
 	DeleteReplicationControllerFn  func(namespace, name string) error
-	ControllerHasDesiredReplicasFn func(rc *api.ReplicationController, timeout time.Duration) error
+	ControllerHasDesiredReplicasFn func(rc *api.ReplicationController, timeout time.Duration, wg *Wait) error
 }
 
 func (c *rollingUpdaterClientImpl) ListReplicationControllers(namespace string, selector labels.Selector) (*api.ReplicationControllerList, error) {
@@ -836,6 +836,6 @@ func (c *rollingUpdaterClientImpl) DeleteReplicationController(namespace, name s
 	return c.DeleteReplicationControllerFn(namespace, name)
 }
 
-func (c *rollingUpdaterClientImpl) ControllerHasDesiredReplicas(rc *api.ReplicationController, timeout time.Duration) error {
-	return c.ControllerHasDesiredReplicasFn(rc, timeout)
+func (c *rollingUpdaterClientImpl) ControllerHasDesiredReplicas(rc *api.ReplicationController, timeout time.Duration, wg *Wait) error {
+	return c.ControllerHasDesiredReplicasFn(rc, timeout, wg)
 }

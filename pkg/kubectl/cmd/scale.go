@@ -113,7 +113,7 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	currentSize := cmdutil.GetFlagInt(cmd, "current-replicas")
 	precondition := &kubectl.ScalePrecondition{currentSize, resourceVersion}
 	retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
-	waitForReplicas := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
+	waitForReplicas := kubectl.NewWait()
 	if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
 		return err
 	}
