@@ -69,8 +69,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"func": "stream"},
 				},
 			},
-			expected: "services/foo",
-			status:   200,
+			status: 200,
 		},
 		{
 			name: "no-name-passed-from-the-cli",
@@ -103,7 +102,40 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"run": "this"},
 				},
 			},
-			expected: "services/mayor",
+			status: 200,
+		},
+		{
+			name: "expose-external-service",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "create-external-load-balancer": "true"},
+			output: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "12", Labels: map[string]string{"svc": "test"}},
+				TypeMeta:   api.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Name:     "default",
+							Protocol: api.Protocol("UDP"),
+							Port:     14,
+						},
+					},
+					Selector: map[string]string{"func": "stream"},
+					Type:     api.ServiceTypeLoadBalancer,
+				},
+			},
+			expected: "you will also need to explicitly open a firewall",
 			status:   200,
 		},
 	}
@@ -135,9 +167,11 @@ func TestRunExposeService(t *testing.T) {
 		}
 		cmd.Run(cmd, test.args)
 
-		out := buf.String()
-		if strings.Contains(out, test.expected) {
-			t.Errorf("%s: unexpected output: %s", test.name, out)
+		if len(test.expected) > 0 {
+			out := buf.String()
+			if !strings.Contains(out, test.expected) {
+				t.Errorf("%s: unexpected output: %s", test.name, out)
+			}
 		}
 	}
 }

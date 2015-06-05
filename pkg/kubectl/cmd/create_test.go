@@ -21,7 +21,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestExtraArgsFail(t *testing.T) {
@@ -127,5 +129,79 @@ func TestCreateDirectory(t *testing.T) {
 
 	if buf.String() != "replicationcontrollers/name\nservices/baz\nreplicationcontrollers/name\nservices/baz\nreplicationcontrollers/name\nservices/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestPrintObjectSpecificMessage(t *testing.T) {
+	tests := []struct {
+		obj          runtime.Object
+		expectOutput bool
+	}{
+		{
+			obj:          &api.Service{},
+			expectOutput: false,
+		},
+		{
+			obj:          &api.Pod{},
+			expectOutput: false,
+		},
+		{
+			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeLoadBalancer}},
+			expectOutput: true,
+		},
+		{
+			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeNodePort}},
+			expectOutput: true,
+		},
+	}
+	for _, test := range tests {
+		buff := &bytes.Buffer{}
+		printObjectSpecificMessage(test.obj, buff)
+		if test.expectOutput && buff.Len() == 0 {
+			t.Errorf("Expected output, saw none for %v", test.obj)
+		}
+		if !test.expectOutput && buff.Len() > 0 {
+			t.Errorf("Expected no output, saw %s for %v", buff.String(), test.obj)
+		}
+	}
+}
+
+func TestMakePortsString(t *testing.T) {
+	tests := []struct {
+		ports          []api.ServicePort
+		expectedOutput string
+	}{
+		{ports: nil, expectedOutput: ""},
+		{ports: []api.ServicePort{}, expectedOutput: ""},
+		{ports: []api.ServicePort{
+			{
+				Port:     80,
+				Protocol: "TCP",
+			},
+		},
+			expectedOutput: "tcp:80",
+		},
+		{ports: []api.ServicePort{
+			{
+				Port:     80,
+				Protocol: "TCP",
+			},
+			{
+				Port:     8080,
+				Protocol: "UDP",
+			},
+			{
+				Port:     9000,
+				Protocol: "TCP",
+			},
+		},
+			expectedOutput: "tcp:80,udp:8080,tcp:9000",
+		},
+	}
+	for _, test := range tests {
+		output := makePortsString(test.ports)
+		if output != test.expectedOutput {
+			t.Errorf("expected: %s, saw: %s.", test.expectedOutput, output)
+		}
 	}
 }
