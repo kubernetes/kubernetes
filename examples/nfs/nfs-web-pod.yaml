@@ -17,7 +17,7 @@ spec:
       volumeMounts:
           # name must match the volume name below
           - name: nfs
-            mountPath: "/var/www/html"
+            mountPath: "/usr/share/nginx/html"
   volumes:
     - name: nfs
       nfs:
