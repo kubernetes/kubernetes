@@ -607,15 +607,19 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		}
 	}
 
-	vip, err := vips.Create(lb.network, vips.CreateOpts{
+	createOpts := vips.CreateOpts{
 		Name:         name,
 		Description:  fmt.Sprintf("Kubernetes external service %s", name),
-		Address:      externalIP.String(),
 		Protocol:     "TCP",
 		ProtocolPort: ports[0].Port, //TODO: need to handle multi-port
 		PoolID:       pool.ID,
 		Persistence:  persistence,
-	}).Extract()
+	}
+	if !externalIP.IsUnspecified() {
+		createOpts.Address = externalIP.String()
+	}
+
+	vip, err := vips.Create(lb.network, createOpts).Extract()
 	if err != nil {
 		if mon != nil {
 			monitors.Delete(lb.network, mon.ID)
