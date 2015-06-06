@@ -168,8 +168,11 @@ fi
 if [[ ${docker_storage} == "btrfs" ]]; then
   DOCKER_OPTS="${DOCKER_OPTS} -s btrfs"
 elif [[ ${docker_storage} == "aufs-nolvm" || ${docker_storage} == "aufs" ]]; then
-  # Install aufs kernel module
+  # Install aufs kernel module (for ubuntu)
   apt-get install --yes linux-image-extra-$(uname -r)
+
+  # Install aufs tools (for debian)
+  apt-get install --yes aufs-tools
 
   DOCKER_OPTS="${DOCKER_OPTS} -s aufs"
 elif [[ ${docker_storage} == "devicemapper" ]]; then
