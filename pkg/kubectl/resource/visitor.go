@@ -37,6 +37,8 @@ import (
 )
 
 // Visitor lets clients walk a list of resources.
+// TODO: we should rethink how we handle errors in the visit loop
+// (See https://github.com/GoogleCloudPlatform/kubernetes/pull/9357#issuecomment-109600305)
 type Visitor interface {
 	Visit(VisitorFunc) error
 }
@@ -220,7 +222,7 @@ func (v *PathVisitor) Visit(fn VisitorFunc) error {
 		if !v.IgnoreErrors {
 			return err
 		}
-		glog.V(2).Infof("Unable to load file %q: %v", v.Path, err)
+		fmt.Fprintf(os.Stderr, "error: unable to load file %q: %v\n", v.Path, err)
 		return nil
 	}
 	return fn(info)
@@ -283,7 +285,7 @@ func (v *DirectoryVisitor) Visit(fn VisitorFunc) error {
 			if !v.IgnoreErrors {
 				return err
 			}
-			glog.V(2).Infof("Unable to load file %q: %v", path, err)
+			fmt.Fprintf(os.Stderr, "error: unable to load file %q: %v\n", path, err)
 			return nil
 		}
 		return fn(info)
@@ -471,7 +473,7 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 		info, err := v.InfoForData(ext.RawJSON, v.Source)
 		if err != nil {
 			if v.IgnoreErrors {
-				glog.Warningf("Could not read an encoded object from %s: %v", v.Source, err)
+				fmt.Fprintf(os.Stderr, "error: could not read an encoded object from %s: %v\n", v.Source, err)
 				glog.V(4).Infof("Unreadable: %s", string(ext.RawJSON))
 				continue
 			}
