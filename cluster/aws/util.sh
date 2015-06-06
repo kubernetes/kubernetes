@@ -23,7 +23,7 @@ source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
 case "${KUBE_OS_DISTRIBUTION}" in
-  ubuntu|wheezy|coreos)
+  ubuntu|wheezy|jessie|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
     ;;
   *)
@@ -186,6 +186,9 @@ case "${KUBE_OS_DISTRIBUTION}" in
     ;;
   wheezy)
     detect-wheezy-image
+    ;;
+  jessie)
+    detect-jessie-image
     ;;
   *)
     echo "Please specify AWS_IMAGE directly (distro not recognized)"
