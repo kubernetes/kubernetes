@@ -1426,7 +1426,7 @@ func isEqualStringPointer(l, r *string) bool {
 	return *l == *r
 }
 
-func isEqualIPPermission(l, r *ec2.IPPermission) bool {
+func isEqualIPPermission(l, r *ec2.IPPermission, compareGroupUserIDs bool) bool {
 	if !isEqualIntPointer(l.FromPort, r.FromPort) {
 		return false
 	}
@@ -1452,8 +1452,10 @@ func isEqualIPPermission(l, r *ec2.IPPermission) bool {
 		if !isEqualStringPointer(l.UserIDGroupPairs[j].GroupID, r.UserIDGroupPairs[j].GroupID) {
 			return false
 		}
-		if !isEqualStringPointer(l.UserIDGroupPairs[j].UserID, r.UserIDGroupPairs[j].UserID) {
-			return false
+		if compareGroupUserIDs {
+			if !isEqualStringPointer(l.UserIDGroupPairs[j].UserID, r.UserIDGroupPairs[j].UserID) {
+				return false
+			}
 		}
 	}
 
@@ -1476,9 +1478,16 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 
 	changes := []*ec2.IPPermission{}
 	for _, addPermission := range addPermissions {
+		hasUserID := false
+		for i := range addPermission.UserIDGroupPairs {
+			if addPermission.UserIDGroupPairs[i].UserID != nil {
+				hasUserID = true
+			}
+		}
+
 		found := false
 		for _, groupPermission := range group.IPPermissions {
-			if isEqualIPPermission(addPermission, groupPermission) {
+			if isEqualIPPermission(addPermission, groupPermission, hasUserID) {
 				found = true
 				break
 			}
@@ -1524,16 +1533,23 @@ func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePerm
 
 	changes := []*ec2.IPPermission{}
 	for _, removePermission := range removePermissions {
-		found := false
+		hasUserID := false
+		for i := range removePermission.UserIDGroupPairs {
+			if removePermission.UserIDGroupPairs[i].UserID != nil {
+				hasUserID = true
+			}
+		}
+
+		var found *ec2.IPPermission
 		for _, groupPermission := range group.IPPermissions {
-			if isEqualIPPermission(groupPermission, removePermission) {
-				found = true
+			if isEqualIPPermission(groupPermission, removePermission, hasUserID) {
+				found = groupPermission
 				break
 			}
 		}
 
-		if found {
-			changes = append(changes, removePermission)
+		if found != nil {
+			changes = append(changes, found)
 		}
 	}
 
