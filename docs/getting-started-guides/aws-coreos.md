@@ -28,10 +28,10 @@ The [cloudformation-template.json](aws/cloudformation-template.json) can be used
 aws cloudformation create-stack --stack-name kubernetes --region us-west-2 \
 --template-body file://aws/cloudformation-template.json \
 --parameters ParameterKey=KeyPair,ParameterValue=<keypair> \
---parameters ParameterKey=ClusterSize,ParameterValue=<cluster_size> \
---parameters ParameterKey=VpcId,ParameterValue=<vpc_id> \
---parameters ParameterKey=SubnetId,ParameterValue=<subnet_id> \
---parameters ParameterKey=SubnetAZ,ParameterValue=<subnet_az> \
+             ParameterKey=ClusterSize,ParameterValue=<cluster_size> \
+             ParameterKey=VpcId,ParameterValue=<vpc_id> \
+             ParameterKey=SubnetId,ParameterValue=<subnet_id> \
+             ParameterKey=SubnetAZ,ParameterValue=<subnet_az>
 ```
 
 It will take a few minutes for the entire stack to come up. You can monitor the stack progress with the following command:
