@@ -1509,7 +1509,7 @@ func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermiss
 
 // Makes sure the security group no longer includes the specified permissions
 // Returns true iff changes were made
-// Returns true if the security group no longer exists
+// If the security group no longer exists, will return (false, nil)
 func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePermissions []*ec2.IPPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
