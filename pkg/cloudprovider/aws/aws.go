@@ -1463,7 +1463,7 @@ func isEqualIPPermission(l, r *ec2.IPPermission) bool {
 // Makes sure the security group includes the specified permissions
 // Returns true iff changes were made
 // The security group must already exist
-func (s *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, addPermissions []*ec2.IPPermission) (bool, error) {
+func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermissions []*ec2.IPPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
 		glog.Warning("error retrieving security group", err)
@@ -1510,7 +1510,7 @@ func (s *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, addPermissi
 // Makes sure the security group no longer includes the specified permissions
 // Returns true iff changes were made
 // Returns true if the security group no longer exists
-func (s *AWSCloud) removeSecurityGroupIngess(securityGroupId string, removePermissions []*ec2.IPPermission) (bool, error) {
+func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePermissions []*ec2.IPPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
 		glog.Warning("error retrieving security group", err)
@@ -1697,7 +1697,7 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 
 			permissions = append(permissions, permission)
 		}
-		_, err = s.ensureSecurityGroupIngess(securityGroupID, permissions)
+		_, err = s.ensureSecurityGroupIngress(securityGroupID, permissions)
 		if err != nil {
 			return nil, err
 		}
@@ -1927,7 +1927,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 		permissions := []*ec2.IPPermission{permission}
 
 		if add {
-			changed, err := s.ensureSecurityGroupIngess(instanceSecurityGroupId, permissions)
+			changed, err := s.ensureSecurityGroupIngress(instanceSecurityGroupId, permissions)
 			if err != nil {
 				return err
 			}
@@ -1935,7 +1935,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 				glog.Warning("allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupId)
 			}
 		} else {
-			changed, err := s.removeSecurityGroupIngess(instanceSecurityGroupId, permissions)
+			changed, err := s.removeSecurityGroupIngress(instanceSecurityGroupId, permissions)
 			if err != nil {
 				return err
 			}
