@@ -55,6 +55,12 @@ docker_storage=${DOCKER_STORAGE:-aufs}
 if [[ ${#block_devices[@]} == 0 ]]; then
   echo "No ephemeral block devices found; will use aufs on root"
   docker_storage="aufs"
+
+  # Install aufs kernel module (for ubuntu)
+  apt-get install --yes linux-image-extra-$(uname -r)
+
+  # Install aufs tools (for debian)
+  apt-get install --yes aufs-tools
 else
   echo "Block devices: ${block_devices[@]}"
 

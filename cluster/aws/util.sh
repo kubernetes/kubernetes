@@ -23,7 +23,7 @@ source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
 case "${KUBE_OS_DISTRIBUTION}" in
-  ubuntu|coreos)
+  ubuntu|wheezy|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
     ;;
   *)
@@ -172,10 +172,34 @@ function detect-security-groups {
 }
 
 # Detects the AMI to use (considering the region)
+# This really should be in the various distro-specific util functions,
+# but CoreOS uses this for the master, so for now it is here.
+#
+# TODO: Remove this and just have each distro implement detect-image
 #
 # Vars set:
 #   AWS_IMAGE
 function detect-image () {
+case "${KUBE_OS_DISTRIBUTION}" in
+  ubuntu|coreos)
+    detect-ubuntu-image
+    ;;
+  wheezy)
+    detect-wheezy-image
+    ;;
+  *)
+    echo "Please specify AWS_IMAGE directly (distro not recognized)"
+    exit 2
+    ;;
+esac
+}
+
+# Detects the AMI to use for ubuntu (considering the region)
+# Used by CoreOS & Ubuntu
+#
+# Vars set:
+#   AWS_IMAGE
+function detect-ubuntu-image () {
   # This is the ubuntu 14.04 image for <region>, amd64, hvm:ebs-ssd
   # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
   # This will need to be updated from time to time as amis are deprecated
@@ -854,7 +878,7 @@ function kube-up {
     sleep 10
   done
   echo "Re-running salt highstate"
-  ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo salt '*' state.highstate > $LOG
+  ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo salt '*' state.highstate > $LOG
 
   echo "Waiting for cluster initialization."
   echo
@@ -883,9 +907,9 @@ function kube-up {
   # config file.  Distribute the same way the htpasswd is done.
   (
     umask 077
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>"$LOG"
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>"$LOG"
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>"$LOG"
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>"$LOG"
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>"$LOG"
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>"$LOG"
 
     create-kubeconfig
   )
@@ -1064,7 +1088,7 @@ function kube-push {
     echo "echo Executing configuration"
     echo "sudo salt '*' mine.update"
     echo "sudo salt --force-color '*' state.highstate"
-  ) | ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo bash
+  ) | ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo bash
 
   get-password
 
@@ -1130,7 +1154,7 @@ function ssh-to-node {
   fi
 
   for try in $(seq 1 5); do
-    if ssh -oLogLevel=quiet -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${ip} "${cmd}"; then
+    if ssh -oLogLevel=quiet -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${ip} "${cmd}"; then
       break
     fi
   done
