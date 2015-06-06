@@ -2004,20 +2004,54 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	}
 
 	{
-		// Delete the security group
-		for _, securityGroupId := range lb.SecurityGroups {
-			if isNilOrEmpty(securityGroupId) {
+		// Delete the security group(s) for the load balancer
+		// Note that this is annoying: the load balancer disappears from the API immediately, but it is still
+		// deleting in the background.  We get a DependencyViolation until the load balancer has deleted itself
+
+		// Collect the security groups to delete
+		securityGroupIDs := map[string]struct{}{}
+		for _, securityGroupID := range lb.SecurityGroups {
+			if isNilOrEmpty(securityGroupID) {
 				glog.Warning("Ignoring empty security group in ", name)
 				continue
 			}
+			securityGroupIDs[*securityGroupID] = struct{}{}
+		}
 
-			request := &ec2.DeleteSecurityGroupInput{}
-			request.GroupID = securityGroupId
-			_, err := s.ec2.DeleteSecurityGroup(request)
-			if err != nil {
-				glog.Errorf("error deleting security group (%s): %v", orEmpty(securityGroupId), err)
-				return err
+		// Loop through and try to delete them
+		timeoutAt := time.Now().Add(time.Second * 300)
+		for {
+			for securityGroupID := range securityGroupIDs {
+				request := &ec2.DeleteSecurityGroupInput{}
+				request.GroupID = &securityGroupID
+				_, err := s.ec2.DeleteSecurityGroup(request)
+				if err == nil {
+					delete(securityGroupIDs, securityGroupID)
+				} else {
+					ignore := false
+					if awsError, ok := err.(awserr.Error); ok {
+						if awsError.Code() == "DependencyViolation" {
+							glog.V(2).Infof("ignoring DependencyViolation while deleting load-balancer security group (%s), assuming because LB is in process of deleting", securityGroupID)
+							ignore = true
+						}
+					}
+					if !ignore {
+						return fmt.Errorf("error while deleting load balancer security group (%s): %v", securityGroupID, err)
+					}
+				}
 			}
+
+			if len(securityGroupIDs) == 0 {
+				break
+			}
+
+			if time.Now().After(timeoutAt) {
+				return fmt.Errorf("timed out waiting for load-balancer deletion: %s", name)
+			}
+
+			glog.V(2).Info("waiting for load-balancer to delete so we can delete security groups: ", name)
+
+			time.Sleep(5 * time.Second)
 		}
 	}
 
