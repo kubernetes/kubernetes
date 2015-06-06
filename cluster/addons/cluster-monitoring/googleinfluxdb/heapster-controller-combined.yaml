@@ -25,7 +25,6 @@ spec:
           command:
             - /heapster
             - --source=kubernetes:https://kubernetes
-            - --sink=gcm
             - --sink=gcl
             - --sink=influxdb:http://monitoring-influxdb:8086
             - --poll_duration=2m
