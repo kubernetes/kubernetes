@@ -266,7 +266,7 @@ type clientSwaggerSchema struct {
 }
 
 func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
-	version, _, err := c.t.DataVersionAndKind(data)
+	version, _, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
 	if err != nil {
 		return err
 	}

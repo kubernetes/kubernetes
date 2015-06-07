@@ -77,9 +77,15 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	if !ok {
 		return fmt.Errorf("error in unmarshaling data %s", string(data))
 	}
-	apiVersion := fields["apiVersion"].(string)
-	kind := fields["kind"].(string)
-	return s.ValidateObject(obj, apiVersion, "", apiVersion+"."+kind)
+	apiVersion := fields["apiVersion"]
+	if apiVersion == nil {
+		fmt.Errorf("apiVersion not set")
+	}
+	kind := fields["kind"]
+	if kind == nil {
+		fmt.Errorf("kind not set")
+	}
+	return s.ValidateObject(obj, apiVersion.(string), "", apiVersion.(string)+"."+kind.(string))
 }
 
 func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, typeName string) error {

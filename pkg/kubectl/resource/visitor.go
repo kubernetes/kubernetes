@@ -213,7 +213,7 @@ func (v *PathVisitor) Visit(fn VisitorFunc) error {
 		return fmt.Errorf("unable to read %q: %v", v.Path, err)
 	}
 	if err := ValidateSchema(data, v.Schema); err != nil {
-		return err
+		return fmt.Errorf("error validating %q: %v", v.Path, err)
 	}
 	info, err := v.Mapper.InfoForData(data, v.Path)
 	if err != nil {
@@ -276,7 +276,7 @@ func (v *DirectoryVisitor) Visit(fn VisitorFunc) error {
 			return fmt.Errorf("unable to read %q: %v", path, err)
 		}
 		if err := ValidateSchema(data, v.Schema); err != nil {
-			return err
+			return fmt.Errorf("error validating %q: %v", path, err)
 		}
 		info, err := v.Mapper.InfoForData(data, path)
 		if err != nil {
@@ -312,7 +312,7 @@ func (v *URLVisitor) Visit(fn VisitorFunc) error {
 		return fmt.Errorf("unable to read URL %q: %v\n", v.URL, err)
 	}
 	if err := ValidateSchema(data, v.Schema); err != nil {
-		return err
+		return fmt.Errorf("error validating %q: %v", v.URL, err)
 	}
 	info, err := v.Mapper.InfoForData(data, v.URL.String())
 	if err != nil {
