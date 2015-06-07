@@ -119,11 +119,28 @@ lxc-docker-{{ override_docker_ver }}:
       - lxc-docker-{{ override_docker_ver }}: /var/cache/docker-install/{{ override_deb }}
 {% endif %}
 
+# Default docker systemd unit file doesn't use an EnvironmentFile; replace it with one that does.
+{% if grains.get('is_systemd') %}
+
+{{ grains.get('systemd_system_path') }}/docker.service:
+  file.managed:
+    - source: salt://docker/docker.service
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - defaults:
+        environment_file: {{ environment_file }}
+{% endif %}
+
 docker:
   service.running:
     - enable: True
     - watch:
       - file: {{ environment_file }}
+{% if grains.get('is_systemd') %}
+      - file: {{ grains.get('systemd_system_path') }}/docker.service
+{% endif %}
       - container_bridge: cbr0
 {% if override_docker_ver != '' %}
     - require:
