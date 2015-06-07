@@ -17,6 +17,7 @@ limitations under the License.
 package jsonpath
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -100,17 +101,25 @@ func (j *JSONPath) evalArray(wr io.Writer, value reflect.Value, node *parse.Arra
 	if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
 		glog.Errorf("%v is not array", value)
 	}
-	indexs := strings.Split(node.Range, ":")
-	if len(indexs) == 1 {
-		index, err := strconv.Atoi(indexs[0])
+	indexes := strings.Split(node.Range, ":")
+	params := []int{0, value.Len(), 1}
+	var err error
+	for i := 0; i < len(indexes); i++ {
+		params[i], err = strconv.Atoi(indexes[i])
 		if err != nil {
 			glog.Errorf("parse range %s to integer", node.Range)
 		}
-		return value.Index(index)
-	} else {
-		glog.Errorf("only supprt single index now")
-		return reflect.Value{}
 	}
+	if len(indexes) == 1 {
+		return value.Index(params[0])
+	} else if len(indexes) == 2 {
+		return value.Slice(params[0], params[1])
+	} else if len(indexes) == 3 {
+		return value.Slice3(params[0], params[1], params[2])
+	} else {
+		glog.Errorf("unsupported filter")
+	}
+	return reflect.Value{}
 }
 
 // evalVariable evaluate VariableNode
@@ -138,6 +147,15 @@ func (j *JSONPath) evalToText(v reflect.Value) []byte {
 		text = strconv.FormatInt(v.Int(), 10)
 	case reflect.String:
 		text = v.String()
+	case reflect.Array, reflect.Slice:
+		buffer := bytes.NewBufferString("[")
+		for i := 0; i < v.Len()-1; i++ {
+			buffer.Write(j.evalToText(v.Index(i)))
+			buffer.WriteString(", ")
+		}
+		buffer.Write(j.evalToText(v.Index(v.Len() - 1)))
+		buffer.WriteString("]")
+		return buffer.Bytes()
 	default:
 		glog.Errorf("%v is not a printable", v)
 	}

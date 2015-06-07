@@ -105,7 +105,7 @@ func TestQuote(t *testing.T) {
 }
 
 func TestArray(t *testing.T) {
-	text := "hello ${[1]}"
+	text := "hello ${[0:2]}"
 	j := NewJSONPath("array")
 	err := j.Parse(text)
 	if err != nil {
@@ -118,7 +118,7 @@ func TestArray(t *testing.T) {
 		t.Errorf("execute array error %v", err)
 	}
 	out := buf.String()
-	expect := "hello Tudesday"
+	expect := "hello [Monday, Tudesday]"
 	if out != expect {
 		t.Errorf("expect to get %s, got %s", expect, out)
 	}
