@@ -5,9 +5,9 @@
     - group: root
     - mode: 755
 
-{% if grains['os_family'] == 'RedHat' %}
+{% if grains.get('is_systemd') %}
 
-/usr/lib/systemd/system/kube-master-addons.service:
+{{ grains.get('systemd_system_path') }}/kube-master-addons.service:
   file.managed:
     - source: salt://kube-master-addons/kube-master-addons.service
     - user: root

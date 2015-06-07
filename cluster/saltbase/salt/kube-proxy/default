@@ -1,5 +1,5 @@
 {% set daemon_args = "$DAEMON_ARGS" -%}
-{% if grains['os_family'] == 'RedHat' -%}
+{% if grains.get('is_systemd') -%}
 	{% set daemon_args = "" -%}
 {% endif -%}
 {# TODO(azure-maintainer): add support for distributing kubeconfig with token to kube-proxy #}

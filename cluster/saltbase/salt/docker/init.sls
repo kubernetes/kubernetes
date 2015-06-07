@@ -1,4 +1,4 @@
-{% if grains['os_family'] == 'RedHat' %}
+{% if grains.get('is_systemd') %}
 {% set environment_file = '/etc/sysconfig/docker' %}
 {% else %}
 {% set environment_file = '/etc/default/docker' %}

@@ -1,4 +1,4 @@
-{% if grains['os_family'] == 'RedHat' %}
+{% if grains.get('is_systemd') %}
 {% set environment_file = '/etc/sysconfig/kube-proxy' %}
 {% else %}
 {% set environment_file = '/etc/default/kube-proxy' %}
@@ -11,9 +11,9 @@
     - group: root
     - mode: 755
 
-{% if grains['os_family'] == 'RedHat' %}
+{% if grains.get('is_systemd') %}
 
-/usr/lib/systemd/system/kube-proxy.service:
+{{ grains.get('systemd_system_path') }}/kube-proxy.service:
   file.managed:
     - source: salt://kube-proxy/kube-proxy.service
     - user: root
@@ -52,7 +52,7 @@ kube-proxy:
     - enable: True
     - watch:
       - file: {{ environment_file }}
-{% if grains['os_family'] != 'RedHat' %}
+{% if not grains.get('is_systemd') %}
       - file: /etc/init.d/kube-proxy
 {% endif %}
       - file: /var/lib/kube-proxy/kubeconfig

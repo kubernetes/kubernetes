@@ -1,4 +1,4 @@
-{% if grains['os_family'] == 'RedHat' %}
+{% if grains.get('is_systemd') %}
 {% set environment_file = '/etc/sysconfig/kubelet' %}
 {% else %}
 {% set environment_file = '/etc/default/kubelet' %}
@@ -19,9 +19,9 @@
     - group: root
     - mode: 755
 
-{% if grains['os_family'] == 'RedHat' %}
+{% if grains.get('is_systemd') %}
 
-/usr/lib/systemd/system/kubelet.service:
+{{ grains.get('systemd_system_path') }}/kubelet.service:
   file.managed:
     - source: salt://kubelet/kubelet.service
     - user: root
@@ -69,7 +69,7 @@ kubelet:
     - enable: True
     - watch:
       - file: /usr/local/bin/kubelet
-{% if grains['os_family'] != 'RedHat' %}
+{% if not grains.get('is_systemd') %}
       - file: /etc/init.d/kubelet
 {% endif %}
       - file: {{ environment_file }}

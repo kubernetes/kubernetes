@@ -24,9 +24,11 @@ delete_etcd_default:
   file.absent:
     - name: /etc/default/etcd
 
+{% if grains.get('is_systemd') %}
 delete_etcd_service_file:
   file.absent:
-    - name: /usr/lib/systemd/system/etcd.service
+    - name: {{ grains.get('systemd_system_path') }}/etcd.service
+{% endif %}
 
 delete_etcd_initd:
   file.absent:

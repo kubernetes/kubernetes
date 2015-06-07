@@ -101,9 +101,9 @@ addon-dir-create:
     - group: root
     - mode: 755
 
-{% if grains['os_family'] == 'RedHat' %}
+{% if grains.get('is_systemd') %}
 
-/usr/lib/systemd/system/kube-addons.service:
+{{ grains.get('systemd_system_path') }}/kube-addons.service:
   file.managed:
     - source: salt://kube-addons/kube-addons.service
     - user: root
