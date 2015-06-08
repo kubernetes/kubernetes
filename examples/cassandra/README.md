@@ -7,6 +7,8 @@ This document also attempts to describe the core components of Kubernetes: _Pods
 ### Prerequisites
 This example assumes that you have a Kubernetes cluster installed and running, and that you have installed the ```kubectl``` command line tool somewhere in your path.  Please see the [getting started](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/getting-started-guides) for installation instructions for your platform.
 
+This example also has a few code and configuration files needed.  To avoid typing these out, you can ```git clone``` the Kubernetes repository to you local computer.
+
 ### A note for the impatient
 This is a somewhat long tutorial.  If you want to jump straight to the "do it now" commands, please see the [tl; dr](#tl-dr) at the end.
 
@@ -27,7 +29,7 @@ spec:
     resources:
       limits:
         cpu: "1"
-    image: kubernetes/cassandra:v2
+    image: gcr.io/google_containers/cassandra:v3
     name: cassandra
     ports:
     - name: cql
@@ -53,24 +55,24 @@ There are a few things to note in this description.  First is that we are runnin
 
 You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```).  We also tell Kubernetes that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 1 cpu (1 core).
 
-Given this configuration, we can create the pod as follows
+Given this configuration, we can create the pod from a file specification as follows
 
 ```sh
 $ kubectl create -f cassandra.yaml
 ```
 
-After a few moments, you should be able to see the pod running:
+After a few moments, you should be able to see the pod running, plus its single container:
 
 ```sh
 $ kubectl get pods cassandra
 POD         IP           CONTAINER(S)   IMAGE(S)                  HOST                                    LABELS           STATUS    CREATED      MESSAGE
 cassandra   10.244.3.3                                            kubernetes-minion-sft2/104.197.42.181   name=cassandra   Running   21 seconds
-                         cassandra      kubernetes/cassandra:v2                                                            Running   3 seconds
+                         cassandra      gcr.io/google_containers/cassandra:v3                                                            Running   3 seconds
 ```
 
 
 ### Adding a Cassandra Service
-In Kubernetes a _[Service](../../docs/services.md)_ describes a set of Pods that perform the same task.  For example, the set of nodes in a Cassandra cluster, or even the single node we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.  This is the way that we use initially use Services with Cassandra.
+In Kubernetes a _[Service](../../docs/services.md)_ describes a set of Pods that perform the same task.  For example, the set of Pods in a Cassandra cluster can be a Kubernetes Service, or even just the single Pod we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set of Pods.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.  This is the way that we use initially use Services with Cassandra.
 
 Here is the service description:
 ```yaml
@@ -160,7 +162,7 @@ spec:
             - name: HEAP_NEWSIZE
               key: HEAP_NEWSIZE
               value: 100M
-          image: "kubernetes/cassandra:v2"
+          image: "gcr.io/google_containers/cassandra:v3"
           name: cassandra
           ports:
             - containerPort: 9042
@@ -190,25 +192,25 @@ Let's scale our cluster to 2:
 $ kubectl scale rc cassandra --replicas=2
 ```
 
-Now if you list the pods in your cluster, you should see two cassandra pods:
+Now if you list the pods in your cluster, and filter to the label ```name=cassandra```, you should see two cassandra pods:
 
 ```sh
-$ kubectl get pods
+$ kubectl get pods -l="name=cassandra"
+
 POD                 IP              CONTAINER(S)   IMAGE(S)                 HOST                                    LABELS           STATUS    CREATED      MESSAGE
 cassandra           10.244.3.3                                              kubernetes-minion-sft2/104.197.42.181   name=cassandra   Running   7 minutes
-                                    cassandra      kubernetes/cassandra:v2                                                           Running   7 minutes
+                                    cassandra      gcr.io/google_containers/cassandra:v3                                                           Running   7 minutes
 cassandra-gnhk8     10.244.0.5                                              kubernetes-minion-dqz3/104.197.2.71     name=cassandra   Running   About a minute
-                                    cassandra      kubernetes/cassandra:v2                                                           Running   51 seconds
+                                    cassandra      gcr.io/google_containers/cassandra:v3                                                           Running   51 seconds
 
 ```
 
 Notice that one of the pods has the human readable name ```cassandra``` that you specified in your config before, and one has a random string, since it was named by the replication controller.
 
-To prove that this all works, you can use the ```nodetool``` command to examine the status of the cluster, for example:
+To prove that this all works, you can use the ```nodetool``` command to examine the status of the cluster.  To do this, use the ```kubectl exec``` command to run ```nodetool``` in one of your Cassandra pods.
 
 ```sh
-$ ssh 104.197.42.181
-$ docker exec <cassandra-container-id> nodetool status
+$ kubectl exec -ti cassandra -- nodetool status
 Datacenter: datacenter1
 =======================
 Status=Up/Down
@@ -223,9 +225,9 @@ Now let's scale our cluster to 4 nodes:
 $ kubectl scale rc cassandra --replicas=4
 ```
 
-Examining the status again:
+In a few moments, you can examine the status again:
 ```sh
-$ docker exec <cassandra-container-id> nodetool status
+$ kubectl exec -ti cassandra -- nodetool status
 Datacenter: datacenter1
 =======================
 Status=Up/Down
@@ -254,7 +256,7 @@ kubectl create -f cassandra-controller.yaml
 kubectl scale rc cassandra --replicas=2
 
 # validate the cluster
-docker exec <container-id> nodetool status
+kubectl exec -ti cassandra -- nodetool status
 
 # scale up to 4 nodes
 kubectl scale rc cassandra --replicas=4
