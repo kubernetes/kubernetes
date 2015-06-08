@@ -541,7 +541,7 @@ function create-certs {
     cd easy-rsa-master/easyrsa3
     ./easyrsa init-pki > /dev/null 2>&1
     ./easyrsa --batch "--req-cn=${cert_ip}@$(date +%s)" build-ca nopass > /dev/null 2>&1
-    ./easyrsa --subject-alt-name=IP:"${cert_ip}" build-server-full "${MASTER_NAME}" nopass > /dev/null 2>&1
+    ./easyrsa --subject-alt-name=IP:"${cert_ip}",DNS:kubernetes,DNS:"${MASTER_NAME}" build-server-full "${MASTER_NAME}" nopass > /dev/null 2>&1
     ./easyrsa build-client-full kubelet nopass > /dev/null 2>&1
     ./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1) || {
     # If there was an error in the subshell, just die.
