@@ -674,6 +674,7 @@ function kube-up {
     echo "readonly MASTER_IP_RANGE='${MASTER_IP_RANGE:-}'"
     echo "readonly KUBELET_TOKEN='${KUBELET_TOKEN}'"
     echo "readonly KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN}'"
+    echo "readonly DOCKER_STORAGE='${DOCKER_STORAGE:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"

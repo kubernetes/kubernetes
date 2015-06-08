@@ -26,6 +26,9 @@ NUM_MINIONS=${NUM_MINIONS:-4}
 # Because regions are globally named, we want to create in a single region; default to us-east-1
 AWS_S3_REGION=${AWS_S3_REGION:-us-east-1}
 
+# Which docker storage mechanism to use.
+DOCKER_STORAGE=${DOCKER_STORAGE:-aufs}
+
 INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-kubernetes}"
 CLUSTER_ID=${INSTANCE_PREFIX}
 AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
