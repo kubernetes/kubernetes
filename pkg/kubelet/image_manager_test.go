@@ -216,7 +216,7 @@ func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
 	spaceFreed, err := manager.freeSpace(2048)
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.Equal(1024, spaceFreed)
+	assert.EqualValues(1024, spaceFreed)
 	assert.Len(fakeDocker.RemovedImages, 1)
 	assert.True(fakeDocker.RemovedImages.Has(imageName(0)))
 }
@@ -245,7 +245,7 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 	spaceFreed, err := manager.freeSpace(1024)
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.Equal(1024, spaceFreed)
+	assert.EqualValues(1024, spaceFreed)
 	assert.Len(fakeDocker.RemovedImages, 1)
 	assert.True(fakeDocker.RemovedImages.Has(imageName(0)))
 }
@@ -277,7 +277,7 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 	spaceFreed, err := manager.freeSpace(1024)
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.Equal(1024, spaceFreed)
+	assert.EqualValues(1024, spaceFreed)
 	assert.Len(fakeDocker.RemovedImages, 1)
 	assert.True(fakeDocker.RemovedImages.Has(imageName(0)))
 }
@@ -302,7 +302,7 @@ func TestFreeSpaceImagesAlsoDoesLookupByRepoTags(t *testing.T) {
 	spaceFreed, err := manager.freeSpace(1024)
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.Equal(1024, spaceFreed)
+	assert.EqualValues(1024, spaceFreed)
 	assert.Len(fakeDocker.RemovedImages, 1)
 	assert.True(fakeDocker.RemovedImages.Has(imageName(0)))
 }
