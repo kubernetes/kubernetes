@@ -239,40 +239,40 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 }
 
 // ValidateObjectMetaUpdate validates an object's metadata when updated
-func ValidateObjectMetaUpdate(meta, old *api.ObjectMeta) errs.ValidationErrorList {
+func ValidateObjectMetaUpdate(new, old *api.ObjectMeta) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	// in the event it is left empty, set it, to allow clients more flexibility
-	if len(meta.UID) == 0 {
-		meta.UID = old.UID
+	if len(new.UID) == 0 {
+		new.UID = old.UID
 	}
 	// ignore changes to timestamp
 	if old.CreationTimestamp.IsZero() {
-		old.CreationTimestamp = meta.CreationTimestamp
+		old.CreationTimestamp = new.CreationTimestamp
 	} else {
-		meta.CreationTimestamp = old.CreationTimestamp
+		new.CreationTimestamp = old.CreationTimestamp
 	}
 
 	// Reject updates that don't specify a resource version
-	if meta.ResourceVersion == "" {
-		allErrs = append(allErrs, errs.NewFieldInvalid("resourceVersion", meta.ResourceVersion, "resourceVersion must be specified for an update"))
+	if new.ResourceVersion == "" {
+		allErrs = append(allErrs, errs.NewFieldInvalid("resourceVersion", new.ResourceVersion, "resourceVersion must be specified for an update"))
 	}
 
-	if old.Name != meta.Name {
-		allErrs = append(allErrs, errs.NewFieldInvalid("name", meta.Name, "field is immutable"))
+	if old.Name != new.Name {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", new.Name, "field is immutable"))
 	}
-	if old.Namespace != meta.Namespace {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", meta.Namespace, "field is immutable"))
+	if old.Namespace != new.Namespace {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", new.Namespace, "field is immutable"))
 	}
-	if old.UID != meta.UID {
-		allErrs = append(allErrs, errs.NewFieldInvalid("uid", meta.UID, "field is immutable"))
+	if old.UID != new.UID {
+		allErrs = append(allErrs, errs.NewFieldInvalid("uid", new.UID, "field is immutable"))
 	}
-	if old.CreationTimestamp != meta.CreationTimestamp {
-		allErrs = append(allErrs, errs.NewFieldInvalid("creationTimestamp", meta.CreationTimestamp, "field is immutable"))
+	if old.CreationTimestamp != new.CreationTimestamp {
+		allErrs = append(allErrs, errs.NewFieldInvalid("creationTimestamp", new.CreationTimestamp, "field is immutable"))
 	}
 
-	allErrs = append(allErrs, ValidateLabels(meta.Labels, "labels")...)
-	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, "annotations")...)
+	allErrs = append(allErrs, ValidateLabels(new.Labels, "labels")...)
+	allErrs = append(allErrs, ValidateAnnotations(new.Annotations, "annotations")...)
 
 	return allErrs
 }
