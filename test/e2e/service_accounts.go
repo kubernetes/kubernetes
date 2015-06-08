@@ -65,7 +65,7 @@ var _ = Describe("ServiceAccounts", func() {
 				Containers: []api.Container{
 					{
 						Name:  "service-account-test",
-						Image: "kubernetes/mounttest:0.1",
+						Image: "kubernetes/mounttest",
 						Args: []string{
 							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountTokenKey),
 						},
