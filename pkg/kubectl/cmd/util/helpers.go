@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -56,6 +57,13 @@ func CheckErr(err error) {
 		return
 	}
 
+	if errors.IsInvalid(err) {
+		details := err.(*errors.StatusError).Status().Details
+		prefix := fmt.Sprintf("The %s %q is invalid:", details.Kind, details.Name)
+		errs := statusCausesToAggrError(details.Causes)
+		fatal(MultilineError(prefix, errs))
+	}
+
 	// handle multiline errors
 	if clientcmd.IsConfigurationInvalid(err) {
 		fatal(MultilineError("Error in configuration: ", err))
@@ -69,6 +77,14 @@ func CheckErr(err error) {
 		msg = fmt.Sprintf("error: %s\n", err.Error())
 	}
 	fatal(msg)
+}
+
+func statusCausesToAggrError(scs []api.StatusCause) utilerrors.Aggregate {
+	errs := make([]error, len(scs))
+	for i, sc := range scs {
+		errs[i] = fmt.Errorf("%s: %s", sc.Field, sc.Message)
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 // StandardErrorMessage translates common errors into a human readable message, or returns
