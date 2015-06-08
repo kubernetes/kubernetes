@@ -24,13 +24,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/parse"
 	"github.com/golang/glog"
 )
 
 type JSONPath struct {
-	name string
-	tree *parse.Tree
+	name   string
+	parser *Parser
 }
 
 func NewJSONPath(n string) *JSONPath {
@@ -40,13 +39,13 @@ func NewJSONPath(n string) *JSONPath {
 }
 
 func (j *JSONPath) Parse(text string) (err error) {
-	j.tree, err = parse.Parse(j.name, text)
+	j.parser, err = Parse(j.name, text)
 	return
 }
 
 func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
 	value := reflect.ValueOf(data)
-	if j.tree == nil {
+	if j.parser == nil {
 		return fmt.Errorf("%s is an incomplete jsonpath template", j.name)
 	}
 	j.walkTree(wr, value)
@@ -55,28 +54,28 @@ func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
 
 // walkTree visit the parsed tree from root
 func (j *JSONPath) walkTree(wr io.Writer, value reflect.Value) {
-	for _, node := range j.tree.Root.Nodes {
+	for _, node := range j.parser.Root.Nodes {
 		j.walk(wr, value, node)
 	}
 }
 
 // walk visit subtree rooted at the gived node in DFS order
-func (j *JSONPath) walk(wr io.Writer, value reflect.Value, node parse.Node) reflect.Value {
+func (j *JSONPath) walk(wr io.Writer, value reflect.Value, node Node) reflect.Value {
 	switch node := node.(type) {
-	case *parse.ListNode:
+	case *ListNode:
 		return j.evalList(wr, value, node)
-	case *parse.TextNode:
+	case *TextNode:
 		return j.evalText(wr, value, node)
-	case *parse.VariableNode:
-		return j.evalVariable(wr, value, node)
-	case *parse.ArrayNode:
-		return j.evalArray(wr, value, node)
+	case *FieldNode:
+		return j.evalField(value, node)
+	case *ArrayNode:
+		return j.evalArray(value, node)
 	}
 	return reflect.Value{}
 }
 
 // evalText evaluate TextNode
-func (j *JSONPath) evalText(wr io.Writer, value reflect.Value, node *parse.TextNode) reflect.Value {
+func (j *JSONPath) evalText(wr io.Writer, value reflect.Value, node *TextNode) reflect.Value {
 	if _, err := wr.Write(node.Text); err != nil {
 		glog.Errorf("%s", err)
 	}
@@ -84,7 +83,7 @@ func (j *JSONPath) evalText(wr io.Writer, value reflect.Value, node *parse.TextN
 }
 
 // evalText evaluate ListNode
-func (j *JSONPath) evalList(wr io.Writer, value reflect.Value, node *parse.ListNode) reflect.Value {
+func (j *JSONPath) evalList(wr io.Writer, value reflect.Value, node *ListNode) reflect.Value {
 	curValue := value
 	for _, node := range node.Nodes {
 		curValue = j.walk(wr, curValue, node)
@@ -97,17 +96,17 @@ func (j *JSONPath) evalList(wr io.Writer, value reflect.Value, node *parse.ListN
 }
 
 // evalText evaluate ArrayNode
-func (j *JSONPath) evalArray(wr io.Writer, value reflect.Value, node *parse.ArrayNode) reflect.Value {
+func (j *JSONPath) evalArray(value reflect.Value, node *ArrayNode) reflect.Value {
 	if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
-		glog.Errorf("%v is not array", value)
+		glog.Errorf("%v is not array or slice", value)
 	}
-	indexes := strings.Split(node.Range, ":")
 	params := []int{0, value.Len(), 1}
+	indexes := strings.Split(node.Value, ":")
 	var err error
 	for i := 0; i < len(indexes); i++ {
 		params[i], err = strconv.Atoi(indexes[i])
 		if err != nil {
-			glog.Errorf("parse range %s to integer", node.Range)
+			glog.Errorf("parse range %s to integer", node.Value)
 		}
 	}
 	if len(indexes) == 1 {
@@ -122,9 +121,9 @@ func (j *JSONPath) evalArray(wr io.Writer, value reflect.Value, node *parse.Arra
 	return reflect.Value{}
 }
 
-// evalVariable evaluate VariableNode
-func (j *JSONPath) evalVariable(wr io.Writer, value reflect.Value, node *parse.VariableNode) reflect.Value {
-	return value.FieldByName(node.Name)
+// evalField evaluate filed from struct value
+func (j *JSONPath) evalField(value reflect.Value, node *FieldNode) reflect.Value {
+	return value.FieldByName(node.Value)
 }
 
 // evalToText translate reflect value to corresponding text
