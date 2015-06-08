@@ -1430,7 +1430,7 @@ func isEqualStringPointer(l, r *string) bool {
 	return *l == *r
 }
 
-func isEqualIPPermission(l, r *ec2.IPPermission) bool {
+func isEqualIPPermission(l, r *ec2.IPPermission, compareGroupUserIDs bool) bool {
 	if !isEqualIntPointer(l.FromPort, r.FromPort) {
 		return false
 	}
@@ -1456,8 +1456,10 @@ func isEqualIPPermission(l, r *ec2.IPPermission) bool {
 		if !isEqualStringPointer(l.UserIDGroupPairs[j].GroupID, r.UserIDGroupPairs[j].GroupID) {
 			return false
 		}
-		if !isEqualStringPointer(l.UserIDGroupPairs[j].UserID, r.UserIDGroupPairs[j].UserID) {
-			return false
+		if compareGroupUserIDs {
+			if !isEqualStringPointer(l.UserIDGroupPairs[j].UserID, r.UserIDGroupPairs[j].UserID) {
+				return false
+			}
 		}
 	}
 
@@ -1467,7 +1469,7 @@ func isEqualIPPermission(l, r *ec2.IPPermission) bool {
 // Makes sure the security group includes the specified permissions
 // Returns true iff changes were made
 // The security group must already exist
-func (s *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, addPermissions []*ec2.IPPermission) (bool, error) {
+func (s *AWSCloud) ensureSecurityGroupIngress(securityGroupId string, addPermissions []*ec2.IPPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
 		glog.Warning("error retrieving security group", err)
@@ -1480,9 +1482,16 @@ func (s *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, addPermissi
 
 	changes := []*ec2.IPPermission{}
 	for _, addPermission := range addPermissions {
+		hasUserID := false
+		for i := range addPermission.UserIDGroupPairs {
+			if addPermission.UserIDGroupPairs[i].UserID != nil {
+				hasUserID = true
+			}
+		}
+
 		found := false
 		for _, groupPermission := range group.IPPermissions {
-			if isEqualIPPermission(addPermission, groupPermission) {
+			if isEqualIPPermission(addPermission, groupPermission, hasUserID) {
 				found = true
 				break
 			}
@@ -1513,8 +1522,8 @@ func (s *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, addPermissi
 
 // Makes sure the security group no longer includes the specified permissions
 // Returns true iff changes were made
-// Returns true if the security group no longer exists
-func (s *AWSCloud) removeSecurityGroupIngess(securityGroupId string, removePermissions []*ec2.IPPermission) (bool, error) {
+// If the security group no longer exists, will return (false, nil)
+func (s *AWSCloud) removeSecurityGroupIngress(securityGroupId string, removePermissions []*ec2.IPPermission) (bool, error) {
 	group, err := s.findSecurityGroup(securityGroupId)
 	if err != nil {
 		glog.Warning("error retrieving security group", err)
@@ -1528,16 +1537,23 @@ func (s *AWSCloud) removeSecurityGroupIngess(securityGroupId string, removePermi
 
 	changes := []*ec2.IPPermission{}
 	for _, removePermission := range removePermissions {
-		found := false
+		hasUserID := false
+		for i := range removePermission.UserIDGroupPairs {
+			if removePermission.UserIDGroupPairs[i].UserID != nil {
+				hasUserID = true
+			}
+		}
+
+		var found *ec2.IPPermission
 		for _, groupPermission := range group.IPPermissions {
-			if isEqualIPPermission(groupPermission, removePermission) {
-				found = true
+			if isEqualIPPermission(groupPermission, removePermission, hasUserID) {
+				found = groupPermission
 				break
 			}
 		}
 
-		if found {
-			changes = append(changes, removePermission)
+		if found != nil {
+			changes = append(changes, found)
 		}
 	}
 
@@ -1701,7 +1717,7 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 
 			permissions = append(permissions, permission)
 		}
-		_, err = s.ensureSecurityGroupIngess(securityGroupID, permissions)
+		_, err = s.ensureSecurityGroupIngress(securityGroupID, permissions)
 		if err != nil {
 			return nil, err
 		}
@@ -1931,7 +1947,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 		permissions := []*ec2.IPPermission{permission}
 
 		if add {
-			changed, err := s.ensureSecurityGroupIngess(instanceSecurityGroupId, permissions)
+			changed, err := s.ensureSecurityGroupIngress(instanceSecurityGroupId, permissions)
 			if err != nil {
 				return err
 			}
@@ -1939,7 +1955,7 @@ func (s *AWSCloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalan
 				glog.Warning("allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupId)
 			}
 		} else {
-			changed, err := s.removeSecurityGroupIngess(instanceSecurityGroupId, permissions)
+			changed, err := s.removeSecurityGroupIngress(instanceSecurityGroupId, permissions)
 			if err != nil {
 				return err
 			}
@@ -1992,20 +2008,54 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	}
 
 	{
-		// Delete the security group
-		for _, securityGroupId := range lb.SecurityGroups {
-			if isNilOrEmpty(securityGroupId) {
+		// Delete the security group(s) for the load balancer
+		// Note that this is annoying: the load balancer disappears from the API immediately, but it is still
+		// deleting in the background.  We get a DependencyViolation until the load balancer has deleted itself
+
+		// Collect the security groups to delete
+		securityGroupIDs := map[string]struct{}{}
+		for _, securityGroupID := range lb.SecurityGroups {
+			if isNilOrEmpty(securityGroupID) {
 				glog.Warning("Ignoring empty security group in ", name)
 				continue
 			}
+			securityGroupIDs[*securityGroupID] = struct{}{}
+		}
 
-			request := &ec2.DeleteSecurityGroupInput{}
-			request.GroupID = securityGroupId
-			_, err := s.ec2.DeleteSecurityGroup(request)
-			if err != nil {
-				glog.Errorf("error deleting security group (%s): %v", orEmpty(securityGroupId), err)
-				return err
+		// Loop through and try to delete them
+		timeoutAt := time.Now().Add(time.Second * 300)
+		for {
+			for securityGroupID := range securityGroupIDs {
+				request := &ec2.DeleteSecurityGroupInput{}
+				request.GroupID = &securityGroupID
+				_, err := s.ec2.DeleteSecurityGroup(request)
+				if err == nil {
+					delete(securityGroupIDs, securityGroupID)
+				} else {
+					ignore := false
+					if awsError, ok := err.(awserr.Error); ok {
+						if awsError.Code() == "DependencyViolation" {
+							glog.V(2).Infof("ignoring DependencyViolation while deleting load-balancer security group (%s), assuming because LB is in process of deleting", securityGroupID)
+							ignore = true
+						}
+					}
+					if !ignore {
+						return fmt.Errorf("error while deleting load balancer security group (%s): %v", securityGroupID, err)
+					}
+				}
 			}
+
+			if len(securityGroupIDs) == 0 {
+				break
+			}
+
+			if time.Now().After(timeoutAt) {
+				return fmt.Errorf("timed out waiting for load-balancer deletion: %s", name)
+			}
+
+			glog.V(2).Info("waiting for load-balancer to delete so we can delete security groups: ", name)
+
+			time.Sleep(5 * time.Second)
 		}
 	}
 
