@@ -505,7 +505,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if wasCreated {
 			status = http.StatusCreated
 		}
-		writeJSON(status, scope.Codec, result, w)
+		writeJSON(status, scope.Codec, result, w, isPrettyPrint(req.Request))
 	}
 }
 

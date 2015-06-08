@@ -2239,7 +2239,7 @@ func (*UnregisteredAPIObject) IsAnAPIObject() {}
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(http.StatusOK, codec, &UnregisteredAPIObject{"Undecodable"}, w)
+		writeJSON(http.StatusOK, codec, &UnregisteredAPIObject{"Undecodable"}, w, false)
 	}))
 	defer server.Close()
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)

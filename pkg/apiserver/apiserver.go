@@ -273,32 +273,49 @@ func write(statusCode int, apiVersion string, codec runtime.Codec, object runtim
 		io.Copy(writer, out)
 		return
 	}
-	writeJSON(statusCode, codec, object, w)
+	writeJSON(statusCode, codec, object, w, isPrettyPrint(req))
+}
+
+func isPrettyPrint(req *http.Request) bool {
+	pp := req.URL.Query().Get("pretty")
+	if len(pp) > 0 {
+		pretty, _ := strconv.ParseBool(pp)
+		return pretty
+	}
+	userAgent := req.UserAgent()
+	// This covers basic all browers and cli http tools
+	if strings.HasPrefix(userAgent, "curl") || strings.HasPrefix(userAgent, "Wget") || strings.HasPrefix(userAgent, "Mozilla/5.0") {
+		return true
+	}
+	return false
 }
 
 // writeJSON renders an object as JSON to the response.
-func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w http.ResponseWriter) {
+func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, pretty bool) {
 	output, err := codec.Encode(object)
 	if err != nil {
 		errorJSONFatal(err, codec, w)
 		return
 	}
-	// PR #2243: Pretty-print JSON by default.
-	formatted := &bytes.Buffer{}
-	err = json.Indent(formatted, output, "", "  ")
-	if err != nil {
-		errorJSONFatal(err, codec, w)
-		return
+	if pretty {
+		// PR #2243: Pretty-print JSON by default.
+		formatted := &bytes.Buffer{}
+		err = json.Indent(formatted, output, "", "  ")
+		if err != nil {
+			errorJSONFatal(err, codec, w)
+			return
+		}
+		output = formatted.Bytes()
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	w.Write(formatted.Bytes())
+	w.Write(output)
 }
 
 // errorJSON renders an error to the response. Returns the HTTP status code of the error.
 func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) int {
 	status := errToAPIStatus(err)
-	writeJSON(status.Code, codec, status, w)
+	writeJSON(status.Code, codec, status, w, true)
 	return status.Code
 }
 

@@ -15,6 +15,14 @@
       "nickname": "createBinding",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Binding",
         "paramType": "body",
         "name": "body",
@@ -58,6 +66,14 @@
       "nickname": "createBinding",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Binding",
         "paramType": "body",
         "name": "body",
@@ -92,6 +108,14 @@
       "summary": "list objects of kind ComponentStatus",
       "nickname": "listComponentStatus",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -161,6 +185,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -202,6 +234,14 @@
       "summary": "list objects of kind ComponentStatus",
       "nickname": "listComponentStatus",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -264,6 +304,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -323,6 +371,14 @@
       "nickname": "createEndpoints",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Endpoints",
         "paramType": "body",
         "name": "body",
@@ -365,6 +421,14 @@
       "summary": "watch individual changes to a list of Endpoints",
       "nickname": "watchEndpointslist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -434,6 +498,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -469,6 +541,14 @@
       "summary": "replace the specified Endpoints",
       "nickname": "replaceEndpoints",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Endpoints",
         "paramType": "body",
@@ -516,6 +596,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -561,6 +649,14 @@
       "summary": "delete a Endpoints",
       "nickname": "deleteEndpoints",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -612,6 +708,14 @@
       "summary": "watch changes to an object of kind Endpoints",
       "nickname": "watchEndpoints",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -690,6 +794,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -741,6 +853,14 @@
       "nickname": "createEndpoints",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Endpoints",
         "paramType": "body",
         "name": "body",
@@ -775,6 +895,14 @@
       "summary": "watch individual changes to a list of Endpoints",
       "nickname": "watchEndpointslist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -837,6 +965,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -896,6 +1032,14 @@
       "nickname": "createEvent",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Event",
         "paramType": "body",
         "name": "body",
@@ -938,6 +1082,14 @@
       "summary": "watch individual changes to a list of Event",
       "nickname": "watchEventlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1007,6 +1159,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -1042,6 +1202,14 @@
       "summary": "replace the specified Event",
       "nickname": "replaceEvent",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Event",
         "paramType": "body",
@@ -1087,6 +1255,14 @@
       "summary": "partially update the specified Event",
       "nickname": "patchEvent",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "body",
@@ -1136,6 +1312,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -1177,6 +1361,14 @@
       "summary": "watch changes to an object of kind Event",
       "nickname": "watchEvent",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1255,6 +1447,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -1306,6 +1506,14 @@
       "nickname": "createEvent",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Event",
         "paramType": "body",
         "name": "body",
@@ -1340,6 +1548,14 @@
       "summary": "watch individual changes to a list of Event",
       "nickname": "watchEventlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1402,6 +1618,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -1461,6 +1685,14 @@
       "nickname": "createLimitRange",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.LimitRange",
         "paramType": "body",
         "name": "body",
@@ -1503,6 +1735,14 @@
       "summary": "watch individual changes to a list of LimitRange",
       "nickname": "watchLimitRangelist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1572,6 +1812,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -1607,6 +1855,14 @@
       "summary": "replace the specified LimitRange",
       "nickname": "replaceLimitRange",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.LimitRange",
         "paramType": "body",
@@ -1652,6 +1908,14 @@
       "summary": "partially update the specified LimitRange",
       "nickname": "patchLimitRange",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "body",
@@ -1701,6 +1965,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -1742,6 +2014,14 @@
       "summary": "watch changes to an object of kind LimitRange",
       "nickname": "watchLimitRange",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1820,6 +2100,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -1871,6 +2159,14 @@
       "nickname": "createLimitRange",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.LimitRange",
         "paramType": "body",
         "name": "body",
@@ -1905,6 +2201,14 @@
       "summary": "watch individual changes to a list of LimitRange",
       "nickname": "watchLimitRangelist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1967,6 +2271,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -2018,6 +2330,14 @@
       "nickname": "createNamespace",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Namespace",
         "paramType": "body",
         "name": "body",
@@ -2052,6 +2372,14 @@
       "summary": "watch individual changes to a list of Namespace",
       "nickname": "watchNamespacelist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -2113,6 +2441,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "name",
         "description": "name of the Namespace",
@@ -2140,6 +2476,14 @@
       "summary": "replace the specified Namespace",
       "nickname": "replaceNamespace",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Namespace",
         "paramType": "body",
@@ -2179,6 +2523,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2216,6 +2568,14 @@
       "summary": "delete a Namespace",
       "nickname": "deleteNamespace",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -2259,6 +2619,14 @@
       "summary": "watch changes to an object of kind Namespace",
       "nickname": "watchNamespace",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -2327,6 +2695,14 @@
       "nickname": "replaceNamespace",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Namespace",
         "paramType": "body",
         "name": "body",
@@ -2370,6 +2746,14 @@
       "nickname": "replaceNamespace",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Namespace",
         "paramType": "body",
         "name": "body",
@@ -2412,6 +2796,14 @@
       "summary": "list or watch objects of kind Node",
       "nickname": "listNode",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -2466,6 +2858,14 @@
       "nickname": "createNode",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Node",
         "paramType": "body",
         "name": "body",
@@ -2500,6 +2900,14 @@
       "summary": "watch individual changes to a list of Node",
       "nickname": "watchNodelist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -2561,6 +2969,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "name",
         "description": "name of the Node",
@@ -2588,6 +3004,14 @@
       "summary": "replace the specified Node",
       "nickname": "replaceNode",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Node",
         "paramType": "body",
@@ -2627,6 +3051,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2664,6 +3096,14 @@
       "summary": "delete a Node",
       "nickname": "deleteNode",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -2707,6 +3147,14 @@
       "summary": "watch changes to an object of kind Node",
       "nickname": "watchNode",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3127,6 +3575,14 @@
       "nickname": "replaceNode",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Node",
         "paramType": "body",
         "name": "body",
@@ -3169,6 +3625,14 @@
       "summary": "list or watch objects of kind PersistentVolumeClaim",
       "nickname": "listPersistentVolumeClaim",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3231,6 +3695,14 @@
       "nickname": "createPersistentVolumeClaim",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PersistentVolumeClaim",
         "paramType": "body",
         "name": "body",
@@ -3273,6 +3745,14 @@
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
       "nickname": "watchPersistentVolumeClaimlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3342,6 +3822,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -3377,6 +3865,14 @@
       "summary": "replace the specified PersistentVolumeClaim",
       "nickname": "replacePersistentVolumeClaim",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.PersistentVolumeClaim",
         "paramType": "body",
@@ -3424,6 +3920,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3469,6 +3973,14 @@
       "summary": "delete a PersistentVolumeClaim",
       "nickname": "deletePersistentVolumeClaim",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -3520,6 +4032,14 @@
       "summary": "watch changes to an object of kind PersistentVolumeClaim",
       "nickname": "watchPersistentVolumeClaim",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3598,6 +4118,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -3649,6 +4177,14 @@
       "nickname": "createPersistentVolumeClaim",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PersistentVolumeClaim",
         "paramType": "body",
         "name": "body",
@@ -3683,6 +4219,14 @@
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
       "nickname": "watchPersistentVolumeClaimlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3743,6 +4287,14 @@
       "nickname": "replacePersistentVolumeClaim",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PersistentVolumeClaim",
         "paramType": "body",
         "name": "body",
@@ -3793,6 +4345,14 @@
       "summary": "list or watch objects of kind PersistentVolume",
       "nickname": "listPersistentVolume",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3847,6 +4407,14 @@
       "nickname": "createPersistentVolume",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PersistentVolume",
         "paramType": "body",
         "name": "body",
@@ -3881,6 +4449,14 @@
       "summary": "watch individual changes to a list of PersistentVolume",
       "nickname": "watchPersistentVolumelist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3942,6 +4518,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "name",
         "description": "name of the PersistentVolume",
@@ -3969,6 +4553,14 @@
       "summary": "replace the specified PersistentVolume",
       "nickname": "replacePersistentVolume",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.PersistentVolume",
         "paramType": "body",
@@ -4008,6 +4600,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4045,6 +4645,14 @@
       "summary": "delete a PersistentVolume",
       "nickname": "deletePersistentVolume",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -4088,6 +4696,14 @@
       "summary": "watch changes to an object of kind PersistentVolume",
       "nickname": "watchPersistentVolume",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -4156,6 +4772,14 @@
       "nickname": "replacePersistentVolume",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PersistentVolume",
         "paramType": "body",
         "name": "body",
@@ -4198,6 +4822,14 @@
       "summary": "list or watch objects of kind Pod",
       "nickname": "listPod",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -4260,6 +4892,14 @@
       "nickname": "createPod",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Pod",
         "paramType": "body",
         "name": "body",
@@ -4302,6 +4942,14 @@
       "summary": "watch individual changes to a list of Pod",
       "nickname": "watchPodlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -4371,6 +5019,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -4406,6 +5062,14 @@
       "summary": "replace the specified Pod",
       "nickname": "replacePod",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Pod",
         "paramType": "body",
@@ -4453,6 +5117,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4498,6 +5170,14 @@
       "summary": "delete a Pod",
       "nickname": "deletePod",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -4549,6 +5229,14 @@
       "summary": "watch changes to an object of kind Pod",
       "nickname": "watchPod",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -5083,6 +5771,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -5134,6 +5830,14 @@
       "nickname": "createPod",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Pod",
         "paramType": "body",
         "name": "body",
@@ -5162,6 +5866,14 @@
       "summary": "create a Binding",
       "nickname": "createBinding",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Binding",
         "paramType": "body",
@@ -5197,6 +5909,14 @@
       "summary": "watch individual changes to a list of Pod",
       "nickname": "watchPodlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -5256,6 +5976,14 @@
       "summary": "create a Binding",
       "nickname": "createBinding",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Binding",
         "paramType": "body",
@@ -5326,6 +6054,14 @@
       "summary": "read the specified Pod",
       "nickname": "readPod",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -5557,6 +6293,14 @@
       "nickname": "replacePod",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Pod",
         "paramType": "body",
         "name": "body",
@@ -5607,6 +6351,14 @@
       "summary": "list or watch objects of kind PodTemplate",
       "nickname": "listPodTemplate",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -5669,6 +6421,14 @@
       "nickname": "createPodTemplate",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PodTemplate",
         "paramType": "body",
         "name": "body",
@@ -5711,6 +6471,14 @@
       "summary": "watch individual changes to a list of PodTemplate",
       "nickname": "watchPodTemplatelist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -5780,6 +6548,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -5815,6 +6591,14 @@
       "summary": "replace the specified PodTemplate",
       "nickname": "replacePodTemplate",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.PodTemplate",
         "paramType": "body",
@@ -5862,6 +6646,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5907,6 +6699,14 @@
       "summary": "delete a PodTemplate",
       "nickname": "deletePodTemplate",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -5958,6 +6758,14 @@
       "summary": "watch changes to an object of kind PodTemplate",
       "nickname": "watchPodTemplate",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6036,6 +6844,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -6087,6 +6903,14 @@
       "nickname": "createPodTemplate",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PodTemplate",
         "paramType": "body",
         "name": "body",
@@ -6121,6 +6945,14 @@
       "summary": "watch individual changes to a list of PodTemplate",
       "nickname": "watchPodTemplatelist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6183,6 +7015,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -6242,6 +7082,14 @@
       "nickname": "createReplicationController",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ReplicationController",
         "paramType": "body",
         "name": "body",
@@ -6284,6 +7132,14 @@
       "summary": "watch individual changes to a list of ReplicationController",
       "nickname": "watchReplicationControllerlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6353,6 +7209,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -6388,6 +7252,14 @@
       "summary": "replace the specified ReplicationController",
       "nickname": "replaceReplicationController",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.ReplicationController",
         "paramType": "body",
@@ -6435,6 +7307,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6480,6 +7360,14 @@
       "summary": "delete a ReplicationController",
       "nickname": "deleteReplicationController",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -6531,6 +7419,14 @@
       "summary": "watch changes to an object of kind ReplicationController",
       "nickname": "watchReplicationController",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6609,6 +7505,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -6660,6 +7564,14 @@
       "nickname": "createReplicationController",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ReplicationController",
         "paramType": "body",
         "name": "body",
@@ -6694,6 +7606,14 @@
       "summary": "watch individual changes to a list of ReplicationController",
       "nickname": "watchReplicationControllerlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6756,6 +7676,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -6815,6 +7743,14 @@
       "nickname": "createResourceQuota",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ResourceQuota",
         "paramType": "body",
         "name": "body",
@@ -6857,6 +7793,14 @@
       "summary": "watch individual changes to a list of ResourceQuota",
       "nickname": "watchResourceQuotalist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6926,6 +7870,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -6961,6 +7913,14 @@
       "summary": "replace the specified ResourceQuota",
       "nickname": "replaceResourceQuota",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.ResourceQuota",
         "paramType": "body",
@@ -7008,6 +7968,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7053,6 +8021,14 @@
       "summary": "delete a ResourceQuota",
       "nickname": "deleteResourceQuota",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -7104,6 +8080,14 @@
       "summary": "watch changes to an object of kind ResourceQuota",
       "nickname": "watchResourceQuota",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7182,6 +8166,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -7233,6 +8225,14 @@
       "nickname": "createResourceQuota",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ResourceQuota",
         "paramType": "body",
         "name": "body",
@@ -7267,6 +8267,14 @@
       "summary": "watch individual changes to a list of ResourceQuota",
       "nickname": "watchResourceQuotalist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7327,6 +8335,14 @@
       "nickname": "replaceResourceQuota",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ResourceQuota",
         "paramType": "body",
         "name": "body",
@@ -7377,6 +8393,14 @@
       "summary": "list or watch objects of kind Secret",
       "nickname": "listSecret",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7439,6 +8463,14 @@
       "nickname": "createSecret",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Secret",
         "paramType": "body",
         "name": "body",
@@ -7481,6 +8513,14 @@
       "summary": "watch individual changes to a list of Secret",
       "nickname": "watchSecretlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7550,6 +8590,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -7585,6 +8633,14 @@
       "summary": "replace the specified Secret",
       "nickname": "replaceSecret",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Secret",
         "paramType": "body",
@@ -7632,6 +8688,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7677,6 +8741,14 @@
       "summary": "delete a Secret",
       "nickname": "deleteSecret",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -7728,6 +8800,14 @@
       "summary": "watch changes to an object of kind Secret",
       "nickname": "watchSecret",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7806,6 +8886,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -7857,6 +8945,14 @@
       "nickname": "createSecret",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Secret",
         "paramType": "body",
         "name": "body",
@@ -7891,6 +8987,14 @@
       "summary": "watch individual changes to a list of Secret",
       "nickname": "watchSecretlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7953,6 +9057,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -8012,6 +9124,14 @@
       "nickname": "createServiceAccount",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ServiceAccount",
         "paramType": "body",
         "name": "body",
@@ -8054,6 +9174,14 @@
       "summary": "watch individual changes to a list of ServiceAccount",
       "nickname": "watchServiceAccountlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -8123,6 +9251,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -8158,6 +9294,14 @@
       "summary": "replace the specified ServiceAccount",
       "nickname": "replaceServiceAccount",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.ServiceAccount",
         "paramType": "body",
@@ -8205,6 +9349,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -8250,6 +9402,14 @@
       "summary": "delete a ServiceAccount",
       "nickname": "deleteServiceAccount",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -8301,6 +9461,14 @@
       "summary": "watch changes to an object of kind ServiceAccount",
       "nickname": "watchServiceAccount",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -8379,6 +9547,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -8430,6 +9606,14 @@
       "nickname": "createServiceAccount",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ServiceAccount",
         "paramType": "body",
         "name": "body",
@@ -8464,6 +9648,14 @@
       "summary": "watch individual changes to a list of ServiceAccount",
       "nickname": "watchServiceAccountlist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -8526,6 +9718,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -8585,6 +9785,14 @@
       "nickname": "createService",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Service",
         "paramType": "body",
         "name": "body",
@@ -8627,6 +9835,14 @@
       "summary": "watch individual changes to a list of Service",
       "nickname": "watchServicelist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -8696,6 +9912,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -8731,6 +9955,14 @@
       "summary": "replace the specified Service",
       "nickname": "replaceService",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Service",
         "paramType": "body",
@@ -8776,6 +10008,14 @@
       "summary": "partially update the specified Service",
       "nickname": "patchService",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "body",
@@ -8825,6 +10065,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
@@ -8866,6 +10114,14 @@
       "summary": "watch changes to an object of kind Service",
       "nickname": "watchService",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -9400,6 +10656,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -9451,6 +10715,14 @@
       "nickname": "createService",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Service",
         "paramType": "body",
         "name": "body",
@@ -9485,6 +10757,14 @@
       "summary": "watch individual changes to a list of Service",
       "nickname": "watchServicelist",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
