@@ -385,8 +385,6 @@ if (isset($_GET['cmd']) === true) {
 Just like the others, you want a service to group your frontend pods.
 The service is described in the file `examples/guestbook/frontend-service.json`:
 
-**NOTE** This json snippet has been modified, in that it adds the publicIPs field for illustration purposes only.
-
 ```js
 {
    "kind":"Service",
