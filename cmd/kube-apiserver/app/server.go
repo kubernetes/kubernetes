@@ -37,6 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	forked "github.com/GoogleCloudPlatform/kubernetes/third_party/forked/coreos/go-etcd/etcd"
@@ -121,7 +122,7 @@ func NewAPIServer() *APIServer {
 
 		RuntimeConfig: make(util.ConfigurationMap),
 		KubeletConfig: client.KubeletConfig{
-			Port:        10250,
+			Port:        ports.KubeletPort,
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
