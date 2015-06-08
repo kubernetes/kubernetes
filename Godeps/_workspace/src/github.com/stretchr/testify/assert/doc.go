@@ -1,4 +1,4 @@
-// A set of comprehensive testing tools for use with the normal Go testing system.
+// Package assert provides a set of comprehensive testing tools for use with the normal Go testing system.
 //
 // Example Usage
 //
@@ -45,7 +45,9 @@
 //
 // Here is an overview of the assert functions:
 //
-//    assert.Equal(t, expected, actual [, message [, format-args])
+//    assert.Equal(t, expected, actual [, message [, format-args]])
+//
+//    assert.EqualValues(t, expected, actual [, message [, format-args]])
 //
 //    assert.NotEqual(t, notExpected, actual [, message [, format-args]])
 //
@@ -98,7 +100,9 @@
 // assert package contains Assertions object. it has assertion methods.
 //
 // Here is an overview of the assert functions:
-//    assert.Equal(expected, actual [, message [, format-args])
+//    assert.Equal(expected, actual [, message [, format-args]])
+//
+//    assert.EqualValues(expected, actual [, message [, format-args]])
 //
 //    assert.NotEqual(notExpected, actual [, message [, format-args]])
 //

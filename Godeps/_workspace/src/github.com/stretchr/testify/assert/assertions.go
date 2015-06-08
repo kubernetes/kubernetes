@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
 	"runtime"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 // TestingT is an interface wrapper around *testing.T
@@ -36,15 +39,12 @@ func ObjectsAreEqual(expected, actual interface{}) bool {
 		return true
 	}
 
-	// Last ditch effort
-	if fmt.Sprintf("%#v", expected) == fmt.Sprintf("%#v", actual) {
-		return true
-	}
-
 	return false
 
 }
 
+// ObjectsAreEqualValues gets whether two objects are equal, or if their
+// values are equal.
 func ObjectsAreEqualValues(expected, actual interface{}) bool {
 	if ObjectsAreEqual(expected, actual) {
 		return true
@@ -66,28 +66,62 @@ func ObjectsAreEqualValues(expected, actual interface{}) bool {
 internally, causing it to print the file:line of the assert method, rather than where
 the problem actually occured in calling code.*/
 
-// CallerInfo returns a string containing the file and line number of the assert call
-// that failed.
-func CallerInfo() string {
+// CallerInfo returns an array of strings containing the file and line number
+// of each stack frame leading from the current test to the assert call that
+// failed.
+func CallerInfo() []string {
 
+	pc := uintptr(0)
 	file := ""
 	line := 0
 	ok := false
+	name := ""
 
+	callers := []string{}
 	for i := 0; ; i++ {
-		_, file, line, ok = runtime.Caller(i)
+		pc, file, line, ok = runtime.Caller(i)
 		if !ok {
-			return ""
+			return nil
 		}
+
 		parts := strings.Split(file, "/")
 		dir := parts[len(parts)-2]
 		file = parts[len(parts)-1]
 		if (dir != "assert" && dir != "mock" && dir != "require") || file == "mock_test.go" {
+			callers = append(callers, fmt.Sprintf("%s:%d", file, line))
+		}
+
+		f := runtime.FuncForPC(pc)
+		if f == nil {
+			break
+		}
+		name = f.Name()
+		// Drop the package
+		segments := strings.Split(name, ".")
+		name = segments[len(segments)-1]
+		if isTest(name, "Test") ||
+			isTest(name, "Benchmark") ||
+			isTest(name, "Example") {
 			break
 		}
 	}
 
-	return fmt.Sprintf("%s:%d", file, line)
+	return callers
+}
+
+// Stolen from the `go test` tool.
+// isTest tells whether name looks like a test (or benchmark, according to prefix).
+// It is a Test (say) if there is a character after Test that is not a lower-case letter.
+// We don't want TesticularCancer.
+func isTest(name, prefix string) bool {
+	if !strings.HasPrefix(name, prefix) {
+		return false
+	}
+	if len(name) == len(prefix) { // "Test" is ok
+		return true
+	}
+	rune, _ := utf8.DecodeRuneInString(name[len(prefix):])
+	return !unicode.IsLower(rune)
 }
 
 // getWhitespaceString returns a string that is long enough to overwrite the default
@@ -146,19 +180,20 @@ func Fail(t TestingT, failureMessage string, msgAndArgs ...interface{}) bool {
 
 	message := messageFromMsgAndArgs(msgAndArgs...)
 
+	errorTrace := strings.Join(CallerInfo(), "\n\r\t\t\t")
 	if len(message) > 0 {
-		t.Errorf("\r%s\r\tLocation:\t%s\n"+
+		t.Errorf("\r%s\r\tError Trace:\t%s\n"+
 			"\r\tError:%s\n"+
 			"\r\tMessages:\t%s\n\r",
 			getWhitespaceString(),
-			CallerInfo(),
+			errorTrace,
 			indentMessageLines(failureMessage, 2),
 			message)
 	} else {
-		t.Errorf("\r%s\r\tLocation:\t%s\n"+
+		t.Errorf("\r%s\r\tError Trace:\t%s\n"+
 			"\r\tError:%s\n\r",
 			getWhitespaceString(),
-			CallerInfo(),
+			errorTrace,
 			indentMessageLines(failureMessage, 2))
 	}
 
@@ -659,9 +694,38 @@ func InDelta(t TestingT, expected, actual interface{}, delta float64, msgAndArgs
 		return Fail(t, fmt.Sprintf("Parameters must be numerical"), msgAndArgs...)
 	}
 
+	if math.IsNaN(af) {
+		return Fail(t, fmt.Sprintf("Actual must not be NaN"), msgAndArgs...)
+	}
+
+	if math.IsNaN(bf) {
+		return Fail(t, fmt.Sprintf("Expected %v with delta %v, but was NaN", expected, delta), msgAndArgs...)
+	}
+
 	dt := af - bf
 	if dt < -delta || dt > delta {
 		return Fail(t, fmt.Sprintf("Max difference between %v and %v allowed is %v, but difference was %v", expected, actual, delta, dt), msgAndArgs...)
+	}
+
+	return true
+}
+
+// InDeltaSlice is the same as InDelta, except it compares two slices.
+func InDeltaSlice(t TestingT, expected, actual interface{}, delta float64, msgAndArgs ...interface{}) bool {
+	if expected == nil || actual == nil ||
+		reflect.TypeOf(actual).Kind() != reflect.Slice ||
+		reflect.TypeOf(expected).Kind() != reflect.Slice {
+		return Fail(t, fmt.Sprintf("Parameters must be slice"), msgAndArgs...)
+	}
+
+	actualSlice := reflect.ValueOf(actual)
+	expectedSlice := reflect.ValueOf(expected)
+
+	for i := 0; i < actualSlice.Len(); i++ {
+		result := InDelta(t, actualSlice.Index(i).Interface(), expectedSlice.Index(i).Interface(), delta)
+		if !result {
+			return result
+		}
 	}
 
 	return true
@@ -699,6 +763,27 @@ func InEpsilon(t TestingT, expected, actual interface{}, epsilon float64, msgAnd
 	delta := calcEpsilonDelta(expected, actual, epsilon)
 
 	return InDelta(t, expected, actual, delta, msgAndArgs...)
+}
+
+// InEpsilonSlice is the same as InEpsilon, except it compares two slices.
+func InEpsilonSlice(t TestingT, expected, actual interface{}, delta float64, msgAndArgs ...interface{}) bool {
+	if expected == nil || actual == nil ||
+		reflect.TypeOf(actual).Kind() != reflect.Slice ||
+		reflect.TypeOf(expected).Kind() != reflect.Slice {
+		return Fail(t, fmt.Sprintf("Parameters must be slice"), msgAndArgs...)
+	}
+
+	actualSlice := reflect.ValueOf(actual)
+	expectedSlice := reflect.ValueOf(expected)
+
+	for i := 0; i < actualSlice.Len(); i++ {
+		result := InEpsilon(t, actualSlice.Index(i).Interface(), expectedSlice.Index(i).Interface(), delta)
+		if !result {
+			return result
+		}
+	}
+
+	return true
 }
 
 /*
