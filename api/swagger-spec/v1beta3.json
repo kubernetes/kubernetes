@@ -10603,7 +10603,7 @@
      },
      "persistentVolumeReclaimPolicy": {
       "type": "string",
-      "description": "persistentVolumeReclaimPolicy is what happens to a volume when released from its claim; Default is Retain."
+      "description": "what happens to a volume when released from its claim; Valid options are Retain (default) and Recycle.  Recyling must be supported by the volume plugin underlying this persistent volume."
      }
     }
    },
@@ -10815,7 +10815,7 @@
      },
      "reason": {
       "type": "string",
-      "description": "(brief) reason the volume is not is not available, such as failed recycling"
+      "description": "(brief) reason the volume is not is not available"
      }
     }
    },

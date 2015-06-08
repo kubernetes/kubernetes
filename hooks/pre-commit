@@ -123,4 +123,16 @@ else
 fi
 echo "${reset}"
 
+echo -ne "Checking for swagger spec that need updating... "
+if ! hack/verify-swagger-spec.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Swagger spec needs to be updated."
+  echo "To regenerate the spec, run:"
+  echo "  hack/update-swagger-spec.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
 exit $exit_code
