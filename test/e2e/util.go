@@ -321,7 +321,7 @@ func waitForPersistentVolumePhase(phase api.PersistentVolumePhase, c *client.Cli
 	return fmt.Errorf("PersistentVolume %s not in phase %s within %v", pvName, phase, timeout)
 }
 
-// createNS should be used by every test, note that we append a common prefix to the provided test name.
+// createTestingNS should be used by every test, note that we append a common prefix to the provided test name.
 // Please see NewFramework instead of using this directly.
 func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) {
 	namespaceObj := &api.Namespace{
