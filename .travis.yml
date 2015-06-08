@@ -24,6 +24,7 @@ install:
   - ./hack/build-go.sh
   - GOPATH=$PWD/Godeps/_workspace:$GOPATH go install ./...
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/verify-gendocs.sh
+  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/verify-swagger-spec.sh
 
 before_script:
   - npm install karma karma-junit-reporter karma-phantomjs-launcher karma-jasmine
