@@ -1,7 +1,6 @@
 # Rackspace
 
-* Supported Version: v0.16.2
- * `git checkout v0.16.2`
+* Supported Version: v0.18.1
 
 In general, the dev-build-and-up.sh workflow for Rackspace is the similar to GCE. The specific implementation is different due to the use of CoreOS, Rackspace Cloud Files and the overall network design.
 
@@ -20,8 +19,9 @@ The current cluster design is inspired by:
 
 ##Provider: Rackspace
 
-- To install the latest released version of kubernetes use `export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash`
 - To build your own released version from source use `export KUBERNETES_PROVIDER=rackspace` and run the `bash hack/dev-build-and-up.sh`
+- Note: The get.k8s.io install method is not working yet for our scripts.
+  * To install the latest released version of kubernetes use `export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash`
 
 ## Build
 1. The kubernetes binaries will be built via the common build scripts in `build/`.
