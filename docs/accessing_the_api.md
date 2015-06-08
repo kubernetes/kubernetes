@@ -1,4 +1,13 @@
-# Reaching the API
+# Configuring APIserver ports
+
+This document describes what ports the kubernetes apiserver
+may serve on and how to reach them.  The audience is
+cluster administrators who want to customize their cluster
+or understand the details. 
+
+Most questions about accessing the cluster are covered
+in [Accessing the cluster](../docs/accessing-the-cluster.md).
+
 
 ## Ports and IPs Served On
 The Kubernetes API is served by the Kubernetes APIServer process.  Typically,
