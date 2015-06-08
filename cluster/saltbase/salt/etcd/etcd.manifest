@@ -7,15 +7,11 @@
 "containers":[
     {
     "name": "etcd-container",
-    "image": "gcr.io/google_containers/etcd:2.0.9",
+    "image": "gcr.io/google_containers/etcd:2.0.9.1",
     "command": [
-              "/usr/local/bin/etcd",
-	      "--addr",
-	      "127.0.0.1:4001",
-	      "--bind-addr",
-	      "127.0.0.1:4001",
-	      "--data-dir",
-	      "/var/etcd/data"
+              "/bin/sh",
+              "-c",
+              "/usr/local/bin/etcd --addr 127.0.0.1:4001 --bind-addr 127.0.0.1:4001 --data-dir /var/etcd/data 1>>/var/log/etcd.log 2>&1"
             ],
     "ports":[
       { "name": "serverport",
@@ -26,16 +22,25 @@
         "hostPort": 4001}
         ],
     "volumeMounts": [
-      { "name": "varetcd",
-        "mountPath": "/var/etcd",
-        "readOnly": false}
-        ]
-       }
+      {"name": "varetcd",
+       "mountPath": "/var/etcd",
+       "readOnly": false
+      },
+      {"name": "varlogetcd",
+       "mountPath": "/var/log/etcd.log",
+       "readOnly": false
+      }
+     ]
+    }
 ],
 "volumes":[
   { "name": "varetcd",
     "hostPath": {
         "path": "/mnt/master-pd/var/etcd"}
+  },
+  { "name": "varlogetcd",
+    "hostPath": {
+        "path": "/var/log/etcd.log"}
   }
 ]
 }}
