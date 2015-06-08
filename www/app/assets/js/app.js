@@ -200,7 +200,7 @@ angular.module("kubernetesApp.config", [])
 
 .constant("ENV", {
 	"/": {
-		"k8sApiServer": "/api/v1beta3",
+		"k8sApiServer": "/api/v1",
 		"k8sDataServer": "",
 		"k8sDataPollMinIntervalSec": 10,
 		"k8sDataPollMaxIntervalSec": 120,
@@ -2388,12 +2388,12 @@ angular.module('kubernetesApp.components.dashboard')
   function PodDataService($q) {
     var pods = {
     "kind": "Pod",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
         "name": "redis-master-c0r1n",
         "generateName": "redis-master-",
         "namespace": "default",
-        "selfLink": "/api/v1beta3/namespaces/default/pods/redis-master-c0r1n",
+        "selfLink": "/api/v1/namespaces/default/pods/redis-master-c0r1n",
         "uid": "f12ddfaf-ff77-11e4-8f2d-080027213276",
         "resourceVersion": "39",
         "creationTimestamp": "2015-05-21T05:12:14Z",
@@ -2401,7 +2401,7 @@ angular.module('kubernetesApp.components.dashboard')
             "name": "redis-master"
         },
         "annotations": {
-            "kubernetes.io/created-by": "{\"kind\":\"SerializedReference\",\"apiVersion\":\"v1beta3\",\"reference\":{\"kind\":\"ReplicationController\",\"namespace\":\"default\",\"name\":\"redis-master\",\"uid\":\"f12969e0-ff77-11e4-8f2d-080027213276\",\"apiVersion\":\"v1beta3\",\"resourceVersion\":\"26\"}}"
+            "kubernetes.io/created-by": "{\"kind\":\"SerializedReference\",\"apiVersion\":\"v1\",\"reference\":{\"kind\":\"ReplicationController\",\"namespace\":\"default\",\"name\":\"redis-master\",\"uid\":\"f12969e0-ff77-11e4-8f2d-080027213276\",\"apiVersion\":\"v1\",\"resourceVersion\":\"26\"}}"
         }
     },
     "spec": {
@@ -2503,16 +2503,16 @@ angular.module('kubernetesApp.components.dashboard')
   function ReplicationControllerDataService($q) {
     var replicationControllers = {
     "kind": "List",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {},
     "items": [
         {
             "kind": "ReplicationController",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "redis-master",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/replicationcontrollers/redis-master",
+                "selfLink": "/api/v1/namespaces/default/replicationcontrollers/redis-master",
                 "uid": "f12969e0-ff77-11e4-8f2d-080027213276",
                 "resourceVersion": "28",
                 "creationTimestamp": "2015-05-21T05:12:14Z",
@@ -2592,16 +2592,16 @@ angular.module('kubernetesApp.components.dashboard')
   function ServiceDataService($q) {
     var services = {
     "kind": "List",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {},
     "items": [
         {
             "kind": "Service",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "kubernetes",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/services/kubernetes",
+                "selfLink": "/api/v1/namespaces/default/services/kubernetes",
                 "resourceVersion": "6",
                 "creationTimestamp": null,
                 "labels": {
@@ -2624,11 +2624,11 @@ angular.module('kubernetesApp.components.dashboard')
         },
         {
             "kind": "Service",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "kubernetes-ro",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/services/kubernetes-ro",
+                "selfLink": "/api/v1/namespaces/default/services/kubernetes-ro",
                 "resourceVersion": "8",
                 "creationTimestamp": null,
                 "labels": {
@@ -2651,11 +2651,11 @@ angular.module('kubernetesApp.components.dashboard')
         },
         {
             "kind": "Service",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "redis-master",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/services/redis-master",
+                "selfLink": "/api/v1/namespaces/default/services/redis-master",
                 "uid": "a6fde246-ff78-11e4-8f2d-080027213276",
                 "resourceVersion": "72",
                 "creationTimestamp": "2015-05-21T05:17:19Z",

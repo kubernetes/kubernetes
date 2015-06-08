@@ -13,12 +13,12 @@
   function PodDataService($q) {
     var pods = {
     "kind": "Pod",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
         "name": "redis-master-c0r1n",
         "generateName": "redis-master-",
         "namespace": "default",
-        "selfLink": "/api/v1beta3/namespaces/default/pods/redis-master-c0r1n",
+        "selfLink": "/api/v1/namespaces/default/pods/redis-master-c0r1n",
         "uid": "f12ddfaf-ff77-11e4-8f2d-080027213276",
         "resourceVersion": "39",
         "creationTimestamp": "2015-05-21T05:12:14Z",
@@ -26,7 +26,7 @@
             "name": "redis-master"
         },
         "annotations": {
-            "kubernetes.io/created-by": "{\"kind\":\"SerializedReference\",\"apiVersion\":\"v1beta3\",\"reference\":{\"kind\":\"ReplicationController\",\"namespace\":\"default\",\"name\":\"redis-master\",\"uid\":\"f12969e0-ff77-11e4-8f2d-080027213276\",\"apiVersion\":\"v1beta3\",\"resourceVersion\":\"26\"}}"
+            "kubernetes.io/created-by": "{\"kind\":\"SerializedReference\",\"apiVersion\":\"v1\",\"reference\":{\"kind\":\"ReplicationController\",\"namespace\":\"default\",\"name\":\"redis-master\",\"uid\":\"f12969e0-ff77-11e4-8f2d-080027213276\",\"apiVersion\":\"v1\",\"resourceVersion\":\"26\"}}"
         }
     },
     "spec": {
