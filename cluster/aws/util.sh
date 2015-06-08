@@ -52,7 +52,6 @@ MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 #  only affects the big storage instance types, which aren't a typical use case right now.
 BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\": \"/dev/sdb\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral3\"}]"
 
-
 function json_val {
     python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
 }
