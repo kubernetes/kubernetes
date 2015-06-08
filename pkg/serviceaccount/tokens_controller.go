@@ -141,9 +141,6 @@ func (e *TokensController) Stop() {
 
 // serviceAccountAdded reacts to a ServiceAccount creation by creating a corresponding ServiceAccountToken Secret
 func (e *TokensController) serviceAccountAdded(obj interface{}) {
-	if !e.secretsSynced() {
-		return
-	}
 	serviceAccount := obj.(*api.ServiceAccount)
 	err := e.createSecretIfNeeded(serviceAccount)
 	if err != nil {
@@ -153,9 +150,6 @@ func (e *TokensController) serviceAccountAdded(obj interface{}) {
 
 // serviceAccountUpdated reacts to a ServiceAccount update (or re-list) by ensuring a corresponding ServiceAccountToken Secret exists
 func (e *TokensController) serviceAccountUpdated(oldObj interface{}, newObj interface{}) {
-	if !e.secretsSynced() {
-		return
-	}
 	newServiceAccount := newObj.(*api.ServiceAccount)
 	err := e.createSecretIfNeeded(newServiceAccount)
 	if err != nil {
@@ -185,9 +179,6 @@ func (e *TokensController) serviceAccountDeleted(obj interface{}) {
 
 // secretAdded reacts to a Secret create by ensuring the referenced ServiceAccount exists, and by adding a token to the secret if needed
 func (e *TokensController) secretAdded(obj interface{}) {
-	if !e.serviceAccountsSynced() {
-		return
-	}
 	secret := obj.(*api.Secret)
 	serviceAccount, err := e.getServiceAccount(secret)
 	if err != nil {
@@ -195,6 +186,10 @@ func (e *TokensController) secretAdded(obj interface{}) {
 		return
 	}
 	if serviceAccount == nil {
+		// We shouldn't delete a secret based on an invalid serviceAccount reference until the serviceAccount store is synced
+		if !e.serviceAccountsSynced() {
+			return
+		}
 		if err := e.deleteSecret(secret); err != nil {
 			glog.Errorf("Error deleting secret %s/%s: %v", secret.Namespace, secret.Name, err)
 		}
@@ -205,9 +200,6 @@ func (e *TokensController) secretAdded(obj interface{}) {
 
 // secretUpdated reacts to a Secret update (or re-list) by deleting the secret (if the referenced ServiceAccount does not exist)
 func (e *TokensController) secretUpdated(oldObj interface{}, newObj interface{}) {
-	if !e.serviceAccountsSynced() {
-		return
-	}
 	newSecret := newObj.(*api.Secret)
 	newServiceAccount, err := e.getServiceAccount(newSecret)
 	if err != nil {
@@ -215,6 +207,10 @@ func (e *TokensController) secretUpdated(oldObj interface{}, newObj interface{})
 		return
 	}
 	if newServiceAccount == nil {
+		// We shouldn't delete a secret based on an invalid serviceAccount reference until the serviceAccount store is synced
+		if !e.serviceAccountsSynced() {
+			return
+		}
 		if err := e.deleteSecret(newSecret); err != nil {
 			glog.Errorf("Error deleting secret %s/%s: %v", newSecret.Namespace, newSecret.Name, err)
 		}
@@ -251,6 +247,11 @@ func (e *TokensController) createSecretIfNeeded(serviceAccount *api.ServiceAccou
 	// If the service account references no secrets, short-circuit and create a new one
 	if len(serviceAccount.Secrets) == 0 {
 		return e.createSecret(serviceAccount)
+	}
+
+	// We shouldn't try to validate secret references until the secrets store is synced
+	if !e.secretsSynced() {
+		return nil
 	}
 
 	// If any existing token secrets are referenced by the service account, return
