@@ -1184,7 +1184,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 	key := filepath.Join(keydir, keyfile)
 	Logf("Using SSH key: %s", key)
 
-	return util.MakePrivateKeySigner(key)
+	return util.MakePrivateKeySignerFromFile(key)
 }
 
 // LatencyMetrics stores data about request latency at a given quantile

@@ -22,6 +22,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -52,10 +53,22 @@ func (s *SSHTunnel) copyBytes(out io.Writer, in io.Reader) {
 }
 
 func NewSSHTunnel(user, keyfile, host string) (*SSHTunnel, error) {
-	signer, err := MakePrivateKeySigner(keyfile)
+	signer, err := MakePrivateKeySignerFromFile(keyfile)
 	if err != nil {
 		return nil, err
 	}
+	return makeSSHTunnel(user, signer, host)
+}
+
+func NewSSHTunnelFromBytes(user string, buffer []byte, host string) (*SSHTunnel, error) {
+	signer, err := MakePrivateKeySignerFromBytes(buffer)
+	if err != nil {
+		return nil, err
+	}
+	return makeSSHTunnel(user, signer, host)
+}
+
+func makeSSHTunnel(user string, signer ssh.Signer, host string) (*SSHTunnel, error) {
 	config := ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
@@ -77,6 +90,9 @@ func (s *SSHTunnel) Open() error {
 }
 
 func (s *SSHTunnel) Dial(network, address string) (net.Conn, error) {
+	if s.client == nil {
+		return nil, errors.New("tunnel is not opened.")
+	}
 	return s.client.Dial(network, address)
 }
 
@@ -135,7 +151,7 @@ func RunSSHCommand(cmd, host string, signer ssh.Signer) (string, string, int, er
 	return bout.String(), berr.String(), code, err
 }
 
-func MakePrivateKeySigner(key string) (ssh.Signer, error) {
+func MakePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 	// Create an actual signer.
 	file, err := os.Open(key)
 	if err != nil {
@@ -146,9 +162,13 @@ func MakePrivateKeySigner(key string) (ssh.Signer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading SSH key %s: '%v'", key, err)
 	}
+	return MakePrivateKeySignerFromBytes(buffer)
+}
+
+func MakePrivateKeySignerFromBytes(buffer []byte) (ssh.Signer, error) {
 	signer, err := ssh.ParsePrivateKey(buffer)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", key, err)
+		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", buffer, err)
 	}
 	return signer, nil
 }
