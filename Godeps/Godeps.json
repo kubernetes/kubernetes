@@ -109,8 +109,8 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
-			"Comment": "v2.0.0-3-g0424b5f",
-			"Rev": "0424b5f86ef0ca57a5309c599f74bbb3e97ecd9d"
+			"Comment": "v2.0.0-13-g4cceaf7",
+			"Rev": "4cceaf7283b76f27c4a732b20730dcdb61053bf5"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-semver/semver",
@@ -475,6 +475,10 @@
 		{
 			"ImportPath": "github.com/syndtr/gocapability/capability",
 			"Rev": "3c85049eaeb429febe7788d9c7aac42322a377fe"
+		},
+		{
+			"ImportPath": "github.com/ugorji/go/codec",
+			"Rev": "821cda7e48749cacf7cad2c6ed01e96457ca7e9d"
 		},
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",

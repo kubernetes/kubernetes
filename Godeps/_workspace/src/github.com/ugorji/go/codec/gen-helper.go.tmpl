@@ -1,0 +1,250 @@
+// //+build ignore
+
+// Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
+// Use of this source code is governed by a BSD-style license found in the LICENSE file.
+
+// ************************************************************
+// DO NOT EDIT.
+// THIS FILE IS AUTO-GENERATED from gen-helper.go.tmpl
+// ************************************************************
+
+package codec
+
+// This file is used to generate helper code for codecgen. 
+// The values here i.e. genHelper(En|De)coder are not to be used directly by 
+// library users. They WILL change continously and without notice.
+// 
+// To help enforce this, we create an unexported type with exported members.
+// The only way to get the type is via the one exported type that we control (somewhat).
+// 
+// When static codecs are created for types, they will use this value
+// to perform encoding or decoding of primitives or known slice or map types.
+
+// GenHelperEncoder is exported so that it can be used externally by codecgen.
+// Library users: DO NOT USE IT DIRECTLY. IT WILL CHANGE CONTINOUSLY WITHOUT NOTICE.
+func GenHelperEncoder(e *Encoder) (genHelperEncoder, encDriver) {
+	return genHelperEncoder{e:e}, e.e 
+}
+
+// GenHelperDecoder is exported so that it can be used externally by codecgen.
+// Library users: DO NOT USE IT DIRECTLY. IT WILL CHANGE CONTINOUSLY WITHOUT NOTICE.
+func GenHelperDecoder(d *Decoder) (genHelperDecoder, decDriver) {
+	return genHelperDecoder{d:d}, d.d 
+}
+
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+type genHelperEncoder struct {
+	e *Encoder
+	F fastpathT 
+}
+
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+type genHelperDecoder struct {
+	d *Decoder
+	F fastpathT 
+}
+
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncBasicHandle() *BasicHandle {
+	return f.e.h
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncBinary() bool {
+	return f.e.be // f.e.hh.isBinaryEncoding()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncFallback(iv interface{}) {
+	// println(">>>>>>>>> EncFallback")
+	f.e.encodeI(iv, false, false)
+}
+
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecBasicHandle() *BasicHandle {
+	return f.d.h
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecBinary() bool {
+     return f.d.be // f.d.hh.isBinaryEncoding()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecSwallow() {
+	f.d.swallow()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecScratchBuffer() []byte {
+	return f.d.b[:]
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecFallback(iv interface{}, chkPtr bool) {
+	// println(">>>>>>>>> DecFallback")
+	f.d.decodeI(iv, chkPtr, false, false, false)
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecSliceHelperStart() (decSliceHelper, int) {
+	return f.d.decSliceHelperStart()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecStructFieldNotFound(index int, name string) {
+	f.d.structFieldNotFound(index, name)
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecArrayCannotExpand(sliceLen, streamLen int) {
+	f.d.arrayCannotExpand(sliceLen, streamLen)
+}
+
+
+{{/*
+
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncDriver() encDriver {
+	return f.e.e
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecDriver() decDriver {
+     return f.d.d
+}
+
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncNil() {
+	f.e.e.EncodeNil()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncBytes(v []byte) {
+	f.e.e.EncodeStringBytes(c_RAW, v)
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncArrayStart(length int) {
+	f.e.e.EncodeArrayStart(length)
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncArrayEnd() {
+	f.e.e.EncodeArrayEnd()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncArrayEntrySeparator() {
+	f.e.e.EncodeArrayEntrySeparator()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncMapStart(length int) {
+	f.e.e.EncodeMapStart(length)
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncMapEnd() {
+	f.e.e.EncodeMapEnd()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncMapEntrySeparator() {
+	f.e.e.EncodeMapEntrySeparator()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncMapKVSeparator() {
+	f.e.e.EncodeMapKVSeparator()
+}
+
+// ---------
+
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecBytes(v *[]byte) {
+	*v = f.d.d.DecodeBytes(*v)
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecTryNil() bool {
+	return f.d.d.TryDecodeAsNil()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecContainerIsNil() (b bool) {
+	return f.d.d.IsContainerType(valueTypeNil)
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecContainerIsMap() (b bool) {
+	return f.d.d.IsContainerType(valueTypeMap)
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecContainerIsArray() (b bool) {
+	return f.d.d.IsContainerType(valueTypeArray)
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecCheckBreak() bool {
+	return f.d.d.CheckBreak()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecMapStart() int {
+	return f.d.d.ReadMapStart()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecArrayStart() int {
+	return f.d.d.ReadArrayStart()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecMapEnd() {
+	f.d.d.ReadMapEnd()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecArrayEnd() {
+	f.d.d.ReadArrayEnd()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecArrayEntrySeparator() {
+	f.d.d.ReadArrayEntrySeparator()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecMapEntrySeparator() {
+	f.d.d.ReadMapEntrySeparator()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecMapKVSeparator() {
+	f.d.d.ReadMapKVSeparator()
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) ReadStringAsBytes(bs []byte) []byte {
+	return f.d.d.DecodeStringAsBytes(bs)
+}
+
+
+// -- encode calls (primitives)
+{{range .Values}}{{if .Primitive }}{{if ne .Primitive "interface{}" }}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) {{ .MethodNamePfx "Enc" true }}(v {{ .Primitive }}) {
+	ee := f.e.e
+	{{ encmd .Primitive "v" }}
+}
+{{ end }}{{ end }}{{ end }}
+
+// -- decode calls (primitives)
+{{range .Values}}{{if .Primitive }}{{if ne .Primitive "interface{}" }}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) {{ .MethodNamePfx "Dec" true }}(vp *{{ .Primitive }}) {
+	dd := f.d.d
+	*vp = {{ decmd .Primitive }}
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) {{ .MethodNamePfx "Read" true }}() (v {{ .Primitive }}) {
+	dd := f.d.d
+	v = {{ decmd .Primitive }}
+	return
+}
+{{ end }}{{ end }}{{ end }}
+
+
+// -- encode calls (slices/maps)
+{{range .Values}}{{if not .Primitive }}{{if .Slice }}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) {{ .MethodNamePfx "Enc" false }}(v []{{ .Elem }}) { {{ else }}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) {{ .MethodNamePfx "Enc" false }}(v map[{{ .MapKey }}]{{ .Elem }}) { {{end}}
+	f.F.{{ .MethodNamePfx "Enc" false }}V(v, false, f.e)
+}
+{{ end }}{{ end }}
+
+// -- decode calls (slices/maps) 
+{{range .Values}}{{if not .Primitive }}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+{{if .Slice }}func (f genHelperDecoder) {{ .MethodNamePfx "Dec" false }}(vp *[]{{ .Elem }}) { 
+{{else}}func (f genHelperDecoder) {{ .MethodNamePfx "Dec" false }}(vp *map[{{ .MapKey }}]{{ .Elem }}) { {{end}}
+	v, changed := f.F.{{ .MethodNamePfx "Dec" false }}V(*vp, false, true, f.d)
+	if changed {
+		*vp = v 
+	}
+}
+{{ end }}{{ end }}
+*/}}
