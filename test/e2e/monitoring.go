@@ -86,7 +86,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 			return nil, err
 		}
 		if len(rcList.Items) != 1 {
-			return nil, fmt.Errorf("expected to find one replicat for RC with label %s but got %d",
+			return nil, fmt.Errorf("expected to find one replica for RC with label %s but got %d",
 				rcLabel, len(rcList.Items))
 		}
 		for _, rc := range rcList.Items {

@@ -81,7 +81,7 @@ function create-resource-from-string() {
   local -r config_string=$1;
   local tries=$2;
   local -r delay=$3;
-  local -r config_name=$1;
+  local -r config_name=$4;
   while [ ${tries} -gt 0 ]; do
     echo "${config_string}" | ${KUBECTL} create -f - && \
         echo "== Successfully started ${config_name} at $(date -Is)" && \
@@ -104,6 +104,7 @@ echo "== Kubernetes addon manager started at $(date -Is) =="
 # at the same time as the services that use them.
 # NOTE: needs to run as root to read this file.
 # Read each line in the csv file of tokens.
+# Expect errors when the script is started again.
 while read line; do
   # Split each line into the token and username.
   IFS=',' read -a parts <<< "${line}"
@@ -120,22 +121,13 @@ for obj in $(find /etc/kubernetes/admission-controls \( -name \*.yaml -o -name \
   echo "++ obj ${obj} is created ++"
 done
 
-for obj in $(find /etc/kubernetes/addons \( -name \*.yaml -o -name \*.json \)); do
-  start_addon ${obj} 100 10 &
-  echo "++ addon ${obj} starting in pid $! ++"
+# Check if the configuration has changed recently - in case the user
+# created/updated/deleted the files on the master.
+while true; do
+  #kube-addon-update.sh must be deployed in the same directory as this file
+  `dirname $0`/kube-addon-update.sh /etc/kubernetes/addons
+  sleep 600
 done
-noerrors="true"
-for pid in $(jobs -p); do
-  wait ${pid} || noerrors="false"
-  echo "++ pid ${pid} complete ++"
-done
-if [ ${noerrors} == "true" ]; then
-  echo "== Kubernetes addon manager completed successfully at $(date -Is) =="
-else
-  echo "== Kubernetes addon manager completed with errors at $(date -Is) =="
-fi
 
-# We stay around so that status checks by salt make it look like
-# the service is good. (We could do this is other ways, but this
-# is simple.)
-sleep infinity
+
+

@@ -25,6 +25,14 @@
 {% endif %}
 
 # Used to restart kube-master-addons service each time salt is run
+# Actually, it doens't work (the service is not restarted),
+# but master-addon service always terminates after it does it job,
+# so it is (usually) not running and it will be started when
+# salt is run.
+# This salt state is not removed because there is a risk
+# of introducing regression in 1.0. Please remove it afterwards.
+# See also the salt config for kube-addons to see how to restart
+# a service on demand.
 master-docker-image-tags:
   file.touch:
     - name: /srv/pillar/docker-images.sls

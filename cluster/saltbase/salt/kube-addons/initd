@@ -67,12 +67,7 @@ case "$1" in
         esac
         ;;
   status)
-	    if [ ! -e ${PIDFILE} ]; then
-	        exit 1
-	    fi
-	    pid=$(cat ${PIDFILE})
-        # Checks that ${pid} is running AND is us.
-        ps --no-headers ${pid} | grep ${SCRIPTNAME} > /dev/null || exit $?
+        status_of_proc -p $PIDFILE $KUBE_ADDONS_SH $NAME
         ;;
 
   restart|force-reload)
