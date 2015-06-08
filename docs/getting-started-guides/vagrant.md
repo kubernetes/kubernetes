@@ -104,7 +104,7 @@ Once your Vagrant machines are up and provisioned, the first thing to do is to c
 You may need to build the binaries first, you can do this with ```make```
 
 ```sh
-$ ./cluster/kubectl.sh get minions
+$ ./cluster/kubectl.sh get nodes
 
 NAME                LABELS
 10.245.1.4          <none>
@@ -126,18 +126,18 @@ cat ~/.kubernetes_vagrant_auth
 }
 ```
 
-You should now be set to use the `cluster/kubectl.sh` script. For example try to list the minions that you have started with:
+You should now be set to use the `cluster/kubectl.sh` script. For example try to list the nodes that you have started with:
 
 ```sh
-./cluster/kubectl.sh get minions
+./cluster/kubectl.sh get nodes
 ```
 
 ### Running containers
 
-Your cluster is running, you can list the minions in your cluster:
+Your cluster is running, you can list the nodes in your cluster:
 
 ```sh
-$ ./cluster/kubectl.sh get minions
+$ ./cluster/kubectl.sh get nodes
 
 NAME                 LABELS
 10.245.2.4           <none>
@@ -177,7 +177,7 @@ NAME                                   IMAGE(S)            HOST                 
 78140853-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.3/10.245.2.3   name=myNginx   Waiting
 ```
 
-You need to wait for the provisioning to complete, you can monitor the minions by doing:
+You need to wait for the provisioning to complete, you can monitor the nodes by doing:
 
 ```sh
 $ sudo salt '*minion-1' cmd.run 'docker images'
@@ -270,13 +270,13 @@ If this is your first time creating the cluster, the kubelet on each minion sche
 
 To set up a vagrant cluster for hacking, follow the [vagrant developer guide](../devel/developer-guides/vagrant.md).
 
-#### I have brought Vagrant up but the minions won't validate!
+#### I have brought Vagrant up but the nodes won't validate!
 
-Log on to one of the minions (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
+Log on to one of the nodes (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
 
-#### I want to change the number of minions!
+#### I want to change the number of nodes!
 
-You can control the number of minions that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough minions to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `NUM_MINIONS` to 1 like so:
+You can control the number of nodes that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough nodes to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `NUM_MINIONS` to 1 like so:
 
 ```sh
 export NUM_MINIONS=1
@@ -291,7 +291,7 @@ Just set it to the number of megabytes you would like the machines to have. For 
 export KUBERNETES_MEMORY=2048
 ```
 
-If you need more granular control, you can set the amount of memory for the master and minions independently. For example:
+If you need more granular control, you can set the amount of memory for the master and nodes independently. For example:
 
 ```sh
 export KUBERNETES_MASTER_MEMORY=1536
