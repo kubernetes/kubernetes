@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,12 +24,6 @@ DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKER_HOST=${DOCKER_HOST:-""}
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-cd "${KUBE_ROOT}"
-
-# This'll canonicalize the path
-KUBE_ROOT=$PWD
-
 source hack/lib/init.sh
 
 # Incoming options
@@ -46,20 +40,26 @@ readonly KUBE_GCS_LATEST_CONTENTS=${KUBE_GCS_LATEST_CONTENTS:-}
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
+readonly KUBE_BUILD_WWW_IMAGE_REPO=kube-build-www
 # These get set in verify_prereqs with a unique hash based on KUBE_ROOT
 # KUBE_BUILD_IMAGE_TAG=<hash>
 # KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
 # KUBE_BUILD_CONTAINER_NAME=kube-build-<hash>
+# KUBE_BUILD_WWW_IMAGE="${KUBE_BUILD_WWW_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
+# KUBE_BUILD_WWW_CONTAINER_NAME=kube-build-www-<hash>
 readonly KUBE_BUILD_IMAGE_CROSS_TAG=cross
 readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
+readonly KUBE_BUILD_GOLANG_REPO=golang
+readonly KUBE_BUILD_NODE_REPO=node
 readonly KUBE_BUILD_GOLANG_VERSION=1.4
+readonly KUBE_BUILD_NODE_VERSION=0.12.3
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>
 
 # Here we map the output directories across both the local and remote _output
 # directories:
 #
 # *_OUTPUT_ROOT    - the base of all output in that environment.
-# *_OUTPUT_SUBPATH - location where golang stuff is built/cached.  Also
+# *_OUTPUT_SUBPATH - location where stuff is built/cached.  Also
 #                    persisted across docker runs with a volume mount.
 # *_OUTPUT_BINPATH - location where final binaries are placed.  If the remote
 #                    is really remote, this is the stuff that has to be copied
@@ -71,7 +71,8 @@ readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
 
 readonly OUTPUT_BINPATH="${CUSTOM_OUTPUT_BINPATH:-$LOCAL_OUTPUT_BINPATH}"
 
-readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
+readonly REMOTE_SOURCE_ROOT="/go/src/${KUBE_GO_PACKAGE}"
+readonly REMOTE_OUTPUT_ROOT="${REMOTE_SOURCE_ROOT}/_output"
 readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
 readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 
@@ -79,13 +80,19 @@ readonly DOCKER_MOUNT_ARGS_BASE=(--volume "${OUTPUT_BINPATH}:${REMOTE_OUTPUT_BIN
 # DOCKER_MOUNT_ARGS=("${DOCKER_MOUNT_ARGS_BASE[@]}" --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}")
 
 # We create a Docker data container to cache incremental build artifacts.  We
-# need to cache both the go tree in _output and the go tree under Godeps.
+# need to cache both the go tree in _output and the go tree under Godeps.  We 
+# also need to cache the output from the www build.
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
-readonly REMOTE_GODEP_GOPATH="/go/src/${KUBE_GO_PACKAGE}/Godeps/_workspace/pkg"
+readonly REMOTE_GODEP_GOPATH="${REMOTE_SOURCE_ROOT}/Godeps/_workspace/pkg"
+readonly REMOTE_OUTPUT_WWWPATH="${REMOTE_OUTPUT_SUBPATH}/www"
 readonly DOCKER_DATA_MOUNT_ARGS=(
   --volume "${REMOTE_OUTPUT_GOPATH}"
   --volume "${REMOTE_GODEP_GOPATH}"
+  --volume "${REMOTE_OUTPUT_WWWPATH}"
 )
+
+# Use the smallest image common to all build containers.
+readonly KUBE_BUILD_DATA_IMAGE=buildpack-deps:jessie-scm
 
 # This is where the final release artifacts are created locally
 readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
@@ -114,6 +121,8 @@ readonly KUBE_DOCKER_WRAPPED_BINARIES=(
 #   KUBE_BUILD_IMAGE_TAG
 #   KUBE_BUILD_IMAGE
 #   KUBE_BUILD_CONTAINER_NAME
+#   KUBE_BUILD_WWW_IMAGE
+#   KUBE_BUILD_WWW_CONTAINER_NAME
 #   KUBE_BUILD_DATA_CONTAINER_NAME
 #   DOCKER_MOUNT_ARGS
 function kube::build::verify_prereqs() {
@@ -167,11 +176,13 @@ function kube::build::verify_prereqs() {
 
     # On OS X, set boot2docker env vars for the 'clean' target if boot2docker is running
     if kube::build::is_osx && kube::build::has_docker ; then
-      if [[ ! -z "$(which boot2docker)" ]]; then
-        if [[ $(boot2docker status) == "running" ]]; then
-          if [[ -z "$DOCKER_HOST" ]]; then
-            kube::log::status "Setting boot2docker env variables"
-            $(boot2docker shellinit)
+      if [[ -z "$DOCKER_NATIVE" ]];then
+        if [[ ! -z "$(which boot2docker)" ]]; then
+          if [[ $(boot2docker status) == "running" ]]; then
+            if [[ -z "$DOCKER_HOST" ]]; then
+              kube::log::status "Setting boot2docker env variables"
+              $(boot2docker shellinit)
+            fi
           fi
         fi
       fi
@@ -183,6 +194,9 @@ function kube::build::verify_prereqs() {
   KUBE_BUILD_IMAGE_TAG="build-${KUBE_ROOT_HASH}"
   KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
   KUBE_BUILD_CONTAINER_NAME="kube-build-${KUBE_ROOT_HASH}"
+  KUBE_BUILD_WWW_IMAGE_TAG="${KUBE_BUILD_IMAGE_TAG}"
+  KUBE_BUILD_WWW_IMAGE="${KUBE_BUILD_WWW_IMAGE_REPO}:${KUBE_BUILD_WWW_IMAGE_TAG}"
+  KUBE_BUILD_WWW_CONTAINER_NAME="kube-build-www-${KUBE_ROOT_HASH}"
   KUBE_BUILD_DATA_CONTAINER_NAME="kube-build-data-${KUBE_ROOT_HASH}"
   DOCKER_MOUNT_ARGS=("${DOCKER_MOUNT_ARGS_BASE[@]}" --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}")
 }
@@ -287,10 +301,10 @@ function kube::build::build_image_built() {
   kube::build::docker_image_exists "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG}"
 }
 
-function kube::build::ensure_golang() {
-  kube::build::docker_image_exists golang "${KUBE_BUILD_GOLANG_VERSION}" || {
+function kube::build::ensure_docker_image() {
+  kube::build::docker_image_exists "${1:-}" "${2:-}" || {
     [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
-      echo "You don't have a local copy of the golang docker image. This image is 450MB."
+      echo "You don't have a local copy of the ${1:-} docker image."
       read -p "Download it now? [y/n] " -r
       echo
       [[ $REPLY =~ ^[yY]$ ]] || {
@@ -299,12 +313,19 @@ function kube::build::ensure_golang() {
       }
     }
 
-    kube::log::status "Pulling docker image: golang:${KUBE_BUILD_GOLANG_VERSION}"
-    "${DOCKER[@]}" pull golang:${KUBE_BUILD_GOLANG_VERSION}
+    kube::log::status "Pulling docker image: ${1:-}:${2:-}"
+    "${DOCKER[@]}" pull "${1:-}:${2:-}"
   }
 }
 
-# The set of source targets to include in the kube-build image
+function kube::build::ensure_golang() {
+  kube::build::ensure_docker_image "${KUBE_BUILD_GOLANG_REPO}" "${KUBE_BUILD_GOLANG_VERSION}"
+}
+
+function kube::build::ensure_node() {
+  kube::build::ensure_docker_image "${KUBE_BUILD_NODE_REPO}" "${KUBE_BUILD_NODE_VERSION}"
+}
+
 function kube::build::source_targets() {
   local targets=(
     api
@@ -315,6 +336,7 @@ function kube::build::source_targets() {
     Godeps/_workspace/src
     Godeps/Godeps.json
     hack
+    hooks
     LICENSE
     pkg
     plugin
@@ -350,10 +372,34 @@ function kube::build::build_image() {
 function kube::build::build_image_cross() {
   kube::build::ensure_golang
 
-  local -r build_context_dir="${LOCAL_OUTPUT_ROOT}/images/${KUBE_BUILD_IMAGE}/cross"
+  local -r build_context_dir="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}/cross"
   mkdir -p "${build_context_dir}"
   cp build/build-image/cross/Dockerfile ${build_context_dir}/Dockerfile
   kube::build::docker_build "${KUBE_BUILD_IMAGE_CROSS}" "${build_context_dir}"
+}
+
+# Set up the context directory for the kube-build-www image and build it.
+function kube::build::build_image_www() {
+  kube::build::ensure_node
+
+  local -r build_context_dir="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_WWW_IMAGE}"
+  local -r source=(
+    build
+    hack
+    hooks
+    LICENSE
+    README.md
+    www
+  )
+
+  mkdir -p "${build_context_dir}"
+  tar czf "${build_context_dir}/kube-www-source.tar.gz" "${source[@]:+${source[@]}}"
+
+  kube::version::get_version_vars
+  kube::version::save_version_vars "${build_context_dir}/kube-version-defs"
+
+  cp build/www/build-image/Dockerfile ${build_context_dir}/Dockerfile
+  kube::build::docker_build "${KUBE_BUILD_WWW_IMAGE}" "${build_context_dir}"
 }
 
 # Build a docker image from a Dockerfile.
@@ -392,11 +438,13 @@ function kube::build::clean_images() {
   kube::build::has_docker || return 0
 
   kube::build::clean_image "${KUBE_BUILD_IMAGE}"
+  kube::build::clean_image "${KUBE_BUILD_WWW_IMAGE}"
 
   kube::log::status "Cleaning all other untagged docker images"
   "${DOCKER[@]}" rmi $("${DOCKER[@]}" images -q --filter 'dangling=true') 2> /dev/null || true
 }
 
+# Build the data container to cache incremental build artifacts.
 function kube::build::ensure_data_container() {
   if ! "${DOCKER[@]}" inspect "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1; then
     kube::log::status "Creating data container"
@@ -404,24 +452,29 @@ function kube::build::ensure_data_container() {
       "${DOCKER[@]}" run
       "${DOCKER_DATA_MOUNT_ARGS[@]}"
       --name "${KUBE_BUILD_DATA_CONTAINER_NAME}"
-      "${KUBE_BUILD_IMAGE}"
+      "${KUBE_BUILD_DATA_IMAGE}"
       true
     )
     "${docker_cmd[@]}"
   fi
 }
 
-# Run a command in the kube-build image.  This assumes that the image has
-# already been built.  This will sync out all output data from the build.
-function kube::build::run_build_command() {
-  kube::log::status "Running build command...."
-  [[ $# != 0 ]] || { echo "Invalid input." >&2; return 4; }
+# Run a command in the supplied image.  This assumes that the image has
+# already been built.
+# $1 is the name of the container to create
+# $2 is the name of the image to use.
+function kube::build::run_containerized_command() {
+  [[ $# > 2 ]] || { echo "Invalid input." >&2; return 4; }
+
+  local docker_image="${1:-}"
+  local docker_container="${2:-}"
+  shift 2
 
   kube::build::ensure_data_container
   kube::build::prepare_output
 
   local -a docker_run_opts=(
-    "--name=${KUBE_BUILD_CONTAINER_NAME}"
+    "--name=$docker_container"
     "${DOCKER_MOUNT_ARGS[@]}"
   )
 
@@ -440,19 +493,33 @@ function kube::build::run_build_command() {
   fi
 
   local -ra docker_cmd=(
-    "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}")
+    "${DOCKER[@]}" run "${docker_run_opts[@]}" "$docker_image")
 
   # Clean up container from any previous run
-  kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
+  kube::build::destroy_container "$docker_container"
   "${docker_cmd[@]}" "$@"
-  kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
+  kube::build::destroy_container "$docker_container"
+}
+
+# Run a command in the kube-build image.  This assumes that the image has
+# already been built.  This will sync out all output data from the build.
+function kube::build::run_build_command() {
+  kube::log::status "Running build command...."
+  kube::build::run_containerized_command "${KUBE_BUILD_IMAGE}" "${KUBE_BUILD_CONTAINER_NAME}" "$@"
+}
+
+# Run a command in the kube-build-www image.  This assumes that the image has
+# already been built.
+function kube::build::run_www_build_command() {
+  kube::log::status "Running www build command...."
+  kube::build::run_containerized_command "${KUBE_BUILD_WWW_IMAGE}" "${KUBE_BUILD_WWW_CONTAINER_NAME}" "$@"
 }
 
 # Test if the output directory is remote (and can only be accessed through
 # docker) or if it is "local" and we can access the output without going through
 # docker.
 function kube::build::is_output_remote() {
-  rm -f "${LOCAL_OUTPUT_SUBPATH}/test_for_remote"
+  rm -f "${LOCAL_OUTPUT_BINPATH}/test_for_remote"
   kube::build::run_build_command touch "${REMOTE_OUTPUT_BINPATH}/test_for_remote"
 
   [[ ! -e "${LOCAL_OUTPUT_BINPATH}/test_for_remote" ]]

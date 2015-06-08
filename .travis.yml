@@ -16,6 +16,9 @@ matrix:
 install:
   - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
   - go get github.com/mattn/goveralls
+  - go get github.com/jteeuwen/go-bindata/...
+  - export PATH=$GOPATH/bin:$PATH
+  - ./hack/www/build-www.sh
   - ./hack/travis/install-etcd.sh
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh

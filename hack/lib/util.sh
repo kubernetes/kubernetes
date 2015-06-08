@@ -183,6 +183,8 @@ kube::util::gen-analytics() {
   mdfiles=($( find "${dir}" -name "*.md" -type f \
               -not -path "${path}/Godeps/*" \
               -not -path "${path}/third_party/*" \
+              -not -path "${path}/node_modules/*" \
+              -not -path "${path}/www/master/node_modules/*" \
               -not -path "${path}/_output/*" \
               -not -path "${path}/docs/kubectl*" ))
   for f in "${mdfiles[@]}"; do
