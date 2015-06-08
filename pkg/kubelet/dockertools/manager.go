@@ -584,6 +584,7 @@ func (dm *DockerManager) runContainer(
 			Image:        container.Image,
 			// Memory and CPU are set here for older versions of Docker (pre-1.6).
 			Memory:     memoryLimit,
+			MemorySwap: -1,
 			CPUShares:  cpuShares,
 			WorkingDir: container.WorkingDir,
 			Labels:     labels,
@@ -634,8 +635,9 @@ func (dm *DockerManager) runContainer(
 		NetworkMode:  netMode,
 		IpcMode:      ipcMode,
 		// Memory and CPU are set here for newer versions of Docker (1.6+).
-		Memory:    memoryLimit,
-		CPUShares: cpuShares,
+		Memory:     memoryLimit,
+		MemorySwap: -1,
+		CPUShares:  cpuShares,
 	}
 	if len(opts.DNS) > 0 {
 		hc.DNS = opts.DNS
