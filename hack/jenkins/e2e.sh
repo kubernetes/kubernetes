@@ -42,19 +42,19 @@ GINKGO_TEST_ARGS=${GINKGO_TEST_ARGS:-""}
 
 if [[ "${PERFORMANCE:-}" == "true" ]]; then
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-      export MASTER_SIZE="m3.xlarge"
+      export MASTER_SIZE=${MASTER_SIZE:-"m3.xlarge"}
     else
-      export MASTER_SIZE="n1-standard-4"
+      export MASTER_SIZE=${MASTER_SIZE:-"n1-standard-4"}
     fi
-    export NUM_MINIONS="100"
-    GINKGO_TEST_ARGS="--ginkgo.focus=\[Performance suite\] "
+    export NUM_MINIONS=${NUM_MINIONS:-"100"}
+    GINKGO_TEST_ARGS=${GINKGO_TEST_ARGS:-"--ginkgo.focus=\[Performance suite\] "}
 else
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-      export MASTER_SIZE="t2.small"
+      export MASTER_SIZE=${MASTER_SIZE:-"t2.small"}
     else
-      export MASTER_SIZE="g1-small"
+      export MASTER_SIZE=${MASTER_SIZE:-"g1-small"}
     fi
-    export NUM_MINIONS="2"
+    export NUM_MINIONS=${NUM_MINIONS:-"2"}
 fi
 
 
