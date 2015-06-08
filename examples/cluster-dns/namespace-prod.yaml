@@ -1,6 +1,6 @@
 apiVersion: v1beta3
 kind: Namespace
 metadata:
-  name: "development"
+  name: "production"
   labels:
-    name: "development"
+    name: "production"
