@@ -735,14 +735,43 @@ function kube-up {
     sleep 10
   done
 
+  # Check for SSH connectivity
+  attempt=0
+  while true; do
+    echo -n Attempt "$(($attempt+1))" to check for SSH to master
+    local output
+    local ok=1
+    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} uptime 2> $LOG) || ok=0
+    if [[ ${ok} == 0 ]]; then
+      if (( attempt > 30 )); then
+        echo
+        echo "(Failed) output was: ${output}"
+        echo
+        echo -e "${color_red}Unable to ssh to master on ${KUBE_MASTER_IP}. Your cluster is unlikely" >&2
+        echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+        echo -e "cluster. (sorry!)${color_norm}" >&2
+        exit 1
+      fi
+    else
+      echo -e " ${color_green}[ssh to master working]${color_norm}"
+      break
+    fi
+    echo -e " ${color_yellow}[ssh to master not working yet]${color_norm}"
+    attempt=$(($attempt+1))
+    sleep 10
+  done
+
   # We need the salt-master to be up for the minions to work
   attempt=0
   while true; do
     echo -n Attempt "$(($attempt+1))" to check for salt-master
     local output
-    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || output=""
-    if [[ -z "${output}" ]]; then
+    local ok=1
+    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || ok=0
+    if [[ ${ok} == 0 ]]; then
       if (( attempt > 30 )); then
+        echo
+        echo "(Failed) output was: ${output}"
         echo
         echo -e "${color_red}salt-master failed to start on ${KUBE_MASTER_IP}. Your cluster is unlikely" >&2
         echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
