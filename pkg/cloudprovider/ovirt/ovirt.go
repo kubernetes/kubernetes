@@ -18,6 +18,7 @@ package ovirt_cloud
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -272,4 +273,8 @@ func (v *OVirtCloud) List(filter string) ([]string, error) {
 
 func (v *OVirtCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	return nil, nil
+}
+
+func (v *OVirtCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
 }

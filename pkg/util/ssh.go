@@ -18,11 +18,17 @@ package util
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"io/ioutil"
+	mathrand "math/rand"
 	"net"
 	"os"
+	"time"
 
 	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
@@ -31,15 +37,12 @@ import (
 // TODO: Unit tests for this code, we can spin up a test SSH server with instructions here:
 // https://godoc.org/golang.org/x/crypto/ssh#ServerConn
 type SSHTunnel struct {
-	Config     *ssh.ClientConfig
-	Host       string
-	SSHPort    int
-	LocalPort  int
-	RemoteHost string
-	RemotePort int
-	running    bool
-	sock       net.Listener
-	client     *ssh.Client
+	Config  *ssh.ClientConfig
+	Host    string
+	SSHPort string
+	running bool
+	sock    net.Listener
+	client  *ssh.Client
 }
 
 func (s *SSHTunnel) copyBytes(out io.Writer, in io.Reader) {
@@ -48,7 +51,7 @@ func (s *SSHTunnel) copyBytes(out io.Writer, in io.Reader) {
 	}
 }
 
-func NewSSHTunnel(user, keyfile, host, remoteHost string, localPort, remotePort int) (*SSHTunnel, error) {
+func NewSSHTunnel(user, keyfile, host string) (*SSHTunnel, error) {
 	signer, err := MakePrivateKeySigner(keyfile)
 	if err != nil {
 		return nil, err
@@ -58,44 +61,27 @@ func NewSSHTunnel(user, keyfile, host, remoteHost string, localPort, remotePort 
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
 	}
 	return &SSHTunnel{
-		Config:     &config,
-		Host:       host,
-		SSHPort:    22,
-		LocalPort:  localPort,
-		RemotePort: remotePort,
-		RemoteHost: remoteHost,
+		Config:  &config,
+		Host:    host,
+		SSHPort: "22",
 	}, nil
 }
 
 func (s *SSHTunnel) Open() error {
 	var err error
-	s.client, err = ssh.Dial("tcp", fmt.Sprintf("%s:%d", s.Host, s.SSHPort), s.Config)
+	s.client, err = ssh.Dial("tcp", net.JoinHostPort(s.Host, s.SSHPort), s.Config)
 	if err != nil {
 		return err
 	}
-	s.sock, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", s.LocalPort))
-	if err != nil {
-		return err
-	}
-	s.running = true
 	return nil
 }
 
-func (s *SSHTunnel) Listen() {
-	for s.running {
-		conn, err := s.sock.Accept()
-		if err != nil {
-			glog.Errorf("Error listening for ssh tunnel to %s (%v)", s.RemoteHost, err)
-			continue
-		}
-		if err := s.tunnel(conn); err != nil {
-			glog.Errorf("Error starting tunnel: %v", err)
-		}
-	}
+func (s *SSHTunnel) Dial(network, address string) (net.Conn, error) {
+	return s.client.Dial(network, address)
 }
 
-func (s *SSHTunnel) tunnel(conn net.Conn) error {
-	tunnel, err := s.client.Dial("tcp", fmt.Sprintf("%s:%d", s.RemoteHost, s.RemotePort))
+func (s *SSHTunnel) tunnel(conn net.Conn, remoteHost, remotePort string) error {
+	tunnel, err := s.client.Dial("tcp", net.JoinHostPort(remoteHost, remotePort))
 	if err != nil {
 		return err
 	}
@@ -105,12 +91,6 @@ func (s *SSHTunnel) tunnel(conn net.Conn) error {
 }
 
 func (s *SSHTunnel) Close() error {
-	// TODO: try to shutdown copying here?
-	s.running = false
-	// TODO: Aggregate errors and keep going?
-	if err := s.sock.Close(); err != nil {
-		return err
-	}
 	if err := s.client.Close(); err != nil {
 		return err
 	}
@@ -171,4 +151,99 @@ func MakePrivateKeySigner(key string) (ssh.Signer, error) {
 		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", key, err)
 	}
 	return signer, nil
+}
+
+type SSHTunnelEntry struct {
+	Address string
+	Tunnel  *SSHTunnel
+}
+
+type SSHTunnelList []SSHTunnelEntry
+
+func MakeSSHTunnels(user, keyfile string, addresses []string) (SSHTunnelList, error) {
+	tunnels := []SSHTunnelEntry{}
+	for ix := range addresses {
+		addr := addresses[ix]
+		tunnel, err := NewSSHTunnel(user, keyfile, addr)
+		if err != nil {
+			return nil, err
+		}
+		tunnels = append(tunnels, SSHTunnelEntry{addr, tunnel})
+	}
+	return tunnels, nil
+}
+
+func (l SSHTunnelList) Open() error {
+	for ix := range l {
+		if err := l[ix].Tunnel.Open(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Close asynchronously closes all tunnels in the list after waiting for 1
+// minute. Tunnels will still be open upon this function's return, but should
+// no longer be used.
+func (l SSHTunnelList) Close() {
+	for ix := range l {
+		entry := l[ix]
+		go func() {
+			time.Sleep(1 * time.Minute)
+			if err := entry.Tunnel.Close(); err != nil {
+				glog.Errorf("Failed to close tunnel %v: %v", entry, err)
+			}
+		}()
+	}
+}
+
+func (l SSHTunnelList) Dial(network, addr string) (net.Conn, error) {
+	if len(l) == 0 {
+		return nil, fmt.Errorf("Empty tunnel list.")
+	}
+	return l[mathrand.Int()%len(l)].Tunnel.Dial(network, addr)
+}
+
+func (l SSHTunnelList) Has(addr string) bool {
+	for ix := range l {
+		if l[ix].Address == addr {
+			return true
+		}
+	}
+	return false
+}
+
+func EncodePrivateKey(private *rsa.PrivateKey) []byte {
+	return pem.EncodeToMemory(&pem.Block{
+		Bytes: x509.MarshalPKCS1PrivateKey(private),
+		Type:  "RSA PRIVATE KEY",
+	})
+}
+
+func EncodePublicKey(public *rsa.PublicKey) ([]byte, error) {
+	publicBytes, err := x509.MarshalPKIXPublicKey(public)
+	if err != nil {
+		return nil, err
+	}
+
+	return pem.EncodeToMemory(&pem.Block{
+		Bytes: publicBytes,
+		Type:  "PUBLIC KEY",
+	}), nil
+}
+
+func EncodeSSHKey(public *rsa.PublicKey) ([]byte, error) {
+	publicKey, err := ssh.NewPublicKey(public)
+	if err != nil {
+		return nil, err
+	}
+	return ssh.MarshalAuthorizedKey(publicKey), nil
+}
+
+func GenerateKey(bits int) (*rsa.PrivateKey, *rsa.PublicKey, error) {
+	private, err := rsa.GenerateKey(rand.Reader, bits)
+	if err != nil {
+		return nil, nil, err
+	}
+	return private, &private.PublicKey, nil
 }

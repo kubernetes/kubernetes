@@ -98,6 +98,8 @@ type APIServer struct {
 	MaxRequestsInFlight        int
 	MinRequestTimeout          int
 	LongRunningRequestRE       string
+	SSHUser                    string
+	SSHKeyfile                 string
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
@@ -202,6 +204,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", 400, "The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.")
 	fs.IntVar(&s.MinRequestTimeout, "min-request-timeout", 1800, "An optional field indicating the minimum number of seconds a handler must keep a request open before timing it out. Currently only honored by the watch request handler, which picks a randomized value above this number as the connection timeout, to spread out load.")
 	fs.StringVar(&s.LongRunningRequestRE, "long-running-request-regexp", "[.*\\/watch$][^\\/proxy.*]", "A regular expression matching long running requests which should be excluded from maximum inflight request handling.")
+	fs.StringVar(&s.SSHUser, "ssh-user", "", "If non-empty, use secure SSH proxy to the nodes, using this user name")
+	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", "", "If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -353,7 +357,12 @@ func (s *APIServer) Run(_ []string) error {
 			}
 		}
 	}
-
+	var installSSH master.InstallSSHKey
+	if cloud != nil {
+		if instances, supported := cloud.Instances(); supported {
+			installSSH = instances.AddSSHKeyToAllInstances
+		}
+	}
 	config := &master.Config{
 		EtcdHelper:             helper,
 		EventTTL:               s.EventTTL,
@@ -379,6 +388,9 @@ func (s *APIServer) Run(_ []string) error {
 		ClusterName:            s.ClusterName,
 		ExternalHost:           s.ExternalHost,
 		MinRequestTimeout:      s.MinRequestTimeout,
+		SSHUser:                s.SSHUser,
+		SSHKeyfile:             s.SSHKeyfile,
+		InstallSSHKey:          installSSH,
 	}
 	m := master.New(config)
 

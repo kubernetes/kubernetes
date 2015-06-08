@@ -78,6 +78,10 @@ func newMesosCloud(configReader io.Reader) (*MesosCloud, error) {
 	}
 }
 
+func (c *MesosCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
+}
+
 // Instances returns a copy of the Mesos cloud Instances implementation.
 // Mesos natively provides minimal cloud-type resources. More robust cloud
 // support requires a combination of Mesos and cloud-specific knowledge.

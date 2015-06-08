@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -53,9 +54,7 @@ type GCECloud struct {
 	projectID        string
 	zone             string
 	instanceID       string
-
-	// We assume here that nodes and master are in the same network. TODO(cjcullen) Fix it.
-	networkName string
+	networkName      string
 
 	// Used for accessing the metadata server
 	metadataAccess func(string) (string, error)
@@ -63,8 +62,9 @@ type GCECloud struct {
 
 type Config struct {
 	Global struct {
-		TokenURL  string `gcfg:"token-url"`
-		ProjectID string `gcfg:"project-id"`
+		TokenURL    string `gcfg:"token-url"`
+		ProjectID   string `gcfg:"project-id"`
+		NetworkName string `gcfg:"network-name"`
 	}
 }
 
@@ -153,10 +153,16 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	if config != nil {
 		var cfg Config
 		if err := gcfg.ReadInto(&cfg, config); err != nil {
+			glog.Errorf("Couldn't read config: %v", err)
 			return nil, err
 		}
-		if cfg.Global.ProjectID != "" && cfg.Global.TokenURL != "" {
+		if cfg.Global.ProjectID != "" {
 			projectID = cfg.Global.ProjectID
+		}
+		if cfg.Global.NetworkName != "" {
+			networkName = cfg.Global.NetworkName
+		}
+		if cfg.Global.TokenURL != "" {
 			tokenSource = newAltTokenSource(cfg.Global.TokenURL)
 		}
 	}
@@ -472,6 +478,48 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 		return nil, err
 	}
 	return res, nil
+}
+
+func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	project, err := gce.service.Projects.Get(gce.projectID).Do()
+	if err != nil {
+		return err
+	}
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	keyString := fmt.Sprintf("%s:%s %s@%s", user, strings.TrimSpace(string(keyData)), user, hostname)
+	found := false
+	for _, item := range project.CommonInstanceMetadata.Items {
+		if item.Key == "sshKeys" {
+			item.Value = addKey(item.Value, keyString)
+			found = true
+			break
+		}
+	}
+	if !found {
+		// This is super unlikely, so log.
+		glog.Infof("Failed to find sshKeys metadata, creating a new item")
+		project.CommonInstanceMetadata.Items = append(project.CommonInstanceMetadata.Items,
+			&compute.MetadataItems{
+				Key:   "sshKeys",
+				Value: keyString,
+			})
+	}
+	op, err := gce.service.Projects.SetCommonInstanceMetadata(gce.projectID, project.CommonInstanceMetadata).Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(op)
+}
+
+func addKey(metadataBefore, keyString string) string {
+	if strings.Contains(metadataBefore, keyString) {
+		// We've already added this key
+		return metadataBefore
+	}
+	return metadataBefore + "\n" + keyString
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.

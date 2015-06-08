@@ -102,6 +102,9 @@ type KubeletConfig struct {
 
 	// HTTPTimeout is used by the client to timeout http requests to Kubelet.
 	HTTPTimeout time.Duration
+
+	// Dial is a custom dialer used for the client
+	Dial func(net, addr string) (net.Conn, error)
 }
 
 // TLSClientConfig contains settings to enable transport layer security

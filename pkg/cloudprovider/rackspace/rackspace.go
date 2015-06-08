@@ -376,6 +376,10 @@ func (i *Instances) InstanceID(name string) (string, error) {
 	return "", nil
 }
 
+func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
+}
+
 func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
 	glog.V(2).Infof("GetNodeResources(%v) called", name)
 

@@ -18,7 +18,9 @@ package master
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -26,6 +28,7 @@ import (
 	rt "runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
@@ -39,6 +42,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/componentstatus"
 	controlleretcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller/etcd"
@@ -143,7 +148,14 @@ type Config struct {
 
 	// The range of ports to be assigned to services with type=NodePort or greater
 	ServiceNodePortRange util.PortRange
+
+	// Used for secure proxy.  If empty, don't use secure proxy.
+	SSHUser       string
+	SSHKeyfile    string
+	InstallSSHKey InstallSSHKey
 }
+
+type InstallSSHKey func(user string, data []byte) error
 
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
@@ -196,6 +208,11 @@ type Master struct {
 	// "Outputs"
 	Handler         http.Handler
 	InsecureHandler http.Handler
+
+	// Used for secure proxy
+	tunnels       util.SSHTunnelList
+	tunnelsLock   sync.Mutex
+	installSSHKey InstallSSHKey
 }
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
@@ -325,6 +342,8 @@ func New(c *Config) *Master {
 		serviceReadWriteIP:  serviceReadWriteIP,
 		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
 		serviceReadWritePort: 443,
+
+		installSSHKey: c.InstallSSHKey,
 	}
 
 	var handlerContainer *restful.Container
@@ -474,15 +493,47 @@ func (m *Master) init(c *Config) {
 		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
 	}
 
+	var proxyDialer func(net, addr string) (net.Conn, error)
+	if len(c.SSHUser) > 0 {
+		glog.Infof("Setting up proxy: %s %s", c.SSHUser, c.SSHKeyfile)
+		exists, err := util.FileExists(c.SSHKeyfile)
+		if err != nil {
+			glog.Errorf("Error detecting if key exists: %v", err)
+		} else if !exists {
+			glog.Infof("Key doesn't exist, attempting to create")
+			err := m.generateSSHKey(c.SSHUser, c.SSHKeyfile)
+			if err != nil {
+				glog.Errorf("Failed to create key pair: %v", err)
+			}
+		}
+		m.setupSecureProxy(c.SSHUser, c.SSHKeyfile)
+		proxyDialer = m.Dial
+
+		// This is pretty ugly.  A better solution would be to pull this all the way up into the
+		// server.go file.
+		httpKubeletClient, ok := c.KubeletClient.(*client.HTTPKubeletClient)
+		if ok {
+			httpKubeletClient.Config.Dial = m.Dial
+			transport, err := client.MakeTransport(httpKubeletClient.Config)
+			if err != nil {
+				glog.Errorf("Error setting up transport over SSH: %v", err)
+			} else {
+				httpKubeletClient.Client.Transport = transport
+			}
+		} else {
+			glog.Errorf("Failed to cast %v to HTTPKubeletClient, skipping SSH tunnel.")
+		}
+	}
+
 	apiVersions := []string{}
 	if m.v1beta3 {
-		if err := m.api_v1beta3().InstallREST(m.handlerContainer); err != nil {
+		if err := m.api_v1beta3().InstallREST(m.handlerContainer, proxyDialer); err != nil {
 			glog.Fatalf("Unable to setup API v1beta3: %v", err)
 		}
 		apiVersions = append(apiVersions, "v1beta3")
 	}
 	if m.v1 {
-		if err := m.api_v1().InstallREST(m.handlerContainer); err != nil {
+		if err := m.api_v1().InstallREST(m.handlerContainer, proxyDialer); err != nil {
 			glog.Fatalf("Unable to setup API v1: %v", err)
 		}
 		apiVersions = append(apiVersions, "v1")
@@ -702,4 +753,139 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	version.Version = "v1"
 	version.Codec = v1.Codec
 	return version
+}
+
+func findExternalAddress(node *api.Node) (string, error) {
+	for ix := range node.Status.Addresses {
+		addr := &node.Status.Addresses[ix]
+		if addr.Type == api.NodeExternalIP {
+			return addr.Address, nil
+		}
+	}
+	return "", fmt.Errorf("Couldn't find external address: %v", node)
+}
+
+func (m *Master) Dial(net, addr string) (net.Conn, error) {
+	m.tunnelsLock.Lock()
+	defer m.tunnelsLock.Unlock()
+	return m.tunnels.Dial(net, addr)
+}
+
+func (m *Master) needToReplaceTunnels(addrs []string) bool {
+	if len(m.tunnels) != len(addrs) {
+		return true
+	}
+	// TODO (cjcullen): This doesn't need to be n^2
+	for ix := range addrs {
+		if !m.tunnels.Has(addrs[ix]) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Master) getNodeAddresses() ([]string, error) {
+	nodes, err := m.nodeRegistry.ListMinions(api.NewDefaultContext(), labels.Everything(), fields.Everything())
+	if err != nil {
+		return nil, err
+	}
+	addrs := []string{}
+	for ix := range nodes.Items {
+		node := &nodes.Items[ix]
+		addr, err := findExternalAddress(node)
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, addr)
+	}
+	return addrs, nil
+}
+
+func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {
+	glog.Infof("replacing tunnels. New addrs: %v", newAddrs)
+	tunnels, err := util.MakeSSHTunnels(user, keyfile, newAddrs)
+	if err != nil {
+		return err
+	}
+	tunnels.Open()
+	if m.tunnels != nil {
+		m.tunnels.Close()
+	}
+	m.tunnels = tunnels
+	return nil
+}
+
+func (m *Master) loadTunnels(user, keyfile string) error {
+	m.tunnelsLock.Lock()
+	defer m.tunnelsLock.Unlock()
+	addrs, err := m.getNodeAddresses()
+	if err != nil {
+		return err
+	}
+	if !m.needToReplaceTunnels(addrs) {
+		return nil
+	}
+	// TODO: This is going to unnecessarily close connections to unchanged nodes.
+	// See comment about using Watch above.
+	glog.Info("found different nodes. Need to replace tunnels")
+	return m.replaceTunnels(user, keyfile, addrs)
+}
+
+func (m *Master) refreshTunnels(user, keyfile string) error {
+	m.tunnelsLock.Lock()
+	defer m.tunnelsLock.Unlock()
+	addrs, err := m.getNodeAddresses()
+	if err != nil {
+		return err
+	}
+	return m.replaceTunnels(user, keyfile, addrs)
+}
+
+func (m *Master) setupSecureProxy(user, keyfile string) {
+	// Sync loop for tunnels
+	// TODO: switch this to watch.
+	go func() {
+		for {
+			if err := m.loadTunnels(user, keyfile); err != nil {
+				glog.Errorf("Failed to load SSH Tunnels: %v", err)
+			}
+			var sleep time.Duration
+			if len(m.tunnels) == 0 {
+				sleep = time.Second
+			} else {
+				// tunnels could lag behind current set of nodes
+				sleep = 10 * time.Second
+			}
+			time.Sleep(sleep)
+		}
+	}()
+	// Refresh loop for tunnels
+	// TODO: could make this more controller-ish
+	go func() {
+		for {
+			time.Sleep(5 * time.Minute)
+			if err := m.refreshTunnels(user, keyfile); err != nil {
+				glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
+			}
+		}
+	}()
+}
+
+func (m *Master) generateSSHKey(user, keyfile string) error {
+	if m.installSSHKey == nil {
+		return errors.New("ssh install function is null")
+	}
+
+	private, public, err := util.GenerateKey(2048)
+	if err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(keyfile, util.EncodePrivateKey(private), 0600); err != nil {
+		return err
+	}
+	data, err := util.EncodeSSHKey(public)
+	if err != nil {
+		return err
+	}
+	return m.installSSHKey(user, data)
 }

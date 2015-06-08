@@ -220,9 +220,12 @@ mount-master-pd() {
   mkdir -p /mnt/master-pd/srv/kubernetes
   # Contains the cluster's initial config parameters and auth tokens
   mkdir -p /mnt/master-pd/srv/salt-overlay
+  # Directory for kube-apiserver to store SSH key (if necessary)
+  mkdir -p /mnt/master-pd/srv/sshproxy
 
   ln -s -f /mnt/master-pd/var/etcd /var/etcd
   ln -s -f /mnt/master-pd/srv/kubernetes /srv/kubernetes
+  ln -s -f /mnt/master-pd/srv/sshproxy /srv/sshproxy
   ln -s -f /mnt/master-pd/srv/salt-overlay /srv/salt-overlay
 
   # This is a bit of a hack to get around the fact that salt has to run after the
@@ -487,16 +490,18 @@ grains:
   cbr-cidr: ${MASTER_IP_RANGE}
   cloud: gce
 EOF
-  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]]; then
+  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]] && ! [[ -z "${NODE_NETWORK:-}" ]] ; then
     cat <<EOF >/etc/gce.conf
 [global]
 token-url = ${TOKEN_URL}
 project-id = ${PROJECT_ID}
+network-name = ${NODE_NETWORK}
 EOF
     EXTERNAL_IP=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   cloud_config: /etc/gce.conf
   advertise_address: '${EXTERNAL_IP}'
+  proxy_ssh_user: '${INSTANCE_PREFIX}'
 EOF
   fi
 }
