@@ -47,6 +47,11 @@ MASTER_INTERNAL_IP=${INTERNAL_IP_BASE}${MASTER_IP_SUFFIX}
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
 MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 
+# Be sure to map all the ephemeral drives.  We can specify more than we actually have.
+# TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
+#  only affects the big storage instance types, which aren't a typical use case right now.
+BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\": \"/dev/sdb\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral3\"}]"
+
 function json_val {
     python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
 }
@@ -692,6 +697,7 @@ function kube-up {
     --key-name ${AWS_SSH_KEY_NAME} \
     --security-group-ids ${MASTER_SG_ID} \
     --associate-public-ip-address \
+    --block-device-mappings "${BLOCK_DEVICE_MAPPINGS}" \
     --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
@@ -773,6 +779,7 @@ function kube-up {
       --key-name ${AWS_SSH_KEY_NAME} \
       --security-group-ids ${MINION_SG_ID} \
       ${public_ip_option} \
+      --block-device-mappings "${BLOCK_DEVICE_MAPPINGS}" \
       --user-data "file://${KUBE_TEMP}/minion-user-data-${i}" | json_val '["Instances"][0]["InstanceId"]')
 
     add-tag $minion_id Name ${MINION_NAMES[$i]}
