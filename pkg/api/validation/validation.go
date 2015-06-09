@@ -1432,6 +1432,10 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements) errs.V
 		}
 		allErrs = append(allErrs, errs...)
 	}
+	quantity, found := requirements.Limits[api.ResourceMemory]
+	if found && quantity.Value() < 4*1024*1024 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("resources.limits[memory]", quantity.String(), "Memory must be at least 4Mb"))
+	}
 	for resourceName, quantity := range requirements.Requests {
 		// Validate resource name.
 		errs := validateResourceName(resourceName.String(), fmt.Sprintf("resources.requests[%s]", resourceName))
