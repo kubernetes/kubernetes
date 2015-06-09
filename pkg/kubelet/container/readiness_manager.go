@@ -28,7 +28,7 @@ type ReadinessManager struct {
 	states map[string]bool
 }
 
-// NewReadinessManager creates ane returns a readiness manager with empty
+// NewReadinessManager creates and returns a readiness manager with empty
 // contents.
 func NewReadinessManager() *ReadinessManager {
 	return &ReadinessManager{states: make(map[string]bool)}

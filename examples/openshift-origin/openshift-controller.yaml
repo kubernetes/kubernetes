@@ -27,6 +27,18 @@ spec:
             - mountPath: /config
               name: config
               readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8443
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8443
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
       volumes: 
         - name: config
           secret:
