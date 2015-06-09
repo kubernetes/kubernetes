@@ -1,46 +1,20 @@
-# Kubernetes UI instructions
+# Kubernetes UI Instructions
 
 ## Kubernetes User Interface
-Kubernetes currently supports a simple web user interface.
+Kubernetes has an extensible user interface with default functionality that describes the current cluster. See the [README](../www/README.md) in the www directory for more information.
 
 ### Running locally
-Start the server:
+Assuming that you have a cluster running locally at `localhost:8080`, as described [here](getting-started-guides/locally.md), you can run the UI against it with kubectl:
 
 ```sh
-cluster/kubectl.sh proxy --www=$PWD/www
+cluster/kubectl.sh proxy --www=www/app --www-prefix=/
 ```
 
-The UI should now be running on [localhost](http://localhost:8001/static/index.html#/groups//selector)
+You should now be able to access it by visiting [localhost:8001](http://localhost:8001/).
+
+You can also use other web servers to serve the contents of the www/app directory, as described [here](../www/README.md#serving-the-app-during-development). 
 
 ### Running remotely
-When Kubernetes is deployed, the server deploys the UI, you can visit ```/static/index.html#/groups//selector``` on your master server.
-
-
-### Interacting with the user interface.
-
-The Kubernetes user interface is a query-based visualization of the Kubernetes API.  The user interface is defined by two functional primitives:
-
-#### GroupBy
-_GroupBy_ takes a label ```key``` as a parameter, places all objects with the same value for that key within a single group. For example ```/groups/host/selector``` groups pods by host.  ```/groups/name/selector``` groups pods by name.  Groups are hierarchical, for example ```/groups/name/host/selector``` first groups by pod name, and then by host.
-
-#### Select
-Select takes a [label selector](./labels.md) and uses it to filter, so only resources which match that label selector are displayed.  For example, ```/groups/host/selector/name=frontend```, shows pods, grouped by host, which have a label with the name `frontend`.
-
-
-## Rebuilding the UI
-The UI relies on [go-bindata](https://github.com/jteeuwen/go-bindata)
-
-To install go-bindata:
-
-```sh
-go get github.com/jteeuwen/go-bindata/...
-```
-
-To rebuild the UI, run the following:
-
-```sh
-hack/build-ui.sh
-```
-
+When Kubernetes is deployed remotely, the api server deploys the UI. To access it, visit `/static/app/` or `/ui`, which redirects to `/static/app/`, on your master server.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/ui.md?pixel)]()
