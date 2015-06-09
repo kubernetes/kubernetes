@@ -19,8 +19,7 @@ Here is a snippet of [glusterfs-endpoints.json](glusterfs-endpoints.json),
       ],
       "ports": [
         {
-          "port": 1,
-          "protocol": "TCP"
+          "port": 1
         }
       ]
 
