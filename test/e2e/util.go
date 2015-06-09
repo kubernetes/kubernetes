@@ -1014,7 +1014,7 @@ func RunRC(config RCConfig) error {
 }
 
 func ScaleRC(c *client.Client, ns, name string, size uint) error {
-	By(fmt.Sprintf("Scaling replication controller %s in namespace %s to %d", name, ns, size))
+	By(fmt.Sprintf("%v Scaling replication controller %s in namespace %s to %d", time.Now(), name, ns, size))
 	scaler, err := kubectl.ScalerFor("ReplicationController", kubectl.NewScalerClient(c))
 	if err != nil {
 		return err
@@ -1050,7 +1050,7 @@ func waitForRCPodsRunning(c *client.Client, ns, rcName string) error {
 
 // Delete a Replication Controller and all pods it spawned
 func DeleteRC(c *client.Client, ns, name string) error {
-	By(fmt.Sprintf("Deleting replication controller %s in namespace %s", name, ns))
+	By(fmt.Sprintf("%v Deleting replication controller %s in namespace %s", time.Now(), name, ns))
 	reaper, err := kubectl.ReaperForReplicationController(c, 10*time.Minute)
 	if err != nil {
 		return err
