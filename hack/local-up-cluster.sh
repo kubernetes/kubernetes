@@ -21,6 +21,7 @@ DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
+ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
@@ -156,8 +157,13 @@ fi
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 
+priv_arg=""
+if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
+  priv_arg="--allow-privileged "
+fi
+
 APISERVER_LOG=/tmp/kube-apiserver.log
-sudo -E "${GO_OUT}/kube-apiserver" \
+sudo -E "${GO_OUT}/kube-apiserver" ${priv_arg}\
   --v=${LOG_LEVEL} \
   --service_account_key_file="${SERVICE_ACCOUNT_KEY}" \
   --service_account_lookup="${SERVICE_ACCOUNT_LOOKUP}" \
@@ -184,7 +190,7 @@ CTLRMGR_PID=$!
 
 KUBELET_LOG=/tmp/kubelet.log
 if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
-  sudo -E "${GO_OUT}/kubelet" \
+  sudo -E "${GO_OUT}/kubelet" ${priv_arg}\
     --v=${LOG_LEVEL} \
     --chaos_chance="${CHAOS_CHANCE}" \
     --container_runtime="${CONTAINER_RUNTIME}" \
@@ -210,7 +216,7 @@ else
     -i \
     --cidfile=$KUBELET_CIDFILE \
     gcr.io/google_containers/kubelet \
-    /kubelet --v=3 --containerized --chaos-chance="${CHAOS_CHANCE}" --hostname-override="127.0.0.1" --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT" --resource-container="" &> $KUBELET_LOG &
+    /kubelet --v=3 --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="127.0.0.1" --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT" --resource-container="" &> $KUBELET_LOG &
 fi
 
 PROXY_LOG=/tmp/kube-proxy.log
