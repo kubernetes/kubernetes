@@ -1,4 +1,4 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: dns-backend
@@ -19,4 +19,3 @@ spec:
           ports:
             - name: backend-port
               containerPort: 8000
-              protocol: tcp
