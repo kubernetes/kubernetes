@@ -85,7 +85,7 @@ EOF
 # NB: If this list ever changes, this script actually has to
 # change to detect the existence of this file, kill any deleted
 # old tokens and add any new tokens (to handle the upgrade case).
-local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
+service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
 for account in "${service_accounts[@]}"; do
   token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   echo "${token},${account},${account}" >> "${KNOWN_TOKENS_FILE}"
