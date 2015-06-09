@@ -89,7 +89,7 @@ elsif host =~ /linux/
   #This should work on most processors, however it will fail on ones without the core id field.
   #So far i have only seen this on a raspberry pi. which you probably don't want to run vagrant on anyhow...
   #But just in case we'll default to the result of nproc if we get 0 just to be safe.
-  $vm_cpus = `cat /proc/cpuinfo | grep 'core id' | uniq | wc -l`.to_i
+  $vm_cpus = `cat /proc/cpuinfo | grep 'core id' | sort -u | wc -l`.to_i
   if $vm_cpus < 1
       $vm_cpus = `nproc`.to_i
   end
