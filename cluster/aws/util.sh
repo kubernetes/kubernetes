@@ -24,7 +24,6 @@ source "${KUBE_ROOT}/cluster/common.sh"
 
 case "${KUBE_OS_DISTRIBUTION}" in
   ubuntu|coreos)
-    echo "Starting cluster using os distro: ${KUBE_OS_DISTRIBUTION}" >&2
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
     ;;
   *)
@@ -547,6 +546,8 @@ function assign-elastic-ip {
 
 
 function kube-up {
+  echo "Starting cluster using os distro: ${KUBE_OS_DISTRIBUTION}" >&2
+
   get-tokens
 
   detect-image
