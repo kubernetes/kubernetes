@@ -61,15 +61,28 @@ const (
 	// String used to mark pod deletion
 	nonExist = "NonExist"
 
-	// How often to poll pods.
-	podPoll = 5 * time.Second
+	// How often to poll pods and nodes.
+	poll = 5 * time.Second
 
 	// service accounts are provisioned after namespace creation
 	// a service account is required to support pod creation in a namespace as part of admission control
 	serviceAccountProvisionTimeout = 2 * time.Minute
 
-	// How often to poll for service accounts
-	serviceAccountPoll = 5 * time.Second
+	// How long to try single API calls (like 'get' or 'list'). Used to prevent
+	// transient failures from failing tests.
+	singleCallTimeout = 30 * time.Second
+
+	// How long nodes have to be "ready" when a test begins. They should already
+	// be "ready" before the test starts, so this is small.
+	nodeReadyInitialTimeout = 20 * time.Second
+
+	// How long pods have to be "ready" when a test begins. They should already
+	// be "ready" before the test starts, so this is small.
+	podReadyBeforeTimeout = 20 * time.Second
+
+	// How wide to print pod names, by default. Useful for aligning printing to
+	// quickly scan through output.
+	podPrintWidth = 55
 )
 
 type CloudConfig struct {
@@ -220,7 +233,6 @@ func podRunningReady(p *api.Pod) (bool, error) {
 	if !podReady(p) {
 		return false, fmt.Errorf("pod '%s' on '%s' didn't have condition {%v %v}; conditions: %v",
 			p.ObjectMeta.Name, p.Spec.NodeName, api.PodReady, api.ConditionTrue, p.Status.Conditions)
-
 	}
 	return true, nil
 }
@@ -235,15 +247,16 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 	if err != nil {
 		return err
 	}
+	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(podPoll) {
+	if wait.Poll(poll, timeout, func() (bool, error) {
 		// We get the new list of pods in every iteration beause more pods come
 		// online during startup and we want to ensure they are also checked.
 		podList, err := c.Pods(ns).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			Logf("Error getting pods in namespace '%s': %v", ns, err)
-			continue
+			return false, nil
 		}
 		nOk, badPods := 0, []api.Pod{}
 		for _, pod := range podList.Items {
@@ -256,14 +269,17 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 		Logf("%d / %d pods in namespace '%s' are running and ready (%d seconds elapsed)",
 			nOk, len(podList.Items), ns, int(time.Since(start).Seconds()))
 		if nOk == len(podList.Items) && nOk >= minPods {
-			return nil
+			return true, nil
 		}
 		logPodStates(badPods)
+		return false, nil
+	}) != nil {
+		return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
 	}
-	return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
+	return nil
 }
 
-func waitForServiceAccountInNamespace(c *client.Client, ns, serviceAccountName string, poll, timeout time.Duration) error {
+func waitForServiceAccountInNamespace(c *client.Client, ns, serviceAccountName string, timeout time.Duration) error {
 	Logf("Waiting up to %v for service account %s to be provisioned in ns %s", timeout, serviceAccountName, ns)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		_, err := c.ServiceAccounts(ns).Get(serviceAccountName)
@@ -277,20 +293,23 @@ func waitForServiceAccountInNamespace(c *client.Client, ns, serviceAccountName s
 	return fmt.Errorf("Service account %s in namespace %s not ready within %v", serviceAccountName, ns, timeout)
 }
 
-func waitForPodCondition(c *client.Client, ns, podName, desc string, poll, timeout time.Duration, condition podCondition) error {
-	Logf("Waiting up to %v for pod %s status to be %s", timeout, podName, desc)
+func waitForPodCondition(c *client.Client, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
+	Logf("Waiting up to %[1]v for pod %-[2]*[3]s status to be %[4]s", timeout, podPrintWidth, podName, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		pod, err := c.Pods(ns).Get(podName)
 		if err != nil {
-			Logf("Get pod %s in ns %s failed, ignoring for %v: %v", podName, ns, poll, err)
+			// Aligning this text makes it much more readable
+			Logf("Get pod %-[1]*[2]s in namespace '%[3]s' failed, ignoring for %[4]v. Error: %[5]v",
+				podPrintWidth, podName, ns, poll, err)
 			continue
 		}
 		done, err := condition(pod)
 		if done {
 			return err
 		}
-		Logf("Waiting for pod '%s' in namespace '%s' status to be '%q' (found phase: '%q', readiness: %t) (%v)",
-			podName, ns, desc, pod.Status.Phase, podReady(pod), time.Since(start))
+		Logf("Waiting for pod %-[1]*[2]s in namespace '%[3]s' status to be '%[4]s'"+
+			"(found phase: %[5]q, readiness: %[6]t) (%[7]v elapsed)",
+			podPrintWidth, podName, ns, desc, pod.Status.Phase, podReady(pod), time.Since(start))
 	}
 	return fmt.Errorf("gave up waiting for pod '%s' to be '%s' after %v", podName, desc, timeout)
 }
@@ -299,7 +318,7 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, poll, timeo
 // the default service account is what is associated with pods when they do not specify a service account
 // as a result, pods are not able to be provisioned in a namespace until the service account is provisioned
 func waitForDefaultServiceAccountInNamespace(c *client.Client, namespace string) error {
-	return waitForServiceAccountInNamespace(c, namespace, "default", serviceAccountPoll, serviceAccountProvisionTimeout)
+	return waitForServiceAccountInNamespace(c, namespace, "default", serviceAccountProvisionTimeout)
 }
 
 // waitForPersistentVolumePhase waits for a PersistentVolume to be in a specific phase or until timeout occurs, whichever comes first.
@@ -343,7 +362,7 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 }
 
 func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
-	return waitForPodCondition(c, namespace, podName, "running", podPoll, podStartTimeout, func(pod *api.Pod) (bool, error) {
+	return waitForPodCondition(c, namespace, podName, "running", podStartTimeout, func(pod *api.Pod) (bool, error) {
 		if pod.Status.Phase == api.PodRunning {
 			return true, nil
 		}
@@ -360,7 +379,7 @@ func waitForPodRunning(c *client.Client, podName string) error {
 
 // waitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
 func waitForPodNotPending(c *client.Client, ns, podName string) error {
-	return waitForPodCondition(c, ns, podName, "!pending", podPoll, podStartTimeout, func(pod *api.Pod) (bool, error) {
+	return waitForPodCondition(c, ns, podName, "!pending", podStartTimeout, func(pod *api.Pod) (bool, error) {
 		if pod.Status.Phase != api.PodPending {
 			Logf("Saw pod '%s' in namespace '%s' out of pending state (found '%q')", podName, ns, pod.Status.Phase)
 			return true, nil
@@ -371,7 +390,7 @@ func waitForPodNotPending(c *client.Client, ns, podName string) error {
 
 // waitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or ran too long.
 func waitForPodSuccessInNamespace(c *client.Client, podName string, contName string, namespace string) error {
-	return waitForPodCondition(c, namespace, podName, "success or failure", podPoll, podStartTimeout, func(pod *api.Pod) (bool, error) {
+	return waitForPodCondition(c, namespace, podName, "success or failure", podStartTimeout, func(pod *api.Pod) (bool, error) {
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
 		ci, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, contName)
 		if !ok {
@@ -1062,6 +1081,19 @@ func DeleteRC(c *client.Client, ns, name string) error {
 	return err
 }
 
+// Convenient wrapper around listing nodes supporting retries.
+func listNodes(c *client.Client, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
+	var nodes *api.NodeList
+	var errLast error
+	if wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+		nodes, errLast = c.Nodes().List(label, field)
+		return errLast == nil, nil
+	}) != nil {
+		return nil, fmt.Errorf("listNodes() failed with last error: %v", errLast)
+	}
+	return nodes, nil
+}
+
 // FailedContainers inspects all containers in a pod and returns failure
 // information for containers that have failed or been restarted.
 // A map is returned where the key is the containerID and the value is a
@@ -1185,6 +1217,74 @@ func getSigner(provider string) (ssh.Signer, error) {
 	Logf("Using SSH key: %s", key)
 
 	return util.MakePrivateKeySigner(key)
+}
+
+// checkPodsRunning returns whether all pods whose names are listed in podNames
+// are running and ready.
+func checkPodsRunningReady(c *client.Client, podNames []string, timeout time.Duration) bool {
+	np, desc := len(podNames), "running and ready"
+	Logf("Waiting up to %v for the following %d pods to be %s: %s", timeout, np, desc, podNames)
+	result := make(chan bool, len(podNames))
+	for ix := range podNames {
+		// Launch off pod readiness checkers.
+		go func(name string) {
+			err := waitForPodCondition(c, api.NamespaceDefault, name, desc, timeout, podRunningReady)
+			result <- err == nil
+		}(podNames[ix])
+	}
+	// Wait for them all to finish.
+	success := true
+	// TODO(mbforbes): Change to `for range` syntax and remove logging once we
+	// support only Go >= 1.4.
+	for _, podName := range podNames {
+		if !<-result {
+			Logf("Pod %-[1]*[2]s failed to be %[3]s.", podPrintWidth, podName, desc)
+			success = false
+		}
+	}
+	Logf("Wanted all %d pods to be %s. Result: %t. Pods: %v", np, desc, success, podNames)
+	return success
+}
+
+// waitForNodeToBeReady returns whether node name is ready within timeout.
+func waitForNodeToBeReady(c *client.Client, name string, timeout time.Duration) bool {
+	return waitForNodeToBe(c, name, true, timeout)
+}
+
+// waitForNodeToBeNotReady returns whether node name is not ready (i.e. the
+// readiness condition is anything but ready, e.g false or unknown) within
+// timeout.
+func waitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duration) bool {
+	return waitForNodeToBe(c, name, false, timeout)
+}
+
+// waitForNodeToBe returns whether node name's readiness state matches wantReady
+// within timeout. If wantReady is true, it will ensure the node is ready; if
+// it's false, it ensures the node is in any state other than ready (e.g. not
+// ready or unknown).
+func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time.Duration) bool {
+	Logf("Waiting up to %v for node %s readiness to be %t", timeout, name, wantReady)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		node, err := c.Nodes().Get(name)
+		if err != nil {
+			Logf("Couldn't get node %s", name)
+			continue
+		}
+
+		// Check the node readiness condition (logging all).
+		for i, cond := range node.Status.Conditions {
+			Logf("Node %s condition %d/%d: type: %v, status: %v",
+				name, i+1, len(node.Status.Conditions), cond.Type, cond.Status)
+			// Ensure that the condition type is readiness and the status
+			// matches as desired.
+			if cond.Type == api.NodeReady && (cond.Status == api.ConditionTrue) == wantReady {
+				Logf("Successfully found node %s readiness to be %t", name, wantReady)
+				return true
+			}
+		}
+	}
+	Logf("Node %s didn't reach desired readiness (%t) within %v", name, wantReady, timeout)
+	return false
 }
 
 // LatencyMetrics stores data about request latency at a given quantile

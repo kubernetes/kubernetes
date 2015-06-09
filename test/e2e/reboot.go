@@ -30,28 +30,17 @@ import (
 )
 
 const (
-	// How long to pause between polling node or pod status.
-	poll = 5 * time.Second
-
-	// How long nodes have to be "ready" before the reboot. They should already
-	// be "ready" before the test starts, so this is small.
-	nodeReadyInitialTimeout = 20 * time.Second
-
-	// How long pods have to be "ready" before the reboot. They should already
-	// be "ready" before the test starts, so this is small.
-	podReadyBeforeTimeout = 20 * time.Second
-
 	// How long a node is allowed to go from "Ready" to "NotReady" after a
 	// reboot is issued before the test is considered failed.
-	rebootNotReadyTimeout = 2 * time.Minute
+	rebootNodeNotReadyTimeout = 2 * time.Minute
 
 	// How long a node is allowed to go from "NotReady" to "Ready" after a
 	// reboot is issued and it is found to be "NotReady" before the test is
 	// considered failed.
-	rebootReadyAgainTimeout = 5 * time.Minute
+	rebootNodeReadyAgainTimeout = 5 * time.Minute
 
 	// How long pods have to be "ready" after the reboot.
-	podReadyAgainTimeout = 5 * time.Minute
+	rebootPodReadyAgainTimeout = 5 * time.Minute
 )
 
 var _ = Describe("Reboot", func() {
@@ -105,7 +94,7 @@ func testReboot(c *client.Client, rebootCmd string) {
 	}
 
 	// Get all nodes, and kick off the test on each.
-	nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	nodelist, err := listNodes(c, labels.Everything(), fields.Everything())
 	if err != nil {
 		Failf("Error getting nodes: %v", err)
 	}
@@ -159,6 +148,10 @@ func issueSSHCommand(node *api.Node, provider, cmd string) error {
 // It returns true through result only if all of the steps pass; at the first
 // failed step, it will return false through result and not run the rest.
 func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan bool) {
+	// Setup
+	ps := newPodStore(c, api.NamespaceDefault, labels.Everything(), fields.OneTermEqualSelector(client.PodHost, name))
+	defer ps.Stop()
+
 	// Get the node initially.
 	Logf("Getting %s", name)
 	node, err := c.Nodes().Get(name)
@@ -175,22 +168,16 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 	}
 
 	// Get all the pods on the node.
-	podList, err := c.Pods(api.NamespaceDefault).List(
-		labels.Everything(), fields.OneTermEqualSelector(client.PodHost, name))
-	if err != nil {
-		Logf("Error getting pods for node %s: %v", name, err)
-		result <- false
-		return
-	}
-	podNames := make([]string, len(podList.Items))
-	for i, p := range podList.Items {
+	pods := ps.List()
+	podNames := make([]string, len(pods))
+	for i, p := range pods {
 		podNames[i] = p.ObjectMeta.Name
 	}
 	Logf("Node %s has %d pods: %v", name, len(podNames), podNames)
 
 	// For each pod, we do a sanity check to ensure it's running / healthy
 	// now, as that's what we'll be checking later.
-	if !checkPodsRunning(c, podNames, podReadyBeforeTimeout) {
+	if !checkPodsRunningReady(c, podNames, podReadyBeforeTimeout) {
 		result <- false
 		return
 	}
@@ -202,93 +189,24 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 	}
 
 	// Wait for some kind of "not ready" status.
-	if !waitForNodeToBeNotReady(c, name, rebootNotReadyTimeout) {
+	if !waitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
 		result <- false
 		return
 	}
 
 	// Wait for some kind of "ready" status.
-	if !waitForNodeToBeReady(c, name, rebootReadyAgainTimeout) {
+	if !waitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
 		result <- false
 		return
 	}
 
 	// Ensure all of the pods that we found on this node before the reboot are
 	// running / healthy.
-	if !checkPodsRunning(c, podNames, podReadyAgainTimeout) {
+	if !checkPodsRunningReady(c, podNames, rebootPodReadyAgainTimeout) {
 		result <- false
 		return
 	}
 
 	Logf("Reboot successful on node %s", name)
 	result <- true
-}
-
-// checkPodsRunning returns whether all pods whose names are listed in podNames
-// are running.
-func checkPodsRunning(c *client.Client, podNames []string, timeout time.Duration) bool {
-	desc := "running and ready"
-	Logf("Waiting up to %v for the following pods to be %s: %s", timeout, desc, podNames)
-	result := make(chan bool, len(podNames))
-	for ix := range podNames {
-		// Launch off pod readiness checkers.
-		go func(name string) {
-			err := waitForPodCondition(c, api.NamespaceDefault, name, desc,
-				poll, timeout, podRunningReady)
-			result <- err == nil
-		}(podNames[ix])
-	}
-	// Wait for them all to finish.
-	success := true
-	// TODO(mbforbes): Change to `for range` syntax and remove logging once we
-	// support only Go >= 1.4.
-	for _, podName := range podNames {
-		if !<-result {
-			Logf("Pod %s failed to be %s.", podName, desc)
-			success = false
-		}
-	}
-	Logf("Wanted all pods to be %s. Result: %t. Pods: %v", desc, success, podNames)
-	return success
-}
-
-// waitForNodeToBeReady returns whether node name is ready within timeout.
-func waitForNodeToBeReady(c *client.Client, name string, timeout time.Duration) bool {
-	return waitForNodeToBe(c, name, true, timeout)
-}
-
-// waitForNodeToBeNotReady returns whether node name is not ready (i.e. the
-// readiness condition is anything but ready, e.g false or unknown) within
-// timeout.
-func waitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duration) bool {
-	return waitForNodeToBe(c, name, false, timeout)
-}
-
-// waitForNodeToBe returns whether node name's readiness state matches wantReady
-// within timeout. If wantReady is true, it will ensure the node is ready; if
-// it's false, it ensures the node is in any state other than ready (e.g. not
-// ready or unknown).
-func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time.Duration) bool {
-	Logf("Waiting up to %v for node %s readiness to be %t", timeout, name, wantReady)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		node, err := c.Nodes().Get(name)
-		if err != nil {
-			Logf("Couldn't get node %s", name)
-			continue
-		}
-
-		// Check the node readiness condition (logging all).
-		for i, cond := range node.Status.Conditions {
-			Logf("Node %s condition %d/%d: type: %v, status: %v",
-				name, i+1, len(node.Status.Conditions), cond.Type, cond.Status)
-			// Ensure that the condition type is readiness and the status
-			// matches as desired.
-			if cond.Type == api.NodeReady && (cond.Status == api.ConditionTrue) == wantReady {
-				Logf("Successfully found node %s readiness to be %t", name, wantReady)
-				return true
-			}
-		}
-	}
-	Logf("Node %s didn't reach desired readiness (%t) within %v", name, wantReady, timeout)
-	return false
 }

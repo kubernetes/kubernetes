@@ -57,7 +57,7 @@ type WaitFunc func() <-chan struct{}
 // placed on the channel and once more when the channel is closed.  If c
 // returns an error the loop ends and that error is returned, and if c returns
 // true the loop ends and nil is returned. ErrWaitTimeout will be returned if
-// the channel is closed without c every returning true.
+// the channel is closed without c ever returning true.
 func WaitFor(wait WaitFunc, c ConditionFunc) error {
 	w := wait()
 	for {
