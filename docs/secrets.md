@@ -27,9 +27,9 @@ This is an example of a simple secret, in json format:
 }
 ```
 
-The data field is a map.
-Its keys must match [DNS_SUBDOMAIN](design/identifiers.md).
-The values are arbitrary data, encoded using base64.
+The data field is a map.  Its keys must match
+[DNS_SUBDOMAIN](design/identifiers.md), except that leading dots are also
+allowed.  The values are arbitrary data, encoded using base64.
 
 This is an example of a pod that uses a secret, in json format:
 ```json
