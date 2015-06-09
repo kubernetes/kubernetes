@@ -6,7 +6,7 @@ matrix:
   include:
     - go: 1.4
       env:
-        - KUBE_TEST_API_VERSIONS="v1beta3"
+        - KUBE_TEST_API_VERSIONS="v1"
           KUBE_TEST_ETCD_PREFIXES="registry"
     - go: 1.3
       env:
