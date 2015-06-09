@@ -43,8 +43,6 @@ metadata:
 spec:
   ports:
   - port: 5672
-    protocol: TCP
-    targetPort: 5672
   selector:
     app: taskQueue
     component: rabbitmq
@@ -87,7 +85,6 @@ spec:
         name: rabbitmq
         ports:
         - containerPort: 5672
-          protocol: TCP
         resources:
           limits:
             cpu: 100m
@@ -124,7 +121,6 @@ spec:
         name: celery
         ports:
         - containerPort: 5672
-          protocol: TCP
         resources:
           limits:
             cpu: 100m
@@ -203,7 +199,6 @@ spec:
         ports:
         - containerPort: 5555
           hostPort: 5555
-          protocol: TCP
         resources:
           limits:
             cpu: 100m

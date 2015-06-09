@@ -19,7 +19,6 @@ spec:
         name: rabbitmq
         ports:
         - containerPort: 5672
-          protocol: TCP
         resources:
           limits:
             cpu: 100m
