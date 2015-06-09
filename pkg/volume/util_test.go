@@ -95,7 +95,7 @@ func (c *mockScrubberClient) DeletePod(name, namespace string) error {
 	return nil
 }
 
-func (c *mockScrubberClient) WatchPod(name, namespace, resourceVersion string) func() *api.Pod {
+func (c *mockScrubberClient) WatchPod(name, namespace, resourceVersion string, stopChannel chan struct{}) func() *api.Pod {
 	return func() *api.Pod {
 		return c.pod
 	}
