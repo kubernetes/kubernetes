@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -132,6 +133,7 @@ func testHostIP(c *client.Client, pod *api.Pod) {
 
 var _ = Describe("Pods", func() {
 	var c *client.Client
+	// TODO convert this to use the NewFramework(...)
 
 	BeforeEach(func() {
 		var err error
@@ -154,6 +156,42 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		})
+	})
+	It("should be schedule with cpu and memory limits", func() {
+		podClient := c.Pods(api.NamespaceDefault)
+
+		By("creating the pod")
+		name := "pod-update-" + string(util.NewUUID())
+		value := strconv.Itoa(time.Now().Nanosecond())
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					"name": "foo",
+					"time": value,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "nginx",
+						Image: "gcr.io/google_containers/pause",
+						Resources: api.ResourceRequirements{
+							Limits: api.ResourceList{
+								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+								api.ResourceMemory: *resource.NewQuantity(10*1024*1024, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+		}
+		defer podClient.Delete(pod.Name, nil)
+		_, err := podClient.Create(pod)
+		if err != nil {
+			Fail(fmt.Sprintf("Error creating a pod: %v", err))
+		}
+		expectNoError(waitForPodRunning(c, pod.Name))
 	})
 	It("should be submitted and removed", func() {
 		podClient := c.Pods(api.NamespaceDefault)
