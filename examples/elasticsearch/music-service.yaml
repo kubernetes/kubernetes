@@ -1,4 +1,4 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata:
   name: music-server
@@ -12,4 +12,4 @@ spec:
   - name: db
     port: 9200
     targetPort: es
-  createExternalLoadBalancer: true
+  type: LoadBalancer
