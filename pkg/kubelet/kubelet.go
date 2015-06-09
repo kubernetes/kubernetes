@@ -1092,6 +1092,7 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType SyncPodType) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
+	start := time.Now()
 
 	// Before returning, regenerate status and store it in the cache.
 	defer func() {
@@ -1107,6 +1108,11 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 			podToUpdate := pod
 			if mirrorPod != nil {
 				podToUpdate = mirrorPod
+			}
+			existingStatus, ok := kl.statusManager.GetPodStatus(podFullName)
+			if !ok || existingStatus.Phase == api.PodPending && status.Phase == api.PodRunning {
+				// TODO: Check the pod annotation instead of using `start`
+				metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(start))
 			}
 			kl.statusManager.SetPodStatus(podToUpdate, status)
 		}
@@ -1379,7 +1385,7 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncP
 
 		// Run the sync in an async manifest worker.
 		kl.podWorkers.UpdatePod(pod, mirrorPods[podFullName], func() {
-			metrics.SyncPodLatency.WithLabelValues(podSyncTypes[pod.UID].String()).Observe(metrics.SinceInMicroseconds(start))
+			metrics.PodWorkerLatency.WithLabelValues(podSyncTypes[pod.UID].String()).Observe(metrics.SinceInMicroseconds(start))
 		})
 
 		// Note the number of containers for new pods.
@@ -2094,6 +2100,12 @@ func getPodReadyCondition(spec *api.PodSpec, statuses []api.ContainerStatus) []a
 // By passing the pod directly, this method avoids pod lookup, which requires
 // grabbing a lock.
 func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
+
+	start := time.Now()
+	defer func() {
+		metrics.PodStatusLatency.Observe(metrics.SinceInMicroseconds(start))
+	}()
+
 	podFullName := kubecontainer.GetPodFullName(pod)
 	glog.V(3).Infof("Generating status for %q", podFullName)
 
