@@ -27,7 +27,7 @@ This pod runs the `env` command in a container that consumes the downward API.  
 through the pod logs to see that the pod was injected with the correct values:
 
 ```shell
-$ kubectl log dapi-test-pod | grep POD_
+$ kubectl logs dapi-test-pod | grep POD_
 2015-04-30T20:22:18.568024817Z POD_NAME=dapi-test-pod
 2015-04-30T20:22:18.568087688Z POD_NAMESPACE=default
 ```
