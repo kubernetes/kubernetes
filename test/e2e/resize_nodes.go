@@ -77,7 +77,7 @@ func waitForNodeInstanceGroupSize(size int) error {
 			continue
 		}
 		if currentSize != size {
-			Logf("Waiting for node istance group size %d, current size %d", size, currentSize)
+			Logf("Waiting for node instance group size %d, current size %d", size, currentSize)
 			continue
 		}
 		Logf("Node instance group has reached the desired size %d", size)
@@ -224,7 +224,7 @@ func waitForPodsCreatedRunningResponding(c *client.Client, ns, name string, repl
 }
 
 var _ = Describe("Nodes", func() {
-	supportedProviders := []string{"gce"}
+	supportedProviders := []string{"gce", "gke"}
 	var testName string
 	var c *client.Client
 	var ns string
