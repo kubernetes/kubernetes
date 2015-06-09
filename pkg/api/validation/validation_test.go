@@ -107,7 +107,7 @@ func TestValidateObjectMetaUpdateIgnoresCreationTimestamp(t *testing.T) {
 
 // Ensure trailing slash is allowed in generate name
 func TestValidateObjectMetaTrimsTrailingSlash(t *testing.T) {
-	errs := ValidateObjectMeta(&api.ObjectMeta{Name: "test", GenerateName: "foo-"}, false, nameIsDNSSubdomain)
+	errs := ValidateObjectMeta(&api.ObjectMeta{Name: "test", GenerateName: "foo-"}, false, NameIsDNSSubdomain)
 	if len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
@@ -481,8 +481,8 @@ func TestValidateVolumes(t *testing.T) {
 				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
 			}
 			detail := errs[i].(*errors.ValidationError).Detail
-			if detail != "" && detail != dns1123LabelErrorMsg {
-				t.Errorf("%s: expected error detail either empty or %s, got %s", k, dns1123LabelErrorMsg, detail)
+			if detail != "" && detail != DNS1123LabelErrorMsg {
+				t.Errorf("%s: expected error detail either empty or %s, got %s", k, DNS1123LabelErrorMsg, detail)
 			}
 		}
 	}
@@ -2781,11 +2781,11 @@ func TestValidateLimitRange(t *testing.T) {
 		},
 		"invalid Name": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: spec},
-			dnsSubdomainErrorMsg,
+			DNSSubdomainErrorMsg,
 		},
 		"invalid Namespace": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
-			dns1123LabelErrorMsg,
+			DNS1123LabelErrorMsg,
 		},
 		"duplicate limit type": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecDuplicateType},
@@ -2856,11 +2856,11 @@ func TestValidateResourceQuota(t *testing.T) {
 		},
 		"invalid Name": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: spec},
-			dnsSubdomainErrorMsg,
+			DNSSubdomainErrorMsg,
 		},
 		"invalid Namespace": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
-			dns1123LabelErrorMsg,
+			DNS1123LabelErrorMsg,
 		},
 	}
 	for k, v := range errorCases {
@@ -3318,12 +3318,12 @@ func TestValidateEndpoints(t *testing.T) {
 		"invalid namespace": {
 			endpoints:   api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
 			errorType:   "FieldValueInvalid",
-			errorDetail: dns1123LabelErrorMsg,
+			errorDetail: DNS1123LabelErrorMsg,
 		},
 		"invalid name": {
 			endpoints:   api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
 			errorType:   "FieldValueInvalid",
-			errorDetail: dnsSubdomainErrorMsg,
+			errorDetail: DNSSubdomainErrorMsg,
 		},
 		"empty addresses": {
 			endpoints: api.Endpoints{
