@@ -58,6 +58,12 @@ if [[ ${#block_devices[@]} == 0 ]]; then
 else
   echo "Block devices: ${block_devices[@]}"
 
+  # Remove any existing mounts
+  for block_device in ${block_devices}; do
+    /bin/umount ${block_device}
+    sed -i -e "\|^${block_device}|d" /etc/fstab
+  done
+
   if [[ ${docker_storage} == "btrfs" ]]; then
     apt-get install --yes btrfs-tools
 
@@ -68,7 +74,8 @@ else
       echo "Found multiple ephemeral block devices, formatting with btrfs as RAID-0"
       mkfs.btrfs -f --data raid0 ${block_devices[@]}
     fi
-    mount -t btrfs ${block_devices[0]} /mnt
+    echo "${block_devices[0]}  /mnt  btrfs  noatime  0 0" >> /etc/fstab
+    mount /mnt
 
     mkdir -p /mnt/kubernetes
 
@@ -79,9 +86,9 @@ else
       echo "aufs-nolvm selected, but multiple ephemeral devices were found; only the first will be available"
     fi
 
-    /bin/umount ${block_devices[0]}
     mkfs -t ext4 ${block_devices[0]}
-    mount -t ext4 ${block_devices[0]} /mnt
+    echo "${block_devices[0]}  /mnt  ext4     noatime  0 0" >> /etc/fstab
+    mount /mnt
 
     mkdir -p /mnt/kubernetes
 
@@ -99,7 +106,6 @@ else
     export LVM_SUPPRESS_FD_WARNINGS=1
 
     for block_device in ${block_devices}; do
-      /bin/umount ${block_device}
       pvcreate ${block_device}
     done
     vgcreate vg-ephemeral ${block_devices[@]}
@@ -133,7 +139,8 @@ else
 
       mkfs -t ext4 /dev/vg-ephemeral/docker
       mkdir -p /mnt/docker
-      mount -t ext4 /dev/vg-ephemeral/docker /mnt/docker
+      echo "/dev/vg-ephemeral/docker  /mnt/docker  ext4  noatime  0 0" >> /etc/fstab
+      mount /mnt/docker
       move_docker="/mnt"
     fi
 
@@ -142,7 +149,9 @@ else
     lvcreate -l 100%FREE -n kubernetes vg-ephemeral
     mkfs -t ext4 /dev/vg-ephemeral/kubernetes
     mkdir -p /mnt/kubernetes
-    mount -t ext4 /dev/vg-ephemeral/kubernetes /mnt/kubernetes
+    echo "/dev/vg-ephemeral/kubernetes  /mnt/kubernetes  ext4  noatime  0 0" >> /etc/fstab
+    mount /mnt/kubernetes
+
     move_kubelet="/mnt/kubernetes"
   else
     echo "Ignoring unknown DOCKER_STORAGE: ${docker_storage}"
