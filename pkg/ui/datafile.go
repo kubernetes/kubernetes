@@ -71,7 +71,7 @@ func www_app_assets_css_app_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 32046, mode: os.FileMode(420), modTime: time.Unix(1433449320, 0)}
+	info := bindata_file_info{name: "www/app/assets/css/app.css", size: 32046, mode: os.FileMode(420), modTime: time.Unix(1433785222, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -88,7 +88,7 @@ func www_app_assets_img_docarrow_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/docArrow.png", size: 373, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/docArrow.png", size: 373, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -109,7 +109,7 @@ func www_app_assets_img_ic_arrow_drop_down_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -151,7 +151,7 @@ func www_app_assets_img_ic_arrow_drop_up_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_up_24px.svg", size: 795, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_arrow_drop_up_24px.svg", size: 795, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -168,7 +168,7 @@ func www_app_assets_img_ic_keyboard_arrow_left_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_left_24px.svg", size: 151, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_left_24px.svg", size: 151, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -185,7 +185,7 @@ func www_app_assets_img_ic_keyboard_arrow_right_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_right_24px.svg", size: 149, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/ic_keyboard_arrow_right_24px.svg", size: 149, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -202,7 +202,7 @@ func www_app_assets_img_icons_arrow_back_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/arrow-back.png", size: 635, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/arrow-back.png", size: 635, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -219,7 +219,7 @@ func www_app_assets_img_icons_favicon_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/favicon.png", size: 1663, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/favicon.png", size: 1663, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -236,7 +236,7 @@ func www_app_assets_img_icons_ic_arrow_forward_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_arrow_forward_24px.svg", size: 158, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_arrow_forward_24px.svg", size: 158, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -253,7 +253,7 @@ func www_app_assets_img_icons_ic_cancel_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_cancel_24px.svg", size: 276, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_cancel_24px.svg", size: 276, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -270,7 +270,7 @@ func www_app_assets_img_icons_ic_close_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -300,7 +300,7 @@ func www_app_assets_img_icons_ic_menu_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu.svg", size: 791, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu.svg", size: 791, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -340,7 +340,7 @@ func www_app_assets_img_icons_ic_menu_24px_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu_24px.svg", size: 841, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/ic_menu_24px.svg", size: 841, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -357,7 +357,7 @@ func www_app_assets_img_icons_list_control_down_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/icons/list_control_down.png", size: 309, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/icons/list_control_down.png", size: 309, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -379,7 +379,7 @@ func www_app_assets_img_kubernetes_svg() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/img/kubernetes.svg", size: 11663, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/assets/img/kubernetes.svg", size: 11663, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -586,7 +586,7 @@ angular.module("kubernetesApp.config", [])
 
 .constant("ENV", {
 	"/": {
-		"k8sApiServer": "/api/v1beta3",
+		"k8sApiServer": "/api/v1",
 		"k8sDataServer": "",
 		"k8sDataPollMinIntervalSec": 10,
 		"k8sDataPollMaxIntervalSec": 120,
@@ -2774,12 +2774,12 @@ angular.module('kubernetesApp.components.dashboard')
   function PodDataService($q) {
     var pods = {
     "kind": "Pod",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
         "name": "redis-master-c0r1n",
         "generateName": "redis-master-",
         "namespace": "default",
-        "selfLink": "/api/v1beta3/namespaces/default/pods/redis-master-c0r1n",
+        "selfLink": "/api/v1/namespaces/default/pods/redis-master-c0r1n",
         "uid": "f12ddfaf-ff77-11e4-8f2d-080027213276",
         "resourceVersion": "39",
         "creationTimestamp": "2015-05-21T05:12:14Z",
@@ -2787,7 +2787,7 @@ angular.module('kubernetesApp.components.dashboard')
             "name": "redis-master"
         },
         "annotations": {
-            "kubernetes.io/created-by": "{\"kind\":\"SerializedReference\",\"apiVersion\":\"v1beta3\",\"reference\":{\"kind\":\"ReplicationController\",\"namespace\":\"default\",\"name\":\"redis-master\",\"uid\":\"f12969e0-ff77-11e4-8f2d-080027213276\",\"apiVersion\":\"v1beta3\",\"resourceVersion\":\"26\"}}"
+            "kubernetes.io/created-by": "{\"kind\":\"SerializedReference\",\"apiVersion\":\"v1\",\"reference\":{\"kind\":\"ReplicationController\",\"namespace\":\"default\",\"name\":\"redis-master\",\"uid\":\"f12969e0-ff77-11e4-8f2d-080027213276\",\"apiVersion\":\"v1\",\"resourceVersion\":\"26\"}}"
         }
     },
     "spec": {
@@ -2889,16 +2889,16 @@ angular.module('kubernetesApp.components.dashboard')
   function ReplicationControllerDataService($q) {
     var replicationControllers = {
     "kind": "List",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {},
     "items": [
         {
             "kind": "ReplicationController",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "redis-master",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/replicationcontrollers/redis-master",
+                "selfLink": "/api/v1/namespaces/default/replicationcontrollers/redis-master",
                 "uid": "f12969e0-ff77-11e4-8f2d-080027213276",
                 "resourceVersion": "28",
                 "creationTimestamp": "2015-05-21T05:12:14Z",
@@ -2978,16 +2978,16 @@ angular.module('kubernetesApp.components.dashboard')
   function ServiceDataService($q) {
     var services = {
     "kind": "List",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {},
     "items": [
         {
             "kind": "Service",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "kubernetes",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/services/kubernetes",
+                "selfLink": "/api/v1/namespaces/default/services/kubernetes",
                 "resourceVersion": "6",
                 "creationTimestamp": null,
                 "labels": {
@@ -3010,11 +3010,11 @@ angular.module('kubernetesApp.components.dashboard')
         },
         {
             "kind": "Service",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "kubernetes-ro",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/services/kubernetes-ro",
+                "selfLink": "/api/v1/namespaces/default/services/kubernetes-ro",
                 "resourceVersion": "8",
                 "creationTimestamp": null,
                 "labels": {
@@ -3037,11 +3037,11 @@ angular.module('kubernetesApp.components.dashboard')
         },
         {
             "kind": "Service",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "redis-master",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/services/redis-master",
+                "selfLink": "/api/v1/namespaces/default/services/redis-master",
                 "uid": "a6fde246-ff78-11e4-8f2d-080027213276",
                 "resourceVersion": "72",
                 "creationTimestamp": "2015-05-21T05:17:19Z",
@@ -3091,7 +3091,7 @@ func www_app_assets_js_app_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 91487, mode: os.FileMode(420), modTime: time.Unix(1433449320, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/app.js", size: 91412, mode: os.FileMode(420), modTime: time.Unix(1433785222, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3133,7 +3133,7 @@ func www_app_assets_js_base_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(420), modTime: time.Unix(1433449294, 0)}
+	info := bindata_file_info{name: "www/app/assets/js/base.js", size: 477048, mode: os.FileMode(420), modTime: time.Unix(1433785197, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3150,7 +3150,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_18px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_18px.svg", size: 114, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3171,7 +3171,7 @@ func www_app_components_dashboard_img_icons_ic_arrow_drop_down_24px_svg() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_arrow_drop_down_24px.svg", size: 166, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3188,7 +3188,7 @@ func www_app_components_dashboard_img_icons_ic_close_18px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_18px.svg", size: 215, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3205,7 +3205,7 @@ func www_app_components_dashboard_img_icons_ic_close_24px_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/img/icons/ic_close_24px.svg", size: 202, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3287,7 +3287,7 @@ func www_app_components_dashboard_manifest_json() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/manifest.json", size: 1854, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3304,7 +3304,7 @@ func www_app_components_dashboard_pages_footer_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/footer.html", size: 7, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3347,7 +3347,7 @@ func www_app_components_dashboard_pages_header_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/header.html", size: 1313, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3371,7 +3371,7 @@ func www_app_components_dashboard_pages_home_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/pages/home.html", size: 247, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3422,7 +3422,7 @@ func www_app_components_dashboard_views_groups_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/groups.html", size: 1298, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3446,7 +3446,7 @@ func www_app_components_dashboard_views_listevents_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listEvents.html", size: 326, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3470,7 +3470,7 @@ func www_app_components_dashboard_views_listminions_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listMinions.html", size: 348, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3494,7 +3494,7 @@ func www_app_components_dashboard_views_listpods_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPods.html", size: 345, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3570,7 +3570,7 @@ func www_app_components_dashboard_views_listpodscards_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsCards.html", size: 1967, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3604,7 +3604,7 @@ func www_app_components_dashboard_views_listpodsvisualizer_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listPodsVisualizer.html", size: 841, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3628,7 +3628,7 @@ func www_app_components_dashboard_views_listreplicationcontrollers_html() (*asse
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listReplicationControllers.html", size: 363, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3652,7 +3652,7 @@ func www_app_components_dashboard_views_listservices_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/listServices.html", size: 349, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3758,7 +3758,7 @@ func www_app_components_dashboard_views_node_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 2307, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/node.html", size: 2307, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3784,7 +3784,7 @@ func www_app_components_dashboard_views_partials_cadvisor_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 454, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/cadvisor.html", size: 454, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3821,7 +3821,7 @@ func www_app_components_dashboard_views_partials_groupbox_html() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupBox.html", size: 769, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3880,7 +3880,7 @@ func www_app_components_dashboard_views_partials_groupitem_html() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2213, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/groupItem.html", size: 2213, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3930,7 +3930,7 @@ func www_app_components_dashboard_views_partials_podtilesbyname_html() (*asset, 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByName.html", size: 1287, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3980,7 +3980,7 @@ func www_app_components_dashboard_views_partials_podtilesbyserver_html() (*asset
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/partials/podTilesByServer.html", size: 1281, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4111,7 +4111,7 @@ func www_app_components_dashboard_views_pod_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 4149, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/pod.html", size: 4149, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4228,7 +4228,7 @@ func www_app_components_dashboard_views_replication_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 3207, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/replication.html", size: 3207, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4359,7 +4359,7 @@ func www_app_components_dashboard_views_service_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 3539, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/components/dashboard/views/service.html", size: 3539, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4434,7 +4434,7 @@ func www_app_index_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/index.html", size: 2569, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/index.html", size: 2569, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4451,7 +4451,7 @@ func www_app_vendor_angular_json_human_dist_angular_json_human_css() (*asset, er
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/vendor/angular-json-human/dist/angular-json-human.css", size: 1151, mode: os.FileMode(420), modTime: time.Unix(1433449320, 0)}
+	info := bindata_file_info{name: "www/app/vendor/angular-json-human/dist/angular-json-human.css", size: 1151, mode: os.FileMode(420), modTime: time.Unix(1433785221, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4473,7 +4473,7 @@ func www_app_vendor_angular_material_angular_material_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/vendor/angular-material/angular-material.css", size: 159606, mode: os.FileMode(420), modTime: time.Unix(1433449294, 0)}
+	info := bindata_file_info{name: "www/app/vendor/angular-material/angular-material.css", size: 159606, mode: os.FileMode(420), modTime: time.Unix(1433785197, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4494,7 +4494,7 @@ func www_app_vendor_d3_d3_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/vendor/d3/d3.min.js", size: 151123, mode: os.FileMode(420), modTime: time.Unix(1433449320, 0)}
+	info := bindata_file_info{name: "www/app/vendor/d3/d3.min.js", size: 151123, mode: os.FileMode(420), modTime: time.Unix(1433785221, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4511,7 +4511,7 @@ func www_app_views_partials_404_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/404.html", size: 60, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/404.html", size: 60, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4542,7 +4542,7 @@ func www_app_views_partials_kubernetes_ui_menu_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/kubernetes-ui-menu.tmpl.html", size: 764, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/kubernetes-ui-menu.tmpl.html", size: 764, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4606,7 +4606,7 @@ func www_app_views_partials_md_table_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 3057, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/md-table.tmpl.html", size: 3057, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4633,7 +4633,7 @@ func www_app_views_partials_menu_toggle_tmpl_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/app/views/partials/menu-toggle.tmpl.html", size: 587, mode: os.FileMode(420), modTime: time.Unix(1433449282, 0)}
+	info := bindata_file_info{name: "www/app/views/partials/menu-toggle.tmpl.html", size: 587, mode: os.FileMode(420), modTime: time.Unix(1433785189, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4661,7 +4661,7 @@ func third_party_swagger_ui_license() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/LICENSE", size: 596, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/LICENSE", size: 596, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4700,7 +4700,7 @@ func third_party_swagger_ui_readme_md() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/README.md", size: 866, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/README.md", size: 866, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4842,7 +4842,7 @@ func third_party_swagger_ui_css_reset_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/css/reset.css", size: 1066, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/css/reset.css", size: 1066, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6115,7 +6115,7 @@ func third_party_swagger_ui_css_screen_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/css/screen.css", size: 43042, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/css/screen.css", size: 43042, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6158,7 +6158,7 @@ func third_party_swagger_ui_css_typography_css() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/css/typography.css", size: 1474, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/css/typography.css", size: 1474, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6175,7 +6175,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_700_eot() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.eot", size: 22924, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.eot", size: 22924, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6603,7 +6603,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_700_svg() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.svg", size: 73575, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.svg", size: 73575, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6620,7 +6620,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_700_ttf() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.ttf", size: 40516, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.ttf", size: 40516, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6637,7 +6637,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_700_woff() (*asset, error)
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.woff", size: 25992, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.woff", size: 25992, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6654,7 +6654,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_700_woff2() (*asset, error
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.woff2", size: 11480, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-700.woff2", size: 11480, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -6671,7 +6671,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_regular_eot() (*asset, err
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.eot", size: 22008, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.eot", size: 22008, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7091,7 +7091,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_regular_svg() (*asset, err
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.svg", size: 72148, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.svg", size: 72148, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7108,7 +7108,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_regular_ttf() (*asset, err
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.ttf", size: 39072, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.ttf", size: 39072, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7125,7 +7125,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_regular_woff() (*asset, er
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.woff", size: 24868, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.woff", size: 24868, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7142,7 +7142,7 @@ func third_party_swagger_ui_fonts_droid_sans_v6_latin_regular_woff2() (*asset, e
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.woff2", size: 11304, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/fonts/droid-sans-v6-latin-regular.woff2", size: 11304, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7159,7 +7159,7 @@ func third_party_swagger_ui_images_explorer_icons_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/explorer_icons.png", size: 5763, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/explorer_icons.png", size: 5763, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7176,7 +7176,7 @@ func third_party_swagger_ui_images_logo_small_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/logo_small.png", size: 770, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/logo_small.png", size: 770, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7193,7 +7193,7 @@ func third_party_swagger_ui_images_pet_store_api_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/pet_store_api.png", size: 824, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/pet_store_api.png", size: 824, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7210,7 +7210,7 @@ func third_party_swagger_ui_images_throbber_gif() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/throbber.gif", size: 9257, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/throbber.gif", size: 9257, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7227,7 +7227,7 @@ func third_party_swagger_ui_images_wordnik_api_png() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/images/wordnik_api.png", size: 980, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/images/wordnik_api.png", size: 980, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7342,7 +7342,7 @@ func third_party_swagger_ui_index_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/index.html", size: 3818, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/index.html", size: 3818, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7373,7 +7373,7 @@ func third_party_swagger_ui_lib_backbone_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/backbone-min.js", size: 20390, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/backbone-min.js", size: 20390, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -7575,108 +7575,108 @@ performAction: function anonymous(yytext,yyleng,yylineno,yy,yystate,$$,_$) {
 
 var $0 = $$.length - 1;
 switch (yystate) {
-case 1: return $$[$0-1]; 
+case 1: return $$[$0-1];
 break;
-case 2: this.$ = new yy.ProgramNode([], $$[$0]); 
+case 2: this.$ = new yy.ProgramNode([], $$[$0]);
 break;
-case 3: this.$ = new yy.ProgramNode($$[$0-2], $$[$0]); 
+case 3: this.$ = new yy.ProgramNode($$[$0-2], $$[$0]);
 break;
-case 4: this.$ = new yy.ProgramNode($$[$0-1], []); 
+case 4: this.$ = new yy.ProgramNode($$[$0-1], []);
 break;
-case 5: this.$ = new yy.ProgramNode($$[$0]); 
+case 5: this.$ = new yy.ProgramNode($$[$0]);
 break;
-case 6: this.$ = new yy.ProgramNode([], []); 
+case 6: this.$ = new yy.ProgramNode([], []);
 break;
-case 7: this.$ = new yy.ProgramNode([]); 
+case 7: this.$ = new yy.ProgramNode([]);
 break;
-case 8: this.$ = [$$[$0]]; 
+case 8: this.$ = [$$[$0]];
 break;
-case 9: $$[$0-1].push($$[$0]); this.$ = $$[$0-1]; 
+case 9: $$[$0-1].push($$[$0]); this.$ = $$[$0-1];
 break;
-case 10: this.$ = new yy.BlockNode($$[$0-2], $$[$0-1].inverse, $$[$0-1], $$[$0]); 
+case 10: this.$ = new yy.BlockNode($$[$0-2], $$[$0-1].inverse, $$[$0-1], $$[$0]);
 break;
-case 11: this.$ = new yy.BlockNode($$[$0-2], $$[$0-1], $$[$0-1].inverse, $$[$0]); 
+case 11: this.$ = new yy.BlockNode($$[$0-2], $$[$0-1], $$[$0-1].inverse, $$[$0]);
 break;
-case 12: this.$ = $$[$0]; 
+case 12: this.$ = $$[$0];
 break;
-case 13: this.$ = $$[$0]; 
+case 13: this.$ = $$[$0];
 break;
-case 14: this.$ = new yy.ContentNode($$[$0]); 
+case 14: this.$ = new yy.ContentNode($$[$0]);
 break;
-case 15: this.$ = new yy.CommentNode($$[$0]); 
+case 15: this.$ = new yy.CommentNode($$[$0]);
 break;
-case 16: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1]); 
+case 16: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1]);
 break;
-case 17: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1]); 
+case 17: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1]);
 break;
-case 18: this.$ = $$[$0-1]; 
+case 18: this.$ = $$[$0-1];
 break;
 case 19:
     // Parsing out the '&' escape token at this level saves ~500 bytes after min due to the removal of one parser node.
     this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1], $$[$0-2][2] === '&');
-  
+
 break;
-case 20: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1], true); 
+case 20: this.$ = new yy.MustacheNode($$[$0-1][0], $$[$0-1][1], true);
 break;
-case 21: this.$ = new yy.PartialNode($$[$0-1]); 
+case 21: this.$ = new yy.PartialNode($$[$0-1]);
 break;
-case 22: this.$ = new yy.PartialNode($$[$0-2], $$[$0-1]); 
+case 22: this.$ = new yy.PartialNode($$[$0-2], $$[$0-1]);
 break;
-case 23: 
+case 23:
 break;
-case 24: this.$ = [[$$[$0-2]].concat($$[$0-1]), $$[$0]]; 
+case 24: this.$ = [[$$[$0-2]].concat($$[$0-1]), $$[$0]];
 break;
-case 25: this.$ = [[$$[$0-1]].concat($$[$0]), null]; 
+case 25: this.$ = [[$$[$0-1]].concat($$[$0]), null];
 break;
-case 26: this.$ = [[$$[$0-1]], $$[$0]]; 
+case 26: this.$ = [[$$[$0-1]], $$[$0]];
 break;
-case 27: this.$ = [[$$[$0]], null]; 
+case 27: this.$ = [[$$[$0]], null];
 break;
-case 28: this.$ = [[$$[$0]], null]; 
+case 28: this.$ = [[$$[$0]], null];
 break;
-case 29: $$[$0-1].push($$[$0]); this.$ = $$[$0-1]; 
+case 29: $$[$0-1].push($$[$0]); this.$ = $$[$0-1];
 break;
-case 30: this.$ = [$$[$0]]; 
+case 30: this.$ = [$$[$0]];
 break;
-case 31: this.$ = $$[$0]; 
+case 31: this.$ = $$[$0];
 break;
-case 32: this.$ = new yy.StringNode($$[$0]); 
+case 32: this.$ = new yy.StringNode($$[$0]);
 break;
-case 33: this.$ = new yy.IntegerNode($$[$0]); 
+case 33: this.$ = new yy.IntegerNode($$[$0]);
 break;
-case 34: this.$ = new yy.BooleanNode($$[$0]); 
+case 34: this.$ = new yy.BooleanNode($$[$0]);
 break;
-case 35: this.$ = $$[$0]; 
+case 35: this.$ = $$[$0];
 break;
-case 36: this.$ = new yy.HashNode($$[$0]); 
+case 36: this.$ = new yy.HashNode($$[$0]);
 break;
-case 37: $$[$0-1].push($$[$0]); this.$ = $$[$0-1]; 
+case 37: $$[$0-1].push($$[$0]); this.$ = $$[$0-1];
 break;
-case 38: this.$ = [$$[$0]]; 
+case 38: this.$ = [$$[$0]];
 break;
-case 39: this.$ = [$$[$0-2], $$[$0]]; 
+case 39: this.$ = [$$[$0-2], $$[$0]];
 break;
-case 40: this.$ = [$$[$0-2], new yy.StringNode($$[$0])]; 
+case 40: this.$ = [$$[$0-2], new yy.StringNode($$[$0])];
 break;
-case 41: this.$ = [$$[$0-2], new yy.IntegerNode($$[$0])]; 
+case 41: this.$ = [$$[$0-2], new yy.IntegerNode($$[$0])];
 break;
-case 42: this.$ = [$$[$0-2], new yy.BooleanNode($$[$0])]; 
+case 42: this.$ = [$$[$0-2], new yy.BooleanNode($$[$0])];
 break;
-case 43: this.$ = [$$[$0-2], $$[$0]]; 
+case 43: this.$ = [$$[$0-2], $$[$0]];
 break;
-case 44: this.$ = new yy.PartialNameNode($$[$0]); 
+case 44: this.$ = new yy.PartialNameNode($$[$0]);
 break;
-case 45: this.$ = new yy.PartialNameNode(new yy.StringNode($$[$0])); 
+case 45: this.$ = new yy.PartialNameNode(new yy.StringNode($$[$0]));
 break;
-case 46: this.$ = new yy.PartialNameNode(new yy.IntegerNode($$[$0])); 
+case 46: this.$ = new yy.PartialNameNode(new yy.IntegerNode($$[$0]));
 break;
-case 47: this.$ = new yy.DataNode($$[$0]); 
+case 47: this.$ = new yy.DataNode($$[$0]);
 break;
-case 48: this.$ = new yy.IdNode($$[$0]); 
+case 48: this.$ = new yy.IdNode($$[$0]);
 break;
-case 49: $$[$0-2].push({part: $$[$0], separator: $$[$0-1]}); this.$ = $$[$0-2]; 
+case 49: $$[$0-2].push({part: $$[$0], separator: $$[$0-1]}); this.$ = $$[$0-2];
 break;
-case 50: this.$ = [{part: $$[$0]}]; 
+case 50: this.$ = [{part: $$[$0]}];
 break;
 }
 },
@@ -7962,77 +7962,77 @@ lexer.performAction = function anonymous(yy,yy_,$avoiding_name_collisions,YY_STA
 
 var YYSTATE=YY_START
 switch($avoiding_name_collisions) {
-case 0: yy_.yytext = "\\"; return 14; 
+case 0: yy_.yytext = "\\"; return 14;
 break;
 case 1:
                                    if(yy_.yytext.slice(-1) !== "\\") this.begin("mu");
                                    if(yy_.yytext.slice(-1) === "\\") yy_.yytext = yy_.yytext.substr(0,yy_.yyleng-1), this.begin("emu");
                                    if(yy_.yytext) return 14;
-                                 
+
 break;
-case 2: return 14; 
+case 2: return 14;
 break;
 case 3:
                                    if(yy_.yytext.slice(-1) !== "\\") this.popState();
                                    if(yy_.yytext.slice(-1) === "\\") yy_.yytext = yy_.yytext.substr(0,yy_.yyleng-1);
                                    return 14;
-                                 
+
 break;
-case 4: yy_.yytext = yy_.yytext.substr(0, yy_.yyleng-4); this.popState(); return 15; 
+case 4: yy_.yytext = yy_.yytext.substr(0, yy_.yyleng-4); this.popState(); return 15;
 break;
-case 5: return 25; 
+case 5: return 25;
 break;
-case 6: return 16; 
+case 6: return 16;
 break;
-case 7: return 20; 
+case 7: return 20;
 break;
-case 8: return 19; 
+case 8: return 19;
 break;
-case 9: return 19; 
+case 9: return 19;
 break;
-case 10: return 23; 
+case 10: return 23;
 break;
-case 11: return 22; 
+case 11: return 22;
 break;
-case 12: this.popState(); this.begin('com'); 
+case 12: this.popState(); this.begin('com');
 break;
-case 13: yy_.yytext = yy_.yytext.substr(3,yy_.yyleng-5); this.popState(); return 15; 
+case 13: yy_.yytext = yy_.yytext.substr(3,yy_.yyleng-5); this.popState(); return 15;
 break;
-case 14: return 22; 
+case 14: return 22;
 break;
-case 15: return 37; 
+case 15: return 37;
 break;
-case 16: return 36; 
+case 16: return 36;
 break;
-case 17: return 36; 
+case 17: return 36;
 break;
-case 18: return 40; 
+case 18: return 40;
 break;
-case 19: /*ignore whitespace*/ 
+case 19: /*ignore whitespace*/
 break;
-case 20: this.popState(); return 24; 
+case 20: this.popState(); return 24;
 break;
-case 21: this.popState(); return 18; 
+case 21: this.popState(); return 18;
 break;
-case 22: yy_.yytext = yy_.yytext.substr(1,yy_.yyleng-2).replace(/\\"/g,'"'); return 31; 
+case 22: yy_.yytext = yy_.yytext.substr(1,yy_.yyleng-2).replace(/\\"/g,'"'); return 31;
 break;
-case 23: yy_.yytext = yy_.yytext.substr(1,yy_.yyleng-2).replace(/\\'/g,"'"); return 31; 
+case 23: yy_.yytext = yy_.yytext.substr(1,yy_.yyleng-2).replace(/\\'/g,"'"); return 31;
 break;
-case 24: return 38; 
+case 24: return 38;
 break;
-case 25: return 33; 
+case 25: return 33;
 break;
-case 26: return 33; 
+case 26: return 33;
 break;
-case 27: return 32; 
+case 27: return 32;
 break;
-case 28: return 36; 
+case 28: return 36;
 break;
-case 29: yy_.yytext = yy_.yytext.substr(1, yy_.yyleng-2); return 36; 
+case 29: yy_.yytext = yy_.yytext.substr(1, yy_.yyleng-2); return 36;
 break;
-case 30: return 'INVALID'; 
+case 30: return 'INVALID';
 break;
-case 31: return 5; 
+case 31: return 5;
 break;
 }
 };
@@ -9668,7 +9668,7 @@ func third_party_swagger_ui_lib_handlebars_1_0_0_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/handlebars-1.0.0.js", size: 72766, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/handlebars-1.0.0.js", size: 72766, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -9712,7 +9712,7 @@ func third_party_swagger_ui_lib_handlebars_2_0_0_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/handlebars-2.0.0.js", size: 48517, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/handlebars-2.0.0.js", size: 48517, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -9729,7 +9729,7 @@ func third_party_swagger_ui_lib_highlight_7_3_pack_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/highlight.7.3.pack.js", size: 7499, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/highlight.7.3.pack.js", size: 7499, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -9747,7 +9747,7 @@ func third_party_swagger_ui_lib_jquery_1_8_0_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery-1.8.0.min.js", size: 92556, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery-1.8.0.min.js", size: 92556, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -9755,7 +9755,7 @@ func third_party_swagger_ui_lib_jquery_1_8_0_min_js() (*asset, error) {
 var _third_party_swagger_ui_lib_jquery_ba_bbq_min_js = []byte(`/*
  * jQuery BBQ: Back Button & Query Library - v1.2.1 - 2/17/2010
  * http://benalman.com/projects/jquery-bbq-plugin/
- * 
+ *
  * Copyright (c) 2010 "Cowboy" Ben Alman
  * Dual licensed under the MIT and GPL licenses.
  * http://benalman.com/about/license/
@@ -9764,7 +9764,7 @@ var _third_party_swagger_ui_lib_jquery_ba_bbq_min_js = []byte(`/*
 /*
  * jQuery hashchange event - v1.2 - 2/11/2010
  * http://benalman.com/projects/jquery-hashchange-plugin/
- * 
+ *
  * Copyright (c) 2010 "Cowboy" Ben Alman
  * Dual licensed under the MIT and GPL licenses.
  * http://benalman.com/about/license/
@@ -9781,7 +9781,7 @@ func third_party_swagger_ui_lib_jquery_ba_bbq_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.ba-bbq.min.js", size: 4119, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.ba-bbq.min.js", size: 4119, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -9799,7 +9799,7 @@ func third_party_swagger_ui_lib_jquery_slideto_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.slideto.min.js", size: 369, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.slideto.min.js", size: 369, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -9823,7 +9823,7 @@ func third_party_swagger_ui_lib_jquery_wiggle_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.wiggle.min.js", size: 762, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/jquery.wiggle.min.js", size: 762, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -11111,7 +11111,7 @@ func third_party_swagger_ui_lib_marked_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/marked.js", size: 28156, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/marked.js", size: 28156, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -11146,7 +11146,7 @@ Content.prototype = {
 
 // ` + "`" + `Content` + "`" + ` objects have the following attributes:
 Object.defineProperties(Content.prototype,{
-  
+
 // - **type**. Typically accessed as ` + "`" + `content.type` + "`" + `, reflects the ` + "`" + `content-type` + "`" + `
 //   header associated with the request or response. If not passed as an options
 //   to the constructor or set explicitly, it will infer the type the ` + "`" + `data` + "`" + `
@@ -11260,7 +11260,7 @@ Content.processors = {};
 // - **stringify**. The function used to convert a Javascript data type into a
 //   raw content entity.
 Content.registerProcessor = function(types,processor) {
-  
+
 // You can pass an array of types that will trigger this processor, or just one.
 // We determine the array via duck-typing here.
   if (types.forEach) {
@@ -11320,7 +11320,7 @@ func third_party_swagger_ui_lib_shred_content_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred/content.js", size: 6862, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred/content.js", size: 6862, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -11350,33 +11350,33 @@ require._core = {
 require.resolve = (function () {
     return function (x, cwd) {
         if (!cwd) cwd = '/';
-        
+
         if (require._core[x]) return x;
         var path = require.modules.path();
         var y = cwd || '.';
-        
+
         if (x.match(/^(?:\.\.?\/|\/)/)) {
             var m = loadAsFileSync(path.resolve(y, x))
                 || loadAsDirectorySync(path.resolve(y, x));
             if (m) return m;
         }
-        
+
         var n = loadNodeModulesSync(x, y);
         if (n) return n;
-        
+
         throw new Error("Cannot find module '" + x + "'");
-        
+
         function loadAsFileSync (x) {
             if (require.modules[x]) {
                 return x;
             }
-            
+
             for (var i = 0; i < require.extensions.length; i++) {
                 var ext = require.extensions[i];
                 if (require.modules[x + ext]) return x + ext;
             }
         }
-        
+
         function loadAsDirectorySync (x) {
             x = x.replace(/\/+$/, '');
             var pkgfile = x + '/package.json';
@@ -11396,10 +11396,10 @@ require.resolve = (function () {
                     if (m) return m;
                 }
             }
-            
+
             return loadAsFileSync(x + '/index');
         }
-        
+
         function loadNodeModulesSync (x, start) {
             var dirs = nodeModulesPathsSync(start);
             for (var i = 0; i < dirs.length; i++) {
@@ -11409,23 +11409,23 @@ require.resolve = (function () {
                 var n = loadAsDirectorySync(dir + '/' + x);
                 if (n) return n;
             }
-            
+
             var m = loadAsFileSync(x);
             if (m) return m;
         }
-        
+
         function nodeModulesPathsSync (start) {
             var parts;
             if (start === '/') parts = [ '' ];
             else parts = path.normalize(start).split('/');
-            
+
             var dirs = [];
             for (var i = parts.length - 1; i >= 0; i--) {
                 if (parts[i] === 'node_modules') continue;
                 var dir = parts.slice(0, i + 1).join('/') + '/node_modules';
                 dirs.push(dir);
             }
-            
+
             return dirs;
         }
     };
@@ -11441,13 +11441,13 @@ require.alias = function (from, to) {
         res = require.resolve(from, '/');
     }
     var basedir = path.dirname(res);
-    
+
     var keys = (Object.keys || function (obj) {
         var res = [];
         for (var key in obj) res.push(key)
         return res;
     })(require.modules);
-    
+
     for (var i = 0; i < keys.length; i++) {
         var key = keys[i];
         if (key.slice(0, basedir.length + 1) === basedir + '/') {
@@ -11465,7 +11465,7 @@ require.define = function (filename, fn) {
         ? ''
         : require.modules.path().dirname(filename)
     ;
-    
+
     var require_ = function (file) {
         return require(file, dirname)
     };
@@ -11475,7 +11475,7 @@ require.define = function (filename, fn) {
     require_.modules = require.modules;
     require_.define = require.define;
     var module_ = { exports : {} };
-    
+
     require.modules[filename] = function () {
         require.modules[filename]._cached = module_.exports;
         fn.call(
@@ -11498,7 +11498,7 @@ if (!process.nextTick) process.nextTick = (function () {
     var canPost = typeof window !== 'undefined'
         && window.postMessage && window.addEventListener
     ;
-    
+
     if (canPost) {
         window.addEventListener('message', function (ev) {
             if (ev.source === window && ev.data === 'browserify-tick') {
@@ -11510,7 +11510,7 @@ if (!process.nextTick) process.nextTick = (function () {
             }
         }, true);
     }
-    
+
     return function (fn) {
         if (canPost) {
             queue.push(fn);
@@ -11620,7 +11620,7 @@ path = normalizeArray(filter(path.split('/'), function(p) {
   if (path && trailingSlash) {
     path += '/';
   }
-  
+
   return (isAbsolute ? '/' : '') + path;
 };
 
@@ -11671,7 +11671,7 @@ require.define("/shred.js", function (require, module, exports, __dirname, __fil
     // Shred is an HTTP client library intended to simplify the use of Node's
 // built-in HTTP library. In particular, we wanted to make it easier to interact
 // with HTTP-based APIs.
-// 
+//
 // See the [examples](./examples.html) for more details.
 
 // Ax is a nice logging library we wrote. You can use any logger, providing it
@@ -11693,7 +11693,7 @@ var Shred = function(options) {
 };
 
 // Most of the real work is done in the request and reponse classes.
- 
+
 Shred.Request = require("./shred/request");
 Shred.Response = require("./shred/response");
 
@@ -11764,7 +11764,7 @@ var format = function(level,message) {
 
 var noOp = function(message) { return this; }
 var makeLogger = function(level,fn) {
-  return function(message) { 
+  return function(message) {
     this.stream.write(this.format(level, message)+"\n");
     return this;
   }
@@ -11876,7 +11876,7 @@ require.define("/node_modules/cookiejar/cookiejar.js", function (require, module
       return this;
     }
     else {
-        return new CookieAccessInfo(domain,path,secure,script)    
+        return new CookieAccessInfo(domain,path,secure,script)
     }
 }
 
@@ -11935,7 +11935,7 @@ Cookie.prototype.parse = function parse(str) {
       , value=pair[2];
       this.name = key;
       this.value = value;
-    
+
       for(var i=1;i<parts.length;i++) {
         pair=parts[i].match(/([^=]+)(?:=((?:.|\n)*))?/)
         , key=pair[1].trim().toLowerCase()
@@ -11964,7 +11964,7 @@ Cookie.prototype.parse = function parse(str) {
           break
         }
       }
-    
+
       return this;
   }
     return new Cookie().parse(str)
@@ -12005,7 +12005,7 @@ Cookie.prototype.collidesWith = function collidesWith(access_info) {
 exports.CookieJar=CookieJar=function CookieJar() {
   if(this instanceof CookieJar) {
       var cookies = {} //name: [Cookie]
-    
+
       this.setCookie = function setCookie(cookie) {
         cookie = Cookie(cookie);
         //Delete the cookie if the set is past the current time
@@ -12069,7 +12069,7 @@ exports.CookieJar=CookieJar=function CookieJar() {
             matches.toValueString=function() {return matches.map(function(c){return c.toValueString();}).join(';');}
         return matches;
       }
-    
+
       return this;
   }
     return new CookieJar()
@@ -12447,7 +12447,7 @@ var processOptions = function(request,options) {
       request.setHeader("cookie", cookieString);
     }
   }
-  
+
   // The content entity can be set either using the ` + "`" + `body` + "`" + ` or ` + "`" + `content` + "`" + ` attributes.
   if (options.body||options.content) {
     request.content = options.body||options.content;
@@ -13065,14 +13065,14 @@ try {
 // ` + "`" + `Request` + "`" + ` object handles this, getting the raw response object and passing it
 // in here, along with the request. The callback allows us to stream the response
 // and then use the callback to let the request know when it's ready.
-var Response = function(raw, request, callback) { 
+var Response = function(raw, request, callback) {
   var response = this;
   this._raw = raw;
 
   // The ` + "`" + `._setHeaders` + "`" + ` method is "private"; you can't otherwise set headers on
   // the response.
   this._setHeaders.call(this,raw.headers);
-  
+
   // store any cookies
   if (request.cookieJar && this.getHeader('set-cookie')) {
     var cookieStrings = this.getHeader('set-cookie');
@@ -13135,7 +13135,7 @@ var Response = function(raw, request, callback) {
     }
 
     var setBodyAndFinish = function (body) {
-      response._body = new Content({ 
+      response._body = new Content({
         body: body,
         type: response.getHeader("Content-Type")
       });
@@ -13155,7 +13155,7 @@ var Response = function(raw, request, callback) {
     else{
        if (response.request.encoding){
             body = Iconv.fromEncoding(body,response.request.encoding);
-        }        
+        }
       setBodyAndFinish(body);
     }
   });
@@ -13188,8 +13188,8 @@ Response.prototype = {
 
 // ` + "`" + `Response` + "`" + ` object properties, all of which are read-only:
 Object.defineProperties(Response.prototype, {
-  
-// - **status**. The HTTP status code for the response. 
+
+// - **status**. The HTTP status code for the response.
   status: {
     get: function() { return this._raw.statusCode; },
     enumerable: true
@@ -13247,7 +13247,7 @@ module.exports = Response;
 });
 
 require.define("/shred/content.js", function (require, module, exports, __dirname, __filename) {
-    
+
 // The purpose of the ` + "`" + `Content` + "`" + ` object is to abstract away the data conversions
 // to and from raw content entities as strings. For example, you want to be able
 // to pass in a Javascript object and have it be automatically converted into a
@@ -13277,7 +13277,7 @@ Content.prototype = {
 
 // ` + "`" + `Content` + "`" + ` objects have the following attributes:
 Object.defineProperties(Content.prototype,{
-  
+
 // - **type**. Typically accessed as ` + "`" + `content.type` + "`" + `, reflects the ` + "`" + `content-type` + "`" + `
 //   header associated with the request or response. If not passed as an options
 //   to the constructor or set explicitly, it will infer the type the ` + "`" + `data` + "`" + `
@@ -13391,7 +13391,7 @@ Content.processors = {};
 // - **stringify**. The function used to convert a Javascript data type into a
 //   raw content entity.
 Content.registerProcessor = function(types,processor) {
-  
+
 // You can pass an array of types that will trigger this processor, or just one.
 // We determine the array via duck-typing here.
   if (types.forEach) {
@@ -13446,7 +13446,7 @@ require.define("/shred/mixins/headers.js", function (require, module, exports, _
 // overload the index operator in Javascript, using a hash to represent the
 // headers means it's possible to have two conflicting values for a single
 // header.
-// 
+//
 // The solution to this is to provide explicit methods to set or get headers.
 // This also has the benefit of allowing us to introduce additional variations,
 // including snake case, which we automatically convert to what Matthew King has
@@ -13460,7 +13460,7 @@ require.define("/shred/mixins/headers.js", function (require, module, exports, _
 var corsetCase = function(string) {
   return string;//.toLowerCase()
       //.replace("_","-")
-      // .replace(/(^|-)(\w)/g, 
+      // .replace(/(^|-)(\w)/g,
           // function(s) { return s.toUpperCase(); });
 };
 
@@ -13484,7 +13484,7 @@ var getHeader = function(object,name) {
 };
 
 // The "real" ` + "`" + `getHeader` + "`" + ` function: get one or more headers, or all of them
-// if you don't ask for any specifics. 
+// if you don't ask for any specifics.
 var getHeaders = function(object,names) {
   var keys = (names && names.length>0) ? names : Object.keys($H(object));
   var hash = keys.reduce(function(hash,key) {
@@ -13512,7 +13512,7 @@ var setHeaders = function(object,hash) {
 // Here's where we actually bind the functionality to an object. These mixins work by
 // exposing mixin functions. Each function mixes in a specific batch of features.
 module.exports = {
-  
+
   // Add getters.
   getters: function(constructor) {
     constructor.prototype.getHeader = function(name) { return getHeader(this,name); };
@@ -13552,10 +13552,10 @@ var iconv = module.exports = {
     fromEncoding: function(buf, encoding) {
         return iconv.getCodec(encoding).fromEncoding(buf);
     },
-    
+
     defaultCharUnicode: '�',
     defaultCharSingleByte: '?',
-    
+
     // Get correct codec for given encoding.
     getCodec: function(encoding) {
         var enc = encoding || "utf8";
@@ -13574,7 +13574,7 @@ var iconv = module.exports = {
                 // Options for other encoding.
                 codecOptions = codec;
                 enc = codec.type;
-            } 
+            }
             else if (type === "Function")
                 // Codec itself.
                 return codec(codecOptions);
@@ -13582,7 +13582,7 @@ var iconv = module.exports = {
                 throw new Error("Encoding not recognized: '" + encoding + "' (searched as: '"+enc+"')");
         }
     },
-    
+
     // Define basic encodings
     encodings: {
         internal: function(options) {
@@ -13600,20 +13600,20 @@ var iconv = module.exports = {
         binary: "internal",
         ascii: "internal",
         base64: "internal",
-        
+
         // Codepage single-byte encodings.
         singlebyte: function(options) {
             // Prepare chars if needed
             if (!options.chars || (options.chars.length !== 128 && options.chars.length !== 256))
                 throw new Error("Encoding '"+options.type+"' has incorrect 'chars' (must be of len 128 or 256)");
-            
+
             if (options.chars.length === 128)
                 options.chars = asciiString + options.chars;
-            
+
             if (!options.charsBuf) {
                 options.charsBuf = new Buffer(options.chars, 'ucs2');
             }
-            
+
             if (!options.revCharsBuf) {
                 options.revCharsBuf = new Buffer(65536);
                 var defChar = iconv.defaultCharSingleByte.charCodeAt(0);
@@ -13622,21 +13622,21 @@ var iconv = module.exports = {
                 for (var i = 0; i < options.chars.length; i++)
                     options.revCharsBuf[options.chars.charCodeAt(i)] = i;
             }
-            
+
             return {
                 toEncoding: function(str) {
                     str = ensureString(str);
-                    
+
                     var buf = new Buffer(str.length);
                     var revCharsBuf = options.revCharsBuf;
                     for (var i = 0; i < str.length; i++)
                         buf[i] = revCharsBuf[str.charCodeAt(i)];
-                    
+
                     return buf;
                 },
                 fromEncoding: function(buf) {
                     buf = ensureBuffer(buf);
-                    
+
                     // Strings are immutable in JS -> we use ucs2 buffer to speed up computations.
                     var charsBuf = options.charsBuf;
                     var newBuf = new Buffer(buf.length*2);
@@ -13663,7 +13663,7 @@ var iconv = module.exports = {
                     revCharsTable[table[key]] = parseInt(key);
                 }
             }
-            
+
             return {
                 toEncoding: function(str) {
                     str = ensureString(str);
@@ -13673,7 +13673,7 @@ var iconv = module.exports = {
                         if (str.charCodeAt(i) >> 7)
                             bufLen++;
 
-                    var newBuf = new Buffer(bufLen), gbkcode, unicode, 
+                    var newBuf = new Buffer(bufLen), gbkcode, unicode,
                         defaultChar = revCharsTable[iconv.defaultCharUnicode.charCodeAt(0)];
 
                     for (var i = 0, j = 0; i < strLen; i++) {
@@ -13698,7 +13698,7 @@ var iconv = module.exports = {
                     }
                     var newBuf = new Buffer(strLen*2), unicode, gbkcode,
                         defaultChar = iconv.defaultCharUnicode.charCodeAt(0);
-                    
+
                     for (var i = 0, j = 0; i < bufLen; i++, j+=2) {
                         gbkcode = buf[i];
                         if (gbkcode & 0x80) {
@@ -13765,7 +13765,7 @@ http.request = function (params, cb) {
     if (!params) params = {};
     if (!params.host) params.host = window.location.host.split(':')[0];
     if (!params.port) params.port = window.location.port;
-    
+
     var req = new Request(new xhrHttp, params);
     if (cb) req.on('response', cb);
     return req;
@@ -13880,15 +13880,15 @@ var Request = module.exports = function (xhr, params) {
     var self = this;
     self.xhr = xhr;
     self.body = '';
-    
+
     var uri = params.host + ':' + params.port + (params.path || '/');
-    
+
     xhr.open(
         params.method || 'GET',
         (params.scheme || 'http') + '://' + uri,
         true
     );
-    
+
     if (params.headers) {
         Object.keys(params.headers).forEach(function (key) {
             if (!isSafeHeader(key)) return;
@@ -13901,12 +13901,12 @@ var Request = module.exports = function (xhr, params) {
             else xhr.setRequestHeader(key, value)
         });
     }
-    
+
     var res = new Response(xhr);
     res.on('ready', function () {
         self.emit('response', res);
     });
-    
+
     xhr.onreadystatechange = function () {
         res.handle(xhr);
     };
@@ -13959,11 +13959,11 @@ function parseHeaders (xhr) {
     for (var i = 0; i < lines.length; i++) {
         var line = lines[i];
         if (line === '') continue;
-        
+
         var m = line.match(/^([^:]+):\s*(.*)/);
         if (m) {
             var key = m[1].toLowerCase(), value = m[2];
-            
+
             if (headers[key] !== undefined) {
                 if ((Array.isArray && Array.isArray(headers[key]))
                 || headers[key] instanceof Array) {
@@ -14007,7 +14007,7 @@ Response.prototype.handle = function () {
         catch (err) {
             capable.status2 = false;
         }
-        
+
         if (capable.status2) {
             this.emit('ready');
         }
@@ -14021,7 +14021,7 @@ Response.prototype.handle = function () {
             }
         }
         catch (err) {}
-        
+
         try {
             this.write();
         }
@@ -14035,7 +14035,7 @@ Response.prototype.handle = function () {
             this.emit('ready');
         }
         this.write();
-        
+
         if (xhr.error) {
             this.emit('error', xhr.responseText);
         }
@@ -14101,7 +14101,7 @@ func third_party_swagger_ui_lib_shred_bundle_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred.bundle.js", size: 88050, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/shred.bundle.js", size: 88050, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -14117,7 +14117,7 @@ var ArrayModel = function(definition) {
   this.name = "arrayModel";
   this.definition = definition || {};
   this.properties = [];
-  
+
   var requiredFields = definition.enum || [];
   var innerType = definition.items;
   if(innerType) {
@@ -15524,7 +15524,7 @@ Property.prototype.toString = function() {
   }
 
 
-  var options = ''; 
+  var options = '';
   var isArray = this.schema.type === 'array';
   var type;
 
@@ -15586,11 +15586,11 @@ Property.prototype.toString = function() {
     }
 
     options += optionHtml('Enum', enumString);
-  }     
+  }
 
   if (options.length > 0)
     str = '<span class="propWrap">' + str + '<table class="optionsWrapper"><tr><th colspan="2">' + this.name + '</th></tr>' + options + '</table></span>';
-  
+
   return str;
 };
 
@@ -15950,11 +15950,11 @@ SwaggerResource.prototype.addOperations = function (resource_path, ops, consumes
           o.summary,
           o.notes,
           type,
-          responseMessages, 
-          this, 
-          consumes, 
-          produces, 
-          o.authorizations, 
+          responseMessages,
+          this,
+          consumes,
+          produces,
+          o.authorizations,
           o.deprecated);
 
       this.operations[op.nickname] = op;
@@ -16436,15 +16436,15 @@ SwaggerOperation.prototype.urlify = function (args) {
     param = params[i];
     if(param.paramType === 'query') {
       if (queryParams !== '')
-        queryParams += '&';    
+        queryParams += '&';
       if (Array.isArray(param)) {
-        var output = '';   
-        for(j = 0; j < param.length; j++) {    
-          if(j > 0)    
-            output += ',';   
-          output += encodeURIComponent(param[j]);    
-        }    
-        queryParams += encodeURIComponent(param.name) + '=' + output;    
+        var output = '';
+        for(j = 0; j < param.length; j++) {
+          if(j > 0)
+            output += ',';
+          output += encodeURIComponent(param[j]);
+        }
+        queryParams += encodeURIComponent(param.name) + '=' + output;
       }
       else {
         if (typeof args[param.name] !== 'undefined') {
@@ -16510,7 +16510,7 @@ SwaggerOperation.prototype.asCurl = function (args) {
   var results = [];
   var i;
 
-  var headers = SwaggerRequest.prototype.setHeaders(args, {}, this);    
+  var headers = SwaggerRequest.prototype.setHeaders(args, {}, this);
   for(i = 0; i < this.parameters.length; i++) {
     var param = this.parameters[i];
     if(param.paramType && param.paramType === 'header' && args[param.name]) {
@@ -17049,7 +17049,7 @@ func third_party_swagger_ui_lib_swagger_client_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-client.js", size: 86354, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-client.js", size: 86354, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -17158,12 +17158,12 @@ function handleLogin() {
     for (var key in authSchemes) {
       if (authSchemes.hasOwnProperty(key)) {
         var flow = authSchemes[key].flow;
-        
+
         if(authSchemes[key].type === 'oauth2' && flow && (flow === 'implicit' || flow === 'accessCode')) {
           var dets = authSchemes[key];
           url = dets.authorizationUrl + '?response_type=' + (flow === 'implicit' ? 'token' : 'code');
           window.swaggerUi.tokenName = dets.tokenName || 'access_token';
-          window.swaggerUi.tokenUrl = (flow === 'accessCode' ? dets.tokenUrl : null);          
+          window.swaggerUi.tokenUrl = (flow === 'accessCode' ? dets.tokenUrl : null);
         }
         else if(authSchemes[key].grantTypes) {
           // 1.2 support
@@ -17190,7 +17190,7 @@ function handleLogin() {
 
     for(k =0; k < o.length; k++) {
       var scope = $(o[k]).attr('scope');
-      
+
       if (scopes.indexOf(scope) === -1)
         scopes.push(scope);
     }
@@ -17262,11 +17262,11 @@ function processOAuthCode(data) {
     url : window.swaggerUi.tokenUrl,
     type: "POST",
     data: params,
-    success:function(data, textStatus, jqXHR) 
+    success:function(data, textStatus, jqXHR)
     {
       onOAuthComplete(data);
     },
-    error: function(jqXHR, textStatus, errorThrown) 
+    error: function(jqXHR, textStatus, errorThrown)
     {
       onOAuthComplete("");
     }
@@ -17320,7 +17320,7 @@ function onOAuthComplete(token) {
               // all scopes are satisfied
               $(o).find('.api-ic').addClass('ic-info');
               $(o).find('.api-ic').removeClass('ic-warning');
-              $(o).find('.api-ic').removeClass('ic-error');          
+              $(o).find('.api-ic').removeClass('ic-error');
             }
           }
         });
@@ -17340,7 +17340,7 @@ func third_party_swagger_ui_lib_swagger_oauth_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-oauth.js", size: 8580, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger-oauth.js", size: 8580, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -18329,16 +18329,16 @@ var _third_party_swagger_ui_lib_swagger_js = []byte(`// swagger.js
       var param = params[i];
       if(param.paramType === 'query') {
         if (queryParams !== '')
-          queryParams += '&';    
+          queryParams += '&';
         if (Array.isArray(param)) {
-          var j;   
-          var output = '';   
-          for(j = 0; j < param.length; j++) {    
-            if(j > 0)    
-              output += ',';   
-            output += encodeURIComponent(param[j]);    
-          }    
-          queryParams += encodeURIComponent(param.name) + '=' + output;    
+          var j;
+          var output = '';
+          for(j = 0; j < param.length; j++) {
+            if(j > 0)
+              output += ',';
+            output += encodeURIComponent(param[j]);
+          }
+          queryParams += encodeURIComponent(param.name) + '=' + output;
         }
         else {
           if (args[param.name]) {
@@ -19052,7 +19052,7 @@ func third_party_swagger_ui_lib_swagger_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger.js", size: 53321, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/swagger.js", size: 53321, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -19074,7 +19074,7 @@ func third_party_swagger_ui_lib_underscore_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/lib/underscore-min.js", size: 15626, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/lib/underscore-min.js", size: 15626, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -19110,7 +19110,7 @@ func third_party_swagger_ui_o2c_html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/o2c.html", size: 449, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/o2c.html", size: 449, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -19254,7 +19254,7 @@ var Docs = {
 			$('.resource ul.endpoints').slideDown();
 			return;
 		}
-		
+
 		$('li#resource_' + resource).addClass('active');
 
 		var elem = $('li#resource_' + resource + ' ul.endpoints');
@@ -19278,7 +19278,7 @@ var Docs = {
 	expandOperationsForResource: function(resource) {
 		// Make sure the resource container is open..
 		Docs.expandEndpointListForResource(resource);
-		
+
 		if (resource == '') {
 			$('.resource ul.endpoints li.operation div.content').slideDown();
 			return;
@@ -21367,7 +21367,7 @@ func third_party_swagger_ui_swagger_ui_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.js", size: 110246, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.js", size: 110246, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -21385,7 +21385,7 @@ func third_party_swagger_ui_swagger_ui_min_js() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.min.js", size: 63466, mode: os.FileMode(420), modTime: time.Unix(1433272971, 0)}
+	info := bindata_file_info{name: "third_party/swagger-ui/swagger-ui.min.js", size: 63466, mode: os.FileMode(420), modTime: time.Unix(1429751137, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

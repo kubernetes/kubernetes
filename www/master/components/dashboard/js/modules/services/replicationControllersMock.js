@@ -14,16 +14,16 @@
   function ReplicationControllerDataService($q) {
     var replicationControllers = {
     "kind": "List",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {},
     "items": [
         {
             "kind": "ReplicationController",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "redis-master",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/replicationcontrollers/redis-master",
+                "selfLink": "/api/v1/namespaces/default/replicationcontrollers/redis-master",
                 "uid": "f12969e0-ff77-11e4-8f2d-080027213276",
                 "resourceVersion": "28",
                 "creationTimestamp": "2015-05-21T05:12:14Z",

@@ -13,16 +13,16 @@
   function ServiceDataService($q) {
     var services = {
     "kind": "List",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {},
     "items": [
         {
             "kind": "Service",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "kubernetes",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/services/kubernetes",
+                "selfLink": "/api/v1/namespaces/default/services/kubernetes",
                 "resourceVersion": "6",
                 "creationTimestamp": null,
                 "labels": {
@@ -45,11 +45,11 @@
         },
         {
             "kind": "Service",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "kubernetes-ro",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/services/kubernetes-ro",
+                "selfLink": "/api/v1/namespaces/default/services/kubernetes-ro",
                 "resourceVersion": "8",
                 "creationTimestamp": null,
                 "labels": {
@@ -72,11 +72,11 @@
         },
         {
             "kind": "Service",
-            "apiVersion": "v1beta3",
+            "apiVersion": "v1",
             "metadata": {
                 "name": "redis-master",
                 "namespace": "default",
-                "selfLink": "/api/v1beta3/namespaces/default/services/redis-master",
+                "selfLink": "/api/v1/namespaces/default/services/redis-master",
                 "uid": "a6fde246-ff78-11e4-8f2d-080027213276",
                 "resourceVersion": "72",
                 "creationTimestamp": "2015-05-21T05:17:19Z",
