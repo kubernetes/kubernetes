@@ -82,7 +82,7 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location, _, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w)
+		writeJSON(status.Code, r.codec, status, w, true)
 		httpCode = status.Code
 		return
 	}

@@ -409,6 +409,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.GET(action.Path).To(handler).
 				Filter(m).
 				Doc("read the specified "+kind).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("read"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
@@ -424,6 +425,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, false, a.minRequestTimeout)).
 				Filter(m).
 				Doc("list objects of kind "+kind).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("list"+kind).
 				Produces("application/json").
 				Returns(http.StatusOK, "OK", versionedList).
@@ -443,6 +445,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.PUT(action.Path).To(UpdateResource(updater, reqScope, a.group.Typer, admit)).
 				Filter(m).
 				Doc("replace the specified "+kind).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("replace"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
@@ -454,6 +457,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.PATCH(action.Path).To(PatchResource(patcher, reqScope, a.group.Typer, admit, mapping.ObjectConvertor)).
 				Filter(m).
 				Doc("partially update the specified "+kind).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType)).
 				Operation("patch"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
@@ -472,6 +476,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.POST(action.Path).To(handler).
 				Filter(m).
 				Doc("create a "+kind).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("create"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
@@ -483,6 +488,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.DELETE(action.Path).To(DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit)).
 				Filter(m).
 				Doc("delete a "+kind).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("delete"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Writes(versionedStatus).
@@ -497,6 +503,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true, a.minRequestTimeout)).
 				Filter(m).
 				Doc("watch changes to an object of kind "+kind).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+kind).
 				Produces("application/json").
 				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
@@ -511,6 +518,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true, a.minRequestTimeout)).
 				Filter(m).
 				Doc("watch individual changes to a list of "+kind).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+kind+"list").
 				Produces("application/json").
 				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
