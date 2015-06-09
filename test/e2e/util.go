@@ -1217,7 +1217,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 	key := filepath.Join(keydir, keyfile)
 	Logf("Using SSH key: %s", key)
 
-	return util.MakePrivateKeySigner(key)
+	return util.MakePrivateKeySignerFromFile(key)
 }
 
 // checkPodsRunning returns whether all pods whose names are listed in podNames
