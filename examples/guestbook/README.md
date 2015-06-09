@@ -151,7 +151,7 @@ This will cause all pods to see the redis master apparently running on <ip>:6379
 Thus, once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 6379).
 
 ### Step Three: Fire up the replicated slave pods
-Although the redis master is a single pod, the redis read slaves are a 'replicated' pod. In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.  The replicationController will automatically launch new Pods if the number of replicas falls (this is quite easy - and fun - to test, just kill the docker processes for your pods at will and watch them come back online on a new node shortly thereafter).
+Although the redis master is a single pod, the redis read slaves are a 'replicated' pod. In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.  The replication controller will automatically launch new pods if the number of replicas falls (this is quite easy - and fun - to test, just kill the docker processes for your pods at will and watch them come back online on a new node shortly thereafter).
 
 Use the file `examples/guestbook/redis-slave-controller.json`, which looks like this:
 
@@ -382,8 +382,6 @@ if (isset($_GET['cmd']) === true) {
 
 Just like the others, you want a service to group your frontend pods.
 The service is described in the file `examples/guestbook/frontend-service.json`:
-
-**NOTE** This json snippet has been modified, in that it adds the publicIPs field for illustration purposes only.
 
 ```js
 {
