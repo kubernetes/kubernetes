@@ -34,7 +34,7 @@ The Celery task queue will need to communicate with the RabbitMQ broker. RabbitM
 Use the file [`examples/celery-rabbitmq/rabbitmq-service.yaml`](rabbitmq-service.yaml):
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata:
   labels:
@@ -66,7 +66,7 @@ This service allows other pods to connect to the rabbitmq. To them, it will be s
 A RabbitMQ broker can be turned up using the file [`examples/celery-rabbitmq/rabbitmq-controller.yaml`](rabbitmq-controller.yaml):
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
@@ -103,7 +103,7 @@ Note that bringing up the pod includes pulling down a docker image, which may ta
 Bringing up the celery worker is done by running `$ kubectl create -f examples/celery-rabbitmq/celery-controller.yaml`, which contains this:
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
@@ -181,7 +181,7 @@ Flower is a web-based tool for monitoring and administrating Celery clusters. By
 To bring up the frontend, run this command `$ kubectl create -f examples/celery-rabbitmq/flower-controller.yaml`. This controller is defined as so:
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
