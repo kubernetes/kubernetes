@@ -1623,6 +1623,13 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 				return
 			}
 			kl.podManager.UpdatePods(u, podSyncTypes)
+			if u.Op == cache.ADD {
+				// TODO: Break out SyncPods and check admission etc
+				for _, p := range u.Pods {
+					kl.podWorkers.UpdatePod(p, nil, func() {})
+				}
+				continue
+			}
 			unsyncedPod = true
 		case <-time.After(kl.resyncInterval):
 			glog.V(4).Infof("Periodic sync")

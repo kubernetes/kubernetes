@@ -16,6 +16,19 @@ limitations under the License.
 
 package cache
 
+type CacheOperation int
+
+const (
+	// This is the current pod configuration
+	SET CacheOperation = iota
+	// Pods with the given ids are new to this source
+	ADD
+	// Pods with the given ids have been removed from this source
+	REMOVE
+	// Pods with the given ids have been updated in this source
+	UPDATE
+)
+
 // UndeltaStore listens to incremental updates and sends complete state on every change.
 // It implements the Store interface so that it can receive a stream of mirrored objects
 // from Reflector.  Whenever it receives any complete (Store.Replace) or incremental change
@@ -25,7 +38,7 @@ package cache
 // PushFunc should be thread safe.
 type UndeltaStore struct {
 	Store
-	PushFunc func([]interface{})
+	PushFunc func([]interface{}, CacheOperation)
 }
 
 // Assert that it implements the Store interface.
@@ -46,7 +59,8 @@ func (u *UndeltaStore) Add(obj interface{}) error {
 	if err := u.Store.Add(obj); err != nil {
 		return err
 	}
-	u.PushFunc(u.Store.List())
+	u.PushFunc([]interface{}{obj}, ADD)
+
 	return nil
 }
 
@@ -54,7 +68,7 @@ func (u *UndeltaStore) Update(obj interface{}) error {
 	if err := u.Store.Update(obj); err != nil {
 		return err
 	}
-	u.PushFunc(u.Store.List())
+	u.PushFunc(u.Store.List(), SET)
 	return nil
 }
 
@@ -62,7 +76,7 @@ func (u *UndeltaStore) Delete(obj interface{}) error {
 	if err := u.Store.Delete(obj); err != nil {
 		return err
 	}
-	u.PushFunc(u.Store.List())
+	u.PushFunc(u.Store.List(), SET)
 	return nil
 }
 
@@ -70,12 +84,13 @@ func (u *UndeltaStore) Replace(list []interface{}) error {
 	if err := u.Store.Replace(list); err != nil {
 		return err
 	}
-	u.PushFunc(u.Store.List())
+	u.PushFunc(u.Store.List(), SET)
 	return nil
 }
 
 // NewUndeltaStore returns an UndeltaStore implemented with a Store.
-func NewUndeltaStore(pushFunc func([]interface{}), keyFunc KeyFunc) *UndeltaStore {
+func NewUndeltaStore(pushFunc func([]interface{}, CacheOperation), keyFunc KeyFunc) *UndeltaStore {
+	// TODO: Pass in a list of operations that we exempt from undelta benavior
 	return &UndeltaStore{
 		Store:    NewStore(keyFunc),
 		PushFunc: pushFunc,

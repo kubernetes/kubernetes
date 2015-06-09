@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -87,7 +88,7 @@ func (pm *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]me
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	switch u.Op {
-	case SET:
+	case cache.SET:
 		glog.V(3).Infof("SET: Containers changed")
 		// Store the new pods. Don't worry about filtering host ports since those
 		// pods will never be looked up.
@@ -104,7 +105,7 @@ func (pm *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]me
 				podSyncTypes[uid] = metrics.SyncPodCreate
 			}
 		}
-	case UPDATE:
+	case cache.UPDATE:
 		glog.V(3).Infof("Update: Containers changed")
 
 		// Store the updated pods. Don't worry about filtering host ports since those
@@ -114,6 +115,20 @@ func (pm *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]me
 		}
 		allPods := applyUpdates(u.Pods, pm.getAllPods())
 		pm.setPods(allPods)
+
+	case cache.ADD:
+		glog.V(3).Infof("Add: Containers changed")
+
+		// Store the updated pods. Don't worry about filtering host ports since those
+		// pods will never be looked up.
+		for i := range u.Pods {
+			podSyncTypes[u.Pods[i].UID] = metrics.SyncPodCreate
+		}
+		// TODO: Something about thread safety needs thinking about here.
+		allPods := u.Pods
+		allPods = append(allPods, pm.getAllPods()...)
+		pm.setPods(allPods)
+
 	default:
 		panic("syncLoop does not support incremental changes")
 	}
