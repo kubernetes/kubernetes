@@ -1005,6 +1005,50 @@ func TestVerbs(t *testing.T) {
 	}
 }
 
+func TestUnversionedPath(t *testing.T) {
+	tt := []struct {
+		host         string
+		prefix       string
+		unversioned  string
+		expectedPath string
+	}{
+		{"", "", "", "/api"},
+		{"", "", "versions", "/api/versions"},
+		{"", "/", "", "/"},
+		{"", "/versions", "", "/versions"},
+		{"", "/api", "", "/api"},
+		{"", "/api/vfake", "", "/api/vfake"},
+		{"", "/api/vfake", "v1beta100", "/api/vfake/v1beta100"},
+		{"", "/api", "/versions", "/api/versions"},
+		{"", "/api", "versions", "/api/versions"},
+		{"", "/a/api", "", "/a/api"},
+		{"", "/a/api", "/versions", "/a/api/versions"},
+		{"", "/a/api", "/versions/d/e", "/a/api/versions/d/e"},
+		{"", "/a/api/vfake", "/versions/d/e", "/a/api/vfake/versions/d/e"},
+	}
+	for i, tc := range tt {
+		c := NewOrDie(&Config{Host: tc.host, Prefix: tc.prefix})
+		r := c.Post().Prefix("/alpha").UnversionedPath(tc.unversioned)
+		if r.path != tc.expectedPath {
+			t.Errorf("test case %d failed: unexpected path: %s, expected %s", i+1, r.path, tc.expectedPath)
+		}
+	}
+	for i, tc := range tt {
+		c := NewOrDie(&Config{Host: tc.host, Prefix: tc.prefix, Version: "v1"})
+		r := c.Post().Prefix("/alpha").UnversionedPath(tc.unversioned)
+		if r.path != tc.expectedPath {
+			t.Errorf("test case %d failed: unexpected path: %s, expected %s", i+1, r.path, tc.expectedPath)
+		}
+	}
+	for i, tc := range tt {
+		c := NewOrDie(&Config{Host: tc.host, Prefix: tc.prefix, Version: "v1beta3"})
+		r := c.Post().Prefix("/alpha").UnversionedPath(tc.unversioned)
+		if r.path != tc.expectedPath {
+			t.Errorf("test case %d failed: unexpected path: %s, expected %s", i+1, r.path, tc.expectedPath)
+		}
+	}
+}
+
 func TestAbsPath(t *testing.T) {
 	expectedPath := "/bar/foo"
 	c := NewOrDie(&Config{})
