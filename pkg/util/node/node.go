@@ -14,12 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package node
 
 import (
+	"fmt"
+	"net"
 	"os/exec"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/golang/glog"
 )
 
@@ -33,4 +36,26 @@ func GetHostname(hostnameOverride string) string {
 		hostname = string(nodename)
 	}
 	return strings.ToLower(strings.TrimSpace(hostname))
+}
+
+// GetNodeHostIP returns the provided node's IP, based on the priority:
+// 1. NodeInternalIP
+// 2. NodeExternalIP
+// 3. NodeLegacyHostIP
+func GetNodeHostIP(node *api.Node) (net.IP, error) {
+	addresses := node.Status.Addresses
+	addressMap := make(map[api.NodeAddressType][]api.NodeAddress)
+	for i := range addresses {
+		addressMap[addresses[i].Type] = append(addressMap[addresses[i].Type], addresses[i])
+	}
+	if addresses, ok := addressMap[api.NodeInternalIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	if addresses, ok := addressMap[api.NodeExternalIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	if addresses, ok := addressMap[api.NodeLegacyHostIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
 }
