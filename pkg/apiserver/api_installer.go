@@ -406,11 +406,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			} else {
 				handler = GetResource(getter, reqScope)
 			}
+			doc := "read the specified " + kind
+			if hasSubresource {
+				doc = "read " + subresource + " of the specified " + kind
+			}
 			route := ws.GET(action.Path).To(handler).
 				Filter(m).
-				Doc("read the specified "+kind).
+				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("read"+kind).
+				Operation("read"+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Writes(versionedObject)
@@ -422,11 +426,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "LIST": // List all resources of a kind.
+			doc := "list objects of kind " + kind
+			if hasSubresource {
+				doc = "list " + subresource + " of objects of kind " + kind
+			}
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, false, a.minRequestTimeout)).
 				Filter(m).
-				Doc("list objects of kind "+kind).
+				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("list"+kind).
+				Operation("list"+kind+strings.Title(subresource)).
 				Produces("application/json").
 				Returns(http.StatusOK, "OK", versionedList).
 				Writes(versionedList)
@@ -435,18 +443,30 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			switch {
 			case isLister && isWatcher:
-				route.Doc("list or watch objects of kind " + kind)
+				doc := "list or watch objects of kind " + kind
+				if hasSubresource {
+					doc = "list or watch " + subresource + " of objects of kind " + kind
+				}
+				route.Doc(doc)
 			case isWatcher:
-				route.Doc("watch objects of kind " + kind)
+				doc := "watch objects of kind " + kind
+				if hasSubresource {
+					doc = "watch " + subresource + "of objects of kind " + kind
+				}
+				route.Doc(doc)
 			}
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PUT": // Update a resource.
+			doc := "replace the specified " + kind
+			if hasSubresource {
+				doc = "replace " + subresource + " of the specified " + kind
+			}
 			route := ws.PUT(action.Path).To(UpdateResource(updater, reqScope, a.group.Typer, admit)).
 				Filter(m).
-				Doc("replace the specified "+kind).
+				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("replace"+kind).
+				Operation("replace"+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Reads(versionedObject).
@@ -454,12 +474,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PATCH": // Partially update a resource
+			doc := "partially update the specified " + kind
+			if hasSubresource {
+				doc = "partially update " + subresource + " of the specified " + kind
+			}
 			route := ws.PATCH(action.Path).To(PatchResource(patcher, reqScope, a.group.Typer, admit, mapping.ObjectConvertor)).
 				Filter(m).
-				Doc("partially update the specified "+kind).
+				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType)).
-				Operation("patch"+kind).
+				Operation("patch"+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", "string").
 				Reads("string").
@@ -473,11 +497,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			} else {
 				handler = CreateResource(creater, reqScope, a.group.Typer, admit)
 			}
+			doc := "create a " + kind
+			if hasSubresource {
+				doc = "create " + subresource + " of a " + kind
+			}
 			route := ws.POST(action.Path).To(handler).
 				Filter(m).
-				Doc("create a "+kind).
+				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("create"+kind).
+				Operation("create"+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Returns(http.StatusOK, "OK", versionedObject).
 				Reads(versionedObject).
@@ -485,11 +513,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "DELETE": // Delete a resource.
+			doc := "delete a " + kind
+			if hasSubresource {
+				doc = "delete " + subresource + " of a " + kind
+			}
 			route := ws.DELETE(action.Path).To(DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit)).
 				Filter(m).
-				Doc("delete a "+kind).
+				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("delete"+kind).
+				Operation("delete"+kind+strings.Title(subresource)).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Writes(versionedStatus).
 				Returns(http.StatusOK, "OK", versionedStatus)
@@ -500,11 +532,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			ws.Route(route)
 		// TODO: deprecated
 		case "WATCH": // Watch a resource.
+			doc := "watch changes to an object of kind " + kind
+			if hasSubresource {
+				doc = "watch changes to " + subresource + " of an object of kind " + kind
+			}
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true, a.minRequestTimeout)).
 				Filter(m).
-				Doc("watch changes to an object of kind "+kind).
+				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("watch"+kind).
+				Operation("watch"+kind+strings.Title(subresource)).
 				Produces("application/json").
 				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
@@ -515,11 +551,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			ws.Route(route)
 		// TODO: deprecated
 		case "WATCHLIST": // Watch all resources of a kind.
+			doc := "watch individual changes to a list of " + kind
+			if hasSubresource {
+				doc = "watch individual changes to a list of " + subresource + " of " + kind
+			}
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true, a.minRequestTimeout)).
 				Filter(m).
-				Doc("watch individual changes to a list of "+kind).
+				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("watch"+kind+"list").
+				Operation("watch"+kind+strings.Title(subresource)+"List").
 				Produces("application/json").
 				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
@@ -529,10 +569,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "REDIRECT": // Get the redirect URL for a resource.
+			doc := "redirect GET request to " + kind
+			if hasSubresource {
+				doc = "redirect GET request to " + subresource + " of " + kind
+			}
 			route := ws.GET(action.Path).To(routeFunction(redirectHandler)).
 				Filter(m).
-				Doc("redirect GET request to " + kind).
-				Operation("redirect" + kind).
+				Doc(doc).
+				Operation("redirect" + kind + strings.Title(subresource)).
 				Produces("*/*").
 				Consumes("*/*").
 				Writes("string")
@@ -540,19 +584,23 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			ws.Route(route)
 		case "PROXY": // Proxy requests to a resource.
 			// Accept all methods as per https://github.com/GoogleCloudPlatform/kubernetes/issues/3996
-			addProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
-			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
-			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
-			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
-			addProxyRoute(ws, "HEAD", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
-			addProxyRoute(ws, "TRACE", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
+			addProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
+			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
+			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
+			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
+			addProxyRoute(ws, "HEAD", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
+			addProxyRoute(ws, "TRACE", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
 		case "CONNECT":
 			for _, method := range connecter.ConnectMethods() {
+				doc := "connect " + method + " requests to " + kind
+				if hasSubresource {
+					doc = "connect " + method + " requests to " + subresource + " of " + kind
+				}
 				route := ws.Method(method).Path(action.Path).
 					To(ConnectResource(connecter, reqScope, admit, connectOptionsKind, path, connectSubpath, connectSubpathKey)).
 					Filter(m).
-					Doc("connect " + method + " requests to " + kind).
-					Operation("connect" + method + kind).
+					Doc(doc).
+					Operation("connect" + strings.Title(strings.ToLower(method)) + kind + strings.Title(subresource)).
 					Produces("*/*").
 					Consumes("*/*").
 					Writes("string")
@@ -809,11 +857,15 @@ func routeFunction(handler http.Handler) restful.RouteFunction {
 	}
 }
 
-func addProxyRoute(ws *restful.WebService, method string, prefix string, path string, proxyHandler http.Handler, kind, resource string, params []*restful.Parameter) {
+func addProxyRoute(ws *restful.WebService, method string, prefix string, path string, proxyHandler http.Handler, kind, resource, subresource string, hasSubresource bool, params []*restful.Parameter) {
+	doc := "proxy " + method + " requests to " + kind
+	if hasSubresource {
+		doc = "proxy " + method + " requests to " + subresource + " of " + kind
+	}
 	proxyRoute := ws.Method(method).Path(path).To(routeFunction(proxyHandler)).
 		Filter(monitorFilter("PROXY", resource)).
-		Doc("proxy " + method + " requests to " + kind).
-		Operation("proxy" + method + kind).
+		Doc(doc).
+		Operation("proxy" + strings.Title(method) + kind + strings.Title(subresource)).
 		Produces("*/*").
 		Consumes("*/*").
 		Writes("string")
