@@ -21,17 +21,28 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
 	"code.google.com/p/google-api-go-client/googleapi"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
+const (
+	// Max QPS to allow through to the token URL.
+	tokenURLQPS = 1
+	// Maximum burst of requests to token URL before limiting.
+	tokenURLBurst = 3
+)
+
 type altTokenSource struct {
 	oauthClient *http.Client
 	tokenURL    string
+	throttle    util.RateLimiter
 }
 
 func (a *altTokenSource) Token() (*oauth2.Token, error) {
+	a.throttle.Accept()
 	req, err := http.NewRequest("GET", a.tokenURL, nil)
 	if err != nil {
 		return nil, err
@@ -62,6 +73,7 @@ func newAltTokenSource(tokenURL string) oauth2.TokenSource {
 	a := &altTokenSource{
 		oauthClient: client,
 		tokenURL:    tokenURL,
+		throttle:    util.NewTokenBucketRateLimiter(tokenURLQPS, tokenURLBurst),
 	}
 	return oauth2.ReuseTokenSource(nil, a)
 }
