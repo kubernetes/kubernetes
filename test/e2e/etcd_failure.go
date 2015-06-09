@@ -121,13 +121,18 @@ func checkExistingRCRecovers(f Framework) {
 	rcSelector := labels.Set{"name": "baz"}.AsSelector()
 
 	By("deleting pods from existing replication controller")
-	pods, err := podClient.List(rcSelector, fields.Everything())
-	Expect(err).NotTo(HaveOccurred())
-	Expect(len(pods.Items) > 0).Should(BeTrue())
-	for _, pod := range pods.Items {
-		err = podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+	expectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
+		pods, err := podClient.List(rcSelector, fields.Everything())
 		Expect(err).NotTo(HaveOccurred())
-	}
+		if len(pods.Items) == 0 {
+			return false, nil
+		}
+		for _, pod := range pods.Items {
+			err = podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+			Expect(err).NotTo(HaveOccurred())
+		}
+		return true, nil
+	}))
 
 	By("waiting for replication controller to recover")
 	expectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
