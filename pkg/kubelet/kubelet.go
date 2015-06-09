@@ -2239,3 +2239,9 @@ func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *TLSOpti
 func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 	ListenAndServeKubeletReadOnlyServer(kl, address, port)
 }
+
+// GetRuntime returns the current Runtime implementation in use by the kubelet. This func
+// is exported to simplify integration with third party kubelet extensions (e.g. kubernetes-mesos).
+func (kl *Kubelet) GetRuntime() kubecontainer.Runtime {
+	return kl.containerRuntime
+}
