@@ -262,7 +262,7 @@ type containerStatusResult struct {
 	err    error
 }
 
-func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string) *containerStatusResult {
+func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string, pod *api.Pod) *containerStatusResult {
 	result := containerStatusResult{api.ContainerStatus{}, "", nil}
 
 	inspectResult, err := dm.client.InspectContainer(dockerID)
@@ -288,8 +288,19 @@ func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string)
 		result.status.State.Running = &api.ContainerStateRunning{
 			StartedAt: util.NewTime(inspectResult.State.StartedAt),
 		}
-		if containerName == PodInfraContainerName && inspectResult.NetworkSettings != nil {
-			result.ip = inspectResult.NetworkSettings.IPAddress
+		if containerName == PodInfraContainerName {
+			if inspectResult.NetworkSettings != nil {
+				result.ip = inspectResult.NetworkSettings.IPAddress
+			}
+			// override the above if a network plugin exists
+			if dm.networkPlugin.Name() != network.DefaultPluginName {
+				netStatus, err := dm.networkPlugin.Status(pod.Namespace, pod.Name, kubeletTypes.DockerID(dockerID))
+				if err != nil {
+					glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), pod.Name, err)
+				} else if netStatus != nil {
+					result.ip = netStatus.IP.String()
+				}
+			}
 		}
 	} else if !inspectResult.State.FinishedAt.IsZero() {
 		reason := ""
@@ -389,7 +400,7 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 
 		var terminationState *api.ContainerState = nil
 		// Inspect the container.
-		result := dm.inspectContainer(value.ID, dockerContainerName, terminationMessagePath)
+		result := dm.inspectContainer(value.ID, dockerContainerName, terminationMessagePath, pod)
 		if result.err != nil {
 			return nil, result.err
 		} else if result.status.State.Terminated != nil {

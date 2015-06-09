@@ -18,6 +18,7 @@ package network
 
 import (
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/golang/glog"
@@ -47,6 +48,21 @@ type NetworkPlugin interface {
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
 	TearDownPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error
+
+	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
+	Status(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) (*PodNetworkStatus, error)
+}
+
+// PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
+// This struct represents version "v1"
+type PodNetworkStatus struct {
+	api.TypeMeta `json:",inline"`
+
+	// IP is the primary ipv4/ipv6 address of the pod. Among other things it is the address that -
+	//   - kube expects to be reachable across the cluster
+	//   - service endpoints are constructed with
+	//   - will be reported in the PodStatus.PodIP field (will override the IP reported by docker)
+	IP net.IP `json:"ip" description:"Primary IP address of the pod"`
 }
 
 // Host is an interface that plugins can use to access the kubelet.
@@ -119,4 +135,8 @@ func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kube
 
 func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id kubeletTypes.DockerID) error {
 	return nil
+}
+
+func (plugin *noopNetworkPlugin) Status(namespace string, name string, id kubeletTypes.DockerID) (*PodNetworkStatus, error) {
+	return nil, nil
 }

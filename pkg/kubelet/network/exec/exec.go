@@ -29,6 +29,15 @@ limitations under the License.
 //         - setup, called after the infra container of a pod is
 //                created, but before other containers of the pod are created
 //         - teardown, called before the pod infra container is killed
+//         - status, called at regular intervals and is supposed to return a json
+//                formatted output indicating the pod's IPAddress(v4/v6). An empty string value or an erroneous output
+//                will mean the container runtime (docker) will be asked for the PodIP
+//                e.g. {
+//                         "apiVersion" : "v1beta1",
+//                         "kind" : "PodNetworkStatus",
+//                         "ip" : "10.20.30.40"
+//                     }
+//                The fields "apiVersion" and "kind" are optional in version v1beta1
 // As the executables are called, the file-descriptors stdin, stdout, stderr
 // remain open. The combined output of stdout/stderr is captured and logged.
 //
@@ -48,6 +57,7 @@ limitations under the License.
 package exec
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -55,6 +65,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	kubeletTypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
@@ -70,6 +81,7 @@ const (
 	initCmd     = "init"
 	setUpCmd    = "setup"
 	tearDownCmd = "teardown"
+	statusCmd   = "status"
 )
 
 func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
@@ -130,4 +142,38 @@ func (plugin *execNetworkPlugin) TearDownPod(namespace string, name string, id k
 	out, err := utilexec.New().Command(plugin.getExecutable(), tearDownCmd, namespace, name, string(id)).CombinedOutput()
 	glog.V(5).Infof("TearDownPod 'exec' network plugin output: %s, %v", string(out), err)
 	return err
+}
+
+func (plugin *execNetworkPlugin) Status(namespace string, name string, id kubeletTypes.DockerID) (*network.PodNetworkStatus, error) {
+	out, err := utilexec.New().Command(plugin.getExecutable(), statusCmd, namespace, name, string(id)).CombinedOutput()
+	glog.V(5).Infof("Status 'exec' network plugin output: %s, %v", string(out), err)
+	if err != nil {
+		return nil, err
+	}
+	if string(out) == "" {
+		return nil, nil
+	}
+	findVersion := struct {
+		api.TypeMeta `json:",inline"`
+	}{}
+	err = json.Unmarshal(out, &findVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	// check kind and version
+	if findVersion.Kind != "" && findVersion.Kind != "PodNetworkStatus" {
+		errStr := fmt.Sprintf("Invalid 'kind' returned in network status for pod '%s'. Valid value is 'PodNetworkStatus', got '%s'.", name, findVersion.Kind)
+		return nil, errors.New(errStr)
+	}
+	switch findVersion.APIVersion {
+	case "":
+		fallthrough
+	case "v1beta1":
+		networkStatus := &network.PodNetworkStatus{}
+		err = json.Unmarshal(out, networkStatus)
+		return networkStatus, err
+	}
+	errStr := fmt.Sprintf("Unknown version '%s' in network status for pod '%s'.", findVersion.APIVersion, name)
+	return nil, errors.New(errStr)
 }
