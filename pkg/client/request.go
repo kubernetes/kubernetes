@@ -210,6 +210,23 @@ func (r *Request) NamespaceIfScoped(namespace string, scoped bool) *Request {
 	return r
 }
 
+// UnversionedPath strips the apiVersion from the baseURL before appending segments.
+func (r *Request) UnversionedPath(segments ...string) *Request {
+	if r.err != nil {
+		return r
+	}
+	upath := path.Clean(r.baseURL.Path)
+	//TODO(jdef) this is a pretty hackish version test
+	if strings.HasPrefix(path.Base(upath), "v") {
+		upath = path.Dir(upath)
+		if upath == "." {
+			upath = "/"
+		}
+	}
+	r.path = path.Join(append([]string{upath}, segments...)...)
+	return r
+}
+
 // AbsPath overwrites an existing path with the segments provided. Trailing slashes are preserved
 // when a single segment is passed.
 func (r *Request) AbsPath(segments ...string) *Request {
