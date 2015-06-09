@@ -126,7 +126,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 			Containers: []api.Container{
 				{
 					Name:  containerName,
-					Image: "kubernetes/mounttest:0.1",
+					Image: "kubernetes/mounttest",
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      volumeName,
