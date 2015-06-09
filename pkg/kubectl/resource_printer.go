@@ -377,7 +377,11 @@ func printPod(pod *api.Pod, w io.Writer, withNamespace bool) error {
 	restarts := 0
 	totalContainers := len(pod.Spec.Containers)
 	readyContainers := 0
+
 	reason := string(pod.Status.Phase)
+	if pod.Status.Reason != "" {
+		reason = pod.Status.Reason
+	}
 
 	for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
 		container := pod.Status.ContainerStatuses[i]

@@ -12663,6 +12663,10 @@
       "type": "string",
       "description": "human readable message indicating details about why the pod is in this condition"
      },
+     "reason": {
+      "type": "string",
+      "description": "(brief-CamelCase) reason indicating details about why the pod is in this condition"
+     },
      "hostIP": {
       "type": "string",
       "description": "IP address of the host to which the pod is assigned; empty if not yet scheduled"
