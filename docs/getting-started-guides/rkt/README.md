@@ -34,11 +34,6 @@ $ export CONTAINER_RUNTIME=rkt
 $ hack/local-up-cluster.sh
 ```
 
-After this, you can launch some pods in another terminal:
-```shell
-$ cluster/kubectl.sh create -f example/pod.yaml
-```
-
 ### CoreOS cluster on GCE
 
 To use rkt as the container runtime for your CoreOS cluster on GCE, you need to specify the OS distribution, project, image:
@@ -88,6 +83,10 @@ $ kube-up.sh
 Note: CoreOS is not supported as the master using the automated launch
 scripts. The master node is always Ubuntu.
 
+### Getting started with your cluster
+See [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
+
+For more complete applications, please look in the [examples directory](../../examples).
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/rkt/README.md?pixel)]()

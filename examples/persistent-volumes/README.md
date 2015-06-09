@@ -29,8 +29,8 @@ PVs are created by posting them to the API server.
 
 ```
 
-cluster/kubectl.sh create -f examples/persistent-volumes/volumes/local-01.yaml
-cluster/kubectl.sh get pv
+kubectl create -f examples/persistent-volumes/volumes/local-01.yaml
+kubectl get pv
 
 NAME        LABELS       CAPACITY            ACCESSMODES         STATUS              CLAIM
 pv0001      map[]        10737418240         RWO                 Available                            
@@ -46,8 +46,8 @@ Claims must be created in the same namespace as the pods that use them.
 
 ```
 
-cluster/kubectl.sh create -f examples/persistent-volumes/claims/claim-01.yaml
-cluster/kubectl.sh get pvc
+kubectl create -f examples/persistent-volumes/claims/claim-01.yaml
+kubectl get pvc
 
 NAME                LABELS              STATUS              VOLUME
 myclaim-1           map[]                                   
@@ -56,13 +56,13 @@ myclaim-1           map[]
 # A background process will attempt to match this claim to a volume.
 # The eventual state of your claim will look something like this:
 
-cluster/kubectl.sh get pvc
+kubectl get pvc
 
 NAME        LABELS    STATUS    VOLUME                                                          
 myclaim-1   map[]     Bound     f5c3a89a-e50a-11e4-972f-80e6500a981e    
 
 
-cluster/kubectl.sh get pv
+kubectl get pv
 
 NAME                LABELS              CAPACITY            ACCESSMODES         STATUS    CLAIM
 pv0001              map[]               10737418240         RWO                 Bound     myclaim-1 / 6bef4c40-e50b-11e4-972f-80e6500a981e          
@@ -75,16 +75,16 @@ Claims are used as volumes in pods.  Kubernetes uses the claim to look up its bo
 
 ```
 
-cluster/kubectl.sh create -f examples/persistent-volumes/simpletest/pod.yaml
+kubectl create -f examples/persistent-volumes/simpletest/pod.yaml
 
-cluster/kubectl.sh get pods
+kubectl get pods
 
 POD       IP           CONTAINER(S)   IMAGE(S)   HOST                  LABELS    STATUS    CREATED
 mypod     172.17.0.2   myfrontend     nginx      127.0.0.1/127.0.0.1   <none>    Running   12 minutes
 
 
-cluster/kubectl.sh create -f examples/persistent-volumes/simpletest/service.json
-cluster/kubectl.sh get services
+kubectl create -f examples/persistent-volumes/simpletest/service.json
+kubectl get services
 
 NAME              LABELS                                    SELECTOR            IP           PORT(S)
 frontendservice   <none>                                    name=frontendhttp   10.0.0.241   3000/TCP

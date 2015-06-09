@@ -7,7 +7,7 @@ Kubernetes has an extensible user interface with default functionality that desc
 Assuming that you have a cluster running locally at `localhost:8080`, as described [here](getting-started-guides/locally.md), you can run the UI against it with kubectl:
 
 ```sh
-cluster/kubectl.sh proxy --www=www/app --www-prefix=/
+kubectl proxy --www=www/app --www-prefix=/
 ```
 
 You should now be able to access it by visiting [localhost:8001](http://localhost:8001/).

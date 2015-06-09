@@ -56,8 +56,6 @@ To start the service, run:
 $ kubectl create -f examples/celery-rabbitmq/rabbitmq-service.yaml
 ```
 
-**NOTE**: If you're running Kubernetes from source, you can use `cluster/kubectl.sh` instead of `kubectl`.
-
 This service allows other pods to connect to the rabbitmq. To them, it will be seen as available on port 5672, although the service is routing the traffic to the container (also via port 5672).
 
 

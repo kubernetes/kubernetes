@@ -34,7 +34,7 @@ The `release.sh` script will build a release.  It will build binaries, run tests
 
 The main output is a tar file: `kubernetes.tar.gz`.  This includes:
 * Cross compiled client utilities.
-* Script (`cluster/kubectl.sh`) for picking and running the right client binary based on platform.
+* Script (`kubectl`) for picking and running the right client binary based on platform.
 * Examples
 * Cluster deployment scripts for various clouds
 * Tar file containing all server binaries

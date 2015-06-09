@@ -21,7 +21,7 @@ gcloud config set project <project-name>
 
 Next, grab the Kubernetes [release binary](https://github.com/GoogleCloudPlatform/kubernetes/releases) and start up a Kubernetes cluster:
 ```
-$ <kubernetes>/cluster/kube-up.sh
+$ cluster/kube-up.sh
 ```
 where `<kubernetes>` is the path to your Kubernetes installation.
 
@@ -104,14 +104,14 @@ Note that we've defined a volume mount for `/var/lib/mysql`, and specified a vol
 Once you've edited the file to set your database password, create the pod as follows, where `<kubernetes>` is the path to your Kubernetes installation:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh create -f mysql.yaml
+$ kubectl create -f mysql.yaml
 ```
 
 It may take a short period before the new pod reaches the `Running` state.
 List all pods to see the status of this new pod and the cluster node that it is running on:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh get pods
+$ kubectl get pods
 ```
 
 
@@ -120,7 +120,7 @@ $ <kubernetes>/cluster/kubectl.sh get pods
 You can take a look at the logs for a pod by using `kubectl.sh log`.  For example:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh log mysql
+$ kubectl log mysql
 ```
 
 If you want to do deeper troubleshooting, e.g. if it seems a container is not staying up, you can also ssh in to the node that a pod is running on.  There, you can run `sudo -s`, then `docker ps -a` to see all the containers.  You can then inspect the logs of containers that have exited, via `docker logs <container_id>`.  (You can also find some relevant logs under `/var/log`, e.g. `docker.log` and `kubelet.log`).
@@ -153,13 +153,13 @@ spec:
 Start the service like this:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh create -f mysql-service.yaml
+$ kubectl create -f mysql-service.yaml
 ```
 
 You can see what services are running via:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh get services
+$ kubectl get services
 ```
 
 
@@ -203,14 +203,14 @@ spec:
 Create the pod:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh create -f wordpress.yaml
+$ kubectl create -f wordpress.yaml
 ```
 
 And list the pods to check that the status of the new pod changes
 to `Running`.  As above, this might take a minute.
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh get pods
+$ kubectl get pods
 ```
 
 ### Start the WordPress service
@@ -242,13 +242,13 @@ Note also that we've set the service port to 80.  We'll return to that shortly.
 Start the service:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh create -f wordpress-service.yaml
+$ kubectl create -f wordpress-service.yaml
 ```
 
 and see it in the list of services:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh get services
+$ kubectl get services
 ```
 
 Then, find the external IP for your WordPress service by listing the forwarding rules for your project:
@@ -285,8 +285,8 @@ Set up your WordPress blog and play around with it a bit.  Then, take down its p
 If you are just experimenting, you can take down and bring up only the pods:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh delete -f wordpress.yaml
-$ <kubernetes>/cluster/kubectl.sh delete -f mysql.yaml
+$ kubectl delete -f wordpress.yaml
+$ kubectl delete -f mysql.yaml
 ```
 
 When you restart the pods again (using the `create` operation as described above), their services will pick up the new pods based on their labels.
@@ -296,7 +296,7 @@ If you want to shut down the entire app installation, you can delete the service
 If you are ready to turn down your Kubernetes cluster altogether, run:
 
 ```shell
-$ <kubernetes>/cluster/kube-down.sh
+$ cluster/kube-down.sh
 ```
 
 

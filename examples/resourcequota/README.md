@@ -11,8 +11,8 @@ This example will work in a custom namespace to demonstrate the concepts involve
 Let's create a new namespace called quota-example:
 
 ```shell
-$ cluster/kubectl.sh create -f namespace.yaml
-$ cluster/kubectl.sh get namespaces
+$ kubectl create -f namespace.yaml
+$ kubectl get namespaces
 NAME            LABELS             STATUS
 default         <none>             Active
 quota-example   <none>             Active
@@ -31,7 +31,7 @@ and API resources (pods, services, etc.) that a namespace may consume.
 Let's create a simple quota in our namespace:
 
 ```shell
-$ cluster/kubectl.sh create -f quota.yaml --namespace=quota-example
+$ kubectl create -f quota.yaml --namespace=quota-example
 ```
 
 Once your quota is applied to a namespace, the system will restrict any creation of content
@@ -41,7 +41,7 @@ You can describe your current quota usage to see what resources are being consum
 namespace.
 
 ```
-$ cluster/kubectl.sh describe quota quota --namespace=quota-example
+$ kubectl describe quota quota --namespace=quota-example
 Name:     quota
 Resource    Used  Hard
 --------    ----  ----
@@ -65,7 +65,7 @@ cpu and memory by creating an nginx container.
 To demonstrate, lets create a replication controller that runs nginx:
 
 ```shell
-$ cluster/kubectl.sh run nginx --image=nginx --replicas=1 --namespace=quota-example
+$ kubectl run nginx --image=nginx --replicas=1 --namespace=quota-example
 CONTROLLER   CONTAINER(S)   IMAGE(S)   SELECTOR    REPLICAS
 nginx        nginx          nginx      run=nginx   1
 ```
@@ -73,14 +73,14 @@ nginx        nginx          nginx      run=nginx   1
 Now let's look at the pods that were created.
 
 ```shell
-$ cluster/kubectl.sh get pods --namespace=quota-example
+$ kubectl get pods --namespace=quota-example
 POD       IP        CONTAINER(S)   IMAGE(S)   HOST      LABELS    STATUS    CREATED   MESSAGE
 ```
 
 What happened?  I have no pods!  Let's describe the replication controller to get a view of what is happening.
 
 ```shell
-cluster/kubectl.sh describe rc nginx --namespace=quota-example
+kubectl describe rc nginx --namespace=quota-example
 Name:   nginx
 Image(s): nginx
 Selector: run=nginx
@@ -98,9 +98,9 @@ do not specify any memory usage.
 So let's set some default limits for the amount of cpu and memory a pod can consume:
 
 ```shell
-$ cluster/kubectl.sh create -f limits.yaml --namespace=quota-example
+$ kubectl create -f limits.yaml --namespace=quota-example
 limitranges/limits
-$ cluster/kubectl.sh describe limits limits --namespace=quota-example
+$ kubectl describe limits limits --namespace=quota-example
 Name:   limits
 Type    Resource  Min Max Default
 ----    --------  --- --- ---
@@ -115,7 +115,7 @@ Now that we have applied default limits for our namespace, our replication contr
 create its pods.
 
 ```shell
-$ cluster/kubectl.sh get pods --namespace=quota-example
+$ kubectl get pods --namespace=quota-example
 POD           IP         CONTAINER(S)   IMAGE(S)   HOST                    LABELS      STATUS    CREATED     MESSAGE
 nginx-t40zm   10.0.0.2                             10.245.1.3/10.245.1.3   run=nginx   Running   2 minutes
                          nginx          nginx                                          Running   2 minutes
@@ -124,7 +124,7 @@ nginx-t40zm   10.0.0.2                             10.245.1.3/10.245.1.3   run=n
 And if we print out our quota usage in the namespace:
 
 ```shell
-cluster/kubectl.sh describe quota quota --namespace=quota-example
+kubectl describe quota quota --namespace=quota-example
 Name:     quota
 Resource    Used    Hard
 --------    ----    ----

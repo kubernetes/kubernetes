@@ -110,7 +110,7 @@ spec:
 
 --------------------------------------------------
 
-cluster/kubectl.sh get pv
+kubectl get pv
 
 NAME                LABELS              CAPACITY            ACCESSMODES         STATUS              CLAIM
 pv0001              map[]               10737418240         RWO                 Pending    
@@ -140,7 +140,7 @@ spec:
 
 --------------------------------------------------
 
-cluster/kubectl.sh get pvc
+kubectl get pvc
 
 
 NAME                LABELS              STATUS              VOLUME
@@ -155,13 +155,13 @@ myclaim-1           map[]               pending
 
 ```
 
-cluster/kubectl.sh get pv
+kubectl get pv
 
 NAME                LABELS              CAPACITY            ACCESSMODES         STATUS              CLAIM
 pv0001              map[]               10737418240         RWO                 Bound               myclaim-1 / f4b3d283-c0ef-11e4-8be4-80e6500a981e
 
 
-cluster/kubectl.sh get pvc
+kubectl get pvc
 
 NAME                LABELS              STATUS              VOLUME
 myclaim-1           map[]               Bound               b16e91d6-c0ef-11e4-8be4-80e6500a981e
@@ -205,7 +205,7 @@ When a claim holder is finished with their data, they can delete their claim.
 
 ```
 
-cluster/kubectl.sh delete pvc myclaim-1
+kubectl delete pvc myclaim-1
 
 ```
 

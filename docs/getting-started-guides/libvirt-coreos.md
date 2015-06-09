@@ -116,7 +116,7 @@ virsh -c qemu:///system list
 You can check that the kubernetes cluster is working with:
 
 ```
-$ ./cluster/kubectl.sh get minions
+$ kubectl get nodes
 NAME                LABELS              STATUS
 192.168.10.2        <none>              Ready
 192.168.10.3        <none>              Ready
@@ -173,7 +173,7 @@ KUBE_PUSH=local cluster/kube-push.sh
 Interact with the cluster
 
 ```
-cluster/kubectl.sh
+kubectl ...
 ```
 
 ### Troubleshooting

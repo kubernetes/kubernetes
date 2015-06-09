@@ -66,13 +66,13 @@ To start Phabricator server use the file [`examples/phabricator/phabricator-cont
 Create the phabricator pod in your Kubernetes cluster by running:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/phabricator/phabricator-controller.json
+$ kubectl create -f examples/phabricator/phabricator-controller.json
 ```
 
 Once that's up you can list the pods in the cluster, to verify that it is running:
 
 ```shell
-cluster/kubectl.sh get pods
+kubectl get pods
 ```
 
 You'll see a single phabricator pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds):
@@ -99,7 +99,7 @@ CONTAINER ID        IMAGE                             COMMAND     CREATED       
 If you read logs of the phabricator container you will notice the following error message:
 
 ```bash
-$ cluster/kubectl.sh log phabricator-controller-02qp4
+$ kubectl log phabricator-controller-02qp4
 [...]
 Raw MySQL Error: Attempt to connect to root@173.194.252.142 failed with error
 #2013: Lost connection to MySQL server at 'reading initial communication
@@ -152,7 +152,7 @@ To automate this process and make sure that a proper host is authorized even if 
 To create the pod run:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/phabricator/authenticator-controller.json
+$ kubectl create -f examples/phabricator/authenticator-controller.json
 ```
 
 
@@ -199,7 +199,7 @@ Use the file [`examples/phabricator/phabricator-service.json`](phabricator-servi
 To create the service run:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/phabricator/phabricator-service.json
+$ kubectl create -f examples/phabricator/phabricator-service.json
 phabricator
 ```
 

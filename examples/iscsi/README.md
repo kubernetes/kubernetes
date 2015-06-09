@@ -19,13 +19,15 @@ Once you have installed iSCSI initiator and new Kubernetes, you can create a pod
 
 Once your pod is created, run it on the Kubernetes master:
 
-    #cluster/kubectl.sh create -f your_new_pod.json
+```console
+kubectl create -f your_new_pod.json
+```
 
 Here is my command and output:
 
 ```console
-# cluster/kubectl.sh create -f examples/iscsi/iscsi.json
-# cluster/kubectl.sh get pods
+# kubectl create -f examples/iscsi/iscsi.json
+# kubectl get pods
 POD       IP            CONTAINER(S)   IMAGE(S)           HOST                                    LABELS    STATUS    CREATED         MESSAGE
 iscsipd   10.244.3.14                                     kubernetes-minion-bz1p/104.154.61.231   <none>    Running   About an hour   
                         iscsipd-rw     kubernetes/pause                                                     Running   About an hour   
