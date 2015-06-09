@@ -391,6 +391,7 @@ func (s *APIServer) Run(_ []string) error {
 		SSHUser:                s.SSHUser,
 		SSHKeyfile:             s.SSHKeyfile,
 		InstallSSHKey:          installSSH,
+		ServiceNodePortRange:   s.ServiceNodePortRange,
 	}
 	m := master.New(config)
 

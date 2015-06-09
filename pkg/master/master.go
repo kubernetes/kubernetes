@@ -247,7 +247,7 @@ func setDefaults(c *Config) {
 		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
 		// but then that breaks the strict nestedness of ServiceType.
 		// Review post-v1
-		defaultServiceNodePortRange := util.PortRange{Base: 30000, Size: 2767}
+		defaultServiceNodePortRange := util.PortRange{Base: 30000, Size: 2768}
 		c.ServiceNodePortRange = defaultServiceNodePortRange
 		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ServiceNodePortRange)
 	}
