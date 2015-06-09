@@ -164,9 +164,6 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 // Show Merged kubeconfig settings.
 $ kubectl config view
 
-// Show only local kubeconfig settings
-$ kubectl config view \-\-local
-
 // Get the password for the e2e user
 $ kubectl config view \-o template \-\-template='\{\{range .users\}\}\{\{ if eq .name "e2e" \}\}\{\{ index .user.password \}\}\{\{end\}\}\{\{end\}\}'
 
