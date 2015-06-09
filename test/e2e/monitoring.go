@@ -56,8 +56,8 @@ const (
 	influxdbDatabaseName = "k8s"
 	influxdbUser         = "root"
 	influxdbPW           = "root"
-	podlistQuery         = "select distinct(pod_id) from /cpu.*/"
-	nodelistQuery        = "select distinct(hostname) from /cpu.*/"
+	podlistQuery         = "select distinct(pod_id) from \"cpu/usage_ns_cumulative\""
+	nodelistQuery        = "select distinct(hostname) from \"cpu/usage_ns_cumulative\""
 	sleepBetweenAttempts = 5 * time.Second
 	testTimeout          = 5 * time.Minute
 )
