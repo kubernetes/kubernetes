@@ -1330,19 +1330,20 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 		}
 		return "", err
 	}
-	if !ok {
-		if err := dm.PullImage(spec, nil /* no pod secrets for the infra container */); err != nil {
-			if ref != nil {
-				dm.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, err)
-			}
+	if ok {
+		if ref != nil {
+			dm.recorder.Eventf(ref, "pulled", "Pod container image %q already present on machine", container.Image)
+		}
+	} else {
+		dm.runtimeHooks.ReportImagePulling(pod, container)
+		err := dm.PullImage(spec, nil /* no pod secrets for the infra container */)
+		dm.runtimeHooks.ReportImagePulled(pod, container, err)
+		if err != nil {
 			return "", err
 		}
 		if ref != nil {
 			dm.recorder.Eventf(ref, "pulled", "Successfully pulled Pod container image %q", container.Image)
 		}
-	}
-	if ok && ref != nil {
-		dm.recorder.Eventf(ref, "pulled", "Pod container image %q already present on machine", container.Image)
 	}
 
 	id, err := dm.runContainerInPod(pod, container, netNamespace, "")
@@ -1517,8 +1518,9 @@ func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container, pullS
 		return nil
 	}
 
+	dm.runtimeHooks.ReportImagePulling(pod, container)
 	err = dm.PullImage(spec, pullSecrets)
-	dm.runtimeHooks.ReportImagePull(pod, container, err)
+	dm.runtimeHooks.ReportImagePulled(pod, container, err)
 	return err
 }
 
