@@ -189,7 +189,7 @@ var _ = Describe("Pod Disks", func() {
 
 func createPD() (string, error) {
 	if testContext.Provider == "gce" {
-		pdName := fmt.Sprintf("e2e-%s", string(util.NewUUID()))
+		pdName := fmt.Sprintf("%s-%s", testContext.prefix, string(util.NewUUID()))
 
 		zone := testContext.CloudConfig.Zone
 		// TODO: make this hit the compute API directly instread of shelling out to gcloud.

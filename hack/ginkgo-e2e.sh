@@ -105,5 +105,6 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --repo-root="${KUBE_VERSION_ROOT}" \
   --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
   --num-nodes="${NUM_MINIONS:-}" \
+  --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
   ${E2E_REPORT_DIR+"--report-dir=${E2E_REPORT_DIR}"} \
   "${@:-}"
