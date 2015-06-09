@@ -119,10 +119,17 @@ else
 
       # Create a docker lv, use docker on it
       # 95% goes to the docker thin-pool
-      lvcreate -l 95%VG --thinpool docker-thinpool vg-ephemeral
+      release=`lsb_release -c -s`
+      if [[ "${release}" != "wheezy" ]] ; then
+        lvcreate -l 95%VG --thinpool docker-thinpool vg-ephemeral
 
-      THINPOOL_SIZE=$(lvs vg-ephemeral/docker-thinpool -o LV_SIZE --noheadings --units M --nosuffix)
-      lvcreate -V${THINPOOL_SIZE}M -T vg-ephemeral/docker-thinpool -n docker
+        THINPOOL_SIZE=$(lvs vg-ephemeral/docker-thinpool -o LV_SIZE --noheadings --units M --nosuffix)
+        lvcreate -V${THINPOOL_SIZE}M -T vg-ephemeral/docker-thinpool -n docker
+      else
+        # Thin provisioning not supported by Wheezy
+        echo "Detected wheezy; won't use LVM thin provisioning"
+        lvcreate -l 95%VG -n docker vg-ephemeral
+      fi
 
       mkfs -t ext4 /dev/vg-ephemeral/docker
       mkdir -p /mnt/docker
