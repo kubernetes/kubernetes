@@ -118,9 +118,6 @@ func (pm *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]me
 
 	case cache.ADD:
 		glog.V(3).Infof("Add: Containers changed")
-
-		// Store the updated pods. Don't worry about filtering host ports since those
-		// pods will never be looked up.
 		for i := range u.Pods {
 			podSyncTypes[u.Pods[i].UID] = metrics.SyncPodCreate
 		}
