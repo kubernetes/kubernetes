@@ -25,10 +25,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -67,7 +65,7 @@ func main() {
 	if *gke != "" {
 		spec = filepath.Join(os.Getenv("HOME"), ".config", "gcloud", "kubernetes", "kubeconfig")
 	} else {
-		spec = filepath.Join(os.Getenv("HOME"), ".kube", ".kubeconfig")
+		spec = filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	}
 	settings, err := clientcmd.LoadFromFile(spec)
 	if err != nil {
@@ -109,10 +107,18 @@ func main() {
 
 	queries := *queriesAverage * len(nodes.Items) * *podsPerNode
 
-	// Make a unique namespace for this test.
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	ns := "serve-hostnames-" + strconv.Itoa(r.Int()%10000)
-	glog.Infof("Using namespace %s for this test.", ns)
+	// Create the namespace
+	got, err := c.Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{GenerateName: "serve-hostnames-"}})
+	if err != nil {
+		glog.Fatalf("Failed to create namespace: %v", err)
+	}
+	ns := got.Name
+	defer func(ns string) {
+		if err := c.Namespaces().Delete(ns); err != nil {
+			glog.Warningf("Failed to delete namespace ns: %e", ns, err)
+		}
+	}(ns)
+	glog.Infof("Created namespace %s", ns)
 
 	// Create a service for these pods.
 	glog.Infof("Creating service %s/serve-hostnames", ns)
