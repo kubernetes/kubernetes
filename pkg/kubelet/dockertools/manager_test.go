@@ -79,7 +79,12 @@ func (fr *fakeRuntimeHooks) ShouldPullImage(pod *api.Pod, container *api.Contain
 	return false
 }
 
-func (fr *fakeRuntimeHooks) ReportImagePull(pod *api.Pod, container *api.Container, pullError error) {
+func (fr *fakeRuntimeHooks) ReportImagePulling(pod *api.Pod, container *api.Container) {
+	fr.recorder.Eventf(nil, "pulling", fmt.Sprintf("%s:%s:%s", pod.Name, container.Name, container.Image))
+}
+
+func (fr *fakeRuntimeHooks) ReportImagePulled(pod *api.Pod, container *api.Container, pullError error) {
+	fr.recorder.Eventf(nil, "pulled", fmt.Sprintf("%s:%s:%s", pod.Name, container.Name, container.Image))
 }
 
 type fakeOptionGenerator struct{}
@@ -863,9 +868,10 @@ func generatePodInfraContainerHash(pod *api.Pod) uint64 {
 	}
 
 	container := &api.Container{
-		Name:  PodInfraContainerName,
-		Image: PodInfraContainerImage,
-		Ports: ports,
+		Name:            PodInfraContainerName,
+		Image:           PodInfraContainerImage,
+		Ports:           ports,
+		ImagePullPolicy: podInfraContainerImagePullPolicy,
 	}
 	return kubecontainer.HashContainer(container)
 }
@@ -891,7 +897,7 @@ func runSyncPod(t *testing.T, dm *DockerManager, fakeDocker *FakeDockerClient, p
 
 func TestSyncPodCreateNetAndContainer(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
-	dm.podInfraContainerImage = "custom_image_name"
+	dm.podInfraContainerImage = "pod_infra_image"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -918,7 +924,7 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 
 	found := false
 	for _, c := range fakeDocker.ContainerList {
-		if c.Image == "custom_image_name" && strings.HasPrefix(c.Names[0], "/k8s_POD") {
+		if c.Image == "pod_infra_image" && strings.HasPrefix(c.Names[0], "/k8s_POD") {
 			found = true
 		}
 	}
@@ -936,10 +942,10 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 
 func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
-	dm.podInfraContainerImage = "custom_image_name"
+	dm.podInfraContainerImage = "pod_infra_image"
 	puller := dm.puller.(*FakeDockerPuller)
 	puller.HasImages = []string{}
-	dm.podInfraContainerImage = "custom_image_name"
+	dm.podInfraContainerImage = "pod_infra_image"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -965,7 +971,7 @@ func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 
 	fakeDocker.Lock()
 
-	if !reflect.DeepEqual(puller.ImagesPulled, []string{"custom_image_name", "something"}) {
+	if !reflect.DeepEqual(puller.ImagesPulled, []string{"pod_infra_image", "something"}) {
 		t.Errorf("Unexpected pulled containers: %v", puller.ImagesPulled)
 	}
 
@@ -1296,10 +1302,11 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 }
 
 func TestSyncPodWithPullPolicy(t *testing.T) {
+	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 	dm, fakeDocker := newTestDockerManager()
 	puller := dm.puller.(*FakeDockerPuller)
 	puller.HasImages = []string{"existing_one", "want:latest"}
-	dm.podInfraContainerImage = "custom_image_name"
+	dm.podInfraContainerImage = "pod_infra_image"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 
 	pod := &api.Pod{
@@ -1323,13 +1330,39 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 
 	fakeDocker.Lock()
 
+	eventSet := []string{
+		"pulling foo:POD:pod_infra_image",
+		"pulled foo:POD:pod_infra_image",
+		"pulling foo:bar:pull_always_image",
+		"pulled foo:bar:pull_always_image",
+		"pulling foo:bar2:pull_if_not_present_image",
+		"pulled foo:bar2:pull_if_not_present_image",
+		`pulled Container image "existing_one" already present on machine`,
+		`pulled Container image "want:latest" already present on machine`,
+	}
+
+	runtimeHooks := dm.runtimeHooks.(*fakeRuntimeHooks)
+	recorder := runtimeHooks.recorder.(*record.FakeRecorder)
+
+	var actualEvents []string
+	for _, ev := range recorder.Events {
+		if strings.HasPrefix(ev, "pull") {
+			actualEvents = append(actualEvents, ev)
+		}
+	}
+	sort.StringSlice(actualEvents).Sort()
+	sort.StringSlice(eventSet).Sort()
+	if !reflect.DeepEqual(actualEvents, eventSet) {
+		t.Errorf("Expected: %#v, Actual: %#v", eventSet, actualEvents)
+	}
+
 	pulledImageSet := make(map[string]empty)
 	for v := range puller.ImagesPulled {
 		pulledImageSet[puller.ImagesPulled[v]] = empty{}
 	}
 
 	if !reflect.DeepEqual(pulledImageSet, map[string]empty{
-		"custom_image_name":         {},
+		"pod_infra_image":           {},
 		"pull_always_image":         {},
 		"pull_if_not_present_image": {},
 	}) {
