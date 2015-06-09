@@ -2203,7 +2203,7 @@ func TestValidateReplicationController(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			if !strings.HasPrefix(field, "spec.template.") &&
-				field != "metadata.name" &&
+				field != "metadata.name OR metadata.generateName" &&
 				field != "metadata.namespace" &&
 				field != "spec.selector" &&
 				field != "spec.template" &&
@@ -2318,11 +2318,11 @@ func TestValidateNode(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			expectedFields := map[string]bool{
-				"metadata.name":        true,
-				"metadata.labels":      true,
-				"metadata.annotations": true,
-				"metadata.namespace":   true,
-				"spec.ExternalID":      true,
+				"metadata.name OR metadata.generateName": true,
+				"metadata.labels":                        true,
+				"metadata.annotations":                   true,
+				"metadata.namespace":                     true,
+				"spec.ExternalID":                        true,
 			}
 			if expectedFields[field] == false {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
@@ -2719,7 +2719,7 @@ func TestValidateLimitRange(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			detail := errs[i].(*errors.ValidationError).Detail
-			if field != "metadata.name" && field != "metadata.namespace" {
+			if field != "metadata.name" && field != "metadata.name OR metadata.generateName" && field != "metadata.namespace" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 			if detail != v.D {
@@ -2786,7 +2786,7 @@ func TestValidateResourceQuota(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			detail := errs[i].(*errors.ValidationError).Detail
-			if field != "metadata.name" && field != "metadata.namespace" {
+			if field != "metadata.name" && field != "metadata.name OR metadata.generateName" && field != "metadata.namespace" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 			if detail != v.D {
