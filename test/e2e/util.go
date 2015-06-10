@@ -96,16 +96,17 @@ type CloudConfig struct {
 }
 
 type TestContextType struct {
-	KubeConfig  string
-	KubeContext string
-	CertDir     string
-	Host        string
-	RepoRoot    string
-	Provider    string
-	CloudConfig CloudConfig
-	KubectlPath string
-	OutputDir   string
-	prefix      string
+	KubeConfig     string
+	KubeContext    string
+	CertDir        string
+	Host           string
+	RepoRoot       string
+	Provider       string
+	CloudConfig    CloudConfig
+	KubectlPath    string
+	OutputDir      string
+	prefix         string
+	MinStartupPods int
 }
 
 var testContext TestContextType

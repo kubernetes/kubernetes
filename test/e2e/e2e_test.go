@@ -41,24 +41,6 @@ const (
 	// running and ready before any e2e tests run. It includes pulling all of
 	// the pods (as of 5/18/15 this is 8 pods).
 	podStartupTimeout = 10 * time.Minute
-
-	// minStartupPods is the minimum number of pods that will allow
-	// waitForPodsRunningReady(...) to succeed (i.e. WLOG if you know that
-	// "DNS", and "Prometheus" pods need to be running, you might set it to "2").
-	// More verbosely, that function
-	// checks that all pods in the cluster are both in a phase of "running" and
-	// have a condition of "ready": "true". It aims to ensure that the cluster's
-	// pods are fully healthy before beginning e2e tests. However, if there were
-	// only 0 pods, it would technically pass if there wasn't a required minimum
-	// number of pods. We expect every cluster to come up with some number of
-	// pods (which in practice is more than this number), so we have this
-	// minimum here as a sanity check to make sure that there are actually pods
-	// on the cluster (i.e. preventing a possible race with kube-addons). This
-	// does *not* mean that the function will succeed as soon as minStartupPods
-	// are found to be running and ready; it ensures that *all* pods it finds
-	// are running and ready. This is the minimum number it must find.
-	// TODO : Add command line option for this so that the number is non trivial.
-	minStartupPods = 0
 )
 
 var (
@@ -111,6 +93,8 @@ func init() {
 	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", -1, "Number of nodes in the cluster")
 
 	flag.StringVar(&cloudConfig.ClusterTag, "cluster-tag", "", "Tag used to identify resources.  Only required if provider is aws.")
+	flag.IntVar(&testContext.MinStartupPods, "minStartupPods", 0, "The number of pods which we need to see in 'Running' state with a 'Ready' condition of true, before we try running tests. This is useful in any cluster which needs some base pod-based services running before it can be used.")
+
 }
 
 func TestE2E(t *testing.T) {
@@ -152,10 +136,9 @@ func TestE2E(t *testing.T) {
 	// cluster infrastructure pods that are being pulled or started can block
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
-	if err := waitForPodsRunningReady(api.NamespaceDefault, minStartupPods, podStartupTimeout); err != nil {
+	if err := waitForPodsRunningReady(api.NamespaceDefault, testContext.MinStartupPods, podStartupTimeout); err != nil {
 		glog.Fatalf("Error waiting for all pods to be running and ready: %v", err)
 	}
-
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	var r []ginkgo.Reporter
 	if *reportDir != "" {
