@@ -60,8 +60,8 @@ function usage() {
 function upgrade-master() {
   echo "== Upgrading master to '${SERVER_BINARY_TAR_URL}'. Do not interrupt, deleting master instance. =="
 
-  get-password
-  get-bearer-token
+  get-kubeconfig-basicauth
+  get-kubeconfig-bearertoken
 
   detect-master
 
@@ -80,7 +80,17 @@ function upgrade-master() {
 function wait-for-master() {
   echo "== Waiting for new master to respond to API requests =="
 
-  until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
+  local curl_auth_arg
+  if [[ -n ${KUBE_BEARER_TOKEN:-} ]]; then
+    curl_auth_arg=(-H "Authorization: Bearer ${KUBE_BEARER_TOKEN}")
+  elif [[ -n ${KUBE_PASSWORD:-} ]]; then
+    curl_auth_arg=(--user "${KUBE_USER}:${KUBE_PASSWORD}")
+  else
+    echo "can't get auth credentials for the current master"
+    exit 1
+  fi
+
+  until curl --insecure "${curl_auth_arg[@]}" --max-time 5 \
     --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/healthz"; do
     printf "."
     sleep 2
