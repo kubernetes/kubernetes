@@ -40,6 +40,10 @@ func matchesPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool,
 	return pod.Name == node, nil
 }
 
+func hasNoPodsPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+	return len(existingPods) == 0, nil
+}
+
 func numericPriority(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	result := []algorithm.HostPriority{}
@@ -166,6 +170,7 @@ func TestGenericScheduler(t *testing.T) {
 		prioritizers []algorithm.PriorityConfig
 		nodes        []string
 		pod          *api.Pod
+		pods         []*api.Pod
 		expectedHost string
 		expectsErr   bool
 	}{
@@ -223,11 +228,66 @@ func TestGenericScheduler(t *testing.T) {
 			expectsErr:   true,
 			name:         "test 7",
 		},
+		{
+			predicates: map[string]algorithm.FitPredicate{
+				"nopods":  hasNoPodsPredicate,
+				"matches": matchesPredicate,
+			},
+			pods: []*api.Pod{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "2"},
+					Spec: api.PodSpec{
+						NodeName: "2",
+					},
+					Status: api.PodStatus{
+						Phase: api.PodRunning,
+					},
+				},
+			},
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
+
+			prioritizers: []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
+			nodes:        []string{"1", "2"},
+			expectsErr:   true,
+			name:         "test 8",
+		},
+		{
+			predicates: map[string]algorithm.FitPredicate{
+				"nopods":  hasNoPodsPredicate,
+				"matches": matchesPredicate,
+			},
+			pods: []*api.Pod{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "2"},
+					Spec: api.PodSpec{
+						NodeName: "2",
+					},
+					Status: api.PodStatus{
+						Phase: api.PodFailed,
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "3"},
+					Spec: api.PodSpec{
+						NodeName: "2",
+					},
+					Status: api.PodStatus{
+						Phase: api.PodSucceeded,
+					},
+				},
+			},
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
+
+			prioritizers: []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
+			nodes:        []string{"1", "2"},
+			expectedHost: "2",
+			name:         "test 9",
+		},
 	}
 
 	for _, test := range tests {
 		random := rand.New(rand.NewSource(0))
-		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, algorithm.FakePodLister([]*api.Pod{}), random)
+		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, algorithm.FakePodLister(test.pods), random)
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeMinionLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
