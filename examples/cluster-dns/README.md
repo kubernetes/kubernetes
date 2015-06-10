@@ -37,6 +37,8 @@ $ kubectl config set-context dev --namespace=development --cluster=${CLUSTER_NAM
 $ kubectl config set-context prod --namespace=production --cluster=${CLUSTER_NAME} --user=${USER_NAME}
 ```
 
+You can view your cluster name and user name in kubernetes config at ~/.kube/config.
+
 ### Step Two: Create backend replication controller in each namespace
 
 Use the file [`examples/cluster-dns/dns-backend-rc.yaml`](dns-backend-rc.yaml) to create a backend server [replication controller](../../docs/replication-controller.md) in each namespace.
@@ -94,7 +96,7 @@ dns-backend   <none>    name=dns-backend   10.0.35.246   8000/TCP
 
 ### Step Four: Create client pod in one namespace
 
-Use the file [`examples/cluster-dns/dns-frontend-pod.yaml`](dns-frontend-pod.yaml) to create a client [pod](../../docs/pods.md) in dev namespace. The client pod will make a connection to backend and exit. Specifically, it tries to connect to address `http://dns-backend.development.kubernetes.local:8000`.
+Use the file [`examples/cluster-dns/dns-frontend-pod.yaml`](dns-frontend-pod.yaml) to create a client [pod](../../docs/pods.md) in dev namespace. The client pod will make a connection to backend and exit. Specifically, it tries to connect to address `http://dns-backend.development.cluster.local:8000`.
 
 ```shell
 $ kubectl config use-context dev
@@ -115,19 +117,21 @@ Wait until the pod succeeds, then we can see the output from the client pod:
 ```shell
 $ kubectl log dns-frontend
 2015-05-07T20:13:54.147664936Z 10.0.236.129
-2015-05-07T20:13:54.147721290Z Send request to: http://dns-backend.development.kubernetes.local:8000
+2015-05-07T20:13:54.147721290Z Send request to: http://dns-backend.development.cluster.local:8000
 2015-05-07T20:13:54.147733438Z <Response [200]>
 2015-05-07T20:13:54.147738295Z Hello World!
 ```
 
-Please refer to the [source code](./images/frontend/client.py) about the logs. First line prints out the ip address associated with the service in dev namespace; remaining lines print out our request and server response. If we switch to prod namespace with the same pod config, we'll see the same result, i.e. dns will resolve across namespace.
+Please refer to the [source code](./images/frontend/client.py) about the log. First line prints out the ip address associated with the service in dev namespace; remaining lines print out our request and server response.
+
+If we switch to prod namespace with the same pod config, we'll see the same result, i.e. dns will resolve across namespace.
 
 ```shell
 $ kubectl config use-context prod
 $ kubectl create -f examples/cluster-dns/dns-frontend-pod.yaml
 $ kubectl log dns-frontend
 2015-05-07T20:13:54.147664936Z 10.0.236.129
-2015-05-07T20:13:54.147721290Z Send request to: http://dns-backend.development.kubernetes.local:8000
+2015-05-07T20:13:54.147721290Z Send request to: http://dns-backend.development.cluster.local:8000
 2015-05-07T20:13:54.147733438Z <Response [200]>
 2015-05-07T20:13:54.147738295Z Hello World!
 ```
@@ -135,7 +139,7 @@ $ kubectl log dns-frontend
 
 #### Note about default namespace
 
-If you prefer not using namespace, then all your services can be addressed using `default` namespace, e.g. `http://dns-backend.default.kubernetes.local:8000`, or shorthand version `http://dns-backend:8000`
+If you prefer not using namespace, then all your services can be addressed using `default` namespace, e.g. `http://dns-backend.default.cluster.local:8000`, or shorthand version `http://dns-backend:8000`
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/cluster-dns/README.md?pixel)]()
