@@ -80,14 +80,6 @@ func deepCopy_v1_AutoScaler(in AutoScaler, out *AutoScaler, c *conversion.Cloner
 	if err := deepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	if in.Labels != nil {
-		out.Labels = make(map[string]string)
-		for key, val := range in.Labels {
-			out.Labels[key] = val
-		}
-	} else {
-		out.Labels = nil
-	}
 	if err := deepCopy_v1_AutoScalerSpec(in.Spec, &out.Spec, c); err != nil {
 		return err
 	}
@@ -138,13 +130,13 @@ func deepCopy_v1_AutoScalerSpec(in AutoScalerSpec, out *AutoScalerSpec, c *conve
 	} else {
 		out.TargetSelector = nil
 	}
-	if in.MonitoringSources != nil {
-		out.MonitoringSources = make([]string, len(in.MonitoringSources))
-		for i := range in.MonitoringSources {
-			out.MonitoringSources[i] = in.MonitoringSources[i]
+	if in.Advisors != nil {
+		out.Advisors = make([]string, len(in.Advisors))
+		for i := range in.Advisors {
+			out.Advisors[i] = in.Advisors[i]
 		}
 	} else {
-		out.MonitoringSources = nil
+		out.Advisors = nil
 	}
 	return nil
 }

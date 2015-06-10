@@ -1,0 +1,3 @@
+Placeholder to add more advisors once we have some custom monitoring stores
+defined - ala Prometheus, InfluxDB, Graphite, OpenTSDB, etc that would
+contain metrics from cadvisor/router/kube-proxy.

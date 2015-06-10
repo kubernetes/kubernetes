@@ -75,7 +75,7 @@ func TestAutoscalerCreate(t *testing.T) {
 			MinAutoScaleCount: 1,
 			MaxAutoScaleCount: 10,
 			TargetSelector:    map[string]string{"foo": "bar"},
-			MonitoringSources: []string{
+			Advisors: []string{
 				"cadvisor",
 				"influxdb",
 				"statsd",
@@ -115,10 +115,9 @@ func TestAutoscalerCreate(t *testing.T) {
 			as1.Spec.MaxAutoScaleCount)
 	}
 
-	if len(response.Spec.MonitoringSources) != len(as1.Spec.MonitoringSources) {
-		t.Errorf("create returned MonitoringSources %#v, expected %#v.",
-			response.Spec.MonitoringSources,
-			as1.Spec.MonitoringSources)
+	if len(response.Spec.Advisors) != len(as1.Spec.Advisors) {
+		t.Errorf("create returned Advisors %#v, expected %#v.",
+			response.Spec.Advisors, as1.Spec.Advisors)
 	}
 }
 
@@ -131,7 +130,7 @@ func TestAutoScalerGet(t *testing.T) {
 		Spec: api.AutoScalerSpec{
 			MaxAutoScaleCount: 42,
 			TargetSelector:    map[string]string{"as": "one"},
-			MonitoringSources: []string{"graphite"},
+			Advisors:          []string{"graphite"},
 		},
 	}
 	c := &testClient{
@@ -161,10 +160,9 @@ func TestAutoScalerGet(t *testing.T) {
 			as1.Spec.MaxAutoScaleCount)
 	}
 
-	if len(response.Spec.MonitoringSources) != len(as1.Spec.MonitoringSources) {
-		t.Errorf("create returned MonitoringSources %#v, expected %#v.",
-			response.Spec.MonitoringSources,
-			as1.Spec.MonitoringSources)
+	if len(response.Spec.Advisors) != len(as1.Spec.Advisors) {
+		t.Errorf("create returned Advisors %#v, expected %#v.",
+			response.Spec.Advisors, as1.Spec.Advisors)
 	}
 }
 
@@ -177,7 +175,7 @@ func TestAutoScalerUpdate(t *testing.T) {
 		Spec: api.AutoScalerSpec{
 			MaxAutoScaleCount: 123,
 			TargetSelector:    map[string]string{"as": "one"},
-			MonitoringSources: []string{"cadvisor"},
+			Advisors:          []string{"cadvisor"},
 		},
 	}
 	c := &testClient{

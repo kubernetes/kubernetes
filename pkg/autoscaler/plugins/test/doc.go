@@ -14,16 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package autoscaler
-
-import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-)
-
-// ScalingAction defines the type and how much to scale by. Used by the
-// plugins to indicate desired actions to the autoscale manager.
-type ScalingAction struct {
-	Type    api.AutoScaleActionType
-	ScaleBy int
-	Trigger api.AutoScaleThreshold
-}
+// Package test contains the test auto scaler plugin.
+package test

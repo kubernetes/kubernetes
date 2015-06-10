@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package autoscaler
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
 // Aggregate operator type used for evaluating autoscale thresholds.
@@ -35,16 +36,16 @@ const (
 	AggregateOperatorTypeNone AggregateOperatorType = "None"
 )
 
-// AutoScaler plugin assess a given spec against one/more/all of the
-// monitoring sources and indicates what autoscaler actions are desired.
+// AutoScaler plugins assess a given spec against one/more/all of the
+// advisors and indicates what autoscaler actions are desired.
 type AutoScalerPlugin interface {
 	Name() string
-	Assess(spec api.AutoScalerSpec, sources []*MonitoringSource) ([]AutoScaleAction, error)
+	Assess(spec api.AutoScalerSpec, advisors []Advisor) ([]ScalingAction, error)
 }
 
-// MonitoringSource evaluates the intents based on the current state.
-type MonitoringSource interface {
-	Initialize(config map[string]string)
+// Advisor evaluates the intents based on the current state.
+type Advisor interface {
+	Initialize(Client client.Interface) error
 	Name() string
 	Evaluate(op AggregateOperatorType, thresholds []api.AutoScaleIntentionThresholdConfig) (bool, error)
 }

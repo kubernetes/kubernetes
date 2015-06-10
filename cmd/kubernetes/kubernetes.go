@@ -33,6 +33,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	asmanager "github.com/GoogleCloudPlatform/kubernetes/pkg/autoscaler/manager"
+	asgenericplugin "github.com/GoogleCloudPlatform/kubernetes/pkg/autoscaler/plugins/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
@@ -126,6 +128,30 @@ func runScheduler(cl *client.Client) {
 	scheduler.New(schedulerConfig).Run()
 }
 
+// createAutoScaleManager creates and configures an auto scaling manager.
+func createAutoScaleManager(client *client.Client) *asmanager.AutoScaleManager {
+	// Assessment interval determines how often the autoscaling policies
+	// are assessed and scaling interval how often to actually scale.
+	assessmentInterval := asmanager.DefaultAssessmentInterval
+	scalingInterval := asmanager.DefaultAutoScalingInterval
+	plugin := asgenericplugin.NewGenericAutoScaler("")
+
+	manager := asmanager.NewAutoScaleManager(client, assessmentInterval, scalingInterval)
+	glog.Infof("Created auto scale manager")
+
+	manager.Register(plugin)
+	glog.Infof("Registered generic auto scale manager plugin")
+
+	err := manager.AddDefaultAdvisors()
+	if err != nil {
+		// This can be a warning eventually, for now, a hard error.
+		glog.Fatalf("Couldn't add default advisors: %v", err)
+	}
+
+	glog.Infof("Added default autoscale manager advisors")
+	return manager
+}
+
 // RunControllerManager starts a controller
 func runControllerManager(cl *client.Client) {
 	const serviceSyncPeriod = 5 * time.Minute
@@ -145,6 +171,9 @@ func runControllerManager(cl *client.Client) {
 
 	controllerManager := replication.NewReplicationManager(cl, replication.BurstReplicas)
 	go controllerManager.Run(5, util.NeverStop)
+
+	autoscaleManager := createAutoScaleManager(cl)
+	go autoscaleManager.Run(5, util.NeverStop)
 }
 
 func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP, port int) {

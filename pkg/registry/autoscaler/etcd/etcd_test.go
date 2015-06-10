@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -55,8 +55,8 @@ func validNewAutoScaler(name string) *api.AutoScaler {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.AutoScalerSpec{
-			TargetSelector:  map[string]string{"foo": "bar"},
-			MonitoringSources: []string{"fizz", "buzz"},
+			TargetSelector: map[string]string{"foo": "bar"},
+			Advisors:       []string{"fizz", "buzz"},
 		},
 	}
 }
@@ -419,7 +419,7 @@ func TestWatchWithSelectorMatch(t *testing.T) {
 	fakeEtcdClient.WaitForWatchCompletion()
 
 	autoScaler := validNewAutoScaler("foo")
-	autoScaler.Labels = map[string]string{"name": "foo"}
+	autoScaler.ObjectMeta.Labels = map[string]string{"name": "foo"}
 	encoded, _ := latest.Codec.Encode(autoScaler)
 	fakeEtcdClient.WatchResponse <- &etcd.Response{
 		Action: "create",

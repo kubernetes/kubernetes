@@ -14,16 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package autoscaler includes the implementation of an auto scaling
+// manager.
 package autoscaler
-
-import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-)
-
-// ScalingAction defines the type and how much to scale by. Used by the
-// plugins to indicate desired actions to the autoscale manager.
-type ScalingAction struct {
-	Type    api.AutoScaleActionType
-	ScaleBy int
-	Trigger api.AutoScaleThreshold
-}

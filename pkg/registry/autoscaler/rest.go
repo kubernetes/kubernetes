@@ -1,5 +1,5 @@
 /*
-Copyright 2015 Google Inc. All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -87,7 +87,7 @@ func MatchAutoScaler(label labels.Selector, field fields.Selector) generic.Match
 		}
 
 		fields := AutoScalerToSelectableFields(autoScaler)
-		return label.Matches(labels.Set(autoScaler.Labels)) && field.Matches(fields), nil
+		return label.Matches(labels.Set(autoScaler.ObjectMeta.Labels)) && field.Matches(fields), nil
 	})
 }
 

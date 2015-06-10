@@ -14,16 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package autoscaler
+package test
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/autoscaler"
 )
 
-// ScalingAction defines the type and how much to scale by. Used by the
-// plugins to indicate desired actions to the autoscale manager.
-type ScalingAction struct {
-	Type    api.AutoScaleActionType
-	ScaleBy int
-	Trigger api.AutoScaleThreshold
+type TestAutoScalerPlugin struct {
+	Tag     string
+	Actions []autoscaler.ScalingAction
+	Error   string
+}
+
+// Name returns the name of this test auto scaler plugin.
+func (p *TestAutoScalerPlugin) Name() string {
+	return p.Tag
+}
+
+// Assesses a policy with the advisors and returns the desired scaling actions.
+func (p *TestAutoScalerPlugin) Assess(spec api.AutoScalerSpec, advisors []autoscaler.Advisor) ([]autoscaler.ScalingAction, error) {
+	if len(p.Error) > 0 {
+		return p.Actions, fmt.Errorf(p.Error)
+	}
+
+	return p.Actions, nil
 }

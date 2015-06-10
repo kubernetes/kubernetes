@@ -117,13 +117,13 @@ func deepCopy_api_AutoScalerSpec(in AutoScalerSpec, out *AutoScalerSpec, c *conv
 	} else {
 		out.TargetSelector = nil
 	}
-	if in.MonitoringSources != nil {
-		out.MonitoringSources = make([]string, len(in.MonitoringSources))
-		for i := range in.MonitoringSources {
-			out.MonitoringSources[i] = in.MonitoringSources[i]
+	if in.Advisors != nil {
+		out.Advisors = make([]string, len(in.Advisors))
+		for i := range in.Advisors {
+			out.Advisors[i] = in.Advisors[i]
 		}
 	} else {
-		out.MonitoringSources = nil
+		out.Advisors = nil
 	}
 	return nil
 }

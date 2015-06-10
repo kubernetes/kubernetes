@@ -1742,22 +1742,22 @@ func ValidateAutoScaler(autoScaler *api.AutoScaler) errs.ValidationErrorList {
 func ValidateAutoScalerSpec(spec *api.AutoScalerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
-	//must have a target selector
+	// Must have a target selector.
 	if len(spec.TargetSelector) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("targetSelector"))
 	}
 
-	//min can't be greater than max
+	// min can't be greater than max
 	if spec.MinAutoScaleCount > spec.MaxAutoScaleCount {
 		allErrs = append(allErrs, errs.NewFieldInvalid("minAutoScaleCount", spec.MinAutoScaleCount, "minAutoScaleCount cannot be greater than maxAutoScaleCount"))
 	}
 
-	//must have a monitoring sources
-	if len(spec.MonitoringSources) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("monitoringSources"))
+	// Must have some advisors.
+	if 0 == len(spec.Advisors) {
+		allErrs = append(allErrs, errs.NewFieldRequired("advisors"))
 	}
 
-	//check all thresholds
+	// Check all thresholds.
 	for _, t := range spec.Thresholds {
 		allErrs = append(allErrs, ValidateAutoScaleThreshold(&t).Prefix("thresholds")...)
 	}

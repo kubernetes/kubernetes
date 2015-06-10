@@ -2003,7 +2003,6 @@ type RangeAllocation struct {
 type AutoScaler struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
-	Labels     map[string]string `json:"labels,omitempty"`
 
 	// Spec defines the auto-scaler targets and thresholds.
 	Spec AutoScalerSpec `json:"spec,omitempty"`
@@ -2039,9 +2038,9 @@ type AutoScalerSpec struct {
 	// are resolved by the selector the auto-scaler will resize the largest one.
 	TargetSelector map[string]string `json:"targetSelector,omitempty"`
 
-	// MonitoringSources defines a set of sources that the auto-scaler
+	// Advisors defines a set of advisory sources that the auto-scaler
 	// uses to examine if thresholds are (b)reached.
-	MonitoringSources []string `json:"monitoringSources,omitempty"`
+	Advisors []string `json:"advisors,omitempty"`
 }
 
 // AutoScaleThreshold is a behavior based on statistics used to drive the auto-scaler in scaling decisions.
@@ -2061,7 +2060,7 @@ type AutoScaleThreshold struct {
 	Intentions []AutoScaleIntentionThresholdConfig `json:"intentions,omitempty"`
 
 	// ActionType holds the auto-scaler action to take when the threshold is (b)reached.
-	ActionType AutoScaleActionType `json:"action,omitempty"`
+	ActionType AutoScaleActionType `json:"actionType,omitempty"`
 
 	// How much to scale up/down by.
 	ScaleBy int `json:"scaleBy,omitempty"`
