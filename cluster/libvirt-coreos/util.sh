@@ -189,7 +189,7 @@ function kube-up {
 
   readonly ssh_keys="$(cat ~/.ssh/id_*.pub | sed 's/^/  - /')"
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
-  readonly discovery=$(curl -s https://discovery.etcd.io/new)
+  readonly discovery=$(curl -s https://discovery.etcd.io/new?size=$((NUM_MINIONS + 1)))
 
   readonly machines=$(join , "${KUBE_MINION_IP_ADDRESSES[@]}")
 

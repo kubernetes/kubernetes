@@ -14,12 +14,12 @@ write_files:
       RuntimeMaxUse=50M
 
 coreos:
-  etcd:
+  etcd2:
     name: ${name}
-    addr: ${public_ip}:4001
-    bind-addr: 0.0.0.0
-    peer-addr: ${public_ip}:7001
-    # peers: {etcd_peers}
+    advertise-client-urls: http://${public_ip}:2379
+    initial-advertise-peer-urls: http://${public_ip}:2380
+    listen-client-urls: http://${public_ip}:2379,http://${public_ip}:4001
+    listen-peer-urls: http://${public_ip}:2380,http://${public_ip}:7001
     discovery: ${discovery}
   units:
     - name: static.network
@@ -69,7 +69,7 @@ coreos:
         ExecStart=/usr/sbin/iptables -w -t nat -A POSTROUTING -o eth0 -j MASQUERADE ! -d ${CONTAINER_SUBNET}
         RemainAfterExit=yes
         Type=oneshot
-    - name: etcd.service
+    - name: etcd2.service
       command: start
     - name: docker.service
       command: start
