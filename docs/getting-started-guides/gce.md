@@ -44,10 +44,10 @@ Add the appropriate binary folder to your ```PATH``` to access kubectl:
 
 ```bash
 # OS X
-export PATH=path/to/kubernetes/platforms/darwin/amd64:$PATH
+export PATH=<path/to/kubernetes-directory>/platforms/darwin/amd64:$PATH
 
 # Linux
-export PATH=path/to/kubernetes/platforms/linux/amd64:$PATH
+export PATH=<path/to/kubernetes-directory>/platforms/linux/amd64:$PATH
 ```
 
 Note: gcloud also ships with ```kubectl```, which by default is added to your path.
