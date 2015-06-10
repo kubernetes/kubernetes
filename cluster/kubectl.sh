@@ -18,15 +18,16 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-echo "-=-=-=-=-=-=-=-=-=-="
-echo "NOTE:"
-echo "kubectl.sh is deprecated and will be removed soon."
-echo "please replace all usage with calls to the kubectl"
-echo "binary and ensure that it is in your PATH." 
-echo ""
-echo "Please see 'kubectl help config' for more details"
-echo "about configuring kubectl for your cluster."
-echo "-=-=-=-=-=-=-=-=-=-="
+# Stop the bleeding, turn off the warning until we fix token gen.
+# echo "-=-=-=-=-=-=-=-=-=-="
+# echo "NOTE:"
+# echo "kubectl.sh is deprecated and will be removed soon."
+# echo "please replace all usage with calls to the kubectl"
+# echo "binary and ensure that it is in your PATH." 
+# echo ""
+# echo "Please see 'kubectl help config' for more details"
+# echo "about configuring kubectl for your cluster."
+# echo "-=-=-=-=-=-=-=-=-=-="
 
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
