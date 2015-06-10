@@ -100,7 +100,7 @@ rethinkdb-driver   db=influxdb   db=rethinkdb              10.0.27.114      2801
 We request for an external load balancer in the [admin-service.yaml](admin-service.yaml) file:
 
 ```
-createExternalLoadBalancer: true
+type: LoadBalancer
 ```
 
 The external load balancer allows us to access the service from outside via an external IP, which is 104.197.19.120 in this case. 

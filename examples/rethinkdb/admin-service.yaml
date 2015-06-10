@@ -1,4 +1,4 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata:
   labels:
@@ -9,7 +9,7 @@ spec:
   ports:
    - port: 8080
      targetPort: 8080
-  createExternalLoadBalancer: true
+  type: LoadBalancer
   selector:
     db: rethinkdb
     role: admin
