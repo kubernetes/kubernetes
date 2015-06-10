@@ -22,7 +22,6 @@ import (
 	"io"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/golang/glog"
 )
@@ -65,9 +64,9 @@ func (j *JSONPath) walk(wr io.Writer, value reflect.Value, node Node) reflect.Va
 	case *ListNode:
 		return j.evalList(wr, value, node)
 	case *TextNode:
-		return j.evalText(wr, value, node)
+		return j.evalText(wr, value, node.Text)
 	case *FieldNode:
-		return j.evalField(value, node)
+		return j.evalField(value, node.Value)
 	case *ArrayNode:
 		return j.evalArray(value, node)
 	}
@@ -75,8 +74,8 @@ func (j *JSONPath) walk(wr io.Writer, value reflect.Value, node Node) reflect.Va
 }
 
 // evalText evaluate TextNode
-func (j *JSONPath) evalText(wr io.Writer, value reflect.Value, node *TextNode) reflect.Value {
-	if _, err := wr.Write(node.Text); err != nil {
+func (j *JSONPath) evalText(wr io.Writer, value reflect.Value, text []byte) reflect.Value {
+	if _, err := wr.Write(text); err != nil {
 		glog.Errorf("%s", err)
 	}
 	return reflect.Value{}
@@ -100,30 +99,22 @@ func (j *JSONPath) evalArray(value reflect.Value, node *ArrayNode) reflect.Value
 	if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
 		glog.Errorf("%v is not array or slice", value)
 	}
-	params := []int{0, value.Len(), 1}
-	indexes := strings.Split(node.Value, ":")
-	var err error
-	for i := 0; i < len(indexes); i++ {
-		params[i], err = strconv.Atoi(indexes[i])
-		if err != nil {
-			glog.Errorf("parse range %s to integer", node.Value)
-		}
+	if !node.Exist[0] {
+		node.Params[0] = 0
 	}
-	if len(indexes) == 1 {
-		return value.Index(params[0])
-	} else if len(indexes) == 2 {
-		return value.Slice(params[0], params[1])
-	} else if len(indexes) == 3 {
-		return value.Slice3(params[0], params[1], params[2])
+	if !node.Exist[1] {
+		node.Params[1] = value.Len()
+	}
+	if !node.Exist[2] {
+		return value.Slice(node.Params[0], node.Params[1])
 	} else {
-		glog.Errorf("unsupported filter")
+		return value.Slice3(node.Params[0], node.Params[1], node.Params[2])
 	}
-	return reflect.Value{}
 }
 
 // evalField evaluate filed from struct value
-func (j *JSONPath) evalField(value reflect.Value, node *FieldNode) reflect.Value {
-	return value.FieldByName(node.Value)
+func (j *JSONPath) evalField(value reflect.Value, exp string) reflect.Value {
+	return value.FieldByName(exp)
 }
 
 // evalToText translate reflect value to corresponding text

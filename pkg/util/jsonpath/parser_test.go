@@ -16,7 +16,9 @@ limitations under the License.
 
 package jsonpath
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestParsePlainText(t *testing.T) {
 	parser, err := Parse("plain", "hello jsonpath")
@@ -75,11 +77,10 @@ func TestParseQuote(t *testing.T) {
 		t.Errorf("expect ${, got %s", node.Text)
 	}
 }
-
 func TestParseArray(t *testing.T) {
-	parser, err := Parse("array", "hello ${[1..3]}")
+	parser, err := Parse("array", "hello ${[1:3]}")
 	if err != nil {
-		t.Errorf("parse quote error %v", err)
+		t.Errorf("parse array error %v", err)
 	}
 	nodes := parser.Root.Nodes
 	if len(nodes) != 2 {
@@ -93,7 +94,28 @@ func TestParseArray(t *testing.T) {
 	}
 	nodes = nodes[1].(*ListNode).Nodes
 	node := nodes[0].(*ArrayNode)
-	if string(node.Value) != "1..3" {
-		t.Errorf("expect ${, got %s", node.Value)
+	if node.Params != [3]int{1, 3, 0} {
+		t.Errorf("expect 1 3 0, got %v", node.Params)
+	}
+}
+func TestParseFilter(t *testing.T) {
+	parser, err := Parse("array", "hello ${[1:3]}")
+	if err != nil {
+		t.Errorf("parse array error %v", err)
+	}
+	nodes := parser.Root.Nodes
+	if len(nodes) != 2 {
+		t.Errorf("expect two nodes, got %v", len(nodes))
+	}
+	if nodes[0].Type() != NodeText {
+		t.Errorf("expect NodeText, got %v", nodes[0])
+	}
+	if nodes[1].Type() != NodeList {
+		t.Errorf("expect NodeList, got %v", nodes[1])
+	}
+	nodes = nodes[1].(*ListNode).Nodes
+	node := nodes[0].(*ArrayNode)
+	if node.Params != [3]int{1, 3, 0} {
+		t.Errorf("expect 1 3 0, got %v", node.Params)
 	}
 }

@@ -18,6 +18,8 @@ package jsonpath
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -123,6 +125,9 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 	if strings.HasPrefix(p.input[p.pos:], rightDelim) {
 		return p.parseRightDelim(cur)
 	}
+	if strings.HasPrefix(p.input[p.pos:], "[?(") {
+		return p.parseFilter(cur)
+	}
 
 	switch r := p.next(); {
 	case r == eof || isEndOfLine(r):
@@ -158,8 +163,53 @@ Loop:
 			break Loop
 		}
 	}
-	value := p.consumeText()
-	cur.append(newArray(value[1 : len(value)-1]))
+	text := p.consumeText()
+	text = string(text[1 : len(text)-1])
+	reg := regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:[\d]*)?$`)
+	value := reg.FindStringSubmatch(text)
+	if value == nil {
+		return fmt.Errorf("incorrect array index")
+	}
+	params := [3]int{}
+	exist := [3]bool{true, true, true}
+	value = value[1:]
+	params[0], _ = strconv.Atoi(value[0])
+	for i := 1; i < 3; i++ {
+		if value[i] != "" {
+			value[i] = value[i][1:]
+			params[i], _ = strconv.Atoi(value[i])
+		} else {
+			exist[i] = false
+			params[i] = 0
+		}
+	}
+	cur.append(newArray(params, exist))
+	return p.parseInsideAction(cur)
+}
+
+// parseFilter scans filter inside array selection
+func (p *Parser) parseFilter(cur *ListNode) error {
+Loop:
+	for {
+		switch p.next() {
+		case eof, '\n':
+			return fmt.Errorf("unterminated filter")
+		case ')':
+			break Loop
+		}
+	}
+	if p.next() != ']' {
+		return fmt.Errorf("unclosed array expect ]")
+	}
+	reg := regexp.MustCompile(`^([^<>=]+)([<>=]+)(.+?)$`)
+	text := p.consumeText()
+	text = string(text[:len(text)-2])
+	value := reg.FindStringSubmatch(text)
+	if value == nil {
+		cur.append(newFilter(text, "exist", ""))
+	} else {
+		cur.append(newFilter(value[1], value[2], value[3]))
+	}
 	return p.parseInsideAction(cur)
 }
 

@@ -34,6 +34,7 @@ const (
 	NodeArray
 	NodeList
 	NodeField
+	NodeFilter
 )
 
 // ListNode holds a sequence of nodes.
@@ -76,9 +77,28 @@ func newField(value string) *FieldNode {
 
 type ArrayNode struct {
 	NodeType
-	Value string
+	Params [3]int //start, end, step
+	Exist  [3]bool
 }
 
-func newArray(value string) *ArrayNode {
-	return &ArrayNode{NodeType: NodeArray, Value: value}
+func newArray(params [3]int, exist [3]bool) *ArrayNode {
+	return &ArrayNode{
+		NodeType: NodeArray,
+		Params:   params,
+		Exist:    exist,
+	}
+}
+
+type FilterNode struct {
+	NodeType
+	Left, Operator, Right string
+}
+
+func newFilter(left, operator, right string) *FilterNode {
+	return &FilterNode{
+		NodeType: NodeFilter,
+		Left:     left,
+		Operator: operator,
+		Right:    right,
+	}
 }
