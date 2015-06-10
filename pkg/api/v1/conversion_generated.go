@@ -2314,13 +2314,13 @@ func convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *Volu
 	} else {
 		out.Glusterfs = nil
 	}
-	if in.PersistentVolumeClaimVolumeSource != nil {
-		out.PersistentVolumeClaimVolumeSource = new(PersistentVolumeClaimVolumeSource)
-		if err := convert_api_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeClaimVolumeSource(in.PersistentVolumeClaimVolumeSource, out.PersistentVolumeClaimVolumeSource, s); err != nil {
+	if in.PersistentVolumeClaim != nil {
+		out.PersistentVolumeClaim = new(PersistentVolumeClaimVolumeSource)
+		if err := convert_api_PersistentVolumeClaimVolumeSource_To_v1_PersistentVolumeClaimVolumeSource(in.PersistentVolumeClaim, out.PersistentVolumeClaim, s); err != nil {
 			return err
 		}
 	} else {
-		out.PersistentVolumeClaimVolumeSource = nil
+		out.PersistentVolumeClaim = nil
 	}
 	if in.RBD != nil {
 		out.RBD = new(RBDVolumeSource)
@@ -4622,13 +4622,13 @@ func convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.Volu
 	} else {
 		out.Glusterfs = nil
 	}
-	if in.PersistentVolumeClaimVolumeSource != nil {
-		out.PersistentVolumeClaimVolumeSource = new(api.PersistentVolumeClaimVolumeSource)
-		if err := convert_v1_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeClaimVolumeSource(in.PersistentVolumeClaimVolumeSource, out.PersistentVolumeClaimVolumeSource, s); err != nil {
+	if in.PersistentVolumeClaim != nil {
+		out.PersistentVolumeClaim = new(api.PersistentVolumeClaimVolumeSource)
+		if err := convert_v1_PersistentVolumeClaimVolumeSource_To_api_PersistentVolumeClaimVolumeSource(in.PersistentVolumeClaim, out.PersistentVolumeClaim, s); err != nil {
 			return err
 		}
 	} else {
-		out.PersistentVolumeClaimVolumeSource = nil
+		out.PersistentVolumeClaim = nil
 	}
 	if in.RBD != nil {
 		out.RBD = new(api.RBDVolumeSource)

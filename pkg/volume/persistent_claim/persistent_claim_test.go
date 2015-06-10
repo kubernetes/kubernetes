@@ -52,7 +52,7 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/persistent-claim" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{PersistentVolumeClaimVolumeSource: &api.PersistentVolumeClaimVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
 	if plug.CanSupport(&volume.Spec{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
@@ -99,7 +99,7 @@ func TestNewBuilder(t *testing.T) {
 				},
 			},
 			podVolume: api.VolumeSource{
-				PersistentVolumeClaimVolumeSource: &api.PersistentVolumeClaimVolumeSource{
+				PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
 					ReadOnly:  false,
 					ClaimName: "claimA",
 				},
@@ -137,7 +137,7 @@ func TestNewBuilder(t *testing.T) {
 				},
 			},
 			podVolume: api.VolumeSource{
-				PersistentVolumeClaimVolumeSource: &api.PersistentVolumeClaimVolumeSource{
+				PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
 					ReadOnly:  false,
 					ClaimName: "claimB",
 				},
@@ -175,7 +175,7 @@ func TestNewBuilder(t *testing.T) {
 				},
 			},
 			podVolume: api.VolumeSource{
-				PersistentVolumeClaimVolumeSource: &api.PersistentVolumeClaimVolumeSource{
+				PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
 					ReadOnly:  false,
 					ClaimName: "claimA",
 				},
@@ -218,7 +218,7 @@ func TestNewBuilder(t *testing.T) {
 				},
 			},
 			podVolume: api.VolumeSource{
-				PersistentVolumeClaimVolumeSource: &api.PersistentVolumeClaimVolumeSource{
+				PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
 					ReadOnly:  false,
 					ClaimName: "claimA",
 				},
@@ -287,7 +287,7 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 		},
 	}
 	podVolume := api.VolumeSource{
-		PersistentVolumeClaimVolumeSource: &api.PersistentVolumeClaimVolumeSource{
+		PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
 			ReadOnly:  false,
 			ClaimName: "claimC",
 		},
