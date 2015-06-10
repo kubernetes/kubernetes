@@ -13,6 +13,14 @@
                  "-c",
                  "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080 {{pillar['log_level']}} 1>>/var/log/kube-scheduler.log 2>&1"
                ],
+    "livenessProbe": {
+      "httpGet": {
+        "path": "/healthz",
+        "port": 10251
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 15
+    },
     "volumeMounts": [
         {
           "name": "logfile",
