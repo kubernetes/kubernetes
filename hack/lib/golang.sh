@@ -18,16 +18,32 @@
 readonly KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
 readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 
+# Load contrib target functions
+if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
+  for contrib in "${KUBERNETES_CONTRIB}"; do
+    source "${KUBE_ROOT}/contrib/${contrib}/target.sh"
+  done
+fi
+
 # The set of server targets that we are only building for Linux
-readonly KUBE_SERVER_TARGETS=(
-  cmd/kube-proxy
-  cmd/kube-apiserver
-  cmd/kube-controller-manager
-  cmd/kubelet
-  cmd/hyperkube
-  cmd/kubernetes
-  plugin/cmd/kube-scheduler
-)
+kube::golang::server_targets() {
+  local targets=(
+    cmd/kube-proxy
+    cmd/kube-apiserver
+    cmd/kube-controller-manager
+    cmd/kubelet
+    cmd/hyperkube
+    cmd/kubernetes
+    plugin/cmd/kube-scheduler
+  )
+  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
+    for contrib in "${KUBERNETES_CONTRIB}"; do
+      targets+=($(eval "kube::contrib::${contrib}::server_targets"))
+    done
+  fi
+  echo "${targets[@]}"
+}
+readonly KUBE_SERVER_TARGETS=($(kube::golang::server_targets))
 readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 
 # The server platform we are building on.
@@ -43,17 +59,26 @@ readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
 readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 
 # The set of test targets that we are building for all platforms
-readonly KUBE_TEST_TARGETS=(
-  cmd/integration
-  cmd/gendocs
-  cmd/genman
-  cmd/genbashcomp
-  cmd/genconversion
-  cmd/gendeepcopy
-  examples/k8petstore/web-server
-  github.com/onsi/ginkgo/ginkgo
-  test/e2e/e2e.test
-)
+kube::golang::test_targets() {
+  local targets=(
+    cmd/integration
+    cmd/gendocs
+    cmd/genman
+    cmd/genbashcomp
+    cmd/genconversion
+    cmd/gendeepcopy
+    examples/k8petstore/web-server
+    github.com/onsi/ginkgo/ginkgo
+    test/e2e/e2e.test
+  )
+  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
+    for contrib in "${KUBERNETES_CONTRIB}"; do
+      targets+=($(eval "kube::contrib::${contrib}::test_targets"))
+    done
+  fi
+  echo "${targets[@]}"
+}
+readonly KUBE_TEST_TARGETS=($(kube::golang::test_targets))
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_PORTABLE=(
