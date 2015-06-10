@@ -19,14 +19,15 @@ package e2e
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 type durations []time.Duration
@@ -43,16 +44,32 @@ var _ = Describe("Service endpoints latency", func() {
 		if err != nil {
 			Failf("Failed to list nodes: %v", err)
 		}
-
 		count := len(nodes.Items)
-		d, err := runServiceLatencies(f, 8*count, 20*count)
-		Expect(err).NotTo(HaveOccurred())
+
+		// Numbers chosen to make the test complete in a short amount
+		// of time. This sample size is not actually large enough to
+		// reliably measure tails on a reasonably sized test cluster,
+		// but it should catch low hanging fruit.
+		var (
+			totalTrials    = 20 * count
+			parallelTrials = 8 * count
+			minSampleSize  = 10 * count
+		)
+
+		failing := util.NewStringSet()
+		d, err := runServiceLatencies(f, parallelTrials, totalTrials)
+		if err != nil {
+			failing.Insert(fmt.Sprintf("Not all RC/pod/service trials succeeded: %v", err))
+		}
 		dSorted := durations(d)
 		sort.Sort(dSorted)
 		n := len(dSorted)
-		if n < 5 {
-			Expect(fmt.Errorf("Did not get a good enough sample size: %v", dSorted)).NotTo(HaveOccurred())
-			return
+		if n < minSampleSize {
+			failing.Insert(fmt.Sprintf("Did not get a good sample size: %v", dSorted))
+		}
+		if n < 2 {
+			failing.Insert("Less than two runs succeeded; aborting.")
+			Fail(strings.Join(failing.List(), "\n"))
 		}
 		percentile := func(p int) time.Duration {
 			est := n * p / 100
@@ -70,11 +87,14 @@ var _ = Describe("Service endpoints latency", func() {
 		Logf("99 %%ile: %v", p99)
 
 		if p99 > 4*p50 {
-			Fail("Tail latency is > 4x median latency")
+			failing.Insert("Tail latency is > 4x median latency")
 		}
 
 		if p50 > time.Second*20 {
-			Fail("Median latency should be less than 20 seconds")
+			failing.Insert("Median latency should be less than 20 seconds")
+		}
+		if failing.Len() > 0 {
+			Fail(strings.Join(failing.List(), "\n"))
 		}
 	})
 })
@@ -112,7 +132,7 @@ func runServiceLatencies(f *Framework, inParallel, total int) (output []time.Dur
 	for i := 0; i < total; i++ {
 		select {
 		case e := <-errs:
-			Expect(e).NotTo(HaveOccurred())
+			Logf("Got error: %v", e)
 			errCount += 1
 		case d := <-durations:
 			output = append(output, d)
@@ -132,7 +152,7 @@ func singleServiceLatency(f *Framework, i int) (time.Duration, error) {
 		Name:         fmt.Sprintf("trial-%v", i),
 		Namespace:    f.Namespace.Name,
 		Replicas:     1,
-		PollInterval: 10,
+		PollInterval: time.Second,
 	}
 	if err := RunRC(cfg); err != nil {
 		return 0, err

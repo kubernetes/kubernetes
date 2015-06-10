@@ -141,7 +141,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Endpoints",
+	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Endpoints",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name":
