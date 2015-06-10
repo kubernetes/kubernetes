@@ -283,8 +283,14 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"pod": &api.Pod{},
 		},
 		"../examples/openshift-origin": {
-			"openshift-controller": &api.ReplicationController{},
-			"openshift-service":    &api.Service{},
+			"openshift-origin-namespace": &api.Namespace{},
+			"openshift-controller":       &api.ReplicationController{},
+			"openshift-service":          &api.Service{},
+			"etcd-controller":            &api.ReplicationController{},
+			"etcd-service":               &api.Service{},
+			"etcd-discovery-controller":  &api.ReplicationController{},
+			"etcd-discovery-service":     &api.Service{},
+			"secret":                     nil,
 		},
 		"../examples/phabricator": {
 			"authenticator-controller": &api.ReplicationController{},
