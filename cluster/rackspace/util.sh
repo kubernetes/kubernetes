@@ -321,7 +321,8 @@ kube-up() {
   detect-master
 
   # TODO look for a better way to get the known_tokens to the master. This is needed over file injection since the files were too large on a 4 node cluster.
-  $(scp -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} ${KUBE_TEMP}/known_tokens.csv core@${KUBE_MASTER_IP}:known_tokens.csv)
+  $(scp -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} ${KUBE_TEMP}/known_tokens.csv core@${KUBE_MASTER_IP}:/home/core/known_tokens.csv)
+  $(sleep 2)
   $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo mv /home/core/known_tokens.csv /var/lib/kube-apiserver/known_tokens.csv)
   $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo chown root.root /var/lib/kube-apiserver/known_tokens.csv)
   $(ssh -o StrictHostKeyChecking=no -i ~/.ssh/${SSH_KEY_NAME} core@${KUBE_MASTER_IP} sudo systemctl restart kube-apiserver)
