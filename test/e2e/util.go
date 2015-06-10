@@ -45,7 +45,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
-	"code.google.com/p/go-uuid/uuid"
 	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/crypto/ssh"
 
@@ -347,19 +346,19 @@ func waitForPersistentVolumePhase(phase api.PersistentVolumePhase, c *client.Cli
 func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) {
 	namespaceObj := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
-			Name:      fmt.Sprintf("e2e-tests-%v-%v", baseName, uuid.New()),
-			Namespace: "",
+			GenerateName: fmt.Sprintf("e2e-tests-%v-", baseName),
+			Namespace:    "",
 		},
 		Status: api.NamespaceStatus{},
 	}
-	_, err := c.Namespaces().Create(namespaceObj)
+	got, err := c.Namespaces().Create(namespaceObj)
 	if err != nil {
-		return namespaceObj, err
+		return got, err
 	}
-	if err := waitForDefaultServiceAccountInNamespace(c, namespaceObj.Name); err != nil {
-		return namespaceObj, err
+	if err := waitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
+		return got, err
 	}
-	return namespaceObj, nil
+	return got, nil
 }
 
 func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
