@@ -39,7 +39,7 @@ if [[ ! -z "${2-}" ]]; then
 fi
 
 cat << EOF
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   labels:
