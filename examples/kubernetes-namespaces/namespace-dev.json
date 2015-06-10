@@ -1,6 +1,6 @@
 {
   "kind": "Namespace",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "development",
     "labels": {

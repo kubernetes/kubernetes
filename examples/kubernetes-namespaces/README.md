@@ -53,7 +53,7 @@ Use the file [`examples/kubernetes-namespaces/namespace-dev.json`](namespace-dev
 ```js
 {
   "kind": "Namespace",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "development",
     "labels": {
