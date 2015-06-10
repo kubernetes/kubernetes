@@ -85,9 +85,8 @@ var _ = Describe("Density", func() {
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
 
 		// Verify latency metrics
-		// TODO: Update threshold to 1s once we reach this goal
 		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
+		highLatencyRequests, err := HighLatencyRequests(c, 2*time.Second, util.NewStringSet("events"))
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})

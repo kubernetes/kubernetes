@@ -78,9 +78,8 @@ var _ = Describe("Load capacity", func() {
 		}
 
 		// Verify latency metrics
-		// TODO: Update threshold to 1s once we reach this goal
 		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
+		highLatencyRequests, err := HighLatencyRequests(c, 1*time.Second, util.NewStringSet("events"))
 		expectNoError(err, "Too many instances metrics above the threshold")
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
