@@ -24,7 +24,7 @@ Note that, although the redis server runs just with a single replica, we use [re
 ```js
 {
    "kind":"ReplicationController",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "metadata":{
       "name":"redis-master",
       "labels":{
@@ -49,8 +49,7 @@ Note that, although the redis server runs just with a single replica, we use [re
                   "image":"redis",
                   "ports":[
                      {
-                        "containerPort":6379,
-                        "protocol":"TCP"
+                        "containerPort":6379
                      }
                   ]
                }
@@ -110,7 +109,7 @@ Use the file `examples/guestbook/redis-master-service.json`:
 ```js
 {
    "kind":"Service",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "metadata":{
       "name":"redis-master",
       "labels":{
@@ -121,8 +120,7 @@ Use the file `examples/guestbook/redis-master-service.json`:
       "ports": [
         {
           "port":6379,
-          "targetPort":6379,
-          "protocol":"TCP"
+          "targetPort":6379
         }
       ],
       "selector":{
@@ -146,10 +144,11 @@ redis-master            name=redis-master                         name=redis-mas
 This will cause all pods to see the redis master apparently running on <ip>:6379.  The traffic flow from slaves to masters can be described in two steps, like so.
 
 - A *redis slave* will connect to "port" on the *redis master service*
-- Traffic will be forwarded from the service "port" (on the service node) to the  *targetPort* on the pod which (a node the service listens to).
+- Traffic will be forwarded from the service "port" (on the service node) to the  *targetPort* on the pod that the service listens to.
 
 Thus, once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 6379).
 
+*targetPort* will default to *port* if it is omitted in the configuration. For simplicity's sake, we omit it in the following configurations.
 ### Step Three: Fire up the replicated slave pods
 Although the redis master is a single pod, the redis read slaves are a 'replicated' pod. In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.  The replication controller will automatically launch new pods if the number of replicas falls (this is quite easy - and fun - to test, just kill the docker processes for your pods at will and watch them come back online on a new node shortly thereafter).
 
@@ -158,7 +157,7 @@ Use the file `examples/guestbook/redis-slave-controller.json`, which looks like 
 ```js
 {
    "kind":"ReplicationController",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "metadata":{
       "name":"redis-slave",
       "labels":{
@@ -183,8 +182,7 @@ Use the file `examples/guestbook/redis-slave-controller.json`, which looks like 
                   "image":"kubernetes/redis-slave:v2",
                   "ports":[
                      {
-                        "containerPort":6379,
-                        "protocol":"TCP"
+                        "containerPort":6379
                      }
                   ]
                }
@@ -221,14 +219,14 @@ You will see a single redis master pod and two redis slave pods.
 
 ### Step Four: Create the redis slave service
 
-Just like the master, we want to have a service to proxy connections to the read slaves. In this case, in addition to discovery, the slave service provides transparent load balancing to web app clients.
+Just like the master, we want to have a service to proxy connections to the redis slaves. In this case, in addition to discovery, the slave service provides transparent load balancing to web app clients.
 
 The service specification for the slaves is in `examples/guestbook/redis-slave-service.json`:
 
 ```js
 {
    "kind":"Service",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "metadata":{
       "name":"redis-slave",
       "labels":{
@@ -238,9 +236,7 @@ The service specification for the slaves is in `examples/guestbook/redis-slave-s
    "spec":{
       "ports": [
         {
-          "port":6379,
-          "targetPort":6379,
-          "protocol":"TCP"
+          "port":6379
         }
       ],
       "selector":{
@@ -275,7 +271,7 @@ The pod is described in the file `examples/guestbook/frontend-controller.json`:
 ```js
 {
    "kind":"ReplicationController",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "metadata":{
       "name":"frontend",
       "labels":{
@@ -300,8 +296,7 @@ The pod is described in the file `examples/guestbook/frontend-controller.json`:
                   "image":"kubernetes/example-guestbook-php-redis:v2",
                   "ports":[
                      {
-                        "containerPort":80,
-                        "protocol":"TCP"
+                        "containerPort":80
                      }
                   ]
                }
@@ -386,7 +381,7 @@ The service is described in the file `examples/guestbook/frontend-service.json`:
 ```js
 {
    "kind":"Service",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "metadata":{
       "name":"frontend",
       "labels":{
@@ -396,9 +391,7 @@ The service is described in the file `examples/guestbook/frontend-service.json`:
    "spec":{
       "ports": [
         {
-          "port":80,
-          "targetPort":80,
-          "protocol":"TCP"
+          "port":80
         }
       ],
       "selector":{
@@ -408,12 +401,7 @@ The service is described in the file `examples/guestbook/frontend-service.json`:
 }
 ```
 
-When `createExternalLoadBalancer` is specified `"createExternalLoadBalancer":true`, it takes some time for an external IP to show up in `kubectl get services` output.
-There should eventually be an internal (10.x.x.x) and an external address assigned to the frontend service.
-If running a single node local setup, or single VM, you don't need `createExternalLoadBalancer`, nor do you need `publicIPs`.
-Read the *Accessing the guestbook site externally* section below for details and set 10.11.22.33 accordingly (for now, you can
-delete these parameters or run this - either way it won't hurt anything to have both parameters the way they are).
-
+Create the service by running:
 ```shell
 $ kubectl create -f examples/guestbook/frontend-service.json
 frontend
@@ -425,9 +413,16 @@ redis-master            name=redis-master                         name=redis-mas
 redis-slave             name=redis-slave                          name=redis-slave             10.0.72.62          6379
 ```
 
+The pods that we have set up are reachable through the frontend service (10.0.93.211), but you'll notice that this IP is unavailable from outside of the kubernetes cluster. Of course, if you are running kubernetes minions locally, this isn't such a big problem - the port binding will allow you to reach the guestbook website at localhost:80... but the beloved **localhost** solution obviously doesn't work in any real world scenario. If you want the website to be accessible externally, read the *Accessing the guestbook site externally* section below for details.
+
+### Accessing the guestbook site externally
+Kubernetes supports two ways of exposing a service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#external-services). Note that if the `LoadBalancer` way is used, it takes some time for an external IP to show up in `kubectl get services` output.
+
+If you are more advanced in the ops arena, note you can manually get the service IP from looking at the output of `kubectl get pods,services`, and modify your firewall using standard tools and services (firewalld, iptables, selinux) which you are already familar with.
+
 ### A few Google Container Engine specifics for playing around with the services.
 
-In GCE, `kubectl` automatically creates forwarding rule for services with `createExternalLoadBalancer`.
+In GCE, `kubectl` automatically creates forwarding rule for services with `LoadBalancer`.
 
 ```shell
 $ gcloud compute forwarding-rules list
@@ -447,17 +442,6 @@ For GCE details about limiting traffic to specific sources, see the [GCE firewal
 
 [cloud-console]: https://console.developer.google.com
 [gce-firewall-docs]: https://cloud.google.com/compute/docs/networking#firewalls
-
-### Accessing the guestbook site externally
-
-The pods that we have set up are reachable through the frontend service, but you'll notice that 10.0.93.211 (the IP of the frontend service) is unavailable from outside of kubernetes.
-Of course, if you are running kubernetes minions locally, this isn't such a big problem - the port binding will allow you to reach the guestbook website at localhost:80... but the beloved **localhost** solution obviously doesn't work in any real world scenario.
-
-Unless you have access to the `createExternalLoadBalancer` feature (cloud provider specific), you will want to set up a **publicIP on a node**, so that the service can be accessed from outside of the internal kubernetes network. This is quite easy.  You simply look at your list of kubelet IP addresses, and update the service file to include a `publicIPs` string, which is mapped to an IP address of any number of your existing kubelets.  This will allow all your kubelets to act as external entry points to the service (translation: this will allow you to browse the guestbook site at your kubelet IP address from your browser).
-
-If you are more advanced in the ops arena, note you can manually get the service IP from looking at the output of `kubectl get pods,services`, and modify your firewall using standard tools and services (firewalld, iptables, selinux) which you are already familar with.
-
-And of course, finally, if you are running Kubernetes locally, you can just visit http://localhost:80.
 
 ### Step Seven: Cleanup
 

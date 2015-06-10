@@ -1,6 +1,6 @@
 {
    "kind":"Service",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "metadata":{
       "name":"frontend",
       "labels":{
@@ -10,9 +10,7 @@
    "spec":{
       "ports": [
         {
-          "port":80,
-          "targetPort":80,
-          "protocol":"TCP"
+          "port":80
         }
       ],
       "selector":{
