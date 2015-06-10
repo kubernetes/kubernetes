@@ -79,11 +79,11 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	}
 	apiVersion := fields["apiVersion"]
 	if apiVersion == nil {
-		fmt.Errorf("apiVersion not set")
+		return fmt.Errorf("apiVersion not set")
 	}
 	kind := fields["kind"]
 	if kind == nil {
-		fmt.Errorf("kind not set")
+		return fmt.Errorf("kind not set")
 	}
 	return s.ValidateObject(obj, apiVersion.(string), "", apiVersion.(string)+"."+kind.(string))
 }
