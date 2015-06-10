@@ -7,7 +7,7 @@ If you don't have a Ceph cluster, you can set up a [containerized Ceph cluster](
    
 Then get the keyring from the Ceph cluster and copy it to */etc/ceph/keyring*.
 
-Once you have installed Ceph and new Kubernetes, you can create a pod based on my examples [rbd.json](v1beta3/rbd.json)  [rbd-with-secret.json](v1beta3/rbd-with-secret.json). In the pod JSON, you need to provide the following information.
+Once you have installed Ceph and new Kubernetes, you can create a pod based on my examples [rbd.json](rbd.json)  [rbd-with-secret.json](rbd-with-secret.json). In the pod JSON, you need to provide the following information.
 
 - *monitors*:  Ceph monitors.
 - *pool*: The name of the RADOS pool, if not provided, default *rbd* pool is used.
@@ -31,7 +31,7 @@ If Ceph authentication secret is provided, the secret should be first be base64 
 Here are my commands:
 
 ```console
-    # kubectl create -f examples/rbd/v1beta3/rbd.json
+    # kubectl create -f examples/rbd/rbd.json
     # kubectl get pods
 ```
 
