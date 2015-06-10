@@ -37,7 +37,7 @@ func (f *fakePodWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateCompl
 	if err != nil {
 		f.t.Errorf("Unexpected error: %v", err)
 	}
-	if err := f.syncPodFn(pod, mirrorPod, kubecontainer.Pods(pods).FindPodByID(pod.UID)); err != nil {
+	if err := f.syncPodFn(pod, mirrorPod, kubecontainer.Pods(pods).FindPodByID(pod.UID), SyncPodUpdate); err != nil {
 		f.t.Errorf("Unexpected error: %v", err)
 	}
 }

@@ -42,7 +42,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -427,7 +426,7 @@ func apiContainerToContainer(c docker.APIContainers) container.Container {
 	}
 }
 
-var emptyPodUIDs map[types.UID]metrics.SyncPodType
+var emptyPodUIDs map[types.UID]SyncPodType
 
 // TODO: Remove this function after all docker-specifc tests have been migrated
 // to dockertools.
@@ -2774,31 +2773,33 @@ func TestUpdateNodeStatusError(t *testing.T) {
 }
 
 func TestCreateMirrorPod(t *testing.T) {
-	testKubelet := newTestKubeletWithFakeRuntime(t)
-	kl := testKubelet.kubelet
-	manager := testKubelet.fakeMirrorClient
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
-			Namespace: "foo",
-			Annotations: map[string]string{
-				ConfigSourceAnnotationKey: "file",
+	for _, updateType := range []SyncPodType{SyncPodCreate, SyncPodUpdate} {
+		testKubelet := newTestKubeletWithFakeRuntime(t)
+		kl := testKubelet.kubelet
+		manager := testKubelet.fakeMirrorClient
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "12345678",
+				Name:      "bar",
+				Namespace: "foo",
+				Annotations: map[string]string{
+					ConfigSourceAnnotationKey: "file",
+				},
 			},
-		},
-	}
-	pods := []*api.Pod{pod}
-	kl.podManager.SetPods(pods)
-	err := kl.syncPod(pod, nil, container.Pod{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	podFullName := kubecontainer.GetPodFullName(pod)
-	if !manager.HasPod(podFullName) {
-		t.Errorf("expected mirror pod %q to be created", podFullName)
-	}
-	if manager.NumOfPods() != 1 || !manager.HasPod(podFullName) {
-		t.Errorf("expected one mirror pod %q, got %v", podFullName, manager.GetPods())
+		}
+		pods := []*api.Pod{pod}
+		kl.podManager.SetPods(pods)
+		err := kl.syncPod(pod, nil, container.Pod{}, updateType)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		podFullName := kubecontainer.GetPodFullName(pod)
+		if !manager.HasPod(podFullName) {
+			t.Errorf("expected mirror pod %q to be created", podFullName)
+		}
+		if manager.NumOfPods() != 1 || !manager.HasPod(podFullName) {
+			t.Errorf("expected one mirror pod %q, got %v", podFullName, manager.GetPods())
+		}
 	}
 }
 
@@ -2844,7 +2845,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*api.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	err := kl.syncPod(pod, mirrorPod, container.Pod{})
+	err := kl.syncPod(pod, mirrorPod, container.Pod{}, SyncPodUpdate)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3044,7 +3045,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{})
+	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3073,7 +3074,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			HostNetwork: true,
 		},
 	}
-	err := kubelet.syncPod(pod, nil, container.Pod{})
+	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
@@ -3100,7 +3101,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{})
+	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3126,7 +3127,7 @@ func TestPrivilegeContainerDisallowed(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.syncPod(pod, nil, container.Pod{})
+	err := kubelet.syncPod(pod, nil, container.Pod{}, SyncPodUpdate)
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}

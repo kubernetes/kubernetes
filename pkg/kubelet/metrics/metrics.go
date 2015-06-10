@@ -83,27 +83,6 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 	})
 }
 
-type SyncPodType int
-
-const (
-	SyncPodSync SyncPodType = iota
-	SyncPodUpdate
-	SyncPodCreate
-)
-
-func (sp SyncPodType) String() string {
-	switch sp {
-	case SyncPodCreate:
-		return "create"
-	case SyncPodUpdate:
-		return "update"
-	case SyncPodSync:
-		return "sync"
-	default:
-		return "unknown"
-	}
-}
-
 // Gets the time since the specified start in microseconds.
 func SinceInMicroseconds(start time.Time) float64 {
 	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
