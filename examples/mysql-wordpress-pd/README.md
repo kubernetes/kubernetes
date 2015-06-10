@@ -66,7 +66,7 @@ First, **edit [`mysql.yaml`](mysql.yaml)**, the mysql pod definition, to use a d
 `mysql.yaml` looks like this:
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   name: mysql
@@ -135,7 +135,7 @@ So if we label our Kubernetes mysql service `mysql`, the wordpress pod will be a
 The [`mysql-service.yaml`](mysql-service.yaml) file looks like this:
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata: 
   labels: 
@@ -170,7 +170,7 @@ Once the mysql service is up, start the wordpress pod, specified in
 Note that this config file also defines a volume, this one using the `wordpress-disk` persistent disk that you created.
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   name: wordpress
@@ -220,23 +220,23 @@ Once the wordpress pod is running, start its service, specified by [`wordpress-s
 The service config file looks like this:
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata: 
   labels: 
     name: wpfrontend
   name: wpfrontend
 spec: 
-  createExternalLoadBalancer: true
   ports:
     # the port that this service should serve on
     - port: 80
   # label keys and values that must match in order to receive traffic for this service
   selector: 
     name: wordpress
+  type: LoadBalancer
 ```
 
-Note the `createExternalLoadBalancer` setting.  This will set up the wordpress service behind an external IP.
+Note the `type: LoadBalancer` setting.  This will set up the wordpress service behind an external IP.
 Note also that we've set the service port to 80.  We'll return to that shortly.
 
 Start the service:
@@ -251,8 +251,12 @@ and see it in the list of services:
 $ kubectl get services
 ```
 
-Then, find the external IP for your WordPress service by listing the forwarding rules for your project:
+Then, find the external IP for your WordPress service by running:
+```
+$ kubectl get services/wpfrontend --template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
+```
 
+or by listing the forwarding rules for your project:
 ```shell
 $ gcloud compute forwarding-rules list
 ```
