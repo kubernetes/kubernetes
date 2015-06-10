@@ -95,6 +95,37 @@ Salt.  You will need to replace the `{{ <param> }}` blocks with your own values
 for the config variables mentioned above.  Other than the templating, these are
 normal kubernetes objects, and can be instantiated with `kubectl create`.
 
+Third, you will have to create a `Secret` that would normally be created by the cluster setup scripts.  This `Secret` holds a `Config` resource that would be passed to kube2sky via the `-kubecfg_file` flag, telling it about your cluster, and if required, the username needed in order to authenticate against the master's api server.
+
+Below is a simple example of how you would weave that by hand.  The example, unlike the cluster setup scripts, assumes an insecure apiserver operatin on the default port 8080.  Notice the `<< ... >>` must be filled by hand.
+
+First, you will want to create a `Config` resource, which will later on be turned into Base64 representation.  
+```
+apiVersion: v1
+kind: Config
+clusters:
+- name: local
+  cluster:
+     server: "http://<<HOSTNAME OR IP OF YOUR MASTER API SERVER>>:8080"
+contexts:
+- context:
+    cluster: local
+  name: service-account-context
+current-context: service-account-context
+```
+Next, you will want to convert this `Config` into a base64 string.  You can do that easily in linux/mac by invoking `base64 -i config.yaml`.  That should give you a base64 string, which you will then be able to copy into the `Secret` resource file.
+
+Finally, we create the `Secret` resource file and make the key name 'kubeconfig' as that is the filename that will be used by kube2sky.
+
+```
+apiVersion: v1beta1
+kind: Secret 
+id: token-system-dns
+data:
+  kubeconfig: "YXBpVmVyc2lvbjogdjEKa2luZDogQ29uZmlnCmNsdXN0ZXJzOgotIG5hbWU6IGxvY2FsCiAgY2x1c3RlcjoKICAgICBzZXJ2ZXI6ICJodHRwOi8vPDxIT1NUTkFNRSBPUiBJUCBPRiBZT1VSIE1BU1RFUiBBUEkgU0VSVkVSPj46ODA4MCIKY29udGV4dHM6Ci0gY29udGV4dDoKICAgIGNsdXN0ZXI6IGxvY2FsCiAgbmFtZTogc2VydmljZS1hY2NvdW50LWNvbnRleHQKY3VycmVudC1jb250ZXh0OiBzZXJ2aWNlLWFjY291bnQtY29udGV4dAo="
+```
+The last step is submitting this `Secret` utilizing kubectl - e.g `kubectl create -f secret.yaml`.
+
 ## How does it work?
 SkyDNS depends on etcd for what to serve, but it doesn't really need all of
 what etcd offers (at least not in the way we use it).  For simplicty, we run
