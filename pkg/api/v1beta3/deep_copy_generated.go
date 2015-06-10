@@ -21,6 +21,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"speter.net/go/exp/math/dec/inf"
@@ -1326,6 +1327,18 @@ func deepCopy_v1beta3_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) er
 	} else {
 		out.ImagePullSecrets = nil
 	}
+	if in.Conflicts != nil {
+		out.Conflicts = make([]labels.LabelSelector, len(in.Conflicts))
+		for i := range in.Conflicts {
+			if newVal, err := c.DeepCopy(in.Conflicts[i]); err != nil {
+				return err
+			} else {
+				out.Conflicts[i] = newVal.(labels.LabelSelector)
+			}
+		}
+	} else {
+		out.Conflicts = nil
+	}
 	return nil
 }
 
@@ -2049,6 +2062,24 @@ func deepCopy_v1beta3_VolumeSource(in VolumeSource, out *VolumeSource, c *conver
 	return nil
 }
 
+func deepCopy_labels_Requirement(in labels.Requirement, out *labels.Requirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.StrValues != nil {
+		out.StrValues = make(map[string]util.Empty)
+		for key, val := range in.StrValues {
+			newVal := new(util.Empty)
+			if err := deepCopy_util_Empty(val, newVal, c); err != nil {
+				return err
+			}
+			out.StrValues[key] = *newVal
+		}
+	} else {
+		out.StrValues = nil
+	}
+	return nil
+}
+
 func deepCopy_runtime_RawExtension(in runtime.RawExtension, out *runtime.RawExtension, c *conversion.Cloner) error {
 	if in.RawJSON != nil {
 		out.RawJSON = make([]uint8, len(in.RawJSON))
@@ -2058,6 +2089,10 @@ func deepCopy_runtime_RawExtension(in runtime.RawExtension, out *runtime.RawExte
 	} else {
 		out.RawJSON = nil
 	}
+	return nil
+}
+
+func deepCopy_util_Empty(in util.Empty, out *util.Empty, c *conversion.Cloner) error {
 	return nil
 }
 
@@ -2194,7 +2229,9 @@ func init() {
 		deepCopy_v1beta3_Volume,
 		deepCopy_v1beta3_VolumeMount,
 		deepCopy_v1beta3_VolumeSource,
+		deepCopy_labels_Requirement,
 		deepCopy_runtime_RawExtension,
+		deepCopy_util_Empty,
 		deepCopy_util_IntOrString,
 		deepCopy_util_Time,
 	)

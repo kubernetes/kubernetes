@@ -177,6 +177,30 @@ func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
 	return selector.Matches(labels.Set(node.Labels))
 }
 
+// NoPodLabelConflict evaluates if a pod fits a node by:
+// 1) Comparing the pod's conflict label selector against labels of all the other pods.
+// 2) Comparing all the other pods conflict label selector with labels of this pod.
+func NoPodLabelConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+	for podIx := range existingPods {
+		if existingPods[podIx].Labels != nil {
+			for ii, _ := range pod.Spec.Conflicts {
+				if pod.Spec.Conflicts[ii].Matches(labels.Set(existingPods[podIx].Labels)) {
+					return false, nil
+				}
+			}
+		}
+		if pod.Labels != nil {
+			for ii, _ := range existingPods[podIx].Spec.Conflicts {
+				if existingPods[podIx].Spec.Conflicts[ii].Matches(labels.Set(pod.Labels)) {
+					return false, nil
+				}
+			}
+		}
+	}
+
+	return true, nil
+}
+
 type NodeSelector struct {
 	info NodeInfo
 }
