@@ -254,7 +254,11 @@ func (s *KubeletServer) Run(_ []string) error {
 		glog.Warning(err)
 	}
 
-	client, err := s.createAPIServerClient()
+	var apiclient *client.Client
+	clientConfig, err := s.CreateAPIServerClientConfig()
+	if err == nil {
+		apiclient, err = client.New(clientConfig)
+	}
 	if err != nil && len(s.APIServerList) > 0 {
 		glog.Warningf("No API client: %v", err)
 	}
@@ -334,7 +338,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		EnableServer:                   s.EnableServer,
 		EnableDebuggingHandlers:        s.EnableDebuggingHandlers,
 		DockerClient:                   dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
-		KubeClient:                     client,
+		KubeClient:                     apiclient,
 		MasterServiceNamespace:         s.MasterServiceNamespace,
 		VolumePlugins:                  ProbeVolumePlugins(),
 		NetworkPlugins:                 ProbeNetworkPlugins(),
@@ -454,7 +458,11 @@ func (s *KubeletServer) createClientConfig() (*client.Config, error) {
 	return clientConfig, nil
 }
 
-func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
+// CreateAPIServerClientConfig generates a client.Config from command line flags,
+// including api-server-list, via createClientConfig and then injects chaos into
+// the configuration via addChaosToClientConfig. This func is exported to support
+// integration with third party kubelet extensions (e.g. kubernetes-mesos).
+func (s *KubeletServer) CreateAPIServerClientConfig() (*client.Config, error) {
 	if len(s.APIServerList) < 1 {
 		return nil, fmt.Errorf("no api servers specified")
 	}
@@ -468,11 +476,7 @@ func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
 		return nil, err
 	}
 	s.addChaosToClientConfig(clientConfig)
-	client, err := client.New(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
+	return clientConfig, nil
 }
 
 // addChaosToClientConfig injects random errors into client connections if configured.
