@@ -1,6 +1,6 @@
 {
   "kind": "Service",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "phabricator"
   },
@@ -14,9 +14,6 @@
     "selector": {
       "name": "phabricator"
     },
-    "createExternalLoadBalancer": true,
-    "publicIPs": [
-      "107.178.210.6"
-    ]
+    "type": "LoadBalancer"
   }
 }
