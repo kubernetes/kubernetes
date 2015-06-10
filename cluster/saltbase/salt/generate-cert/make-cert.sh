@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cert_dir=/srv/kubernetes
-cert_group=kube-cert
+cert_dir=${CERT_DIR:-/srv/kubernetes}
+cert_group=${CERT_GROUP:-kube-cert}
 
 mkdir -p "$cert_dir"
 

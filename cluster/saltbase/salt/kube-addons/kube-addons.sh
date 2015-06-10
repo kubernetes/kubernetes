@@ -22,6 +22,7 @@ KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-600}
 
 SYSTEM_NAMESPACE=kube-system
+token_dir=${TOKEN_DIR:-/srv/kubernetes}
 
 function create-kubeconfig-secret() {
   local -r token=$1
@@ -174,7 +175,7 @@ while read line; do
     # do not have DNS available will have to override the server.
     create-kubeconfig-secret "${token}" "${username}" "https://kubernetes.default"
   fi
-done < /srv/kubernetes/known_tokens.csv
+done < ${token_dir}/known_tokens.csv
 
 # Create admission_control objects if defined before any other addon services. If the limits
 # are defined in a namespace other than default, we should still create the limits for the
