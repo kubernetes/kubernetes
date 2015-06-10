@@ -23,7 +23,6 @@ echo "WRITING KUBE FILES , will overwrite the jsons, then testing pods. is kube 
 #kubectl=$GOPATH/src/github.com/GoogleCloudPlatform/kubernetes/cluster/kubectl.sh"
 kubectl="kubectl"
 VERSION="r.2.8.19"
-PUBLIC_IP="10.1.4.89" # ip which we use to access the Web server.
 _SECONDS=1000          # number of seconds to measure throughput.
 FE="1"                # amount of Web server  
 LG="1"                # amount of load generators
@@ -33,15 +32,14 @@ NS="default"       # namespace
 
 kubectl="${1:-$kubectl}"
 VERSION="${2:-$VERSION}"
-PUBLIC_IP="${3:-$PUBLIC_IP}" # ip which we use to access the Web server.
-_SECONDS="${4:-$_SECONDS}"   # number of seconds to measure throughput.
-FE="${5:-$FE}"       # amount of Web server  
-LG="${6:-$LG}"        # amount of load generators
-SLAVE="${7:-$SLAVE}"     # amount of redis slaves 
-TEST="${8:-$TEST}"      # 0 = Dont run tests, 1 = Do run tests.
-NS="${9:-$NS}"          # namespace
+_SECONDS="${3:-$_SECONDS}"   # number of seconds to measure throughput.
+FE="${4:-$FE}"       # amount of Web server  
+LG="${5:-$LG}"        # amount of load generators
+SLAVE="${6:-$SLAVE}"     # amount of redis slaves 
+TEST="${7:-$TEST}"      # 0 = Dont run tests, 1 = Do run tests.
+NS="${8:-$NS}"          # namespace
 
-echo "Running w/ args: kubectl $kubectl version $VERSION ip $PUBLIC_IP sec $_SECONDS fe $FE lg $LG slave $SLAVE test $TEST NAMESPACE $NS"
+echo "Running w/ args: kubectl $kubectl version $VERSION sec $_SECONDS fe $FE lg $LG slave $SLAVE test $TEST NAMESPACE $NS"
 function create { 
 
 cat << EOF > fe-rc.json
@@ -117,10 +115,10 @@ cat << EOF > fe-s.json
     "ports": [{
       "port": 3000
     }],
-    "deprecatedPublicIPs":["$PUBLIC_IP","10.1.4.89"],
     "selector": {
       "name": "frontend"
-    }
+    },
+    "type": "LoadBalancer"
   }
 }
 EOF
@@ -229,6 +227,24 @@ $kubectl create -f fe-s.json --namespace=$NS
 $kubectl create -f bps-load-gen-rc.json --namespace=$NS
 }
 
+#This script assumes the cloud provider is able to create a load balancer. If this not the case, you may want to check out other ways to make the frontend service accessible from outside (https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#external-services)
+function getIP {
+  echo "Waiting up to 1 min for a public IP to be assigned by the cloud provider..."
+  for i in `seq 1 20`;
+  do
+    PUBLIC_IP=$($kubectl get services/frontend --namespace=$NS -o template --template="{{range .status.loadBalancer.ingress}}{{.ip}}{{end}}")
+      if [ -n "$PUBLIC_IP" ]; then
+        printf '\n\n\n%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' =
+        echo "public IP=$PUBLIC_IP"
+        printf '%*s\n\n\n\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' = 
+        return
+      fi
+      sleep 3
+  done
+  echo "Failed to detect the public IP after 1 min, exit!"
+  exit 1
+}
+
 function pollfor {
   pass_http=0
 
@@ -271,17 +287,9 @@ function tests {
   done
 }
 
-function warning {
-  echo ""
-  echo "THIS SCRIPT IS FOR KUBERNETES < v1."
-  echo "For LATER VERSIONS, use k8petstore-nodeport.sh or k8petstore-loadbalacer.sh!!!!"
-  echo "In particular PublicIP is DEPRECATED in post-v1 releases!!!"
-  echo ""
-}
-
-warning
-
 create
+
+getIP
 
 pollfor
 
