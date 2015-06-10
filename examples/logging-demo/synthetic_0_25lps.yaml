@@ -12,7 +12,7 @@
 #     sleep 4
 #     i=$[$i+1]
 #   done
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   labels:
