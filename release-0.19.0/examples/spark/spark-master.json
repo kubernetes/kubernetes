@@ -1,0 +1,28 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "spark-master",
+    "labels": {
+      "name": "spark-master"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "spark-master",
+        "image": "mattf/spark-master",
+        "ports": [
+          {
+            "containerPort": 7077
+          }
+        ],
+        "resources": {
+          "limits": {
+            "cpu": "100m"
+          }
+        }
+      }
+    ]
+  }
+}

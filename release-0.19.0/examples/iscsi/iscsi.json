@@ -1,0 +1,53 @@
+{
+    "apiVersion": "v1beta3",
+    "kind": "Pod",
+    "metadata": {
+        "name": "iscsipd"
+    },
+    "spec": {
+        "containers": [
+            {
+                "name": "iscsipd-ro",
+                "image": "kubernetes/pause",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/mnt/iscsipd",
+                        "name": "iscsipd-ro"
+                    }
+                ]
+            },
+            {
+                "name": "iscsipd-rw",
+                "image": "kubernetes/pause",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/mnt/iscsipd",
+                        "name": "iscsipd-rw"
+                    }
+                ]
+            }
+        ],
+        "volumes": [
+            {
+                "name": "iscsipd-ro",
+                "iscsi": {
+                    "targetPortal": "10.16.154.81:3260",
+                    "iqn": "iqn.2014-12.world.server:storage.target01",
+                    "lun": 0,
+                    "fsType": "ext4",
+                    "readOnly": true
+                }
+            },
+            {
+                "name": "iscsipd-rw",
+                "iscsi": {
+                    "targetPortal": "10.16.154.81:3260",
+                    "iqn": "iqn.2014-12.world.server:storage.target01",
+                    "lun": 1,
+                    "fsType": "xfs",
+                    "readOnly": false
+                }
+            }
+        ]
+    }
+}
