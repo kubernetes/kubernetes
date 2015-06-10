@@ -51,7 +51,7 @@ If you are running different kubernetes clusters, you may need to specify ```-s 
 
 ### Run an application
 ```sh
-kubectl -s http://localhost:8080 run nginx --image=nginx --port=80
+kubectl -s http://localhost:8080 run-container nginx --image=nginx --port=80
 ```
 
 now run ```docker ps``` you should see nginx running.  You may need to wait a few minutes for the image to get pulled.
