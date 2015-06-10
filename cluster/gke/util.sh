@@ -100,6 +100,7 @@ function verify-prereqs() {
   fi
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update preview || true
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update alpha|| true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update kubectl|| true
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update || true
 }
 
@@ -116,18 +117,18 @@ function kube-up() {
   detect-project >&2
 
   # Make the specified network if we need to.
-  if ! gcloud compute networks --project "${PROJECT}" describe "${NETWORK}" &>/dev/null; then
+  if ! "${GCLOUD}" compute networks --project "${PROJECT}" describe "${NETWORK}" &>/dev/null; then
     echo "Creating new network: ${NETWORK}" >&2
-    gcloud compute networks create "${NETWORK}" --project="${PROJECT}" --range "${NETWORK_RANGE}"
+    "${GCLOUD}" compute networks create "${NETWORK}" --project="${PROJECT}" --range "${NETWORK_RANGE}"
   else
     echo "Using network: ${NETWORK}" >&2
   fi
 
   # Allow SSH on all nodes in the network. This doesn't actually check whether
   # such a rule exists, only whether we've created this exact rule.
-  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${FIREWALL_SSH}" &>/dev/null; then
+  if ! "${GCLOUD}" compute firewall-rules --project "${PROJECT}" describe "${FIREWALL_SSH}" &>/dev/null; then
     echo "Creating new firewall for SSH: ${FIREWALL_SSH}" >&2
-    gcloud compute firewall-rules create "${FIREWALL_SSH}" \
+    "${GCLOUD}" compute firewall-rules create "${FIREWALL_SSH}" \
       --allow="tcp:22" \
       --network="${NETWORK}" \
       --project="${PROJECT}" \
@@ -136,13 +137,20 @@ function kube-up() {
     echo "Using firewall-rule: ${FIREWALL_SSH}" >&2
   fi
 
+  local create_args=(
+    "--zone=${ZONE}"
+    "--project=${PROJECT}"
+    "--num-nodes=${NUM_MINIONS}"
+    "--network=${NETWORK}"
+  )
+  if [[ ! -z "${DOGFOOD_GCLOUD:-}" ]]; then
+    create_args+=("--cluster-version=${CLUSTER_API_VERSION:-}")
+  else
+    create_args+=("--cluster-api-version=${CLUSTER_API_VERSION:-}")
+  fi
+
   # Bring up the cluster.
-  "${GCLOUD}" alpha container clusters create "${CLUSTER_NAME}" \
-    --zone="${ZONE}" \
-    --project="${PROJECT}" \
-    --cluster-api-version="${CLUSTER_API_VERSION:-}" \
-    --num-nodes="${NUM_MINIONS}" \
-    --network="${NETWORK}"
+  "${GCLOUD}" "${CMD_GROUP}" container clusters create "${CLUSTER_NAME}" "${create_args[@]}"
 }
 
 # Execute prior to running tests to initialize required structure. This is
@@ -191,10 +199,10 @@ function test-setup() {
 function get-password() {
   echo "... in get-password()" >&2
   detect-project >&2
-  KUBE_USER=$("${GCLOUD}" alpha container clusters describe \
+  KUBE_USER=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep user | cut -f 4 -d ' ')
-  KUBE_PASSWORD=$("${GCLOUD}" alpha container clusters describe \
+  KUBE_PASSWORD=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep password | cut -f 4 -d ' ')
 }
@@ -211,7 +219,7 @@ function detect-master() {
   echo "... in detect-master()" >&2
   detect-project >&2
   KUBE_MASTER="k8s-${CLUSTER_NAME}-master"
-  KUBE_MASTER_IP=$("${GCLOUD}" alpha container clusters describe \
+  KUBE_MASTER_IP=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep endpoint | cut -f 2 -d ' ')
 }
@@ -310,6 +318,6 @@ function test-teardown() {
 function kube-down() {
   echo "... in kube-down()" >&2
   detect-project >&2
-  "${GCLOUD}" alpha container clusters delete --project="${PROJECT}" \
+  "${GCLOUD}" "${CMD_GROUP}" container clusters delete --project="${PROJECT}" \
     --zone="${ZONE}" "${CLUSTER_NAME}" --quiet
 }
