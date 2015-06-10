@@ -699,7 +699,7 @@ func (gce *GCECloud) AttachDisk(diskName string, readOnly bool) error {
 			return err
 		}
 		for _, disk := range instance.Disks {
-			if disk.InitializeParams.DiskName == diskName {
+			if disk.Source == attachedDisk.Source {
 				// Disk is already attached, we're good to go.
 				return nil
 			}
