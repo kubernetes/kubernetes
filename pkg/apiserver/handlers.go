@@ -267,8 +267,6 @@ type APIRequestInfoResolver struct {
 // /namespaces/{namespace}/{resource}/{resourceName}
 // /{resource}
 // /{resource}/{resourceName}
-// /{resource}/{resourceName}?namespace={namespace}
-// /{resource}?namespace={namespace}
 //
 // Special verbs:
 // /proxy/{resource}/{resourceName}
@@ -341,18 +339,7 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 			}
 		}
 	} else {
-		// URL forms: /{resource}/*
-		// URL forms: POST /{resource} is a legacy API convention to create in "default" namespace
-		// URL forms: /{resource}/{resourceName} use the "default" namespace if omitted from query param
-		// URL forms: /{resource} assume cross-namespace operation if omitted from query param
-		requestInfo.Namespace = req.URL.Query().Get("namespace")
-		if len(requestInfo.Namespace) == 0 {
-			if len(currentParts) > 1 || req.Method == "POST" {
-				requestInfo.Namespace = api.NamespaceDefault
-			} else {
-				requestInfo.Namespace = api.NamespaceAll
-			}
-		}
+		requestInfo.Namespace = api.NamespaceNone
 	}
 
 	// parsing successful, so we now know the proper value for .Parts

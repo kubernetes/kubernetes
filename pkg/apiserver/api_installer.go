@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	gpath "path"
 	"reflect"
 	"sort"
@@ -282,7 +281,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
 
 	} else {
-		// v1beta3 format with namespace in path
+		// v1beta3+ format with namespace in path
 		if scope.ParamPath() {
 			// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 			namespaceParam := ws.PathParameter(scope.ParamName(), scope.ParamDescription()).DataType("string")
@@ -325,42 +324,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"LIST", resource, params, namer}, isLister)
 			actions = appendIf(actions, action{"POST", resource, params, namer}, isCreater)
 			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer}, allowWatchList)
-
 		} else {
-			// Handler for standard REST verbs (GET, PUT, POST and DELETE).
-			// v1beta1/v1beta2 format where namespace was a query parameter
-			namespaceParam := ws.QueryParameter(scope.ParamName(), scope.ParamDescription()).DataType("string")
-			namespaceParams := []*restful.Parameter{namespaceParam}
-
-			basePath := resource
-			resourcePath := basePath
-			resourceParams := namespaceParams
-			itemPath := resourcePath + "/{name}"
-			nameParams := append(namespaceParams, nameParam)
-			proxyParams := append(nameParams, pathParam)
-			if hasSubresource {
-				itemPath = itemPath + "/" + subresource
-				resourcePath = itemPath
-				resourceParams = nameParams
-			}
-			namer := legacyScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
-
-			actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
-			actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
-
-			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
-			if getSubpath {
-				actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
-			}
-			actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
-			actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
-			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
-			actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
-			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
-			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
-			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
-			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
+			// Namespace as param is no longer supported
+			return fmt.Errorf("namespace as a parameter is no longer supported")
 		}
 	}
 
@@ -712,6 +678,9 @@ func (n scopeNaming) GenerateLink(req *restful.Request, obj runtime.Object) (pat
 			return "", "", err
 		}
 	}
+	if len(name) == 0 {
+		return "", "", errEmptyName
+	}
 	path = strings.Replace(n.itemPath, "{name}", name, 1)
 	path = strings.Replace(path, "{"+n.scope.ParamName()+"}", namespace, 1)
 	return path, "", nil
@@ -727,88 +696,6 @@ func (n scopeNaming) GenerateListLink(req *restful.Request) (path, query string,
 // name cannot be returned.
 // TODO: distinguish between objects with name/namespace and without via a specific error.
 func (n scopeNaming) ObjectName(obj runtime.Object) (namespace, name string, err error) {
-	name, err = n.SelfLinker.Name(obj)
-	if err != nil {
-		return "", "", err
-	}
-	namespace, err = n.SelfLinker.Namespace(obj)
-	if err != nil {
-		return "", "", err
-	}
-	return namespace, name, err
-}
-
-// legacyScopeNaming modifies a scopeNaming to read namespace from the query. It implements
-// ScopeNamer for older query based namespace parameters.
-type legacyScopeNaming struct {
-	scope meta.RESTScope
-	runtime.SelfLinker
-	itemPath string
-}
-
-// legacyScopeNaming implements ScopeNamer
-var _ ScopeNamer = legacyScopeNaming{}
-
-// Namespace returns the namespace from the query or the default.
-func (n legacyScopeNaming) Namespace(req *restful.Request) (namespace string, err error) {
-	if n.scope.Name() == meta.RESTScopeNameRoot {
-		return api.NamespaceNone, nil
-	}
-	values, ok := req.Request.URL.Query()[n.scope.ParamName()]
-	if !ok || len(values) == 0 {
-		// legacy behavior
-		if req.Request.Method == "POST" || len(req.PathParameter("name")) > 0 {
-			return api.NamespaceDefault, nil
-		}
-		return api.NamespaceAll, nil
-	}
-	return values[0], nil
-}
-
-// Name returns the name from the path, the namespace (or default), or an error if the
-// name is empty.
-func (n legacyScopeNaming) Name(req *restful.Request) (namespace, name string, err error) {
-	namespace, _ = n.Namespace(req)
-	name = req.PathParameter("name")
-	if len(name) == 0 {
-		return "", "", errEmptyName
-	}
-	return namespace, name, nil
-}
-
-// GenerateLink returns the appropriate path and query to locate an object by its canonical path.
-func (n legacyScopeNaming) GenerateLink(req *restful.Request, obj runtime.Object) (path, query string, err error) {
-	namespace, name, err := n.ObjectName(obj)
-	if err != nil {
-		return "", "", err
-	}
-	if len(name) == 0 {
-		return "", "", errEmptyName
-	}
-	path = strings.Replace(n.itemPath, "{name}", name, -1)
-	values := make(url.Values)
-	values.Set(n.scope.ParamName(), namespace)
-	query = values.Encode()
-	return path, query, nil
-}
-
-// GenerateListLink returns the appropriate path and query to locate a list by its canonical path.
-func (n legacyScopeNaming) GenerateListLink(req *restful.Request) (path, query string, err error) {
-	namespace, err := n.Namespace(req)
-	if err != nil {
-		return "", "", err
-	}
-	path = req.Request.URL.Path
-	values := make(url.Values)
-	values.Set(n.scope.ParamName(), namespace)
-	query = values.Encode()
-	return path, query, nil
-}
-
-// ObjectName returns the name and namespace set on the object, or an error if the
-// name cannot be returned.
-// TODO: distinguish between objects with name/namespace and without via a specific error.
-func (n legacyScopeNaming) ObjectName(obj runtime.Object) (namespace, name string, err error) {
 	name, err = n.SelfLinker.Name(obj)
 	if err != nil {
 		return "", "", err
