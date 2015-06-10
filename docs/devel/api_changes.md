@@ -334,8 +334,8 @@ The API spec changes should be in a commit separate from your other changes.
 ## Incompatible API changes
 If your change is going to be backward incompatible or might be a breaking change for API
 consumers, please send an announcement to `kubernetes-dev@googlegroups.com` before
-the change gets in. If you are unsure, ask. Also make sure that the change gets documented in
-`CHANGELOG.md` for the next release.
+the change gets in. If you are unsure, ask. Also make sure that the change (description and PR #) gets documented in the
+[releases](https://github.com/GoogleCloudPlatform/kubernetes/releases) page for the next release.
 
 ## Adding new REST objects
 
