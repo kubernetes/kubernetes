@@ -107,9 +107,6 @@ The kube-controller-manager has several options.
 **--resource-quota-sync-period**=10s
 	The period for syncing quota usage status in the system
 
-**--service-account-private-key-file**=""
-	Filename containing a PEM-encoded private RSA key used to sign service account tokens.
-
 **--stderrthreshold**=2
 	logs at or above this threshold go to stderr
 

@@ -419,10 +419,11 @@ func startServiceAccountTestServer(t *testing.T) (*client.Client, client.Config,
 		Authenticator:     authenticator,
 		Authorizer:        authorizer,
 		AdmissionControl:  serviceAccountAdmission,
+		TokenGenerator:    serviceaccount.JWTTokenGenerator(serviceAccountKey),
 	})
 
 	// Start the service account and service account token controllers
-	tokenController := serviceaccount.NewTokensController(rootClient, serviceaccount.DefaultTokenControllerOptions(serviceaccount.JWTTokenGenerator(serviceAccountKey)))
+	tokenController := serviceaccount.NewTokensController(rootClient, serviceaccount.DefaultTokenControllerOptions())
 	tokenController.Run()
 	serviceAccountController := serviceaccount.NewServiceAccountsController(rootClient, serviceaccount.DefaultServiceAccountsControllerOptions())
 	serviceAccountController.Run()

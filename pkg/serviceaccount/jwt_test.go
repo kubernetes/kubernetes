@@ -21,10 +21,12 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/dgrijalva/jwt-go"
 )
 
@@ -141,7 +143,25 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 
 	// Generate the token
 	generator := JWTTokenGenerator(getPrivateKey(privateKey))
-	token, err := generator.GenerateToken(*serviceAccount, *secret)
+	token, err := generator.GenerateToken(api.ServiceAccountTokenRequest{}, *serviceAccount, *secret)
+	if err != nil {
+		t.Fatalf("error generating token: %v", err)
+	}
+	if len(token) == 0 {
+		t.Fatalf("no token generated")
+	}
+
+	unexpiredSpec := api.ServiceAccountTokenRequest{Expires: util.NewTime(time.Now().Add(time.Hour))}
+	unexpiredToken, err := generator.GenerateToken(unexpiredSpec, *serviceAccount, *secret)
+	if err != nil {
+		t.Fatalf("error generating token: %v", err)
+	}
+	if len(token) == 0 {
+		t.Fatalf("no token generated")
+	}
+
+	expiredSpec := api.ServiceAccountTokenRequest{Expires: util.NewTime(time.Now().Add(-time.Hour))}
+	expiredToken, err := generator.GenerateToken(expiredSpec, *serviceAccount, *secret)
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
 	}
@@ -157,6 +177,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	testCases := map[string]struct {
 		Client client.Interface
 		Keys   []*rsa.PublicKey
+		Token  string
 
 		ExpectedErr      bool
 		ExpectedOK       bool
@@ -166,26 +187,46 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		"no keys": {
 			Client:      nil,
 			Keys:        []*rsa.PublicKey{},
+			Token:       token,
 			ExpectedErr: false,
 			ExpectedOK:  false,
 		},
 		"invalid keys": {
 			Client:      nil,
 			Keys:        []*rsa.PublicKey{getPublicKey(otherPublicKey)},
+			Token:       token,
 			ExpectedErr: true,
 			ExpectedOK:  false,
 		},
 		"valid key": {
 			Client:           nil,
 			Keys:             []*rsa.PublicKey{getPublicKey(publicKey)},
+			Token:            token,
 			ExpectedErr:      false,
 			ExpectedOK:       true,
 			ExpectedUserName: expectedUserName,
 			ExpectedUserUID:  expectedUserUID,
 		},
+		"unexpired token": {
+			Client:           nil,
+			Keys:             []*rsa.PublicKey{getPublicKey(publicKey)},
+			Token:            unexpiredToken,
+			ExpectedErr:      false,
+			ExpectedOK:       true,
+			ExpectedUserName: expectedUserName,
+			ExpectedUserUID:  expectedUserUID,
+		},
+		"expired token": {
+			Client:      nil,
+			Keys:        []*rsa.PublicKey{getPublicKey(publicKey)},
+			Token:       expiredToken,
+			ExpectedErr: true,
+			ExpectedOK:  false,
+		},
 		"rotated keys": {
 			Client:           nil,
 			Keys:             []*rsa.PublicKey{getPublicKey(otherPublicKey), getPublicKey(publicKey)},
+			Token:            token,
 			ExpectedErr:      false,
 			ExpectedOK:       true,
 			ExpectedUserName: expectedUserName,
@@ -194,6 +235,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		"valid lookup": {
 			Client:           testclient.NewSimpleFake(serviceAccount, secret),
 			Keys:             []*rsa.PublicKey{getPublicKey(publicKey)},
+			Token:            token,
 			ExpectedErr:      false,
 			ExpectedOK:       true,
 			ExpectedUserName: expectedUserName,
@@ -202,12 +244,14 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		"invalid secret lookup": {
 			Client:      testclient.NewSimpleFake(serviceAccount),
 			Keys:        []*rsa.PublicKey{getPublicKey(publicKey)},
+			Token:       token,
 			ExpectedErr: true,
 			ExpectedOK:  false,
 		},
 		"invalid serviceaccount lookup": {
 			Client:      testclient.NewSimpleFake(secret),
 			Keys:        []*rsa.PublicKey{getPublicKey(publicKey)},
+			Token:       token,
 			ExpectedErr: true,
 			ExpectedOK:  false,
 		},
@@ -217,7 +261,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		getter := NewGetterFromClient(tc.Client)
 		authenticator := JWTTokenAuthenticator(tc.Keys, tc.Client != nil, getter)
 
-		user, ok, err := authenticator.AuthenticateToken(token)
+		user, ok, err := authenticator.AuthenticateToken(tc.Token)
 		if (err != nil) != tc.ExpectedErr {
 			t.Errorf("%s: Expected error=%v, got %v", k, tc.ExpectedErr, err)
 			continue

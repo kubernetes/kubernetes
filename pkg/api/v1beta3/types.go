@@ -1191,6 +1191,22 @@ type ServiceAccountList struct {
 	Items []ServiceAccount `json:"items" description:"list of ServiceAccounts"`
 }
 
+// ServiceAccountTokenRequest is used to request a service account token
+type ServiceAccountTokenRequest struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
+
+	Expires util.Time `json:"expires,omitempty" description:"time at which to expire the requested token; if this value is empty no expiration is requested"`
+}
+
+// ServiceAccountTokenResponse is used to return a reference to the secret containing the requested token
+type ServiceAccountTokenResponse struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
+
+	Secret LocalObjectReference `json:"secret" description:"reference to the secret in the same namespace containing the requested token"`
+}
+
 // Endpoints is a collection of endpoints that implement the actual service.  Example:
 //   Name: "mysvc",
 //   Subsets: [

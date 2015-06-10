@@ -17,7 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -36,8 +35,6 @@ import (
 
 // TokensControllerOptions contains options for the TokensController
 type TokensControllerOptions struct {
-	// TokenGenerator is the generator to use to create new tokens
-	TokenGenerator TokenGenerator
 	// ServiceAccountResync is the time.Duration at which to fully re-list service accounts.
 	// If zero, re-list will be delayed as long as possible
 	ServiceAccountResync time.Duration
@@ -47,15 +44,14 @@ type TokensControllerOptions struct {
 }
 
 // DefaultTokenControllerOptions returns
-func DefaultTokenControllerOptions(tokenGenerator TokenGenerator) TokensControllerOptions {
-	return TokensControllerOptions{TokenGenerator: tokenGenerator}
+func DefaultTokenControllerOptions() TokensControllerOptions {
+	return TokensControllerOptions{}
 }
 
 // NewTokensController returns a new *TokensController.
 func NewTokensController(cl client.Interface, options TokensControllerOptions) *TokensController {
 	e := &TokensController{
 		client: cl,
-		token:  options.TokenGenerator,
 	}
 
 	e.serviceAccounts, e.serviceAccountController = framework.NewIndexerInformer(
@@ -108,7 +104,6 @@ type TokensController struct {
 	stopChan chan struct{}
 
 	client client.Interface
-	token  TokenGenerator
 
 	serviceAccounts cache.Indexer
 	secrets         cache.Indexer
@@ -193,8 +188,6 @@ func (e *TokensController) secretAdded(obj interface{}) {
 		if err := e.deleteSecret(secret); err != nil {
 			glog.Errorf("Error deleting secret %s/%s: %v", secret.Namespace, secret.Name, err)
 		}
-	} else {
-		e.generateTokenIfNeeded(serviceAccount, secret)
 	}
 }
 
@@ -214,8 +207,6 @@ func (e *TokensController) secretUpdated(oldObj interface{}, newObj interface{})
 		if err := e.deleteSecret(newSecret); err != nil {
 			glog.Errorf("Error deleting secret %s/%s: %v", newSecret.Namespace, newSecret.Name, err)
 		}
-	} else {
-		e.generateTokenIfNeeded(newServiceAccount, newSecret)
 	}
 }
 
@@ -272,30 +263,16 @@ func (e *TokensController) createSecretIfNeeded(serviceAccount *api.ServiceAccou
 
 // createSecret creates a secret of type ServiceAccountToken for the given ServiceAccount
 func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) error {
-	// Build the secret
-	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
-			Name:      secret.Strategy.GenerateName(fmt.Sprintf("%s-token-", serviceAccount.Name)),
-			Namespace: serviceAccount.Namespace,
-			Annotations: map[string]string{
-				api.ServiceAccountNameKey: serviceAccount.Name,
-				api.ServiceAccountUIDKey:  string(serviceAccount.UID),
-			},
-		},
-		Type: api.SecretTypeServiceAccountToken,
-		Data: map[string][]byte{},
-	}
+	tokenRequest := &api.ServiceAccountTokenRequest{}
 
-	// Generate the token
-	token, err := e.token.GenerateToken(*serviceAccount, *secret)
+	tokenResponse, err := e.client.ServiceAccounts(serviceAccount.Namespace).RequestToken(serviceAccount.Name, tokenRequest)
 	if err != nil {
 		return err
 	}
-	secret.Data[api.ServiceAccountTokenKey] = []byte(token)
 
-	// Save the secret
-	if _, err := e.client.Secrets(serviceAccount.Namespace).Create(secret); err != nil {
-		return err
+	secretName := tokenResponse.Secret.Name
+	if len(secretName) == 0 {
+		return errors.New("Token request was not fulfilled")
 	}
 
 	// We don't want to update the cache's copy of the service account
@@ -305,13 +282,13 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 	if err != nil {
 		return err
 	}
-	serviceAccount.Secrets = append(serviceAccount.Secrets, api.ObjectReference{Name: secret.Name})
+	serviceAccount.Secrets = append(serviceAccount.Secrets, api.ObjectReference{Name: secretName})
 
 	_, err = serviceAccounts.Update(serviceAccount)
 	if err != nil {
 		// we weren't able to use the token, try to clean it up.
-		glog.V(2).Infof("Deleting secret %s/%s because reference couldn't be added (%v)", secret.Namespace, secret.Name, err)
-		if err := e.client.Secrets(secret.Namespace).Delete(secret.Name); err != nil {
+		glog.V(2).Infof("Deleting secret %s/%s because reference couldn't be added (%v)", serviceAccount.Namespace, secretName, err)
+		if err := e.client.Secrets(serviceAccount.Namespace).Delete(secretName); err != nil {
 			glog.Error(err) // if we fail, just log it
 		}
 	}
@@ -321,38 +298,6 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 	}
 
 	return err
-}
-
-// generateTokenIfNeeded populates the token data for the given Secret if not already set
-func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAccount, secret *api.Secret) error {
-	if secret.Annotations == nil {
-		secret.Annotations = map[string]string{}
-	}
-	if secret.Data == nil {
-		secret.Data = map[string][]byte{}
-	}
-
-	tokenData, ok := secret.Data[api.ServiceAccountTokenKey]
-	if ok && len(tokenData) > 0 {
-		return nil
-	}
-
-	// Generate the token
-	token, err := e.token.GenerateToken(*serviceAccount, *secret)
-	if err != nil {
-		return err
-	}
-
-	// Set the token and annotations
-	secret.Data[api.ServiceAccountTokenKey] = []byte(token)
-	secret.Annotations[api.ServiceAccountNameKey] = serviceAccount.Name
-	secret.Annotations[api.ServiceAccountUIDKey] = string(serviceAccount.UID)
-
-	// Save the secret
-	if _, err := e.client.Secrets(secret.Namespace).Update(secret); err != nil {
-		return err
-	}
-	return nil
 }
 
 // deleteSecret deletes the given secret
