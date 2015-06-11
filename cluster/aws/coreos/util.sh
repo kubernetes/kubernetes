@@ -16,6 +16,8 @@
 
 # A library of helper functions for CoreOS.
 
+SSH_USER=ubuntu
+
 function detect-minion-image (){
   if [[ -z "${KUBE_MINION_IMAGE-}" ]]; then
     KUBE_MINION_IMAGE=$(curl -s -L http://${COREOS_CHANNEL}.release.core-os.net/amd64-usr/current/coreos_production_ami_all.json | python -c "import json,sys;obj=json.load(sys.stdin);print filter(lambda t: t['name']=='${AWS_REGION}', obj['amis'])[0]['hvm']")

@@ -17,35 +17,8 @@
 
 # A library of helper functions for Ubuntu.
 
-function detect-minion-image() {
-  if [[ -z "${KUBE_MINION_IMAGE=-}" ]]; then
-    detect-image
-    KUBE_MINION_IMAGE=$AWS_IMAGE
-  fi
-}
+source "${KUBE_ROOT}/cluster/aws/ubuntu/common.sh"
 
-function generate-minion-user-data {
-  i=$1
-  # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
-  echo "#! /bin/bash"
-  echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
-  echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
-  echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
-  echo "readonly DOCKER_STORAGE='${DOCKER_STORAGE:-}'"
-  grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
-  grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
-  grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"
-}
+# TODO: Move image detection in here once it is no longer shared with CoreOS
 
-function check-minion() {
-  local minion_name=$1
-  local minion_ip=$2
-
-  local output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@$minion_ip sudo docker ps -a 2>/dev/null)
-  if [[ -z "${output}" ]]; then
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@$minion_ip sudo service docker start > $LOG 2>&1
-    echo "not working yet"
-  else
-    echo "working"
-  fi
-}
+SSH_USER=ubuntu
