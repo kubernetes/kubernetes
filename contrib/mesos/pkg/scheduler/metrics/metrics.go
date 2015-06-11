@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	schedulerSubsystem = "k8sm_scheduler"
+	schedulerSubsystem = "mesos_scheduler"
 )
 
 var (

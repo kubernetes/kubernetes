@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	runtimeSubsystem = "runtime"
+	runtimeSubsystem = "mesos_runtime"
 )
 
 var (
