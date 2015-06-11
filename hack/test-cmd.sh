@@ -65,7 +65,7 @@ kube::log::status "Starting kubelet in masterless mode"
   --port="$KUBELET_PORT" \
   --healthz_port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
 KUBELET_PID=$!
-kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet: " 0.2 25
+kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet(masterless)"
 kill ${KUBELET_PID} 1>&2 2>/dev/null
 
 kube::log::status "Starting kubelet in masterful mode"
@@ -81,7 +81,7 @@ kube::log::status "Starting kubelet in masterful mode"
   --healthz_port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
 KUBELET_PID=$!
 
-kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet: " 0.2 25
+kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet"
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
@@ -98,17 +98,18 @@ kube::log::status "Starting kube-apiserver"
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
-kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
+kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
 
 # Start controller manager
-kube::log::status "Starting CONTROLLER-MANAGER"
+kube::log::status "Starting controller-manager"
 "${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
   --machines="127.0.0.1" \
+  --port="${CTLRMGR_PORT}" \
   --master="127.0.0.1:${API_PORT}" 1>&2 &
 CTLRMGR_PID=$!
 
-kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager: "
-kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta3/nodes/127.0.0.1" "apiserver(nodes): " 0.2 25
+kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager"
+kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta3/nodes/127.0.0.1" "apiserver(nodes)"
 
 # Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
