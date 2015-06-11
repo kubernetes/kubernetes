@@ -445,16 +445,11 @@ For GCE details about limiting traffic to specific sources, see the [GCE firewal
 
 ### Step Seven: Cleanup
 
-If you are in a live kubernetes cluster, you can just kill the pods, using a script such as this (obviously, read through it and make sure you understand it before running it blindly, as it will kill several pods automatically for you).
+If you are in a live kubernetes cluster, you can just kill the pods by stopping the replication controllers and deleting the services.  Using labels to select the resources to stop or delete is an easy way to do this in one command.
 
 ```shell
-### First, kill services and controllers.
-kubectl stop -f examples/guestbook/redis-master-controller.json
-kubectl stop -f examples/guestbook/redis-slave-controller.json
-kubectl stop -f examples/guestbook/frontend-controller.json
-kubectl delete -f examples/guestbook/redis-master-service.json
-kubectl delete -f examples/guestbook/redis-slave-service.json
-kubectl delete -f examples/guestbook/frontend-service.json
+kubectl stop rc -l "name in (redis-master, redis-slave, frontend)"
+kubectl delete service -l "name in (redis-master, redis-slave, frontend)"
 ```
 
 To completely tear down a Kubernetes cluster, if you ran this from source, you can use
