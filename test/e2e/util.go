@@ -1145,6 +1145,21 @@ func waitForNodeToBeNotReady(c *client.Client, name string, timeout time.Duratio
 	return waitForNodeToBe(c, name, false, timeout)
 }
 
+func isNodeReadySetAsExpected(node *api.Node, wantReady bool) bool {
+	// Check the node readiness condition (logging all).
+	for i, cond := range node.Status.Conditions {
+		Logf("Node %s condition %d/%d: type: %v, status: %v",
+			node.Name, i+1, len(node.Status.Conditions), cond.Type, cond.Status)
+		// Ensure that the condition type is readiness and the status
+		// matches as desired.
+		if cond.Type == api.NodeReady && (cond.Status == api.ConditionTrue) == wantReady {
+			Logf("Successfully found node %s readiness to be %t", node.Name, wantReady)
+			return true
+		}
+	}
+	return false
+}
+
 // waitForNodeToBe returns whether node name's readiness state matches wantReady
 // within timeout. If wantReady is true, it will ensure the node is ready; if
 // it's false, it ensures the node is in any state other than ready (e.g. not
@@ -1158,20 +1173,26 @@ func waitForNodeToBe(c *client.Client, name string, wantReady bool, timeout time
 			continue
 		}
 
-		// Check the node readiness condition (logging all).
-		for i, cond := range node.Status.Conditions {
-			Logf("Node %s condition %d/%d: type: %v, status: %v",
-				name, i+1, len(node.Status.Conditions), cond.Type, cond.Status)
-			// Ensure that the condition type is readiness and the status
-			// matches as desired.
-			if cond.Type == api.NodeReady && (cond.Status == api.ConditionTrue) == wantReady {
-				Logf("Successfully found node %s readiness to be %t", name, wantReady)
-				return true
-			}
+		if isNodeReadySetAsExpected(node, wantReady) {
+			return true
 		}
 	}
 	Logf("Node %s didn't reach desired readiness (%t) within %v", name, wantReady, timeout)
 	return false
+}
+
+// Filters nodes in NodeList in place, removing nodes that do not
+// satisfy the given condition
+// TODO: consider merging with pkg/client/cache.NodeLister
+func filterNodes(nodeList *api.NodeList, fn func(node api.Node) bool) {
+	var l []api.Node
+
+	for _, node := range nodeList.Items {
+		if fn(node) {
+			l = append(l, node)
+		}
+	}
+	nodeList.Items = l
 }
 
 // LatencyMetrics stores data about request latency at a given quantile
