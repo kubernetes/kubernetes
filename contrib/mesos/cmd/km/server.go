@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/cmd/km/server.go
+// clone of the upstream cmd/hypercube/server.go
 package main
 
 import (
@@ -70,7 +69,14 @@ func (s *Server) Flags() *pflag.FlagSet {
 	if s.flags == nil {
 		s.flags = pflag.NewFlagSet(s.Name(), pflag.ContinueOnError)
 		s.flags.SetOutput(ioutil.Discard)
-		s.flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
 	}
 	return s.flags
+}
+
+func (s *Server) FindServer(name string) bool {
+	if s == nil {
+		return false
+	}
+	_, err := s.hk.FindServer(name)
+	return err == nil
 }

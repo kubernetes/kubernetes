@@ -17,6 +17,9 @@ limitations under the License.
 // Package app implements a server that runs a set of active
 // components.  This includes replication controllers, service endpoints and
 // nodes.
+//
+// CAUTION: If you update code in this file, you may need to also update code
+//          in contrib/mesos/pkg/controlmanager/controlmanager.go
 package app
 
 import (
