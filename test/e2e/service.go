@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -1010,66 +1011,63 @@ func testLoadBalancerNotReachable(ingress api.LoadBalancerIngress, port int) {
 }
 
 func testReachable(ip string, port int) {
-	var err error
-	var resp *http.Response
-
 	url := fmt.Sprintf("http://%s:%d", ip, port)
 	if ip == "" {
-		Failf("got empty IP for reachability check", url)
+		Failf("Got empty IP for reachability check (%s)", url)
 	}
 	if port == 0 {
-		Failf("got port==0 for reachability check", url)
+		Failf("Got port==0 for reachability check (%s)", url)
 	}
 
 	By(fmt.Sprintf("Checking reachability of %s", url))
-	for t := time.Now(); time.Since(t) < podStartTimeout; time.Sleep(5 * time.Second) {
-		resp, err = httpGetNoConnectionPool(url)
-		if err == nil {
-			break
+	expectNoError(wait.Poll(poll, podStartTimeout, func() (bool, error) {
+		resp, err := httpGetNoConnectionPool(url)
+		if err != nil {
+			Logf("Got error waiting for reachability of %s: %v", url, err)
+			return false, nil
 		}
-		By(fmt.Sprintf("Got error waiting for reachability of %s: %v", url, err))
-	}
-	Expect(err).NotTo(HaveOccurred())
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	Expect(err).NotTo(HaveOccurred())
-	if resp.StatusCode != 200 {
-		Failf("received non-success return status %q trying to access %s; got body: %s", resp.Status, url, string(body))
-	}
-	if !strings.Contains(string(body), "test-webserver") {
-		Failf("received response body without expected substring 'test-webserver': %s", string(body))
-	}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			Logf("Got error reading response from %s: %v", url, err)
+			return false, nil
+		}
+		if resp.StatusCode != 200 {
+			return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s", resp.Status, url, string(body))
+		}
+		if !strings.Contains(string(body), "test-webserver") {
+			return false, fmt.Errorf("received response body without expected substring 'test-webserver': %s", string(body))
+		}
+		Logf("Successfully reached %v", url)
+		return true, nil
+	}))
 }
 
 func testNotReachable(ip string, port int) {
-	var err error
-	var resp *http.Response
-	var body []byte
-
 	url := fmt.Sprintf("http://%s:%d", ip, port)
 	if ip == "" {
-		Failf("got empty IP for non-reachability check", url)
+		Failf("Got empty IP for non-reachability check (%s)", url)
 	}
 	if port == 0 {
-		Failf("got port==0 for non-reachability check", url)
+		Failf("Got port==0 for non-reachability check (%s)", url)
 	}
 
-	for t := time.Now(); time.Since(t) < podStartTimeout; time.Sleep(5 * time.Second) {
-		resp, err = httpGetNoConnectionPool(url)
+	By(fmt.Sprintf("Checking that %s is not reachable", url))
+	expectNoError(wait.Poll(poll, podStartTimeout, func() (bool, error) {
+		resp, err := httpGetNoConnectionPool(url)
 		if err != nil {
-			break
+			Logf("Successfully waited for the url %s to be unreachable.", url)
+			return true, nil
 		}
-		body, err = ioutil.ReadAll(resp.Body)
-		Expect(err).NotTo(HaveOccurred())
-		resp.Body.Close()
-		By(fmt.Sprintf("Got success waiting for non-reachability of %s: %v", url, resp.Status))
-	}
-	if err == nil {
-		Failf("able to reach service %s when should no longer have been reachable: %q body=%s", url, resp.Status, string(body))
-	}
-	// TODO: Check type of error
-	By(fmt.Sprintf("Found (expected) error during not-reachability test %v", err))
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			Logf("Expecting %s to be unreachable but was reachable and got an error reading response: %v", url, err)
+			return false, nil
+		}
+		Logf("Able to reach service %s when should no longer have been reachable, status:%d and body: %s", url, resp.Status, string(body))
+		return false, nil
+	}))
 }
 
 // Does an HTTP GET, but does not reuse TCP connections
