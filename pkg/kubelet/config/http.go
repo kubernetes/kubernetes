@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
@@ -74,7 +75,7 @@ func (s *sourceURL) extractFromURL() error {
 	}
 	if len(data) == 0 {
 		// Emit an update with an empty PodList to allow HTTPSource to be marked as seen
-		s.updates <- kubelet.PodUpdate{[]*api.Pod{}, kubelet.SET, kubelet.HTTPSource}
+		s.updates <- kubelet.PodUpdate{[]*api.Pod{}, cache.SET, kubelet.HTTPSource}
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
 	// Short circuit if the data has not changed since the last time it was read.
@@ -90,7 +91,7 @@ func (s *sourceURL) extractFromURL() error {
 			// It parsed but could not be used.
 			return singlePodErr
 		}
-		s.updates <- kubelet.PodUpdate{[]*api.Pod{pod}, kubelet.SET, kubelet.HTTPSource}
+		s.updates <- kubelet.PodUpdate{[]*api.Pod{pod}, cache.SET, kubelet.HTTPSource}
 		return nil
 	}
 
@@ -105,7 +106,7 @@ func (s *sourceURL) extractFromURL() error {
 		for i := range podList.Items {
 			pods = append(pods, &podList.Items[i])
 		}
-		s.updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.HTTPSource}
+		s.updates <- kubelet.PodUpdate{pods, cache.SET, kubelet.HTTPSource}
 		return nil
 	}
 

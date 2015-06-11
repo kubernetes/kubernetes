@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 )
 
 const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
@@ -29,15 +30,6 @@ const ConfigMirrorAnnotationKey = "kubernetes.io/config.mirror"
 type PodOperation int
 
 const (
-	// This is the current pod configuration
-	SET PodOperation = iota
-	// Pods with the given ids are new to this source
-	ADD
-	// Pods with the given ids have been removed from this source
-	REMOVE
-	// Pods with the given ids have been updated in this source
-	UPDATE
-
 	// These constants identify the sources of pods
 	// Updates from a file
 	FileSource = "file"
@@ -65,7 +57,7 @@ const (
 // are generated.
 type PodUpdate struct {
 	Pods   []*api.Pod
-	Op     PodOperation
+	Op     cache.CacheOperation
 	Source string
 }
 

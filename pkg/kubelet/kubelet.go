@@ -1130,12 +1130,18 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 	kl.volumeManager.SetVolumes(pod.UID, podVolumes)
 
-	podStatus, err := kl.generatePodStatus(pod)
-	if err != nil {
-		glog.Errorf("Unable to get status for pod %q (uid %q): %v", podFullName, uid, err)
-		return err
+	var podStatus api.PodStatus
+	if _, ok := kl.statusManager.GetPodStatus(podFullName); ok {
+		var err error
+		podStatus, err = kl.generatePodStatus(pod)
+		if err != nil {
+			glog.Errorf("Unable to get status for pod %q (uid %q): %v", podFullName, uid, err)
+			return err
+		}
+	} else {
+		glog.V(3).Infof("New pod %v, using default pod status", podFullName)
+		podStatus = pod.Status
 	}
-
 	pullSecrets, err := kl.getPullSecretsForPod(pod)
 	if err != nil {
 		glog.Errorf("Unable to get pull secrets for pod %q (uid %q): %v", podFullName, uid, err)
@@ -1624,6 +1630,13 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 				return
 			}
 			kl.podManager.UpdatePods(u, podSyncTypes)
+			if u.Op == cache.ADD {
+				// TODO: Break out SyncPods and check admission etc
+				for _, p := range u.Pods {
+					kl.podWorkers.UpdatePod(p, nil, func() {})
+				}
+				continue
+			}
 			unsyncedPod = true
 		case <-time.After(kl.resyncInterval):
 			glog.V(4).Infof("Periodic sync")

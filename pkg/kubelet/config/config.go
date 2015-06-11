@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
@@ -43,6 +44,9 @@ const (
 	// PodConfigNotificationSnapshotAndUpdates delivers an UPDATE message whenever pods are
 	// changed, and a SET message if there are any additions or removals.
 	PodConfigNotificationSnapshotAndUpdates
+	// PodConfigNotificationSnapshotOnDelete delivers a snapshot for every DELETE, but sends
+	// ADD and UPDATE as individual PodUpdates.
+	PodConfigNotificationSnapshotOnDelete
 	// PodConfigNotificationIncremental delivers ADD, UPDATE, and REMOVE to the update channel.
 	PodConfigNotificationIncremental
 )
@@ -168,12 +172,23 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 			s.updates <- *updates
 		}
 		if len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
-			s.updates <- kubelet.PodUpdate{s.MergedState().([]*api.Pod), kubelet.SET, source}
+			s.updates <- kubelet.PodUpdate{s.MergedState().([]*api.Pod), cache.SET, source}
 		}
 
 	case PodConfigNotificationSnapshot:
 		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
-			s.updates <- kubelet.PodUpdate{s.MergedState().([]*api.Pod), kubelet.SET, source}
+			s.updates <- kubelet.PodUpdate{s.MergedState().([]*api.Pod), cache.SET, source}
+		}
+
+	case PodConfigNotificationSnapshotOnDelete:
+		if len(updates.Pods) > 0 {
+			s.updates <- *updates
+		}
+		if len(adds.Pods) > 0 {
+			s.updates <- *adds
+		}
+		if len(deletes.Pods) > 0 {
+			s.updates <- kubelet.PodUpdate{s.MergedState().([]*api.Pod), cache.SET, source}
 		}
 
 	default:
@@ -187,9 +202,9 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 
-	adds = &kubelet.PodUpdate{Op: kubelet.ADD}
-	updates = &kubelet.PodUpdate{Op: kubelet.UPDATE}
-	deletes = &kubelet.PodUpdate{Op: kubelet.REMOVE}
+	adds = &kubelet.PodUpdate{Op: cache.ADD}
+	updates = &kubelet.PodUpdate{Op: cache.UPDATE}
+	deletes = &kubelet.PodUpdate{Op: cache.REMOVE}
 
 	pods := s.pods[source]
 	if pods == nil {
@@ -198,13 +213,14 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 
 	update := change.(kubelet.PodUpdate)
 	switch update.Op {
-	case kubelet.ADD, kubelet.UPDATE:
-		if update.Op == kubelet.ADD {
+	case cache.ADD, cache.UPDATE:
+		if update.Op == cache.ADD {
 			glog.V(4).Infof("Adding new pods from source %s : %v", source, update.Pods)
 		} else {
 			glog.V(4).Infof("Updating pods from source %s : %v", source, update.Pods)
 		}
 
+		// TODO: Think about what happens when we get an add immediately followed by delete.
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
 			name := kubecontainer.GetPodFullName(ref)
@@ -227,7 +243,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			adds.Pods = append(adds.Pods, ref)
 		}
 
-	case kubelet.REMOVE:
+	case cache.REMOVE:
 		glog.V(4).Infof("Removing a pod %v", update)
 		for _, value := range update.Pods {
 			name := kubecontainer.GetPodFullName(value)
@@ -240,7 +256,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			// this is a no-op
 		}
 
-	case kubelet.SET:
+	case cache.SET:
 		glog.V(4).Infof("Setting pods for source %s : %v", source, update)
 		s.markSourceSet(source)
 		// Clear the old map entries by just creating a new map
@@ -329,7 +345,7 @@ func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventReco
 func (s *podStorage) Sync() {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
-	s.updates <- kubelet.PodUpdate{s.MergedState().([]*api.Pod), kubelet.SET, kubelet.AllSource}
+	s.updates <- kubelet.PodUpdate{s.MergedState().([]*api.Pod), cache.SET, kubelet.AllSource}
 }
 
 // Object implements config.Accessor
