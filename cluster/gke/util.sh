@@ -168,7 +168,8 @@ function test-setup() {
   detect-project >&2
 
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG="k8s-${CLUSTER_NAME}-node"
+  MINION_TAG="gke-${CLUSTER_NAME}-node"
+  OLD_MINION_TAG="k8s-${CLUSTER_NAME}-node"
 
   # Open up port 80 & 8080 so common containers on minions can be reached.
   # TODO(mbforbes): Is adding ${USER} necessary, and sufficient, to avoid
@@ -177,14 +178,14 @@ function test-setup() {
     "${MINION_TAG}-${USER}-http-alt" \
     --allow tcp:80,tcp:8080 \
     --project "${PROJECT}" \
-    --target-tags "${MINION_TAG}" \
+    --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
     --network="${NETWORK}"
 
   "${GCLOUD}" compute firewall-rules create \
     "${MINION_TAG}-${USER}-nodeports" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --project "${PROJECT}" \
-    --target-tags "${MINION_TAG}" \
+    --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
     --network="${NETWORK}"
 }
 
@@ -311,7 +312,7 @@ function test-teardown() {
 
   detect-project >&2
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG="k8s-${CLUSTER_NAME}-node"
+  MINION_TAG="gke-${CLUSTER_NAME}-node"
 
   # First, remove anything we did with test-setup (currently, the firewall).
   # NOTE: Keep in sync with names above in test-setup.
