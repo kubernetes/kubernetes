@@ -103,3 +103,49 @@ func (f *Framework) WaitForPodRunning(podName string) error {
 func (f *Framework) TestContainerOutput(scenarioName string, pod *api.Pod, expectedOutput []string) {
 	testContainerOutputInNamespace(scenarioName, f.Client, pod, expectedOutput, f.Namespace.Name)
 }
+
+// WaitForAnEndpoint waits for at least one endpoint to become available in the
+// service's corresponding endpoints object.
+func (f *Framework) WaitForAnEndpoint(serviceName string) error {
+	for {
+		// TODO: Endpoints client should take a field selector so we
+		// don't have to list everything.
+		list, err := f.Client.Endpoints(f.Namespace.Name).List(labels.Everything())
+		if err != nil {
+			return err
+		}
+		rv := list.ResourceVersion
+
+		isOK := func(e *api.Endpoints) bool {
+			return e.Name == serviceName && len(e.Subsets) > 0 && len(e.Subsets[0].Addresses) > 0
+		}
+		for i := range list.Items {
+			if isOK(&list.Items[i]) {
+				return nil
+			}
+		}
+
+		w, err := f.Client.Endpoints(f.Namespace.Name).Watch(
+			labels.Everything(),
+			fields.Set{"metadata.name": serviceName}.AsSelector(),
+			rv,
+		)
+		if err != nil {
+			return err
+		}
+		defer w.Stop()
+
+		for {
+			val, ok := <-w.ResultChan()
+			if !ok {
+				// reget and re-watch
+				break
+			}
+			if e, ok := val.Object.(*api.Endpoints); ok {
+				if isOK(e) {
+					return nil
+				}
+			}
+		}
+	}
+}
