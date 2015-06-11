@@ -100,6 +100,68 @@ Salt.  You will need to replace the `{{ <param> }}` blocks with your own values
 for the config variables mentioned above.  Other than the templating, these are
 normal kubernetes objects, and can be instantiated with `kubectl create`.
 
+## How do I test if it is working?
+First deploy DNS as described above.
+
+### 1 Create a simple Pod to use as a test environment.
+
+Create a file named busybox.yaml with the
+following contents:
+
+```yaml
+apiVersion: v1beta3
+kind: Pod
+metadata:
+  name: busybox
+  namespace: default
+spec:
+  containers:
+  - image: busybox
+    command:
+      - sleep
+      - "3600"
+    imagePullPolicy: IfNotPresent
+    name: busybox
+  restartPolicy: Always
+```
+
+Then create a pod using this file:
+
+```
+kubectl create -f busybox.yaml
+```
+
+### 2 Wait for this pod to go into the running state. 
+
+You can get its status with:
+```
+kubectl get pods busybox
+```
+
+You should see:
+```
+NAME      READY     REASON    RESTARTS   AGE
+busybox   1/1       Running   0          <some-time>
+```
+
+### 3 Validate DNS works
+Once that pod is running, you can exec nslookup in that environment:
+```
+kubectl exec busybox -- nslookup kubernetes
+```
+
+You should see something like:
+```
+Server:    10.0.0.10
+Address 1: 10.0.0.10
+
+Name:      kubernetes
+Address 1: 10.0.0.1
+```
+
+If you see that, DNS is working correctly.
+
+
 ## How does it work?
 SkyDNS depends on etcd for what to serve, but it doesn't really need all of
 what etcd offers (at least not in the way we use it).  For simplicty, we run
