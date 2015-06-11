@@ -472,7 +472,8 @@ func (k *KubernetesExecutor) launchTask(driver bindings.ExecutorDriver, taskId s
 	task.podName = podFullName
 	k.pods[podFullName] = pod
 
-	// send the latest snapshot of the set of pods to the kubelet via the pod update channel
+	// send the latest snapshot of the set of pods to the kubelet via the pod update channel.
+	// this results in the kubelet spinning up the new pod.
 	update := kubelet.PodUpdate{Op: kubelet.SET}
 	for _, p := range k.pods {
 		update.Pods = append(update.Pods, p)

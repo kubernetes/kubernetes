@@ -56,7 +56,7 @@ const (
 type schedulerInterface interface {
 	sync.Locker // synchronize scheduler plugin operations
 	SlaveIndex
-	algorithm() PodScheduleFunc
+	algorithm() PodScheduleFunc // see types.go
 	offers() offers.Registry
 	tasks() podtask.Registry
 

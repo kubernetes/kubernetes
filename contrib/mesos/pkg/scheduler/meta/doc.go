@@ -15,5 +15,8 @@ limitations under the License.
 */
 
 // Package meta defines framework constants used as keys in k8s annotations
-// that are attached to k8s pods
+// that are attached to k8s pods. The scheduler uses some of these annotations
+// for reconciliation upon failover. Other annotations are used as part of
+// the host-to-pod port-mapping implementation understood by the k8s-mesos
+// scheduler and custom endpoints-controller implementation.
 package meta
