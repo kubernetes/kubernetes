@@ -69,7 +69,7 @@ cluster/kubectl.sh get replicationcontrollers
 
 Note the difference between a [container](http://docs.k8s.io/containers.md)
 and a [pod](http://docs.k8s.io/pods.md). Since you only asked for the former, kubernetes will create a wrapper pod for you.
-However you can't view the nginx start page on localhost. To verify that nginx is running you need to run `curl` within the docker container (try `docker exec`).
+However you cannot view the nginx start page on localhost. To verify that nginx is running you need to run `curl` within the docker container (try `docker exec`).
 
 You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:
 
@@ -81,11 +81,12 @@ Congratulations!
 
 ### Troubleshooting
 
-#### I can't reach service IPs on the network.
+#### I cannot reach service IPs on the network.
 
 Some firewall software that uses iptables may not interact well with
-kubernetes.  If you're having trouble around networking, try disabling any
-firewall or other iptables-using systems, first.
+kubernetes.  If you have trouble around networking, try disabling any
+firewall or other iptables-using systems, first.  Also, you can check
+if SELinux is blocking anything by running a command such as `journalctl --since yesterday | grep avc`.
 
 By default the IP range for service cluster IPs is 10.0.*.* - depending on your
 docker installation, this may conflict with IPs for containers.  If you find
