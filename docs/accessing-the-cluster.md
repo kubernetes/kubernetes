@@ -197,7 +197,7 @@ As mentioned above, you use the `kubectl cluster-info` command to retrieve the s
 
 #### Using web browsers to access services running on the cluster
 You may be able to put a apiserver proxy url into the address bar of a browser.  However:
-  - Web browsers cannot usually pass tokens, so you may need to use basic (password) auth.  Apiserver can be configured to accespt basic auth,
+  - Web browsers cannot usually pass tokens, so you may need to use basic (password) auth.  Apiserver can be configured to accept basic auth,
     but your cluster may not be configured to accept basic auth.
   - Some web apps may not work, particularly those with client side javascript that construct urls in a
     way that is unaware of the proxy path prefix.

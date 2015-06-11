@@ -22,7 +22,7 @@ The value of that label is the hash of the complete JSON representation of the``
 If a rollout fails or is terminated in the middle, it is important that the user be able to resume the roll out.
 To facilitate recovery in the case of a crash of the updating process itself, we add the following annotations to each replicaController in the ```kubernetes.io/``` annotation namespace:
    * ```desired-replicas``` The desired number of replicas for this controller (either N or zero)
-   * ```update-partner``` A pointer to the replicaiton controller resource that is the other half of this update (syntax ```<name>``` the namespace is assumed to be identical to the namespace of this replication controller.)
+   * ```update-partner``` A pointer to the replication controller resource that is the other half of this update (syntax ```<name>``` the namespace is assumed to be identical to the namespace of this replication controller.)
 
 Recovery is achieved by issuing the same command again:
 

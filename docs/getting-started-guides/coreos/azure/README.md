@@ -164,7 +164,7 @@ frontend-controller-oh43e   10.2.2.22  php-redis     kubernetes/example-guestboo
 
 ## Exposing the app to the outside world
 
-To makes sure the app is working, you probably want to load it in the browser. For accessing the Guesbook service from the outside world, an Azure endpoint needs to be created like shown on the picture below.
+To makes sure the app is working, you probably want to load it in the browser. For accessing the Guestbook service from the outside world, an Azure endpoint needs to be created like shown on the picture below.
 
 ![Creating an endpoint](external_access.png)
 

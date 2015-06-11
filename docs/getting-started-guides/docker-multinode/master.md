@@ -77,7 +77,7 @@ You now need to edit the docker configuration to activate new flags.  Again, thi
 
 This may be in ```/etc/default/docker``` or ```/etc/systemd/service/docker.service``` or it may be elsewhere.
 
-Regardless, you need to add the following to the docker comamnd line:
+Regardless, you need to add the following to the docker command line:
 ```sh
 --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}
 ```
