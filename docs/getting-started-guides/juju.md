@@ -191,8 +191,7 @@ or
 
 ## More Info
 
-Look in the `juju` directory in the
-[kubernetes](https://github.com/GoogleCloudPlatform/kubernetes/) github project.
+Look in the [`juju`](juju/) directory.
 
 [Glossary of Juju terms](juju/user-glossary.html)
 
