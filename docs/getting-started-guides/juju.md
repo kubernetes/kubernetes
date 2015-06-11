@@ -194,12 +194,18 @@ or
 Look in the `juju` directory in the
 [kubernetes](https://github.com/GoogleCloudPlatform/kubernetes/) github project.
 
-We have a [Glossary of Juju terms](juju/user-glossary.html)
+[Glossary of Juju terms](juju/user-glossary.html)
+
 
  - [Bundle File](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/juju/bundles/local.yaml)
    * [Kubernetes master charm](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes-master)
    * [Kubernetes minion charm](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes)
  - [More about Juju](https://juju.ubuntu.com)
+
+##### Developers 
+
+If you wish to integrate with the Kubernetes Charm ecosystem in Juju, we have
+documented the [relationships and interfaces](juju/dev-interfaces.md)
 
 
 ### Cloud compatibility
