@@ -1,6 +1,6 @@
 {
   "kind": "Endpoints",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "glusterfs-cluster"
   },
@@ -13,8 +13,7 @@
       ],
       "ports": [
         {
-          "port": 1,
-          "protocol": "TCP"
+          "port": 1
         }
       ]
     },
@@ -26,8 +25,7 @@
       ],
       "ports": [
         {
-          "port": 1,
-          "protocol": "TCP"
+          "port": 1
         }
       ]
     }
