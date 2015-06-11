@@ -65,10 +65,13 @@ Of course, giving services a name is just half of the problem - DNS names need a
 domain also.  This implementation uses a configurable local domain, which can
 also be passed to containers by kubelet as a DNS search suffix.
 
+Kubelets automatically find the DNS server by looking for a service in the default
+namespace called `kubernetes-dns`. The DNS domain is found by looking at an
+annotation on that service called `kubernetes.io/cluster-domain`.
+
 ## How do I configure it?
 The easiest way to use DNS is to use a supported kubernetes cluster setup,
-which should have the required logic to read some config variables and plumb
-them all the way down to kubelet.
+which should have the required logic to read some config variables.
 
 Supported environments offer the following config flags, which are used at
 cluster turn-up to create the SkyDNS pods and configure the kubelets.  For
@@ -85,15 +88,9 @@ This enables DNS with a DNS Service IP of `10.0.0.10` and a local domain of
 `cluster.local`, served by a single copy of SkyDNS.
 
 If you are not using a supported cluster setup, you will have to replicate some
-of this yourself.  First, each kubelet needs to run with the following flags
-set:
+of this yourself.
 
-```
---cluster_dns=<DNS service ip>
---cluster_domain=<default local domain>
-```
-
-Second, you need to start the DNS server ReplicationController and Service. See
+First, you need to start the DNS server ReplicationController and Service. See
 the example files ([ReplicationController](skydns-rc.yaml.in) and
 [Service](skydns-svc.yaml.in)), but keep in mind that these are templated for
 Salt.  You will need to replace the `{{ <param> }}` blocks with your own values

@@ -163,7 +163,7 @@ $ kubectl cluster-info
 Kubernetes master is running at https://104.154.60.226
 Elasticsearch is running at https://104.154.60.226/api/v1/proxy/namespaces/default/services/elasticsearch-logging
 Kibana is running at https://104.154.60.226/api/v1/proxy/namespaces/default/services/kibana-logging
-KubeDNS is running at https://104.154.60.226/api/v1/proxy/namespaces/default/services/kube-dns
+KubeDNS is running at https://104.154.60.226/api/v1/proxy/namespaces/default/services/kubernetes-dns
 ```
 
 To find the user name and password to access the URLs,

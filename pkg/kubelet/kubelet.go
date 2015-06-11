@@ -1006,6 +1006,30 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, pod
 	return fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
 }
 
+func (kl *Kubelet) lookupDnsService() (string, string, error) {
+	// Lookup the cluster DNS service and returns its info
+	if kl.serviceLister == nil {
+		return "", "", nil
+	}
+	services, err := kl.serviceLister.List()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to list services when setting up env vars.")
+	}
+
+	for _, service := range services.Items {
+		if service.Name == "kubernetes-dns" && service.Namespace == "default" {
+			// ignore services where ClusterIP is "None" or empty
+			if api.IsServiceIPSet(&service) {
+				// An empty domain string is accounted for in caller
+				domain := service.Annotations["kubernetes.io/cluster-domain"]
+				return service.Spec.ClusterIP, domain, nil
+			}
+		}
+	}
+
+	return "", "", nil
+}
+
 // getClusterDNS returns a list of the DNS servers and a list of the DNS search
 // domains of the cluster.
 func (kl *Kubelet) getClusterDNS(pod *api.Pod) ([]string, []string, error) {
@@ -1021,16 +1045,40 @@ func (kl *Kubelet) getClusterDNS(pod *api.Pod) ([]string, []string, error) {
 		return nil, nil, err
 	}
 
-	var dns, dnsSearch []string
+	var clusterDNS, clusterDomain string
 
+	// If cluster DNS support not specified on the command line, look it up
+	if kl.clusterDNS == nil || kl.clusterDomain == "" {
+		clusterDNS, clusterDomain, err = kl.lookupDnsService()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	// Use args from the command line if theyt are present
 	if kl.clusterDNS != nil {
-		dns = append([]string{kl.clusterDNS.String()}, hostDNS...)
+		clusterDNS = kl.clusterDNS.String()
 	}
 	if kl.clusterDomain != "" {
-		nsSvcDomain := fmt.Sprintf("%s.svc.%s", pod.Namespace, kl.clusterDomain)
-		svcDomain := fmt.Sprintf("svc.%s", kl.clusterDomain)
-		dnsSearch = append([]string{nsSvcDomain, svcDomain, kl.clusterDomain}, hostSearch...)
+		clusterDomain = kl.clusterDomain
 	}
+
+	dns := []string{}
+	dnsSearch := []string{}
+
+	if clusterDNS != "" {
+		dns = append(dns, clusterDNS)
+	}
+	if clusterDomain != "" {
+		nsSvcDomain := fmt.Sprintf("%s.svc.%s", pod.Namespace, clusterDomain)
+		svcDomain := fmt.Sprintf("svc.%s", clusterDomain)
+		dnsSearch = append(dnsSearch, nsSvcDomain, svcDomain, clusterDomain)
+	}
+
+	// Always add info from host resolv.conf
+	dns = append(dns, hostDNS...)
+	dnsSearch = append(dnsSearch, hostSearch...)
+
 	return dns, dnsSearch, nil
 }
 

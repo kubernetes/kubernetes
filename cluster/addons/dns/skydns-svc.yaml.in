@@ -1,12 +1,14 @@
 apiVersion: v1beta3
 kind: Service
 metadata:
-  name: kube-dns
+  name: kubernetes-dns
   namespace: default
   labels:
     k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "KubeDNS"
+  annotations:
+    kubernetes.io/cluster-domain: {{ pillar['dns_domain'] }}
 spec:
   selector:
     k8s-app: kube-dns

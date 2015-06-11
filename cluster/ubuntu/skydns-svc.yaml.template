@@ -1,6 +1,6 @@
 kind: Service
 apiVersion: v1beta1
-id: kube-dns
+id: kubernetes-dns
 namespace: default
 protocol: UDP
 port: 53
@@ -10,5 +10,7 @@ labels:
   k8s-app: kube-dns
   name: kube-dns
   kubernetes.io/cluster-service: "true"
+annotations:
+  kubernetes.io/cluster-domain: {{ pillar['dns_domain'] }}
 selector:
   k8s-app: kube-dns
