@@ -7,56 +7,67 @@ services has been deployed.
 
 ### Prerequisites
 
-> Note: If you're running kube-up, on ubuntu - all of the dependencies
-> will be handled for you. You may safely skip to the section:
-> [Launch Kubernetes Cluster](#launch-kubernetes-cluster)
+> Note: If you plan on using the Kuberentes script `kube-up.sh`, on Ubuntu -
+> all of the dependencies will be handled for you. You may safely skip to the
+> section: [Launch Kubernetes Cluster](#launch-kubernetes-cluster).
 
-#### On Ubuntu
+#### Prerequisites using Docker
 
-[Install the Juju client](https://juju.ubuntu.com/install) on your
-local ubuntu system:
-
-    sudo add-apt-repository ppa:juju/stable
-    sudo apt-get update
-    sudo apt-get install juju-core juju-quickstart
-
-
-#### With Docker
-
-If you are not using ubuntu or prefer the isolation of docker, you may
-run the following:
+If you are not using Ubuntu or prefer the isolation of Docker, use the Docker
+image that contains the all the Juju tools:
 
     mkdir ~/.juju
     sudo docker run -v ~/.juju:/home/ubuntu/.juju -ti whitmo/jujubox:latest
 
-At this point from either path you will have access to the `juju
-quickstart` command.
+To enter the interactive mode for Quickstart use the `juju quickstart -i`
+command.
 
-To set up the credentials for your chosen cloud run:
+### Quickstart
+For Juju to manage the public clouds you must provide your cloud credentials.  
+The Quickstart tool makes this easy with a text based curses interface. This
+example will illustrate setting up the Amazon cloud environment, but the
+concepts are the same for other cloud environments.
 
-    juju quickstart --constraints="mem=3.75G" -i
+From the main Quickstart screen, create a `new Amazon EC2 environment`.
 
-Follow the dialogue and choose `save` and `use`.  Quickstart will now
-bootstrap the juju root node and setup the juju web based user
-interface.
+* Type "amazon" in the 'environment name' field.
+* The 'admin secret' is the password for the Juju GUI, should you ever use it.
+
+![Quickstart environment name and admin secret](juju/img/quickstart1.png)
+
+* Copy and paste your AWS 'access key' from the AWS control panel.
+* Copy and paste your AWS 'secret key' from the AWS control panel.
+
+![Quickstart access key and secret key](juju/img/quickstart2.png)
+
+- Make this the default environment.
+- Select `save` and `use` to write the changes to your environments.yaml file.
+
+![Quickstart default and save](juju/img/quickstart3.png)
+
+The Juju client using Secure Shell (SSH) to interact with the servers in the
+cloud. Quickstart will prompt you to create SSH keys if you do not already
+have keys on this system.
 
 
 ## Launch Kubernetes cluster
 
-You will need to have the Kubernetes tools compiled before launching the cluster
+You will need to set the Kuberentes provider to "juju" and run the `kube-up.sh`
+script from the `kubernetes` directory:  
 
-    make all WHAT=cmd/kubectl
     export KUBERNETES_PROVIDER=juju
     cluster/kube-up.sh
 
 If this is your first time running the `kube-up.sh` script, it will install
-the required predependencies to get started with Juju, additionally it will
-launch a curses based configuration utility allowing you to select your cloud
-provider and enter the proper access credentials.
+the required prerequisites to get started with Juju, additionally it will
+launch [Quickstart](#quickstart) a curses based configuration utility allowing
+you to select your cloud provider and enter the proper access credentials.
 
-Next it will deploy the kubernetes master, etcd, 2 minions with flannel based
-Software Defined Networking.
+The script will deploy a four system Kubernetes cluster which consists of: one
+kubernetes-master, two kubernetes nodes on a docker hosts with flannel-docker
+Software Defined Networking (SDN), and one etcd key value store.
 
+![Kubernetes cluster](juju/img/kubernetes-cluster.png)
 
 ## Exploring the cluster
 
@@ -70,7 +81,6 @@ Juju status provides information about each unit in the cluster:
       - flannel-docker/1: 52.6.104.142 (started)
       - kubernetes/1: 52.6.104.142 (started)
     - etcd/0: 52.5.216.210 (started) 4001/tcp
-    - juju-gui/0: 52.5.205.174 (started) 80/tcp, 443/tcp
     - kubernetes-master/0: 52.6.19.238 (started) 8080/tcp
 
 You can use `juju ssh` to access any of the units:
@@ -80,8 +90,8 @@ You can use `juju ssh` to access any of the units:
 
 ## Run some containers!
 
-`kubectl` is available on the kubernetes master node.  We'll ssh in to
-launch some containers, but one could use kubectl locally setting
+`kubectl` is installed and available on the Kubernetes master node.  You can
+ssh in to launch some containers, but one could use kubectl locally setting
 KUBERNETES_MASTER to point at the ip of `kubernetes-master/0`.
 
 No pods will be available before starting a container:
@@ -173,7 +183,7 @@ The [k8petstore example](https://github.com/GoogleCloudPlatform/kubernetes/blob/
 
 ## Tear down cluster
 
-    ./kube-down.sh
+    cluster/kube-down.sh
 
 or
 
@@ -181,11 +191,14 @@ or
 
 ## More Info
 
-Kubernetes Bundle on Github
+Look in the `juju` directory in the
+[kubernetes](https://github.com/GoogleCloudPlatform/kubernetes/) github project.
+
+We have a [Glossary of Juju terms](juju/user-glossary.html)
 
  - [Bundle File](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/juju/bundles/local.yaml)
    * [Kubernetes master charm](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes-master)
-   * [Kubernetes mininion charm](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes)
+   * [Kubernetes minion charm](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes)
  - [More about Juju](https://juju.ubuntu.com)
 
 
@@ -203,7 +216,6 @@ HPCloud           | TBD
 OpenStack         | TBD
 Joyent            | TBD
 Azure             | TBD
-Digital Ocean     | TBD
 MAAS (bare metal) | TBD
 GCE               | TBD
 
@@ -215,7 +227,6 @@ HPCloud           | [Pass](http://reports.vapour.ws/charm-test-details/charm-bun
 OpenStack         | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136)
 Joyent            | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136)
 Azure             | TBD
-Digital Ocean     | TBD
 MAAS (bare metal) | TBD
 GCE               | TBD
 
