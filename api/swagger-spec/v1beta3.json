@@ -13294,7 +13294,8 @@
       "description": "the port number that is exposed"
      },
      "targetPort": {
-      "type": "string",
+      "type": "integer",
+      "format": "int32",
       "description": "the port to access on the pods targeted by the service; defaults to the service port"
      },
      "nodePort": {
