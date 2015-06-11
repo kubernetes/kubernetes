@@ -83,11 +83,11 @@ else
   NODE_INSTANCE_GROUP=""
 fi
 
-ginkgo_args=()
+# Use eval to preserve embedded quoted strings.
+eval "ginkgo_args=(${GINKGO_ARGS:-})"
 if [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
   ginkgo_args+=("-p")
 fi
-
 
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig

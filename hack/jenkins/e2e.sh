@@ -37,8 +37,13 @@ else
     export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 fi
 
-# Additional parameters that are passed to ginkgo runner.
+# TODO: clean up this mess.
+# Additional parameters that are passed to the Ginkgo runner.
+GINKGO_ARGS=${GINKGO_ARGS:-"--noColor"}
+# Additional parameters that are passed to the Ginkgo e2e tests.
 GINKGO_TEST_ARGS=${GINKGO_TEST_ARGS:-""}
+# Addditional parameters that are passed to hack/e2e.go
+E2E_OPT=${E2E_OPT:-""}
 
 if [[ "${PERFORMANCE:-}" == "true" ]]; then
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
@@ -219,7 +224,10 @@ fi
 # Jenkins will look at the junit*.xml files for test failures, so don't exit
 # with a nonzero error code if it was only tests that failed.
 if [[ "${E2E_TEST,,}" == "true" ]]; then
-    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}--ginkgo.noColor" || true
+    # GINKGO_ARGS is parsed by the Ginkgo runner itself, whereas the --test_args
+    # flag is parsed by the test.
+    export GINKGO_ARGS
+    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}" || true
 fi
 
 # TODO(zml): We have a bunch of legacy Jenkins configs that are
