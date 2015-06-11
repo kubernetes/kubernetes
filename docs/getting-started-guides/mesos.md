@@ -3,13 +3,16 @@
 <!-- TODO: Update, clean up. -->
 
 Mesos allows dynamic sharing of cluster resources between Kubernetes and other first-class Mesos frameworks such as [Hadoop][1], [Spark][2], and [Chronos][3].
-Mesos ensures applications from different frameworks running on your cluster are isolated and that resources are allocated fairly.
+Mesos also ensures applications from different frameworks running on your cluster are isolated and that resources are allocated fairly.
 
 Running Kubernetes on Mesos allows you to easily move Kubernetes workloads from one cloud provider to another to your own physical datacenter.
 
 This tutorial will walk you through setting up Kubernetes on a Mesos cluster.
 It provides a step by step walk through of adding Kubernetes to a Mesos cluster and running the classic GuestBook demo application.
 The walkthrough presented here is based on the v0.4.x series of the Kubernetes-Mesos project, which itself is based on Kubernetes v0.11.0.
+
+**NOTE:** There are [known issues with the current implementation][11].
+Please [file an issue against the kubernetes-mesos project][12] if you have problems completing the steps below.
 
 ### Prerequisites
 
@@ -296,6 +299,8 @@ Now, you can visit the guestbook in your browser!
 [8]: mesos/k8s-firewall.png
 [9]: mesos/k8s-guestbook.png
 [10]: http://mesos.apache.org/
+[11]: https://github.com/mesosphere/kubernetes-mesos/blob/master/docs/issues.md
+[12]: https://github.com/mesosphere/kubernetes-mesos/issues
 
 
 
