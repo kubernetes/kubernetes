@@ -326,6 +326,10 @@ func (k *kubeScheduler) doSchedule(task *podtask.T, err error) (string, error) {
 			return "", fmt.Errorf("task.offer assignment must be idempotent, task %+v: offer %+v", task, offer)
 		}
 		task.Offer = offer
+		//TODO(jdef) FillFromDetails currently allocates fixed (hardwired) cpu and memory resources for all
+		//tasks. This will be fixed once we properly integrate parent-cgroup support into the kublet-executor.
+		//For now we are completely ignoring the resources specified in the pod.
+		//see: https://github.com/mesosphere/kubernetes-mesos/issues/68
 		task.FillFromDetails(details)
 		if err := k.api.tasks().Update(task); err != nil {
 			offer.Release()

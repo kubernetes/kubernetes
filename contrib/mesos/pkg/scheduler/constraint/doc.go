@@ -16,4 +16,6 @@ limitations under the License.
 
 // Package constraint exposes Marathon-like constraints for scheduling pods.
 // Incomplete.
+// TODO(jdef) We need better alignment between k8s-mesos and k8s scheduling
+// constraints (read: a common constraints API).
 package constraint

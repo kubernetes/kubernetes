@@ -153,6 +153,7 @@ func (t *T) BuildTaskInfo() *mesos.TaskInfo {
 
 // Fill the Spec in the T, should be called during k8s scheduling,
 // before binding.
+// TODO(jdef): remove hardcoded values and make use of actual pod resource settings
 func (t *T) FillFromDetails(details *mesos.Offer) error {
 	if details == nil {
 		//programming error
