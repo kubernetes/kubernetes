@@ -8,12 +8,25 @@ package mount
 import "C"
 
 const (
-	RDONLY      = C.MNT_RDONLY
-	NOSUID      = C.MNT_NOSUID
-	NOEXEC      = C.MNT_NOEXEC
-	SYNCHRONOUS = C.MNT_SYNCHRONOUS
-	NOATIME     = C.MNT_NOATIME
+	// RDONLY will mount the filesystem as read-only.
+	RDONLY = C.MNT_RDONLY
 
+	// NOSUID will not allow set-user-identifier or set-group-identifier bits to
+	// take effect.
+	NOSUID = C.MNT_NOSUID
+
+	// NOEXEC will not allow execution of any binaries on the mounted file system.
+	NOEXEC = C.MNT_NOEXEC
+
+	// SYNCHRONOUS will allow any I/O to the file system to be done synchronously.
+	SYNCHRONOUS = C.MNT_SYNCHRONOUS
+
+	// NOATIME will not update the file access time when reading from a file.
+	NOATIME = C.MNT_NOATIME
+)
+
+// These flags are unsupported.
+const (
 	BIND        = 0
 	DIRSYNC     = 0
 	MANDLOCK    = 0
