@@ -19,7 +19,7 @@ limitations under the License.
 // nodes.
 //
 // CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/pkg/controlmanager/controlmanager.go
+//          in contrib/mesos/pkg/controllermanager/controllermanager.go
 package app
 
 import (

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/pkg/service/endpoints_manager.go
+//          in contrib/mesos/pkg/service/endpoints_controller.go
 package service
 
 import (
