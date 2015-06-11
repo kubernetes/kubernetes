@@ -166,9 +166,10 @@ We can add minion units like so:
 The [k8petstore example](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/k8petstore) is available as a
 [juju action](https://jujucharms.com/docs/devel/actions).
 
-    juju action do kubernetes-master/0
+    juju action do kubernetes-master/0 petstore
 
-Note: this example includes curl statements to exercise the app, which automatically generates "petstore" transactions written to redis, and allows you to visualize the throughput in your browswer.
+> Note: this example includes 1000 curl statements to exercise the app.
+> Action success to date takes approx. 30 minutes to complete.
 
 ## Tear down cluster
 
@@ -182,10 +183,9 @@ or
 
 Kubernetes Bundle on Github
 
- - [Bundle Repository](https://github.com/whitmo/bundle-kubernetes)
-   * [Kubernetes master charm](https://github.com/whitmo/charm-kubernetes-master)
-   * [Kubernetes mininion charm](https://github.com/whitmo/charm-kubernetes)
- - [Bundle Documentation](http://whitmo.github.io/bundle-kubernetes)
+ - [Bundle File](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/juju/bundles/local.yaml)
+   * [Kubernetes master charm](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes-master)
+   * [Kubernetes mininion charm](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes)
  - [More about Juju](https://juju.ubuntu.com)
 
 
@@ -193,6 +193,8 @@ Kubernetes Bundle on Github
 
 Juju runs natively against a variety of cloud providers and can be
 made to work against many more using a generic manual provider.
+
+
 
 Provider          | v0.15.0
 --------------    | -------
