@@ -89,14 +89,23 @@ versions of Kubernetes are expected to provide more automation for populating
 environment variables from files.
 
 
-## Changes to Secrets
+## Secret and Pod Lifetime interaction
 
-Once a pod is created, its secret volumes will not change, even if the secret
-resource is modified.  To change the secret used, the original pod must be
-deleted, and a new pod (perhaps with an identical PodSpec) must be created.
-Therefore, updating a secret follows the same workflow as deploying a new
-container image.  The `kubectl rolling-update` command can be used ([man
-page](kubectl_rolling-update.md)).
+When a pod is created via the API, there is no check whether a referenced
+secret exists.  Once a pod is scheduled, the kubelet will try to fetch the
+secret value.  If the secret cannot be fetched because it does not exist or
+because of a temporary lack of connection to the API server, kubelet will
+periodically retry.  It will report an event about the pod explaining the
+reason it is not started yet.  Once the a secret is fetched, the kubelet will
+create and mount a volume containing it.  None of the pod's containers will
+start until all the pod's volumes are mounted.
+
+Once the kubelet has started a pod's containers, its secret volumes will not
+change, even if the secret resource is modified.  To change the secret used,
+the original pod must be deleted, and a new pod (perhaps with an identical
+PodSpec) must be created.  Therefore, updating a secret follows the same
+workflow as deploying a new container image.  The `kubectl rolling-update`
+command can be used ([man page](kubectl_rolling-update.md)).
 
 The resourceVersion of the secret is not specified when it is referenced.
 Therefore, if a secret is updated at about the same time as pods are starting,
