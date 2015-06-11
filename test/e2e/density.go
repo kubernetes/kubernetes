@@ -102,17 +102,17 @@ var _ = Describe("Density", func() {
 		skip          bool
 		podsPerMinion int
 		/* Controls how often the apiserver is polled for pods */
-		interval int
+		interval time.Duration
 	}
 
 	densityTests := []Density{
 		// This test should always run, even if larger densities are skipped.
-		{podsPerMinion: 3, skip: false, interval: 10},
-		{podsPerMinion: 30, skip: false, interval: 10},
+		{podsPerMinion: 3, skip: false, interval: 10 * time.Second},
+		{podsPerMinion: 30, skip: false, interval: 10 * time.Second},
 		// More than 30 pods per node is outside our v1.0 goals.
 		// We might want to enable those tests in the future.
-		{podsPerMinion: 50, skip: true, interval: 10},
-		{podsPerMinion: 100, skip: true, interval: 1},
+		{podsPerMinion: 50, skip: true, interval: 10 * time.Second},
+		{podsPerMinion: 100, skip: true, interval: 1 * time.Second},
 	}
 
 	for _, testArg := range densityTests {
