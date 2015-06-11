@@ -37,7 +37,7 @@ and the way the topology of Services is connected.  A Charm defines what
 relations it `provides` and what relations that it can connect with `requires`
 Relations are a bi-directional communication pipeline, written declaratively in
 charms in a 'provides' and 'requires' stanza. These relational interfaces
-dictate how Service s interact with one another.
+dictate how Services interact with one another.
 
 ##### Repository
 A location where multiple Charms are stored. Repositories may be as simple as
