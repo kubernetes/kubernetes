@@ -45,6 +45,7 @@ if [[ "${PERFORMANCE:-}" == "true" ]]; then
       export MASTER_SIZE=${MASTER_SIZE:-"m3.xlarge"}
     else
       export MASTER_SIZE=${MASTER_SIZE:-"n1-standard-4"}
+      export MINION_SIZE=${MINION_SIZE:-"n1-standard-2"}
     fi
     export NUM_MINIONS=${NUM_MINIONS:-"100"}
     GINKGO_TEST_ARGS=${GINKGO_TEST_ARGS:-"--ginkgo.focus=\[Performance suite\] "}
@@ -53,6 +54,7 @@ else
       export MASTER_SIZE=${MASTER_SIZE:-"t2.small"}
     else
       export MASTER_SIZE=${MASTER_SIZE:-"g1-small"}
+      export MINION_SIZE=${MINION_SIZE:-"n1-standard-2"}
     fi
     export NUM_MINIONS=${NUM_MINIONS:-"2"}
 fi
