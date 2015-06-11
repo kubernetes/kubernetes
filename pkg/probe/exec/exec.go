@@ -39,11 +39,13 @@ func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 	if err != nil {
 		exit, ok := err.(exec.ExitError)
 		if ok {
-			if exit.ExitStatus() == 0 {
-				return probe.Success, string(data), nil
-			} else {
-				return probe.Failure, string(data), nil
-			}
+                    if exit.ExitStatus() == 0 {
+                        return probe.Success, string(data), nil
+                    } else if exit.ExitStatus() == 1 {
+                        return probe.Unknown, string(data), nil
+                    } else {
+                        return probe.Failure, string(data), nil
+                    }
 		}
 		return probe.Unknown, "", err
 	}

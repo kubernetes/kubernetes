@@ -670,7 +670,7 @@ func TestProbeContainer(t *testing.T) {
 			testContainer: api.Container{
 				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
 			},
-			expectedResult:    probe.Failure,
+			expectedResult:    probe.Unknown,
 			expectedReadiness: false,
 		},
 		{
@@ -735,7 +735,7 @@ func TestProbeContainer(t *testing.T) {
 				LivenessProbe:  &api.Probe{InitialDelaySeconds: 100},
 				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
 			},
-			expectedResult:    probe.Failure,
+			expectedResult:    probe.Unknown,
 			expectedReadiness: false,
 		},
 		{
