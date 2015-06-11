@@ -259,7 +259,7 @@ function detect-minion-names {
 # Vars set:
 #   NODE_INSTANCE_GROUP
 function detect-node-instance-group {
-  NODE_INSTANCE_GROUP=$("${GCLOUD}" alpha container clusters describe \
+  NODE_INSTANCE_GROUP=$("${GCLOUD}" "${CMD_GROUP}" container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep instanceGroupManagers | cut -d '/' -f 11)
 }
