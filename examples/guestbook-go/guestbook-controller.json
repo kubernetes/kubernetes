@@ -1,6 +1,6 @@
 {
    "kind":"ReplicationController",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "metadata":{
       "name":"guestbook",
       "labels":{
@@ -21,13 +21,12 @@
          "spec":{
             "containers":[
                {
-                  "image":"kubernetes/guestbook:v2",
                   "name":"guestbook",
+                  "image":"kubernetes/guestbook:v2",
                   "ports":[
                      {
                         "name":"http-server",
-                        "containerPort":3000,
-                        "protocol":"TCP"
+                        "containerPort":3000
                      }
                   ]
                }

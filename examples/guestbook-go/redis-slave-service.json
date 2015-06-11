@@ -1,6 +1,6 @@
 {
    "kind":"Service",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "metadata":{
       "name":"redis-slave",
       "labels":{
@@ -12,8 +12,7 @@
       "ports": [
         {
           "port":6379,
-          "targetPort":"redis-server",
-          "protocol":"TCP"
+          "targetPort":"redis-server"
         }
       ],
       "selector":{
