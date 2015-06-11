@@ -358,6 +358,8 @@ function upload-server-tars() {
   SERVER_BINARY_TAR_URL=
   SALT_TAR_URL=
 
+  ensure-temp-dir
+
   if [[ -z ${AWS_S3_BUCKET-} ]]; then
       local project_hash=
       local key=$(aws configure get aws_access_key_id)
