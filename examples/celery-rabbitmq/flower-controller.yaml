@@ -1,4 +1,4 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
@@ -20,7 +20,6 @@ spec:
         ports:
         - containerPort: 5555
           hostPort: 5555
-          protocol: TCP
         resources:
           limits:
             cpu: 100m
