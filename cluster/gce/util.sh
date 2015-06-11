@@ -400,7 +400,7 @@ function create-node-template {
   # TODO(mbforbes): To make this really robust, we need to parse the output and
   #                 add retries. Just relying on a non-zero exit code doesn't
   #                 distinguish an ephemeral failed call from a "not-exists".
-  if gcloud compute instance-templates describe "$1" &>/dev/null; then
+  if gcloud compute instance-templates describe "$1" --project "${PROJECT}" &>/dev/null; then
     echo "Instance template ${1} already exists; continuing." >&2
     return
   fi
