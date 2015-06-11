@@ -209,26 +209,16 @@ made to work against many more using a generic manual provider.
 
 
 
-Provider          | v0.15.0
---------------    | -------
-AWS               | TBD
-HPCloud           | TBD
-OpenStack         | TBD
-Joyent            | TBD
-Azure             | TBD
-MAAS (bare metal) | TBD
-GCE               | TBD
 
-
-Provider          | v0.8.1
---------------    | -------
-AWS               | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136)
-HPCloud           | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136)
-OpenStack         | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136)
-Joyent            | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136)
-Azure             | TBD
-MAAS (bare metal) | TBD
-GCE               | TBD
+Provider          | v0.15.0 | v0.8.1  
+--------------    | ------- | -------
+AWS               | TBD |[Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136) 
+HPCloud           | TBD | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136)
+OpenStack         | TBD | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136) 
+Joyent            | TBD | [Pass](http://reports.vapour.ws/charm-test-details/charm-bundle-test-parent-136) 
+Azure             | TBD | TBD
+MAAS (bare metal) | TBD | TBD
+GCE               | TBD | TBD
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/juju.md?pixel)]()
