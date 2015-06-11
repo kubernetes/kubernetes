@@ -96,12 +96,12 @@ kubectl create -f meteor-controller.json
 kubectl create -f meteor-service.json
 ```
 
-Note that [`meteor-service.json`](meteor-service.json) creates an external load balancer, so
+Note that [`meteor-service.json`](meteor-service.json) creates a load balancer, so
 your app should be available through the IP of that load balancer once
 the Meteor pods are started. You can find the IP of your load balancer
 by running:
 ```
-kubectl get services/meteor -o template -t "{{.spec.publicIPs}}"
+kubectl get services/meteor --template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
 ```
 
 You will have to open up port 80 if it's not open yet in your
