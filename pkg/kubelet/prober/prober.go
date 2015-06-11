@@ -89,94 +89,93 @@ func NewTestProber(
 }
 
 // Probe checks the liveness/readiness of the given container.
-// If the container's liveness probe is unsuccessful, set readiness to false.
-// If liveness is successful, do a readiness check and set readiness accordingly.
 func (pb *prober) Probe(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
-	// Build a name string for logs.
-	ctrName := fmt.Sprintf("%s:%s", kubecontainer.GetPodFullName(pod), container.Name)
-
-	// Probe liveness.
-	if container.LivenessProbe != nil {
-		live, output, err := pb.probeLiveness(pod, status, container, containerID, createdAt)
-		if err != nil || live != probe.Success {
-			// Liveness failed in one way or another.
-			pb.readinessManager.SetReadiness(containerID, false)
-			ref, ok := pb.refManager.GetRef(containerID)
-			if !ok {
-				glog.Warningf("No ref for pod %q - '%v'", containerID, container.Name)
-			}
-			if err != nil {
-				glog.V(1).Infof("Liveness probe for %q errored: %v", ctrName, err)
-				if ok {
-					pb.recorder.Eventf(ref, "unhealthy", "Liveness probe errored: %v", err)
-				}
-				return probe.Unknown, err
-			} else { // live != probe.Success
-				glog.V(1).Infof("Liveness probe for %q failed (%v): %s", ctrName, live, output)
-				if ok {
-					pb.recorder.Eventf(ref, "unhealthy", "Liveness probe failed: %s", output)
-				}
-				return live, nil
-			}
-		}
-		glog.V(3).Infof("Liveness probe for %q succeeded", ctrName)
-	}
-
-	// Probe readiness.
-	if container.ReadinessProbe != nil {
-		ready, output, err := pb.probeReadiness(pod, status, container, containerID, createdAt)
-		if err != nil || ready != probe.Success {
-			// Readiness failed in one way or another.
-			pb.readinessManager.SetReadiness(containerID, false)
-			ref, ok := pb.refManager.GetRef(containerID)
-			if !ok {
-				glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
-			}
-			if err != nil {
-				glog.V(1).Infof("readiness probe for %q errored: %v", ctrName, err)
-				if ok {
-					pb.recorder.Eventf(ref, "unhealthy", "Readiness probe errored: %v", err)
-				}
-				return probe.Unknown, err
-			} else { // ready != probe.Success
-				glog.V(1).Infof("Readiness probe for %q failed (%v): %s", ctrName, ready, output)
-				if ok {
-					pb.recorder.Eventf(ref, "unhealthy", "Readiness probe failed: %s", output)
-				}
-				return ready, nil
-			}
-		}
-		glog.V(3).Infof("Readiness probe for %q succeeded", ctrName)
-	}
-
-	pb.readinessManager.SetReadiness(containerID, true)
-	return probe.Success, nil
+	pb.probeReadiness(pod, status, container, containerID, createdAt)
+	return pb.probeLiveness(pod, status, container, containerID, createdAt)
 }
 
 // probeLiveness probes the liveness of a container.
 // If the initalDelay since container creation on liveness probe has not passed the probe will return probe.Success.
-func (pb *prober) probeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, string, error) {
+func (pb *prober) probeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
+	var live probe.Result
+	var output string
+	var err error
 	p := container.LivenessProbe
 	if p == nil {
-		return probe.Success, "", nil
+		return probe.Success, nil
 	}
 	if time.Now().Unix()-createdAt < p.InitialDelaySeconds {
-		return probe.Success, "", nil
+		return probe.Success, nil
+	} else {
+		live, output, err = pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
 	}
-	return pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
+	ctrName := fmt.Sprintf("%s:%s", kubecontainer.GetPodFullName(pod), container.Name)
+	if err != nil || live != probe.Success {
+		// Liveness failed in one way or another.
+		ref, ok := pb.refManager.GetRef(containerID)
+		if !ok {
+			glog.Warningf("No ref for pod %q - '%v'", containerID, container.Name)
+		}
+		if err != nil {
+			glog.V(1).Infof("Liveness probe for %q errored: %v", ctrName, err)
+			if ok {
+				pb.recorder.Eventf(ref, "unhealthy", "Liveness probe errored: %v", err)
+			}
+			return probe.Unknown, err
+		} else { // live != probe.Success
+			glog.V(1).Infof("Liveness probe for %q failed (%v): %s", ctrName, live, output)
+			if ok {
+				pb.recorder.Eventf(ref, "unhealthy", "Liveness probe failed: %s", output)
+			}
+			return live, nil
+		}
+	}
+	glog.V(3).Infof("Liveness probe for %q succeeded", ctrName)
+	return probe.Success, nil
 }
 
-// probeReadiness probes the readiness of a container.
-// If the initial delay on the readiness probe has not passed the probe will return probe.Failure.
-func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, string, error) {
+// probeReadiness probes and sets the readiness of a container.
+// If the initial delay on the readiness probe has not passed, we set readiness to false.
+func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) {
+	var ready probe.Result
+	var output string
+	var err error
 	p := container.ReadinessProbe
 	if p == nil {
-		return probe.Success, "", nil
+		ready = probe.Success
+	} else if time.Now().Unix()-createdAt < p.InitialDelaySeconds {
+		ready = probe.Failure
+	} else {
+		ready, output, err = pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
 	}
-	if time.Now().Unix()-createdAt < p.InitialDelaySeconds {
-		return probe.Failure, "", nil
+	ctrName := fmt.Sprintf("%s:%s", kubecontainer.GetPodFullName(pod), container.Name)
+	if err != nil || ready == probe.Failure {
+		// Readiness failed in one way or another.
+		pb.readinessManager.SetReadiness(containerID, false)
+		ref, ok := pb.refManager.GetRef(containerID)
+		if !ok {
+			glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
+		}
+		if err != nil {
+			glog.V(1).Infof("readiness probe for %q errored: %v", ctrName, err)
+			if ok {
+				pb.recorder.Eventf(ref, "unhealthy", "Readiness probe errored: %v", err)
+			}
+			return
+		} else { // ready != probe.Success
+			glog.V(1).Infof("Readiness probe for %q failed (%v): %s", ctrName, ready, output)
+			if ok {
+				pb.recorder.Eventf(ref, "unhealthy", "Readiness probe failed: %s", output)
+			}
+			return
+		}
 	}
-	return pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
+	if ready == probe.Success {
+		pb.readinessManager.SetReadiness(containerID, true)
+	}
+
+	glog.V(3).Infof("Readiness probe for %q succeeded", ctrName)
+
 }
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
