@@ -17,8 +17,8 @@ charm encapsulates the configuration management, how it interfaces
 with other Services, lifecycle management, and peering/scaling up and down.
 
 ##### Environment
-An Environment is a configured location where Service can be deployed. The  environment configuration is defined in the `~/.juju/environments.yaml`
-file.
+An Environment is a configured location where Service can be deployed. The
+environment configuration is defined in the `~/.juju/environments.yaml` file.
 
 ##### Interface
 Interfaces are loosely typed contracts between Services that establish an
