@@ -218,14 +218,15 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		// ManifestURL: ""
 		// FileCheckFrequency
 		// HTTPCheckFrequency
-		PodInfraContainerImage:         s.PodInfraContainerImage,
-		SyncFrequency:                  s.SyncFrequency,
-		RegistryPullQPS:                s.RegistryPullQPS,
-		RegistryBurst:                  s.RegistryBurst,
-		MinimumGCAge:                   s.MinimumGCAge,
-		MaxPerPodContainerCount:        s.MaxPerPodContainerCount,
-		MaxContainerCount:              s.MaxContainerCount,
-		RegisterNode:                   s.RegisterNode,
+		PodInfraContainerImage:  s.PodInfraContainerImage,
+		SyncFrequency:           s.SyncFrequency,
+		RegistryPullQPS:         s.RegistryPullQPS,
+		RegistryBurst:           s.RegistryBurst,
+		MinimumGCAge:            s.MinimumGCAge,
+		MaxPerPodContainerCount: s.MaxPerPodContainerCount,
+		MaxContainerCount:       s.MaxContainerCount,
+		RegisterNode:            s.RegisterNode,
+		// StandaloneMode: false
 		ClusterDomain:                  s.ClusterDomain,
 		ClusterDNS:                     s.ClusterDNS,
 		Runonce:                        s.RunOnce,
@@ -327,6 +328,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		gcPolicy,
 		pc.SeenAllSources,
 		kc.RegisterNode,
+		kc.StandaloneMode,
 		kc.ClusterDomain,
 		net.IP(kc.ClusterDNS),
 		kc.MasterServiceNamespace,
