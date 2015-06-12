@@ -14,53 +14,41 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ui
+// A simple static web server for hosting the Kubernetes cluster UI.
+package main
 
 import (
+	"flag"
+	"fmt"
 	"mime"
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui/data/dashboard"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui/data/swagger"
+	"github.com/golang/glog"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 )
 
-const dashboardPath = "/static/app/#/dashboard/"
+var (
+	port = flag.Int("port", 8080, "Port number to serve at.")
+)
 
-type MuxInterface interface {
-	Handle(pattern string, handler http.Handler)
-	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
-}
-
-func InstallSupport(mux MuxInterface, enableSwaggerSupport bool) {
+func main() {
+	flag.Parse()
 
 	// Send correct mime type for .svg files.  TODO: remove when
 	// https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33
 	// makes it into all of our supported go versions.
 	mime.AddExtensionType(".svg", "image/svg+xml")
 
-	// Expose files in www/ on <host>/static/
+	// Expose files in www/ on <host>
 	fileServer := http.FileServer(&assetfs.AssetFS{
 		Asset:    dashboard.Asset,
 		AssetDir: dashboard.AssetDir,
-		Prefix:   "www",
+		Prefix:   "www/app",
 	})
-	prefix := "/static/"
-	mux.Handle(prefix, http.StripPrefix(prefix, fileServer))
-	prefix = "/ui/"
-	mux.HandleFunc(prefix, func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, dashboardPath, http.StatusTemporaryRedirect)
-	})
+	http.Handle("/", fileServer)
 
-	if enableSwaggerSupport {
-		// Expose files in third_party/swagger-ui/ on <host>/swagger-ui
-		fileServer = http.FileServer(&assetfs.AssetFS{
-			Asset:    swagger.Asset,
-			AssetDir: swagger.AssetDir,
-			Prefix:   "third_party/swagger-ui",
-		})
-		prefix = "/swagger-ui/"
-		mux.Handle(prefix, http.StripPrefix(prefix, fileServer))
-	}
+	// TODO: Add support for serving over TLS.
+	glog.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", *port), nil))
 }
