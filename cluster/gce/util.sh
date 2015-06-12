@@ -35,6 +35,10 @@ ALLOCATE_NODE_CIDRS=true
 
 KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
+# Suffix to append to the staging path used for the server tars. Useful if
+# multiple versions of the server are being used in the same project
+# simultaneously (e.g. on Jenkins).
+KUBE_GCS_STAGING_PATH_SUFFIX=${KUBE_GCS_STAGING_PATH_SUFFIX-""}
 
 # VERSION_REGEX matches things like "v0.13.1"
 readonly KUBE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
@@ -214,7 +218,7 @@ function upload-server-tars() {
     gsutil mb "${staging_bucket}"
   fi
 
-  local -r staging_path="${staging_bucket}/devel"
+  local -r staging_path="${staging_bucket}/devel${KUBE_GCS_STAGING_PATH_SUFFIX}"
 
   local server_hash
   local salt_hash
