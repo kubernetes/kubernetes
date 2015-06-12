@@ -401,8 +401,11 @@ function create-node-template {
   #                 add retries. Just relying on a non-zero exit code doesn't
   #                 distinguish an ephemeral failed call from a "not-exists".
   if gcloud compute instance-templates describe "$1" --project "${PROJECT}" &>/dev/null; then
-    echo "Instance template ${1} already exists; continuing." >&2
-    return
+    echo "Instance template ${1} already exists; deleting." >&2
+    if ! gcloud compute instance-templates delete "$1" --project "${PROJECT}" &>/dev/null; then
+      echo -e "${color_yellow}Failed to delete existing instance template${color_norm}" >&2
+      exit 2
+    fi
   fi
 
   local attempt=0
