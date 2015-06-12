@@ -22,7 +22,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/golang/glog"
 )
@@ -48,11 +47,33 @@ type podManager interface {
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	GetPodsAndMirrorMap() ([]*api.Pod, map[string]*api.Pod)
 	SetPods(pods []*api.Pod)
-	UpdatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.SyncPodType)
+	UpdatePods(u PodUpdate, podSyncTypes map[types.UID]SyncPodType)
 	DeleteOrphanedMirrorPods()
 	TranslatePodUID(uid types.UID) types.UID
 	IsMirrorPodOf(mirrorPod, pod *api.Pod) bool
 	mirrorClient
+}
+
+// SyncPodType classifies pod updates, eg: create, update.
+type SyncPodType int
+
+const (
+	SyncPodSync SyncPodType = iota
+	SyncPodUpdate
+	SyncPodCreate
+)
+
+func (sp SyncPodType) String() string {
+	switch sp {
+	case SyncPodCreate:
+		return "create"
+	case SyncPodUpdate:
+		return "update"
+	case SyncPodSync:
+		return "sync"
+	default:
+		return "unknown"
+	}
 }
 
 // All maps in basicPodManager should be set by calling UpdatePods();
@@ -83,7 +104,7 @@ func newBasicPodManager(apiserverClient client.Interface) *basicPodManager {
 }
 
 // Update the internal pods with those provided by the update.
-func (pm *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.SyncPodType) {
+func (pm *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]SyncPodType) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	switch u.Op {
@@ -101,7 +122,7 @@ func (pm *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]me
 
 		for uid := range pm.podByUID {
 			if _, ok := existingPods[uid]; !ok {
-				podSyncTypes[uid] = metrics.SyncPodCreate
+				podSyncTypes[uid] = SyncPodCreate
 			}
 		}
 	case UPDATE:
@@ -110,7 +131,7 @@ func (pm *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]me
 		// Store the updated pods. Don't worry about filtering host ports since those
 		// pods will never be looked up.
 		for i := range u.Pods {
-			podSyncTypes[u.Pods[i].UID] = metrics.SyncPodUpdate
+			podSyncTypes[u.Pods[i].UID] = SyncPodUpdate
 		}
 		allPods := applyUpdates(u.Pods, pm.getAllPods())
 		pm.setPods(allPods)
@@ -121,7 +142,7 @@ func (pm *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]me
 	// Mark all remaining pods as sync.
 	for uid := range pm.podByUID {
 		if _, ok := podSyncTypes[uid]; !ok {
-			podSyncTypes[uid] = metrics.SyncPodSync
+			podSyncTypes[uid] = SyncPodSync
 		}
 	}
 }
