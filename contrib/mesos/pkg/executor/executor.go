@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	containerPollTime = 300 * time.Millisecond
+	containerPollTime = 1 * time.Second
 	launchGracePeriod = 5 * time.Minute
 )
 
