@@ -1142,7 +1142,7 @@ func (t *WebserverTest) BuildServiceSpec() *api.Service {
 }
 
 // Create a pod with the well-known webserver configuration, and record it for cleanup
-func (t *WebserverTest) CreateWebserverPod() {
+func (t *WebserverTest) CreateWebserverPod() *api.Pod {
 	name := t.ServiceName + "-" + strconv.Itoa(t.SequenceNext())
 	pod := &api.Pod{
 		TypeMeta: api.TypeMeta{
@@ -1162,11 +1162,12 @@ func (t *WebserverTest) CreateWebserverPod() {
 			},
 		},
 	}
-	_, err := t.CreatePod(pod)
+	pod, err := t.CreatePod(pod)
 	if err != nil {
 		Failf("Failed to create pod %s: %v", pod.Name, err)
 	}
 	expectNoError(waitForPodRunningInNamespace(t.Client, pod.Name, t.Namespace))
+	return pod
 }
 
 // Create a pod, and record it for cleanup
