@@ -17,6 +17,8 @@
 
 # Emacs save files
 *~
+\#*\#
+.\#*
 
 # Vim-related files
 [._]*.s[a-w][a-z]
@@ -58,3 +60,7 @@ www/master/shared/config/development.json
 
 # Karma output
 www/test_out
+
+# precommit temporary directories created by ./hack/verify-gendocs.sh and ./hack/lib/util.sh
+_tmp/
+doc_tmp/
