@@ -105,6 +105,36 @@ func IsValidPortNum(port int) bool {
 	return 0 < port && port < 65536
 }
 
+const doubleHyphensFmt string = ".*(--).*"
+
+var doubleHyphensRegexp = regexp.MustCompile("^" + doubleHyphensFmt + "$")
+
+const IdentifierNoHyphensBeginEndFmt string = "[a-z0-9]([a-z0-9-]*[a-z0-9])*"
+
+var identifierNoHyphensBeginEndRegexp = regexp.MustCompile("^" + IdentifierNoHyphensBeginEndFmt + "$")
+
+const atLeastOneLetterFmt string = ".*[a-z].*"
+
+var atLeastOneLetterRegexp = regexp.MustCompile("^" + atLeastOneLetterFmt + "$")
+
+// IsValidPortName check that the argument is valid syntax. It must be non empty and no more than 15 characters long
+// It must contains at least one letter [a-z] and it must contains only [a-z0-9-].
+// Hypens ('-') cannot be leading or trailing character of the string and cannot be adjacent to other hyphens.
+// Although RFC 6335 allows upper and lower case characters but case is ignored for comparison purposes: (HTTP
+// and http denote the same service).
+func IsValidPortName(port string) bool {
+	if len(port) < 1 || len(port) > 15 {
+		return false
+	}
+	if doubleHyphensRegexp.MatchString(port) {
+		return false
+	}
+	if identifierNoHyphensBeginEndRegexp.MatchString(port) && atLeastOneLetterRegexp.MatchString(port) {
+		return true
+	}
+	return false
+}
+
 // IsValidIPv4 tests that the argument is a valid IPv4 address.
 func IsValidIPv4(value string) bool {
 	return net.ParseIP(value) != nil && net.ParseIP(value).To4() != nil

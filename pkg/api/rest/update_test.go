@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func makeValidService() api.Service {
@@ -36,7 +37,7 @@ func makeValidService() api.Service {
 			Selector:        map[string]string{"key": "val"},
 			SessionAffinity: "None",
 			Type:            api.ServiceTypeClusterIP,
-			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675}},
+			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: util.NewIntOrStringFromInt(8675)}},
 		},
 	}
 }
