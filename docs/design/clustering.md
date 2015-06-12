@@ -38,7 +38,7 @@ The proposed solution will provide a range of options for setting up and maintai
 
 The building blocks of an easier solution:
 
-* **Move to TLS** We will move to using TLS for all intra-cluster communication.  We will explicitly idenitfy the trust chain (the set of trusted CAs) as opposed to trusting the system CAs.  We will also use client certificates for all AuthN.
+* **Move to TLS** We will move to using TLS for all intra-cluster communication.  We will explicitly identify the trust chain (the set of trusted CAs) as opposed to trusting the system CAs.  We will also use client certificates for all AuthN.
 * [optional] **API driven CA** Optionally, we will run a CA in the master that will mint certificates for the nodes/kubelets.  There will be pluggable policies that will automatically approve certificate requests here as appropriate.
   * **CA approval policy**  This is a pluggable policy object that can automatically approve CA signing requests.  Stock policies will include `always-reject`, `queue` and `insecure-always-approve`.  With `queue` there would be an API for evaluating and accepting/rejecting requests.  Cloud providers could implement a policy here that verifies other out of band information and automatically approves/rejects based on other external factors.
 * **Scoped Kubelet Accounts** These accounts are per-minion and (optionally) give a minion permission to register itself.

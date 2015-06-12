@@ -15,7 +15,7 @@ your image.
 ## Using a Private Registry
 Private registries may require keys to read images from them.
 Credentials can be provided in several ways:
-  - Using Google Container Registy
+  - Using Google Container Registry
     - Per-cluster
     - automatically configured on GCE/GKE
     - all pods can read the project's private registry

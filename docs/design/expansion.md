@@ -55,7 +55,7 @@ available to subsequent expansions.
 ### Use Case: Variable expansion in command
 
 Users frequently need to pass the values of environment variables to a container's command.  
-Currently, Kubernetes does not perform any expansion of varibles.  The workaround is to invoke a
+Currently, Kubernetes does not perform any expansion of variables.  The workaround is to invoke a
 shell in the container's command and have the shell perform the substitution, or to write a wrapper
 script that sets up the environment and runs the command.  This has a number of drawbacks:
 
@@ -116,7 +116,7 @@ expanded, then `$(VARIABLE_NAME)` should be present in the output.
 
 Although the `$(var)` syntax does overlap with the `$(command)` form of command substitution
 supported by many shells, because unexpanded variables are present verbatim in the output, we
-expect this will not present a problem to many users.  If there is a collision between a varible
+expect this will not present a problem to many users.  If there is a collision between a variable
 name and command substitution syntax, the syntax can be escaped with the form `$$(VARIABLE_NAME)`,
 which will evaluate to `$(VARIABLE_NAME)` whether `VARIABLE_NAME` can be expanded or not.
 

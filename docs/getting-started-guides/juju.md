@@ -130,7 +130,7 @@ Get info on the pod:
 
 To test the hello app, we need to locate which minion is hosting
 the container. Better tooling for using juju to introspect container
-is in the works but for we can use `juju run` and `juju status` to find
+is in the works but we can use `juju run` and `juju status` to find
 our hello app.
 
 Exit out of our ssh session and run:

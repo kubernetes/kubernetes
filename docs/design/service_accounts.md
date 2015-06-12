@@ -13,7 +13,7 @@ Processes in Pods may need to call the Kubernetes API.  For example:
 They also may interact with services other than the Kubernetes API, such as:
   - an image repository, such as docker -- both when the images are pulled to start the containers, and for writing
     images in the case of pods that generate images.
-  - accessing other cloud services, such as blob storage, in the context of a larged, integrated, cloud offering (hosted
+  - accessing other cloud services, such as blob storage, in the context of a large, integrated, cloud offering (hosted
     or private).
   - accessing files in an NFS volume attached to the pod
 

@@ -90,7 +90,7 @@ The kube-controller-manager has several options.
 	The period for syncing nodes from cloudprovider. Longer periods will result in fewer calls to cloud provider, but may delay addition of new nodes to cluster.
 
 **--pod-eviction-timeout**=5m0s
-	The grace peroid for deleting pods on failed nodes.
+	The grace period for deleting pods on failed nodes.
 
 **--port**=10252
 	The port that the controller-manager's http service runs on

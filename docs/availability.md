@@ -21,7 +21,7 @@ Specific scenarios:
   - Apiserver backing storage lost
     - Results
       - apiserver should fail to come up.
-      - kubelets will not be able to reach it but will continute to run the same pods and provide the same service proxying.
+      - kubelets will not be able to reach it but will continue to run the same pods and provide the same service proxying.
       - manual recovery or recreation of apiserver state necessary before apiserver is restarted.
   - Supporting services (node controller, replication controller manager, scheduler, etc) VM shutdown or crashes
     - currently those are colocated with the apiserver, and their unavailability has similar consequences as apiserver
@@ -103,11 +103,11 @@ Reasons to have multiple clusters include:
   - test clusters to canary new Kubernetes releases or other cluster software.
 
 ### Selecting the right number of clusters
-The selection of the number of kubernetes clusters may be a relatively static choice, only revisted occasionally.
+The selection of the number of kubernetes clusters may be a relatively static choice, only revisited occasionally.
 By contrast, the number of nodes in a cluster and the number of pods in a service may be change frequently according to
 load and growth.
 
-To pick the number of clusters, first, decide which regions you need to be in to have adequete latency to all your end users, for services that will run
+To pick the number of clusters, first, decide which regions you need to be in to have adequate latency to all your end users, for services that will run
 on Kubernetes (if you use a Content Distribution Network, the latency requirements for the CDN-hosted content need not
 be considered).  Legal issues might influence this as well. For example, a company with a global customer base might decide to have clusters in US, EU, AP, and SA regions. 
 Call the number of regions to be in `R`.

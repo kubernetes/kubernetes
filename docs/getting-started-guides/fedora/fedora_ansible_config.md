@@ -14,7 +14,7 @@ Ansible will take care of the rest of the configuration for you - configuring ne
 
 ## Architecture of the cluster
 
-A Kubernetes cluster reqiures etcd, a master, and n minions, so we will create a cluster with three hosts, for example:
+A Kubernetes cluster requires etcd, a master, and n minions, so we will create a cluster with three hosts, for example:
 
 ```
     fed1 (master,etcd) = 192.168.121.205
