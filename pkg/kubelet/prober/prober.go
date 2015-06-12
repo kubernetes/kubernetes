@@ -174,7 +174,7 @@ func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container a
 		return probe.Success, "", nil
 	}
 	if time.Now().Unix()-createdAt < p.InitialDelaySeconds {
-		return probe.Failure, "", nil
+                return probe.Unknown, "Less then InitialDelaySeconds", nil
 	}
 	return pb.runProbeWithRetries(p, pod, status, container, containerID, maxProbeRetries)
 }

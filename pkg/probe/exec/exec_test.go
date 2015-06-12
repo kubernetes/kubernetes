@@ -71,7 +71,8 @@ func TestExec(t *testing.T) {
 		// Run returns error
 		{probe.Unknown, true, "", fmt.Errorf("test error")},
 		// Unhealthy
-		{probe.Failure, false, "Fail", &fakeExitError{true, 1}},
+		{probe.Unknown, false, "Fail", &fakeExitError{true, 1}},
+		{probe.Failure, false, "Fail", &fakeExitError{true, 2}},
 	}
 	for i, test := range tests {
 		fake := FakeCmd{

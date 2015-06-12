@@ -1350,13 +1350,16 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 			containersToKeep[containerID] = index
 			continue
 		}
-		if result == probe.Success {
-			glog.V(4).Infof("probe success: %q", container.Name)
-			containersToKeep[containerID] = index
-			continue
-		}
-		glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
-		containersToStart[index] = empty{}
+                if result == probe.Success {
+                    glog.V(4).Infof("probe success: %q", container.Name)
+                    containersToKeep[containerID] = index
+                } else if result == probe.Unknown {
+                    glog.V(2).Infof("probe unknow: %q, will keep this container", container.Name)
+                    containersToKeep[containerID] = index
+                } else {
+                    glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
+                    containersToStart[index] = empty{}
+                }
 	}
 
 	// After the loop one of the following should be true:
