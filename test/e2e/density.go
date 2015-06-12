@@ -63,7 +63,7 @@ var _ = Describe("Density", func() {
 
 		// Print latency metrics before the test.
 		// TODO: Remove this once we reset metrics before the test.
-		_, err = HighLatencyRequests(c, 2*time.Second, util.NewStringSet("events"))
+		_, err = HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
 		expectNoError(err)
 
 		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
@@ -91,7 +91,7 @@ var _ = Describe("Density", func() {
 
 		// Verify latency metrics
 		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
-		highLatencyRequests, err := HighLatencyRequests(c, 2*time.Second, util.NewStringSet("events"))
+		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
