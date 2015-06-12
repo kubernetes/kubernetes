@@ -160,6 +160,7 @@ function kube-up() {
 # Assumed vars:
 #   CLUSTER_NAME
 #   GCLOUD
+#   ZONE
 # Vars set:
 #   MINION_TAG
 function test-setup() {
@@ -169,7 +170,7 @@ function test-setup() {
   detect-minions >&2
 
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG=$($GCLOUD compute instances describe ${MINION_NAMES[0]} | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
+  MINION_TAG=$($GCLOUD compute instances describe ${MINION_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
   OLD_MINION_TAG="k8s-${CLUSTER_NAME}-node"
 
   # Open up port 80 & 8080 so common containers on minions can be reached.
@@ -290,13 +291,14 @@ function restart-apiserver() {
 #   CLUSTER_NAME
 #   GCLOUD
 #   KUBE_ROOT
+#   ZONE
 function test-teardown() {
   echo "... in test-teardown()" >&2
 
   detect-project >&2
   detect-minions >&2
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG=$($GCLOUD compute instances describe ${MINION_NAMES[0]} | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
+  MINION_TAG=$($GCLOUD compute instances describe ${MINION_NAMES[0]} --project="${PROJECT}" --zone="${ZONE}" | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
 
   # First, remove anything we did with test-setup (currently, the firewall).
   # NOTE: Keep in sync with names above in test-setup.
