@@ -116,6 +116,14 @@ var _ = Describe("Networking", func() {
 		if err != nil {
 			Failf("Failed to list nodes: %v", err)
 		}
+		// previous tests may have cause failures of some nodes. Let's skip
+		// 'Not Ready' nodes, just in case (there is no need to fail the test).
+		filterNodes(nodes, func(node api.Node) bool {
+			return isNodeReadySetAsExpected(&node, true)
+		})
+		if len(nodes.Items) < 2 {
+			Failf("Less than two nodes were found Ready.")
+		}
 
 		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.4")
 
