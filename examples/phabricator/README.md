@@ -26,7 +26,7 @@ To start Phabricator server use the file [`examples/phabricator/phabricator-cont
 ```js
 {
   "kind": "ReplicationController",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "phabricator-controller",
     "labels": {
@@ -118,7 +118,7 @@ To automate this process and make sure that a proper host is authorized even if 
 ```js
 {
   "kind": "ReplicationController",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "authenticator-controller",
     "labels": {
@@ -174,7 +174,7 @@ Use the file [`examples/phabricator/phabricator-service.json`](phabricator-servi
 ```js
 {
   "kind": "Service",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "phabricator"
   },
@@ -188,10 +188,7 @@ Use the file [`examples/phabricator/phabricator-service.json`](phabricator-servi
     "selector": {
       "name": "phabricator"
     },
-    "createExternalLoadBalancer": true,
-    "publicIPs": [
-      "107.178.210.6"
-    ]
+    "type": "LoadBalancer"
   }
 }
 ```
@@ -203,7 +200,15 @@ $ kubectl create -f examples/phabricator/phabricator-service.json
 phabricator
 ```
 
-Note that it will also create an external load balancer so that we can access it from outside. You may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+To play with the service itself, find the external IP of the load balancer:
+
+```shell
+$ kubectl get services guestbook -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}'
+```
+
+and then visit port 80 of that IP address.
+
+**Note**: You may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
 ```shell
 $ gcloud compute firewall-rules create phabricator-node-80 --allow=tcp:80 --target-tags kubernetes-minion
