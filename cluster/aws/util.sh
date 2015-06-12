@@ -473,12 +473,11 @@ function add-tag {
   echo "Adding tag to ${1}: ${2}=${3}"
 
   # We need to retry in case the resource isn't yet fully created
-  sleep 3
   n=0
-  until [ $n -ge 5 ]; do
+  until [ $n -ge 25 ]; do
     $AWS_CMD create-tags --resources ${1} --tags Key=${2},Value=${3} > $LOG && return
     n=$[$n+1]
-    sleep 15
+    sleep 3
   done
 
   echo "Unable to add tag to AWS resource"
