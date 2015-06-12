@@ -768,7 +768,7 @@ function kube-up {
     echo -n Attempt "$(($attempt+1))" to check for SSH to master
     local output
     local ok=1
-    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} uptime 2> $LOG) || ok=0
+    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} uptime 2> $LOG) || ok=0
     if [[ ${ok} == 0 ]]; then
       if (( attempt > 30 )); then
         echo
@@ -794,7 +794,7 @@ function kube-up {
     echo -n Attempt "$(($attempt+1))" to check for salt-master
     local output
     local ok=1
-    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || ok=0
+    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || ok=0
     if [[ ${ok} == 0 ]]; then
       if (( attempt > 30 )); then
         echo
