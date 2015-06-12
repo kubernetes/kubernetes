@@ -17,6 +17,9 @@ limitations under the License.
 // Package app makes it easy to create a kubelet server for various contexts.
 package app
 
+// Note: if you change code in this file, you might need to change code in
+// contrib/mesos/pkg/executor/service/.
+
 import (
 	"crypto/tls"
 	"fmt"

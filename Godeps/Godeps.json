@@ -359,6 +359,10 @@
 			"Rev": "afde71eb1740fd763ab9450e1f700ba0e53c36d0"
 		},
 		{
+			"ImportPath": "github.com/kardianos/osext",
+			"Rev": "8fef92e41e22a70e700a96b29f066cda30ea24ef"
+		},
+		{
 			"ImportPath": "github.com/kr/pty",
 			"Comment": "release.r56-25-g05017fc",
 			"Rev": "05017fcccf23c823bfdea560dcc958a136e54fb7"
@@ -368,7 +372,15 @@
 			"Rev": "fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a"
 		},
 		{
+			"ImportPath": "github.com/mesos/mesos-go/auth",
+			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+		},
+		{
 			"ImportPath": "github.com/mesos/mesos-go/detector",
+			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+		},
+		{
+			"ImportPath": "github.com/mesos/mesos-go/executor",
 			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
 		},
 		{
@@ -377,6 +389,14 @@
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
+			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+		},
+		{
+			"ImportPath": "github.com/mesos/mesos-go/messenger",
+			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
+		},
+		{
+			"ImportPath": "github.com/mesos/mesos-go/scheduler",
 			"Rev": "4b1767c0dfc51020e01f35da5b38472f40ce572a"
 		},
 		{

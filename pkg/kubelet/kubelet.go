@@ -16,6 +16,9 @@ limitations under the License.
 
 package kubelet
 
+// Note: if you change code in this file, you might need to change code in
+// contrib/mesos/pkg/executor/.
+
 import (
 	"errors"
 	"fmt"
