@@ -315,10 +315,11 @@ as of Kubernetes 1.0.
 ### Type = NodePort
 
 If you set the `type` field to `"NodePort"`, the Kubernetes master will
-allocate you a port (from a flag-configured range) on each node for each port
-exposed by your `Service`.  That port will be reported in your `Service`'s
-`spec.ports[*].nodePort` field.  If you specify a value in that field, the
-system will allocate you that port or else will fail the API transaction.
+allocate you a port (from a flag-configured range, default: 30,000 - 32,767) 
+on each node for each port exposed by your `Service`.  That port will be 
+reported in your `Service`'s `spec.ports[*].nodePort` field.  If you specify 
+a value in that field, the system will allocate you that port or else will 
+fail the API transaction.
 
 This gives developers the freedom to set up their own load balancers, to
 configure cloud environments that are not fully supported by Kubernetes, or
