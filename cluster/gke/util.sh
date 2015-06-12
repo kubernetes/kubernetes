@@ -166,23 +166,22 @@ function test-setup() {
   echo "... in test-setup()" >&2
   # Detect the project into $PROJECT if it isn't set
   detect-project >&2
+  detect-minions >&2
 
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG="gke-${CLUSTER_NAME}-node"
+  MINION_TAG=$($GCLOUD compute instances describe ${MINION_NAMES[0]} | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
   OLD_MINION_TAG="k8s-${CLUSTER_NAME}-node"
 
   # Open up port 80 & 8080 so common containers on minions can be reached.
-  # TODO(mbforbes): Is adding ${USER} necessary, and sufficient, to avoid
-  #                 collisions here?
   "${GCLOUD}" compute firewall-rules create \
-    "${MINION_TAG}-${USER}-http-alt" \
+    "${MINION_TAG}-http-alt" \
     --allow tcp:80,tcp:8080 \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
     --network="${NETWORK}"
 
   "${GCLOUD}" compute firewall-rules create \
-    "${MINION_TAG}-${USER}-nodeports" \
+    "${MINION_TAG}-nodeports" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG},${OLD_MINION_TAG}" \
@@ -242,10 +241,9 @@ function detect-minions() {
 #   MINION_NAMES
 function detect-minion-names {
   detect-project
-  GROUP_NAME=($(gcloud preview --project "${PROJECT}" instance-groups \
-    --zone "${ZONE}" list | grep -o "k8s-${CLUSTER_NAME}-.\{8\}-group"))
+  detect-node-instance-group
   MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
-    --zone "${ZONE}" instances --group "${GROUP_NAME}" list \
+    --zone "${ZONE}" instances --group "${NODE_INSTANCE_GROUP}" list \
     | cut -d'/' -f11))
   echo "MINION_NAMES=${MINION_NAMES[*]}"
 }
@@ -311,14 +309,15 @@ function test-teardown() {
   echo "... in test-teardown()" >&2
 
   detect-project >&2
+  detect-minions >&2
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG="gke-${CLUSTER_NAME}-node"
+  MINION_TAG=$($GCLOUD compute instances describe ${MINION_NAMES[0]} | grep -o "gke-${CLUSTER_NAME}-.\{8\}-node" | head -1)
 
   # First, remove anything we did with test-setup (currently, the firewall).
   # NOTE: Keep in sync with names above in test-setup.
-  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-${USER}-http-alt" \
+  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-http-alt" \
     --project="${PROJECT}" || true
-  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-${USER}-nodeports" \
+  "${GCLOUD}" compute firewall-rules delete "${MINION_TAG}-nodeports" \
     --project="${PROJECT}" || true
 
   # Then actually turn down the cluster.
