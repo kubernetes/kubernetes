@@ -360,6 +360,18 @@ func (ec2 *FakeEC2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, err
 	panic("Not implemented")
 }
 
+func (s *FakeEC2) DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error) {
+	panic("Not implemented")
+}
+
+func (s *FakeEC2) CreateRoute(request *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error) {
+	panic("Not implemented")
+}
+
+func (s *FakeEC2) DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error) {
+	panic("Not implemented")
+}
+
 type FakeELB struct {
 	aws *FakeAWSServices
 }

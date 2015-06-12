@@ -22,6 +22,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
+ALLOCATE_NODE_CIDRS=true
+
 case "${KUBE_OS_DISTRIBUTION}" in
   ubuntu|wheezy|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
@@ -695,6 +697,8 @@ function kube-up {
     echo "readonly SALT_MASTER='${MASTER_INTERNAL_IP}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
+    echo "readonly CLUSTER_IP_RANGE='${CLUSTER_IP_RANGE}'"
+    echo "readonly ALLOCATE_NODE_CIDRS='${ALLOCATE_NODE_CIDRS}'"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     echo "readonly ZONE='${ZONE}'"
@@ -854,7 +858,8 @@ function kube-up {
     MINION_IDS[$i]=$minion_id
   done
 
-  # Add routes to minions
+  # Configure minion networking
+  # TODO(justinsb): Check if we can change source-dest-check before instance fully running
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # We are not able to add a route to the instance until that instance is in "running" state.
     # This is quite an ugly solution to this problem. In Bash 4 we could use assoc. arrays to do this for
@@ -864,7 +869,6 @@ function kube-up {
     echo "Minion ${MINION_NAMES[$i]} running"
     sleep 10
     $AWS_CMD modify-instance-attribute --instance-id $minion_id --source-dest-check '{"Value": false}' > $LOG
-    $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MINION_IP_RANGES[$i]} --instance-id $minion_id > $LOG
   done
 
   FAIL=0
