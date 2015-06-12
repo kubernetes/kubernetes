@@ -859,6 +859,18 @@ func getResourcesByInstanceType(instanceType string) (*api.NodeResources, error)
 	case "m3.2xlarge":
 		return makeNodeResources("m3", 26, 30)
 
+		// m4: General purpose
+	case "m4.large":
+		return makeNodeResources("m4", 6.5, 8)
+	case "m4.xlarge":
+		return makeNodeResources("m4", 13, 16)
+	case "m4.2xlarge":
+		return makeNodeResources("m4", 26, 32)
+	case "m4.4xlarge":
+		return makeNodeResources("m4", 53.5, 64)
+	case "m4.10xlarge":
+		return makeNodeResources("m4", 124.5, 160)
+
 		// i2: Storage optimized (SSD)
 	case "i2.xlarge":
 		return makeNodeResources("i2", 14, 30.5)
