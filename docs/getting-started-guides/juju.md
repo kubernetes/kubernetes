@@ -128,9 +128,9 @@ Get info on the pod:
     kubectl get pods
 
 
-To test the hello app, we'll need to locate which minion is hosting
+To test the hello app, we need to locate which minion is hosting
 the container. Better tooling for using juju to introspect container
-is in the works but for let'suse `juju run` and `juju status` to find
+is in the works but for we can use `juju run` and `juju status` to find
 our hello app.
 
 Exit out of our ssh session and run:
@@ -161,17 +161,14 @@ We can add minion units like so:
 
     juju add-unit docker # creates unit docker/2, kubernetes/2, docker-flannel/2
 
+## Launch the "k8petstore" example app
 
-## Launch the "petstore" example app
-
-The petstore example is available as a
+The [k8petstore example](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/k8petstore) is available as a
 [juju action](https://jujucharms.com/docs/devel/actions).
 
     juju action do kubernetes-master/0
 
-
-Note: this example includes curl statements to exercise the app.
-
+Note: this example includes curl statements to exercise the app, which automatically generates "petstore" transactions written to redis, and allows you to visualize the throughput in your browswer.
 
 ## Tear down cluster
 
@@ -180,7 +177,6 @@ Note: this example includes curl statements to exercise the app.
 or
 
     juju destroy-environment --force `juju env`
-
 
 ## More Info
 

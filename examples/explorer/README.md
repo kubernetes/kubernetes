@@ -17,7 +17,7 @@ $ kubectl create -f pod.json
 $ kubectl proxy &
 Starting to serve on localhost:8001
 
-$ curl localhost:8001/api/v1beta3/proxy/namespaces/default/pods/explorer:8080/vars/
+$ curl localhost:8001/api/v1/proxy/namespaces/default/pods/explorer:8080/vars/
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 HOSTNAME=explorer
 KIBANA_LOGGING_PORT_5601_TCP_PORT=5601
@@ -78,7 +78,7 @@ KUBERNETES_PORT_443_TCP_PROTO=tcp
 KUBERNETES_PORT_443_TCP_ADDR=10.0.0.2
 HOME=/
 
-$ curl localhost:8001/api/v1beta3/proxy/namespaces/default/pods/explorer:8080/fs/
+$ curl localhost:8001/api/v1/proxy/namespaces/default/pods/explorer:8080/fs/
 mount/
 var/
 .dockerenv
@@ -90,9 +90,9 @@ sys/
 README.md
 explorer
 
-$ curl localhost:8001/api/v1beta3/proxy/namespaces/default/pods/explorer:8080/dns?q=elasticsearch-logging
+$ curl localhost:8001/api/v1/proxy/namespaces/default/pods/explorer:8080/dns?q=elasticsearch-logging
 <html><head></head><body>
-<form action="/api/v1beta3/proxy/namespaces/default/pods/explorer:8080/dns">
+<form action="/api/v1/proxy/namespaces/default/pods/explorer:8080/dns">
 <input name="q" type="text" value="elasticsearch-logging"/>
 <button type="submit">Lookup</button>
 </form>

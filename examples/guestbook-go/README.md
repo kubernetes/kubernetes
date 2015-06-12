@@ -154,7 +154,7 @@ You will see a single redis master pod, two redis slaves, and three guestbook po
 
 ### Step Six: Create the guestbook service.
 
-Just like the others, you want a service to group your guestbook pods.  The service specification for the guestbook is in `examples/guestbook-go/guestbook-service.json`.  There's a twist this time - because we want it to be externally visible, we set the `createExternalLoadBalancer` flag on the service.
+Just like the others, you want a service to group your guestbook pods.  The service specification for the guestbook is in `examples/guestbook-go/guestbook-service.json`.  There's a twist this time - because we want it to be externally visible, we set `"type": "LoadBalancer"` for the service.
 
 ```shell
 $ kubectl create -f examples/guestbook-go/guestbook-service.json

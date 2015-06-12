@@ -1,0 +1,47 @@
+apiVersion: v1beta3
+kind: ReplicationController
+metadata: 
+  name: monitoring-heapster-v1
+  namespace: default
+  labels: 
+    k8s-app: heapster
+    version: v1
+    kubernetes.io/cluster-service: "true"
+spec: 
+  replicas: 1
+  selector: 
+    k8s-app: heapster
+    version: v1
+  template: 
+    metadata: 
+      labels: 
+        k8s-app: heapster
+        version: v1
+        kubernetes.io/cluster-service: "true"
+    spec: 
+      containers: 
+        - image: gcr.io/google_containers/heapster:v0.13.0
+          name: heapster
+          command:
+            - /heapster
+            - --source=kubernetes:https://kubernetes
+            - --sink=gcl
+            - --sink=influxdb:http://monitoring-influxdb:8086
+            - --poll_duration=2m
+            - --stats_resolution=1m
+          volumeMounts: 
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
+            - name: monitoring-token
+              mountPath: /etc/kubernetes/kubeconfig
+              readOnly: true
+
+      volumes: 
+        - name: ssl-certs
+          hostPath: 
+            path: /etc/ssl/certs
+        - name: monitoring-token
+          secret:
+            secretName: token-system-monitoring
+

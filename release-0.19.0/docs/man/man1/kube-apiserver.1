@@ -1,0 +1,259 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Scott Collier" "October 2014"  ""
+
+.SH NAME
+.PP
+kube\-apiserver \- Provides the API for kubernetes orchestration.
+
+.SH SYNOPSIS
+.PP
+\fBkube\-apiserver\fP [OPTIONS]
+
+.SH DESCRIPTION
+.PP
+The \fBkubernetes\fP API server validates and configures data for 3 types of objects: pods, services, and replicationcontrollers. Beyond just servicing REST operations, the API Server does two other things as well: 1. Schedules pods to worker nodes. Right now the scheduler is very simple. 2. Synchronize pod information (where they are, what ports they are exposing) with the service configuration.
+
+.PP
+The the kube\-apiserver several options.
+
+.SH OPTIONS
+.PP
+\fB\-\-address\fP=127.0.0.1
+    DEPRECATED: see \-\-insecure\-bind\-address instead
+
+.PP
+\fB\-\-admission\-control\fP="AlwaysAdmit"
+    Ordered list of plug\-ins to do admission control of resources into cluster. Comma\-delimited list of: AlwaysDeny, AlwaysAdmit, ServiceAccount, NamespaceExists, NamespaceLifecycle, NamespaceAutoProvision, LimitRanger, SecurityContextDeny, ResourceQuota
+
+.PP
+\fB\-\-admission\-control\-config\-file\fP=""
+    File with admission control configuration.
+
+.PP
+\fB\-\-allow\-privileged\fP=false
+    If true, allow privileged containers.
+
+.PP
+\fB\-\-alsologtostderr\fP=false
+    log to standard error as well as files
+
+.PP
+\fB\-\-api\-burst\fP=200
+    API burst amount for the read only port
+
+.PP
+\fB\-\-api\-prefix\fP="/api"
+    The prefix for API requests on the server. Default '/api'.
+
+.PP
+\fB\-\-api\-rate\fP=10
+    API rate limit as QPS for the read only port
+
+.PP
+\fB\-\-authorization\-mode\fP="AlwaysAllow"
+    Selects how to do authorization on the secure port.  One of: AlwaysAllow,AlwaysDeny,ABAC
+
+.PP
+\fB\-\-authorization\-policy\-file\fP=""
+    File with authorization policy in csv format, used with \-\-authorization\-mode=ABAC, on the secure port.
+
+.PP
+\fB\-\-basic\-auth\-file\fP=""
+    If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.
+
+.PP
+\fB\-\-bind\-address\fP=0.0.0.0
+    The IP address on which to serve the \-\-read\-only\-port and \-\-secure\-port ports. This address must be reachable by the rest of the cluster. If blank, all interfaces will be used.
+
+.PP
+\fB\-\-cert\-dir\fP="/var/run/kubernetes"
+    The directory where the TLS certs are located (by default /var/run/kubernetes). If \-\-tls\-cert\-file and \-\-tls\-private\-key\-file are provided, this flag will be ignored.
+
+.PP
+\fB\-\-client\-ca\-file\fP=""
+    If set, any request presenting a client certificate signed by one of the authorities in the client\-ca\-file is authenticated with an identity corresponding to the CommonName of the client certificate.
+
+.PP
+\fB\-\-cloud\-config\fP=""
+    The path to the cloud provider configuration file.  Empty string for no configuration file.
+
+.PP
+\fB\-\-cloud\-provider\fP=""
+    The provider for cloud services.  Empty string for no provider.
+
+.PP
+\fB\-\-cluster\-name\fP="kubernetes"
+    The instance prefix for the cluster
+
+.PP
+\fB\-\-cors\-allowed\-origins\fP=[]
+    List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.
+
+.PP
+\fB\-\-etcd\-config\fP=""
+    The config file for the etcd client. Mutually exclusive with \-etcd\-servers.
+
+.PP
+\fB\-\-etcd\-prefix\fP="/registry"
+    The prefix for all resource paths in etcd.
+
+.PP
+\fB\-\-etcd\-servers\fP=[]
+    List of etcd servers to watch (
+\[la]http://ip:port\[ra]), comma separated. Mutually exclusive with \-etcd\-config
+
+.PP
+\fB\-\-event\-ttl\fP=1h0m0s
+    Amount of time to retain events. Default 1 hour.
+
+.PP
+\fB\-\-external\-hostname\fP=""
+    The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)
+
+.PP
+\fB\-\-insecure\-bind\-address\fP=127.0.0.1
+    The IP address on which to serve the \-\-insecure\-port (set to 0.0.0.0 for all interfaces). Defaults to localhost.
+
+.PP
+\fB\-\-insecure\-port\fP=8080
+    The port on which to serve unsecured, unauthenticated access. Default 8080. It is assumed that firewall rules are set up such that this port is not reachable from outside of the cluster and that port 443 on the cluster's public address is proxied to this port. This is performed by nginx in the default setup.
+
+.PP
+\fB\-\-kubelet\_certificate\_authority\fP=""
+    Path to a cert. file for the certificate authority.
+
+.PP
+\fB\-\-kubelet\_client\_certificate\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-kubelet\_client\_key\fP=""
+    Path to a client key file for TLS.
+
+.PP
+\fB\-\-kubelet\_https\fP=true
+    Use https for kubelet connections
+
+.PP
+\fB\-\-kubelet\_port\fP=10250
+    Kubelet port
+
+.PP
+\fB\-\-kubelet\_timeout\fP=5s
+    Timeout for kubelet operations
+
+.PP
+\fB\-\-log\_backtrace\_at\fP=:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-\-log\_dir\fP=
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-\-log\_flush\_frequency\fP=5s
+    Maximum number of seconds between log flushes
+
+.PP
+\fB\-\-logtostderr\fP=true
+    log to standard error instead of files
+
+.PP
+\fB\-\-long\-running\-request\-regexp\fP="[.\fI\\/watch\$][^\\/proxy.\fP]"
+    A regular expression matching long running requests which should be excluded from maximum inflight request handling.
+
+.PP
+\fB\-\-master\-service\-namespace\fP="default"
+    The namespace from which the kubernetes master services should be injected into pods
+
+.PP
+\fB\-\-max\-requests\-inflight\fP=400
+    The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.
+
+.PP
+\fB\-\-old\-etcd\-prefix\fP="/registry"
+    The previous prefix for all resource paths in etcd, if any.
+
+.PP
+\fB\-\-port\fP=8080
+    DEPRECATED: see \-\-insecure\-port instead
+
+.PP
+\fB\-\-service\-cluster\-ip\-range\fP=
+    A CIDR notation IP range from which to assign service cluster IPs. This must not overlap with any IP ranges assigned to nodes for pods.
+
+.PP
+\fB\-\-profiling\fP=true
+    Enable profiling via web interface host:port/debug/pprof/
+
+.PP
+\fB\-\-public\-address\-override\fP=0.0.0.0
+    DEPRECATED: see \-\-bind\-address instead
+
+.PP
+\fB\-\-read\-only\-port\fP=7080
+    The port on which to serve read\-only resources. If 0, don't serve read\-only at all. It is assumed that firewall rules are set up such that this port is not reachable from outside of the cluster.
+
+.PP
+\fB\-\-runtime\-config\fP=
+    A set of key=value pairs that describe runtime configuration that may be passed to the apiserver. api/ key can be used to turn on/off specific api versions. api/all and api/legacy are special keys to control all and legacy api versions respectively.
+
+.PP
+\fB\-\-secure\-port\fP=6443
+    The port on which to serve HTTPS with authentication and authorization. If 0, don't serve HTTPS at all.
+
+.PP
+\fB\-\-service\-account\-key\-file\fP=""
+    File containing PEM\-encoded x509 RSA private or public key, used to verify ServiceAccount tokens. If unspecified, \-\-tls\-private\-key\-file is used.
+
+.PP
+\fB\-\-service\-account\-lookup\fP=false
+    If true, validate ServiceAccount tokens exist in etcd as part of authentication.
+
+.PP
+\fB\-\-stderrthreshold\fP=2
+    logs at or above this threshold go to stderr
+
+.PP
+\fB\-\-storage\-version\fP=""
+    The version to store resources with. Defaults to server preferred
+
+.PP
+\fB\-\-tls\-cert\-file\fP=""
+    File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). If HTTPS serving is enabled, and \-\-tls\-cert\-file and \-\-tls\-private\-key\-file are not provided, a self\-signed certificate and key are generated for the public address and saved to /var/run/kubernetes.
+
+.PP
+\fB\-\-tls\-private\-key\-file\fP=""
+    File containing x509 private key matching \-\-tls\-cert\-file.
+
+.PP
+\fB\-\-token\-auth\-file\fP=""
+    If set, the file that will be used to secure the secure port of the API server via token authentication.
+
+.PP
+\fB\-\-v\fP=0
+    log level for V logs
+
+.PP
+\fB\-\-version\fP=false
+    Print version information and quit
+
+.PP
+\fB\-\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+.SH EXAMPLES
+.PP
+.RS
+
+.nf
+/usr/bin/kube\-apiserver \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001 \-\-insecure\_bind\_address=127.0.0.1 \-\-insecure\_port=8080 \-\-kubelet\_port=10250 \-\-service\-cluster\-ip\-range=10.1.1.0/24 \-\-allow\_privileged=false
+
+.fi
+
+.SH HISTORY
+.PP
+October 2014, Originally compiled by Scott Collier (scollier at redhat dot com) based
+ on the kubernetes source material and internal work.
+
+.PP
+[]()

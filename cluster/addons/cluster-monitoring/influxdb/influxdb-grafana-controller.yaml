@@ -1,4 +1,4 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: monitoring-influx-grafana-v1

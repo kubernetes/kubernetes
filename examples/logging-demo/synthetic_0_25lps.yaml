@@ -12,7 +12,7 @@
 #     sleep 4
 #     i=$[$i+1]
 #   done
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   labels:
@@ -20,10 +20,11 @@ metadata:
   name: synthetic-logger-0.25lps-pod
 spec:
   containers:
-  - args:
+  - name: synth-lgr
+    image: ubuntu:14.04
+    args:
     - bash
     - -c
     - 'i="0"; while true; do echo -n "`hostname`: $i: "; date --rfc-3339 ns; sleep
       4; i=$[$i+1]; done'
-    image: ubuntu:14.04
-    name: synth-lgr
+    

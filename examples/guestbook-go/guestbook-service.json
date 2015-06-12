@@ -1,6 +1,6 @@
 {
    "kind":"Service",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "metadata":{
       "name":"guestbook",
       "labels":{
@@ -8,16 +8,15 @@
       }
    },
    "spec":{
-      "createExternalLoadBalancer": true,
       "ports": [
          {
            "port":3000,
-           "targetPort":"http-server",
-           "protocol":"TCP"
+           "targetPort":"http-server"
          }
       ],
       "selector":{
          "name":"guestbook"
-      }
+      },
+      "type": "LoadBalancer"
    }
 }

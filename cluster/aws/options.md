@@ -70,4 +70,10 @@ will run on this storage if available, as typically the root disk is comparative
 
 If your machines don't have any ephemeral disks, this will default to the aufs driver on your root disk (with no LVM).
 
+**KUBE_OS_DISTRIBUTION**
+
+The distribution to use.  Valid options: `wheezy`, `ubuntu`, `coreos`.
+
+Defaults to wheezy (Debian Wheezy), which is the same as is used by default on GCE.
+
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/aws/options.md?pixel)]()

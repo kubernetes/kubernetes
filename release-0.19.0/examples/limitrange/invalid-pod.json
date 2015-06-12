@@ -1,0 +1,22 @@
+{
+  "apiVersion":"v1beta3",
+  "kind": "Pod",
+  "metadata": {
+    "name": "invalid-pod",
+    "labels": { 
+      "name": "invalid-pod"
+    }
+  },
+  "spec": {
+      "containers": [{
+        "name": "kubernetes-serve-hostname",
+        "image": "gcr.io/google_containers/serve_hostname",
+        "resources": {
+          "limits": {
+            "cpu": "10m",
+            "memory": "5Mi"
+         }        
+      }
+    }]
+  }
+}

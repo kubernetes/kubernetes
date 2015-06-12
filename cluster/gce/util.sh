@@ -400,7 +400,7 @@ function create-node-template {
   # TODO(mbforbes): To make this really robust, we need to parse the output and
   #                 add retries. Just relying on a non-zero exit code doesn't
   #                 distinguish an ephemeral failed call from a "not-exists".
-  if gcloud compute instance-templates describe "$1" &>/dev/null; then
+  if gcloud compute instance-templates describe "$1" --project "${PROJECT}" &>/dev/null; then
     echo "Instance template ${1} already exists; continuing." >&2
     return
   fi
@@ -550,6 +550,8 @@ function create-certs {
     exit 2
   }
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
+  # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
+  # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
   CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
   MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')
   MASTER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | base64 | tr -d '\r\n')
@@ -978,21 +980,37 @@ function test-setup {
 
   # Open up port 80 & 8080 so common containers on minions can be reached
   # TODO(roberthbailey): Remove this once we are no longer relying on hostPorts.
+  local start=`date +%s`
   gcloud compute firewall-rules create \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG}" \
     --allow tcp:80,tcp:8080 \
     --network "${NETWORK}" \
-    "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
+    "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || true
+  # As there is no simple way to wait longer for this operation we need to manually
+  # wait some additional time (20 minutes altogether).
+  until gcloud compute firewall-rules describe "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
+  do sleep 5
+  done
+  # Check if the firewall rule exists and fail if it does not.
+  gcloud compute firewall-rules describe "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
 
   # Open up the NodePort range
   # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
+  start=`date +%s`
   gcloud compute firewall-rules create \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG}" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --network "${NETWORK}" \
-    "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports"
+    "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || true
+  # As there is no simple way to wait longer for this operation we need to manually
+  # wait some additional time (20 minutes altogether).
+  until gcloud compute firewall-rules describe "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
+  do sleep 5
+  done
+  # Check if the firewall rule exists and fail if it does not.
+  gcloud compute firewall-rules describe "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports"
 }
 
 # Execute after running tests to perform any required clean-up. This is called

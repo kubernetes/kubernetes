@@ -30,7 +30,7 @@ In Kubernetes a _[Service](../../docs/services.md)_ describes a set of Pods that
 
 Here is the service description:
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata: 
   labels: 
@@ -59,7 +59,7 @@ In Kubernetes a _[Replication Controller](../../docs/replication-controller.md)_
 Replication Controllers will "adopt" existing pods that match their selector query, so let's create a Replication Controller with a single replica to adopt our existing Hazelcast Pod.
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata: 
   labels: 
@@ -105,7 +105,7 @@ $ kubectl create -f hazelcast-controller.yaml
 After the controller provisions successfully the pod, you can query the service endpoints:
 ```sh
 $ kubectl get endpoints hazelcast -o yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Endpoints
 metadata:
   creationTimestamp: 2015-05-04T17:43:40Z
@@ -114,7 +114,7 @@ metadata:
   name: hazelcast
   namespace: default
   resourceVersion: "120480"
-  selfLink: /api/v1beta3/namespaces/default/endpoints/hazelcast
+  selfLink: /api/v1/namespaces/default/endpoints/hazelcast
   uid: 19a22aa9-f285-11e4-b38f-42010af0bbf9
 subsets:
 - addresses:

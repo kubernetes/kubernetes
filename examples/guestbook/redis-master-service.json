@@ -1,6 +1,6 @@
 {
    "kind":"Service",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "metadata":{
       "name":"redis-master",
       "labels":{
@@ -11,8 +11,7 @@
       "ports": [
         {
           "port":6379,
-          "targetPort":6379,
-          "protocol":"TCP"
+          "targetPort":6379
         }
       ],
       "selector":{

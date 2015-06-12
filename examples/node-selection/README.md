@@ -23,32 +23,32 @@ You can verify that it worked by re-running `kubectl get nodes` and checking tha
 Take whatever pod config file you want to run, and add a nodeSelector section to it, like this. For example, if this is my pod config:
 
 <pre>
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
+  name: nginx
   labels:
     env: test
-  name: nginx
 spec:
   containers:
-  - image: nginx
-    name: nginx
+  - name: nginx
+    image: nginx
 </pre>
 
 Then add a nodeSelector like so:
 
 <pre>
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
+  name: nginx
   labels:
     env: test
-  name: nginx
 spec:
   containers:
-  - image: nginx
+  - name: nginx
+    image: nginx
     imagePullPolicy: IfNotPresent
-    name: nginx
   <b>nodeSelector:
     disktype: ssd</b>
 </pre>

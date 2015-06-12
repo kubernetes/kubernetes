@@ -1,6 +1,6 @@
 {
   "kind": "Pod",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "kubectl-tester"
   },
@@ -10,12 +10,11 @@
         "name": "bb",
         "image": "gcr.io/google_containers/busybox",
         "command": [
-          "sh", "-c", "sleep 5; wget -O - ${KUBERNETES_RO_SERVICE_HOST}:${KUBERNETES_RO_SERVICE_PORT}/api/v1beta3/pods/; sleep 10000"
+          "sh", "-c", "sleep 5; wget -O - ${KUBERNETES_RO_SERVICE_HOST}:${KUBERNETES_RO_SERVICE_PORT}/api/v1/pods/; sleep 10000"
         ],
         "ports": [
           {
-            "containerPort": 8080,
-            "protocol": "TCP"
+            "containerPort": 8080
           }
         ],
         "env": [

@@ -2,7 +2,7 @@ logrotate:
   pkg:
     - installed
 
-{% set logrotate_files = ['kube-scheduler', 'kube-proxy', 'kubelet', 'kube-apiserver', 'kube-controller-manager', 'kube-addons'] %}
+{% set logrotate_files = ['kube-scheduler', 'kube-proxy', 'kubelet', 'kube-apiserver', 'kube-controller-manager', 'kube-addons', 'docker'] %}
 {% for file in logrotate_files %}
 /etc/logrotate.d/{{ file }}:
   file:
@@ -16,10 +16,10 @@ logrotate:
       file: {{ file }}
 {% endfor %}
 
-/etc/logrotate.d/docker:
+/etc/logrotate.d/docker-containers:
   file:
     - managed
-    - source: salt://logrotate/docker
+    - source: salt://logrotate/docker-containers
     - template: jinja
     - user: root
     - group: root

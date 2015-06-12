@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -74,6 +75,7 @@ func describerMap(c *client.Client) map[string]Describer {
 		"ResourceQuota":         &ResourceQuotaDescriber{c},
 		"PersistentVolume":      &PersistentVolumeDescriber{c},
 		"PersistentVolumeClaim": &PersistentVolumeClaimDescriber{c},
+		"Namespace":             &NamespaceDescriber{c},
 	}
 	return m
 }
@@ -111,11 +113,143 @@ func init() {
 		describeService,
 		describeReplicationController,
 		describeNode,
+		describeNamespace,
 	)
 	if err != nil {
 		glog.Fatalf("Cannot register describers: %v", err)
 	}
 	DefaultObjectDescriber = d
+}
+
+// NamespaceDescriber generates information about a namespace
+type NamespaceDescriber struct {
+	client.Interface
+}
+
+func (d *NamespaceDescriber) Describe(namespace, name string) (string, error) {
+	ns, err := d.Namespaces().Get(name)
+	if err != nil {
+		return "", err
+	}
+	resourceQuotaList, err := d.ResourceQuotas(name).List(labels.Everything())
+	if err != nil {
+		return "", err
+	}
+	limitRangeList, err := d.LimitRanges(name).List(labels.Everything())
+	if err != nil {
+		return "", err
+	}
+
+	return describeNamespace(ns, resourceQuotaList, limitRangeList)
+}
+
+func describeNamespace(namespace *api.Namespace, resourceQuotaList *api.ResourceQuotaList, limitRangeList *api.LimitRangeList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", namespace.Name)
+		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(namespace.Labels))
+		fmt.Fprintf(out, "Status:\t%s\n", string(namespace.Status.Phase))
+		if resourceQuotaList != nil {
+			fmt.Fprintf(out, "\n")
+			DescribeResourceQuotas(resourceQuotaList, out)
+		}
+		if limitRangeList != nil {
+			fmt.Fprintf(out, "\n")
+			DescribeLimitRanges(limitRangeList, out)
+		}
+		return nil
+	})
+}
+
+// DescribeLimitRanges merges a set of limit range items into a single tabular description
+func DescribeLimitRanges(limitRanges *api.LimitRangeList, w io.Writer) {
+	if len(limitRanges.Items) == 0 {
+		fmt.Fprint(w, "No resource limits.\n")
+		return
+	}
+	fmt.Fprintf(w, "Resource Limits\n Type\tResource\tMin\tMax\tDefault\n")
+	fmt.Fprintf(w, " ----\t--------\t---\t---\t---\n")
+	for _, limitRange := range limitRanges.Items {
+		for i := range limitRange.Spec.Limits {
+			item := limitRange.Spec.Limits[i]
+			maxResources := item.Max
+			minResources := item.Min
+			defaultResources := item.Default
+
+			set := map[api.ResourceName]bool{}
+			for k := range maxResources {
+				set[k] = true
+			}
+			for k := range minResources {
+				set[k] = true
+			}
+			for k := range defaultResources {
+				set[k] = true
+			}
+
+			for k := range set {
+				// if no value is set, we output -
+				maxValue := "-"
+				minValue := "-"
+				defaultValue := "-"
+
+				maxQuantity, maxQuantityFound := maxResources[k]
+				if maxQuantityFound {
+					maxValue = maxQuantity.String()
+				}
+
+				minQuantity, minQuantityFound := minResources[k]
+				if minQuantityFound {
+					minValue = minQuantity.String()
+				}
+
+				defaultQuantity, defaultQuantityFound := defaultResources[k]
+				if defaultQuantityFound {
+					defaultValue = defaultQuantity.String()
+				}
+
+				msg := " %v\t%v\t%v\t%v\t%v\n"
+				fmt.Fprintf(w, msg, item.Type, k, minValue, maxValue, defaultValue)
+			}
+		}
+	}
+}
+
+// DescribeResourceQuotas merges a set of quota items into a single tabular description of all quotas
+func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w io.Writer) {
+	if len(quotas.Items) == 0 {
+		fmt.Fprint(w, "No resource quota.\n")
+		return
+	}
+	resources := []api.ResourceName{}
+	hard := map[api.ResourceName]resource.Quantity{}
+	used := map[api.ResourceName]resource.Quantity{}
+	for _, q := range quotas.Items {
+		for resource := range q.Status.Hard {
+			resources = append(resources, resource)
+			hardQuantity := q.Status.Hard[resource]
+			usedQuantity := q.Status.Used[resource]
+
+			// if for some reason there are multiple quota documents, we take least permissive
+			prevQuantity, ok := hard[resource]
+			if ok {
+				if hardQuantity.Value() < prevQuantity.Value() {
+					hard[resource] = hardQuantity
+				}
+			} else {
+				hard[resource] = hardQuantity
+			}
+			used[resource] = usedQuantity
+		}
+	}
+
+	sort.Sort(SortableResourceNames(resources))
+	fmt.Fprint(w, "Resource Quotas\n Resource\tUsed\tHard\n")
+	fmt.Fprint(w, " ---\t---\t---\n")
+	for _, resource := range resources {
+		hardQuantity := hard[resource]
+		usedQuantity := used[resource]
+		fmt.Fprintf(w, " %s\t%s\t%s\n", string(resource), usedQuantity.String(), hardQuantity.String())
+	}
 }
 
 // LimitRangeDescriber generates information about a limit range

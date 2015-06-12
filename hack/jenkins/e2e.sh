@@ -45,6 +45,7 @@ if [[ "${PERFORMANCE:-}" == "true" ]]; then
       export MASTER_SIZE=${MASTER_SIZE:-"m3.xlarge"}
     else
       export MASTER_SIZE=${MASTER_SIZE:-"n1-standard-4"}
+      export MINION_SIZE=${MINION_SIZE:-"n1-standard-2"}
     fi
     export NUM_MINIONS=${NUM_MINIONS:-"100"}
     GINKGO_TEST_ARGS=${GINKGO_TEST_ARGS:-"--ginkgo.focus=\[Performance suite\] "}
@@ -52,7 +53,8 @@ else
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
       export MASTER_SIZE=${MASTER_SIZE:-"t2.small"}
     else
-      export MASTER_SIZE=${MASTER_SIZE:-"g1-small"}
+      export MASTER_SIZE=${MASTER_SIZE:-"n1-standard-2"}
+      export MINION_SIZE=${MINION_SIZE:-"n1-standard-2"}
     fi
     export NUM_MINIONS=${NUM_MINIONS:-"2"}
 fi
@@ -219,7 +221,7 @@ fi
 # Jenkins will look at the junit*.xml files for test failures, so don't exit
 # with a nonzero error code if it was only tests that failed.
 if [[ "${E2E_TEST,,}" == "true" ]]; then
-    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}--ginkgo.noColor" || true
+    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS} --ginkgo.noColor" || true
 fi
 
 # TODO(zml): We have a bunch of legacy Jenkins configs that are

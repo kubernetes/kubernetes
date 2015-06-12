@@ -53,6 +53,10 @@ type debugError interface {
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
 func CheckErr(err error) {
+	checkErr(err, fatal)
+}
+
+func checkErr(err error, handleErr func(string)) {
 	if err == nil {
 		return
 	}
@@ -61,22 +65,22 @@ func CheckErr(err error) {
 		details := err.(*errors.StatusError).Status().Details
 		prefix := fmt.Sprintf("The %s %q is invalid:", details.Kind, details.Name)
 		errs := statusCausesToAggrError(details.Causes)
-		fatal(MultilineError(prefix, errs))
+		handleErr(MultilineError(prefix, errs))
 	}
 
 	// handle multiline errors
 	if clientcmd.IsConfigurationInvalid(err) {
-		fatal(MultilineError("Error in configuration: ", err))
+		handleErr(MultilineError("Error in configuration: ", err))
 	}
 	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) > 0 {
-		fatal(MultipleErrors("", agg.Errors()))
+		handleErr(MultipleErrors("", agg.Errors()))
 	}
 
 	msg, ok := StandardErrorMessage(err)
 	if !ok {
 		msg = fmt.Sprintf("error: %s\n", err.Error())
 	}
-	fatal(msg)
+	handleErr(msg)
 }
 
 func statusCausesToAggrError(scs []api.StatusCause) utilerrors.Aggregate {

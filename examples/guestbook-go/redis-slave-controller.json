@@ -1,6 +1,6 @@
 {
    "kind":"ReplicationController",
-   "apiVersion":"v1beta3",
+   "apiVersion":"v1",
    "id":"redis-slave",
    "metadata":{
       "name":"redis-slave",
@@ -35,8 +35,7 @@
                   "ports":[
                      {
                         "name":"redis-server",
-                        "containerPort":6379,
-                        "protocol":"TCP"
+                        "containerPort":6379
                      }
                   ]
                }

@@ -61,6 +61,11 @@ var _ = Describe("Density", func() {
 		expectNoError(err)
 		uuid = string(util.NewUUID())
 
+		// Print latency metrics before the test.
+		// TODO: Remove this once we reset metrics before the test.
+		_, err = HighLatencyRequests(c, 2*time.Second, util.NewStringSet("events"))
+		expectNoError(err)
+
 		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "before"))
 	})
@@ -85,9 +90,8 @@ var _ = Describe("Density", func() {
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "after"))
 
 		// Verify latency metrics
-		// TODO: Update threshold to 1s once we reach this goal
 		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
-		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
+		highLatencyRequests, err := HighLatencyRequests(c, 2*time.Second, util.NewStringSet("events"))
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
@@ -98,17 +102,17 @@ var _ = Describe("Density", func() {
 		skip          bool
 		podsPerMinion int
 		/* Controls how often the apiserver is polled for pods */
-		interval int
+		interval time.Duration
 	}
 
 	densityTests := []Density{
 		// This test should always run, even if larger densities are skipped.
-		{podsPerMinion: 3, skip: false, interval: 10},
-		{podsPerMinion: 30, skip: false, interval: 10},
+		{podsPerMinion: 3, skip: false, interval: 10 * time.Second},
+		{podsPerMinion: 30, skip: false, interval: 10 * time.Second},
 		// More than 30 pods per node is outside our v1.0 goals.
 		// We might want to enable those tests in the future.
-		{podsPerMinion: 50, skip: true, interval: 10},
-		{podsPerMinion: 100, skip: true, interval: 1},
+		{podsPerMinion: 50, skip: true, interval: 10 * time.Second},
+		{podsPerMinion: 100, skip: true, interval: 1 * time.Second},
 	}
 
 	for _, testArg := range densityTests {

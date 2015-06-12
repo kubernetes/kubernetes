@@ -204,7 +204,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/rbd/secret": {
 			"ceph-secret": &api.Secret{},
 		},
-		"../examples/rbd/v1beta3": {
+		"../examples/rbd": {
 			"rbd":             &api.Pod{},
 			"rbd-with-secret": &api.Pod{},
 		},

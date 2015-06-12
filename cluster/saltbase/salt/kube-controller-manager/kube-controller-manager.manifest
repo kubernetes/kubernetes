@@ -45,6 +45,14 @@
                  "-c",
                  "/usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
                ],
+    "livenessProbe": {
+      "httpGet": {
+        "path": "/healthz",
+        "port": 10252
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 15
+    },
     "volumeMounts": [
         {{cloud_config_mount}}
         { "name": "srvkube",
