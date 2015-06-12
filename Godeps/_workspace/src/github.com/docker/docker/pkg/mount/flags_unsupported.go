@@ -2,6 +2,7 @@
 
 package mount
 
+// These flags are unsupported.
 const (
 	BIND        = 0
 	DIRSYNC     = 0

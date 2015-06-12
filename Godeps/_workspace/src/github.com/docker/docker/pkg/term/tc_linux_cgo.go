@@ -24,6 +24,7 @@ func MakeRaw(fd uintptr) (*State, error) {
 	newState := oldState.termios
 
 	C.cfmakeraw((*C.struct_termios)(unsafe.Pointer(&newState)))
+	newState.Oflag = newState.Oflag | C.OPOST
 	if err := tcset(fd, &newState); err != 0 {
 		return nil, err
 	}

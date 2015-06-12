@@ -1,10 +1,13 @@
 package timeutils
 
 import (
+	"fmt"
 	"testing"
+	"time"
 )
 
 func TestGetTimestamp(t *testing.T) {
+	now := time.Now()
 	cases := []struct{ in, expected string }{
 		{"0", "-62167305600"}, // 0 gets parsed year 0
 
@@ -23,12 +26,17 @@ func TestGetTimestamp(t *testing.T) {
 		// unix timestamps returned as is
 		{"1136073600", "1136073600"},
 
+		// Durations
+		{"1m", fmt.Sprintf("%d", now.Add(-1*time.Minute).Unix())},
+		{"1.5h", fmt.Sprintf("%d", now.Add(-90*time.Minute).Unix())},
+		{"1h30m", fmt.Sprintf("%d", now.Add(-90*time.Minute).Unix())},
+
 		// String fallback
 		{"invalid", "invalid"},
 	}
 
 	for _, c := range cases {
-		o := GetTimestamp(c.in)
+		o := GetTimestamp(c.in, now)
 		if o != c.expected {
 			t.Fatalf("wrong value for '%s'. expected:'%s' got:'%s'", c.in, c.expected, o)
 		}

@@ -41,6 +41,6 @@ func TestHumanDuration(t *testing.T) {
 	assertEquals(t, "13 months", HumanDuration(13*month))
 	assertEquals(t, "23 months", HumanDuration(23*month))
 	assertEquals(t, "24 months", HumanDuration(24*month))
-	assertEquals(t, "2.010959 years", HumanDuration(24*month+2*week))
-	assertEquals(t, "3.164384 years", HumanDuration(3*year+2*month))
+	assertEquals(t, "2 years", HumanDuration(24*month+2*week))
+	assertEquals(t, "3 years", HumanDuration(3*year+2*month))
 }

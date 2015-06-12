@@ -28,7 +28,8 @@ const (
 	mountinfoFormat = "%d %d %d:%d %s %s %s %s"
 )
 
-// Parse /proc/self/mountinfo because comparing Dev and ino does not work from bind mounts
+// Parse /proc/self/mountinfo because comparing Dev and ino does not work from
+// bind mounts
 func parseMountTable() ([]*MountInfo, error) {
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
@@ -80,7 +81,9 @@ func parseInfoFile(r io.Reader) ([]*MountInfo, error) {
 	return out, nil
 }
 
-// PidMountInfo collects the mounts for a specific Pid
+// PidMountInfo collects the mounts for a specific process ID. If the process
+// ID is unknown, it is better to use `GetMounts` which will inspect
+// "/proc/self/mountinfo" instead.
 func PidMountInfo(pid int) ([]*MountInfo, error) {
 	f, err := os.Open(fmt.Sprintf("/proc/%d/mountinfo", pid))
 	if err != nil {

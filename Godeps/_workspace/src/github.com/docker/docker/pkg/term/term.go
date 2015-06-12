@@ -4,6 +4,7 @@ package term
 
 import (
 	"errors"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -23,6 +24,20 @@ type Winsize struct {
 	Width  uint16
 	x      uint16
 	y      uint16
+}
+
+func StdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
+	return os.Stdin, os.Stdout, os.Stderr
+}
+
+func GetFdInfo(in interface{}) (uintptr, bool) {
+	var inFd uintptr
+	var isTerminalIn bool
+	if file, ok := in.(*os.File); ok {
+		inFd = file.Fd()
+		isTerminalIn = IsTerminal(inFd)
+	}
+	return inFd, isTerminalIn
 }
 
 func GetWinsize(fd uintptr) (*Winsize, error) {
