@@ -808,7 +808,8 @@ var _ = Describe("Services", func() {
 })
 
 func waitForLoadBalancerIngress(c *client.Client, serviceName, namespace string) (*api.Service, error) {
-	const timeout = 4 * time.Minute
+	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
+	const timeout = 20 * time.Minute
 	var service *api.Service
 	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to have a LoadBalancer ingress point", timeout, serviceName, namespace))
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
@@ -826,7 +827,8 @@ func waitForLoadBalancerIngress(c *client.Client, serviceName, namespace string)
 }
 
 func waitForLoadBalancerDestroy(c *client.Client, serviceName, namespace string) (*api.Service, error) {
-	const timeout = 4 * time.Minute
+	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
+	const timeout = 10 * time.Minute
 	var service *api.Service
 	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to have no LoadBalancer ingress points", timeout, serviceName, namespace))
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
