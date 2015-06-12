@@ -565,7 +565,27 @@ func SimpleKubelet(client *client.Client,
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
-	kcfg.NodeName = kcfg.Hostname
+
+	if kcfg.NodeName == "" {
+		// Query the cloud provider for our node name, default to Hostname
+		nodeName := kcfg.Hostname
+		if kcfg.Cloud != nil {
+			var err error
+			instances, ok := kcfg.Cloud.Instances()
+			if !ok {
+				return fmt.Errorf("failed to get instances from cloud provider")
+			}
+
+			nodeName, err = instances.CurrentNodeName(kcfg.Hostname)
+			if err != nil {
+				return fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+			}
+
+			glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
+		}
+
+		kcfg.NodeName = nodeName
+	}
 
 	eventBroadcaster := record.NewBroadcaster()
 	kcfg.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet", Host: kcfg.NodeName})

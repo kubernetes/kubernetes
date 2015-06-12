@@ -275,6 +275,11 @@ func (v *OVirtCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	return nil, nil
 }
 
+// Implementation of Instances.CurrentNodeName
+func (v *OVirtCloud) CurrentNodeName(hostname string) (string, error) {
+	return hostname, nil
+}
+
 func (v *OVirtCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
