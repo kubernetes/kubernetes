@@ -50,6 +50,8 @@ const (
 	INTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/ip"
 )
 
+const k8sNodeRouteTag = "k8s-node-route"
+
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service          *compute.Service
@@ -634,11 +636,19 @@ func getMetadataValue(metadata *compute.Metadata, key string) (string, bool) {
 	return "", false
 }
 
-func (gce *GCECloud) ListRoutes(filter string) ([]*cloudprovider.Route, error) {
-	listCall := gce.service.Routes.List(gce.projectID)
-	if len(filter) > 0 {
-		listCall = listCall.Filter("name eq " + filter)
+func truncateClusterName(clusterName string) string {
+	if len(clusterName) > 26 {
+		return clusterName[:26]
 	}
+	return clusterName
+}
+
+func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
+	listCall := gce.service.Routes.List(gce.projectID)
+
+	prefix := truncateClusterName(clusterName)
+	listCall = listCall.Filter("name eq " + prefix + "-.*")
+
 	res, err := listCall.Do()
 	if err != nil {
 		return nil, err
@@ -648,21 +658,32 @@ func (gce *GCECloud) ListRoutes(filter string) ([]*cloudprovider.Route, error) {
 		if path.Base(r.Network) != gce.networkName {
 			continue
 		}
+		// Not managed if route description != "k8s-node-route"
+		if r.Description != k8sNodeRouteTag {
+			continue
+		}
+		// Not managed if route name doesn't start with <clusterName>
+		if !strings.HasPrefix(r.Name, prefix) {
+			continue
+		}
+
 		target := path.Base(r.NextHopInstance)
-		routes = append(routes, &cloudprovider.Route{r.Name, target, r.DestRange, r.Description})
+		routes = append(routes, &cloudprovider.Route{r.Name, target, r.DestRange})
 	}
 	return routes, nil
 }
 
-func (gce *GCECloud) CreateRoute(route *cloudprovider.Route) error {
+func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
+	routeName := truncateClusterName(clusterName) + "-" + nameHint
+
 	instanceName := canonicalizeInstanceName(route.TargetInstance)
 	insertOp, err := gce.service.Routes.Insert(gce.projectID, &compute.Route{
-		Name:            route.Name,
+		Name:            routeName,
 		DestRange:       route.DestinationCIDR,
 		NextHopInstance: fmt.Sprintf("zones/%s/instances/%s", gce.zone, instanceName),
 		Network:         fmt.Sprintf("global/networks/%s", gce.networkName),
 		Priority:        1000,
-		Description:     route.Description,
+		Description:     k8sNodeRouteTag,
 	}).Do()
 	if err != nil {
 		return err
@@ -670,9 +691,8 @@ func (gce *GCECloud) CreateRoute(route *cloudprovider.Route) error {
 	return gce.waitForGlobalOp(insertOp)
 }
 
-func (gce *GCECloud) DeleteRoute(name string) error {
-	instanceName := canonicalizeInstanceName(name)
-	deleteOp, err := gce.service.Routes.Delete(gce.projectID, instanceName).Do()
+func (gce *GCECloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
+	deleteOp, err := gce.service.Routes.Delete(gce.projectID, route.Name).Do()
 	if err != nil {
 		return err
 	}
