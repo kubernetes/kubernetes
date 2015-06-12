@@ -8,11 +8,13 @@ kubelet \- Processes a container manifest so the containers are launched accordi
 
 The **kubernetes** kubelet runs on each node. The Kubelet works in terms of a container manifest. A container manifest is a YAML or JSON file that describes a pod. The Kubelet takes a set of manifests that are provided in various mechanisms and ensures that the containers described in those manifests are started and continue running.
 
-There are 3 ways that a container manifest can be provided to the Kubelet:
+There are 3 ways that a container manifest can be provided to the Kubelet.
 
-    File: Path passed as a flag on the command line. This file is rechecked every 20 seconds (configurable with a flag).
-    HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint is checked every 20 seconds (also configurable with a flag).
-    HTTP server: The kubelet can also listen for HTTP and respond to a simple API (underspec'd currently) to submit a new manifest.
+File: Path passed as a flag on the command line. This file is rechecked every 20 seconds (configurable with a flag).
+
+HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint is checked every 20 seconds (also configurable with a flag).
+
+HTTP server: The kubelet can also listen for HTTP and respond to a simple API (underspec'd currently) to submit a new manifest.
 
 # OPTIONS
 *       **--address=0.0.0.0**: The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)
