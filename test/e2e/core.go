@@ -75,10 +75,9 @@ func logCore(cmds []command, hosts []string, dir, provider string) {
 	for _, cmd := range cmds {
 		fmt.Printf("SSH'ing to all nodes and running %s\n", cmd.cmd)
 		for _, host := range hosts {
+			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				wg.Add(1)
-
 				logfile := fmt.Sprintf("%s/%s-%s.log", dir, host, cmd.component)
 				fmt.Printf("Writing to %s.\n", logfile)
 				stdout, stderr, _, err := SSH(cmd.cmd, host, provider)
