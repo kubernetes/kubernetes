@@ -65,7 +65,12 @@ The above lets you 'curl localhost:8001/custom/api/v1/pods'
 	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix.")
 	cmd.Flags().StringP("www-prefix", "P", "/static/", "Prefix to serve static files under, if static file directory is specified.")
 	cmd.Flags().StringP("api-prefix", "", "/api/", "Prefix to serve the proxied API under.")
+	cmd.Flags().String("accept-paths", kubectl.DefaultPathAcceptRE, "Regular expression for paths that the proxy should accept.")
+	cmd.Flags().String("reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject.")
+	cmd.Flags().String("accept-hosts", kubectl.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
+	cmd.Flags().String("reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject.")
 	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy.")
+	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks.  Use with caution.")
 	return cmd
 }
 
@@ -87,7 +92,17 @@ func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	if !strings.HasSuffix(apiProxyPrefix, "/") {
 		apiProxyPrefix += "/"
 	}
-	server, err := kubectl.NewProxyServer(cmdutil.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, clientConfig)
+	filter := &kubectl.FilterServer{
+		AcceptPaths: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-paths")),
+		RejectPaths: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "reject-paths")),
+		AcceptHosts: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-hosts")),
+	}
+	if cmdutil.GetFlagBool(cmd, "disable-filter") {
+		glog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
+		filter = nil
+	}
+
+	server, err := kubectl.NewProxyServer(cmdutil.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, filter, clientConfig)
 	if err != nil {
 		return err
 	}

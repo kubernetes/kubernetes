@@ -29,6 +29,157 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
+func TestAccept(t *testing.T) {
+	tests := []struct {
+		acceptPaths  string
+		rejectPaths  string
+		acceptHosts  string
+		path         string
+		host         string
+		method       string
+		expectAccept bool
+	}{
+
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "127.0.0.1",
+			method:       "GET",
+			expectAccept: true,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "localhost",
+			method:       "GET",
+			expectAccept: true,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods/foo/exec",
+			host:         "127.0.0.1",
+			method:       "GET",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "evil.com",
+			method:       "GET",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "localhost.evil.com",
+			method:       "GET",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "127a0b0c1",
+			method:       "GET",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/foo/v1/pods",
+			host:         "localhost",
+			method:       "GET",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods",
+			host:         "localhost",
+			method:       "POST",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods/somepod",
+			host:         "localhost",
+			method:       "PUT",
+			expectAccept: false,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/pods/somepod",
+			host:         "localhost",
+			method:       "PATCH",
+			expectAccept: false,
+		},
+	}
+	for _, test := range tests {
+		filter := &FilterServer{
+			AcceptPaths:   MakeRegexpArrayOrDie(test.acceptPaths),
+			RejectPaths:   MakeRegexpArrayOrDie(test.rejectPaths),
+			AcceptHosts:   MakeRegexpArrayOrDie(test.acceptHosts),
+			RejectMethods: MakeRegexpArrayOrDie(DefaultMethodRejectRE),
+		}
+		accept := filter.accept(test.method, test.path, test.host)
+		if accept != test.expectAccept {
+			t.Errorf("expected: %v, got %v for %#v", test.expectAccept, accept, test)
+		}
+	}
+}
+
+func TestRegexpMatch(t *testing.T) {
+	tests := []struct {
+		str         string
+		regexps     string
+		expectMatch bool
+	}{
+		{
+			str:         "foo",
+			regexps:     "bar,.*",
+			expectMatch: true,
+		},
+		{
+			str:         "foo",
+			regexps:     "bar,fo.*",
+			expectMatch: true,
+		},
+		{
+			str:         "bar",
+			regexps:     "bar,fo.*",
+			expectMatch: true,
+		},
+		{
+			str:         "baz",
+			regexps:     "bar,fo.*",
+			expectMatch: false,
+		},
+	}
+	for _, test := range tests {
+		match := matchesRegexp(test.str, MakeRegexpArrayOrDie(test.regexps))
+		if test.expectMatch != match {
+			t.Errorf("expected: %v, found: %v, for %s and %v", test.expectMatch, match, test.str, test.regexps)
+		}
+	}
+}
+
 func TestFileServing(t *testing.T) {
 	const (
 		fname = "test.txt"
@@ -136,7 +287,7 @@ func TestPathHandling(t *testing.T) {
 
 	for _, item := range table {
 		func() {
-			p, err := NewProxyServer("", item.prefix, "/not/used/for/this/test", cc)
+			p, err := NewProxyServer("", item.prefix, "/not/used/for/this/test", nil, cc)
 			if err != nil {
 				t.Fatalf("%#v: %v", item, err)
 			}
