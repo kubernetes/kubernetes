@@ -490,7 +490,18 @@ func (k *KubernetesExecutor) launchTask(driver bindings.ExecutorDriver, taskId s
 
 	// Delay reporting 'task running' until container is up.
 	psf := podStatusFunc(func() (*api.PodStatus, error) {
-		return k.podStatusFunc(k.kl, pod)
+		status, err := k.podStatusFunc(k.kl, pod)
+		if err != nil {
+			return nil, err
+		}
+		status.Phase = kubelet.GetPhase(&pod.Spec, status.ContainerStatuses)
+		hostIP, err := k.kl.GetHostIP()
+		if err != nil {
+			log.Errorf("Cannot get host IP: %v", err)
+		} else {
+			status.HostIP = hostIP.String()
+		}
+		return status, nil
 	})
 
 	go k._launchTask(driver, taskId, podFullName, psf)
