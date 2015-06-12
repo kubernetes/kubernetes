@@ -40,58 +40,58 @@ func makeStat(i int) *info.ContainerStats {
 	}
 }
 
-func getRecentStats(t *testing.T, memoryStorage *InMemoryStorage, numStats int) []*info.ContainerStats {
-	stats, err := memoryStorage.RecentStats(containerName, zero, zero, numStats)
+func getRecentStats(t *testing.T, memoryCache *InMemoryCache, numStats int) []*info.ContainerStats {
+	stats, err := memoryCache.RecentStats(containerName, zero, zero, numStats)
 	require.Nil(t, err)
 	return stats
 }
 
 func TestAddStats(t *testing.T) {
-	memoryStorage := New(60*time.Second, nil)
+	memoryCache := New(60*time.Second, nil)
 
 	assert := assert.New(t)
-	assert.Nil(memoryStorage.AddStats(containerRef, makeStat(0)))
-	assert.Nil(memoryStorage.AddStats(containerRef, makeStat(1)))
-	assert.Nil(memoryStorage.AddStats(containerRef, makeStat(2)))
-	assert.Nil(memoryStorage.AddStats(containerRef, makeStat(0)))
+	assert.Nil(memoryCache.AddStats(containerRef, makeStat(0)))
+	assert.Nil(memoryCache.AddStats(containerRef, makeStat(1)))
+	assert.Nil(memoryCache.AddStats(containerRef, makeStat(2)))
+	assert.Nil(memoryCache.AddStats(containerRef, makeStat(0)))
 	containerRef2 := info.ContainerReference{
 		Name: "/container2",
 	}
-	assert.Nil(memoryStorage.AddStats(containerRef2, makeStat(0)))
-	assert.Nil(memoryStorage.AddStats(containerRef2, makeStat(1)))
+	assert.Nil(memoryCache.AddStats(containerRef2, makeStat(0)))
+	assert.Nil(memoryCache.AddStats(containerRef2, makeStat(1)))
 }
 
 func TestRecentStatsNoRecentStats(t *testing.T) {
-	memoryStorage := makeWithStats(0)
+	memoryCache := makeWithStats(0)
 
-	_, err := memoryStorage.RecentStats(containerName, zero, zero, 60)
+	_, err := memoryCache.RecentStats(containerName, zero, zero, 60)
 	assert.NotNil(t, err)
 }
 
-// Make an instance of InMemoryStorage with n stats.
-func makeWithStats(n int) *InMemoryStorage {
-	memoryStorage := New(60*time.Second, nil)
+// Make an instance of InMemoryCache with n stats.
+func makeWithStats(n int) *InMemoryCache {
+	memoryCache := New(60*time.Second, nil)
 
 	for i := 0; i < n; i++ {
-		memoryStorage.AddStats(containerRef, makeStat(i))
+		memoryCache.AddStats(containerRef, makeStat(i))
 	}
-	return memoryStorage
+	return memoryCache
 }
 
 func TestRecentStatsGetZeroStats(t *testing.T) {
-	memoryStorage := makeWithStats(10)
+	memoryCache := makeWithStats(10)
 
-	assert.Len(t, getRecentStats(t, memoryStorage, 0), 0)
+	assert.Len(t, getRecentStats(t, memoryCache, 0), 0)
 }
 
 func TestRecentStatsGetSomeStats(t *testing.T) {
-	memoryStorage := makeWithStats(10)
+	memoryCache := makeWithStats(10)
 
-	assert.Len(t, getRecentStats(t, memoryStorage, 5), 5)
+	assert.Len(t, getRecentStats(t, memoryCache, 5), 5)
 }
 
 func TestRecentStatsGetAllStats(t *testing.T) {
-	memoryStorage := makeWithStats(10)
+	memoryCache := makeWithStats(10)
 
-	assert.Len(t, getRecentStats(t, memoryStorage, -1), 10)
+	assert.Len(t, getRecentStats(t, memoryCache, -1), 10)
 }

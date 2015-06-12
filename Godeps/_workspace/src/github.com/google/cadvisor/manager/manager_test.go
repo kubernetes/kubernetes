@@ -22,19 +22,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/docker"
 	info "github.com/google/cadvisor/info/v1"
 	itest "github.com/google/cadvisor/info/v1/test"
-	"github.com/google/cadvisor/storage/memory"
 	"github.com/google/cadvisor/utils/sysfs/fakesysfs"
 )
 
 // TODO(vmarmol): Refactor these tests.
 
 func createManagerAndAddContainers(
-	memoryStorage *memory.InMemoryStorage,
+	memoryCache *memory.InMemoryCache,
 	sysfs *fakesysfs.FakeSysFs,
 	containers []string,
 	f func(*container.MockContainerHandler),
@@ -42,9 +42,9 @@ func createManagerAndAddContainers(
 ) *manager {
 	container.ClearContainerHandlerFactories()
 	mif := &manager{
-		containers:    make(map[namespacedContainerName]*containerData),
-		quitChannels:  make([]chan error, 0, 2),
-		memoryStorage: memoryStorage,
+		containers:   make(map[namespacedContainerName]*containerData),
+		quitChannels: make([]chan error, 0, 2),
+		memoryCache:  memoryCache,
 	}
 	for _, name := range containers {
 		mockHandler := container.NewMockContainerHandler(name)
@@ -53,7 +53,7 @@ func createManagerAndAddContainers(
 			spec,
 			nil,
 		).Once()
-		cont, err := newContainerData(name, memoryStorage, mockHandler, nil, false, &collector.FakeCollectorManager{})
+		cont, err := newContainerData(name, memoryCache, mockHandler, nil, false, &collector.FakeCollectorManager{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -82,10 +82,10 @@ func expectManagerWithContainers(containers []string, query *info.ContainerInfoR
 		infosMap[container] = itest.GenerateRandomContainerInfo(container, 4, query, 1*time.Second)
 	}
 
-	memoryStorage := memory.New(time.Duration(query.NumStats)*time.Second, nil)
+	memoryCache := memory.New(time.Duration(query.NumStats)*time.Second, nil)
 	sysfs := &fakesysfs.FakeSysFs{}
 	m := createManagerAndAddContainers(
-		memoryStorage,
+		memoryCache,
 		sysfs,
 		containers,
 		func(h *container.MockContainerHandler) {
@@ -95,7 +95,7 @@ func expectManagerWithContainers(containers []string, query *info.ContainerInfoR
 				t.Error(err)
 			}
 			for _, stat := range cinfo.Stats {
-				err = memoryStorage.AddStats(ref, stat)
+				err = memoryCache.AddStats(ref, stat)
 				if err != nil {
 					t.Error(err)
 				}

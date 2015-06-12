@@ -84,15 +84,20 @@ func GetStats(cgroupManager cgroups.Manager, networkInterfaces []string) (*info.
 	}
 	stats := toContainerStats(libcontainerStats)
 
-	if len(networkInterfaces) != 0 {
-		// ContainerStats only reports stat for one network device.
-		// TODO(rjnagal): Handle multiple physical network devices.
-		// TODO(rjnagal): Use networking stats directly from libcontainer.
-		stats.Network, err = sysinfo.GetNetworkStats(networkInterfaces[0])
+	// TODO(rjnagal): Use networking stats directly from libcontainer.
+	stats.Network.Interfaces = make([]info.InterfaceStats, len(networkInterfaces))
+	for i := range networkInterfaces {
+		interfaceStats, err := sysinfo.GetNetworkStats(networkInterfaces[i])
 		if err != nil {
 			return stats, err
 		}
+		stats.Network.Interfaces[i] = interfaceStats
 	}
+	// For backwards compatability.
+	if len(networkInterfaces) > 0 {
+		stats.Network.InterfaceStats = stats.Network.Interfaces[0]
+	}
+
 	return stats, nil
 }
 
@@ -213,15 +218,25 @@ func toContainerStats2(s *cgroups.Stats, ret *info.ContainerStats) {
 }
 
 func toContainerStats3(libcontainerStats *libcontainer.Stats, ret *info.ContainerStats) {
-	// TODO(vmarmol): Handle multiple interfaces.
-	ret.Network.RxBytes = libcontainerStats.Interfaces[0].RxBytes
-	ret.Network.RxPackets = libcontainerStats.Interfaces[0].RxPackets
-	ret.Network.RxErrors = libcontainerStats.Interfaces[0].RxErrors
-	ret.Network.RxDropped = libcontainerStats.Interfaces[0].RxDropped
-	ret.Network.TxBytes = libcontainerStats.Interfaces[0].TxBytes
-	ret.Network.TxPackets = libcontainerStats.Interfaces[0].TxPackets
-	ret.Network.TxErrors = libcontainerStats.Interfaces[0].TxErrors
-	ret.Network.TxDropped = libcontainerStats.Interfaces[0].TxDropped
+	ret.Network.Interfaces = make([]info.InterfaceStats, len(libcontainerStats.Interfaces))
+	for i := range libcontainerStats.Interfaces {
+		ret.Network.Interfaces[i] = info.InterfaceStats{
+			Name:      libcontainerStats.Interfaces[i].Name,
+			RxBytes:   libcontainerStats.Interfaces[i].RxBytes,
+			RxPackets: libcontainerStats.Interfaces[i].RxPackets,
+			RxErrors:  libcontainerStats.Interfaces[i].RxErrors,
+			RxDropped: libcontainerStats.Interfaces[i].RxDropped,
+			TxBytes:   libcontainerStats.Interfaces[i].TxBytes,
+			TxPackets: libcontainerStats.Interfaces[i].TxPackets,
+			TxErrors:  libcontainerStats.Interfaces[i].TxErrors,
+			TxDropped: libcontainerStats.Interfaces[i].TxDropped,
+		}
+	}
+
+	// Add to base struct for backwards compatability.
+	if len(ret.Network.Interfaces) > 0 {
+		ret.Network.InterfaceStats = ret.Network.Interfaces[0]
+	}
 }
 
 func toContainerStats(libcontainerStats *libcontainer.Stats) *info.ContainerStats {

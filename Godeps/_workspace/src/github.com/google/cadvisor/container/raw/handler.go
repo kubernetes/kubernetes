@@ -305,15 +305,13 @@ func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 }
 
 func (self *rawContainerHandler) GetStats() (*info.ContainerStats, error) {
-	var networkInterfaces []string
 	nd, err := self.GetRootNetworkDevices()
 	if err != nil {
 		return new(info.ContainerStats), err
 	}
-	if len(nd) != 0 {
-		// ContainerStats only reports stat for one network device.
-		// TODO(rjnagal): Handle multiple physical network devices.
-		networkInterfaces = []string{nd[0].Name}
+	networkInterfaces := make([]string, len(nd))
+	for i := range nd {
+		networkInterfaces[i] = nd[i].Name
 	}
 	stats, err := libcontainer.GetStats(self.cgroupManager, networkInterfaces)
 	if err != nil {

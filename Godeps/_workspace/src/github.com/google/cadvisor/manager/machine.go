@@ -62,7 +62,12 @@ func getClockSpeed(procInfo []byte) (uint64, error) {
 	// Fall back to /proc/cpuinfo
 	matches := CpuClockSpeedMHz.FindSubmatch(procInfo)
 	if len(matches) != 2 {
-		return 0, fmt.Errorf("could not detect clock speed from output: %q", string(procInfo))
+		//Check if we are running on Power systems which have a different format
+		CpuClockSpeedMHz, _ = regexp.Compile("clock\\t*: +([0-9]+.[0-9]+)MHz")
+		matches = CpuClockSpeedMHz.FindSubmatch(procInfo)
+		if len(matches) != 2 {
+			return 0, fmt.Errorf("could not detect clock speed from output: %q", string(procInfo))
+		}
 	}
 	speed, err := strconv.ParseFloat(string(matches[1]), 64)
 	if err != nil {

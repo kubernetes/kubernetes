@@ -312,7 +312,9 @@ type MemoryStatsMemoryData struct {
 	Pgmajfault uint64 `json:"pgmajfault"`
 }
 
-type NetworkStats struct {
+type InterfaceStats struct {
+	// The name of the interface.
+	Name string `json:"name"`
 	// Cumulative count of bytes received.
 	RxBytes uint64 `json:"rx_bytes"`
 	// Cumulative count of packets received.
@@ -329,6 +331,11 @@ type NetworkStats struct {
 	TxErrors uint64 `json:"tx_errors"`
 	// Cumulative count of packets dropped while transmitting.
 	TxDropped uint64 `json:"tx_dropped"`
+}
+
+type NetworkStats struct {
+	InterfaceStats `json:",inline"`
+	Interfaces     []InterfaceStats `json:"interfaces,omitempty"`
 }
 
 type FsStats struct {

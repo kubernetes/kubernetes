@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
 	itest "github.com/google/cadvisor/info/v1/test"
-	"github.com/google/cadvisor/storage/memory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,25 +34,25 @@ import (
 const containerName = "/container"
 
 // Create a containerData instance for a test.
-func setupContainerData(t *testing.T, spec info.ContainerSpec) (*containerData, *container.MockContainerHandler, *memory.InMemoryStorage) {
+func setupContainerData(t *testing.T, spec info.ContainerSpec) (*containerData, *container.MockContainerHandler, *memory.InMemoryCache) {
 	mockHandler := container.NewMockContainerHandler(containerName)
 	mockHandler.On("GetSpec").Return(
 		spec,
 		nil,
 	)
-	memoryStorage := memory.New(60, nil)
-	ret, err := newContainerData(containerName, memoryStorage, mockHandler, nil, false, &collector.FakeCollectorManager{})
+	memoryCache := memory.New(60, nil)
+	ret, err := newContainerData(containerName, memoryCache, mockHandler, nil, false, &collector.FakeCollectorManager{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return ret, mockHandler, memoryStorage
+	return ret, mockHandler, memoryCache
 }
 
 // Create a containerData instance for a test and add a default GetSpec mock.
-func newTestContainerData(t *testing.T) (*containerData, *container.MockContainerHandler, *memory.InMemoryStorage) {
+func newTestContainerData(t *testing.T) (*containerData, *container.MockContainerHandler, *memory.InMemoryCache) {
 	spec := itest.GenerateRandomContainerSpec(4)
-	ret, mockHandler, memoryStorage := setupContainerData(t, spec)
-	return ret, mockHandler, memoryStorage
+	ret, mockHandler, memoryCache := setupContainerData(t, spec)
+	return ret, mockHandler, memoryCache
 }
 
 func TestUpdateSubcontainers(t *testing.T) {
@@ -116,9 +116,9 @@ func TestUpdateSubcontainersWithErrorOnDeadContainer(t *testing.T) {
 	mockHandler.AssertExpectations(t)
 }
 
-func checkNumStats(t *testing.T, memoryStorage *memory.InMemoryStorage, numStats int) {
+func checkNumStats(t *testing.T, memoryCache *memory.InMemoryCache, numStats int) {
 	var empty time.Time
-	stats, err := memoryStorage.RecentStats(containerName, empty, empty, -1)
+	stats, err := memoryCache.RecentStats(containerName, empty, empty, -1)
 	require.Nil(t, err)
 	assert.Len(t, stats, numStats)
 }
@@ -127,7 +127,7 @@ func TestUpdateStats(t *testing.T) {
 	statsList := itest.GenerateRandomStats(1, 4, 1*time.Second)
 	stats := statsList[0]
 
-	cd, mockHandler, memoryStorage := newTestContainerData(t)
+	cd, mockHandler, memoryCache := newTestContainerData(t)
 	mockHandler.On("GetStats").Return(
 		stats,
 		nil,
@@ -138,7 +138,7 @@ func TestUpdateStats(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	checkNumStats(t, memoryStorage, 1)
+	checkNumStats(t, memoryCache, 1)
 	mockHandler.AssertExpectations(t)
 }
 

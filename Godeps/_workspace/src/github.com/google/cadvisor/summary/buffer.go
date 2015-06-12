@@ -19,7 +19,7 @@ import (
 )
 
 // Manages a buffer of usage samples.
-// This is similar to stats buffer in storage/memory.
+// This is similar to stats buffer in cache/memory.
 // The main difference is that we do not pre-allocate the buffer as most containers
 // won't live that long.
 type SamplesBuffer struct {
