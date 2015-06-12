@@ -61,7 +61,7 @@ func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
 	store.ReturnDeletedObject = true
 
 	statusStore := *store
-	statusStore.UpdateStrategy = autoscaler.AutoScalers
+	statusStore.UpdateStrategy = autoscaler.AutoScalersStatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}
 }

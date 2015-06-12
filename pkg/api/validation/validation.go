@@ -1821,13 +1821,31 @@ func validateIntentionThreshold(t *api.AutoScaleIntentionThresholdConfig) errs.V
 	return allErrs
 }
 
-// ValidateNamespaceUpdate tests to make sure a mamespace update can be applied.  Modifies oldAutoScaler.
-func ValidateAutoScalerUpdate(oldAutoScaler *api.AutoScaler, autoScaler *api.AutoScaler) errs.ValidationErrorList {
+// ValidateAutoScalerUpdate tests to make sure am autoscaler update can be
+// applied.  Modifies newAutoScaler.
+func ValidateAutoScalerUpdate(newAutoScaler, oldAutoScaler *api.AutoScaler) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldAutoScaler.ObjectMeta, &autoScaler.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newAutoScaler.ObjectMeta, &oldAutoScaler.ObjectMeta).Prefix("metadata")...)
 
 	//use all creation validations
-	allErrs = append(allErrs, ValidateAutoScaler(autoScaler)...)
+	allErrs = append(allErrs, ValidateAutoScaler(newAutoScaler)...)
 
+	return allErrs
+}
+
+// ValidateAutoScalerStatus tests if required fields are set.
+func ValidateAutoScalerStatus(autoScaler *api.AutoScaler) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&autoScaler.ObjectMeta, true, ValidateAutoScalerName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateAutoScalerSpec(&autoScaler.Spec)...)
+	return allErrs
+}
+
+// ValidateAutoScalerStatusUpdate tests to make sure am autoscaler status update can be applied.  Modifies oldAutoScaler.
+func ValidateAutoScalerStatusUpdate(newAutoScaler, oldAutoScaler *api.AutoScaler) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newAutoScaler.ObjectMeta, &oldAutoScaler.ObjectMeta).Prefix("metadata")...)
+
+	newAutoScaler.Spec = oldAutoScaler.Spec
 	return allErrs
 }

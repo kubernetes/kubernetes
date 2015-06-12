@@ -75,7 +75,36 @@ func (autoScalerStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate validates AutoScalers during an update
 func (autoScalerStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateAutoScalerUpdate(old.(*api.AutoScaler), obj.(*api.AutoScaler))
+	return validation.ValidateAutoScalerUpdate(obj.(*api.AutoScaler), old.(*api.AutoScaler))
+}
+
+type autoScalerStatusStrategy struct {
+	autoScalerStrategy
+}
+
+var AutoScalersStatusStrategy = autoScalerStatusStrategy{AutoScalers}
+
+// NamespaceScoped is true for AutoScalersStatusStrategy.
+func (autoScalerStatusStrategy) NamespaceScoped() bool {
+	return true
+}
+
+// PrepareForUpdate sets the Spec field which is not allowed to be set by end users on update.
+func (autoScalerStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newAs := obj.(*api.AutoScaler)
+	oldAs := old.(*api.AutoScaler)
+	newAs.Spec = oldAs.Spec
+}
+
+// Validate validates a new AutoScalerStatusStrategy.
+func (autoScalerStatusStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+	autoScaler := obj.(*api.AutoScaler)
+	return validation.ValidateAutoScalerStatus(autoScaler)
+}
+
+// ValidateUpdate validates AutoScalersStatusStrategy during an update
+func (autoScalerStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	return validation.ValidateAutoScalerStatusUpdate(obj.(*api.AutoScaler), old.(*api.AutoScaler))
 }
 
 // MatchAutoScaler returns a generic matcher for a given label and field selector.
