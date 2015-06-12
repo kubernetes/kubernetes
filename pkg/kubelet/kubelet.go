@@ -1960,8 +1960,10 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	return err
 }
 
-// getPhase returns the phase of a pod given its container info.
-func getPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
+// GetPhase returns the phase of a pod given its container info.
+// This func is exported to simplify integration with 3rd party kubelet
+// integrations like kubernetes-mesos.
+func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 	running := 0
 	waiting := 0
 	stopped := 0
@@ -2080,7 +2082,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	}
 
 	// Assume info is ready to process
-	podStatus.Phase = getPhase(spec, podStatus.ContainerStatuses)
+	podStatus.Phase = GetPhase(spec, podStatus.ContainerStatuses)
 	for _, c := range spec.Containers {
 		for i, st := range podStatus.ContainerStatuses {
 			if st.Name == c.Name {

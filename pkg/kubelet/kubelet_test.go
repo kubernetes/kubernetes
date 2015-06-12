@@ -1657,7 +1657,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
+		if status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 		}
 	}
@@ -1745,7 +1745,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
+		if status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 		}
 	}
@@ -1833,7 +1833,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
+		if status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 		}
 	}
