@@ -114,6 +114,7 @@ func waitUntilRuntimeIsUp(cr kubecontainer.Runtime, timeout time.Duration) error
 // New creates a new Kubelet for use in main
 func NewMainKubelet(
 	hostname string,
+	nodeName string,
 	dockerClient dockertools.DockerInterface,
 	kubeClient client.Interface,
 	rootDirectory string,
@@ -179,7 +180,7 @@ func NewMainKubelet(
 	if kubeClient != nil {
 		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
 		// than an interface. There is no way to construct a list+watcher using resource name.
-		fieldSelector := fields.Set{client.ObjectNameField: hostname}.AsSelector()
+		fieldSelector := fields.Set{client.ObjectNameField: nodeName}.AsSelector()
 		listWatch := &cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
 				return kubeClient.Nodes().List(labels.Everything(), fieldSelector)
@@ -197,8 +198,8 @@ func NewMainKubelet(
 	// TODO: what is namespace for node?
 	nodeRef := &api.ObjectReference{
 		Kind:      "Node",
-		Name:      hostname,
-		UID:       types.UID(hostname),
+		Name:      nodeName,
+		UID:       types.UID(nodeName),
 		Namespace: "",
 	}
 
@@ -224,6 +225,7 @@ func NewMainKubelet(
 
 	klet := &Kubelet{
 		hostname:                       hostname,
+		nodeName:                       nodeName,
 		dockerClient:                   dockerClient,
 		kubeClient:                     kubeClient,
 		rootDirectory:                  rootDirectory,
@@ -362,6 +364,7 @@ type nodeLister interface {
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	hostname       string
+	nodeName       string
 	dockerClient   dockertools.DockerInterface
 	runtimeCache   kubecontainer.RuntimeCache
 	kubeClient     client.Interface
@@ -637,13 +640,13 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 	if err != nil {
 		return nil, errors.New("cannot list nodes")
 	}
-	host := kl.GetHostname()
+	nodeName := kl.nodeName
 	for _, n := range l.Items {
-		if n.Name == host {
+		if n.Name == nodeName {
 			return &n, nil
 		}
 	}
-	return nil, fmt.Errorf("node %v not found", host)
+	return nil, fmt.Errorf("node %v not found", nodeName)
 }
 
 // Starts garbage collection theads.
@@ -709,7 +712,7 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 	node := &api.Node{
 		ObjectMeta: api.ObjectMeta{
-			Name:   kl.hostname,
+			Name:   kl.nodeName,
 			Labels: map[string]string{"kubernetes.io/hostname": kl.hostname},
 		},
 	}
@@ -718,18 +721,20 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 		if !ok {
 			return nil, fmt.Errorf("failed to get instances from cloud provider")
 		}
+
 		// TODO(roberthbailey): Can we do this without having credentials to talk
 		// to the cloud provider?
 		// TODO: ExternalID is deprecated, we'll have to drop this code
-		externalID, err := instances.ExternalID(kl.hostname)
+		externalID, err := instances.ExternalID(kl.nodeName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get external ID from cloud provider: %v", err)
 		}
 		node.Spec.ExternalID = externalID
+
 		// TODO: We can't assume that the node has credentials to talk to the
 		// cloudprovider from arbitrary nodes. At most, we should talk to a
 		// local metadata server here.
-		node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(kl.cloud, kl.hostname)
+		node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(kl.cloud, kl.nodeName)
 		if err != nil {
 			return nil, err
 		}
@@ -760,13 +765,13 @@ func (kl *Kubelet) registerWithApiserver() {
 		glog.V(2).Infof("Attempting to register node %s", node.Name)
 		if _, err := kl.kubeClient.Nodes().Create(node); err != nil {
 			if apierrors.IsAlreadyExists(err) {
-				currentNode, err := kl.kubeClient.Nodes().Get(kl.hostname)
+				currentNode, err := kl.kubeClient.Nodes().Get(kl.nodeName)
 				if err != nil {
-					glog.Errorf("error getting node %q: %v", kl.hostname, err)
+					glog.Errorf("error getting node %q: %v", kl.nodeName, err)
 					continue
 				}
 				if currentNode == nil {
-					glog.Errorf("no node instance returned for %q", kl.hostname)
+					glog.Errorf("no node instance returned for %q", kl.nodeName)
 					continue
 				}
 				if currentNode.Spec.ExternalID == node.Spec.ExternalID {
@@ -1830,10 +1835,10 @@ func (kl *Kubelet) updateNodeStatus() error {
 }
 
 func (kl *Kubelet) recordNodeStatusEvent(event string) {
-	glog.V(2).Infof("Recording %s event message for node %s", event, kl.hostname)
+	glog.V(2).Infof("Recording %s event message for node %s", event, kl.nodeName)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	kl.recorder.Eventf(kl.nodeRef, event, "Node %s status is now: %s", kl.hostname, event)
+	kl.recorder.Eventf(kl.nodeRef, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
 // Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
@@ -1850,7 +1855,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		}
 		// TODO(roberthbailey): Can we do this without having credentials to talk
 		// to the cloud provider?
-		nodeAddresses, err := instances.NodeAddresses(kl.hostname)
+		nodeAddresses, err := instances.NodeAddresses(kl.nodeName)
 		if err != nil {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		}
@@ -1904,7 +1909,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			// TODO: This requires a transaction, either both node status is updated
 			// and event is recorded or neither should happen, see issue #6055.
 			kl.recorder.Eventf(kl.nodeRef, "rebooted",
-				"Node %s has been rebooted, boot id: %s", kl.hostname, info.BootID)
+				"Node %s has been rebooted, boot id: %s", kl.nodeName, info.BootID)
 		}
 		node.Status.NodeInfo.BootID = info.BootID
 	}
@@ -1993,12 +1998,12 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
 // is set, this function will also confirm that cbr0 is configured correctly.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
-	node, err := kl.kubeClient.Nodes().Get(kl.hostname)
+	node, err := kl.kubeClient.Nodes().Get(kl.nodeName)
 	if err != nil {
-		return fmt.Errorf("error getting node %q: %v", kl.hostname, err)
+		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
 	if node == nil {
-		return fmt.Errorf("no node instance returned for %q", kl.hostname)
+		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
 	if err := kl.setNodeStatus(node); err != nil {
 		return err

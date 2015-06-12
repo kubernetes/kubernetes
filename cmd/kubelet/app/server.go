@@ -565,8 +565,10 @@ func SimpleKubelet(client *client.Client,
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
+	kcfg.NodeName = kcfg.Hostname
+
 	eventBroadcaster := record.NewBroadcaster()
-	kcfg.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet", Host: kcfg.Hostname})
+	kcfg.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet", Host: kcfg.NodeName})
 	eventBroadcaster.StartLogging(glog.Infof)
 	if kcfg.KubeClient != nil {
 		glog.V(4).Infof("Sending events to api server.")
@@ -625,17 +627,17 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 	// define file config source
 	if kc.ConfigFile != "" {
 		glog.Infof("Adding manifest file: %v", kc.ConfigFile)
-		config.NewSourceFile(kc.ConfigFile, kc.Hostname, kc.FileCheckFrequency, cfg.Channel(kubelet.FileSource))
+		config.NewSourceFile(kc.ConfigFile, kc.NodeName, kc.FileCheckFrequency, cfg.Channel(kubelet.FileSource))
 	}
 
 	// define url config source
 	if kc.ManifestURL != "" {
 		glog.Infof("Adding manifest url: %v", kc.ManifestURL)
-		config.NewSourceURL(kc.ManifestURL, kc.Hostname, kc.HTTPCheckFrequency, cfg.Channel(kubelet.HTTPSource))
+		config.NewSourceURL(kc.ManifestURL, kc.NodeName, kc.HTTPCheckFrequency, cfg.Channel(kubelet.HTTPSource))
 	}
 	if kc.KubeClient != nil {
 		glog.Infof("Watching apiserver")
-		config.NewSourceApiserver(kc.KubeClient, kc.Hostname, cfg.Channel(kubelet.ApiserverSource))
+		config.NewSourceApiserver(kc.KubeClient, kc.NodeName, cfg.Channel(kubelet.ApiserverSource))
 	}
 	return cfg
 }
@@ -656,6 +658,7 @@ type KubeletConfig struct {
 	FileCheckFrequency             time.Duration
 	HTTPCheckFrequency             time.Duration
 	Hostname                       string
+	NodeName                       string
 	PodInfraContainerImage         string
 	SyncFrequency                  time.Duration
 	RegistryPullQPS                float64
@@ -715,6 +718,7 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 	pc = makePodSourceConfig(kc)
 	k, err = kubelet.NewMainKubelet(
 		kc.Hostname,
+		kc.NodeName,
 		kc.DockerClient,
 		kubeClient,
 		kc.RootDirectory,
