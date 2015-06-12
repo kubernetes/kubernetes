@@ -16,7 +16,7 @@ with the basic authentication username and password.
 Here is an example replication controller specification that creates 4 instances of Elasticsearch which is in the file
 [music-rc.yaml](music-rc.yaml).
 ```
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
@@ -68,7 +68,7 @@ for the replication controller (in this case `mytunes`).
 Before creating pods with the replication controller a secret containing the bearer authentication token
 should be set up. A template is provided in the file [apiserver-secret.yaml](apiserver-secret.yaml):
 ```
-apiVersion: v1beta3
+apiVersion: v1
 kind: Secret
 metadata:
   name: apiserver-secret
@@ -92,7 +92,7 @@ eUdsRGNNdlNaUFg0UHlQMFE1YkhnQVlnaTFpeUVIdjIK=
 ```
 resulting in the file:
 ```
-apiVersion: v1beta3
+apiVersion: v1
 kind: Secret
 metadata:
   name: apiserver-secret
@@ -113,10 +113,10 @@ $ kubectl create -f music-rc.yaml --namespace=mytunes
 replicationcontrollers/music-db
 
 ```
-It's also useful to have a [service](../../docs/services.md) with an external load balancer for accessing the Elasticsearch
+It's also useful to have a [service](../../docs/services.md) with an load balancer for accessing the Elasticsearch
 cluster which can be found in the file [music-service.yaml](music-service.yaml).
 ```
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata:
   name: music-server
@@ -130,7 +130,7 @@ spec:
   - name: db
     port: 9200
     targetPort: es
-  createExternalLoadBalancer: true
+  type: LoadBalancer
 ```
 Let's create the service with an external load balancer:
 ```
