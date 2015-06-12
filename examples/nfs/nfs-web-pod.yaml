@@ -1,5 +1,5 @@
 #
-# This pod imports nfs-server.default.kube.local:/ into /var/www/html
+# This pod imports nfs-server.default.kube.local:/ into /usr/share/nginx/html
 #
 
 apiVersion: v1
