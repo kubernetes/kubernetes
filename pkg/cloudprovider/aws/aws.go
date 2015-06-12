@@ -235,7 +235,11 @@ func (self *AWSCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error
 }
 
 func (a *AWSCloud) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
+	selfInstance, err := a.getSelfAWSInstance()
+	if err != nil {
+		return "", err
+	}
+	return selfInstance.awsID, nil
 }
 
 // Implementation of EC2.Instances
@@ -551,7 +555,7 @@ func (aws *AWSCloud) Routes() (cloudprovider.Routes, bool) {
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	instance, err := aws.getInstanceByDnsName(name)
+	instance, err := aws.getInstanceById(name)
 	if err != nil {
 		return nil, err
 	}
@@ -585,7 +589,8 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (aws *AWSCloud) ExternalID(name string) (string, error) {
-	inst, err := aws.getInstanceByDnsName(name)
+	// TODO: Do we need to verify it exists, or can we just return name
+	inst, err := aws.getInstanceById(name)
 	if err != nil {
 		return "", err
 	}
@@ -594,53 +599,14 @@ func (aws *AWSCloud) ExternalID(name string) (string, error) {
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (aws *AWSCloud) InstanceID(name string) (string, error) {
-	inst, err := aws.getInstanceByDnsName(name)
+	// TODO: Do we need to verify it exists, or can we just construct it knowing our AZ (or via caching?)
+	inst, err := aws.getInstanceById(name)
 	if err != nil {
 		return "", err
 	}
 	// In the future it is possible to also return an endpoint as:
 	// <endpoint>/<zone>/<instanceid>
 	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceID), nil
-}
-
-// Return the instances matching the relevant private dns name.
-func (s *AWSCloud) getInstanceByDnsName(name string) (*ec2.Instance, error) {
-	filters := []*ec2.Filter{
-		newEc2Filter("private-dns-name", name),
-	}
-	filters = s.addFilters(filters)
-	request := &ec2.DescribeInstancesInput{
-		Filters: filters,
-	}
-
-	instances, err := s.ec2.DescribeInstances(request)
-	if err != nil {
-		return nil, err
-	}
-
-	matchingInstances := []*ec2.Instance{}
-	for _, instance := range instances {
-		// TODO: Push running logic down into filter?
-		if !isAlive(instance) {
-			continue
-		}
-
-		if orEmpty(instance.PrivateDNSName) != name {
-			// TODO: Should we warn here? - the filter should have caught this
-			// (this will happen in the tests if they don't fully mock the EC2 API)
-			continue
-		}
-
-		matchingInstances = append(matchingInstances, instance)
-	}
-
-	if len(matchingInstances) == 0 {
-		return nil, fmt.Errorf("no instances found for host: %s", name)
-	}
-	if len(matchingInstances) > 1 {
-		return nil, fmt.Errorf("multiple instances found for host: %s", name)
-	}
-	return matchingInstances[0], nil
 }
 
 // Check if the instance is alive (running or pending)
@@ -702,16 +668,9 @@ func (s *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 			continue
 		}
 
-		privateDNSName := orEmpty(instance.PrivateDNSName)
-		if privateDNSName == "" {
-			glog.V(2).Infof("skipping EC2 instance (no PrivateDNSName): %s",
-				orEmpty(instance.InstanceID))
-			continue
-		}
-
 		for _, tag := range instance.Tags {
 			if orEmpty(tag.Key) == "Name" && re.MatchString(orEmpty(tag.Value)) {
-				matchingInstances = append(matchingInstances, privateDNSName)
+				matchingInstances = append(matchingInstances, orEmpty(instance.InstanceID))
 				break
 			}
 		}
@@ -728,7 +687,7 @@ func (aws *AWSCloud) List(filter string) ([]string, error) {
 
 // GetNodeResources implements Instances.GetNodeResources
 func (aws *AWSCloud) GetNodeResources(name string) (*api.NodeResources, error) {
-	instance, err := aws.getInstanceByDnsName(name)
+	instance, err := aws.getInstanceById(name)
 	if err != nil {
 		return nil, err
 	}
@@ -1189,7 +1148,7 @@ func (aws *AWSCloud) getAwsInstance(instanceName string) (*awsInstance, error) {
 			return nil, fmt.Errorf("error getting self-instance: %v", err)
 		}
 	} else {
-		instance, err := aws.getInstanceByDnsName(instanceName)
+		instance, err := aws.getInstanceById(instanceName)
 		if err != nil {
 			return nil, fmt.Errorf("error finding instance: %v", err)
 		}
@@ -1656,7 +1615,7 @@ func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, p
 		return nil, fmt.Errorf("publicIP cannot be specified for AWS ELB")
 	}
 
-	instances, err := s.getInstancesByDnsNames(hosts)
+	instances, err := s.getInstancesByIds(hosts)
 	if err != nil {
 		return nil, err
 	}
@@ -2068,7 +2027,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 
 // UpdateTCPLoadBalancer implements TCPLoadBalancer.UpdateTCPLoadBalancer
 func (s *AWSCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
-	instances, err := s.getInstancesByDnsNames(hosts)
+	instances, err := s.getInstancesByIds(hosts)
 	if err != nil {
 		return err
 	}
@@ -2143,19 +2102,38 @@ func (s *AWSCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) er
 }
 
 // TODO: Make efficient
-func (a *AWSCloud) getInstancesByDnsNames(names []string) ([]*ec2.Instance, error) {
+func (a *AWSCloud) getInstancesByIds(ids []string) ([]*ec2.Instance, error) {
 	instances := []*ec2.Instance{}
-	for _, name := range names {
-		instance, err := a.getInstanceByDnsName(name)
+	for _, id := range ids {
+		instance, err := a.getInstanceById(id)
 		if err != nil {
 			return nil, err
 		}
 		if instance == nil {
-			return nil, fmt.Errorf("unable to find instance " + name)
+			return nil, fmt.Errorf("unable to find instance " + id)
 		}
 		instances = append(instances, instance)
 	}
 	return instances, nil
+}
+
+// Returns the instance with the specified ID
+func (a *AWSCloud) getInstanceById(instanceID string) (*ec2.Instance, error) {
+	request := &ec2.DescribeInstancesInput{
+		InstanceIDs: []*string{&instanceID},
+	}
+
+	instances, err := a.ec2.DescribeInstances(request)
+	if err != nil {
+		return nil, err
+	}
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no instances found for instance: %s", instanceID)
+	}
+	if len(instances) > 1 {
+		return nil, fmt.Errorf("multiple instances found for instance: %s", instanceID)
+	}
+	return instances[0], nil
 }
 
 // Add additional filters, to match on our tags
