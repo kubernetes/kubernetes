@@ -19,7 +19,6 @@ package routecontroller
 import (
 	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -37,8 +36,6 @@ type RouteController struct {
 	clusterName string
 	clusterCIDR *net.IPNet
 }
-
-const k8sNodeRouteTag = "k8s-node-route"
 
 func New(routes cloudprovider.Routes, kubeClient client.Interface, clusterName string, clusterCIDR *net.IPNet) *RouteController {
 	return &RouteController{
@@ -58,7 +55,7 @@ func (rc *RouteController) Run(syncPeriod time.Duration) {
 }
 
 func (rc *RouteController) reconcileNodeRoutes() error {
-	routeList, err := rc.routes.ListRoutes(rc.truncatedClusterName() + "-.*")
+	routeList, err := rc.routes.ListRoutes(rc.clusterName)
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
 	}
@@ -85,16 +82,15 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 		if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
 			// If not, create the route.
 			route := &cloudprovider.Route{
-				Name:            rc.truncatedClusterName() + "-" + string(node.UID),
 				TargetInstance:  node.Name,
 				DestinationCIDR: node.Spec.PodCIDR,
-				Description:     k8sNodeRouteTag,
 			}
-			go func(route *cloudprovider.Route) {
-				if err := rc.routes.CreateRoute(route); err != nil {
-					glog.Errorf("Could not create route %s: %v", route.Name, err)
+			nameHint := string(node.UID)
+			go func(nameHint string, route *cloudprovider.Route) {
+				if err := rc.routes.CreateRoute(rc.clusterName, nameHint, route); err != nil {
+					glog.Errorf("Could not create route %s %s: %v", nameHint, route.DestinationCIDR, err)
 				}
-			}(route)
+			}(nameHint, route)
 		}
 		nodeCIDRs[node.Name] = node.Spec.PodCIDR
 	}
@@ -103,22 +99,15 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 			// Check if this route applies to a node we know about & has correct CIDR.
 			if nodeCIDRs[route.TargetInstance] != route.DestinationCIDR {
 				// Delete the route.
-				go func(routeName string) {
-					if err := rc.routes.DeleteRoute(routeName); err != nil {
-						glog.Errorf("Could not delete route %s: %v", routeName, err)
+				go func(route *cloudprovider.Route) {
+					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
+						glog.Errorf("Could not delete route %s %s: %v", route.Name, route.DestinationCIDR, err)
 					}
-				}(route.Name)
+				}(route)
 			}
 		}
 	}
 	return nil
-}
-
-func (rc *RouteController) truncatedClusterName() string {
-	if len(rc.clusterName) > 26 {
-		return rc.clusterName[:26]
-	}
-	return rc.clusterName
 }
 
 func (rc *RouteController) isResponsibleForRoute(route *cloudprovider.Route) bool {
@@ -133,14 +122,6 @@ func (rc *RouteController) isResponsibleForRoute(route *cloudprovider.Route) boo
 		lastIP[i] = cidr.IP[i] | ^cidr.Mask[i]
 	}
 	if !rc.clusterCIDR.Contains(cidr.IP) || !rc.clusterCIDR.Contains(lastIP) {
-		return false
-	}
-	// Not responsible if route name doesn't start with <clusterName>
-	if !strings.HasPrefix(route.Name, rc.clusterName) {
-		return false
-	}
-	// Not responsible if route description != "k8s-node-route"
-	if route.Description != k8sNodeRouteTag {
 		return false
 	}
 	return true

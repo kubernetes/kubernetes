@@ -58,9 +58,14 @@ type FakeCloud struct {
 	ExternalIP    net.IP
 	Balancers     []FakeBalancer
 	UpdateCalls   []FakeUpdateBalancerCall
-	RouteMap      map[string]*cloudprovider.Route
+	RouteMap      map[string]*FakeRoute
 	Lock          sync.Mutex
 	cloudprovider.Zone
+}
+
+type FakeRoute struct {
+	ClusterName string
+	Route       cloudprovider.Route
 }
 
 func (f *FakeCloud) addCall(desc string) {
@@ -198,35 +203,42 @@ func (f *FakeCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	return f.NodeResources, f.Err
 }
 
-func (f *FakeCloud) ListRoutes(filter string) ([]*cloudprovider.Route, error) {
+func (f *FakeCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.addCall("list-routes")
 	var routes []*cloudprovider.Route
-	for _, route := range f.RouteMap {
-		if match, _ := regexp.MatchString(filter, route.Name); match {
-			routes = append(routes, route)
+	for _, fakeRoute := range f.RouteMap {
+		if clusterName == fakeRoute.ClusterName {
+			routeCopy := fakeRoute.Route
+			routes = append(routes, &routeCopy)
 		}
 	}
 	return routes, f.Err
 }
 
-func (f *FakeCloud) CreateRoute(route *cloudprovider.Route) error {
+func (f *FakeCloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.addCall("create-route")
-	if _, exists := f.RouteMap[route.Name]; exists {
-		f.Err = fmt.Errorf("route with name %q already exists")
+	name := clusterName + "-" + nameHint
+	if _, exists := f.RouteMap[name]; exists {
+		f.Err = fmt.Errorf("route %q already exists", name)
 		return f.Err
 	}
-	f.RouteMap[route.Name] = route
+	fakeRoute := FakeRoute{}
+	fakeRoute.Route = *route
+	fakeRoute.Route.Name = name
+	fakeRoute.ClusterName = clusterName
+	f.RouteMap[name] = &fakeRoute
 	return nil
 }
 
-func (f *FakeCloud) DeleteRoute(name string) error {
+func (f *FakeCloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.addCall("delete-route")
+	name := route.Name
 	if _, exists := f.RouteMap[name]; !exists {
 		f.Err = fmt.Errorf("no route found with name %q", name)
 		return f.Err

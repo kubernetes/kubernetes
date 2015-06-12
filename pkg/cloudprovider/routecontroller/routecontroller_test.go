@@ -33,27 +33,20 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		clusterCIDR         string
 		routeName           string
 		routeCIDR           string
-		routeDescription    string
 		expectedResponsible bool
 	}{
 		// Routes that belong to this cluster
-		{"10.244.0.0/16", myClusterRoute, "10.244.0.0/24", "k8s-node-route", true},
-		{"10.244.0.0/16", myClusterRoute, "10.244.10.0/24", "k8s-node-route", true},
-		{"10.244.0.0/16", myClusterRoute, "10.244.255.0/24", "k8s-node-route", true},
-		{"10.244.0.0/14", myClusterRoute, "10.244.0.0/24", "k8s-node-route", true},
-		{"10.244.0.0/14", myClusterRoute, "10.247.255.0/24", "k8s-node-route", true},
-		// Routes inside our cidr, but not named how we would have named them
-		{"10.244.0.0/16", "background-cluster-route", "10.244.0.0/16", "k8s-node-route", false},
-		{"10.244.0.0/16", "special-single-route", "10.244.12.34/32", "k8s-node-route", false},
-		// Routes inside our cidr, but not tagged how we would have tagged them in the description
-		{"10.244.0.0/16", "my-awesome-cluster-background", "10.244.0.0/16", "", false},
-		{"10.244.0.0/16", "my-awesome-cluster-single-route", "10.244.12.34/32", "this is a route", false},
+		{"10.244.0.0/16", myClusterRoute, "10.244.0.0/24", true},
+		{"10.244.0.0/16", myClusterRoute, "10.244.10.0/24", true},
+		{"10.244.0.0/16", myClusterRoute, "10.244.255.0/24", true},
+		{"10.244.0.0/14", myClusterRoute, "10.244.0.0/24", true},
+		{"10.244.0.0/14", myClusterRoute, "10.247.255.0/24", true},
 		// Routes that match our naming/tagging scheme, but are outside our cidr
-		{"10.244.0.0/16", myClusterRoute, "10.224.0.0/24", "k8s-node-route", false},
-		{"10.244.0.0/16", myClusterRoute, "10.0.10.0/24", "k8s-node-route", false},
-		{"10.244.0.0/16", myClusterRoute, "10.255.255.0/24", "k8s-node-route", false},
-		{"10.244.0.0/14", myClusterRoute, "10.248.0.0/24", "k8s-node-route", false},
-		{"10.244.0.0/14", myClusterRoute, "10.243.255.0/24", "k8s-node-route", false},
+		{"10.244.0.0/16", myClusterRoute, "10.224.0.0/24", false},
+		{"10.244.0.0/16", myClusterRoute, "10.0.10.0/24", false},
+		{"10.244.0.0/16", myClusterRoute, "10.255.255.0/24", false},
+		{"10.244.0.0/14", myClusterRoute, "10.248.0.0/24", false},
+		{"10.244.0.0/14", myClusterRoute, "10.243.255.0/24", false},
 	}
 	for i, testCase := range testCases {
 		_, cidr, err := net.ParseCIDR(testCase.clusterCIDR)
@@ -65,7 +58,6 @@ func TestIsResponsibleForRoute(t *testing.T) {
 			Name:            testCase.routeName,
 			TargetInstance:  "doesnt-matter-for-this-test",
 			DestinationCIDR: testCase.routeCIDR,
-			Description:     testCase.routeDescription,
 		}
 		if resp := rc.isResponsibleForRoute(route); resp != testCase.expectedResponsible {
 			t.Errorf("%d. isResponsibleForRoute() = %t; want %t", i, resp, testCase.expectedResponsible)
@@ -87,12 +79,12 @@ func TestReconcile(t *testing.T) {
 				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", "k8s-node-route"},
-				{cluster + "-02", "node-2", "10.120.1.0/24", "k8s-node-route"},
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", "k8s-node-route"},
-				{cluster + "-02", "node-2", "10.120.1.0/24", "k8s-node-route"},
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 		},
 		// 2 nodes, one route already there
@@ -102,11 +94,11 @@ func TestReconcile(t *testing.T) {
 				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", "k8s-node-route"},
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", "k8s-node-route"},
-				{cluster + "-02", "node-2", "10.120.1.0/24", "k8s-node-route"},
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 		},
 		// 2 nodes, no routes yet
@@ -117,8 +109,8 @@ func TestReconcile(t *testing.T) {
 			},
 			initialRoutes: []*cloudprovider.Route{},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", "k8s-node-route"},
-				{cluster + "-02", "node-2", "10.120.1.0/24", "k8s-node-route"},
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 		},
 		// 2 nodes, a few too many routes
@@ -128,14 +120,14 @@ func TestReconcile(t *testing.T) {
 				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", "k8s-node-route"},
-				{cluster + "-02", "node-2", "10.120.1.0/24", "k8s-node-route"},
-				{cluster + "-03", "node-3", "10.120.2.0/24", "k8s-node-route"},
-				{cluster + "-04", "node-4", "10.120.3.0/24", "k8s-node-route"},
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-02", "node-2", "10.120.1.0/24"},
+				{cluster + "-03", "node-3", "10.120.2.0/24"},
+				{cluster + "-04", "node-4", "10.120.3.0/24"},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", "k8s-node-route"},
-				{cluster + "-02", "node-2", "10.120.1.0/24", "k8s-node-route"},
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 		},
 		// 2 nodes, 2 routes, but only 1 is right
@@ -145,19 +137,22 @@ func TestReconcile(t *testing.T) {
 				{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: "10.120.1.0/24"}},
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", "k8s-node-route"},
-				{cluster + "-03", "node-3", "10.120.2.0/24", "k8s-node-route"},
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-03", "node-3", "10.120.2.0/24"},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24", "k8s-node-route"},
-				{cluster + "-02", "node-2", "10.120.1.0/24", "k8s-node-route"},
+				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
 		},
 	}
 	for i, testCase := range testCases {
-		cloud := &fake_cloud.FakeCloud{RouteMap: make(map[string]*cloudprovider.Route)}
+		cloud := &fake_cloud.FakeCloud{RouteMap: make(map[string]*fake_cloud.FakeRoute)}
 		for _, route := range testCase.initialRoutes {
-			cloud.RouteMap[route.Name] = route
+			fakeRoute := &fake_cloud.FakeRoute{}
+			fakeRoute.ClusterName = cluster
+			fakeRoute.Route = *route
+			cloud.RouteMap[route.Name] = fakeRoute
 		}
 		routes, ok := cloud.Routes()
 		if !ok {
@@ -177,7 +172,7 @@ func TestReconcile(t *testing.T) {
 		for {
 			select {
 			case <-tick.C:
-				if finalRoutes, err = routes.ListRoutes(""); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
+				if finalRoutes, err = routes.ListRoutes(cluster); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
 					break poll
 				}
 			case <-timeoutChan:

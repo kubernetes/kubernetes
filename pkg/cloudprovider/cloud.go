@@ -119,6 +119,7 @@ type Instances interface {
 // Route is a representation of an advanced routing rule.
 type Route struct {
 	// Name is the name of the routing rule in the cloud-provider.
+	// It will be ignored in a Create (although nameHint may influence it)
 	Name string
 	// TargetInstance is the name of the instance as specified in routing rules
 	// for the cloud-provider (in gce: the Instance Name).
@@ -126,18 +127,19 @@ type Route struct {
 	// Destination CIDR is the CIDR format IP range that this routing rule
 	// applies to.
 	DestinationCIDR string
-	// Description is a free-form string. It can be useful for tagging Routes.
-	Description string
 }
 
 // Routes is an abstract, pluggable interface for advanced routing rules.
 type Routes interface {
-	// List all routes that match the filter
-	ListRoutes(filter string) ([]*Route, error)
-	// Create the described route
-	CreateRoute(route *Route) error
-	// Delete the specified route
-	DeleteRoute(name string) error
+	// List all managed routes that belong to the specified clusterName
+	ListRoutes(clusterName string) ([]*Route, error)
+	// Create the described managed route
+	// route.Name will be ignored, although the cloud-provider may use nameHint
+	// to create a more user-meaningful name.
+	CreateRoute(clusterName string, nameHint string, route *Route) error
+	// Delete the specified managed route
+	// Route should be as returned by ListRoutes
+	DeleteRoute(clusterName string, route *Route) error
 }
 
 var InstanceNotFound = errors.New("instance not found")
