@@ -910,8 +910,10 @@ func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byt
 		return nil, err
 	}
 	if !useNativeExec {
+		glog.V(2).Infof("Using nsinit to run the command %+v inside container %s", cmd, containerID)
 		return dm.runInContainerUsingNsinit(containerID, cmd)
 	}
+	glog.V(2).Infof("Using docker native exec to run cmd %+v inside container %s", cmd, containerID)
 	createOpts := docker.CreateExecOptions{
 		Container:    containerID,
 		Cmd:          cmd,
@@ -934,16 +936,19 @@ func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byt
 	}
 	err = dm.client.StartExec(execObj.ID, startOpts)
 	if err != nil {
+		glog.V(2).Infof("StartExec With error: %v", err)
 		return nil, err
 	}
 	tick := time.Tick(2 * time.Second)
 	for {
 		inspect, err2 := dm.client.InspectExec(execObj.ID)
 		if err2 != nil {
+			glog.V(2).Infof("InspectExec %s failed with error: %+v", execObj.ID, err2)
 			return buf.Bytes(), err2
 		}
 		if !inspect.Running {
 			if inspect.ExitCode != 0 {
+				glog.V(2).Infof("InspectExec %s exit with result %+v", execObj.ID, inspect)
 				err = &dockerExitError{inspect}
 			}
 			break
