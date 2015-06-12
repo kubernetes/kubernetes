@@ -738,7 +738,7 @@ function kube-down {
 
   # The gcloud APIs don't return machine parsable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
-  if gcloud preview managed-instance-groups --zone "${ZONE}" describe "${NODE_INSTANCE_PREFIX}-group" &>/dev/null; then
+  if gcloud preview managed-instance-groups --project "${PROJECT}" --zone "${ZONE}" describe "${NODE_INSTANCE_PREFIX}-group" &>/dev/null; then
     deleteCmdOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" delete \
       --project "${PROJECT}" \
       --quiet \
