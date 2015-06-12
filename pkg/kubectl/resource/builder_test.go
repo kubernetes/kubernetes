@@ -963,7 +963,7 @@ func TestReplaceAliases(t *testing.T) {
 		{
 			name:     "alias-in-comma-separated-arg",
 			arg:      "all,secrets",
-			expected: "rc,svc,pods,pvc,secrets",
+			expected: "rc,svc,pods,pvc,as,secrets",
 		},
 	}
 
