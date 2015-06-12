@@ -124,6 +124,7 @@ func NewMainKubelet(
 	containerGCPolicy ContainerGCPolicy,
 	sourcesReady SourcesReadyFn,
 	registerNode bool,
+	standaloneMode bool,
 	clusterDomain string,
 	clusterDNS net.IP,
 	masterServiceNamespace string,
@@ -232,6 +233,7 @@ func NewMainKubelet(
 		httpClient:                     &http.Client{},
 		sourcesReady:                   sourcesReady,
 		registerNode:                   registerNode,
+		standaloneMode:                 standaloneMode,
 		clusterDomain:                  clusterDomain,
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
@@ -386,6 +388,9 @@ type Kubelet struct {
 
 	// Set to true to have the node register itself with the apiserver.
 	registerNode bool
+
+	// Set to true if the kubelet is in standalone mode (i.e. setup without an apiserver)
+	standaloneMode bool
 
 	// If non-empty, use this for container DNS search.
 	clusterDomain string
@@ -2126,11 +2131,13 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses)...)
 
-	hostIP, err := kl.GetHostIP()
-	if err != nil {
-		glog.Errorf("Cannot get host IP: %v", err)
-	} else {
-		podStatus.HostIP = hostIP.String()
+	if !kl.standaloneMode {
+		hostIP, err := kl.GetHostIP()
+		if err != nil {
+			glog.V(4).Infof("Cannot get host IP: %v", err)
+		} else {
+			podStatus.HostIP = hostIP.String()
+		}
 	}
 
 	return *podStatus, nil

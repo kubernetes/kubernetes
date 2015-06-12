@@ -94,6 +94,7 @@ type KubeletServer struct {
 	OOMScoreAdj                    int
 	APIServerList                  util.StringList
 	RegisterNode                   bool
+	StandaloneMode                 bool
 	ClusterDomain                  string
 	MasterServiceNamespace         string
 	ClusterDNS                     util.IP
@@ -332,6 +333,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		MaxPerPodContainerCount:        s.MaxPerPodContainerCount,
 		MaxContainerCount:              s.MaxContainerCount,
 		RegisterNode:                   s.RegisterNode,
+		StandaloneMode:                 (len(s.APIServerList) == 0),
 		ClusterDomain:                  s.ClusterDomain,
 		ClusterDNS:                     s.ClusterDNS,
 		Runonce:                        s.RunOnce,
@@ -662,6 +664,7 @@ type KubeletConfig struct {
 	MaxPerPodContainerCount        int
 	MaxContainerCount              int
 	RegisterNode                   bool
+	StandaloneMode                 bool
 	ClusterDomain                  string
 	ClusterDNS                     util.IP
 	EnableServer                   bool
@@ -722,6 +725,7 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		gcPolicy,
 		pc.SeenAllSources,
 		kc.RegisterNode,
+		kc.StandaloneMode,
 		kc.ClusterDomain,
 		net.IP(kc.ClusterDNS),
 		kc.MasterServiceNamespace,
