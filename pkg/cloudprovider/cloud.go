@@ -111,6 +111,9 @@ type Instances interface {
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
 	AddSSHKeyToAllInstances(user string, keyData []byte) error
+	// Returns the name of the node we are currently running on
+	// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
+	CurrentNodeName(hostname string) (string, error)
 }
 
 // Route is a representation of an advanced routing rule.

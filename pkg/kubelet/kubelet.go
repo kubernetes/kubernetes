@@ -1855,6 +1855,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		}
 		// TODO(roberthbailey): Can we do this without having credentials to talk
 		// to the cloud provider?
+		// TODO(justinsb): We can if CurrentNodeName() was actually CurrentNode() and returned an interface
 		nodeAddresses, err := instances.NodeAddresses(kl.nodeName)
 		if err != nil {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)

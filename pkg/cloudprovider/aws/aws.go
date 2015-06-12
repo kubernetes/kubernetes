@@ -234,6 +234,10 @@ func (self *AWSCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error
 	return errors.New("unimplemented")
 }
 
+func (a *AWSCloud) CurrentNodeName(hostname string) (string, error) {
+	return hostname, nil
+}
+
 // Implementation of EC2.Instances
 func (self *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*ec2.Instance, error) {
 	// Instances are paged
