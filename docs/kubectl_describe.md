@@ -11,7 +11,7 @@ This command joins many API calls together to form a detailed description of a
 given resource.
 
 ```
-kubectl describe (RESOURCE NAME | RESOURCE/NAME)
+kubectl describe (RESOURCE NAME | RESOURCE/NAME) [flags]
 ```
 
 ### Examples
@@ -22,12 +22,16 @@ $ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 
 // Describe a pod
 $ kubectl describe pods/nginx
+
+// Describe pods by label name=myLabel
+$ kubectl describe po -l name=myLabel
 ```
 
 ### Options
 
 ```
   -h, --help=false: help for describe
+  -l, --selector="": Selector (label query) to filter on
 ```
 
 ### Options inherited from parent commands

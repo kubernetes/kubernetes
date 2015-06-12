@@ -43,17 +43,22 @@ given resource.`,
 $ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 
 // Describe a pod
-$ kubectl describe pods/nginx`,
+$ kubectl describe pods/nginx
+
+// Describe pods by label name=myLabel
+$ kubectl describe po -l name=myLabel`,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunDescribe(f, out, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs: kubectl.DescribableResources(),
 	}
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	return cmd
 }
 
 func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+	selector := cmdutil.GetFlagString(cmd, "selector")
 	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -63,6 +68,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
+		SelectorParam(selector).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
@@ -86,16 +92,15 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		}
 		return err
 	}
-	if len(infos) > 1 {
-		return fmt.Errorf("multiple resources provided: %v", args)
-	}
-	info := infos[0]
 
-	s, err := describer.Describe(info.Namespace, info.Name)
-	if err != nil {
-		return err
+	for _, info := range infos {
+		s, err := describer.Describe(info.Namespace, info.Name)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "%s\n\n", s)
 	}
-	fmt.Fprintf(out, "%s\n", s)
+
 	return nil
 }
 

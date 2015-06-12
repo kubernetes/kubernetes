@@ -19,6 +19,8 @@ before_install:
   - if [[ $SHIPPABLE_GO_VERSION == *release* ]]; then gvm install release; gvm use release; fi
   - if [[ $SHIPPABLE_GO_VERSION =~ [0-9].[0-9] ]]; then gvm install go$SHIPPABLE_GO_VERSION; gvm use go$SHIPPABLE_GO_VERSION; fi
   - export GOPATH=$SHIPPABLE_GOPATH
+  - ln -s $GOPATH/src/github.com/hurf $GOPATH/src/github.com/GoogleCloudPlatform
+  - cd $GOPATH/src/github.com/GoogleCloudPlatform/kubernetes
 
 install:
   - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
@@ -38,6 +40,3 @@ script:
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS}" KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4 LOG_LEVEL=4 ./hack/test-integration.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-update-storage-objects.sh
-
-notifications:
-  irc: "chat.freenode.net#google-containers"
