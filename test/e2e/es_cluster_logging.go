@@ -164,6 +164,18 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	if nodeCount == 0 {
 		Failf("Failed to find any nodes")
 	}
+	Logf("Found %d nodes.", len(nodes.Items))
+
+	// Filter out unhealthy nodes.
+	// Previous tests may have cause failures of some nodes. Let's skip
+	// 'Not Ready' nodes, just in case (there is no need to fail the test).
+	filterNodes(nodes, func(node api.Node) bool {
+		return isNodeReadySetAsExpected(&node, true)
+	})
+	if len(nodes.Items) < 2 {
+		Failf("Less than two nodes were found Ready.")
+	}
+	Logf("Found %d healthy nodes.", len(nodes.Items))
 
 	// Create a unique root name for the resources in this test to permit
 	// parallel executions of this test.
