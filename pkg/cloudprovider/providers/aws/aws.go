@@ -109,6 +109,14 @@ type ELB interface {
 	DescribeLoadBalancers(*elb.DescribeLoadBalancersInput) (*elb.DescribeLoadBalancersOutput, error)
 	RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error)
 	DeregisterInstancesFromLoadBalancer(*elb.DeregisterInstancesFromLoadBalancerInput) (*elb.DeregisterInstancesFromLoadBalancerOutput, error)
+
+	DetachLoadBalancerFromSubnets(*elb.DetachLoadBalancerFromSubnetsInput) (*elb.DetachLoadBalancerFromSubnetsOutput, error)
+	AttachLoadBalancerToSubnets(*elb.AttachLoadBalancerToSubnetsInput) (*elb.AttachLoadBalancerToSubnetsOutput, error)
+
+	CreateLoadBalancerListeners(*elb.CreateLoadBalancerListenersInput) (*elb.CreateLoadBalancerListenersOutput, error)
+	DeleteLoadBalancerListeners(*elb.DeleteLoadBalancerListenersInput) (*elb.DeleteLoadBalancerListenersOutput, error)
+
+	ApplySecurityGroupsToLoadBalancer(*elb.ApplySecurityGroupsToLoadBalancerInput) (*elb.ApplySecurityGroupsToLoadBalancerOutput, error)
 }
 
 // This is a simple pass-through of the Autoscaling client interface, which allows for testing
@@ -1581,26 +1589,10 @@ func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutp
 	}
 }
 
-// CreateTCPLoadBalancer implements TCPLoadBalancer.CreateTCPLoadBalancer
-// TODO(justinsb): This must be idempotent
+// EnsureTCPLoadBalancer implements TCPLoadBalancer.EnsureTCPLoadBalancer
 // TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anwyay.
 func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	glog.V(2).Infof("EnsureTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
-
-	glog.V(2).Info("Checking if load balancer already exists: %s", name)
-	_, exists, err := s.GetTCPLoadBalancer(name, region)
-	if err != nil {
-		return nil, fmt.Errorf("error checking if AWS load balancer already exists: %v", err)
-	}
-
-	// TODO: Implement a more efficient update strategy for common changes than delete & create
-	// In particular, if we implement hosts update, we can get rid of UpdateHosts
-	if exists {
-		err := s.EnsureTCPLoadBalancerDeleted(name, region)
-		if err != nil {
-			return nil, fmt.Errorf("error deleting existing AWS load balancer: %v", err)
-		}
-	}
 
 	elbClient, err := s.getELBClient(region)
 	if err != nil {
@@ -1631,7 +1623,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 	}
 
 	// Construct list of configured subnets
-	subnetIds := []*string{}
+	subnetIDs := []string{}
 	{
 		request := &ec2.DescribeSubnetsInput{}
 		filters := []*ec2.Filter{}
@@ -1647,7 +1639,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 
 		//	zones := []string{}
 		for _, subnet := range subnets {
-			subnetIds = append(subnetIds, subnet.SubnetID)
+			subnetIDs = append(subnetIDs, orEmpty(subnet.SubnetID))
 			if !strings.HasPrefix(orEmpty(subnet.AvailabilityZone), region) {
 				glog.Error("found AZ that did not match region", orEmpty(subnet.AvailabilityZone), " vs ", region)
 				return nil, fmt.Errorf("invalid AZ for region")
@@ -1686,60 +1678,32 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 			return nil, err
 		}
 	}
+	securityGroupIDs := []string{securityGroupID}
+
+	// Figure out what mappings we want on the load balancer
+	listeners := []*elb.Listener{}
+	for _, port := range ports {
+		if port.NodePort == 0 {
+			glog.Errorf("Ignoring port without NodePort defined: %v", port)
+			continue
+		}
+		instancePort := int64(port.NodePort)
+		loadBalancerPort := int64(port.Port)
+		protocol := strings.ToLower(string(port.Protocol))
+
+		listener := &elb.Listener{}
+		listener.InstancePort = &instancePort
+		listener.LoadBalancerPort = &loadBalancerPort
+		listener.Protocol = &protocol
+		listener.InstanceProtocol = &protocol
+
+		listeners = append(listeners, listener)
+	}
 
 	// Build the load balancer itself
-	var loadBalancer *elb.LoadBalancerDescription
-	{
-		loadBalancer, err = s.describeLoadBalancer(region, name)
-		if err != nil {
-			return nil, err
-		}
-
-		if loadBalancer == nil {
-			createRequest := &elb.CreateLoadBalancerInput{}
-			createRequest.LoadBalancerName = aws.String(name)
-
-			listeners := []*elb.Listener{}
-			for _, port := range ports {
-				if port.NodePort == 0 {
-					glog.Errorf("Ignoring port without NodePort defined: %v", port)
-					continue
-				}
-				instancePort := int64(port.NodePort)
-				loadBalancerPort := int64(port.Port)
-				protocol := strings.ToLower(string(port.Protocol))
-
-				listener := &elb.Listener{}
-				listener.InstancePort = &instancePort
-				listener.LoadBalancerPort = &loadBalancerPort
-				listener.Protocol = &protocol
-				listener.InstanceProtocol = &protocol
-
-				listeners = append(listeners, listener)
-			}
-
-			createRequest.Listeners = listeners
-
-			// We are supposed to specify one subnet per AZ.
-			// TODO: What happens if we have more than one subnet per AZ?
-			createRequest.Subnets = subnetIds
-
-			createRequest.SecurityGroups = []*string{&securityGroupID}
-
-			glog.Info("Creating load balancer with name: ", name)
-			_, err := elbClient.CreateLoadBalancer(createRequest)
-			if err != nil {
-				return nil, err
-			}
-
-			loadBalancer, err = s.describeLoadBalancer(region, name)
-			if err != nil {
-				glog.Warning("Unable to retrieve load balancer immediately after creation")
-				return nil, err
-			}
-		} else {
-			// TODO: Verify that load balancer configuration matches?
-		}
+	loadBalancer, err := s.ensureLoadBalancer(region, name, listeners, subnetIDs, securityGroupIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	err = s.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
@@ -1748,22 +1712,12 @@ func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, p
 		return nil, err
 	}
 
-	registerRequest := &elb.RegisterInstancesWithLoadBalancerInput{}
-	registerRequest.LoadBalancerName = loadBalancer.LoadBalancerName
-	for _, instance := range instances {
-		registerInstance := &elb.Instance{}
-		registerInstance.InstanceID = instance.InstanceID
-		registerRequest.Instances = append(registerRequest.Instances, registerInstance)
-	}
-
-	registerResponse, err := elbClient.RegisterInstancesWithLoadBalancer(registerRequest)
+	err = s.ensureLoadBalancerInstances(elbClient, orEmpty(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
 	if err != nil {
-		// TODO: Is it better to delete the load balancer entirely?
-		glog.Warningf("Error registering instances with load-balancer %s: %v", name, err)
+		glog.Warning("Error registering instances with the load balancer: %v", err)
 		return nil, err
 	}
 
-	glog.V(1).Infof("Updated instances registered with load-balancer %s: %v", name, registerResponse.Instances)
 	glog.V(1).Infof("Loadbalancer %s has DNS name %s", name, orEmpty(loadBalancer.DNSName))
 
 	// TODO: Wait for creation?
@@ -2010,6 +1964,7 @@ func (s *AWSCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 			}
 
 			if len(securityGroupIDs) == 0 {
+				glog.V(2).Info("deleted all security groups for load balancer: ", name)
 				break
 			}
 
@@ -2047,51 +2002,9 @@ func (s *AWSCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) er
 		return fmt.Errorf("Load balancer not found")
 	}
 
-	existingInstances := map[string]*elb.Instance{}
-	for _, instance := range lb.Instances {
-		existingInstances[orEmpty(instance.InstanceID)] = instance
-	}
-
-	wantInstances := map[string]*ec2.Instance{}
-	for _, instance := range instances {
-		wantInstances[orEmpty(instance.InstanceID)] = instance
-	}
-
-	addInstances := []*elb.Instance{}
-	for instanceId := range wantInstances {
-		addInstance := &elb.Instance{}
-		addInstance.InstanceID = aws.String(instanceId)
-		addInstances = append(addInstances, addInstance)
-	}
-
-	removeInstances := []*elb.Instance{}
-	for instanceId := range existingInstances {
-		_, found := wantInstances[instanceId]
-		if !found {
-			removeInstance := &elb.Instance{}
-			removeInstance.InstanceID = aws.String(instanceId)
-			removeInstances = append(removeInstances, removeInstance)
-		}
-	}
-
-	if len(addInstances) > 0 {
-		registerRequest := &elb.RegisterInstancesWithLoadBalancerInput{}
-		registerRequest.Instances = addInstances
-		registerRequest.LoadBalancerName = lb.LoadBalancerName
-		_, err = elbClient.RegisterInstancesWithLoadBalancer(registerRequest)
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(removeInstances) > 0 {
-		deregisterRequest := &elb.DeregisterInstancesFromLoadBalancerInput{}
-		deregisterRequest.Instances = removeInstances
-		deregisterRequest.LoadBalancerName = lb.LoadBalancerName
-		_, err = elbClient.DeregisterInstancesFromLoadBalancer(deregisterRequest)
-		if err != nil {
-			return err
-		}
+	err = s.ensureLoadBalancerInstances(elbClient, orEmpty(lb.LoadBalancerName), lb.Instances, instances)
+	if err != nil {
+		return nil
 	}
 
 	err = s.updateInstanceSecurityGroupsForLoadBalancer(lb, instances)

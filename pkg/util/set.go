@@ -131,6 +131,21 @@ func (s1 StringSet) IsSuperset(s2 StringSet) bool {
 	return true
 }
 
+// Equal returns true iff s1 is equal (as a set) to s2.
+// Two sets are equal if their membership is identical.
+// (In practice, this means same elements, order doesn't matter)
+func (s1 StringSet) Equal(s2 StringSet) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	for item := range s2 {
+		if !s1.Has(item) {
+			return false
+		}
+	}
+	return true
+}
+
 // List returns the contents as a sorted string slice.
 func (s StringSet) List() []string {
 	res := make([]string, 0, len(s))
