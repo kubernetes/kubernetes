@@ -1158,6 +1158,8 @@ func getSigner(provider string) (ssh.Signer, error) {
 	switch provider {
 	case "gce", "gke":
 		keyfile = "google_compute_engine"
+	case "aws":
+		keyfile = "kube_aws_rsa"
 	default:
 		return nil, fmt.Errorf("getSigner(...) not implemented for %s", provider)
 	}
