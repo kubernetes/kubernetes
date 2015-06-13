@@ -1584,8 +1584,23 @@ func (s *AWSCloud) createTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOutp
 // CreateTCPLoadBalancer implements TCPLoadBalancer.CreateTCPLoadBalancer
 // TODO(justinsb): This must be idempotent
 // TODO(justinsb) It is weird that these take a region.  I suspect it won't work cross-region anwyay.
-func (s *AWSCloud) CreateTCPLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
-	glog.V(2).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
+func (s *AWSCloud) EnsureTCPLoadBalancer(name, region string, publicIP net.IP, ports []*api.ServicePort, hosts []string, affinity api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+	glog.V(2).Infof("EnsureTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, publicIP, ports, hosts)
+
+	glog.V(2).Info("Checking if load balancer already exists: %s", name)
+	_, exists, err := s.GetTCPLoadBalancer(name, region)
+	if err != nil {
+		return nil, fmt.Errorf("error checking if AWS load balancer already exists: %v", err)
+	}
+
+	// TODO: Implement a more efficient update strategy for common changes than delete & create
+	// In particular, if we implement hosts update, we can get rid of UpdateHosts
+	if exists {
+		err := s.EnsureTCPLoadBalancerDeleted(name, region)
+		if err != nil {
+			return nil, fmt.Errorf("error deleting existing AWS load balancer: %v", err)
+		}
+	}
 
 	elbClient, err := s.getELBClient(region)
 	if err != nil {

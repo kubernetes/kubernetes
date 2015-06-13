@@ -110,12 +110,22 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 				t.Errorf("unexpected client actions: %v", actions)
 			}
 		} else {
-			if len(cloud.Balancers) != 1 {
-				t.Errorf("expected one load balancer to be created, got %v", cloud.Balancers)
-			} else if cloud.Balancers[0].Name != controller.loadBalancerName(item.service) ||
-				cloud.Balancers[0].Region != region ||
-				cloud.Balancers[0].Ports[0].Port != item.service.Spec.Ports[0].Port {
-				t.Errorf("created load balancer has incorrect parameters: %v", cloud.Balancers[0])
+			var balancer *fake_cloud.FakeBalancer
+			for k := range cloud.Balancers {
+				if balancer == nil {
+					b := cloud.Balancers[k]
+					balancer = &b
+				} else {
+					t.Errorf("expected one load balancer to be created, got %v", cloud.Balancers)
+					break
+				}
+			}
+			if balancer == nil {
+				t.Errorf("expected one load balancer to be created, got none")
+			} else if balancer.Name != controller.loadBalancerName(item.service) ||
+				balancer.Region != region ||
+				balancer.Ports[0].Port != item.service.Spec.Ports[0].Port {
+				t.Errorf("created load balancer has incorrect parameters: %v", balancer)
 			}
 			actionFound := false
 			for _, action := range actions {

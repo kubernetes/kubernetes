@@ -335,7 +335,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 			return fmt.Errorf("Failed to persist updated status to apiserver, even after retries. Giving up: %v", err), notRetryable
 		}
 	} else {
-		glog.Infof("Not persisting unchanged LoadBalancerStatus to registry.")
+		glog.V(2).Infof("Not persisting unchanged LoadBalancerStatus to registry.")
 	}
 
 	return nil, notRetryable
@@ -383,7 +383,7 @@ func (s *ServiceController) createExternalLoadBalancer(service *api.Service) err
 		for _, publicIP := range service.Spec.DeprecatedPublicIPs {
 			// TODO: Make this actually work for multiple IPs by using different
 			// names for each. For now, we'll just create the first and break.
-			status, err := s.balancer.CreateTCPLoadBalancer(name, s.zone.Region, net.ParseIP(publicIP),
+			status, err := s.balancer.EnsureTCPLoadBalancer(name, s.zone.Region, net.ParseIP(publicIP),
 				ports, hostsFromNodeList(&nodes), service.Spec.SessionAffinity)
 			if err != nil {
 				return err
@@ -393,7 +393,7 @@ func (s *ServiceController) createExternalLoadBalancer(service *api.Service) err
 			break
 		}
 	} else {
-		status, err := s.balancer.CreateTCPLoadBalancer(name, s.zone.Region, nil,
+		status, err := s.balancer.EnsureTCPLoadBalancer(name, s.zone.Region, nil,
 			ports, hostsFromNodeList(&nodes), service.Spec.SessionAffinity)
 		if err != nil {
 			return err
