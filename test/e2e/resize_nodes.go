@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -38,38 +39,65 @@ import (
 const serveHostnameImage = "gcr.io/google_containers/serve_hostname:1.1"
 
 func resizeGroup(size int) error {
-	// TODO: make this hit the compute API directly instread of shelling out to gcloud.
-	output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone,
-		"resize", testContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--new-size=%v", size)).CombinedOutput()
-	if err != nil {
-		Logf("Failed to resize node instance group: %v", string(output))
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+		// TODO: make this hit the compute API directly instread of shelling out to gcloud.
+		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
+		output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID, "--zone="+testContext.CloudConfig.Zone,
+			"resize", testContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--new-size=%v", size)).CombinedOutput()
+		if err != nil {
+			Logf("Failed to resize node instance group: %v", string(output))
+		}
+		return err
+	} else {
+		// Supported by aws
+		instanceGroups, ok := testContext.CloudConfig.Provider.(aws_cloud.InstanceGroups)
+		if !ok {
+			return fmt.Errorf("Provider does not support InstanceGroups")
+		}
+		return instanceGroups.ResizeInstanceGroup(testContext.CloudConfig.NodeInstanceGroup, size)
 	}
-	return err
 }
 
 func groupSize() (int, error) {
-	// TODO: make this hit the compute API directly instread of shelling out to gcloud.
-	output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID,
-		"--zone="+testContext.CloudConfig.Zone, "describe", testContext.CloudConfig.NodeInstanceGroup).CombinedOutput()
-	if err != nil {
-		return -1, err
-	}
-	pattern := "currentSize: "
-	i := strings.Index(string(output), pattern)
-	if i == -1 {
-		return -1, fmt.Errorf("could not find '%s' in the output '%s'", pattern, output)
-	}
-	truncated := output[i+len(pattern):]
-	j := strings.Index(string(truncated), "\n")
-	if j == -1 {
-		return -1, fmt.Errorf("could not find new line in the truncated output '%s'", truncated)
-	}
+	if testContext.Provider == "gce" || testContext.Provider == "gke" {
+		// TODO: make this hit the compute API directly instread of shelling out to gcloud.
+		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
+		output, err := exec.Command("gcloud", "preview", "managed-instance-groups", "--project="+testContext.CloudConfig.ProjectID,
+			"--zone="+testContext.CloudConfig.Zone, "describe", testContext.CloudConfig.NodeInstanceGroup).CombinedOutput()
+		if err != nil {
+			return -1, err
+		}
+		pattern := "currentSize: "
+		i := strings.Index(string(output), pattern)
+		if i == -1 {
+			return -1, fmt.Errorf("could not find '%s' in the output '%s'", pattern, output)
+		}
+		truncated := output[i+len(pattern):]
+		j := strings.Index(string(truncated), "\n")
+		if j == -1 {
+			return -1, fmt.Errorf("could not find new line in the truncated output '%s'", truncated)
+		}
 
-	currentSize, err := strconv.Atoi(string(truncated[:j]))
-	if err != nil {
-		return -1, err
+		currentSize, err := strconv.Atoi(string(truncated[:j]))
+		if err != nil {
+			return -1, err
+		}
+		return currentSize, nil
+	} else {
+		// Supported by aws
+		instanceGroups, ok := testContext.CloudConfig.Provider.(aws_cloud.InstanceGroups)
+		if !ok {
+			return -1, fmt.Errorf("provider does not support InstanceGroups")
+		}
+		instanceGroup, err := instanceGroups.DescribeInstanceGroup(testContext.CloudConfig.NodeInstanceGroup)
+		if err != nil {
+			return -1, fmt.Errorf("error describing instance group: %v", err)
+		}
+		if instanceGroup == nil {
+			return -1, fmt.Errorf("instance group not found: %s", testContext.CloudConfig.NodeInstanceGroup)
+		}
+		return instanceGroup.CurrentSize()
 	}
-	return currentSize, nil
 }
 
 func waitForGroupSize(size int) error {
@@ -358,7 +386,7 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 }
 
 var _ = Describe("Nodes", func() {
-	supportedProviders := []string{"gce", "gke"}
+	supportedProviders := []string{"aws", "gce", "gke"}
 	var testName string
 	var c *client.Client
 	var ns string
