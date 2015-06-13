@@ -158,6 +158,19 @@ type RCConfig struct {
 	PollInterval  time.Duration
 	PodStatusFile *os.File
 	Replicas      int
+
+	// Env vars, set the same for every pod.
+	Env map[string]string
+
+	// Extra labels added to every pod.
+	Labels map[string]string
+
+	// Ports to declare in the container (map of name to containerPort).
+	Ports map[string]int
+
+	// Pointer to a list of pods; if non-nil, will be set to a list of pods
+	// created by this RC by RunRC.
+	CreatedPods *[]*api.Pod
 }
 
 func Logf(format string, a ...interface{}) {
@@ -841,6 +854,23 @@ func RunRC(config RCConfig) error {
 			},
 		},
 	}
+	if config.Env != nil {
+		for k, v := range config.Env {
+			c := &rc.Spec.Template.Spec.Containers[0]
+			c.Env = append(c.Env, api.EnvVar{Name: k, Value: v})
+		}
+	}
+	if config.Labels != nil {
+		for k, v := range config.Labels {
+			rc.Spec.Template.ObjectMeta.Labels[k] = v
+		}
+	}
+	if config.Ports != nil {
+		for k, v := range config.Ports {
+			c := &rc.Spec.Template.Spec.Containers[0]
+			c.Ports = append(c.Ports, api.ContainerPort{Name: k, ContainerPort: v})
+		}
+	}
 	_, err := config.Client.ReplicationControllers(config.Namespace).Create(rc)
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
@@ -866,6 +896,9 @@ func RunRC(config RCConfig) error {
 		inactive := 0
 		failedContainers := 0
 		pods := podStore.List()
+		if config.CreatedPods != nil {
+			*config.CreatedPods = pods
+		}
 		for _, p := range pods {
 			if p.Status.Phase == api.PodRunning {
 				running++
