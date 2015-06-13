@@ -24,6 +24,9 @@ source "${KUBE_ROOT}/cluster/common.sh"
 
 ALLOCATE_NODE_CIDRS=true
 
+NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
+ASG_NAME="${NODE_INSTANCE_PREFIX}-group"
+
 case "${KUBE_OS_DISTRIBUTION}" in
   ubuntu|wheezy|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
@@ -40,6 +43,7 @@ AWS_REGION=${ZONE%?}
 export AWS_DEFAULT_REGION=${AWS_REGION}
 AWS_CMD="aws --output json ec2"
 AWS_ELB_CMD="aws --output json elb"
+AWS_ASG_CMD="aws --output json autoscaling"
 
 INTERNAL_IP_BASE=172.20.0
 MASTER_IP_SUFFIX=.9
@@ -93,22 +97,20 @@ function expect_instance_states {
   python -c "import json,sys; lst = [str(instance['InstanceId']) for reservation in json.load(sys.stdin)['Reservations'] for instance in reservation['Instances'] if instance['State']['Name'] != '$1']; print ' '.join(lst)"
 }
 
-function get_instance_public_ip {
+function get_instanceid_from_name {
   local tagName=$1
   $AWS_CMD --output text describe-instances \
     --filters Name=tag:Name,Values=${tagName} \
               Name=instance-state-name,Values=running \
               Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
-    --query Reservations[].Instances[].NetworkInterfaces[0].Association.PublicIp
+    --query Reservations[].Instances[].InstanceId
 }
 
-function get_instance_private_ip {
-  local tagName=$1
+function get_instance_public_ip {
+  local instance_id=$1
   $AWS_CMD --output text describe-instances \
-    --filters Name=tag:Name,Values=${tagName} \
-              Name=instance-state-name,Values=running \
-              Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
-    --query Reservations[].Instances[].NetworkInterfaces[0].PrivateIpAddress
+    --instance-ids ${instance_id} \
+    --query Reservations[].Instances[].NetworkInterfaces[0].Association.PublicIp
 }
 
 # Gets a security group id, by name ($1)
@@ -124,17 +126,49 @@ function get_security_group_id {
 
 function detect-master () {
   KUBE_MASTER=${MASTER_NAME}
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    KUBE_MASTER_IP=$(get_instance_public_ip $MASTER_NAME)
+  if [[ -z "${KUBE_MASTER_ID-}" ]]; then
+    KUBE_MASTER_ID=$(get_instanceid_from_name ${MASTER_NAME})
+  fi
+  if [[ -z "${KUBE_MASTER_ID-}" ]]; then
+    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
+    exit 1
   fi
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
+    KUBE_MASTER_IP=$(get_instance_public_ip ${KUBE_MASTER_ID})
+  fi
+  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
+    echo "Could not detect Kubernetes master node IP.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
 
+
+function query-running-minions () {
+  local query=$1
+  $AWS_CMD --output text describe-instances \
+           --filters Name=instance-state-name,Values=running \
+                     Name=vpc-id,Values=${VPC_ID} \
+                     Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                     Name=tag:Role,Values=${MINION_TAG} \
+           --query ${query}
+}
+
+function find-running-minions () {
+  MINION_IDS=()
+  MINION_NAMES=()
+  for id in $(query-running-minions "Reservations[].Instances[].InstanceId"); do
+    MINION_IDS+=("${id}")
+
+    # We use the minion ids as the name
+    MINION_NAMES+=("${id}")
+  done
+}
+
 function detect-minions () {
+  find-running-minions
+
+  # This is inefficient, but we want MINION_NAMES / MINION_IDS to be ordered the same as KUBE_MINION_IP_ADDRESSES
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip
@@ -143,9 +177,10 @@ function detect-minions () {
     else
       minion_ip=$(get_instance_private_ip ${MINION_NAMES[$i]})
     fi
-    echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
+    echo "Found minion ${i}: ${MINION_NAMES[$i]} @ ${minion_ip}"
     KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
   done
+
   if [[ -z "$KUBE_MINION_IP_ADDRESSES" ]]; then
     echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
@@ -696,7 +731,7 @@ function kube-up {
     echo "cd /var/cache/kubernetes-install"
     echo "readonly SALT_MASTER='${MASTER_INTERNAL_IP}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
-    echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
+    echo "readonly NODE_INSTANCE_PREFIX='${NODE_INSTANCE_PREFIX}'"
     echo "readonly CLUSTER_IP_RANGE='${CLUSTER_IP_RANGE}'"
     echo "readonly ALLOCATE_NODE_CIDRS='${ALLOCATE_NODE_CIDRS}'"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
@@ -749,7 +784,7 @@ function kube-up {
 
    while true; do
     echo -n Attempt "$(($attempt+1))" to check for master node
-    local ip=$(get_instance_public_ip $MASTER_NAME)
+    local ip=$(get_instance_public_ip ${master_id})
     if [[ -z "${ip}" ]]; then
       if (( attempt > 30 )); then
         echo
@@ -827,62 +862,65 @@ function kube-up {
     sleep 10
   done
 
-  MINION_IDS=()
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    echo "Starting Minion (${MINION_NAMES[$i]})"
-    generate-minion-user-data $i > "${KUBE_TEMP}/minion-user-data-${i}"
-
-    local public_ip_option
-    if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
-      public_ip_option="--associate-public-ip-address"
-    else
-      public_ip_option="--no-associate-public-ip-address"
-    fi
-
-    minion_id=$($AWS_CMD run-instances \
+  echo "Creating minion configuration"
+  generate-minion-user-data > "${KUBE_TEMP}/minion-user-data"
+  local public_ip_option
+  if [[ "${ENABLE_MINION_PUBLIC_IP}" == "true" ]]; then
+    public_ip_option="--associate-public-ip-address"
+  else
+    public_ip_option="--no-associate-public-ip-address"
+  fi
+  ${AWS_ASG_CMD} create-launch-configuration \
+      --launch-configuration-name ${ASG_NAME} \
       --image-id $KUBE_MINION_IMAGE \
-      --iam-instance-profile Name=$IAM_PROFILE_MINION \
+      --iam-instance-profile ${IAM_PROFILE_MINION} \
       --instance-type $MINION_SIZE \
-      --subnet-id $SUBNET_ID \
-      --private-ip-address $INTERNAL_IP_BASE.1${i} \
       --key-name ${AWS_SSH_KEY_NAME} \
-      --security-group-ids ${MINION_SG_ID} \
+      --security-groups ${MINION_SG_ID} \
       ${public_ip_option} \
       --block-device-mappings "${BLOCK_DEVICE_MAPPINGS}" \
-      --user-data "file://${KUBE_TEMP}/minion-user-data-${i}" | json_val '["Instances"][0]["InstanceId"]')
+      --user-data "file://${KUBE_TEMP}/minion-user-data"
 
-    add-tag $minion_id Name ${MINION_NAMES[$i]}
-    add-tag $minion_id Role $MINION_TAG
-    add-tag $minion_id KubernetesCluster ${CLUSTER_ID}
+  echo "Creating autoscaling group"
+  ${AWS_ASG_CMD} create-auto-scaling-group \
+      --auto-scaling-group-name ${ASG_NAME} \
+      --launch-configuration-name ${ASG_NAME} \
+      --min-size ${NUM_MINIONS} \
+      --max-size ${NUM_MINIONS} \
+      --vpc-zone-identifier ${SUBNET_ID} \
+      --tags ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Name,Value=${NODE_INSTANCE_PREFIX} \
+             ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${MINION_TAG} \
+             ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=KubernetesCluster,Value=${CLUSTER_ID}
 
-    MINION_IDS[$i]=$minion_id
-  done
+  # Wait for the minions to be running
+  # TODO(justinsb): This is really not needed any more
+  attempt=0
+  while true; do
+    find-running-minions > $LOG
+    if [[ ${#MINION_IDS[@]} == ${NUM_MINIONS} ]]; then
+      echo -e " ${color_green}${#MINION_IDS[@]} minions started; ready${color_norm}"
+      break
+    fi
 
-  # Configure minion networking
-  # TODO(justinsb): Check if we can change source-dest-check before instance fully running
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    # We are not able to add a route to the instance until that instance is in "running" state.
-    # This is quite an ugly solution to this problem. In Bash 4 we could use assoc. arrays to do this for
-    # all instances at once but we can't be sure we are running Bash 4.
-    minion_id=${MINION_IDS[$i]}
-    wait-for-instance-running $minion_id
-    echo "Minion ${MINION_NAMES[$i]} running"
+    if (( attempt > 30 )); then
+      echo
+      echo "Expected number of minions did not start in time"
+      echo
+      echo -e "${color_red}Expected number of minions failed to start.  Your cluster is unlikely" >&2
+      echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+      echo -e "cluster. (sorry!)${color_norm}" >&2
+      exit 1
+    fi
+
+    echo -e " ${color_yellow}${#MINION_IDS[@]} minions started; waiting${color_norm}"
+    attempt=$(($attempt+1))
     sleep 10
-    $AWS_CMD modify-instance-attribute --instance-id $minion_id --source-dest-check '{"Value": false}' > $LOG
   done
-
-  FAIL=0
-  for job in `jobs -p`; do
-    wait $job || let "FAIL+=1"
-  done
-  if (( $FAIL != 0 )); then
-    echo "${FAIL} commands failed.  Exiting."
-    exit 2
-  fi
 
   detect-master > $LOG
   detect-minions > $LOG
 
+  # TODO(justinsb): This is really not necessary any more
   # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to
   # make sure that everything is well configured.
   # TODO: Can we poll here?
@@ -937,15 +975,15 @@ function kube-up {
   set +e
 
   # Basic sanity checking
+  # TODO(justinsb): This is really not needed any more
   local rc # Capture return code without exiting because of errexit bash option
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  for (( i=0; i<${#KUBE_MINION_IP_ADDRESSES[@]}; i++)); do
       # Make sure docker is installed and working.
       local attempt=0
       while true; do
-        local minion_name=${MINION_NAMES[$i]}
         local minion_ip=${KUBE_MINION_IP_ADDRESSES[$i]}
-        echo -n Attempt "$(($attempt+1))" to check Docker on node "${minion_name} @ ${minion_ip}" ...
-        local output=`check-minion ${minion_name} ${minion_ip}`
+        echo -n "Attempt $(($attempt+1)) to check Docker on node @ ${minion_ip} ..."
+        local output=`check-minion ${minion_ip}`
         echo $output
         if [[ "${output}" != "working" ]]; then
           if (( attempt > 9 )); then
@@ -994,6 +1032,15 @@ function kube-down {
           sleep 3
         fi
       done
+    fi
+
+    if [[ -n $(${AWS_ASG_CMD} --output text describe-auto-scaling-groups --auto-scaling-group-names ${ASG_NAME} --query AutoScalingGroups[].AutoScalingGroupName) ]]; then
+      echo "Deleting auto-scaling group: ${ASG_NAME}"
+      ${AWS_ASG_CMD} delete-auto-scaling-group --force-delete --auto-scaling-group-name ${ASG_NAME}
+    fi
+    if [[ -n $(${AWS_ASG_CMD} --output text describe-launch-configurations --launch-configuration-names ${ASG_NAME} --query LaunchConfigurations[].LaunchConfigurationName) ]]; then
+      echo "Deleting auto-scaling launch configuration: ${ASG_NAME}"
+      ${AWS_ASG_CMD} delete-launch-configuration --launch-configuration-name ${ASG_NAME}
     fi
 
     echo "Deleting instances in VPC: ${vpc_id}"
@@ -1169,6 +1216,14 @@ function test-teardown {
 function ssh-to-node {
   local node="$1"
   local cmd="$2"
+
+  if [[ "${node}" == "${MASTER_NAME}" ]]; then
+    node=$(get_instanceid_from_name ${MASTER_NAME})
+    if [[ -z "${node-}" ]]; then
+      echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
+      exit 1
+    fi
+  fi
 
   local ip=$(get_instance_public_ip ${node})
   if [[ -z "$ip" ]]; then

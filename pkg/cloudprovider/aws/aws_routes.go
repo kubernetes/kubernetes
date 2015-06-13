@@ -69,9 +69,29 @@ func (s *AWSCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error
 	return routes, nil
 }
 
+// Sets the instance attribute "source-dest-check" to the specified value
+func (s *AWSCloud) configureInstanceSourceDestCheck(instanceID string, sourceDestCheck bool) error {
+	request := &ec2.ModifyInstanceAttributeInput{}
+	request.InstanceID = aws.String(instanceID)
+	request.SourceDestCheck = &ec2.AttributeBooleanValue{Value: aws.Boolean(sourceDestCheck)}
+
+	_, err := s.ec2.ModifyInstanceAttribute(request)
+	if err != nil {
+		return fmt.Errorf("error configuring source-dest-check on instance %s: %v", instanceID, err)
+	}
+	return nil
+}
+
 // CreateRoute implements Routes.CreateRoute
 // Create the described route
 func (s *AWSCloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
+	// In addition to configuring the route itself, we also need to configure the instance to accept that traffic
+	// On AWS, this requires turning source-dest checks off
+	err := s.configureInstanceSourceDestCheck(route.TargetInstance, false)
+	if err != nil {
+		return err
+	}
+
 	table, err := s.findRouteTable(clusterName)
 	if err != nil {
 		return err

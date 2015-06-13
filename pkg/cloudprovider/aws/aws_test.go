@@ -372,6 +372,10 @@ func (s *FakeEC2) DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOu
 	panic("Not implemented")
 }
 
+func (s *FakeEC2) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error) {
+	panic("Not implemented")
+}
+
 type FakeELB struct {
 	aws *FakeAWSServices
 }

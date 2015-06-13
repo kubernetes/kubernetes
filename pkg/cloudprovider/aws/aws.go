@@ -90,6 +90,8 @@ type EC2 interface {
 	DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error)
 	CreateRoute(request *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error)
 	DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error)
+
+	ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error)
 }
 
 // This is a simple pass-through of the ELB client interface, which allows for testing
@@ -412,6 +414,10 @@ func (s *awsSdkEC2) CreateRoute(request *ec2.CreateRouteInput) (*ec2.CreateRoute
 
 func (s *awsSdkEC2) DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error) {
 	return s.ec2.DeleteRoute(request)
+}
+
+func (s *awsSdkEC2) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error) {
+	return s.ec2.ModifyInstanceAttribute(request)
 }
 
 func init() {
