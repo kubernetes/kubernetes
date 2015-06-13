@@ -70,10 +70,10 @@ func init() {
 	framework.DeleteAllEtcdKeys()
 }
 
-// getPods returns the cmd line -pods or b.N if -pods wasn't specified.
-// Benchmarks can call getPods to get the number of pods they need to
+// GetPods returns the cmd line -pods or b.N if -pods wasn't specified.
+// Benchmarks can call GetPods to get the number of pods they need to
 // create for a given benchmark.
-func getPods(bN int) int {
+func GetPods(bN int) int {
 	if Pods < 0 {
 		return bN
 	}
@@ -117,7 +117,7 @@ func BenchmarkPodList(b *testing.B) {
 	m := framework.NewMasterComponents(&framework.Config{nil, true, false, 250.0, 500})
 	defer m.Stop(true, true)
 
-	numPods, numTasks, iter := getPods(b.N), getTasks(b.N), getIterations(b.N)
+	numPods, numTasks, iter := GetPods(b.N), getTasks(b.N), getIterations(b.N)
 	podsPerNode := numPods / numTasks
 	if podsPerNode < 1 {
 		podsPerNode = 1
@@ -156,7 +156,7 @@ func BenchmarkPodListEtcd(b *testing.B) {
 	m := framework.NewMasterComponents(&framework.Config{nil, true, false, 250.0, 500})
 	defer m.Stop(true, true)
 
-	numPods, numTasks, iter := getPods(b.N), getTasks(b.N), getIterations(b.N)
+	numPods, numTasks, iter := GetPods(b.N), getTasks(b.N), getIterations(b.N)
 	podsPerNode := numPods / numTasks
 	if podsPerNode < 1 {
 		podsPerNode = 1

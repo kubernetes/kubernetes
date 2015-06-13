@@ -81,7 +81,7 @@ func TestRunOnce(t *testing.T) {
 		rootDirectory:       "/tmp/kubelet",
 		recorder:            &record.FakeRecorder{},
 		cadvisor:            cadvisor,
-		nodeLister:          testNodeLister{},
+		NodeLister:          testNodeLister{},
 		statusManager:       newStatusManager(nil),
 		containerRefManager: kubecontainer.NewRefManager(),
 		readinessManager:    kubecontainer.NewReadinessManager(),

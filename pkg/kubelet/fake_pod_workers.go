@@ -42,4 +42,4 @@ func (f *fakePodWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateCompl
 	}
 }
 
-func (f *fakePodWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty) {}
+func (f *fakePodWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]Empty) {}

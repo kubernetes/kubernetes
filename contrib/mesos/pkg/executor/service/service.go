@@ -316,6 +316,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 
 	pc := kconfig.NewPodConfig(kconfig.PodConfigNotificationSnapshotAndUpdates, kc.Recorder)
 	updates := pc.Channel(MESOS_CFG_SOURCE)
+	stopCh := make(chan struct{})
 
 	klet, err := kubelet.NewMainKubelet(
 		kc.Hostname,
@@ -353,6 +354,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		kc.ConfigureCBR0,
 		kc.MaxPods,
 		kc.DockerExecHandler,
+		stopCh,
 	)
 	if err != nil {
 		return nil, nil, err
