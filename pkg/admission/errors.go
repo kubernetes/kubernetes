@@ -34,7 +34,7 @@ func NewForbidden(a Attributes, internalError error) error {
 	if obj != nil {
 		objectMeta, err := api.ObjectMetaFor(obj)
 		if err != nil {
-			return apierrors.NewForbidden(kind, name, err)
+			return apierrors.NewForbidden(kind, name, internalError)
 		}
 
 		// this is necessary because name object name generation has not occurred yet
