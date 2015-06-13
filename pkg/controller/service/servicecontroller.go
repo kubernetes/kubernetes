@@ -238,7 +238,14 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 	case cache.Sync:
 		err, retry := s.createLoadBalancerIfNeeded(namespacedName, service, cachedService.appliedState)
 		if err != nil {
-			s.eventRecorder.Event(service, "creating loadbalancer failed", err.Error())
+			message := "error creating load balancer"
+			if retry {
+				message += " (will retry): "
+			} else {
+				message += " (will not retry): "
+			}
+			message += err.Error()
+			s.eventRecorder.Event(service, "creating loadbalancer failed", message)
 			return err, retry
 		}
 		// Always update the cache upon success.
@@ -248,11 +255,14 @@ func (s *ServiceController) processDelta(delta *cache.Delta) (error, bool) {
 		cachedService.appliedState = service
 		s.cache.set(namespacedName.String(), cachedService)
 	case cache.Deleted:
+		s.eventRecorder.Event(service, "deleting loadbalancer", "deleting loadbalancer")
 		err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region)
 		if err != nil {
-			s.eventRecorder.Event(service, "deleting loadbalancer failed", err.Error())
+			message := "error deleting load balancer (will retry): " + err.Error()
+			s.eventRecorder.Event(service, "deleting loadbalancer failed", message)
 			return err, retryable
 		}
+		s.eventRecorder.Event(service, "deleted loadbalancer", "deleted loadbalancer")
 		s.cache.delete(namespacedName.String())
 	default:
 		glog.Errorf("Unexpected delta type: %v", delta.Type)
@@ -272,9 +282,11 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		// we can recreate it cleanly.
 		if wantsExternalLoadBalancer(cachedService) {
 			glog.Infof("Deleting existing load balancer for service %s that needs an updated load balancer.", namespacedName)
+			s.eventRecorder.Event(service, "deleting loadbalancer", "deleting loadbalancer, will recreate with updated configuration")
 			if err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(cachedService), s.zone.Region); err != nil {
 				return err, retryable
 			}
+			s.eventRecorder.Event(service, "deleted loadbalancer", "deleted loadbalancer")
 		}
 	} else {
 		// If we don't have any cached memory of the load balancer, we have to ask
@@ -289,9 +301,11 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		} else if exists {
 			glog.Infof("Deleting old LB for previously uncached service %s whose endpoint %s doesn't match the service's desired IPs %v",
 				namespacedName, status, service.Spec.DeprecatedPublicIPs)
+			s.eventRecorder.Event(service, "deleting loadbalancer", "deleting loadbalancer, will recreate with updated IPs")
 			if err := s.balancer.EnsureTCPLoadBalancerDeleted(s.loadBalancerName(service), s.zone.Region); err != nil {
 				return err, retryable
 			}
+			s.eventRecorder.Event(service, "deleted loadbalancer", "deleted loadbalancer")
 		}
 	}
 
@@ -306,10 +320,12 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		glog.V(2).Infof("Creating LB for service %s", namespacedName)
 
 		// The load balancer doesn't exist yet, so create it.
+		s.eventRecorder.Event(service, "creating loadbalancer", "creating loadbalancer")
 		err := s.createExternalLoadBalancer(service)
 		if err != nil {
 			return fmt.Errorf("failed to create external load balancer for service %s: %v", namespacedName, err), retryable
 		}
+		s.eventRecorder.Event(service, "created loadbalancer", "created loadbalancer")
 	}
 
 	// Write the state if changed
@@ -651,9 +667,11 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 		return nil
 	}
 
+	// This operation doesn't normally take very long (and happens pretty often), so we only record the final event
 	name := cloudprovider.GetLoadBalancerName(service)
 	err := s.balancer.UpdateTCPLoadBalancer(name, s.zone.Region, hosts)
 	if err == nil {
+		s.eventRecorder.Event(service, "updated loadbalancer", "updated loadbalancer with new hosts")
 		return nil
 	}
 
@@ -663,6 +681,9 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 	} else if !exists {
 		return nil
 	}
+
+	message := "error updating loadbalancer with new hosts: " + err.Error()
+	s.eventRecorder.Event(service, "updating loadbalancer failed", message)
 	return err
 }
 
