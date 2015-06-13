@@ -52,20 +52,23 @@ type Process interface {
 	Running() <-chan struct{}
 }
 
-// this is an error promise. if we ever start building out support for other promise types it will probably
+// ErrorOnce an error promise. If we ever start building out support for other promise types it will probably
 // make sense to group them in some sort of "promises" package.
 type ErrorOnce interface {
-	// return a chan that only ever sends one error, either obtained via Report() or Forward()
+	// Err returns a chan that only ever sends one error, either obtained via Report() or Forward().
 	Err() <-chan error
 
-	// reports the given error via Err(), but only if no other errors have been reported or forwarded
+	// Report reports the given error via Err(), but only if no other errors have been reported or forwarded.
 	Report(error)
+
+	// Report reports an error via Err(), but only if no other errors have been reported or forwarded, using
+	// fmt.Errorf to generate the error.
 	Reportf(string, ...interface{})
 
-	// waits for an error on the incoming chan, the result of which is later obtained via Err() (if no
-	// other errors have been reported or forwarded)
+	// forward waits for an error on the incoming chan, the result of which is later obtained via Err() (if no
+	// other errors have been reported or forwarded).
 	forward(<-chan error)
 
-	// non-blocking, spins up a goroutine that reports an error (if any) that occurs on the error chan.
+	// Send is non-blocking; it spins up a goroutine that reports an error (if any) that occurs on the error chan.
 	Send(<-chan error) ErrorOnce
 }

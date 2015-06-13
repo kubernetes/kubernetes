@@ -33,6 +33,10 @@ const (
 
 	// how many actions we can store in the backlog
 	defaultActionQueueDepth = 1024
+
+	// wait this long before re-attempting to enqueue an action into
+	// the scheduling backlog
+	defaultMaxRescheduleWait = 5 * time.Millisecond
 )
 
 type procImpl struct {
@@ -56,15 +60,21 @@ type Config struct {
 
 	// determines the size of the deferred action backlog
 	actionQueueDepth uint32
+
+	// wait this long before re-attempting to enqueue an action into
+	// the scheduling backlog
+	maxRescheduleWait time.Duration
 }
 
 var (
+	// default process configuration, used in the creation of all new processes
 	defaultConfig = Config{
 		actionHandlerCrashDelay: defaultActionHandlerCrashDelay,
 		actionQueueDepth:        defaultActionQueueDepth,
+		maxRescheduleWait:       defaultMaxRescheduleWait,
 	}
-	pid           uint32
-	closedErrChan <-chan error
+	pid           uint32       // global pid counter
+	closedErrChan <-chan error // singleton chan that's always closed
 )
 
 func init() {
@@ -110,6 +120,7 @@ func (self *procImpl) begin() runtime.Signal {
 	}
 	defer log.V(2).Infof("started process %d", self.pid)
 	var entered runtime.Latch
+
 	// execute actions on the backlog chan
 	return runtime.After(func() {
 		runtime.Until(func() {
@@ -154,6 +165,7 @@ func (self *procImpl) doLater(deferredAction Action) (err <-chan error) {
 	self.writeLock.Lock()
 	defer self.writeLock.Unlock()
 
+	var timer *time.Timer
 	for err == nil && !scheduled {
 		switch s := self.state.get(); s {
 		case stateRunning:
@@ -161,7 +173,13 @@ func (self *procImpl) doLater(deferredAction Action) (err <-chan error) {
 			case self.backlog <- a:
 				scheduled = true
 			default:
+				if timer == nil {
+					timer = time.AfterFunc(self.maxRescheduleWait, self.changed.Broadcast)
+				} else {
+					timer.Reset(self.maxRescheduleWait)
+				}
 				self.changed.Wait()
+				timer.Stop()
 			}
 		case stateTerminal:
 			err = ErrorChan(errProcessTerminated)
@@ -292,21 +310,18 @@ func (b *errorOnce) forward(errIn <-chan error) {
 }
 
 type processAdapter struct {
-	parent   Process
+	Process
 	delegate Doer
 }
 
 func (p *processAdapter) Do(a Action) <-chan error {
-	if p == nil || p.parent == nil || p.delegate == nil {
-		return ErrorChan(errIllegalState)
-	}
 	errCh := NewErrorOnce(p.Done())
 	go func() {
-		errOuter := p.parent.Do(func() {
+		errOuter := p.Process.Do(func() {
 			errInner := p.delegate.Do(a)
 			errCh.forward(errInner)
 		})
-		// if the outer err is !nil then either the parent failed to schedule the
+		// if the outer err is !nil then either the parent Process failed to schedule the
 		// the action, or else it backgrounded the scheduling task.
 		if errOuter != nil {
 			errCh.forward(errOuter)
@@ -315,42 +330,17 @@ func (p *processAdapter) Do(a Action) <-chan error {
 	return errCh.Err()
 }
 
-func (p *processAdapter) End() <-chan struct{} {
-	if p != nil && p.parent != nil {
-		return p.parent.End()
-	}
-	return nil
-}
-
-func (p *processAdapter) Done() <-chan struct{} {
-	if p != nil && p.parent != nil {
-		return p.parent.Done()
-	}
-	return nil
-}
-
-func (p *processAdapter) Running() <-chan struct{} {
-	if p != nil && p.parent != nil {
-		return p.parent.Running()
-	}
-	return nil
-}
-
-func (p *processAdapter) OnError(ch <-chan error, f func(error)) <-chan struct{} {
-	if p != nil && p.parent != nil {
-		return p.parent.OnError(ch, f)
-	}
-	return nil
-}
-
-// returns a process that, within its execution context, delegates to the specified Doer.
-// if the given Doer instance is nil, a valid Process is still returned though calls to its
-// Do() implementation will always return errIllegalState.
-// if the given Process instance is nil then in addition to the behavior in the prior sentence,
-// calls to End() and Done() are effectively noops.
+// DoWith returns a process that, within its execution context, delegates to the specified Doer.
+// Expect a panic if either the given Process or Doer are nil.
 func DoWith(other Process, d Doer) Process {
+	if other == nil {
+		panic(fmt.Sprintf("cannot DoWith a nil process"))
+	}
+	if d == nil {
+		panic(fmt.Sprintf("cannot DoWith a nil doer"))
+	}
 	return &processAdapter{
-		parent:   other,
+		Process:  other,
 		delegate: d,
 	}
 }
