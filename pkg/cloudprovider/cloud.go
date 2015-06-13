@@ -103,6 +103,7 @@ type Instances interface {
 	// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 	ExternalID(name string) (string, error)
 	// InstanceID returns the cloud provider ID of the specified instance.
+	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 	InstanceID(name string) (string, error)
 	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
 	List(filter string) ([]string, error)
