@@ -1,5 +1,5 @@
 {% set docker_opts = "" -%}
-{% if grains.docker_opts is defined and grains.docker_opts -%}
+{% if grains.docker_opts is defined -%}
   {% set docker_opts = grains.docker_opts -%}
 {% endif -%}
 
