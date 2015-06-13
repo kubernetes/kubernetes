@@ -232,8 +232,11 @@ $kubectl create -f bps-load-gen-rc.json --namespace=$NS
 #Get the IP addresses of all Kubernetes nodes.
 function getIP {
   #currently this script is only tested on GCE. The following line may need to be updated if k8s is not running on a cloud platform
-  NODES_IP=$($kubectl get nodes -t='{{range .items}}{{range .status.addresses}}{{if eq .type "ExternalIP"}}{{.address}}{{print "\n"}}{{end}}{{end}}{{end}}')
+  NODES_IP=$($kubectl get nodes -t='{{range .items}}{{range .status.addresses}}{{if or (eq .type "ExternalIP") (eq .type "LegacyHostIP")}}{{.address}}{{print "\n"}}{{end}}{{end}}{{end}}')
   TEST_IP=$($kubectl get nodes -t='{{range (index .items 0).status.addresses}}{{if eq .type "ExternalIP"}}{{.address}}{{end}}{{end}}')
+  if [ -z "$TEST_IP" ]; then
+    TEST_IP=$($kubectl get nodes -t='{{range (index .items 0).status.addresses}}{{if eq .type "LegacyHostIP"}}{{.address}}{{end}}{{end}}')
+  fi
   if [ -z "$NODES_IP" ]; then
     echo "Error: Can't get node's IP!!!"
     exit 1
