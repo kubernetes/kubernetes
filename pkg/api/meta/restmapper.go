@@ -192,7 +192,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		}
 	}
 	if len(version) == 0 {
-		return nil, fmt.Errorf("no object named %q is registered", kind)
+		return nil, fmt.Errorf("no kind named %q is registered in versions %q", kind, versions)
 	}
 
 	// Ensure we have a REST mapping
