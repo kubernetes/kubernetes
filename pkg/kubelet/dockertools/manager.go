@@ -1036,29 +1036,38 @@ func (dm *DockerManager) KillPod(pod kubecontainer.Pod) error {
 	// can be Len errors + the networkPlugin teardown error.
 	errs := make(chan error, len(pod.Containers)+1)
 	wg := sync.WaitGroup{}
+	var networkID types.UID
 	for _, container := range pod.Containers {
 		wg.Add(1)
 		go func(container *kubecontainer.Container) {
 			defer util.HandleCrash()
+			defer wg.Done()
 
 			// TODO: Handle this without signaling the pod infra container to
 			// adapt to the generic container runtime.
 			if container.Name == PodInfraContainerName {
-				err := dm.networkPlugin.TearDownPod(pod.Namespace, pod.Name, kubeletTypes.DockerID(container.ID))
-				if err != nil {
-					glog.Errorf("Failed tearing down the infra container: %v", err)
-					errs <- err
-				}
+				// Store the container runtime for later deletion.
+				// We do this so that PreStop handlers can run in the network namespace.
+				networkID = container.ID
+				return
 			}
-			err := dm.killContainer(container.ID)
-			if err != nil {
+			if err := dm.killContainer(container.ID); err != nil {
 				glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, pod.ID)
 				errs <- err
 			}
-			wg.Done()
 		}(container)
 	}
 	wg.Wait()
+	if len(networkID) > 0 {
+		if err := dm.networkPlugin.TearDownPod(pod.Namespace, pod.Name, kubeletTypes.DockerID(networkID)); err != nil {
+			glog.Errorf("Failed tearing down the infra container: %v", err)
+			errs <- err
+		}
+		if err := dm.killContainer(networkID); err != nil {
+			glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, pod.ID)
+			errs <- err
+		}
+	}
 	close(errs)
 	if len(errs) > 0 {
 		errList := []error{}
