@@ -14,22 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/cmd/km/kube-apiserver.go
+// clone of the upstream cmd/hypercube/kube-proxy.go
 package main
 
 import (
-	kubeapiserver "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-apiserver/app"
+	kubeproxy "github.com/GoogleCloudPlatform/kubernetes/cmd/kube-proxy/app"
 )
 
-// NewKubeAPIServer creates a new hyperkube Server object that includes the
+// NewKubeProxy creates a new hyperkube Server object that includes the
 // description and flags.
-func NewKubeAPIServer() *Server {
-	s := kubeapiserver.NewAPIServer()
+func NewKubeProxy() *Server {
+	s := kubeproxy.NewProxyServer()
 
 	hks := Server{
-		SimpleUsage: "apiserver",
-		Long:        "The main API entrypoint and interface to the storage system.  The API server is also the focal point for all authorization decisions.",
+		SimpleUsage: "proxy",
+		Long: `The Kubernetes proxy server is responsible for taking traffic directed at
+		services and forwarding it to the appropriate pods.  It generally runs on
+		nodes next to the Kubelet and proxies traffic from local pods to remote pods.
+		It is also used when handling incoming external traffic.`,
 		Run: func(_ *Server, args []string) error {
 			return s.Run(args)
 		},

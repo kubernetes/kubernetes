@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// A binary that can morph into all of the other kubernetes binaries. You can
-// also soft-link to it busybox style.
-//
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/cmd/km/km.go
+// clone of the upstream cmd/hypercube/main.go
 package main
 
 import (
@@ -27,14 +23,14 @@ import (
 
 func main() {
 	hk := HyperKube{
-		Name: "hyperkube",
-		Long: "This is an all-in-one binary that can run any of the various Kubernetes servers.",
+		Name: "km",
+		Long: "This is an all-in-one binary that can run any of the various Kubernetes-Mesos servers.",
 	}
 
 	hk.AddServer(NewKubeAPIServer())
-	hk.AddServer(NewKubeControllerManager())
+	hk.AddServer(NewControllerManager())
 	hk.AddServer(NewScheduler())
-	hk.AddServer(NewKubelet())
+	hk.AddServer(NewKubeletExecutor())
 	hk.AddServer(NewKubeProxy())
 
 	hk.RunToExit(os.Args)
