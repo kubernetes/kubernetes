@@ -19,6 +19,7 @@ package executor
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -97,10 +98,15 @@ type suicideWatcher interface {
 
 type podStatusFunc func() (*api.PodStatus, error)
 
+// KubeletInterface consists of the kubelet.Kubelet API's that we actually use
+type KubeletInterface interface {
+	GetHostIP() (net.IP, error)
+}
+
 // KubernetesExecutor is an mesos executor that runs pods
 // in a minion machine.
 type KubernetesExecutor struct {
-	kl                  *kubelet.Kubelet   // the kubelet instance.
+	kl                  KubeletInterface   // the kubelet instance.
 	updateChan          chan<- interface{} // to send pod config updates to the kubelet
 	state               stateType
 	tasks               map[string]*kuberTask
@@ -118,11 +124,11 @@ type KubernetesExecutor struct {
 	kubeletFinished     <-chan struct{} // signals that kubelet Run() died
 	initialRegistration sync.Once
 	exitFunc            func(int)
-	podStatusFunc       func(*kubelet.Kubelet, *api.Pod) (*api.PodStatus, error)
+	podStatusFunc       func(KubeletInterface, *api.Pod) (*api.PodStatus, error)
 }
 
 type Config struct {
-	Kubelet         *kubelet.Kubelet
+	Kubelet         KubeletInterface
 	Updates         chan<- interface{} // to send pod config updates to the kubelet
 	SourceName      string
 	APIClient       *client.Client
@@ -132,7 +138,7 @@ type Config struct {
 	SuicideTimeout  time.Duration
 	KubeletFinished <-chan struct{} // signals that kubelet Run() died
 	ExitFunc        func(int)
-	PodStatusFunc   func(*kubelet.Kubelet, *api.Pod) (*api.PodStatus, error)
+	PodStatusFunc   func(KubeletInterface, *api.Pod) (*api.PodStatus, error)
 }
 
 func (k *KubernetesExecutor) isConnected() bool {

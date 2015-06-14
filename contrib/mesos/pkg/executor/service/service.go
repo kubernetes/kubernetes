@@ -376,8 +376,8 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 			}
 		},
 		ExitFunc: os.Exit,
-		PodStatusFunc: func(kl *kubelet.Kubelet, pod *api.Pod) (*api.PodStatus, error) {
-			return kl.GetRuntime().GetPodStatus(pod)
+		PodStatusFunc: func(_ executor.KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
+			return klet.GetRuntime().GetPodStatus(pod)
 		},
 	})
 
