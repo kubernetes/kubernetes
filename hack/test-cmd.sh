@@ -417,6 +417,21 @@ for version in "${kube_api_versions[@]}"; do
   # Post-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  ### Create two PODs from 1 yaml file
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f examples/multi-pod.yaml "${kube_flags[@]}"
+  # Post-condition: valid-pod and redis-proxy PODs are running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:redis-proxy:'
+
+  ### Delete two PODs from 1 yaml file
+  # Pre-condition: redis-master and redis-proxy PODs are running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:redis-proxy:'
+  # Command
+  kubectl delete -f examples/multi-pod.yaml "${kube_flags[@]}"
+  # Post-condition: no PODs are running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
   ##############
   # Namespaces #
