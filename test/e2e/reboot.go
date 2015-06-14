@@ -94,7 +94,7 @@ func testReboot(c *client.Client, rebootCmd string) {
 	// there (the limiting factor is the implementation of util.go's
 	// getSigner(...)).
 	provider := testContext.Provider
-	if !providerIs("gce") {
+	if !providerIs("aws", "gce") {
 		By(fmt.Sprintf("Skipping reboot test, which is not implemented for %s", provider))
 		return
 	}
