@@ -227,8 +227,9 @@ fi
 # TODO(zml): We have a bunch of legacy Jenkins configs that are
 # expecting junit*.xml to be in ${WORKSPACE} root and it's Friday
 # afternoon, so just put the junit report where it's expected.
+# If link already exists, non-zero return code should not cause build to fail.
 for junit in ${ARTIFACTS}/junit*.xml; do
-  ln -s ${junit} ${WORKSPACE}
+  ln -s -f ${junit} ${WORKSPACE} || true
 done
 
 ### Clean up ###
