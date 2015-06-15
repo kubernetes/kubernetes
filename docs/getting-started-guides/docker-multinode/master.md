@@ -131,8 +131,8 @@ kubectl get nodes
 
 This should print:
 ```
-NAME        LABELS    STATUS
-127.0.0.1   <none>    Ready
+NAME        LABELS                             STATUS
+127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
 ```
 
 If the status of the node is ```NotReady``` or ```Unknown``` please check that all of the containers you created are successfully running.
