@@ -356,7 +356,10 @@ func TestProc_doWithNestedXConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	const CONC = 20
 	wg.Add(CONC)
-	timeout := 3 * time.Second
+
+	// this test spins up TONS of goroutines that can take a little while to execute on a busy
+	// CI server. drawing the line at 10s because I've never seen it take anywhere near that long.
+	timeout := 10 * time.Second
 
 	for i := 0; i < CONC; i++ {
 		i := i
