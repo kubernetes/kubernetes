@@ -70,7 +70,7 @@ var _ = Describe("Etcd failure", func() {
 func etcdFailTest(framework Framework, failCommand, fixCommand string, repeat bool) {
 	// This test requires SSH, so the provider check should be identical to
 	// those tests.
-	if !providerIs("gce", "gke") {
+	if !providerIs("gce") {
 		By(fmt.Sprintf("Skippingt test, which is not implemented for %s", testContext.Provider))
 		return
 	}

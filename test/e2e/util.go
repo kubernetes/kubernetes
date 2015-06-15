@@ -479,6 +479,34 @@ func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error
 	})
 }
 
+// waits until the service appears (exists == true), or disappears (exists == false)
+func waitForService(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
+	return wait.Poll(interval, timeout, func() (bool, error) {
+		_, err := c.Services(namespace).Get(name)
+		if err != nil {
+			Logf("Get service %s in namespace %s failed (%v).", name, namespace, err)
+			return !exist, nil
+		} else {
+			Logf("Service %s in namespace %s found.", name, namespace)
+			return exist, nil
+		}
+	})
+}
+
+// waits until the RC appears (exists == true), or disappears (exists == false)
+func waitForReplicationController(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
+	return wait.Poll(interval, timeout, func() (bool, error) {
+		_, err := c.ReplicationControllers(namespace).Get(name)
+		if err != nil {
+			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
+			return !exist, nil
+		} else {
+			Logf("ReplicationController %s in namespace %s found.", name, namespace)
+			return exist, nil
+		}
+	})
+}
+
 // Context for checking pods responses by issuing GETs to them and verifying if the answer with pod name.
 type podResponseChecker struct {
 	c              *client.Client
