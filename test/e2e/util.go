@@ -773,7 +773,7 @@ func (p PodDiff) Print(ignorePhases util.StringSet) {
 			continue
 		}
 		if info.phase == nonExist {
-			Logf("Pod %v was deleted, had phase %v and host %v", name, info.phase, info.hostname)
+			Logf("Pod %v was deleted, had phase %v and host %v", name, info.oldPhase, info.oldHostname)
 			continue
 		}
 		phaseChange, hostChange := false, false
