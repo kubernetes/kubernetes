@@ -227,9 +227,16 @@ fi
 # TODO(zml): We have a bunch of legacy Jenkins configs that are
 # expecting junit*.xml to be in ${WORKSPACE} root and it's Friday
 # afternoon, so just put the junit report where it's expected.
-for junit in ${ARTIFACTS}/junit*.xml; do
-  ln -s ${junit} ${WORKSPACE}
-done
+results=($(ls "${ARTIFACTS}" | grep "junit.*.xml")) || true
+if [[ ! -z ${results:-} ]]; then
+    for junit in "${results[@]}"; do
+        # Jenkins runs that trigger sequentially (e.g. step1 -> step2 -> ...) will
+        # have e2e test results overwrite each other because they all run in the
+        # same workspace. For those cases, we prefix the final location with the
+        # step name.
+        mv "${ARTIFACTS}/${junit}" "${WORKSPACE}/${JENKINS_STEP_PREFIX:-}${junit}"
+    done
+fi
 
 ### Clean up ###
 if [[ "${E2E_DOWN,,}" == "true" ]]; then
