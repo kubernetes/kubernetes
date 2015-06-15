@@ -96,7 +96,10 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
 	}
 
 	count := 0
-	err = r.Visit(func(info *resource.Info) error {
+	err = r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		data, err := info.Mapping.Codec.Encode(info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)

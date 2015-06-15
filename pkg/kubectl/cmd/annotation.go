@@ -166,16 +166,19 @@ func (o AnnotateOptions) RunAnnotate() error {
 	if err := r.Err(); err != nil {
 		return err
 	}
-	return r.Visit(func(info *resource.Info) error {
-		_, err := cmdutil.UpdateObject(info, func(obj runtime.Object) error {
+	return r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+		_, uErr := cmdutil.UpdateObject(info, func(obj runtime.Object) error {
 			err := o.updateAnnotations(obj)
 			if err != nil {
 				return err
 			}
 			return nil
 		})
-		if err != nil {
-			return err
+		if uErr != nil {
+			return uErr
 		}
 		return nil
 	})

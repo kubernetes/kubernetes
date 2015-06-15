@@ -132,7 +132,10 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
 	}
-	err := r.Visit(func(info *resource.Info) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		found++
 		reaper, err := f.Reaper(info.Mapping)
 		if err != nil {
@@ -166,7 +169,10 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
 	}
-	err := r.Visit(func(info *resource.Info) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		found++
 		return deleteResource(info, out, shortOutput, mapper)
 	})
