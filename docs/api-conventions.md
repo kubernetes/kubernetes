@@ -3,6 +3,10 @@ API Conventions
 
 Updated: 4/16/2015
 
+*This document is oriented at users who want a deeper understanding of the kubernetes
+API structure, and developers wanting to extend the kubernetes API.  An introduction to
+using resources with kubectl can be found in (working_with_resources.md).*
+
 The conventions of the [Kubernetes API](api.md) (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
 
 The general style of the Kubernetes API is RESTful - clients create, update, delete, or retrieve a description of an object via the standard HTTP verbs (POST, PUT, DELETE, and GET) - and those APIs preferentially accept and return JSON. Kubernetes also exposes additional endpoints for non-standard verbs and allows alternative content types. All of the JSON accepted and returned by the server has a schema, identified by the "kind" and "apiVersion" fields. Where relevant HTTP header fields exist, they should mirror the content of JSON fields, but the information should not be represented only in the HTTP header.
