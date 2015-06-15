@@ -260,6 +260,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		response, err := bodyToJSON(body)
 		if err != nil {
 			Logf("After %v failed to unmarshal response: %v", time.Since(start), err)
+			Logf("Body: %s", string(body))
 			continue
 		}
 		hits, ok := response["hits"].(map[string]interface{})
