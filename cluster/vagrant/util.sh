@@ -141,6 +141,8 @@ function create-provision-scripts {
     echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
     echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
     echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
+    echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
+    echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
     awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
@@ -163,6 +165,8 @@ function create-provision-scripts {
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
       echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
+      echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
+      echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
@@ -251,6 +255,7 @@ function verify-cluster {
 # Instantiate a kubernetes cluster
 function kube-up {
   get-password
+  get-tokens
   create-provision-scripts
 
   vagrant up
@@ -367,4 +372,9 @@ function restart-apiserver {
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   echo "Vagrant doesn't need special preparations for e2e tests" 1>&2
+}
+
+function get-tokens() {
+  KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 }

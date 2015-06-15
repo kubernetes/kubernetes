@@ -17,6 +17,57 @@
 # exit on any error
 set -e
 
+#setup kubelet config
+mkdir -p "/var/lib/kubelet"
+(umask 077;
+cat > "/var/lib/kubelet/kubeconfig" << EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+user:
+  token: ${KUBELET_TOKEN}
+clusters:
+- name: local
+cluster:
+  insecure-skip-tls-verify: true
+contexts:
+- context:
+  cluster: local
+  user: kubelet
+name: service-account-context
+current-context: service-account-context
+EOF
+)
+
+#setup proxy config
+mkdir -p "/var/lib/kube-proxy/"
+# Make a kubeconfig file with the token.
+# TODO(etune): put apiserver certs into secret too, and reference from authfile,
+# so that "Insecure" is not needed.
+(umask 077;
+cat > "/var/lib/kube-proxy/kubeconfig" << EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kube-proxy
+user:
+  token: ${KUBE_PROXY_TOKEN}
+clusters:
+- name: local
+cluster:
+   insecure-skip-tls-verify: true
+contexts:
+- context:
+  cluster: local
+  user: kube-proxy
+name: service-account-context
+current-context: service-account-context
+EOF
+)
+
+
+
 # Set the host name explicitly
 # See: https://github.com/mitchellh/vagrant/issues/2430
 hostnamectl set-hostname ${MINION_NAME}
