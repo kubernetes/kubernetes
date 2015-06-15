@@ -30,7 +30,7 @@ import (
 var _ = Describe("EmptyDir volumes", func() {
 	f := NewFramework("emptydir")
 
-	It("volume on tmpfs should have the correct mode", func() {
+	It("should have the correct mode", func() {
 		volumePath := "/test-volume"
 		source := &api.EmptyDirVolumeSource{
 			Medium: api.StorageMediumMemory,
@@ -47,7 +47,7 @@ var _ = Describe("EmptyDir volumes", func() {
 		})
 	})
 
-	It("should support r/w on tmpfs", func() {
+	It("should support r/w", func() {
 		volumePath := "/test-volume"
 		filePath := path.Join(volumePath, "test-file")
 		source := &api.EmptyDirVolumeSource{
