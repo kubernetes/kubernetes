@@ -34,7 +34,38 @@ set -e
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-"${KUBE_ROOT}/hack/build-go.sh"
+function usage {
+            echo "This script starts a local kube cluster. "
+            echo "Example 1: hack/local-up-cluster.sh -o _output/dockerized/bin/linux/amd64/ (run from docker output)"
+            echo "Example 2: hack/local-up-cluster.sh (build a local copy of the source)"
+}
+
+### Allow user to supply the source directory.
+GO_OUT=""
+while getopts "o:" OPTION
+do
+    case $OPTION in
+        o) 
+            echo "skipping build"
+            echo "using source $OPTARG"
+            GO_OUT="$OPTARG"
+            if [ $GO_OUT == "" ]; then
+                echo "You provided an invalid value for the build output directory."
+                exit 
+            fi
+            ;;
+        ?)
+            usage    
+            exit
+            ;;
+    esac
+done
+
+if [ "x$GO_OUT" == "x" ]; then
+    "${KUBE_ROOT}/hack/build-go.sh"
+else
+    echo "skipped the build."
+fi
 
 function test_docker {
     ${DOCKER[@]} ps 2> /dev/null 1> /dev/null
@@ -104,6 +135,8 @@ function detect_binary {
         exit 1
         ;;
     esac
+
+   GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
 }
 
 cleanup_dockerized_kubelet()
@@ -268,12 +301,15 @@ To start using your cluster, open up another terminal/tab and run:
 EOF
 }
 
-
 test_docker
 test_apiserver_off
-detect_binary
+
+### IF the user didn't supply an output/ for the build... Then we detect.
+if [ "$GO_OUT" == "" ]; then 
+    detect_binary
+fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
-GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
+echo "Using GO_OUT $GO_OUT"
 KUBELET_CIDFILE=/tmp/kubelet.cid
 trap cleanup EXIT
 echo "Starting services now!"
