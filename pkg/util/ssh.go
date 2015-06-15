@@ -97,6 +97,9 @@ func (s *SSHTunnel) Dial(network, address string) (net.Conn, error) {
 }
 
 func (s *SSHTunnel) tunnel(conn net.Conn, remoteHost, remotePort string) error {
+	if s.client == nil {
+		return errors.New("tunnel is not opened.")
+	}
 	tunnel, err := s.client.Dial("tcp", net.JoinHostPort(remoteHost, remotePort))
 	if err != nil {
 		return err
@@ -107,6 +110,9 @@ func (s *SSHTunnel) tunnel(conn net.Conn, remoteHost, remotePort string) error {
 }
 
 func (s *SSHTunnel) Close() error {
+	if s.client == nil {
+		return errors.New("Cannot close tunnel. Tunnel was not opened.")
+	}
 	if err := s.client.Close(); err != nil {
 		return err
 	}
@@ -196,8 +202,13 @@ func MakeSSHTunnels(user, keyfile string, addresses []string) (SSHTunnelList, er
 func (l SSHTunnelList) Open() error {
 	for ix := range l {
 		if err := l[ix].Tunnel.Open(); err != nil {
-			return err
+			// Remove a failed Open from the list.
+			glog.Errorf("Failed to open tunnel %v: %v", l[ix], err)
+			l = append(l[:ix], l[ix+1:]...)
 		}
+	}
+	if len(l) == 0 {
+		return errors.New("Failed to open any tunnels.")
 	}
 	return nil
 }
@@ -209,6 +220,7 @@ func (l SSHTunnelList) Close() {
 	for ix := range l {
 		entry := l[ix]
 		go func() {
+			defer HandleCrash()
 			time.Sleep(1 * time.Minute)
 			if err := entry.Tunnel.Close(); err != nil {
 				glog.Errorf("Failed to close tunnel %v: %v", entry, err)
