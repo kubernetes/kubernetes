@@ -344,7 +344,6 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 	}
 
 	pod := NewTestPod(1)
-	pod.Spec.Containers[0].Name = "foo"
 	podTask, err := podtask.New(api.NewDefaultContext(), "",
 		*pod, &mesosproto.ExecutorInfo{})
 	assert.Equal(t, nil, err, "must be able to create a task from a pod")
@@ -503,6 +502,7 @@ func NewTestPod(i int) *api.Pod {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
+					Name: "foo",
 					Ports: []api.ContainerPort{
 						{
 							ContainerPort: 8000 + i,
