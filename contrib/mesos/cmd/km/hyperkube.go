@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/cmd/km/hyperkube.go
+// clone of the upstream cmd/hypercube/hyperkube.go
 package main
 
 import (
@@ -72,7 +71,6 @@ func (hk *HyperKube) Flags() *pflag.FlagSet {
 	if hk.baseFlags == nil {
 		hk.baseFlags = pflag.NewFlagSet(hk.Name, pflag.ContinueOnError)
 		hk.baseFlags.SetOutput(ioutil.Discard)
-		hk.baseFlags.SetNormalizeFunc(util.WordSepNormalizeFunc)
 		hk.baseFlags.BoolVarP(&hk.helpFlagVal, "help", "h", false, "help for "+hk.Name)
 
 		// These will add all of the "global" flags (defined with both the

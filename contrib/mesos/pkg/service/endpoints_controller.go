@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/pkg/service/endpoints_controller.go
 package service
 
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/endpoints"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -32,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	kservice "github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/workqueue"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -39,29 +40,20 @@ import (
 	"github.com/golang/glog"
 )
 
-const (
-	// We'll attempt to recompute EVERY service's endpoints at least this
-	// often. Higher numbers = lower CPU/network load; lower numbers =
-	// shorter amount of time before a mistaken endpoint is corrected.
-	FullServiceResyncPeriod = 30 * time.Second
-
-	// We'll keep pod watches open up to this long. In the unlikely case
-	// that a watch misdelivers info about a pod, it'll take this long for
-	// that mistake to be rectified.
-	PodRelistPeriod = 5 * time.Minute
-)
-
 var (
 	keyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
 )
 
+type EndpointController interface {
+	Run(workers int, stopCh <-chan struct{})
+}
+
 // NewEndpointController returns a new *EndpointController.
-func NewEndpointController(client *client.Client) *EndpointController {
-	e := &EndpointController{
+func NewEndpointController(client *client.Client) *endpointController {
+	e := &endpointController{
 		client: client,
 		queue:  workqueue.New(),
 	}
-
 	e.serviceStore.Store, e.serviceController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
@@ -72,7 +64,7 @@ func NewEndpointController(client *client.Client) *EndpointController {
 			},
 		},
 		&api.Service{},
-		FullServiceResyncPeriod,
+		kservice.FullServiceResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: e.enqueueService,
 			UpdateFunc: func(old, cur interface{}) {
@@ -92,19 +84,18 @@ func NewEndpointController(client *client.Client) *EndpointController {
 			},
 		},
 		&api.Pod{},
-		PodRelistPeriod,
+		kservice.PodRelistPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    e.addPod,
 			UpdateFunc: e.updatePod,
 			DeleteFunc: e.deletePod,
 		},
 	)
-
 	return e
 }
 
 // EndpointController manages selector-based service endpoints.
-type EndpointController struct {
+type endpointController struct {
 	client *client.Client
 
 	serviceStore cache.StoreToServiceLister
@@ -125,7 +116,7 @@ type EndpointController struct {
 
 // Runs e; will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
-func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
+func (e *endpointController) Run(workers int, stopCh <-chan struct{}) {
 	defer util.HandleCrash()
 	go e.serviceController.Run(stopCh)
 	go e.podController.Run(stopCh)
@@ -141,7 +132,7 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	e.queue.ShutDown()
 }
 
-func (e *EndpointController) getPodServiceMemberships(pod *api.Pod) (util.StringSet, error) {
+func (e *endpointController) getPodServiceMemberships(pod *api.Pod) (util.StringSet, error) {
 	set := util.StringSet{}
 	services, err := e.serviceStore.GetPodServices(pod)
 	if err != nil {
@@ -161,7 +152,7 @@ func (e *EndpointController) getPodServiceMemberships(pod *api.Pod) (util.String
 
 // When a pod is added, figure out what services it will be a member of and
 // enqueue them. obj must have *api.Pod type.
-func (e *EndpointController) addPod(obj interface{}) {
+func (e *endpointController) addPod(obj interface{}) {
 	pod := obj.(*api.Pod)
 	services, err := e.getPodServiceMemberships(pod)
 	if err != nil {
@@ -176,7 +167,7 @@ func (e *EndpointController) addPod(obj interface{}) {
 // When a pod is updated, figure out what services it used to be a member of
 // and what services it will be a member of, and enqueue the union of these.
 // old and cur must be *api.Pod types.
-func (e *EndpointController) updatePod(old, cur interface{}) {
+func (e *endpointController) updatePod(old, cur interface{}) {
 	if api.Semantic.DeepEqual(old, cur) {
 		return
 	}
@@ -204,7 +195,7 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 
 // When a pod is deleted, enqueue the services the pod used to be a member of.
 // obj could be an *api.Pod, or a DeletionFinalStateUnknown marker item.
-func (e *EndpointController) deletePod(obj interface{}) {
+func (e *endpointController) deletePod(obj interface{}) {
 	if _, ok := obj.(*api.Pod); ok {
 		// Enqueue all the services that the pod used to be a member
 		// of. This happens to be exactly the same thing we do when a
@@ -216,13 +207,13 @@ func (e *EndpointController) deletePod(obj interface{}) {
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 	}
-	glog.Infof("Pod %q was deleted but we don't have a record of its final state, so it will take up to %v before it will be removed from all endpoint records.", podKey, FullServiceResyncPeriod)
+	glog.Infof("Pod %q was deleted but we don't have a record of its final state, so it will take up to %v before it will be removed from all endpoint records.", podKey, kservice.FullServiceResyncPeriod)
 
 	// TODO: keep a map of pods to services to handle this condition.
 }
 
 // obj could be an *api.Service, or a DeletionFinalStateUnknown marker item.
-func (e *EndpointController) enqueueService(obj interface{}) {
+func (e *endpointController) enqueueService(obj interface{}) {
 	key, err := keyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
@@ -235,7 +226,7 @@ func (e *EndpointController) enqueueService(obj interface{}) {
 // marks them done. You may run as many of these in parallel as you wish; the
 // workqueue guarantees that they will not end up processing the same service
 // at the same time.
-func (e *EndpointController) worker() {
+func (e *endpointController) worker() {
 	for {
 		func() {
 			key, quit := e.queue.Get()
@@ -252,7 +243,7 @@ func (e *EndpointController) worker() {
 	}
 }
 
-func (e *EndpointController) syncService(key string) {
+func (e *endpointController) syncService(key string) {
 	startTime := time.Now()
 	defer func() {
 		glog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Now().Sub(startTime))
@@ -309,18 +300,19 @@ func (e *EndpointController) syncService(key string) {
 				glog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 				continue
 			}
-			if len(pod.Status.PodIP) == 0 {
-				glog.V(4).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
+			// HACK(jdef): use HostIP instead of pod.CurrentState.PodIP for generic mesos compat
+			if len(pod.Status.HostIP) == 0 {
+				glog.V(4).Infof("Failed to find a host IP for pod %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
-
 			if !api.IsPodReady(pod) {
 				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
 				continue
 			}
 
+			// HACK(jdef): use HostIP instead of pod.CurrentState.PodIP for generic mesos compat
 			epp := api.EndpointPort{Name: portName, Port: portNum, Protocol: portProto}
-			epa := api.EndpointAddress{IP: pod.Status.PodIP, TargetRef: &api.ObjectReference{
+			epa := api.EndpointAddress{IP: pod.Status.HostIP, TargetRef: &api.ObjectReference{
 				Kind:            "Pod",
 				Namespace:       pod.ObjectMeta.Namespace,
 				Name:            pod.ObjectMeta.Name,
@@ -375,7 +367,7 @@ func (e *EndpointController) syncService(key string) {
 // do this once on startup, because in steady-state these are detected (but
 // some stragglers could have been left behind if the endpoint controller
 // reboots).
-func (e *EndpointController) checkLeftoverEndpoints() {
+func (e *endpointController) checkLeftoverEndpoints() {
 	list, err := e.client.Endpoints(api.NamespaceAll).List(labels.Everything())
 	if err != nil {
 		glog.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err)
@@ -396,6 +388,8 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 // targetPort is a number, use that.  If the targetPort is a string, look that
 // string up in all named ports in all containers in the target pod.  If no
 // match is found, fail.
+//
+// HACK(jdef): return the HostPort instead of the ContainerPort for generic mesos compat.
 func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
 	portName := svcPort.TargetPort
 	switch portName.Kind {
@@ -404,13 +398,44 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
 		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
 				if port.Name == name && port.Protocol == svcPort.Protocol {
-					return port.ContainerPort, nil
+					return findMappedPortName(pod, port.Protocol, name)
 				}
 			}
 		}
 	case util.IntstrInt:
-		return portName.IntVal, nil
+		// HACK(jdef): slightly different semantics from upstream here:
+		// we ensure that if the user spec'd a port in the service that
+		// it actually maps to a host-port assigned to the pod. upstream
+		// doesn't check this and happily returns the container port spec'd
+		// in the service, but that doesn't align w/ mesos port mgmt.
+		p := portName.IntVal
+		for _, container := range pod.Spec.Containers {
+			for _, port := range container.Ports {
+				if port.ContainerPort == p && port.Protocol == svcPort.Protocol {
+					return findMappedPort(pod, port.Protocol, p)
+				}
+			}
+		}
 	}
-
 	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
+}
+
+func findMappedPort(pod *api.Pod, protocol api.Protocol, port int) (int, error) {
+	if len(pod.Annotations) > 0 {
+		key := fmt.Sprintf(meta.PortMappingKeyFormat, string(protocol), port)
+		if value, found := pod.Annotations[key]; found {
+			return strconv.Atoi(value)
+		}
+	}
+	return 0, fmt.Errorf("failed to find mapped container %s port: %d", protocol, port)
+}
+
+func findMappedPortName(pod *api.Pod, protocol api.Protocol, portName string) (int, error) {
+	if len(pod.Annotations) > 0 {
+		key := fmt.Sprintf(meta.PortNameMappingKeyFormat, string(protocol), portName)
+		if value, found := pod.Annotations[key]; found {
+			return strconv.Atoi(value)
+		}
+	}
+	return 0, fmt.Errorf("failed to find mapped container %s port name: %q", protocol, portName)
 }
