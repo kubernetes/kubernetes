@@ -630,6 +630,9 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 }
 
 func (kl *Kubelet) GetNode() (*api.Node, error) {
+	if kl.standaloneMode {
+		return nil, errors.New("no node entry for kubelet in standalone mode")
+	}
 	l, err := kl.nodeLister.List()
 	if err != nil {
 		return nil, errors.New("cannot list nodes")
@@ -1569,6 +1572,9 @@ func (kl *Kubelet) handleOutOfDisk(pods []*api.Pod, podSyncTypes map[types.UID]S
 
 // checkNodeSelectorMatching detects pods that do not match node's labels.
 func (kl *Kubelet) checkNodeSelectorMatching(pods []*api.Pod) (fitting []*api.Pod, notFitting []*api.Pod) {
+	if kl.standaloneMode {
+		return pods, notFitting
+	}
 	node, err := kl.GetNode()
 	if err != nil {
 		glog.Errorf("error getting node: %v", err)
