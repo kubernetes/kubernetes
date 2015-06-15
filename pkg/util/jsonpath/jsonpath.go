@@ -64,18 +64,20 @@ func (j *JSONPath) walk(wr io.Writer, value reflect.Value, node Node) reflect.Va
 	case *ListNode:
 		return j.evalList(wr, value, node)
 	case *TextNode:
-		return j.evalText(wr, value, node.Text)
+		return j.evalText(wr, value, node)
 	case *FieldNode:
-		return j.evalField(value, node.Value)
+		return j.evalField(value, node)
 	case *ArrayNode:
 		return j.evalArray(value, node)
+	case *FilterNode:
+		return j.evalFilter(value, node)
 	}
 	return reflect.Value{}
 }
 
 // evalText evaluate TextNode
-func (j *JSONPath) evalText(wr io.Writer, value reflect.Value, text []byte) reflect.Value {
-	if _, err := wr.Write(text); err != nil {
+func (j *JSONPath) evalText(wr io.Writer, value reflect.Value, node *TextNode) reflect.Value {
+	if _, err := wr.Write(node.Text); err != nil {
 		glog.Errorf("%s", err)
 	}
 	return reflect.Value{}
@@ -113,8 +115,14 @@ func (j *JSONPath) evalArray(value reflect.Value, node *ArrayNode) reflect.Value
 }
 
 // evalField evaluate filed from struct value
-func (j *JSONPath) evalField(value reflect.Value, exp string) reflect.Value {
-	return value.FieldByName(exp)
+func (j *JSONPath) evalField(value reflect.Value, node *FieldNode) reflect.Value {
+	return value.FieldByName(node.Value)
+}
+
+// evalFilter filter array according to FilterNode
+func (j *JSONPath) evalFilter(value reflect.Value, node *FilterNode) reflect.Value {
+	result := reflect.ValueOf([]interface{}{})
+	return result
 }
 
 // evalToText translate reflect value to corresponding text

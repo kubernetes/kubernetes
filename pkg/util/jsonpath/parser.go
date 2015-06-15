@@ -126,6 +126,8 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 		return p.parseRightDelim(cur)
 	}
 	if strings.HasPrefix(p.input[p.pos:], "[?(") {
+		p.pos += len("[?(")
+		p.consumeText()
 		return p.parseFilter(cur)
 	}
 
@@ -189,6 +191,7 @@ Loop:
 
 // parseFilter scans filter inside array selection
 func (p *Parser) parseFilter(cur *ListNode) error {
+	p.consumeText()
 Loop:
 	for {
 		switch p.next() {
@@ -201,7 +204,7 @@ Loop:
 	if p.next() != ']' {
 		return fmt.Errorf("unclosed array expect ]")
 	}
-	reg := regexp.MustCompile(`^([^<>=]+)([<>=]+)(.+?)$`)
+	reg := regexp.MustCompile(`^([^!<>=]+)([!<>=]+)(.+?)$`)
 	text := p.consumeText()
 	text = string(text[:len(text)-2])
 	value := reg.FindStringSubmatch(text)

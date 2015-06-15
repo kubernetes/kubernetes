@@ -20,102 +20,49 @@ import (
 	"testing"
 )
 
-func TestParsePlainText(t *testing.T) {
-	parser, err := Parse("plain", "hello jsonpath")
-	if err != nil {
-		t.Errorf("parse plain text error %v", err)
-	}
-	nodes := parser.Root.Nodes
-	if len(nodes) != 1 {
-		t.Errorf("expect one nodes, got %v", len(nodes))
-	}
-	if nodes[0].Type() != NodeText {
-		t.Errorf("expect %v, got %v")
-	}
+type parserTest struct {
+	name  string
+	text  string
+	nodes []Node
 }
 
-func TestParseVariable(t *testing.T) {
-	parser, err := Parse("variable", "hello ${.jsonpath}")
-	if err != nil {
-		t.Errorf("parse variable error %v", err)
-	}
-	nodes := parser.Root.Nodes
-	if len(nodes) != 2 {
-		t.Errorf("expect two nodes, got %v", len(nodes))
-	}
-	if nodes[0].Type() != NodeText {
-		t.Errorf("expect NodeText, got %v", nodes[0])
-	}
-	if nodes[1].Type() != NodeList {
-		t.Errorf("expect NodeList, got %v", nodes[1])
-	}
-	nodes = nodes[1].(*ListNode).Nodes
-	node := nodes[0].(*FieldNode)
-	if node.Value != "jsonpath" {
-		t.Errorf("expect NodeVariable jsonpath, got %s", node.Value)
-	}
+var parserTests = []parserTest{
+	{"plain", `hello jsonpath`,
+		[]Node{newText("hello jsonpath")}},
+	{"variable", `hello ${.jsonpath}`,
+		[]Node{newText("hello "), newList(), newField("jsonpath")}},
+	{"quote", `hello ${"${"}`,
+		[]Node{newText("hello "), newList(), newText("${")}},
+	{"array", `hello ${[1:3]}`,
+		[]Node{newText("hello "), newList(), newArray([3]int{1, 3, 0}, [3]bool{true, true, false})}},
+	{"filter", `${[?(@.price<3)]}`,
+		[]Node{newList(), newFilter("@.price", "<", "3")}},
 }
 
-func TestParseQuote(t *testing.T) {
-	parser, err := Parse("variable", `hello ${"${"}`)
-	if err != nil {
-		t.Errorf("parse quote error %v", err)
+func collectNode(nodes []Node, cur Node) []Node {
+	nodes = append(nodes, cur)
+	if cur.Type() == NodeList {
+		for _, node := range cur.(*ListNode).Nodes {
+			nodes = collectNode(nodes, node)
+		}
 	}
-	nodes := parser.Root.Nodes
-	if len(nodes) != 2 {
-		t.Errorf("expect two nodes, got %v", len(nodes))
-	}
-	if nodes[0].Type() != NodeText {
-		t.Errorf("expect NodeText, got %v", nodes[0])
-	}
-	if nodes[1].Type() != NodeList {
-		t.Errorf("expect NodeList, got %v", nodes[1])
-	}
-	nodes = nodes[1].(*ListNode).Nodes
-	node := nodes[0].(*TextNode)
-	if string(node.Text[:]) != "${" {
-		t.Errorf("expect ${, got %s", node.Text)
-	}
+	return nodes
 }
-func TestParseArray(t *testing.T) {
-	parser, err := Parse("array", "hello ${[1:3]}")
-	if err != nil {
-		t.Errorf("parse array error %v", err)
-	}
-	nodes := parser.Root.Nodes
-	if len(nodes) != 2 {
-		t.Errorf("expect two nodes, got %v", len(nodes))
-	}
-	if nodes[0].Type() != NodeText {
-		t.Errorf("expect NodeText, got %v", nodes[0])
-	}
-	if nodes[1].Type() != NodeList {
-		t.Errorf("expect NodeList, got %v", nodes[1])
-	}
-	nodes = nodes[1].(*ListNode).Nodes
-	node := nodes[0].(*ArrayNode)
-	if node.Params != [3]int{1, 3, 0} {
-		t.Errorf("expect 1 3 0, got %v", node.Params)
-	}
-}
-func TestParseFilter(t *testing.T) {
-	parser, err := Parse("array", "hello ${[1:3]}")
-	if err != nil {
-		t.Errorf("parse array error %v", err)
-	}
-	nodes := parser.Root.Nodes
-	if len(nodes) != 2 {
-		t.Errorf("expect two nodes, got %v", len(nodes))
-	}
-	if nodes[0].Type() != NodeText {
-		t.Errorf("expect NodeText, got %v", nodes[0])
-	}
-	if nodes[1].Type() != NodeList {
-		t.Errorf("expect NodeList, got %v", nodes[1])
-	}
-	nodes = nodes[1].(*ListNode).Nodes
-	node := nodes[0].(*ArrayNode)
-	if node.Params != [3]int{1, 3, 0} {
-		t.Errorf("expect 1 3 0, got %v", node.Params)
+
+func TestParser(t *testing.T) {
+	for _, test := range parserTests {
+		parser, err := Parse(test.name, test.text)
+		if err != nil {
+			t.Errorf("parse %s error %v", test.name, err)
+		}
+		result := collectNode([]Node{}, parser.Root)[1:]
+		if len(result) != len(test.nodes) {
+			t.Errorf("in %s, expect to get %d nodes, got %d nodes", test.name, len(test.nodes), len(result))
+		}
+		for i, expect := range test.nodes {
+			if result[i].String() != expect.String() {
+				t.Errorf("in %s, expect %v, got %v", test.name, expect, result[i])
+			}
+		}
 	}
 }

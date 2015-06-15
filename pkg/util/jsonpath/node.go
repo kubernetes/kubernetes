@@ -16,17 +16,18 @@ limitations under the License.
 
 package jsonpath
 
+import "fmt"
+
 // NodeType identifies the type of a parse tree node.
 type NodeType int
 
-type Node interface {
-	Type() NodeType
-}
-
 // Type returns itself and provides an easy default implementation
-// for embedding in a Node. Embedded in all non-trivial Nodes.
 func (t NodeType) Type() NodeType {
 	return t
+}
+
+func (t NodeType) String() string {
+	return NodeTypeName[t]
 }
 
 const (
@@ -36,6 +37,19 @@ const (
 	NodeField
 	NodeFilter
 )
+
+var NodeTypeName = map[NodeType]string{
+	NodeText:   "NodeText",
+	NodeArray:  "NodeArray",
+	NodeList:   "NodeList",
+	NodeField:  "NodeField",
+	NodeFilter: "NodeFilter",
+}
+
+type Node interface {
+	Type() NodeType
+	String() string
+}
 
 // ListNode holds a sequence of nodes.
 type ListNode struct {
@@ -47,12 +61,12 @@ func newList() *ListNode {
 	return &ListNode{NodeType: NodeList}
 }
 
-func (l *ListNode) Type() NodeType {
-	return l.NodeType
-}
-
 func (l *ListNode) append(n Node) {
 	l.Nodes = append(l.Nodes, n)
+}
+
+func (l *ListNode) String() string {
+	return fmt.Sprintf("%s", l.Type())
 }
 
 // TextNode holds plain text.
@@ -65,6 +79,10 @@ func newText(text string) *TextNode {
 	return &TextNode{NodeType: NodeText, Text: []byte(text)}
 }
 
+func (t *TextNode) String() string {
+	return fmt.Sprintf("%s: %s", t.Type(), t.Text)
+}
+
 // FieldNode holds filed of struct
 type FieldNode struct {
 	NodeType
@@ -73,6 +91,10 @@ type FieldNode struct {
 
 func newField(value string) *FieldNode {
 	return &FieldNode{NodeType: NodeField, Value: value}
+}
+
+func (f *FieldNode) String() string {
+	return fmt.Sprintf("%s: %s", f.Type(), f.Value)
 }
 
 type ArrayNode struct {
@@ -89,6 +111,10 @@ func newArray(params [3]int, exist [3]bool) *ArrayNode {
 	}
 }
 
+func (a *ArrayNode) String() string {
+	return fmt.Sprintf("%s: %v %v", a.Type(), a.Params, a.Exist)
+}
+
 type FilterNode struct {
 	NodeType
 	Left, Operator, Right string
@@ -101,4 +127,8 @@ func newFilter(left, operator, right string) *FilterNode {
 		Operator: operator,
 		Right:    right,
 	}
+}
+
+func (f *FilterNode) String() string {
+	return fmt.Sprintf("%s: %s %s %s", f.Type(), f.Left, f.Operator, f.Right)
 }
