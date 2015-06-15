@@ -343,6 +343,16 @@ func getIptablesVersionString(exec utilexec.Interface) (string, error) {
 	return string(bytes), nil
 }
 
+// GetIptablesVersion returns the major minor and patch version of iptables
+// which will all be zero in case of error, and any error encountered.
+func GetIptablesVersion(exec utilexec.Interface) (int, int, int, error) {
+	s, err := getIptablesVersionString(exec)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	return extractIptablesVersion(s)
+}
+
 // Checks if an iptables version is after 1.4.11, when --check was added
 func iptablesHasCheckCommand(v1 int, v2 int, v3 int) bool {
 	if v1 > 1 {
