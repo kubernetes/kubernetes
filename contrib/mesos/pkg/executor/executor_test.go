@@ -18,6 +18,7 @@ package executor
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -285,6 +286,15 @@ func TestExecutorReregister(t *testing.T) {
 	mockDriver.AssertExpectations(t)
 }
 
+type fakeKubelet struct {
+	*kubelet.Kubelet
+	hostIP net.IP
+}
+
+func (kl *fakeKubelet) GetHostIP() (net.IP, error) {
+	return kl.hostIP, nil
+}
+
 // TestExecutorLaunchAndKillTask ensures that the executor is able to launch
 // and kill tasks while properly bookkeping its tasks.
 func TestExecutorLaunchAndKillTask(t *testing.T) {
@@ -304,8 +314,11 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 			Host:    testApiServer.server.URL,
 			Version: testapi.Version(),
 		}),
-		Kubelet: &kubelet.Kubelet{},
-		PodStatusFunc: func(kl *kubelet.Kubelet, pod *api.Pod) (*api.PodStatus, error) {
+		Kubelet: &fakeKubelet{
+			Kubelet: &kubelet.Kubelet{},
+			hostIP:  net.IPv4(127, 0, 0, 1),
+		},
+		PodStatusFunc: func(kl KubeletInterface, pod *api.Pod) (*api.PodStatus, error) {
 			return &api.PodStatus{
 				ContainerStatuses: []api.ContainerStatus{
 					{
@@ -489,6 +502,7 @@ func NewTestPod(i int) *api.Pod {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
+					Name: "foo",
 					Ports: []api.ContainerPort{
 						{
 							ContainerPort: 8000 + i,
