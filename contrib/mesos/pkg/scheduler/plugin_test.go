@@ -120,7 +120,11 @@ func NewMockPodsListWatch(initialPodList api.PodList) *MockPodsListWatch {
 			return lw.fakeWatcher, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
-			return &lw.list, nil
+			lw.lock.Lock()
+			defer lw.lock.Unlock()
+
+			listCopy, err := api.Scheme.DeepCopy(&lw.list)
+			return listCopy.(*api.PodList), err
 		},
 	}
 	return &lw
