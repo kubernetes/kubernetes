@@ -827,14 +827,6 @@ type PodCondition struct {
 	Status ConditionStatus  `json:"status"`
 }
 
-// PodContainerInfo is a wrapper for PodInfo that can be encode/decoded
-// DEPRECATED: Replaced with PodStatusResult
-type PodContainerInfo struct {
-	TypeMeta      `json:",inline"`
-	ObjectMeta    `json:"metadata,omitempty"`
-	ContainerInfo []ContainerStatus `json:"containerInfo"`
-}
-
 // RestartPolicy describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
 // If none of the following policies is specified, the default one
