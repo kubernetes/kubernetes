@@ -1,4 +1,3 @@
-
 # Persistent Installation of MySQL and WordPress on Kubernetes
 
 This example describes how to run a persistent installation of [Wordpress](https://wordpress.org/) using the [volumes](/docs/volumes.md) feature of Kubernetes, and [Google Compute Engine](https://cloud.google.com/compute/docs/disks) [persistent disks](/docs/volumes.md#gcepersistentdisk).
@@ -9,51 +8,48 @@ We'll create two Kubernetes [pods](http://docs.k8s.io/pods.md) to run mysql and 
 
 This example demonstrates several useful things, including: how to set up and use persistent disks with Kubernetes pods; how to define Kubernetes services to leverage docker-links-compatible service environment variables; and use of an external load balancer to expose the wordpress service externally and make it transparent to the user if the wordpress pod moves to a different cluster node.
 
-## Install gcloud and start up a Kubernetes cluster
+## Get started on Google Compute Engine
 
-First, if you have not already done so, [create](https://cloud.google.com/compute/docs/quickstart) a [Google Cloud Platform](https://cloud.google.com/) project, and install the [gcloud SDK](https://cloud.google.com/sdk/).
+Because we're using the `GCEPersistentDisk` type of volume for persistent storage, this example is only applicable to [Google Compute Engine](https://cloud.google.com/compute/). Take a look at the [volumes documentation](/docs/volumes.md) for other options.
 
-Then, set the gcloud default project name to point to the project you want to use for your Kubernetes cluster:
+First, if you have not already done so:
 
-```
+1. [Create](https://cloud.google.com/compute/docs/quickstart) a [Google Cloud Platform](https://cloud.google.com/) project.
+2. [Enable billing](https://developers.google.com/console/help/new/#billing).
+3. Install the [gcloud SDK](https://cloud.google.com/sdk/).
+
+Authenticate with gcloud and set the gcloud default project name to point to the project you want to use for your Kubernetes cluster:
+
+```shell
+gcloud auth login
 gcloud config set project <project-name>
 ```
 
-Next, grab the Kubernetes [release binary](https://github.com/GoogleCloudPlatform/kubernetes/releases) and start up a Kubernetes cluster:
-```
-$ cluster/kube-up.sh
-```
-where `<kubernetes>` is the path to your Kubernetes installation.
-
-Or, as [described here](http://docs.k8s.io/getting-started-guides/gce.md), you can do this via:
+Next, start up a Kubernetes cluster:
 ```shell
 wget -q -O - https://get.k8s.io | bash
 ```
-or
-```shell
-curl -sS https://get.k8s.io | bash
-```
+
+Please see the [GCE getting started guide](http://docs.k8s.io/getting-started-guides/gce.md) for full details and other options for starting a cluster.
 
 ## Create two persistent disks
 
 For this WordPress installation, we're going to configure our Kubernetes [pods](http://docs.k8s.io/pods.md) to use [persistent disks](https://cloud.google.com/compute/docs/disks). This means that we can preserve installation state across pod shutdown and re-startup.
 
-You will need to create the disks in the same [GCE zone](https://cloud.google.com/compute/docs/zones) as the Kubernetes cluster. The `cluster/kube-up.sh` script will create the cluster in the `us-central1-b` zone by default, as seen in the [config-default.sh](/cluster/gce/config-default.sh) file. Replace `$ZONE` below with the appropriate zone.
+You will need to create the disks in the same [GCE zone](https://cloud.google.com/compute/docs/zones) as the Kubernetes cluster. The default setup script will create the cluster in the `us-central1-b` zone, as seen in the [config-default.sh](/cluster/gce/config-default.sh) file. Replace `$ZONE` below with the appropriate zone.
 
-Before doing anything else, we'll create the persistent disks that we'll use for the installation: one for the mysql pod, and one for the wordpress pod.
-The general series of steps required is as described [here](http://docs.k8s.io/volumes.md), where $DISK_SIZE is specified as, e.g. '500GB'.  In future, this process will be more streamlined.
+We will create two disks: one for the mysql pod, and one for the wordpress pod. In this example, we create 20GB disks, which will be sufficient for this demo. Feel free to change the size to align with your needs, as wordpress requirements can vary. Also, keep in mind that [disk performance scales with size](https://cloud.google.com/compute/docs/disks/#comparison_of_disk_types).
 
-So for the two disks used in this example, do the following.
-First create the mysql disk, setting the disk size to meet your needs:
+First create the mysql disk.
 
 ```shell
-gcloud compute disks create --size=$DISK_SIZE --zone=$ZONE mysql-disk
+gcloud compute disks create --size=20GB --zone=$ZONE mysql-disk
 ```
 
-Then create the wordpress disk.  Note that you may not want as large a disk size for the wordpress code as for the mysql disk.
+Then create the wordpress disk.
 
 ```shell
-gcloud compute disks create --size=$DISK_SIZE --zone=$ZONE wordpress-disk
+gcloud compute disks create --size=20GB --zone=$ZONE wordpress-disk
 ```
 
 ## Start the Mysql Pod and Service
@@ -302,14 +298,6 @@ If you are ready to turn down your Kubernetes cluster altogether, run:
 ```shell
 $ cluster/kube-down.sh
 ```
-
-
-
-
-
-
-
-
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/mysql-wordpress-pd/README.md?pixel)]()
