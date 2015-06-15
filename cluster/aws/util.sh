@@ -635,11 +635,21 @@ function kube-up {
   echo "Using Internet Gateway $IGW_ID"
 
   echo "Associating route table."
-  ROUTE_TABLE_ID=$($AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID | json_val '["RouteTables"][0]["RouteTableId"]')
+  ROUTE_TABLE_ID=$($AWS_CMD --output text describe-route-tables \
+                            --filters Name=vpc-id,Values=${VPC_ID} \
+                                      Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                            --query RouteTables[].RouteTableId)
+  if [[ -z "${ROUTE_TABLE_ID}" ]]; then
+    echo "Creating route table"
+    ROUTE_TABLE_ID=$($AWS_CMD --output text create-route-table \
+                              --vpc-id=${VPC_ID} \
+                              --query RouteTable.RouteTableId)
+    add-tag ${ROUTE_TABLE_ID} KubernetesCluster ${CLUSTER_ID}
+  fi
+
+  echo "Associating route table ${ROUTE_TABLE_ID} to subnet ${SUBNET_ID}"
   $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $SUBNET_ID > $LOG || true
-  echo "Configuring route table."
-  $AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID > $LOG || true
-  echo "Adding route to route table."
+  echo "Adding route to route table ${ROUTE_TABLE_ID}"
   $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID > $LOG || true
 
   echo "Using Route Table $ROUTE_TABLE_ID"
@@ -1064,6 +1074,14 @@ function kube-down {
                       | tr "\t" "\n")
     for route_table_id in ${route_table_ids}; do
       $AWS_CMD delete-route --route-table-id $route_table_id --destination-cidr-block 0.0.0.0/0 > $LOG
+    done
+    route_table_ids=$($AWS_CMD --output text describe-route-tables \
+                               --filters Name=vpc-id,Values=$vpc_id \
+                                         Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                               --query RouteTables[].RouteTableId \
+                      | tr "\t" "\n")
+    for route_table_id in ${route_table_ids}; do
+      $AWS_CMD delete-route-table --route-table-id $route_table_id > $LOG
     done
 
     $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
