@@ -19,8 +19,16 @@ limitations under the License.
 package service
 
 import (
+	"archive/zip"
+	"bytes"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/archive"
+	"github.com/stretchr/testify/assert"
 )
 
 type fakeSchedulerProcess struct {
@@ -105,4 +113,43 @@ func Test_awaitFailoverDoneFailover(t *testing.T) {
 	if !failoverHandlerCalled {
 		t.Fatalf("expected call to failover handler")
 	}
+}
+
+func Test_StaticPods(t *testing.T) {
+	assert := assert.New(t)
+
+	// create static pods config files, spod1 on toplevel and spod2 in a directory "dir"
+	staticPodsConfigPath, err := ioutil.TempDir(os.TempDir(), "executor-k8sm-archive")
+	assert.NoError(err)
+	defer os.RemoveAll(staticPodsConfigPath)
+
+	spod1, err := os.Create(filepath.Join(staticPodsConfigPath, "spod1.json"))
+	assert.NoError(err)
+	_, err = spod1.WriteString("content1")
+	assert.NoError(err)
+
+	err = os.Mkdir(filepath.Join(staticPodsConfigPath, "dir"), 0755)
+	assert.NoError(err)
+
+	spod2, err := os.Create(filepath.Join(staticPodsConfigPath, "dir", "spod2.json"))
+	assert.NoError(err)
+	_, err = spod2.WriteString("content2")
+	assert.NoError(err)
+
+	// archive config files
+	data, fileNum, err := archive.ZipDir(staticPodsConfigPath)
+	assert.NoError(err)
+	assert.Equal(2, fileNum)
+
+	// unarchive config files
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	assert.NoError(err)
+	fileNames := []string{}
+	for _, f := range zr.File {
+		if !f.FileInfo().IsDir() {
+			fileNames = append(fileNames, f.Name)
+		}
+	}
+	assert.Contains(fileNames, "spod1.json")
+	assert.Contains(fileNames, "dir/spod2.json")
 }

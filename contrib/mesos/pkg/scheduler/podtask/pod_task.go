@@ -33,8 +33,8 @@ import (
 )
 
 const (
-	containerCpus = 0.25 // initial CPU allocated for executor
-	containerMem  = 64   // initial MB of memory allocated for executor
+	DefaultContainerCpus = 0.25 // initial CPU allocated for executor
+	DefaultContainerMem  = 64   // initial MB of memory allocated for executor
 )
 
 type StateType int
@@ -164,8 +164,8 @@ func (t *T) FillFromDetails(details *mesos.Offer) error {
 
 	t.Spec = Spec{
 		SlaveID: details.GetSlaveId().GetValue(),
-		CPU:     containerCpus,
-		Memory:  containerMem,
+		CPU:     DefaultContainerCpus,
+		Memory:  DefaultContainerMem,
 	}
 
 	if mapping, err := t.mapper.Generate(t, details); err != nil {
@@ -238,7 +238,7 @@ func (t *T) AcceptOffer(offer *mesos.Offer) bool {
 	// resource allocation and management.
 	//
 	// TODO(jdef): remove hardcoded values and make use of actual pod resource settings
-	if (cpus < containerCpus) || (mem < containerMem) {
+	if (cpus < DefaultContainerCpus) || (mem < DefaultContainerMem) {
 		log.V(3).Infof("not enough resources: cpus: %f mem: %f", cpus, mem)
 		return false
 	}

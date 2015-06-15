@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/archive"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/election"
 	execcfg "github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/executor/config"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/hyperkube"
@@ -41,6 +42,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/ha"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/metrics"
+	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"github.com/GoogleCloudPlatform/kubernetes/contrib/mesos/pkg/scheduler/uid"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
@@ -116,6 +118,7 @@ type SchedulerServer struct {
 	KubeletHostNetworkSources     string
 	KubeletSyncFrequency          time.Duration
 	KubeletNetworkPluginName      string
+	StaticPodsConfigPath          string
 
 	executable  string // path to the binary running this service
 	client      *client.Client
@@ -174,6 +177,7 @@ func (s *SchedulerServer) addCoreFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
 	fs.StringVar(&s.ClusterDomain, "cluster-domain", s.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	fs.Var(&s.ClusterDNS, "cluster-dns", "IP address for a cluster DNS server. If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
+	fs.StringVar(&s.StaticPodsConfigPath, "static-pods-config", s.StaticPodsConfigPath, "Path for specification of static pods. Path should point to dir containing the staticPods configuration files. Defaults to none.")
 
 	fs.StringVar(&s.MesosMaster, "mesos-master", s.MesosMaster, "Location of the Mesos master. The format is a comma-delimited list of of hosts like zk://host1:port,host2:port/mesos. If using ZooKeeper, pay particular attention to the leading zk:// and trailing /mesos! If not using ZooKeeper, standard URLs like http://localhost are also acceptable.")
 	fs.StringVar(&s.MesosUser, "mesos-user", s.MesosUser, "Mesos user for this framework, defaults to root.")
@@ -351,6 +355,25 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		Command: ci,
 		Name:    proto.String(execcfg.DefaultInfoName),
 		Source:  proto.String(execcfg.DefaultInfoSource),
+	}
+
+	// Check for staticPods
+	if s.StaticPodsConfigPath != "" {
+		bs, numberStaticPods, err := archive.ZipDir(s.StaticPodsConfigPath)
+		if err != nil {
+			return nil, nil, err
+		}
+		info.Data = bs
+
+		// Adjust the resource accounting for the executor.
+		// Currently each podTask accounts the default amount of resources.
+		// TODO(joerg84) adapt to actual resources specified by pods.
+		log.Infof("Detected %d staticPods in Configuration.", numberStaticPods)
+
+		info.Resources = []*mesos.Resource{
+			mutil.NewScalarResource("cpus", float64(numberStaticPods)*podtask.DefaultContainerCpus),
+			mutil.NewScalarResource("mem", float64(numberStaticPods)*podtask.DefaultContainerMem),
+		}
 	}
 
 	// calculate ExecutorInfo hash to be used for validating compatibility
