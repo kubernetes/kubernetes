@@ -1,4 +1,18 @@
 - 
+    date: 2015-06-24 18:30:00 +0100
+    title: "DevOps Exchange @ Cloud World Forum"
+    location: "London, UK"
+    venue: "Olympia Grand"
+    speaker: "Craig Box"
+    url: "http://www.meetup.com/DevOps-Exchange-London/events/222999772/"
+- 
+    date: 2015-06-24 12:30:00 +0100
+    title: "Cloud World Forum"
+    location: "London, UK"
+    venue: "Olympia Grand"
+    speaker: "Craig Box"
+    url: "http://cloudwf.com/"
+- 
     date: 2015-06-08 00:00:00 -0800
     title: "dotScale"
     location: "Paris, France"
