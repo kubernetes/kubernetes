@@ -8,17 +8,17 @@ This is a follow up to the [Guestbook Example](../guestbook/README.md)'s [Go imp
 - It generates massive load using a semantically rich, realistic transaction simulator for petstores
 
 This application will run a web server which returns REDIS records for a petstore application.
-It is meant to simulate and test high load on kubernetes or any other docker based system.
+It is meant to simulate and test high load on Kubernetes or any other docker based system.
 
-If you are new to kubernetes, and you haven't run guestbook yet, 
+If you are new to Kubernetes, and you haven't run guestbook yet, 
 
 you might want to stop here and go back and run guestbook app first.  
 
-The guestbook tutorial will teach you a lot about the basics of kubernetes, and we've tried not to be redundant here.
+The guestbook tutorial will teach you a lot about the basics of Kubernetes, and we've tried not to be redundant here.
 
 ## Architecture of this SOA
 
-A diagram of the overall architecture of this application can be seen in [arch.dot](arch.dot) (you can paste the contents in any graphviz viewer, including online ones such as http://sandbox.kidstrythisathome.com/erdos/.
+A diagram of the overall architecture of this application can be seen in [k8petstore.dot](k8petstore.dot) (you can paste the contents in any graphviz viewer, including online ones such as http://sandbox.kidstrythisathome.com/erdos/.
 
 ## Docker image dependencies
 
@@ -48,7 +48,7 @@ To work on the app, just cd to the `dev` directory, and follow the instructions.
 
 redis and go.  Then you can use the `Vagrantfile` in this top level directory to launch a minimal version of the app in pure docker containers.
 
-If that is all working, you can finally run `k8petstore.sh` in any kubernetes cluster, and run the app at scale.
+If that is all working, you can finally run `k8petstore.sh` in any Kubernetes cluster, and run the app at scale.
 
 ## Set up the data generator (optional)
 
@@ -70,33 +70,31 @@ You will likely want to checkout the branch 2b2392bf135e9f1256bd0b930f05ae5aef8b
 
 ## Now what? 
 
-Once you have done the above 3 steps, you have a working, from source, locally runnable version of the k8petstore app, now, we can try to run it in kubernetes.
+Once you have done the above 3 steps, you have a working, from source, locally runnable version of the k8petstore app, now, we can try to run it in Kubernetes.
 
 ## Hacking, testing, benchmarking
 
-Once the app is running, you can go to the location of publicIP:3000 (the first parameter in the script).  In your browser, you should see a chart 
+Once the app is running, you can access the app in your browser, you should see a chart 
 
-and the k8petstore title page, as well as an indicator of transaction throughput, and so on.  You should be able to modify  
+and the k8petstore title page, as well as an indicator of transaction throughput, and so on.
 
 You can modify the HTML pages, add new REST paths to the Go app, and so on.
 
-## Running in kubernetes
+## Running in Kubernetes
 
-Now that you are done hacking around on the app, you can run it in kubernetes.  To do this, you will want to rebuild the docker images (most likely, for the Go web-server app), but less likely for the other images which you are less likely to need to change. Then you will push those images to dockerhub.
+Now that you are done hacking around on the app, you can run it in Kubernetes.  To do this, you will want to rebuild the docker images (most likely, for the Go web-server app), but less likely for the other images which you are less likely to need to change. Then you will push those images to dockerhub.
 
-Now, how to run the entire application in kubernetes? 
+Now, how to run the entire application in Kubernetes? 
 
-To simplify running this application, we have a single file, k8petstore.sh, which writes out json files on to disk.  This allows us to have dynamic parameters, without needing to worry about managing multiplejson files.
+To simplify running this application, we have a single file, k8petstore.sh, which writes out json files on to disk.  This allows us to have dynamic parameters, without needing to worry about managing multiple json files.
 
-You might want to change it to point to your customized Go image, if you chose to modify things.  
+You might want to change it to point to your customized Go image, if you chose to modify things, like the number of data generators (more generators will create more load on the redis master).
 
-like the number of data generators (more generators will create more load on the redis master).
+So, to run this app in Kubernetes, simply run [The all in one k8petstore.sh shell script](k8petstore.sh).
 
-So, to run this app in kubernetes, simply run [The all in one k8petstore.sh shell script](k8petstore.sh).
+Note that at the top of the script there are a few self explanatory parameters to set, among which the Public IPs parameter is where you can checkout the web ui (at $PUBLIC_IP:3000), which will show a plot and read outs of transaction throughput.
 
-Note that there are a few , self explanatory parameters to set at the top of it.  
-
-Most importantly, the Public IPs parameter, so that you can checkout the web ui (at $PUBLIC_IP:3000), which will show a plot and read outs of transaction throughput.
+In the mean time, because the public IP will be deprecated in Kubernetes v1, we provide another script k8petstore-loadbalancer.sh, which requests the cloud provider (e.g., GCE, AWS) to assign a public IP. You can find the assigned IP address in the output of the script. If your cloud provider does not support load balancer or you are not running Kubernetes on a cloud, you may want to use [NodePort](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#external-services) instead. 
 
 ## Future
 
