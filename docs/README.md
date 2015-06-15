@@ -4,6 +4,7 @@
 This documentation is current for HEAD.
 
 Documentation for previous releases is available in their respective branches:
+   * [v0.19.0](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/release-0.19.0/docs)
    * [v0.18.1](https://github.com/GoogleCloudPlatform/kubernetes/tree/release-0.18/docs)
    * [v0.17.1](https://github.com/GoogleCloudPlatform/kubernetes/tree/release-0.17/docs)
 
