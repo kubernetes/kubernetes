@@ -755,7 +755,7 @@ function kube-down {
         while [[ "$deleteCmdStatus" != "DONE" ]]
         do
           sleep 5
-          deleteCmdOperationOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" get-operation $deleteCmdOperationId)
+          deleteCmdOperationOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" --project "${PROJECT}" get-operation $deleteCmdOperationId)
           deleteCmdStatus=$(echo $deleteCmdOperationOutput | grep -i "status:" | sed "s/.*status:[[:space:]]*\([^[:space:]]*\).*/\1/g")
           echo "Waiting for MIG deletion to complete. Current status: " $deleteCmdStatus
         done
@@ -763,7 +763,7 @@ function kube-down {
     fi
   fi
 
-  if gcloud compute instance-templates describe "${NODE_INSTANCE_PREFIX}-template" &>/dev/null; then
+  if gcloud compute instance-templates describe --project "${PROJECT}" "${NODE_INSTANCE_PREFIX}-template" &>/dev/null; then
     gcloud compute instance-templates delete \
       --project "${PROJECT}" \
       --quiet \
@@ -771,7 +771,7 @@ function kube-down {
   fi
 
   # First delete the master (if it exists).
-  if gcloud compute instances describe "${MASTER_NAME}" --zone "${ZONE}" &>/dev/null; then
+  if gcloud compute instances describe "${MASTER_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
     gcloud compute instances delete \
       --project "${PROJECT}" \
       --quiet \
@@ -781,7 +781,7 @@ function kube-down {
   fi
 
   # Delete the master pd (possibly leaked by kube-up if master create failed).
-  if gcloud compute disks describe "${MASTER_NAME}"-pd --zone "${ZONE}" &>/dev/null; then
+  if gcloud compute disks describe "${MASTER_NAME}"-pd --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
     gcloud compute disks delete \
       --project "${PROJECT}" \
       --quiet \
@@ -808,7 +808,7 @@ function kube-down {
   done
 
   # Delete firewall rule for the master.
-  if gcloud compute firewall-rules describe "${MASTER_NAME}-https" &>/dev/null; then
+  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
     gcloud compute firewall-rules delete  \
       --project "${PROJECT}" \
       --quiet \
@@ -816,7 +816,7 @@ function kube-down {
   fi
 
   # Delete firewall rule for minions.
-  if gcloud compute firewall-rules describe "${MINION_TAG}-all" &>/dev/null; then
+  if gcloud compute firewall-rules describe "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
     gcloud compute firewall-rules delete  \
       --project "${PROJECT}" \
       --quiet \
@@ -840,7 +840,7 @@ function kube-down {
 
   # Delete the master's reserved IP
   local REGION=${ZONE%-*}
-  if gcloud compute addresses describe "${MASTER_NAME}-ip" --region "${REGION}" &>/dev/null; then
+  if gcloud compute addresses describe "${MASTER_NAME}-ip" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
     gcloud compute addresses delete \
       --project "${PROJECT}" \
       --region "${REGION}" \
@@ -996,11 +996,11 @@ function test-setup {
     "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  until gcloud compute firewall-rules describe "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
+  until gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
   do sleep 5
   done
   # Check if the firewall rule exists and fail if it does not.
-  gcloud compute firewall-rules describe "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
+  gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
 
   # Open up the NodePort range
   # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
@@ -1013,11 +1013,11 @@ function test-setup {
     "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  until gcloud compute firewall-rules describe "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
+  until gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
   do sleep 5
   done
   # Check if the firewall rule exists and fail if it does not.
-  gcloud compute firewall-rules describe "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports"
+  gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports"
 }
 
 # Execute after running tests to perform any required clean-up. This is called
