@@ -103,9 +103,8 @@ func TestE2E(t *testing.T) {
 	util.InitLogs()
 	defer util.FlushLogs()
 
-	// TODO: possibly clean up or refactor this functionality.
 	if testContext.Provider == "" {
-		glog.Fatal("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
+		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
 	}
 
 	if testContext.Provider == "aws" {

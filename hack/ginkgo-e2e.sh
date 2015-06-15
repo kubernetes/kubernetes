@@ -42,7 +42,13 @@ export KUBECTL KUBE_CONFIG_FILE
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 
 # ---- Do cloud-provider-specific setup
-if [[ -z "${AUTH_CONFIG:-}" ]];  then
+if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
+    echo "Conformance test: not doing test setup."
+  KUBERNETES_PROVIDER=""
+  auth_config=(
+    "--kubeconfig=${KUBECONFIG}"
+  )
+else
     echo "Setting up for KUBERNETES_PROVIDER=\"${KUBERNETES_PROVIDER}\"."
 
     source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
@@ -51,23 +57,9 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
 
     detect-master >/dev/null
 
-    if [[ "${KUBERNETES_PROVIDER}" == "conformance_test" ]]; then
-      auth_config=(
-        "--auth-config=${KUBERNETES_CONFORMANCE_TEST_AUTH_CONFIG:-}"
-        "--cert-dir=${KUBERNETES_CONFORMANCE_TEST_CERT_DIR:-}"
-      )
-    else
-      auth_config=(
-      "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
-      )
-    fi
-else
-  echo "Conformance Test.  No cloud-provider-specific preparation."
-  KUBERNETES_PROVIDER=""
-  auth_config=(
-    "--auth-config=${AUTH_CONFIG:-}"
-    "--cert-dir=${CERT_DIR:-}"
-  )
+    auth_config=(
+    "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
+    )
 fi
 
 if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
@@ -81,6 +73,9 @@ if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
 fi
 
 ginkgo_args=()
+if [[ -n ${CONFORMANCE_TEST_SKIP_REGEX:-} ]]; then
+  ginkgo_args+=("--skip=\"${CONFORMANCE_TEST_SKIP_REGEX}\"")
+fi
 if [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
   ginkgo_args+=("-p")
 fi
