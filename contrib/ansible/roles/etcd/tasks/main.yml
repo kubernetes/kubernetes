@@ -14,7 +14,11 @@
         - restart etcd
 
 - name: Enable etcd
-  service: name=etcd enabled=yes state=started
+  service: name=etcd enabled=yes
+
+- name: Start etcd
+  service: name=etcd state=started
+  register: etcd_started
 
 - include: firewalld.yml
   when: has_firewalld

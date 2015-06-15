@@ -1,6 +1,7 @@
 ---
 - name: restart etcd
   service: name=etcd state=restarted
+  when: etcd_started.changed == false
 
 - name: Save iptables rules
   command: service iptables save
