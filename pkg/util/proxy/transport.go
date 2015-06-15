@@ -29,39 +29,40 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-// tagsToAttrs states which attributes of which tags require URL substitution.
+// atomsToAttrs states which attributes of which tags require URL substitution.
 // Sources: http://www.w3.org/TR/REC-html40/index/attributes.html
 //          http://www.w3.org/html/wg/drafts/html/master/index.html#attributes-1
-var tagsToAttrs = map[string]util.StringSet{
-	"a":          util.NewStringSet("href"),
-	"applet":     util.NewStringSet("codebase"),
-	"area":       util.NewStringSet("href"),
-	"audio":      util.NewStringSet("src"),
-	"base":       util.NewStringSet("href"),
-	"blockquote": util.NewStringSet("cite"),
-	"body":       util.NewStringSet("background"),
-	"button":     util.NewStringSet("formaction"),
-	"command":    util.NewStringSet("icon"),
-	"del":        util.NewStringSet("cite"),
-	"embed":      util.NewStringSet("src"),
-	"form":       util.NewStringSet("action"),
-	"frame":      util.NewStringSet("longdesc", "src"),
-	"head":       util.NewStringSet("profile"),
-	"html":       util.NewStringSet("manifest"),
-	"iframe":     util.NewStringSet("longdesc", "src"),
-	"img":        util.NewStringSet("longdesc", "src", "usemap"),
-	"input":      util.NewStringSet("src", "usemap", "formaction"),
-	"ins":        util.NewStringSet("cite"),
-	"link":       util.NewStringSet("href"),
-	"object":     util.NewStringSet("classid", "codebase", "data", "usemap"),
-	"q":          util.NewStringSet("cite"),
-	"script":     util.NewStringSet("src"),
-	"source":     util.NewStringSet("src"),
-	"video":      util.NewStringSet("poster", "src"),
+var atomsToAttrs = map[atom.Atom]util.StringSet{
+	atom.A:          util.NewStringSet("href"),
+	atom.Applet:     util.NewStringSet("codebase"),
+	atom.Area:       util.NewStringSet("href"),
+	atom.Audio:      util.NewStringSet("src"),
+	atom.Base:       util.NewStringSet("href"),
+	atom.Blockquote: util.NewStringSet("cite"),
+	atom.Body:       util.NewStringSet("background"),
+	atom.Button:     util.NewStringSet("formaction"),
+	atom.Command:    util.NewStringSet("icon"),
+	atom.Del:        util.NewStringSet("cite"),
+	atom.Embed:      util.NewStringSet("src"),
+	atom.Form:       util.NewStringSet("action"),
+	atom.Frame:      util.NewStringSet("longdesc", "src"),
+	atom.Head:       util.NewStringSet("profile"),
+	atom.Html:       util.NewStringSet("manifest"),
+	atom.Iframe:     util.NewStringSet("longdesc", "src"),
+	atom.Img:        util.NewStringSet("longdesc", "src", "usemap"),
+	atom.Input:      util.NewStringSet("src", "usemap", "formaction"),
+	atom.Ins:        util.NewStringSet("cite"),
+	atom.Link:       util.NewStringSet("href"),
+	atom.Object:     util.NewStringSet("classid", "codebase", "data", "usemap"),
+	atom.Q:          util.NewStringSet("cite"),
+	atom.Script:     util.NewStringSet("src"),
+	atom.Source:     util.NewStringSet("src"),
+	atom.Video:      util.NewStringSet("poster", "src"),
 
 	// TODO: css URLs hidden in style elements.
 }
@@ -108,7 +109,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return resp, nil
 	}
 
-	return t.fixLinks(req, resp)
+	return t.rewriteResponse(req, resp)
 }
 
 // rewriteURL rewrites a single URL to go through the proxy, if the URL refers
@@ -139,36 +140,42 @@ func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL) string {
 	return url.String()
 }
 
-// updateURLs checks and updates any of n's attributes that are listed in tagsToAttrs.
-// Any URLs found are, if they share the source host, updated with the necessary changes
-// to make a visit to that URL also go through the proxy.
-// sourceURL is the URL of the page which we're currently on.
-func (t *Transport) updateURLs(n *html.Node, sourceURL *url.URL) {
-	if n.Type != html.ElementNode {
-		return
-	}
-	attrs, ok := tagsToAttrs[n.Data]
-	if !ok {
-		return
-	}
-	for i, attr := range n.Attr {
-		if !attrs.Has(attr.Key) {
-			continue
+// rewriteHTML scans the HTML for tags with url-valued attributes, and updates
+// those values with the urlRewriter function. The updated HTML is output to the
+// writer.
+func rewriteHTML(reader io.Reader, writer io.Writer, urlRewriter func(string) string) error {
+	// Note: This assumes the content is UTF-8.
+	tokenizer := html.NewTokenizer(reader)
+
+	var err error
+	for err == nil {
+		tokenType := tokenizer.Next()
+		switch tokenType {
+		case html.ErrorToken:
+			err = tokenizer.Err()
+		case html.StartTagToken, html.SelfClosingTagToken:
+			token := tokenizer.Token()
+			if urlAttrs, ok := atomsToAttrs[token.DataAtom]; ok {
+				for i, attr := range token.Attr {
+					if urlAttrs.Has(attr.Key) {
+						token.Attr[i].Val = urlRewriter(attr.Val)
+					}
+				}
+			}
+			_, err = writer.Write([]byte(token.String()))
+		default:
+			_, err = writer.Write(tokenizer.Raw())
 		}
-		n.Attr[i].Val = t.rewriteURL(attr.Val, sourceURL)
 	}
+	if err != io.EOF {
+		return err
+	}
+	return nil
 }
 
-// scan recursively calls f for every n and every subnode of n.
-func (t *Transport) scan(n *html.Node, f func(*html.Node)) {
-	f(n)
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		t.scan(c, f)
-	}
-}
-
-// fixLinks modifies links in an HTML file such that they will be redirected through the proxy if needed.
-func (t *Transport) fixLinks(req *http.Request, resp *http.Response) (*http.Response, error) {
+// rewriteResponse modifies an HTML response by updating absolute links refering
+// to the original host to instead refer to the proxy transport.
+func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*http.Response, error) {
 	origBody := resp.Body
 	defer origBody.Close()
 
@@ -195,15 +202,13 @@ func (t *Transport) fixLinks(req *http.Request, resp *http.Response) (*http.Resp
 		return resp, nil
 	}
 
-	doc, err := html.Parse(reader)
-	if err != nil {
-		glog.Errorf("Parse failed: %v", err)
-		return resp, err
+	urlRewriter := func(targetUrl string) string {
+		return t.rewriteURL(targetUrl, req.URL)
 	}
-
-	t.scan(doc, func(n *html.Node) { t.updateURLs(n, req.URL) })
-	if err := html.Render(writer, doc); err != nil {
-		glog.Errorf("Failed to render: %v", err)
+	err := rewriteHTML(reader, writer, urlRewriter)
+	if err != nil {
+		glog.Errorf("Failed to rewrite URLs: %v", err)
+		return resp, err
 	}
 
 	resp.Body = ioutil.NopCloser(newContent)
