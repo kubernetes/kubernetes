@@ -863,29 +863,6 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 	return allErrs
 }
 
-var supportedManifestVersions = util.NewStringSet("v1beta1", "v1beta2")
-
-// ValidateManifest tests that the specified ContainerManifest has valid data.
-// This includes checking formatting and uniqueness.  It also canonicalizes the
-// structure by setting default values and implementing any backwards-compatibility
-// tricks.
-// TODO: replaced by ValidatePodSpec
-func ValidateManifest(manifest *api.ContainerManifest) errs.ValidationErrorList {
-	allErrs := errs.ValidationErrorList{}
-
-	if len(manifest.Version) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("version"))
-	} else if !supportedManifestVersions.Has(strings.ToLower(manifest.Version)) {
-		allErrs = append(allErrs, errs.NewFieldNotSupported("version", manifest.Version))
-	}
-	allVolumes, vErrs := validateVolumes(manifest.Volumes)
-	allErrs = append(allErrs, vErrs.Prefix("volumes")...)
-	allErrs = append(allErrs, validateContainers(manifest.Containers, allVolumes).Prefix("containers")...)
-	allErrs = append(allErrs, validateRestartPolicy(&manifest.RestartPolicy).Prefix("restartPolicy")...)
-	allErrs = append(allErrs, validateDNSPolicy(&manifest.DNSPolicy).Prefix("dnsPolicy")...)
-	return allErrs
-}
-
 func validateRestartPolicy(restartPolicy *api.RestartPolicy) errs.ValidationErrorList {
 	allErrors := errs.ValidationErrorList{}
 	switch *restartPolicy {

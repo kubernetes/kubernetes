@@ -50,55 +50,58 @@ func TestExtractFromHttpBadness(t *testing.T) {
 	expectEmptyChannel(t, ch)
 }
 
-func TestExtractInvalidManifest(t *testing.T) {
+func TestExtractInvalidPods(t *testing.T) {
 	var testCases = []struct {
-		desc      string
-		manifests interface{}
+		desc string
+		pod  *api.Pod
 	}{
 		{
-			desc:      "No version",
-			manifests: []api.ContainerManifest{{Version: ""}},
+			desc: "No version",
+			pod:  &api.Pod{TypeMeta: api.TypeMeta{APIVersion: ""}},
 		},
 		{
-			desc:      "Invalid version",
-			manifests: []api.ContainerManifest{{Version: "v1betta2"}},
+			desc: "Invalid version",
+			pod:  &api.Pod{TypeMeta: api.TypeMeta{APIVersion: "v1betta2"}},
 		},
 		{
 			desc: "Invalid volume name",
-			manifests: []api.ContainerManifest{
-				{Version: testapi.Version(), Volumes: []api.Volume{{Name: "_INVALID_"}}},
+			pod: &api.Pod{
+				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				Spec: api.PodSpec{
+					Volumes: []api.Volume{{Name: "_INVALID_"}},
+				},
 			},
 		},
 		{
 			desc: "Duplicate volume names",
-			manifests: []api.ContainerManifest{
-				{
-					Version: testapi.Version(),
+			pod: &api.Pod{
+				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				Spec: api.PodSpec{
 					Volumes: []api.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
 			},
 		},
 		{
 			desc: "Unspecified container name",
-			manifests: []api.ContainerManifest{
-				{
-					Version:    testapi.Version(),
+			pod: &api.Pod{
+				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: ""}},
 				},
 			},
 		},
 		{
 			desc: "Invalid container name",
-			manifests: []api.ContainerManifest{
-				{
-					Version:    testapi.Version(),
+			pod: &api.Pod{
+				TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+				Spec: api.PodSpec{
 					Containers: []api.Container{{Name: "_INVALID_"}},
 				},
 			},
 		},
 	}
 	for _, testCase := range testCases {
-		data, err := json.Marshal(testCase.manifests)
+		data, err := json.Marshal(testCase.pod)
 		if err != nil {
 			t.Fatalf("%s: Some weird json problem: %v", testCase.desc, err)
 		}

@@ -437,9 +437,9 @@ func TestExecutorStaticPods(t *testing.T) {
 		assert.NoError(t, err)
 		spod := `{
 	"apiVersion": "v1beta3",
-	"name": "%v",
 	"kind": "Pod",
 	"metadata": {
+		"name": "%v",
 		"labels": { "name": "foo", "cluster": "bar" }
 	},
 	"spec": {

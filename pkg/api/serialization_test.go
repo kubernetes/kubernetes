@@ -125,7 +125,7 @@ func TestList(t *testing.T) {
 	roundTripSame(t, item)
 }
 
-var nonRoundTrippableTypes = util.NewStringSet("ContainerManifest", "ContainerManifestList")
+var nonRoundTrippableTypes = util.NewStringSet()
 var nonInternalRoundTrippableTypes = util.NewStringSet("List", "ListOptions", "PodExecOptions")
 var nonRoundTrippableTypesByVersion = map[string][]string{}
 

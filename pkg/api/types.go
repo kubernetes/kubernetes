@@ -1814,43 +1814,6 @@ type EventList struct {
 	Items []Event `json:"items"`
 }
 
-// ContainerManifest corresponds to the Container Manifest format, documented at:
-// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
-// This is used as the representation of Kubernetes workloads.
-// DEPRECATED: Replaced with Pod
-type ContainerManifest struct {
-	// Required: This must be a supported version string, such as "v1beta1".
-	Version string `json:"version"`
-	// Required: This must be a DNS_SUBDOMAIN.
-	// TODO: ID on Manifest is deprecated and will be removed in the future.
-	ID string `json:"id"`
-	// TODO: UUID on Manifest is deprecated in the future once we are done
-	// with the API refactoring. It is required for now to determine the instance
-	// of a Pod.
-	UUID                          types.UID     `json:"uuid,omitempty"`
-	Volumes                       []Volume      `json:"volumes"`
-	Containers                    []Container   `json:"containers"`
-	RestartPolicy                 RestartPolicy `json:"restartPolicy,omitempty"`
-	TerminationGracePeriodSeconds *int64        `json:"terminationGracePeriodSeconds,omitempty"`
-	ActiveDeadlineSeconds         *int64        `json:"activeDeadlineSeconds,omitempty"`
-	// Required: Set DNS policy.
-	DNSPolicy   DNSPolicy `json:"dnsPolicy"`
-	HostNetwork bool      `json:"hostNetwork,omitempty"`
-	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
-	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
-	// in the case of docker, only DockerConfig type secrets are honored.
-	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" description:"list of references to secrets in the same namespace available for pulling the container images"`
-}
-
-// ContainerManifestList is used to communicate container manifests to kubelet.
-// DEPRECATED: Replaced with Pods
-type ContainerManifestList struct {
-	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
-
-	Items []ContainerManifest `json:"items"`
-}
-
 // List holds a list of objects, which may not be known by the server.
 type List struct {
 	TypeMeta `json:",inline"`

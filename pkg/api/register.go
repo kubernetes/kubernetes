@@ -42,8 +42,6 @@ func init() {
 		&Binding{},
 		&Event{},
 		&EventList{},
-		&ContainerManifest{},
-		&ContainerManifestList{},
 		&List{},
 		&LimitRange{},
 		&LimitRangeList{},
@@ -91,8 +89,6 @@ func (*Binding) IsAnAPIObject()                   {}
 func (*Status) IsAnAPIObject()                    {}
 func (*Event) IsAnAPIObject()                     {}
 func (*EventList) IsAnAPIObject()                 {}
-func (*ContainerManifest) IsAnAPIObject()         {}
-func (*ContainerManifestList) IsAnAPIObject()     {}
 func (*List) IsAnAPIObject()                      {}
 func (*LimitRange) IsAnAPIObject()                {}
 func (*LimitRangeList) IsAnAPIObject()            {}

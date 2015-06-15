@@ -103,7 +103,6 @@ func init() {
 		"ListOptions",
 		"DeleteOptions",
 		"Status",
-		"ContainerManifest",
 		"PodLogOptions",
 		"PodExecOptions",
 		"PodProxyOptions")
