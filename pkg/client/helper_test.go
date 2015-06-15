@@ -269,12 +269,11 @@ func TestSetKubernetesDefaults(t *testing.T) {
 		{
 			Config{},
 			Config{
-				Prefix:         "/api",
-				Version:        latest.Version,
-				Codec:          latest.Codec,
-				LegacyBehavior: (latest.Version == "v1beta1" || latest.Version == "v1beta2"),
-				QPS:            5,
-				Burst:          10,
+				Prefix:  "/api",
+				Version: latest.Version,
+				Codec:   latest.Codec,
+				QPS:     5,
+				Burst:   10,
 			},
 			false,
 		},

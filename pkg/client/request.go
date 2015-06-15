@@ -72,13 +72,6 @@ type Request struct {
 	baseURL *url.URL
 	codec   runtime.Codec
 
-	// If true, add "?namespace=<namespace>" as a query parameter, if false put namespaces/<namespace> in path
-	// Query parameter is considered legacy behavior
-	namespaceInQuery bool
-	// If true, lowercase resource prior to inserting into a path, if false, leave it as is. Preserving
-	// case is considered legacy behavior.
-	preserveResourceCase bool
-
 	// generic components accessible via method setters
 	path    string
 	subpath string
@@ -107,7 +100,7 @@ type Request struct {
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
 func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion string,
-	codec runtime.Codec, namespaceInQuery bool, preserveResourceCase bool) *Request {
+	codec runtime.Codec) *Request {
 	metrics.Register()
 	return &Request{
 		client:     client,
@@ -115,10 +108,7 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion str
 		baseURL:    baseURL,
 		path:       baseURL.Path,
 		apiVersion: apiVersion,
-
-		codec:                codec,
-		namespaceInQuery:     namespaceInQuery,
-		preserveResourceCase: preserveResourceCase,
+		codec:      codec,
 	}
 }
 
@@ -490,15 +480,11 @@ func (r *Request) Body(obj interface{}) *Request {
 // URL returns the current working URL.
 func (r *Request) URL() *url.URL {
 	p := r.path
-	if r.namespaceSet && !r.namespaceInQuery && len(r.namespace) > 0 {
+	if r.namespaceSet && len(r.namespace) > 0 {
 		p = path.Join(p, "namespaces", r.namespace)
 	}
 	if len(r.resource) != 0 {
-		resource := r.resource
-		if !r.preserveResourceCase {
-			resource = strings.ToLower(resource)
-		}
-		p = path.Join(p, resource)
+		p = path.Join(p, strings.ToLower(r.resource))
 	}
 	// Join trims trailing slashes, so preserve r.path's trailing slash for backwards compat if nothing was changed
 	if len(r.resourceName) != 0 || len(r.subpath) != 0 || len(r.subresource) != 0 {
@@ -516,10 +502,6 @@ func (r *Request) URL() *url.URL {
 		for _, value := range values {
 			query.Add(key, value)
 		}
-	}
-
-	if r.namespaceSet && r.namespaceInQuery {
-		query.Set("namespace", r.namespace)
 	}
 
 	// timeout is handled specially here.

@@ -119,11 +119,9 @@ func TestDoRequestBearer(t *testing.T) {
 	defer testServer.Close()
 	request, _ := http.NewRequest("GET", testServer.URL, nil)
 	c, err := RESTClientFor(&Config{
-		Host:           testServer.URL,
-		Version:        testapi.Version(),
-		Codec:          testapi.Codec(),
-		LegacyBehavior: true,
-
+		Host:        testServer.URL,
+		Version:     testapi.Version(),
+		Codec:       testapi.Codec(),
 		BearerToken: "test",
 	})
 	if err != nil {
@@ -149,11 +147,9 @@ func TestDoRequestWithoutPassword(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host:           testServer.URL,
-		Version:        testapi.Version(),
-		Codec:          testapi.Codec(),
-		LegacyBehavior: true,
-
+		Host:     testServer.URL,
+		Version:  testapi.Version(),
+		Codec:    testapi.Codec(),
 		Username: "test",
 	})
 	if err != nil {
@@ -190,11 +186,9 @@ func TestDoRequestSuccess(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host:           testServer.URL,
-		Version:        testapi.Version(),
-		Codec:          testapi.Codec(),
-		LegacyBehavior: true,
-
+		Host:     testServer.URL,
+		Version:  testapi.Version(),
+		Codec:    testapi.Codec(),
 		Username: "user",
 		Password: "pass",
 	})
@@ -235,10 +229,9 @@ func TestDoRequestFailed(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host:           testServer.URL,
-		Version:        testapi.Version(),
-		Codec:          testapi.Codec(),
-		LegacyBehavior: true,
+		Host:    testServer.URL,
+		Version: testapi.Version(),
+		Codec:   testapi.Codec(),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -268,11 +261,9 @@ func TestDoRequestCreated(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	c, err := RESTClientFor(&Config{
-		Host:           testServer.URL,
-		Version:        testapi.Version(),
-		Codec:          testapi.Codec(),
-		LegacyBehavior: true,
-
+		Host:     testServer.URL,
+		Version:  testapi.Version(),
+		Codec:    testapi.Codec(),
 		Username: "user",
 		Password: "pass",
 	})

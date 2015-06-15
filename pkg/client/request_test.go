@@ -70,14 +70,14 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 }
 
 func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
-	r := &Request{baseURL: &url.URL{}, path: "/path/", namespaceInQuery: true}
+	r := &Request{baseURL: &url.URL{}, path: "/path/"}
 	if s := r.URL().String(); s != "/path/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}, namespaceInQuery: true}).AbsPath("/foo/")
+	r := (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
@@ -89,7 +89,7 @@ func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
 }
 
 func TestRequestAbsPathJoins(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}, namespaceInQuery: true}).AbsPath("foo/bar", "baz")
+	r := (&Request{baseURL: &url.URL{}}).AbsPath("foo/bar", "baz")
 	if s := r.URL().String(); s != "foo/bar/baz" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
@@ -100,20 +100,11 @@ func TestRequestSetsNamespace(t *testing.T) {
 		baseURL: &url.URL{
 			Path: "/",
 		},
-		namespaceInQuery: true,
 	}).Namespace("foo")
 	if r.namespace == "" {
 		t.Errorf("namespace should be set: %#v", r)
 	}
-	if s := r.URL().String(); s != "?namespace=foo" {
-		t.Errorf("namespace should be in params: %s", s)
-	}
 
-	r = (&Request{
-		baseURL: &url.URL{
-			Path: "/",
-		},
-	}).Namespace("foo")
 	if s := r.URL().String(); s != "namespaces/foo" {
 		t.Errorf("namespace should be in path: %s", s)
 	}
@@ -217,7 +208,7 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 
 func TestURLTemplate(t *testing.T) {
 	uri, _ := url.Parse("http://localhost")
-	r := NewRequest(nil, "POST", uri, "test", nil, false, false)
+	r := NewRequest(nil, "POST", uri, "test", nil)
 	r.Prefix("pre1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0")
 	full := r.URL()
 	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
@@ -278,7 +269,7 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
-		r := NewRequest(nil, "", uri, testapi.Version(), testapi.Codec(), true, true)
+		r := NewRequest(nil, "", uri, testapi.Version(), testapi.Codec())
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -638,7 +629,7 @@ func TestRequestUpgrade(t *testing.T) {
 			Err: true,
 		},
 		{
-			Request: NewRequest(nil, "", uri, testapi.Version(), testapi.Codec(), true, true),
+			Request: NewRequest(nil, "", uri, testapi.Version(), testapi.Codec()),
 			Config: &Config{
 				Username: "u",
 				Password: "p",
@@ -647,7 +638,7 @@ func TestRequestUpgrade(t *testing.T) {
 			Err:             false,
 		},
 		{
-			Request: NewRequest(nil, "", uri, testapi.Version(), testapi.Codec(), true, true),
+			Request: NewRequest(nil, "", uri, testapi.Version(), testapi.Codec()),
 			Config: &Config{
 				BearerToken: "b",
 			},
