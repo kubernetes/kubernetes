@@ -62,7 +62,6 @@ func (a *APIInstaller) Install(proxyDialer func(network, addr string) (net.Conn,
 	// Create the WebService.
 	ws = a.newWebService()
 
-	redirectHandler := (&RedirectHandler{a.group.Storage, a.group.Codec, a.group.Context, a.info})
 	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info, proxyDialer})
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
@@ -74,7 +73,7 @@ func (a *APIInstaller) Install(proxyDialer func(network, addr string) (net.Conn,
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
-		if err := a.registerResourceHandlers(path, a.group.Storage[path], ws, redirectHandler, proxyHandler); err != nil {
+		if err := a.registerResourceHandlers(path, a.group.Storage[path], ws, proxyHandler); err != nil {
 			errors = append(errors, err)
 		}
 	}
@@ -93,7 +92,7 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 	return ws
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, redirectHandler, proxyHandler http.Handler) error {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) error {
 	admit := a.group.Admit
 	context := a.group.Context
 
@@ -277,7 +276,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
-		actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
@@ -316,7 +314,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
 			actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
-			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
@@ -360,7 +357,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
 			actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
-			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
@@ -566,20 +562,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
 				return err
 			}
-			addParams(route, action.Params)
-			ws.Route(route)
-		case "REDIRECT": // Get the redirect URL for a resource.
-			doc := "redirect GET request to " + kind
-			if hasSubresource {
-				doc = "redirect GET request to " + subresource + " of " + kind
-			}
-			route := ws.GET(action.Path).To(routeFunction(redirectHandler)).
-				Filter(m).
-				Doc(doc).
-				Operation("redirect" + kind + strings.Title(subresource)).
-				Produces("*/*").
-				Consumes("*/*").
-				Writes("string")
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PROXY": // Proxy requests to a resource.
