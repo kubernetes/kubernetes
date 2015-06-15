@@ -215,6 +215,24 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 	}
 }
 
+func TestURLTemplate(t *testing.T) {
+	uri, _ := url.Parse("http://localhost")
+	r := NewRequest(nil, "POST", uri, "test", nil, false, false)
+	r.Prefix("pre1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0")
+	full := r.URL()
+	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
+		t.Errorf("unexpected initial URL: %s", full)
+	}
+	actual := r.finalURLTemplate()
+	expected := "http://localhost/pre1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D?p0=%7Bvalue%7D"
+	if actual != expected {
+		t.Errorf("unexpected URL template: %s %s", actual, expected)
+	}
+	if r.URL().String() != full.String() {
+		t.Errorf("creating URL template changed request: %s -> %s", full.String(), r.URL().String())
+	}
+}
+
 func TestTransformResponse(t *testing.T) {
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")

@@ -530,12 +530,25 @@ func (r *Request) URL() *url.URL {
 	return finalURL
 }
 
-// finalURLTemplate is similar to URL(), but if the request contains name of an object
-// (e.g. GET for a specific Pod) it will be substited with "<name>".
-func (r *Request) finalURLTemplate() string {
+// finalURLTemplate is similar to URL(), but will make all specific parameter values equal
+// - instead of name or namespace, "{name}" and "{namespace}" will be used, and all query
+// parameters will be reset. This creates a copy of the request so as not to change the
+// underyling object.  This means some useful request info (like the types of field
+// selectors in use) will be lost.
+// TODO: preserve field selector keys
+func (r Request) finalURLTemplate() string {
 	if len(r.resourceName) != 0 {
-		r.resourceName = "<name>"
+		r.resourceName = "{name}"
 	}
+	if r.namespaceSet && len(r.namespace) != 0 {
+		r.namespace = "{namespace}"
+	}
+	newParams := url.Values{}
+	v := []string{"{value}"}
+	for k := range r.params {
+		newParams[k] = v
+	}
+	r.params = newParams
 	return r.URL().String()
 }
 
