@@ -807,7 +807,9 @@ func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {
 	if err != nil {
 		return err
 	}
-	tunnels.Open()
+	if err := tunnels.Open(); err != nil {
+		return err
+	}
 	if m.tunnels != nil {
 		m.tunnels.Close()
 	}
@@ -844,31 +846,22 @@ func (m *Master) refreshTunnels(user, keyfile string) error {
 func (m *Master) setupSecureProxy(user, keyfile string) {
 	// Sync loop for tunnels
 	// TODO: switch this to watch.
-	go func() {
-		for {
-			if err := m.loadTunnels(user, keyfile); err != nil {
-				glog.Errorf("Failed to load SSH Tunnels: %v", err)
-			}
-			var sleep time.Duration
-			if len(m.tunnels) == 0 {
-				sleep = time.Second
-			} else {
-				// tunnels could lag behind current set of nodes
-				sleep = 10 * time.Second
-			}
-			time.Sleep(sleep)
+	go util.Until(func() {
+		if err := m.loadTunnels(user, keyfile); err != nil {
+			glog.Errorf("Failed to load SSH Tunnels: %v", err)
 		}
-	}()
+		if len(m.tunnels) != 0 {
+			time.Sleep(9 * time.Second)
+		}
+	}, 1 * time.Second, util.NeverStop)
 	// Refresh loop for tunnels
 	// TODO: could make this more controller-ish
-	go func() {
-		for {
-			time.Sleep(5 * time.Minute)
-			if err := m.refreshTunnels(user, keyfile); err != nil {
-				glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
-			}
+	go util.Until(func() {
+		time.Sleep(5 * time.Minute)
+		if err := m.refreshTunnels(user, keyfile); err != nil {
+			glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
 		}
-	}()
+	}, 0 * time.Second, util.NeverStop)
 }
 
 func (m *Master) generateSSHKey(user, keyfile string) error {
