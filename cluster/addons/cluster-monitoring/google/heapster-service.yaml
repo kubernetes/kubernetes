@@ -4,7 +4,7 @@ metadata:
   name: monitoring-heapster
   labels: 
     kubernetes.io/cluster-service: "true"
-    name: monitoring-heapster
+    kubernetes.io/name: "Heapster"
 spec: 
   ports: 
     - port: 80
