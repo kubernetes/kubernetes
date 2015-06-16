@@ -102,10 +102,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		clientConfig = DefaultClientConfig(flags)
 	}
 
-	clients := &clientCache{
-		clients: make(map[string]*client.Client),
-		loader:  clientConfig,
-	}
+	clients := NewClientCache(clientConfig)
 
 	return &Factory{
 		clients:    clients,
