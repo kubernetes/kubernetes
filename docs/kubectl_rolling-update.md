@@ -28,14 +28,19 @@ $ cat frontend-v2.json | kubectl rolling-update frontend-v1 -f -
 // name of the replication controller.
 $ kubectl rolling-update frontend-v1 frontend-v2 --image=image:v2
 
-// Update the pods of frontend by just changing the image, and keeping the old name
+// Update the pods of frontend that only has a a single container by just changing the image, and keeping the old name
 $ kubectl rolling-update frontend --image=image:v2
+
+// Update the pods of a frontend that has multiple containers by just changing the image, and keeping the old name
+$ kubectl rolling-update frontend --image=image:v2 --container-name=myapp
 
 ```
 
 ### Options
 
 ```
+
+      --container-name="": Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod.
       --deployment-label-key="deployment": The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise
       --dry-run=false: If true, print out the changes that would be made, but don't actually make them.
   -f, --filename="": Filename or URL to file to use to create the new controller.
