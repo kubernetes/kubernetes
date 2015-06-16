@@ -113,13 +113,14 @@ function prepare-upgrade() {
 #
 # Assumed vars:
 #   MASTER_NAME
+#   PROJECT
 #   ZONE
 #
 # Args:
 # $1 env key to use
 function get-env-val() {
   # TODO(mbforbes): Make this more reliable with retries.
-  gcloud compute ssh --zone ${ZONE} ${MASTER_NAME} --command \
+  gcloud compute --project ${PROJECT} ssh --zone ${ZONE} ${MASTER_NAME} --command \
     "curl --fail --silent -H 'Metadata-Flavor: Google' \
       'http://metadata/computeMetadata/v1/instance/attributes/kube-env'" 2>/dev/null \
     | grep ${1} | cut -d : -f 2 | cut -d \' -f 2
