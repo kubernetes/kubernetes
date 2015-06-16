@@ -3,7 +3,7 @@
 The user guide is intended for anyone who wants to run programs and services
 on an existing Kubernetes cluster.  Setup and administration of a
 Kubernetes cluster is described in the [Cluster Admin Guide](cluster-admin-guide.md).
-The developer guide is for anyone wanting to either write code which directly accesses the
+The [Developer Guide](developer-guide.md) is for anyone wanting to either write code which directly accesses the
 kubernetes API, or to contribute directly to the kubernetes project.
 
 ## Primary concepts
