@@ -328,7 +328,7 @@ func TestCreateReplica(t *testing.T) {
 		},
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
-	fakeHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("pods", api.NamespaceDefault, ""), "POST", nil)
+	fakeHandler.ValidateRequest(t, testapi.ResourcePath("pods", api.NamespaceDefault, ""), "POST", nil)
 	actualPod, err := client.Codec.Decode([]byte(fakeHandler.RequestBody))
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
@@ -397,7 +397,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	rc.Status = api.ReplicationControllerStatus{Replicas: 4}
 
 	decRc := runtime.EncodeOrDie(testapi.Codec(), rc)
-	fakeHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery(replicationControllerResourceName(), rc.Namespace, rc.Name), "PUT", &decRc)
+	fakeHandler.ValidateRequest(t, testapi.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name), "PUT", &decRc)
 	validateSyncReplication(t, &fakePodControl, 1, 0)
 }
 

@@ -318,7 +318,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", ns, "foo"), "PUT", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexisting(t *testing.T) {
@@ -358,7 +358,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", ns, "foo"), "PUT", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
@@ -387,7 +387,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", api.NamespaceDefault, "foo"), "GET", nil)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", api.NamespaceDefault, "foo"), "GET", nil)
 }
 
 func TestSyncEndpointsItems(t *testing.T) {
@@ -429,7 +429,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	})
 	// endpointsHandler should get 2 requests - one for "GET" and the next for "POST".
 	endpointsHandler.ValidateRequestCount(t, 2)
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", ns, ""), "POST", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, ""), "POST", &data)
 }
 
 func TestSyncEndpointsItemsWithLabels(t *testing.T) {
@@ -476,7 +476,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	})
 	// endpointsHandler should get 2 requests - one for "GET" and the next for "POST".
 	endpointsHandler.ValidateRequestCount(t, 2)
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", ns, ""), "POST", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, ""), "POST", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
@@ -525,5 +525,5 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", ns, "foo"), "PUT", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
