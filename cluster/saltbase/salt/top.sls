@@ -2,6 +2,7 @@ base:
   '*':
     - base
     - debian-auto-upgrades
+    - salt-helpers
 
   'roles:kubernetes-pool':
     - match: grain

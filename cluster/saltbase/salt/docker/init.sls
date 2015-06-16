@@ -131,20 +131,25 @@ lxc-docker-{{ override_docker_ver }}:
     - mode: 644
     - defaults:
         environment_file: {{ environment_file }}
-{% endif %}
+  cmd.run:
+      - name: /opt/kubernetes/helpers/services bounce docker
+      - watch:
+        - file: {{ grains.get('systemd_system_path') }}/docker.service
+        - file: {{ environment_file }}
+
+{% else %}
 
 docker:
   service.running:
     - enable: True
     - watch:
       - file: {{ environment_file }}
-{% if grains.get('is_systemd') %}
-      - file: {{ grains.get('systemd_system_path') }}/docker.service
-{% endif %}
       - container_bridge: cbr0
 {% if override_docker_ver != '' %}
     - require:
       - pkg: lxc-docker-{{ override_docker_ver }}
+{% endif %}
+
 {% endif %}
 
 {% endif %}
