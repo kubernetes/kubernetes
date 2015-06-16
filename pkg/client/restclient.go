@@ -38,11 +38,6 @@ type RESTClient struct {
 	// A string identifying the version of the API this client is expected to use.
 	apiVersion string
 
-	// LegacyBehavior controls if URLs should encode the namespace as a query param,
-	// and if resource case is preserved for supporting older API conventions of
-	// Kubernetes.  Newer clients should leave this false.
-	LegacyBehavior bool
-
 	// Codec is the encoding and decoding scheme that applies to a particular set of
 	// REST resources.
 	Codec runtime.Codec
@@ -59,9 +54,8 @@ type RESTClient struct {
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
-// decoding of responses from the server. If this client should use the older, legacy
-// API conventions from Kubernetes API v1beta1 and v1beta2, set legacyBehavior true.
-func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyBehavior bool, maxQPS float32, maxBurst int) *RESTClient {
+// decoding of responses from the server.
+func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, maxQPS float32, maxBurst int) *RESTClient {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -76,12 +70,8 @@ func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyB
 	return &RESTClient{
 		baseURL:    &base,
 		apiVersion: apiVersion,
-
-		Codec: c,
-
-		LegacyBehavior: legacyBehavior,
-
-		Throttle: throttle,
+		Codec:      c,
+		Throttle:   throttle,
 	}
 }
 
@@ -101,7 +91,7 @@ func (c *RESTClient) Verb(verb string) *Request {
 	if c.Throttle != nil {
 		c.Throttle.Accept()
 	}
-	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec, c.LegacyBehavior, c.LegacyBehavior).Timeout(c.Timeout)
+	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec).Timeout(c.Timeout)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").

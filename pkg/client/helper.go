@@ -46,11 +46,6 @@ type Config struct {
 	// a RESTClient directly. When initializing a Client, will be set with the default
 	// code version.
 	Version string
-	// LegacyBehavior defines whether the RESTClient should follow conventions that
-	// existed prior to v1beta3 in Kubernetes - namely, namespace (if specified)
-	// not being part of the path, and resource names allowing mixed case. Set to
-	// true when using Kubernetes v1beta1 or v1beta2.
-	LegacyBehavior bool
 	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
 	// to a RESTClient or Client. Required when initializing a RESTClient, optional
 	// when initializing a Client.
@@ -218,7 +213,6 @@ func SetKubernetesDefaults(config *Config) error {
 	if config.Codec == nil {
 		config.Codec = versionInterfaces.Codec
 	}
-	config.LegacyBehavior = (version == "v1beta1" || version == "v1beta2")
 	if config.QPS == 0.0 {
 		config.QPS = 5.0
 	}
@@ -245,7 +239,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, config.Version, config.Codec, config.LegacyBehavior, config.QPS, config.Burst)
+	client := NewRESTClient(baseURL, config.Version, config.Codec, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
