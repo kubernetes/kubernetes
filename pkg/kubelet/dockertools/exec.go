@@ -25,6 +25,7 @@ import (
 
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	docker "github.com/fsouza/go-dockerclient"
+	"github.com/golang/glog"
 )
 
 // ExecHandler knows how to execute a command in a running Docker container.
@@ -123,6 +124,7 @@ func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *doc
 		return err
 	}
 	tick := time.Tick(2 * time.Second)
+	count := 0
 	for {
 		inspect, err2 := client.InspectExec(execObj.ID)
 		if err2 != nil {
@@ -134,6 +136,13 @@ func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *doc
 			}
 			break
 		}
+
+		count++
+		if count == 5 {
+			glog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
+			break
+		}
+
 		<-tick
 	}
 
