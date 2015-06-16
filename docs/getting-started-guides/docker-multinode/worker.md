@@ -103,31 +103,6 @@ The service proxy provides load-balancing between groups of containers defined b
 sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.18.2 /hyperkube proxy --master=http://${MASTER_IP}:8080 --v=2
 ```
 
-
-### Add the node to the cluster
-
-On the master you created above, create a file named ```node.yaml``` make it's contents:
-
-```yaml
-apiVersion: v1
-kind: Node
-metadata:
-  name: ${NODE_IP}
-spec:
-  externalID: ${NODE_IP}
-status:
-  # Fill in appropriate values below
-  capacity:
-    cpu: "1"
-    memory: 3Gi
-```
-
-Make the API call to add the node, you should do this on the master node that you created above.  Otherwise you need to add ```-s=http://${MASTER_IP}:8080``` to point ```kubectl``` at the master.
-
-```sh
-./kubectl create -f node.yaml
-```
-
 ### Next steps
 
 Move on to [testing your cluster](testing.md) or [add another node](#adding-a-kubernetes-worker-node-via-docker)

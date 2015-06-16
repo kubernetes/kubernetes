@@ -8,9 +8,9 @@ kubectl get nodes
 
 That should show something like:
 ```
-NAME           LABELS    STATUS
-10.240.99.26   <none>    Ready
-127.0.0.1      <none>    Ready
+NAME           LABELS                                 STATUS
+10.240.99.26   kubernetes.io/hostname=10.240.99.26    Ready
+127.0.0.1      kubernetes.io/hostname=127.0.0.1       Ready
 ```
 
 If the status of any node is ```Unknown``` or ```NotReady``` your cluster is broken, double check that all containers are running properly, and if all else fails, contact us on IRC at
