@@ -12,7 +12,7 @@ pkg-core:
       - glusterfs-client
 {% endif %}
 
-{% if grains['oscodename'] == 'jessie' %}
+{% if grains['oscodename'] in [ 'vivid', 'jessie' ] %}
 is_systemd:
   grains.present:
     - value: True
