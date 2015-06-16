@@ -272,7 +272,7 @@ func (r *nfsRecycler) Recycle() error {
 			Containers: []api.Container{
 				{
 					Name:  "scrubber",
-					Image: "busybox",
+					Image: "gcr.io/google_containers/busybox",
 					// delete the contents of the volume, but not the directory itself
 					Command: []string{"/bin/sh"},
 					// the scrubber:
