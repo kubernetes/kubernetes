@@ -223,11 +223,12 @@ func MakeSSHTunnels(user, keyfile string, addresses []string) (SSHTunnelList, er
 }
 
 func (l SSHTunnelList) Open() error {
-	for ix := range l {
+	for ix := 0; ix < len(l); ix++ {
 		if err := l[ix].Tunnel.Open(); err != nil {
 			// Remove a failed Open from the list.
 			glog.Errorf("Failed to open tunnel %v: %v", l[ix], err)
 			l = append(l[:ix], l[ix+1:]...)
+			ix--
 		}
 	}
 	if len(l) == 0 {
