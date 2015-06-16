@@ -180,15 +180,17 @@ type HumanReadablePrinter struct {
 	handlerMap    map[reflect.Type]*handlerEntry
 	noHeaders     bool
 	withNamespace bool
+	columnLabels  []string
 	lastType      reflect.Type
 }
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
-func NewHumanReadablePrinter(noHeaders, withNamespace bool) *HumanReadablePrinter {
+func NewHumanReadablePrinter(noHeaders, withNamespace bool, columnLabels []string) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
 		handlerMap:    make(map[reflect.Type]*handlerEntry),
 		noHeaders:     noHeaders,
 		withNamespace: withNamespace,
+		columnLabels:  columnLabels,
 	}
 	printer.addDefaultHandlers()
 	return printer
@@ -215,17 +217,18 @@ func (h *HumanReadablePrinter) Handler(columns []string, printFunc interface{}) 
 
 func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value) error {
 	if printFunc.Kind() != reflect.Func {
-		return fmt.Errorf("invalid print handler. %#v is not a function.", printFunc)
+		return fmt.Errorf("invalid print handler. %#v is not a function", printFunc)
 	}
 	funcType := printFunc.Type()
-	if funcType.NumIn() != 3 || funcType.NumOut() != 1 {
+	if funcType.NumIn() != 4 || funcType.NumOut() != 1 {
 		return fmt.Errorf("invalid print handler." +
 			"Must accept 3 parameters and return 1 value.")
 	}
 	if funcType.In(1) != reflect.TypeOf((*io.Writer)(nil)).Elem() ||
+		funcType.In(3) != reflect.TypeOf((*[]string)(nil)).Elem() ||
 		funcType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
 		return fmt.Errorf("invalid print handler. The expected signature is: "+
-			"func handler(obj %v, w io.Writer, withNamespace bool) error", funcType.In(0))
+			"func handler(obj %v, w io.Writer, withNamespace bool, columnLabels []string) error", funcType.In(0))
 	}
 	return nil
 }
@@ -368,7 +371,7 @@ func translateTimestamp(timestamp util.Time) string {
 	return shortHumanDuration(time.Now().Sub(timestamp.Time))
 }
 
-func printPod(pod *api.Pod, w io.Writer, withNamespace bool) error {
+func printPod(pod *api.Pod, w io.Writer, withNamespace bool, columnLabels []string) error {
 	name := pod.Name
 	if withNamespace {
 		name = types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}.String()
@@ -398,29 +401,30 @@ func printPod(pod *api.Pod, w io.Writer, withNamespace bool) error {
 		}
 	}
 
-	_, err := fmt.Fprintf(w, "%s\t%d/%d\t%s\t%d\t%s\n",
+	if _, err := fmt.Fprintf(w, "%s\t%d/%d\t%s\t%d\t%s",
 		name,
 		readyContainers,
 		totalContainers,
 		reason,
 		restarts,
-		translateTimestamp(pod.CreationTimestamp))
-	if err != nil {
+		translateTimestamp(pod.CreationTimestamp),
+	); err != nil {
 		return err
 	}
-	return nil
+	_, err := fmt.Fprint(w, appendLabels(pod.Labels, columnLabels))
+	return err
 }
 
-func printPodList(podList *api.PodList, w io.Writer, withNamespace bool) error {
+func printPodList(podList *api.PodList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, pod := range podList.Items {
-		if err := printPod(&pod, w, withNamespace); err != nil {
+		if err := printPod(&pod, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printPodTemplate(pod *api.PodTemplate, w io.Writer, withNamespace bool) error {
+func printPodTemplate(pod *api.PodTemplate, w io.Writer, withNamespace bool, columnLabels []string) error {
 	var name string
 	if withNamespace {
 		name = types.NamespacedName{pod.Namespace, pod.Name}.String()
@@ -433,15 +437,19 @@ func printPodTemplate(pod *api.PodTemplate, w io.Writer, withNamespace bool) err
 	if len(containers) > 0 {
 		firstContainer, containers = containers[0], containers[1:]
 	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s",
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
 		formatLabels(pod.Template.Labels),
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
+	if _, err := fmt.Fprint(w, appendLabels(pod.Labels, columnLabels)); err != nil {
+		return err
+	}
+
 	// Lay out all the other containers on separate lines.
 	for _, container := range containers {
 		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "")
@@ -452,16 +460,16 @@ func printPodTemplate(pod *api.PodTemplate, w io.Writer, withNamespace bool) err
 	return nil
 }
 
-func printPodTemplateList(podList *api.PodTemplateList, w io.Writer, withNamespace bool) error {
+func printPodTemplateList(podList *api.PodTemplateList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, pod := range podList.Items {
-		if err := printPodTemplate(&pod, w, withNamespace); err != nil {
+		if err := printPodTemplate(&pod, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printReplicationController(controller *api.ReplicationController, w io.Writer, withNamespace bool) error {
+func printReplicationController(controller *api.ReplicationController, w io.Writer, withNamespace bool, columnLabels []string) error {
 	var name string
 	if withNamespace {
 		name = types.NamespacedName{controller.Namespace, controller.Name}.String()
@@ -474,15 +482,20 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 	if len(containers) > 0 {
 		firstContainer, containers = containers[0], containers[1:]
 	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n",
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d",
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
 		formatLabels(controller.Spec.Selector),
-		controller.Spec.Replicas)
-	if err != nil {
+		controller.Spec.Replicas,
+	); err != nil {
 		return err
 	}
+	if _, err := fmt.Fprint(w, appendLabels(controller.Labels, columnLabels)); err != nil {
+		return err
+	}
+
 	// Lay out all the other containers on separate lines.
 	for _, container := range containers {
 		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "", "")
@@ -493,16 +506,16 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 	return nil
 }
 
-func printReplicationControllerList(list *api.ReplicationControllerList, w io.Writer, withNamespace bool) error {
+func printReplicationControllerList(list *api.ReplicationControllerList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, controller := range list.Items {
-		if err := printReplicationController(&controller, w, withNamespace); err != nil {
+		if err := printReplicationController(&controller, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printService(svc *api.Service, w io.Writer, withNamespace bool) error {
+func printService(svc *api.Service, w io.Writer, withNamespace bool, columnLabels []string) error {
 	var name string
 	if withNamespace {
 		name = types.NamespacedName{svc.Namespace, svc.Name}.String()
@@ -519,8 +532,11 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool) error {
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s\n", name, formatLabels(svc.Labels),
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s", name, formatLabels(svc.Labels),
 		formatLabels(svc.Spec.Selector), ips[0], svc.Spec.Ports[0].Port, svc.Spec.Ports[0].Protocol); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(w, appendLabels(svc.Labels, columnLabels)); err != nil {
 		return err
 	}
 
@@ -546,50 +562,57 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool) error {
 	return nil
 }
 
-func printServiceList(list *api.ServiceList, w io.Writer, withNamespace bool) error {
+func printServiceList(list *api.ServiceList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, svc := range list.Items {
-		if err := printService(&svc, w, withNamespace); err != nil {
+		if err := printService(&svc, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printEndpoints(endpoints *api.Endpoints, w io.Writer, withNamespace bool) error {
+func printEndpoints(endpoints *api.Endpoints, w io.Writer, withNamespace bool, columnLabels []string) error {
 	var name string
 	if withNamespace {
 		name = types.NamespacedName{endpoints.Namespace, endpoints.Name}.String()
 	} else {
 		name = endpoints.Name
 	}
-	_, err := fmt.Fprintf(w, "%s\t%s\n", name, formatEndpoints(endpoints, nil))
+
+	if _, err := fmt.Fprintf(w, "%s\t%s", name, formatEndpoints(endpoints, nil)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(endpoints.Labels, columnLabels))
 	return err
 }
 
-func printEndpointsList(list *api.EndpointsList, w io.Writer, withNamespace bool) error {
+func printEndpointsList(list *api.EndpointsList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, item := range list.Items {
-		if err := printEndpoints(&item, w, withNamespace); err != nil {
+		if err := printEndpoints(&item, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printNamespace(item *api.Namespace, w io.Writer, withNamespace bool) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", item.Name, formatLabels(item.Labels), item.Status.Phase)
+func printNamespace(item *api.Namespace, w io.Writer, withNamespace bool, columnLabels []string) error {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", item.Name, formatLabels(item.Labels), item.Status.Phase); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
 	return err
 }
 
-func printNamespaceList(list *api.NamespaceList, w io.Writer, withNamespace bool) error {
+func printNamespaceList(list *api.NamespaceList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, item := range list.Items {
-		if err := printNamespace(&item, w, withNamespace); err != nil {
+		if err := printNamespace(&item, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printSecret(item *api.Secret, w io.Writer, withNamespace bool) error {
+func printSecret(item *api.Secret, w io.Writer, withNamespace bool, columnLabels []string) error {
 	var name string
 	if withNamespace {
 		name = types.NamespacedName{item.Namespace, item.Name}.String()
@@ -597,13 +620,16 @@ func printSecret(item *api.Secret, w io.Writer, withNamespace bool) error {
 		name = item.Name
 	}
 
-	_, err := fmt.Fprintf(w, "%s\t%s\t%v\n", name, item.Type, len(item.Data))
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%v", name, item.Type, len(item.Data)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
 	return err
 }
 
-func printSecretList(list *api.SecretList, w io.Writer, withNamespace bool) error {
+func printSecretList(list *api.SecretList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, item := range list.Items {
-		if err := printSecret(&item, w, withNamespace); err != nil {
+		if err := printSecret(&item, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
@@ -611,7 +637,7 @@ func printSecretList(list *api.SecretList, w io.Writer, withNamespace bool) erro
 	return nil
 }
 
-func printServiceAccount(item *api.ServiceAccount, w io.Writer, withNamespace bool) error {
+func printServiceAccount(item *api.ServiceAccount, w io.Writer, withNamespace bool, columnLabels []string) error {
 	var name string
 	if withNamespace {
 		name = types.NamespacedName{item.Namespace, item.Name}.String()
@@ -619,13 +645,16 @@ func printServiceAccount(item *api.ServiceAccount, w io.Writer, withNamespace bo
 		name = item.Name
 	}
 
-	_, err := fmt.Fprintf(w, "%s\t%d\n", name, len(item.Secrets))
+	if _, err := fmt.Fprintf(w, "%s\t%d", name, len(item.Secrets)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
 	return err
 }
 
-func printServiceAccountList(list *api.ServiceAccountList, w io.Writer, withNamespace bool) error {
+func printServiceAccountList(list *api.ServiceAccountList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, item := range list.Items {
-		if err := printServiceAccount(&item, w, withNamespace); err != nil {
+		if err := printServiceAccount(&item, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
@@ -633,7 +662,7 @@ func printServiceAccountList(list *api.ServiceAccountList, w io.Writer, withName
 	return nil
 }
 
-func printNode(node *api.Node, w io.Writer, withNamespace bool) error {
+func printNode(node *api.Node, w io.Writer, withNamespace bool, columnLabels []string) error {
 	conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
 	NodeAllConditions := []api.NodeConditionType{api.NodeReady}
 	for i := range node.Status.Conditions {
@@ -656,20 +685,24 @@ func printNode(node *api.Node, w io.Writer, withNamespace bool) error {
 	if node.Spec.Unschedulable {
 		status = append(status, "SchedulingDisabled")
 	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", node.Name, formatLabels(node.Labels), strings.Join(status, ","))
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", node.Name, formatLabels(node.Labels), strings.Join(status, ",")); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(node.Labels, columnLabels))
 	return err
 }
 
-func printNodeList(list *api.NodeList, w io.Writer, withNamespace bool) error {
+func printNodeList(list *api.NodeList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, node := range list.Items {
-		if err := printNode(&node, w, withNamespace); err != nil {
+		if err := printNode(&node, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, withNamespace bool) error {
+func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, withNamespace bool, columnLabels []string) error {
 	var name string
 	if withNamespace {
 		name = types.NamespacedName{pv.Namespace, pv.Name}.String()
@@ -689,20 +722,23 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, withNamespace 
 	aQty := pv.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.Value()
 
-	_, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\n", name, formatLabels(pv.Labels), aSize, modesStr, pv.Status.Phase, claimRefUID, pv.Status.Reason)
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\t%s", name, formatLabels(pv.Labels), aSize, modesStr, pv.Status.Phase, claimRefUID, pv.Status.Reason); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(pv.Labels, columnLabels))
 	return err
 }
 
-func printPersistentVolumeList(list *api.PersistentVolumeList, w io.Writer, withNamespace bool) error {
+func printPersistentVolumeList(list *api.PersistentVolumeList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, pv := range list.Items {
-		if err := printPersistentVolume(&pv, w, withNamespace); err != nil {
+		if err := printPersistentVolume(&pv, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, withNamespace bool) error {
+func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, withNamespace bool, columnLabels []string) error {
 	var name string
 	if withNamespace {
 		name = types.NamespacedName{pvc.Namespace, pvc.Name}.String()
@@ -710,22 +746,25 @@ func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, wit
 		name = pvc.Name
 	}
 
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", name, pvc.Labels, pvc.Status.Phase, pvc.Spec.VolumeName)
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", name, pvc.Labels, pvc.Status.Phase, pvc.Spec.VolumeName); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(pvc.Labels, columnLabels))
 	return err
 }
 
-func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, w io.Writer, withNamespace bool) error {
+func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, psd := range list.Items {
-		if err := printPersistentVolumeClaim(&psd, w, withNamespace); err != nil {
+		if err := printPersistentVolumeClaim(&psd, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printEvent(event *api.Event, w io.Writer, withNamespace bool) error {
-	_, err := fmt.Fprintf(
-		w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
+func printEvent(event *api.Event, w io.Writer, withNamespace bool, columnLabels []string) error {
+	if _, err := fmt.Fprintf(
+		w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s",
 		event.FirstTimestamp.Time.Format(time.RFC1123Z),
 		event.LastTimestamp.Time.Format(time.RFC1123Z),
 		event.Count,
@@ -735,22 +774,25 @@ func printEvent(event *api.Event, w io.Writer, withNamespace bool) error {
 		event.Reason,
 		event.Source,
 		event.Message,
-	)
+	); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(event.Labels, columnLabels))
 	return err
 }
 
 // Sorts and prints the EventList in a human-friendly format.
-func printEventList(list *api.EventList, w io.Writer, withNamespace bool) error {
+func printEventList(list *api.EventList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	sort.Sort(SortableEvents(list.Items))
 	for i := range list.Items {
-		if err := printEvent(&list.Items[i], w, withNamespace); err != nil {
+		if err := printEvent(&list.Items[i], w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printLimitRange(limitRange *api.LimitRange, w io.Writer, withNamespace bool) error {
+func printLimitRange(limitRange *api.LimitRange, w io.Writer, withNamespace bool, columnLabels []string) error {
 	var name string
 	if withNamespace {
 		name = types.NamespacedName{limitRange.Namespace, limitRange.Name}.String()
@@ -758,24 +800,24 @@ func printLimitRange(limitRange *api.LimitRange, w io.Writer, withNamespace bool
 		name = limitRange.Name
 	}
 
-	_, err := fmt.Fprintf(
-		w, "%s\n",
-		name,
-	)
+	if _, err := fmt.Fprintf(w, "%s", name); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(limitRange.Labels, columnLabels))
 	return err
 }
 
 // Prints the LimitRangeList in a human-friendly format.
-func printLimitRangeList(list *api.LimitRangeList, w io.Writer, withNamespace bool) error {
+func printLimitRangeList(list *api.LimitRangeList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for i := range list.Items {
-		if err := printLimitRange(&list.Items[i], w, withNamespace); err != nil {
+		if err := printLimitRange(&list.Items[i], w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printResourceQuota(resourceQuota *api.ResourceQuota, w io.Writer, withNamespace bool) error {
+func printResourceQuota(resourceQuota *api.ResourceQuota, w io.Writer, withNamespace bool, columnLabels []string) error {
 	var name string
 	if withNamespace {
 		name = types.NamespacedName{resourceQuota.Namespace, resourceQuota.Name}.String()
@@ -783,24 +825,24 @@ func printResourceQuota(resourceQuota *api.ResourceQuota, w io.Writer, withNames
 		name = resourceQuota.Name
 	}
 
-	_, err := fmt.Fprintf(
-		w, "%s\n",
-		name,
-	)
+	if _, err := fmt.Fprintf(w, "%s", name); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(resourceQuota.Labels, columnLabels))
 	return err
 }
 
 // Prints the ResourceQuotaList in a human-friendly format.
-func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer, withNamespace bool) error {
+func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for i := range list.Items {
-		if err := printResourceQuota(&list.Items[i], w, withNamespace); err != nil {
+		if err := printResourceQuota(&list.Items[i], w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printComponentStatus(item *api.ComponentStatus, w io.Writer, withNamespace bool) error {
+func printComponentStatus(item *api.ComponentStatus, w io.Writer, withNamespace bool, columnLabels []string) error {
 	status := "Unknown"
 	message := ""
 	error := ""
@@ -816,18 +858,47 @@ func printComponentStatus(item *api.ComponentStatus, w io.Writer, withNamespace 
 			break
 		}
 	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", item.Name, status, message, error)
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", item.Name, status, message, error); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
 	return err
 }
 
-func printComponentStatusList(list *api.ComponentStatusList, w io.Writer, withNamespace bool) error {
+func printComponentStatusList(list *api.ComponentStatusList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, item := range list.Items {
-		if err := printComponentStatus(&item, w, withNamespace); err != nil {
+		if err := printComponentStatus(&item, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func appendLabels(itemLabels map[string]string, columnLabels []string) string {
+	var buffer bytes.Buffer
+
+	for _, cl := range columnLabels {
+		buffer.WriteString(fmt.Sprint("\t"))
+		if il, ok := itemLabels[cl]; ok {
+			buffer.WriteString(fmt.Sprint(il))
+		} else {
+			buffer.WriteString("<n/a>")
+		}
+	}
+	buffer.WriteString("\n")
+
+	return buffer.String()
+}
+
+func formatLabelHeaders(columnLabels []string) []string {
+	formHead := make([]string, len(columnLabels))
+	for i, l := range columnLabels {
+		p := strings.Split(l, "/")
+		formHead[i] = strings.ToUpper((p[len(p)-1]))
+	}
+	return formHead
 }
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
@@ -837,10 +908,11 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	t := reflect.TypeOf(obj)
 	if handler := h.handlerMap[t]; handler != nil {
 		if !h.noHeaders && t != h.lastType {
-			h.printHeader(handler.columns, w)
+			headers := append(handler.columns, formatLabelHeaders(h.columnLabels)...)
+			h.printHeader(headers, w)
 			h.lastType = t
 		}
-		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(w), reflect.ValueOf(h.withNamespace)}
+		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(w), reflect.ValueOf(h.withNamespace), reflect.ValueOf(h.columnLabels)}
 		resultValue := handler.printFunc.Call(args)[0]
 		if resultValue.IsNil() {
 			return nil
