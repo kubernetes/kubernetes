@@ -275,6 +275,8 @@ _kubectl_describe()
 
     flags+=("--help")
     flags+=("-h")
+    flags+=("--selector=")
+    two_word_flags+=("-l")
 
     must_have_one_flag=()
     must_have_one_noun=()
