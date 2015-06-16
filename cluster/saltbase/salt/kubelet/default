@@ -75,5 +75,8 @@
   {% set system_container = "--system-container=/system" -%}
   {% set cgroup_root = "--cgroup_root=/" -%}
 {% endif -%}
+{% if grains['oscodename'] == 'vivid' -%}
+  {% set cgroup_root = "--cgroup_root=docker" -%}
+{% endif -%}
 
 DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{cgroup_root}} {{system_container}}"
