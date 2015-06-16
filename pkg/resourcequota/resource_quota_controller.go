@@ -17,7 +17,6 @@ limitations under the License.
 package resourcequota
 
 import (
-	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -63,19 +62,13 @@ func (rm *ResourceQuotaManager) synchronize() {
 		glog.Errorf("Synchronization error: %v (%#v)", err, err)
 	}
 	resourceQuotas = list.Items
-	wg := sync.WaitGroup{}
-	wg.Add(len(resourceQuotas))
 	for ix := range resourceQuotas {
-		go func(ix int) {
-			defer wg.Done()
-			glog.V(4).Infof("periodic sync of %v/%v", resourceQuotas[ix].Namespace, resourceQuotas[ix].Name)
-			err := rm.syncHandler(resourceQuotas[ix])
-			if err != nil {
-				glog.Errorf("Error synchronizing: %v", err)
-			}
-		}(ix)
+		glog.V(4).Infof("periodic sync of %v/%v", resourceQuotas[ix].Namespace, resourceQuotas[ix].Name)
+		err := rm.syncHandler(resourceQuotas[ix])
+		if err != nil {
+			glog.Errorf("Error synchronizing: %v", err)
+		}
 	}
-	wg.Wait()
 }
 
 // FilterQuotaPods eliminates pods that no longer have a cost against the quota
