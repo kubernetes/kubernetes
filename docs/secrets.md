@@ -103,17 +103,17 @@ start until all the pod's volumes are mounted.
 Once the kubelet has started a pod's containers, its secret volumes will not
 change, even if the secret resource is modified.  To change the secret used,
 the original pod must be deleted, and a new pod (perhaps with an identical
-PodSpec) must be created.  Therefore, updating a secret follows the same
+`PodSpec`) must be created.  Therefore, updating a secret follows the same
 workflow as deploying a new container image.  The `kubectl rolling-update`
 command can be used ([man page](kubectl_rolling-update.md)).
 
-The resourceVersion of the secret is not specified when it is referenced.
+The `resourceVersion` of the secret is not specified when it is referenced.
 Therefore, if a secret is updated at about the same time as pods are starting,
 then it is not defined which version of the secret will be used for the pod. It
 is not possible currently to check what resource version of a secret object was
 used when a pod was created.  It is planned that pods will report this
-information, so that a controller could restart ones using a old
-resourceVersion.  In the interim, if this is a concern, it is recommended to not
+information, so that a replication controller restarts ones using an old
+`resourceVersion`.  In the interim, if this is a concern, it is recommended to not
 update the data of existing secrets, but to create new ones with distinct names.
 
 ## Use cases

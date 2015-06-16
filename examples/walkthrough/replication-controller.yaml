@@ -4,11 +4,11 @@ metadata:
   name: nginx-controller
 spec:
   replicas: 2
-  # selector identifies the set of Pods that this
-  # replicaController is responsible for managing
+  # selector identifies the set of pods that this
+  # replication controller is responsible for managing
   selector:
     name: nginx
-  # podTemplate defines the 'cookie cutter' used for creating
+  # template defines the 'cookie cutter' used for creating
   # new pods when necessary
   template:
     metadata:
