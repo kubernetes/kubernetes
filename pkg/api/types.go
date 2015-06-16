@@ -2153,51 +2153,51 @@ type RangeAllocation struct {
 // AutoScaler monitors other resources that are resizeable and adjusts them according to configuration.
 type AutoScaler struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
 
 	// Spec defines the auto-scaler targets and thresholds.
-	Spec AutoScalerSpec `json:"spec,omitempty"`
+	Spec AutoScalerSpec `json:"spec,omitempty" description:"spec defines the auto-scaler targets and thresholds; http://docs.k8s.io/api-conventions.md#spec-and-status"`
 
 	// Status defines the actions the auto-scaler has taken.
-	Status AutoScalerStatus `json:"status,omitempty"`
+	Status AutoScalerStatus `json:"status,omitempty" description:"most recent status of an auto-scaler, populated by the auto-scale manager; http://docs.k8s.io/api-conventions.md#spec-and-status"`
 }
 
 // AutoScalerStatus provides the status of an auto-scaler.
 type AutoScalerStatus struct {
 	// Last autoscaler action trigger.
-	LastActionTrigger AutoScaleThreshold `json:"lastActionTrigger,omitempty"`
+	LastActionTrigger AutoScaleThreshold `json:"lastActionTrigger,omitempty" description:"threshold that triggered the last action"`
 
 	// Timestamp of the last autoscaler action.
-	LastActionTimestamp util.Time `json:"lastActionTimestamp,omitempty"`
+	LastActionTimestamp util.Time `json:"lastActionTimestamp,omitempty" description:"time of the last auto-scaler action"`
 }
 
 // AutoScalerSpec defines the auto-scaler targets and thresholds.
 type AutoScalerSpec struct {
 	// Thresholds holds a collection of AutoScaleThresholds that drive the auto-scaler.
-	Thresholds []AutoScaleThreshold `json:"thresholds,omitempty"`
+	Thresholds []AutoScaleThreshold `json:"thresholds,omitempty" description:"collection of thresholds that drive the auto-scaler"`
 
 	// MaxAutoScaleCount defines the max replicas that the auto-scaler can use.  This value must be
 	// >= MinAutoScaleCount.
-	MaxAutoScaleCount int `json:"maxAutoScaleCount,omitempty"`
+	MaxAutoScaleCount int `json:"maxAutoScaleCount,omitempty" description:"maximum replicas that the auto-scaler will scale upto"`
 
 	// MinAutoScaleCount defines the minimum number replicas that the auto-scaler can reduce to,
 	// 0 means that the application is allowed to idle.
-	MinAutoScaleCount int `json:"minAutoScaleCount,omitempty"`
+	MinAutoScaleCount int `json:"minAutoScaleCount,omitempty" description:"minumum replicas the auto-scaler will scale down to"`
 
 	// TargetSelector provides the resizeable target(s).  Right now this is a ReplicationController
 	// in the future it could be a job or any resource that implements resize.  If multiple targets
 	// are resolved by the selector the auto-scaler will resize the largest one.
-	TargetSelector map[string]string `json:"targetSelector,omitempty"`
+	TargetSelector map[string]string `json:"targetSelector,omitempty" description:"selector for the target the auto-scaler will resize"`
 
 	// Advisors defines a set of advisory sources that the auto-scaler
 	// uses to examine if thresholds are (b)reached.
-	Advisors []string `json:"advisors,omitempty"`
+	Advisors []string `json:"advisors,omitempty" description:"list of auto-scale advisors"`
 }
 
 // AutoScaleThreshold is a behavior based on statistics used to drive the auto-scaler in scaling decisions.
 type AutoScaleThreshold struct {
 	// Type is the type of threshold being used, intention or value.
-	Type AutoScaleThresholdType `json:"type,omitempty"`
+	Type AutoScaleThresholdType `json:"type,omitempty" description:"auto-scale threshold type; intention or value based"`
 
 	// Intentions holds the config for intention based thresholds.
 	// All the thresholds must be (b)reached for the auto-scale action
@@ -2208,28 +2208,28 @@ type AutoScaleThreshold struct {
 	//        defining multiple AutoScaleThresholds.
 	//        Example:  scale up if MaxRPS > 30
 	//            [OR]  scale up if ResponseTime > 200ms
-	Intentions []AutoScaleIntentionThresholdConfig `json:"intentions,omitempty"`
+	Intentions []AutoScaleIntentionThresholdConfig `json:"intentions,omitempty" description:"intentions describes the thresholds that must be reached in order for an auto-scaling action to be taken"`
 
 	// ActionType holds the auto-scaler action to take when the threshold is (b)reached.
-	ActionType AutoScaleActionType `json:"actionType,omitempty"`
+	ActionType AutoScaleActionType `json:"actionType,omitempty" description:"auto-scale action to take when the thresholds are reached"`
 
 	// How much to scale up/down by.
-	ScaleBy int `json:"scaleBy,omitempty"`
+	ScaleBy int `json:"scaleBy,omitempty" description:"replicas to scale up or down by"`
 }
 
 // AutoScaleIntentionThresholdConfig holds configuration for intention based thresholds.
 // The scaler will adjust by 1 accordingly and maintain once the intention is reached.
 type AutoScaleIntentionThresholdConfig struct {
 	// Intent is the lexicon of what intention is requested.
-	Intent AutoScaleIntentionType `json:"intent,omitempty"`
+	Intent AutoScaleIntentionType `json:"intent,omitempty" description:"requested auto-scale intention"`
 
 	// Value is intention dependent in terms of above, below, equal and represents
 	// the value to check against.
-	Value float32 `json:"value,omitempty"`
+	Value float32 `json:"value,omitempty" description:"threshold value to check the intention against"`
 
 	// Duration is the time interval (in seconds) for which we want to
 	// compare the intention threshold value.
-	Duration int `json:"duration,omitempty"`
+	Duration int `json:"duration,omitempty" description:"time interval to use for comparing the intention threshold; in seconds"`
 }
 
 // AutoScaleActionType defines the action to take when a condition is reached.
@@ -2277,8 +2277,8 @@ const (
 // AutoScalerList is a list of AutoScaler items
 type AutoScalerList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds"`
 
 	// Items is a list of AutoScaler objects.
-	Items []AutoScaler `json:"items"`
+	Items []AutoScaler `json:"items" description:"list of auto-scaler configurations"`
 }
