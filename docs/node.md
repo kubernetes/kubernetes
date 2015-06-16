@@ -2,7 +2,7 @@
 
 ## What is a node?
 
-`Node` is a worker node in Kubernetes, previously known as `Minion`. Node
+`Node` is a worker machine in Kubernetes, previously known as `Minion`. Node
 may be a VM or physical machine, depending on the cluster. Each node has
 the services necessary to run [Pods](pods.md) and be managed from the master
 systems. The services include docker, kubelet and network proxy. See
@@ -11,11 +11,13 @@ doc for more details.
 
 ## Node Status
 
-Node status describes current status of a node. For now, there are three
+Node status describes current status of a node. For now, there are the following
 pieces of information:
 
-### HostIP
+### Node Addresses
 
+<!--- TODO: this section is outdated. There is no HostIP field in the API,
+but there are addresses of type InternalIP and ExternalIP -->
 Host IP address is queried from cloudprovider and stored as part of node
 status. If kubernetes runs without cloudprovider, node's ID will be used.
 IP address can change, and there are different kind of IPs, e.g. public
@@ -37,11 +39,12 @@ scheduling Pods. For a node to be considered a scheduling candidate, it
 must have appropriate conditions, see below.
 
 ### Node Condition
-Node Condition describes the conditions of `Running` nodes. Current valid
-condition is `NodeReady`. In the future, we plan to add more. 
-`NodeReady` means kubelet is healthy and ready to accept pods. Different 
-condition provides different level of understanding for node health. 
-Node condition is represented as a json object. For example, 
+Node Condition describes the conditions of `Running` nodes. (However,
+it can be present also when node status is different, e.g. `Unknown`)
+Current valid condition is `Ready`. In the future, we plan to add more.
+`Ready` means kubelet is healthy and ready to accept pods. Different
+condition provides different level of understanding for node health.
+Node condition is represented as a json object. For example,
 the following conditions mean the node is in sane state:
 ```json
 "conditions": [
@@ -52,9 +55,20 @@ the following conditions mean the node is in sane state:
 ]
 ```
 
+### Node Capacity
+
+Describes the resources available on the node: CPUs, memory and the maximum
+number of pods that can be scheduled on this node.
+
+### Node Info
+General information about the node, for instance kernel version, kubernetes
+version, docker version (if used), OS name. The information is gathered by 
+Kubernetes from the node.
+
+
 ## Node Management
 
-Unlike [Pod](pods.md) and [Service](services.md), `Node` is not inherently
+Unlike [Pods](pods.md) and [Services](services.md), a Node is not inherently
 created by Kubernetes: it is either created from cloud providers like GCE,
 or from your physical or virtual machines. What this means is that when
 Kubernetes creates a node, it only creates a representation for the node.
@@ -73,10 +87,10 @@ For example, if you try to create a node from the following content:
 }
 ```
 
-Kubernetes will create a `Node` object internally (the representation), and
+Kubernetes will create a Node object internally (the representation), and
 validate the node by health checking based on the `metadata.name` field: we
 assume `metadata.name` can be resolved. If the node is valid, i.e. all necessary
-services are running, it is eligible to run a `Pod`; otherwise, it will be
+services are running, it is eligible to run a Pod; otherwise, it will be
 ignored for any cluster activity, until it becomes valid. Note that Kubernetes
 will keep invalid node unless explicitly deleted by client, and it will keep
 checking to see if it becomes valid.
@@ -86,13 +100,13 @@ Node Controller and Kube Admin.
 
 ### Node Controller
 
-Node controller is a component in Kubernetes master which manages `Node`
+Node controller is a component in Kubernetes master which manages Node
 objects. It performs two major functions: cluster-wide node synchronization
 and single node life-cycle management.
 
-Node controller has a sync loop that creates/deletes `Node`s from Kubernetes
+Node controller has a sync loop that creates/deletes Nodes from Kubernetes
 based on all matching VM instances listed from cloud provider. The sync period
-can be controlled via flag "--node_sync_period". If a new instance
+can be controlled via flag `--node_sync_period`. If a new instance
 gets created, Node Controller creates a representation for it. If an existing
 instance gets deleted, Node Controller deletes the representation. Note however,
 Node Controller is unable to provision the node for you, i.e. it won't install
@@ -108,7 +122,7 @@ register itself with the API server.  This is the preferred pattern, used by mos
 
 For self-registration, the kubelet is started with the following options:
   - `--apiservers=` tells the kubelet the location of the apiserver.
-  - `--kubeconfig` tells kubelet where to find credentials to authenticate itself to the apiserver.  
+  - `--kubeconfig` tells kubelet where to find credentials to authenticate itself to the apiserver.
   - `--cloud_provider=` tells the kubelet how to talk to a cloud provider to read metadata about itself.
   - `--register-node` tells the kubelet to create its own node resource.
 
