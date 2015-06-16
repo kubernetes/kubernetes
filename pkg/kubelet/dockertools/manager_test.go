@@ -898,7 +898,7 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 		// Create pod infra container.
 		"create", "start", "inspect_container",
 		// Create container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	fakeDocker.Lock()
@@ -947,7 +947,7 @@ func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 		// Create pod infra container.
 		"create", "start", "inspect_container",
 		// Create container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	fakeDocker.Lock()
@@ -999,7 +999,7 @@ func TestSyncPodWithPodInfraCreatesContainer(t *testing.T) {
 		// Inspect pod infra container (but does not create)"
 		"inspect_container",
 		// Create container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	fakeDocker.Lock()
@@ -1040,7 +1040,7 @@ func TestSyncPodDeletesWithNoPodInfraContainer(t *testing.T) {
 		// Create pod infra container.
 		"create", "start", "inspect_container",
 		// Create container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	// A map iteration is used to delete containers, so must not depend on
@@ -1165,7 +1165,7 @@ func TestSyncPodBadHash(t *testing.T) {
 		// Check the pod infra container.
 		"inspect_container",
 		// Kill and restart the bad hash container.
-		"inspect_container", "stop", "create", "start",
+		"inspect_container", "stop", "create", "start", "inspect_container",
 	})
 
 	if err := fakeDocker.AssertStopped([]string{"1234"}); err != nil {
@@ -1225,7 +1225,7 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 		// Kill the unhealthy container.
 		"inspect_container", "stop",
 		// Restart the unhealthy container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	if err := fakeDocker.AssertStopped([]string{"1234"}); err != nil {
@@ -1410,7 +1410,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 				// Check the pod infra container.
 				"inspect_container",
 				// Restart both containers.
-				"create", "start", "create", "start",
+				"create", "start", "inspect_container", "create", "start", "inspect_container",
 			},
 			[]string{"succeeded", "failed"},
 			[]string{},
@@ -1421,7 +1421,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 				// Check the pod infra container.
 				"inspect_container",
 				// Restart the failed container.
-				"create", "start",
+				"create", "start", "inspect_container",
 			},
 			[]string{"failed"},
 			[]string{},
@@ -1834,7 +1834,7 @@ func TestSyncPodWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 		// Check the pod infra container.
 		"inspect_container",
 		// Create container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	fakeDocker.Lock()

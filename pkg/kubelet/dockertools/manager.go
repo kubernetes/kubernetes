@@ -48,9 +48,11 @@ import (
 )
 
 const (
-	// The oom_score_adj of the POD infrastructure container. The default is 0, so
-	// any value below that makes it *less* likely to get OOM killed.
-	podOomScoreAdj = -100
+	// The oom_score_adj of the POD infrastructure container. The default is 0 for
+	// any other docker containers, so any value below that makes it *less* likely
+	// to get OOM killed.
+	podOomScoreAdj           = -100
+	userContainerOomScoreAdj = 0
 
 	maxReasonCacheEntries = 200
 
@@ -1195,6 +1197,28 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	if err = dm.os.Symlink(containerLogFile, symlinkFile); err != nil {
 		glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", podFullName, container.Name, err)
 	}
+
+	// Set OOM score of POD container to lower than those of the other containers
+	// which have OOM score 0 by default in the pod. This ensures that it is
+	// killed only as a last resort.
+	containerInfo, err := dm.client.InspectContainer(string(id))
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure the PID actually exists, else we'll move ourselves.
+	if containerInfo.State.Pid == 0 {
+		return "", fmt.Errorf("failed to get init PID for Docker container %q", string(id))
+	}
+	if container.Name == PodInfraContainerName {
+		util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
+	} else {
+		// Children processes of docker daemon will inheritant the OOM score from docker
+		// daemon process. We explicitly apply OOM score 0 by default to the user
+		// containers to avoid daemons or POD containers are killed by oom killer.
+		util.ApplyOomScoreAdj(containerInfo.State.Pid, userContainerOomScoreAdj)
+	}
+
 	return kubeletTypes.DockerID(id), err
 }
 
@@ -1249,19 +1273,6 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 		return "", err
 	}
 
-	// Set OOM score of POD container to lower than those of the other
-	// containers in the pod. This ensures that it is killed only as a last
-	// resort.
-	containerInfo, err := dm.client.InspectContainer(string(id))
-	if err != nil {
-		return "", err
-	}
-
-	// Ensure the PID actually exists, else we'll move ourselves.
-	if containerInfo.State.Pid == 0 {
-		return "", fmt.Errorf("failed to get init PID for Docker pod infra container %q", string(id))
-	}
-	util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
 	return id, nil
 }
 
