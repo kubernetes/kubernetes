@@ -59,22 +59,3 @@ func TestResourcePath(t *testing.T) {
 		}
 	}
 }
-
-func TestResourcePathWithNamespaceQuery(t *testing.T) {
-	testCases := []struct {
-		resource  string
-		namespace string
-		name      string
-		expected  string
-	}{
-		{"resource", "mynamespace", "myresource", "/api/" + Version() + "/namespaces/mynamespace/resource/myresource"},
-		{"resource", "", "myresource", "/api/" + Version() + "/resource/myresource"},
-		{"resource", "mynamespace", "", "/api/" + Version() + "/namespaces/mynamespace/resource"},
-		{"resource", "", "", "/api/" + Version() + "/resource"},
-	}
-	for _, item := range testCases {
-		if actual := ResourcePathWithNamespaceQuery(item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
-		}
-	}
-}

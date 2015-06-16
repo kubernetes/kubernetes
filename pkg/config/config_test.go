@@ -67,8 +67,8 @@ func TestCreateObjects(t *testing.T) {
 
 	typer, mapper := getTyperAndMapper()
 	client, s := getFakeClient(t, []string{
-		testapi.ResourcePathWithNamespaceQuery("pods", api.NamespaceDefault, ""),
-		testapi.ResourcePathWithNamespaceQuery("services", api.NamespaceDefault, ""),
+		testapi.ResourcePath("pods", api.NamespaceDefault, ""),
+		testapi.ResourcePath("services", api.NamespaceDefault, ""),
 	})
 
 	errs := CreateObjects(typer, mapper, client, items)

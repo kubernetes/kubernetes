@@ -170,7 +170,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		if !exists {
 			continue
 		}
-		handler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("pods", "bar", "foo"), "GET", nil)
+		handler.ValidateRequest(t, testapi.ResourcePath("pods", "bar", "foo"), "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
@@ -241,7 +241,7 @@ func TestBind(t *testing.T) {
 			continue
 		}
 		expectedBody := runtime.EncodeOrDie(testapi.Codec(), item.binding)
-		handler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("bindings", api.NamespaceDefault, ""), "POST", &expectedBody)
+		handler.ValidateRequest(t, testapi.ResourcePath("bindings", api.NamespaceDefault, ""), "POST", &expectedBody)
 	}
 }
 

@@ -22,7 +22,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -79,20 +78,17 @@ func SelfLink(resource, name string) string {
 
 // Returns the appropriate path for the given prefix (watch, proxy, redirect, etc), resource, namespace and name.
 // For ex, this is of the form:
-// /api/v1beta1/watch/pods/pod0 for v1beta1 and
-// /api/v1beta3/watch/namespaces/foo/pods/pod0 for v1beta3.
+// /api/v1/watch/namespaces/foo/pods/pod0 for v1.
 func ResourcePathWithPrefix(prefix, resource, namespace, name string) string {
 	path := "/api/" + Version()
 	if prefix != "" {
 		path = path + "/" + prefix
 	}
-	if !api.PreV1Beta3(Version()) {
-		if namespace != "" {
-			path = path + "/namespaces/" + namespace
-		}
-		// Resource names in v1beta3 are lower case.
-		resource = strings.ToLower(resource)
+	if namespace != "" {
+		path = path + "/namespaces/" + namespace
 	}
+	// Resource names are lower case.
+	resource = strings.ToLower(resource)
 	if resource != "" {
 		path = path + "/" + resource
 	}
@@ -108,21 +104,4 @@ func ResourcePathWithPrefix(prefix, resource, namespace, name string) string {
 // /api/v1beta3/namespaces/foo/pods/pod0 for v1beta3.
 func ResourcePath(resource, namespace, name string) string {
 	return ResourcePathWithPrefix("", resource, namespace, name)
-}
-
-// Returns the appropriate path along with the query params for the given resource, namespace and name.
-// For ex, this is of the form:
-// /api/v1beta1/pods/pod0?namespace=foo for v1beta1 and
-// /api/v1beta3/namespaces/foo/pods/pod0 for v1beta3.
-func ResourcePathWithNamespaceQuery(resource, namespace, name string) string {
-	return ResourcePathWithPrefixAndNamespaceQuery("", resource, namespace, name)
-}
-
-func ResourcePathWithPrefixAndNamespaceQuery(prefix, resource, namespace, name string) string {
-	path := ResourcePathWithPrefix(prefix, resource, namespace, name)
-	// Add namespace as query param for pre v1beta3.
-	if api.PreV1Beta3(Version()) && namespace != "" {
-		path = path + "?namespace=" + namespace
-	}
-	return path
 }
