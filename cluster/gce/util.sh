@@ -825,10 +825,14 @@ function kube-down {
 
   # Delete routes.
   local -a routes
-  # Clean up all routes w/ names like "<cluster-name>-minion-<4-char-node-identifier>"
-  # e.g. "kubernetes-minion-2pl1"
+  # Clean up all routes w/ names like "<cluster-name>-<node-GUID>"
+  # e.g. "kubernetes-12345678-90ab-cdef-1234-567890abcdef". The name is
+  # determined by the node controller on the master.
+  # Note that this is currently a noop, as synchronously deleting the node MIG
+  # first allows the master to cleanup routes itself.
+  local TRUNCATED_PREFIX="${INSTANCE_PREFIX:0:26}"
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
-    --regexp "${INSTANCE_PREFIX}-minion-.{4}" | awk 'NR >= 2 { print $1 }') )
+    --regexp "${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}" | awk 'NR >= 2 { print $1 }') )
   while (( "${#routes[@]}" > 0 )); do
     echo Deleting routes "${routes[*]::10}"
     gcloud compute routes delete \
