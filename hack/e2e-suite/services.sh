@@ -280,8 +280,8 @@ function verify_from_container() {
   echo "waiting for $1 at $2:$3"
   results=($(ssh-to-node "${test_node}" "
       set -e;
-      sudo docker pull busybox >/dev/null;
-      sudo docker run busybox sh -c '
+      sudo docker pull gcr.io/google_containers/busybox >/dev/null;
+      sudo docker run gcr.io/google_containers/busybox sh -c '
           for i in $(seq -s' ' 1 $(($4*3))); do
             if wget -q -T 3 -O - http://$2:$3; then
               echo

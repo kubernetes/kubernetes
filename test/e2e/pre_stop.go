@@ -76,7 +76,7 @@ func testPreStop(c *client.Client, ns string) {
 			Containers: []api.Container{
 				{
 					Name:    "tester",
-					Image:   "busybox",
+					Image:   "gcr.io/google_containers/busybox",
 					Command: []string{"sleep", "600"},
 					Lifecycle: &api.Lifecycle{
 						PreStop: &api.Handler{
