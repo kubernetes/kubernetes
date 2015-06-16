@@ -55,7 +55,7 @@ MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 # Be sure to map all the ephemeral drives.  We can specify more than we actually have.
 # TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
 #  only affects the big storage instance types, which aren't a typical use case right now.
-BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\": \"/dev/sdb\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral3\"}]"
+BLOCK_DEVICE_MAPPINGS="{\"DeviceName\": \"/dev/sdb\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral3\"}"
 
 function json_val {
     python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
@@ -724,6 +724,9 @@ function kube-up {
   # HTTPS to the master is allowed (for API access)
   authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
 
+  master_volume_mapping="{\"DeviceName\": \"/dev/sdh\",\"Ebs\":{\"DeleteOnTermination\":false,\"VolumeSize\":${MASTER_DISK_SIZE},\"VolumeType\":\"${MASTER_DISK_TYPE}\"}}"
+  master_block_device_mappings="[${master_volume_mapping},${BLOCK_DEVICE_MAPPINGS}]"
+
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
     echo "#! /bin/bash"
@@ -756,6 +759,7 @@ function kube-up {
     echo "readonly KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN}'"
     echo "readonly DOCKER_STORAGE='${DOCKER_STORAGE:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/setup-master-pd.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
@@ -772,7 +776,7 @@ function kube-up {
     --key-name ${AWS_SSH_KEY_NAME} \
     --security-group-ids ${MASTER_SG_ID} \
     --associate-public-ip-address \
-    --block-device-mappings "${BLOCK_DEVICE_MAPPINGS}" \
+    --block-device-mappings "${master_block_device_mappings}" \
     --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
@@ -809,6 +813,16 @@ function kube-up {
     attempt=$(($attempt+1))
     sleep 10
   done
+
+  # Master is ready, find the id of the root ebs device
+  # This assumes that the root device will be the first device listed in the response"
+  master_volume_id=$($AWS_CMD describe-instance-attribute \
+    --instance-id $master_id \
+    --attribute blockDeviceMapping | \
+    json_val '["BlockDeviceMappings"][0]["Ebs"]["VolumeId"]')
+
+  add-tag $master_volume_id Name ${MASTER_NAME}-pd
+  add-tag $master_volume_id KubernetesCluster ${CLUSTER_ID}
 
   # Check for SSH connectivity
   attempt=0
@@ -878,7 +892,7 @@ function kube-up {
       --key-name ${AWS_SSH_KEY_NAME} \
       --security-groups ${MINION_SG_ID} \
       ${public_ip_option} \
-      --block-device-mappings "${BLOCK_DEVICE_MAPPINGS}" \
+      --block-device-mappings "[${BLOCK_DEVICE_MAPPINGS}]" \
       --user-data "file://${KUBE_TEMP}/minion-user-data"
 
   echo "Creating autoscaling group"
