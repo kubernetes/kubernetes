@@ -17,7 +17,7 @@ Enter `Services`.
 A Kubernetes `Service` is an abstraction which defines a logical set of `Pods`
 and a policy by which to access them - sometimes called a micro-service.  The
 set of `Pods` targeted by a `Service` is (usually) determined by a [`Label
-Selector`](labels.md) (see below for why you might want a `Service` without a
+Selector`](labels.md#label-selectors) (see below for why you might want a `Service` without a
 selector).
 
 As an example, consider an image-processing backend which is running with 3
@@ -70,13 +70,13 @@ also named "my-service".
 Note that a `Service` can map an incoming port to any `targetPort`.  By default
 the `targetPort` is the same as the `port` field.  Perhaps more interesting is
 that `targetPort` can be a string, referring to the name of a port in the
-backend `Pod`s.  The actual port number assigned to that name can be different
+backend `Pods`.  The actual port number assigned to that name can be different
 in each backend `Pod`. This offers a lot of flexibility for deploying and
-evolving your `Service`s.  For example, you can change the port number that
+evolving your `Services`.  For example, you can change the port number that
 pods expose in the next version of your backend software, without breaking
 clients.
 
-Kubernetes `Service`s support `TCP` and `UDP` for protocols.  The default
+Kubernetes `Services` support `TCP` and `UDP` for protocols.  The default
 is `TCP`.
 
 ### Services without selectors
@@ -161,12 +161,12 @@ By default, the choice of backend is random.  Client-IP based session affinity
 can be selected by setting `service.spec.sessionAffinity` to `"ClientIP"` (the
 default is `"None"`).
 
-As of Kubernetes 1.0, `Service`s are a "layer 3" (TCP/UDP over IP) construct.  We do not
+As of Kubernetes 1.0, `Services` are a "layer 3" (TCP/UDP over IP) construct.  We do not
 yet have a concept of "layer 7" (HTTP) services.
 
 ## Multi-Port Services
 
-Many `Service`s need to expose more than one port.  For this case, Kubernetes
+Many `Services` need to expose more than one port.  For this case, Kubernetes
 supports multiple port definitions on a `Service` object.  When using multiple
 ports you must give all of your ports names, so that endpoints can be
 disambiguated.  For example:
@@ -260,7 +260,8 @@ variables will not be populated.  DNS does not have this restriction.
 
 ### DNS
 
-An optional (though strongly recommended) cluster add-on is a DNS server.  The
+An optional (though strongly recommended) [cluster
+add-on](../cluster/add-ons/README.md) is a DNS server.  The
 DNS server watches the Kubernetes API for new `Services` and creates a set of
 DNS records for each.  If DNS has been enabled throughout the cluster then all
 `Pods` should be able to do name resolution of `Services` automatically.
@@ -268,11 +269,11 @@ DNS records for each.  If DNS has been enabled throughout the cluster then all
 For example, if you have a `Service` called "my-service" in Kubernetes
 `Namespace` "my-ns" a DNS record for "my-service.my-ns" is created.  `Pods`
 which exist in the "my-ns" `Namespace` should be able to find it by simply doing
-a name lookup for "my-service".  `Pods` which exist in other `Namespace`s must
+a name lookup for "my-service".  `Pods` which exist in other `Namespaces` must
 qualify the name as "my-service.my-ns".  The result of these name lookups is the
 cluster IP.
 
-We will soon add DNS support for multi-port `Service`s in the form of SRV
+We will soon add DNS support for multi-port `Services` in the form of SRV
 records.
 
 ## Headless services
@@ -280,10 +281,10 @@ records.
 Sometimes you don't need or want load-balancing and a single service IP.  In
 this case, you can create "headless" services by specifying `"None"` for the
 cluster IP (`spec.clusterIP`).
-For such `Service`s, a cluster IP is not allocated and service-specific
-environment variables for `Pod`s are not created.  DNS is configured to return
+For such `Services`, a cluster IP is not allocated and service-specific
+environment variables for `Pods` are not created.  DNS is configured to return
 multiple A records (addresses) for the `Service` name, which point directly to
-the `Pod`s backing the `Service`.  Additionally, the kube proxy does not handle
+the `Pods` backing the `Service`.  Additionally, the kube proxy does not handle
 these services and there is no load balancing or proxying done by the platform
 for them.  The endpoints controller will still create `Endpoints` records in
 the API.
@@ -401,9 +402,9 @@ eliminate userspace proxying in favor of doing it all in iptables.  This should
 perform better and fix the source-IP obfuscation, though is less flexible than
 arbitrary userspace code.
 
-We intend to have first-class support for L7 (HTTP) `Service`s.
+We intend to have first-class support for L7 (HTTP) `Services`.
 
-We intend to have more flexible ingress modes for `Service`s which encompass
+We intend to have more flexible ingress modes for `Services` which encompass
 the current `ClusterIP`, `NodePort`, and `LoadBalancer` modes and more.
 
 ## The gory details of virtual IPs
@@ -457,7 +458,7 @@ backend, and starts proxying traffic from the client to the backend.
 
 This means that `Service` owners can choose any port they want without risk of
 collision.  Clients can simply connect to an IP and port, without being aware
-of which `Pod`s they are actually accessing.
+of which `Pods` they are actually accessing.
 
 ![Services detailed diagram](services_detail.png)
 
