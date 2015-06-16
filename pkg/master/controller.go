@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/endpoints"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
@@ -157,8 +158,14 @@ func (c *Controller) CreateMasterServiceIfNeeded(serviceName string, serviceIP n
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),
 			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeClusterIP,
 		},
 	}
+
+	if err := rest.BeforeCreate(rest.Services, ctx, svc); err != nil {
+		return err
+	}
+
 	_, err := c.ServiceRegistry.CreateService(ctx, svc)
 	if err != nil && errors.IsAlreadyExists(err) {
 		err = nil
