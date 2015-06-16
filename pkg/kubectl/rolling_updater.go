@@ -94,35 +94,34 @@ func CreateNewControllerFromCurrentController(c *client.Client, namespace, oldNa
 		return nil, err
 	}
 
-
 	// targetContainer will hold the index of the container that should be updated.
 	var targetContainer int
 	var targetContainerFound bool
 
 	switch {
-		// Pod has no containers - abort. (Same as earlier behavior)
-		case len(newRc.Spec.Template.Spec.Containers) == 0:
-			return nil, goerrors.New(fmt.Sprintf("pod has no containers! (%v)", newRc))
-		// no container name specified, and only one container in Pod - update it. (same as earlier behavior)
-		case containerName == "" && len(newRc.Spec.Template.Spec.Containers) == 1:
-			targetContainer = 0
-		// no container name specified, and multiple containers in Pod - abort. (same as earlier behavior)
-		case containerName == "" && len(newRc.Spec.Template.Spec.Containers) > 1:
-			return nil, goerrors.New("container name must be specified to image update a multi-container pod")
-		// Find container by liternal name match. TODO - maybe this should be more general label matching?
-		case containerName != "":
-			for containerIndex := 0; containerIndex < len(newRc.Spec.Template.Spec.Containers); containerIndex++ {
-				if newRc.Spec.Template.Spec.Containers[containerIndex].Name == containerName {
-					targetContainer = containerIndex
-					targetContainerFound = true
-					break
-				}
+	// Pod has no containers - abort. (Same as earlier behavior)
+	case len(newRc.Spec.Template.Spec.Containers) == 0:
+		return nil, goerrors.New(fmt.Sprintf("pod has no containers! (%v)", newRc))
+	// no container name specified, and only one container in Pod - update it. (same as earlier behavior)
+	case containerName == "" && len(newRc.Spec.Template.Spec.Containers) == 1:
+		targetContainer = 0
+	// no container name specified, and multiple containers in Pod - abort. (same as earlier behavior)
+	case containerName == "" && len(newRc.Spec.Template.Spec.Containers) > 1:
+		return nil, goerrors.New("container name must be specified to image update a multi-container pod")
+	// Find container by liternal name match. TODO - maybe this should be more general label matching?
+	case containerName != "":
+		for containerIndex := 0; containerIndex < len(newRc.Spec.Template.Spec.Containers); containerIndex++ {
+			if newRc.Spec.Template.Spec.Containers[containerIndex].Name == containerName {
+				targetContainer = containerIndex
+				targetContainerFound = true
+				break
 			}
-			if ! targetContainerFound {
-				return nil, goerrors.New(fmt.Sprintf("container %s not found in replication controller '%v'", containerName, newRc.Name))
-			}
-		default:
-			return nil, goerrors.New("unknown failure generating replication controller")
+		}
+		if !targetContainerFound {
+			return nil, goerrors.New(fmt.Sprintf("container %s not found in replication controller '%v'", containerName, newRc.Name))
+		}
+	default:
+		return nil, goerrors.New("unknown failure generating replication controller")
 	}
 
 	newRc.Spec.Template.Spec.Containers[targetContainer].Image = image
