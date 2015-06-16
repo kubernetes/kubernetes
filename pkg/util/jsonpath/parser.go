@@ -172,20 +172,23 @@ Loop:
 	if value == nil {
 		return fmt.Errorf("incorrect array index")
 	}
-	params := [3]int{}
-	exist := [3]bool{true, true, true}
 	value = value[1:]
-	params[0], _ = strconv.Atoi(value[0])
 	for i := 1; i < 3; i++ {
 		if value[i] != "" {
 			value[i] = value[i][1:]
-			params[i], _ = strconv.Atoi(value[i])
-		} else {
-			exist[i] = false
-			params[i] = 0
 		}
 	}
-	cur.append(newArray(params, exist))
+	params := [3]ParamsEntry{}
+	for i := 0; i < 3; i++ {
+		if value[i] != "" {
+			params[i].Exists = true
+			params[i].Value, _ = strconv.Atoi(value[i])
+		} else {
+			params[i].Exists = false
+			params[i].Value = 0
+		}
+	}
+	cur.append(newArray(params))
 	return p.parseInsideAction(cur)
 }
 

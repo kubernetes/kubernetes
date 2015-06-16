@@ -34,7 +34,7 @@ var parserTests = []parserTest{
 	{"quote", `hello ${"${"}`,
 		[]Node{newText("hello "), newList(), newText("${")}},
 	{"array", `hello ${[1:3]}`,
-		[]Node{newText("hello "), newList(), newArray([3]int{1, 3, 0}, [3]bool{true, true, false})}},
+		[]Node{newText("hello "), newList(), newArray([3]ParamsEntry{{1, true}, {3, true}, {0, false}})}},
 	{"filter", `${[?(@.price<3)]}`,
 		[]Node{newList(), newFilter("@.price", "<", "3")}},
 }

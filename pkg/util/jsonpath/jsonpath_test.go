@@ -21,105 +21,47 @@ import (
 	"testing"
 )
 
-func TestPlainText(t *testing.T) {
-	text := "hello jsonpath"
-	j := NewJSONPath("plain")
-	err := j.Parse(text)
-	if err != nil {
-		t.Errorf("parse plain text %s error %v", text, err)
-	}
-	buf := new(bytes.Buffer)
-	err = j.Execute(buf, nil)
-	if err != nil {
-		t.Errorf("execute plain text error %v", err)
-	}
-	out := buf.String()
-	if out != text {
-		t.Errorf("expect to get %s, got %s", text, out)
-	}
+type jsonpathTest struct {
+	name     string
+	template string
+	input    interface{}
+	expect   string
 }
 
-func TestVariable(t *testing.T) {
-	text := "hello ${.jsonpath}"
-	j := NewJSONPath("variable")
-	err := j.Parse(text)
-	if err != nil {
-		t.Errorf("parse variable %s error %v", text, err)
-	}
-	buf := new(bytes.Buffer)
-	err = j.Execute(buf, struct{ jsonpath string }{jsonpath: "world"})
-	if err != nil {
-		t.Errorf("execute variable error %v", err)
-	}
-	out := buf.String()
-	expect := "hello world"
-	if out != expect {
-		t.Errorf("expect to get %s, got %s", expect, out)
-	}
+var jsonpathTests = []jsonpathTest{
+	{"plain", "hello jsonpath", nil, "hello jsonpath"},
+	{"variable", "hello ${.v}", A{v: "world"}, "hello world"},
+	{"nest", "hello ${.a.v}", B{a: A{v: "world"}}, "hello world"},
+	{"quote", `${"${"}`, nil, "${"},
+	{"array", "${[0:2]}", []string{"Monday", "Tudesday"}, "[Monday, Tudesday]"},
 }
 
-func TestNestedDict(t *testing.T) {
-	text := "hello ${.jsonpath.title}"
-	j := NewJSONPath("nestedDict")
-	err := j.Parse(text)
-	if err != nil {
-		t.Errorf("parse nested dict %s error %v", text, err)
-	}
-	buf := new(bytes.Buffer)
-
-	type inner struct {
-		title string
-	}
-	type outer struct {
-		jsonpath inner
-	}
-	err = j.Execute(buf, outer{jsonpath: inner{title: "world"}})
-	if err != nil {
-		t.Errorf("execute variable error %v", err)
-	}
-	out := buf.String()
-	expect := "hello world"
-	if out != expect {
-		t.Errorf("expect to get %s, got %s", expect, out)
-	}
+// only for test use
+type A struct {
+	v string
 }
 
-func TestQuote(t *testing.T) {
-	text := `hello ${"${"}`
-	j := NewJSONPath("quote")
-	err := j.Parse(text)
-	if err != nil {
-		t.Errorf("parse quote %s error %v", text, err)
-	}
-	buf := new(bytes.Buffer)
-	err = j.Execute(buf, nil)
-	if err != nil {
-		t.Errorf("execute quote error %v", err)
-	}
-	out := buf.String()
-	expect := "hello ${"
-	if out != expect {
-		t.Errorf("expect to get %s, got %s", expect, out)
-	}
-
+// only for test use
+type B struct {
+	v string
+	a A
 }
 
-func TestArray(t *testing.T) {
-	text := "hello ${[0:2]}"
-	j := NewJSONPath("array")
-	err := j.Parse(text)
-	if err != nil {
-		t.Errorf("parse array %s error %v", text, err)
-	}
-	buf := new(bytes.Buffer)
-	testSlice := []string{"Monday", "Tudesday"}
-	err = j.Execute(buf, testSlice)
-	if err != nil {
-		t.Errorf("execute array error %v", err)
-	}
-	out := buf.String()
-	expect := "hello [Monday, Tudesday]"
-	if out != expect {
-		t.Errorf("expect to get %s, got %s", expect, out)
+func TestJSONPath(t *testing.T) {
+	for _, test := range jsonpathTests {
+		j := NewJSONPath(test.name)
+		err := j.Parse(test.template)
+		if err != nil {
+			t.Errorf("in %s, parse %s error %v", test.name, test.template, err)
+		}
+		buf := new(bytes.Buffer)
+		err = j.Execute(buf, test.input)
+		if err != nil {
+			t.Errorf("in %s, execute error %v", err)
+		}
+		out := buf.String()
+		if out != test.expect {
+			t.Errorf("in %s, expect to get %s, got %s", test.name, test.expect, out)
+		}
 	}
 }

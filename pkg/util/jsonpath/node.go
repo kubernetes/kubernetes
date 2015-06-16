@@ -97,24 +97,30 @@ func (f *FieldNode) String() string {
 	return fmt.Sprintf("%s: %s", f.Type(), f.Value)
 }
 
-type ArrayNode struct {
-	NodeType
-	Params [3]int //start, end, step
-	Exist  [3]bool
+// ParamsEntry holds param information for ArrayNode
+type ParamsEntry struct {
+	Value  int
+	Exists bool
 }
 
-func newArray(params [3]int, exist [3]bool) *ArrayNode {
+// ArrayNode holds start, end, step information for array index selection
+type ArrayNode struct {
+	NodeType
+	Params [3]ParamsEntry //start, end, step
+}
+
+func newArray(params [3]ParamsEntry) *ArrayNode {
 	return &ArrayNode{
 		NodeType: NodeArray,
 		Params:   params,
-		Exist:    exist,
 	}
 }
 
 func (a *ArrayNode) String() string {
-	return fmt.Sprintf("%s: %v %v", a.Type(), a.Params, a.Exist)
+	return fmt.Sprintf("%s: %v", a.Type(), a.Params)
 }
 
+// FilterNode holds operand and operator information for filter
 type FilterNode struct {
 	NodeType
 	Left, Operator, Right string
