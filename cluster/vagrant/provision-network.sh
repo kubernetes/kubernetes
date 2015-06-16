@@ -50,7 +50,7 @@ function provision-network {
     echo "Add ovs bridge"
     ovs-vsctl del-br ${OVS_SWITCH} || true
     ovs-vsctl add-br ${OVS_SWITCH} -- set Bridge ${OVS_SWITCH} fail-mode=secure
-    ovs-vsctl set bridge ${OVS_SWITCH} protocols=OpenFlow13
+    ovs-vsctl set bridge ${OVS_SWITCH} protocols=OpenFlow10,OpenFlow11,OpenFlow12,OpenFlow13
     ovs-vsctl del-port ${OVS_SWITCH} ${TUNNEL_BASE}0 || true
     ovs-vsctl add-port ${OVS_SWITCH} ${TUNNEL_BASE}0 -- set Interface ${TUNNEL_BASE}0 type=${TUNNEL_BASE} options:remote_ip="flow" options:key="flow" ofport_request=10
 
