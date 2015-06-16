@@ -258,9 +258,11 @@ func (v *DirectoryVisitor) ignoreFile(path string) bool {
 }
 
 func (v *DirectoryVisitor) Visit(fn VisitorFunc) error {
-	return filepath.Walk(v.Path, func(path string, fi os.FileInfo, err error) error {
+	errs := []error{}
+	err := filepath.Walk(v.Path, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			errs = append(errs, err)
+			return nil
 		}
 
 		if fi.IsDir() {
@@ -275,21 +277,34 @@ func (v *DirectoryVisitor) Visit(fn VisitorFunc) error {
 
 		data, err := ioutil.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("unable to read %q: %v", path, err)
+			errs = append(errs, fmt.Errorf("unable to read %q: %v", path, err))
+			return nil
 		}
 		if err := ValidateSchema(data, v.Schema); err != nil {
-			return fmt.Errorf("error validating %q: %v", path, err)
+			errs = append(errs, fmt.Errorf("error validating %q: %v", path, err))
+			return nil
 		}
 		info, err := v.Mapper.InfoForData(data, path)
 		if err != nil {
 			if !v.IgnoreErrors {
-				return err
+				errs = append(errs, err)
+				return nil
 			}
-			fmt.Fprintf(os.Stderr, "error: unable to load file %q: %v\n", path, err)
+			errs = append(errs, fmt.Errorf("error: unable to load file %q: %v\n", path, err))
 			return nil
 		}
-		return fn(info)
+		if err := fn(info); err != nil {
+			errs = append(errs, fmt.Errorf("error visiting %q: %v", path, err))
+		}
+		return nil
 	})
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) == 1 {
+		return errs[0]
+	}
+	return errors.NewAggregate(errs)
 }
 
 // URLVisitor downloads the contents of a URL, and if successful, returns
