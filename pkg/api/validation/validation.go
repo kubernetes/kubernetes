@@ -1315,15 +1315,64 @@ func ValidateLimitRange(limitRange *api.LimitRange) errs.ValidationErrorList {
 	allErrs = append(allErrs, ValidateObjectMeta(&limitRange.ObjectMeta, true, ValidateLimitRangeName).Prefix("metadata")...)
 
 	// ensure resource names are properly qualified per docs/resources.md
+	limitTypeSet := map[api.LimitType]bool{}
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
+		_, found := limitTypeSet[limit.Type]
+		if found {
+			allErrs = append(allErrs, errs.NewFieldDuplicate(fmt.Sprintf("spec.limits[%d].type", i), limit.Type))
+		}
+		limitTypeSet[limit.Type] = true
+
+		keys := util.StringSet{}
+		min := map[string]int64{}
+		max := map[string]int64{}
+		defaults := map[string]int64{}
+
 		for k := range limit.Max {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].max[%s]", i, k))...)
+			keys.Insert(string(k))
+			q := limit.Max[k]
+			max[string(k)] = q.Value()
 		}
 		for k := range limit.Min {
 			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].min[%s]", i, k))...)
+			keys.Insert(string(k))
+			q := limit.Min[k]
+			min[string(k)] = q.Value()
+		}
+		for k := range limit.Default {
+			allErrs = append(allErrs, validateResourceName(string(k), fmt.Sprintf("spec.limits[%d].default[%s]", i, k))...)
+			keys.Insert(string(k))
+			q := limit.Default[k]
+			defaults[string(k)] = q.Value()
+		}
+
+		for k := range keys {
+			minValue, minValueFound := min[k]
+			maxValue, maxValueFound := max[k]
+			defaultValue, defaultValueFound := defaults[k]
+
+			if minValueFound && maxValueFound && minValue > maxValue {
+				minQuantity := limit.Min[api.ResourceName(k)]
+				maxQuantity := limit.Max[api.ResourceName(k)]
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].max[%s]", i, k), minValue, fmt.Sprintf("min value %s is greater than max value %s", minQuantity.String(), maxQuantity.String())))
+			}
+
+			if defaultValueFound && minValueFound && minValue > defaultValue {
+				minQuantity := limit.Min[api.ResourceName(k)]
+				defaultQuantity := limit.Default[api.ResourceName(k)]
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].max[%s]", i, k), minValue, fmt.Sprintf("min value %s is greater than default value %s", minQuantity.String(), defaultQuantity.String())))
+			}
+
+			if defaultValueFound && maxValueFound && defaultValue > maxValue {
+				maxQuantity := limit.Max[api.ResourceName(k)]
+				defaultQuantity := limit.Default[api.ResourceName(k)]
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("spec.limits[%d].max[%s]", i, k), minValue, fmt.Sprintf("default value %s is greater than max value %s", defaultQuantity.String(), maxQuantity.String())))
+			}
 		}
 	}
+
 	return allErrs
 }
 

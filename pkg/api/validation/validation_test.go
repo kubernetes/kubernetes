@@ -2670,6 +2670,64 @@ func TestValidateLimitRange(t *testing.T) {
 					api.ResourceCPU:    resource.MustParse("0"),
 					api.ResourceMemory: resource.MustParse("100"),
 				},
+				Default: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("50"),
+					api.ResourceMemory: resource.MustParse("500"),
+				},
+			},
+		},
+	}
+
+	invalidSpecDuplicateType := api.LimitRangeSpec{
+		Limits: []api.LimitRangeItem{
+			{
+				Type: api.LimitTypePod,
+				Max: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("100"),
+					api.ResourceMemory: resource.MustParse("10000"),
+				},
+				Min: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("0"),
+					api.ResourceMemory: resource.MustParse("100"),
+				},
+			},
+			{
+				Type: api.LimitTypePod,
+				Min: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("0"),
+					api.ResourceMemory: resource.MustParse("100"),
+				},
+			},
+		},
+	}
+
+	invalidSpecRangeMaxLessThanMin := api.LimitRangeSpec{
+		Limits: []api.LimitRangeItem{
+			{
+				Type: api.LimitTypePod,
+				Max: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("10"),
+				},
+				Min: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("1000"),
+				},
+			},
+		},
+	}
+
+	invalidSpecRangeDefaultOutsideRange := api.LimitRangeSpec{
+		Limits: []api.LimitRangeItem{
+			{
+				Type: api.LimitTypePod,
+				Max: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("1000"),
+				},
+				Min: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("100"),
+				},
+				Default: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("2000"),
+				},
 			},
 		},
 	}
@@ -2710,6 +2768,18 @@ func TestValidateLimitRange(t *testing.T) {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
 			dns1123LabelErrorMsg,
 		},
+		"duplicate limit type": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecDuplicateType},
+			"",
+		},
+		"min value 1k is greater than max value 10": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeMaxLessThanMin},
+			"min value 1k is greater than max value 10",
+		},
+		"invalid spec default outside range": {
+			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidSpecRangeDefaultOutsideRange},
+			"default value 2k is greater than max value 1k",
+		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateLimitRange(&v.R)
@@ -2717,11 +2787,7 @@ func TestValidateLimitRange(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			field := errs[i].(*errors.ValidationError).Field
 			detail := errs[i].(*errors.ValidationError).Detail
-			if field != "metadata.name" && field != "metadata.namespace" {
-				t.Errorf("%s: missing prefix for: %v", k, errs[i])
-			}
 			if detail != v.D {
 				t.Errorf("%s: expected error detail either empty or %s, got %s", k, v.D, detail)
 			}
@@ -2787,7 +2853,7 @@ func TestValidateResourceQuota(t *testing.T) {
 			field := errs[i].(*errors.ValidationError).Field
 			detail := errs[i].(*errors.ValidationError).Detail
 			if field != "metadata.name" && field != "metadata.namespace" {
-				t.Errorf("%s: missing prefix for: %v", k, errs[i])
+				t.Errorf("%s: missing prefix for: %v", k, field)
 			}
 			if detail != v.D {
 				t.Errorf("%s: expected error detail either empty or %s, got %s", k, v.D, detail)
