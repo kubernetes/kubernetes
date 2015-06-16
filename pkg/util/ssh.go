@@ -32,8 +32,29 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 )
+
+var (
+	tunnelOpenCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "ssh_tunnel_open_count",
+			Help: "Counter of ssh tunnel total open attempts",
+		},
+	)
+	tunnelOpenFailCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "ssh_tunnel_open_fail_count",
+			Help: "Counter of ssh tunnel failed open attempts",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(tunnelOpenCounter)
+	prometheus.MustRegister(tunnelOpenFailCounter)
+}
 
 // TODO: Unit tests for this code, we can spin up a test SSH server with instructions here:
 // https://godoc.org/golang.org/x/crypto/ssh#ServerConn
@@ -83,7 +104,9 @@ func makeSSHTunnel(user string, signer ssh.Signer, host string) (*SSHTunnel, err
 func (s *SSHTunnel) Open() error {
 	var err error
 	s.client, err = ssh.Dial("tcp", net.JoinHostPort(s.Host, s.SSHPort), s.Config)
+	tunnelOpenCounter.Inc()
 	if err != nil {
+		tunnelOpenFailCounter.Inc()
 		return err
 	}
 	return nil

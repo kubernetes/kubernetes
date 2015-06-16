@@ -851,9 +851,11 @@ func (m *Master) setupSecureProxy(user, keyfile string) {
 			glog.Errorf("Failed to load SSH Tunnels: %v", err)
 		}
 		if len(m.tunnels) != 0 {
+			// Sleep for 10 seconds if we have some tunnels.
+			// TODO (cjcullen): tunnels can lag behind actually existing nodes.
 			time.Sleep(9 * time.Second)
 		}
-	}, 1 * time.Second, util.NeverStop)
+	}, 1*time.Second, util.NeverStop)
 	// Refresh loop for tunnels
 	// TODO: could make this more controller-ish
 	go util.Until(func() {
@@ -861,7 +863,7 @@ func (m *Master) setupSecureProxy(user, keyfile string) {
 		if err := m.refreshTunnels(user, keyfile); err != nil {
 			glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
 		}
-	}, 0 * time.Second, util.NeverStop)
+	}, 0*time.Second, util.NeverStop)
 }
 
 func (m *Master) generateSSHKey(user, keyfile string) error {
