@@ -4,9 +4,8 @@ metadata:
   name: monitoring-influxdb
   namespace: default 
   labels: 
-    k8s-app: influxGrafana
     kubernetes.io/cluster-service: "true"
-    kubernetes.io/name: "influxGrafana"
+    kubernetes.io/name: "InfluxDB"
 spec: 
   ports: 
     - name: http
