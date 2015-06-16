@@ -76,10 +76,12 @@ func (c *Controller) Start() {
 
 	// run all of the controllers once prior to returning from Start.
 	if err := repairClusterIPs.RunOnce(); err != nil {
-		glog.Errorf("Unable to perform initial IP allocation check: %v", err)
+		// If we fail to repair cluster IPs apiserver is useless. We should restart and retry.
+		glog.Fatalf("Unable to perform initial IP allocation check: %v", err)
 	}
 	if err := repairNodePorts.RunOnce(); err != nil {
-		glog.Errorf("Unable to perform initial service nodePort check: %v", err)
+		// If we fail to repair node ports apiserver is useless. We should restart and retry.
+		glog.Fatalf("Unable to perform initial service nodePort check: %v", err)
 	}
 	if err := c.UpdateKubernetesService(); err != nil {
 		glog.Errorf("Unable to perform initial Kubernetes service initialization: %v", err)
