@@ -207,9 +207,11 @@ type SSHTunnelEntry struct {
 	Tunnel  *SSHTunnel
 }
 
-type SSHTunnelList []SSHTunnelEntry
+type SSHTunnelList struct {
+	entries []SSHTunnelEntry
+}
 
-func MakeSSHTunnels(user, keyfile string, addresses []string) (SSHTunnelList, error) {
+func MakeSSHTunnels(user, keyfile string, addresses []string) (*SSHTunnelList, error) {
 	tunnels := []SSHTunnelEntry{}
 	for ix := range addresses {
 		addr := addresses[ix]
@@ -219,19 +221,22 @@ func MakeSSHTunnels(user, keyfile string, addresses []string) (SSHTunnelList, er
 		}
 		tunnels = append(tunnels, SSHTunnelEntry{addr, tunnel})
 	}
-	return tunnels, nil
+	return &SSHTunnelList{tunnels}, nil
 }
 
-func (l SSHTunnelList) Open() error {
-	for ix := 0; ix < len(l); ix++ {
-		if err := l[ix].Tunnel.Open(); err != nil {
-			// Remove a failed Open from the list.
-			glog.Errorf("Failed to open tunnel %v: %v", l[ix], err)
-			l = append(l[:ix], l[ix+1:]...)
-			ix--
+// Open attempts to open all tunnels in the list, and removes any tunnels that
+// failed to open.
+func (l *SSHTunnelList) Open() error {
+	var openTunnels []SSHTunnelEntry
+	for ix := range l.entries {
+		if err := l.entries[ix].Tunnel.Open(); err != nil {
+			glog.Errorf("Failed to open tunnel %v: %v", l.entries[ix], err)
+		} else {
+			openTunnels = append(openTunnels, l.entries[ix])
 		}
 	}
-	if len(l) == 0 {
+	l.entries = openTunnels
+	if len(l.entries) == 0 {
 		return errors.New("Failed to open any tunnels.")
 	}
 	return nil
@@ -240,9 +245,9 @@ func (l SSHTunnelList) Open() error {
 // Close asynchronously closes all tunnels in the list after waiting for 1
 // minute. Tunnels will still be open upon this function's return, but should
 // no longer be used.
-func (l SSHTunnelList) Close() {
-	for ix := range l {
-		entry := l[ix]
+func (l *SSHTunnelList) Close() {
+	for ix := range l.entries {
+		entry := l.entries[ix]
 		go func() {
 			defer HandleCrash()
 			time.Sleep(1 * time.Minute)
@@ -253,20 +258,24 @@ func (l SSHTunnelList) Close() {
 	}
 }
 
-func (l SSHTunnelList) Dial(network, addr string) (net.Conn, error) {
-	if len(l) == 0 {
+func (l *SSHTunnelList) Dial(network, addr string) (net.Conn, error) {
+	if len(l.entries) == 0 {
 		return nil, fmt.Errorf("Empty tunnel list.")
 	}
-	return l[mathrand.Int()%len(l)].Tunnel.Dial(network, addr)
+	return l.entries[mathrand.Int()%len(l.entries)].Tunnel.Dial(network, addr)
 }
 
-func (l SSHTunnelList) Has(addr string) bool {
-	for ix := range l {
-		if l[ix].Address == addr {
+func (l *SSHTunnelList) Has(addr string) bool {
+	for ix := range l.entries {
+		if l.entries[ix].Address == addr {
 			return true
 		}
 	}
 	return false
+}
+
+func (l *SSHTunnelList) Len() int {
+	return len(l.entries)
 }
 
 func EncodePrivateKey(private *rsa.PrivateKey) []byte {

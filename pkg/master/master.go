@@ -210,7 +210,7 @@ type Master struct {
 	InsecureHandler http.Handler
 
 	// Used for secure proxy
-	tunnels       util.SSHTunnelList
+	tunnels       *util.SSHTunnelList
 	tunnelsLock   sync.Mutex
 	installSSHKey InstallSSHKey
 }
@@ -772,7 +772,7 @@ func (m *Master) Dial(net, addr string) (net.Conn, error) {
 }
 
 func (m *Master) needToReplaceTunnels(addrs []string) bool {
-	if len(m.tunnels) != len(addrs) {
+	if m.tunnels == nil || m.tunnels.Len() != len(addrs) {
 		return true
 	}
 	// TODO (cjcullen): This doesn't need to be n^2
@@ -850,7 +850,7 @@ func (m *Master) setupSecureProxy(user, keyfile string) {
 		if err := m.loadTunnels(user, keyfile); err != nil {
 			glog.Errorf("Failed to load SSH Tunnels: %v", err)
 		}
-		if len(m.tunnels) != 0 {
+		if m.tunnels != nil && m.tunnels.Len() != 0 {
 			// Sleep for 10 seconds if we have some tunnels.
 			// TODO (cjcullen): tunnels can lag behind actually existing nodes.
 			time.Sleep(9 * time.Second)
