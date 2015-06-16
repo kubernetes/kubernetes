@@ -224,7 +224,7 @@ var _ = Describe("Volumes", func() {
 	// the test needs privileged containers, which are disabled by default.
 	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
 	Describe("[Skipped] NFS", func() {
-		It("should be montable", func() {
+		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
