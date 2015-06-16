@@ -79,18 +79,6 @@ func NewContiguousAllocationMap(max int, rangeSpec string) *AllocationBitmap {
 	return &a
 }
 
-// NewRandomAllocationInterface creates an allocation bitmap satisfying Interface using the
-// random scan strategy.
-func NewRandomAllocationInterface(max int, rangeSpec string) Interface {
-	return NewAllocationMap(max, rangeSpec)
-}
-
-// NewContiguousAllocationInterface creates an allocation bitmap satisfying Interface using the
-// contiguous scan strategy.
-func NewContiguousAllocationInterface(max int, rangeSpec string) Interface {
-	return NewContiguousAllocationMap(max, rangeSpec)
-}
-
 // Allocate attempts to reserve the provided item.
 // Returns true if it was allocated, false if it was already in use
 func (r *AllocationBitmap) Allocate(offset int) (bool, error) {
