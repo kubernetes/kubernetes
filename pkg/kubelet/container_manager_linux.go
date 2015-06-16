@@ -185,19 +185,19 @@ func ensureDockerInContainer(oomScoreAdj int, manager *fs.Manager) error {
 	for _, pid := range pids {
 		cont, err := getContainer(pid)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to find container of PID %q: %v", pid, err))
+			errs = append(errs, fmt.Errorf("failed to find container of PID %d: %v", pid, err))
 		}
 
 		if cont != manager.Cgroups.Name {
 			err = manager.Apply(pid)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to move PID %q (in %q) to %q", pid, cont, manager.Cgroups.Name))
+				errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q", pid, cont, manager.Cgroups.Name))
 			}
 		}
 
 		// Also apply oom_score_adj to processes
 		if err := util.ApplyOomScoreAdj(pid, oomScoreAdj); err != nil {
-			errs = append(errs, fmt.Errorf("failed to apply oom score %q to PID %q", oomScoreAdj, pid))
+			errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d", oomScoreAdj, pid))
 		}
 	}
 
