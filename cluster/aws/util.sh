@@ -31,7 +31,7 @@ ASG_NAME="${NODE_INSTANCE_PREFIX}-group"
 MASTER_DISK_ID=
 
 case "${KUBE_OS_DISTRIBUTION}" in
-  ubuntu|wheezy|jessie|coreos)
+  ubuntu|wheezy|jessie|vivid|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
     ;;
   *)
@@ -223,6 +223,9 @@ function detect-image () {
 case "${KUBE_OS_DISTRIBUTION}" in
   ubuntu|coreos)
     detect-ubuntu-image
+    ;;
+  vivid)
+    detect-vivid-image
     ;;
   wheezy)
     detect-wheezy-image
