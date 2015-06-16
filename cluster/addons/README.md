@@ -4,7 +4,7 @@ Cluster add-ons are Services and Replication Controllers (with pods) that are
 shipped with the kubernetes binaries and whose update policy is also consistent
 with the update of kubernetes cluster.
 
-On the clusterm the addons are kept in ```/etc/kubernetes/addons``` on the master node, in yaml files
+On the cluster the addons are kept in ```/etc/kubernetes/addons``` on the master node, in yaml files
 (json is not supported at the moment).
 Each add-on must specify the following label: ````kubernetes.io/cluster-service: true````.
 Yaml files that do not define this label will be ignored.
@@ -32,7 +32,7 @@ of:
 1. Creating objects from new manifests
   1. This is done for manifests that do not correspond to existing API objects
      with the same basename
-1. Updating objects whose basename is the samem but whose versions changed.
+1. Updating objects whose basename is the same, but whose versions changed.
   1. The update is currently performed by removing the old object and creating
      the new one. In the future, rolling update of replication controllers will
      be implemented to keep the add-on services up and running during update of add-on
