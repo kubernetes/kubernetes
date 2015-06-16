@@ -19,6 +19,8 @@
 # managed result is of that. Start everything below that directory.
 KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 
+ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-600}
+
 function create-kubeconfig-secret() {
   local -r token=$1
   local -r username=$2
@@ -118,7 +120,7 @@ function create-resource-from-string() {
 # The business logic for whether a given object should be created
 # was already enforced by salt, and /etc/kubernetes/addons is the
 # managed result is of that. Start everything below that directory.
-echo "== Kubernetes addon manager started at $(date -Is) =="
+echo "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC}=="
 
 # Load the kube-env, which has all the environment variables we care
 # about, in a flat yaml format.
@@ -167,7 +169,7 @@ done
 while true; do
   #kube-addon-update.sh must be deployed in the same directory as this file
   `dirname $0`/kube-addon-update.sh /etc/kubernetes/addons
-  sleep 600
+  sleep $ADDON_CHECK_INTERVAL_SEC
 done
 
 
