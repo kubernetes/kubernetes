@@ -106,9 +106,11 @@ var _ = Describe("Density", func() {
 	}
 
 	densityTests := []Density{
-		// This test should always run, even if larger densities are skipped.
-		{podsPerMinion: 3, skip: false, interval: 10 * time.Second},
-		{podsPerMinion: 30, skip: false, interval: 10 * time.Second},
+		// This test should not be run in a regular jenkins run, because it is not isolated enough
+		// (metrics from other tests affects this one).
+		// TODO: Reenable once we can measure latency only from a single test.
+		{podsPerMinion: 3, skip: true, interval: 10 * time.Second},
+		{podsPerMinion: 30, skip: true, interval: 10 * time.Second},
 		// More than 30 pods per node is outside our v1.0 goals.
 		// We might want to enable those tests in the future.
 		{podsPerMinion: 50, skip: true, interval: 10 * time.Second},
