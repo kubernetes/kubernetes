@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	ServiceAccountUsernamePrefix    = "serviceaccount"
+	ServiceAccountUsernamePrefix    = "system:serviceaccount"
 	ServiceAccountUsernameSeparator = ":"
 
 	Issuer = "kubernetes/serviceaccount"
@@ -84,11 +84,15 @@ func MakeUsername(namespace, name string) string {
 // SplitUsername returns the namespace and ServiceAccount name embedded in the given username,
 // or an error if the username is not a valid name produced by MakeUsername
 func SplitUsername(username string) (string, string, error) {
-	parts := strings.Split(username, ServiceAccountUsernameSeparator)
-	if len(parts) != 3 || parts[0] != ServiceAccountUsernamePrefix || len(parts[1]) == 0 || len(parts[2]) == 0 {
+	if !strings.HasPrefix(username, ServiceAccountUsernamePrefix+ServiceAccountUsernameSeparator) {
 		return "", "", fmt.Errorf("Username must be in the form %s", MakeUsername("namespace", "name"))
 	}
-	return parts[1], parts[2], nil
+	username = strings.TrimPrefix(username, ServiceAccountUsernamePrefix+ServiceAccountUsernameSeparator)
+	parts := strings.Split(username, ServiceAccountUsernameSeparator)
+	if len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+		return "", "", fmt.Errorf("Username must be in the form %s", MakeUsername("namespace", "name"))
+	}
+	return parts[0], parts[1], nil
 }
 
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.

@@ -121,7 +121,7 @@ func TestReadPublicKey(t *testing.T) {
 }
 
 func TestTokenGenerateAndValidate(t *testing.T) {
-	expectedUserName := "serviceaccount:test:my-service-account"
+	expectedUserName := "system:serviceaccount:test:my-service-account"
 	expectedUserUID := "12345"
 
 	// Related API objects
@@ -239,6 +239,25 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		if user.GetUID() != tc.ExpectedUserUID {
 			t.Errorf("%s: Expected userUID=%v, got %v", k, tc.ExpectedUserUID, user.GetUID())
 			continue
+		}
+	}
+}
+
+func TestMakeSplitUsername(t *testing.T) {
+	username := MakeUsername("ns", "name")
+	ns, name, err := SplitUsername(username)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if ns != "ns" || name != "name" {
+		t.Errorf("Expected ns/name, got %s/%s", ns, name)
+	}
+
+	invalid := []string{"test", "system:serviceaccount", "system:serviceaccount:", "system:serviceaccount:ns", "system:serviceaccount:ns:name:extra"}
+	for _, n := range invalid {
+		_, _, err := SplitUsername("test")
+		if err == nil {
+			t.Errorf("Expected error for %s", n)
 		}
 	}
 }
