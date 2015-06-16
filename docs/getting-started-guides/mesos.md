@@ -44,6 +44,7 @@ The internal IP address of the master may be obtained via `hostname -i`.
 $ export servicehost=$(hostname -i)
 $ export mesos_master=${servicehost}:5050
 $ export KUBERNETES_MASTER=http://${servicehost}:8888
+$ export container_network=10.0.0.0/24
 ```
 ### Deploy etcd
 Start etcd and verify that it is running:
@@ -74,6 +75,7 @@ $ ./bin/km apiserver \
   --service-cluster-ip-range=10.10.10.0/24 \
   --port=8888 \
   --cloud_provider=mesos \
+  --portal_net=${container_network} \
   --v=1 >apiserver.log 2>&1 &
 
 $ ./bin/km controller-manager \
