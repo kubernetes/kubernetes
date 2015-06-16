@@ -142,21 +142,42 @@ func (s *SSHTunnel) Close() error {
 	return nil
 }
 
+// Interface to allow mocking of ssh.Dial, for testing SSH
+type sshDialer interface {
+	Dial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error)
+}
+
+// Real implementation of sshDialer
+type realSSHDialer struct{}
+
+func (d *realSSHDialer) Dial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
+	return ssh.Dial(network, addr, config)
+}
+
 // RunSSHCommand returns the stdout, stderr, and exit code from running cmd on
-// host along with any SSH-level error.
-func RunSSHCommand(cmd, host string, signer ssh.Signer) (string, string, int, error) {
+// host as specific user, along with any SSH-level error.
+// If user=="", it will default (like SSH) to os.Getenv("USER")
+func RunSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
+	return runSSHCommand(&realSSHDialer{}, cmd, user, host, signer)
+}
+
+// Internal implementation of runSSHCommand, for testing
+func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
+	if user == "" {
+		user = os.Getenv("USER")
+	}
 	// Setup the config, dial the server, and open a session.
 	config := &ssh.ClientConfig{
-		User: os.Getenv("USER"),
+		User: user,
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
 	}
-	client, err := ssh.Dial("tcp", host, config)
+	client, err := dialer.Dial("tcp", host, config)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error getting SSH client to host %s: '%v'", host, err)
+		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: '%v'", user, host, err)
 	}
 	session, err := client.NewSession()
 	if err != nil {
-		return "", "", 0, fmt.Errorf("error creating session to host %s: '%v'", host, err)
+		return "", "", 0, fmt.Errorf("error creating session to %s@%s: '%v'", user, host, err)
 	}
 	defer session.Close()
 
@@ -176,7 +197,7 @@ func RunSSHCommand(cmd, host string, signer ssh.Signer) (string, string, int, er
 		} else {
 			// Some other kind of error happened (e.g. an IOError); consider the
 			// SSH unsuccessful.
-			err = fmt.Errorf("failed running `%s` on %s: '%v'", cmd, host, err)
+			err = fmt.Errorf("failed running `%s` on %s@%s: '%v'", cmd, user, host, err)
 		}
 	}
 	return bout.String(), berr.String(), code, err

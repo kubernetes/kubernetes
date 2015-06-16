@@ -24,6 +24,9 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
+	"io"
+	"os"
+	"strings"
 )
 
 type testSSHServer struct {
@@ -158,4 +161,85 @@ func TestSSHTunnel(t *testing.T) {
 	if err := tunnel.Close(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+}
+
+type mockSSHDialer struct {
+	network string
+	addr    string
+	config  *ssh.ClientConfig
+}
+
+func (d *mockSSHDialer) Dial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
+	d.network = network
+	d.addr = addr
+	d.config = config
+	return nil, fmt.Errorf("mock error from Dial")
+}
+
+type mockSigner struct {
+}
+
+func (s *mockSigner) PublicKey() ssh.PublicKey {
+	panic("mockSigner.PublicKey not implemented")
+}
+
+func (s *mockSigner) Sign(rand io.Reader, data []byte) (*ssh.Signature, error) {
+	panic("mockSigner.Sign not implemented")
+}
+
+func TestSSHUser(t *testing.T) {
+	signer := &mockSigner{}
+
+	table := []struct {
+		title      string
+		user       string
+		host       string
+		signer     ssh.Signer
+		command    string
+		expectUser string
+	}{
+		{
+			title:      "all values provided",
+			user:       "testuser",
+			host:       "testhost",
+			signer:     signer,
+			command:    "uptime",
+			expectUser: "testuser",
+		},
+		{
+			title:      "empty user defaults to GetEnv(USER)",
+			user:       "",
+			host:       "testhost",
+			signer:     signer,
+			command:    "uptime",
+			expectUser: os.Getenv("USER"),
+		},
+	}
+
+	for _, item := range table {
+		dialer := &mockSSHDialer{}
+
+		_, _, _, err := runSSHCommand(dialer, item.command, item.user, item.host, item.signer)
+		if err == nil {
+			t.Errorf("expected error (as mock returns error); did not get one")
+		}
+		errString := err.Error()
+		if !strings.HasPrefix(errString, fmt.Sprintf("error getting SSH client to %s@%s:", item.expectUser, item.host)) {
+			t.Errorf("unexpected error: %v", errString)
+		}
+
+		if dialer.network != "tcp" {
+			t.Errorf("unexpected network: %v", dialer.network)
+		}
+
+		if dialer.config.User != item.expectUser {
+			t.Errorf("unexpected user: %v", dialer.config.User)
+		}
+		if len(dialer.config.Auth) != 1 {
+			t.Errorf("unexpected auth: %v", dialer.config.Auth)
+		}
+		// (No way to test Auth - nothing exported?)
+
+	}
+
 }
