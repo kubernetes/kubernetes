@@ -611,7 +611,7 @@ func (dm *DockerManager) runContainer(
 	}
 
 	if ref != nil {
-		dm.recorder.Eventf(ref, "created", "Created with docker id %v", dockerContainer.ID)
+		dm.recorder.Eventf(ref, "created", "Created with docker id %v", util.ShortenString(dockerContainer.ID, 12))
 	}
 
 	binds := makeMountBindings(opts.Mounts)
@@ -658,12 +658,12 @@ func (dm *DockerManager) runContainer(
 	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
 		if ref != nil {
 			dm.recorder.Eventf(ref, "failed",
-				"Failed to start with docker id %v with error: %v", dockerContainer.ID, err)
+				"Failed to start with docker id %v with error: %v", util.ShortenString(dockerContainer.ID, 12), err)
 		}
 		return "", err
 	}
 	if ref != nil {
-		dm.recorder.Eventf(ref, "started", "Started with docker id %v", dockerContainer.ID)
+		dm.recorder.Eventf(ref, "started", "Started with docker id %v", util.ShortenString(dockerContainer.ID, 12))
 	}
 	return dockerContainer.ID, nil
 }
@@ -1152,7 +1152,7 @@ func (dm *DockerManager) killContainer(containerID types.UID) error {
 		glog.Warningf("No ref for pod '%v'", ID)
 	} else {
 		// TODO: pass reason down here, and state, or move this call up the stack.
-		dm.recorder.Eventf(ref, "killing", "Killing %v", ID)
+		dm.recorder.Eventf(ref, "killing", "Killing with docker id %v", util.ShortenString(ID, 12))
 	}
 	return err
 }
