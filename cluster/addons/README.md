@@ -1,11 +1,26 @@
 # Cluster add-ons
 
 Cluster add-ons are Services and Replication Controllers (with pods) that are
-shipped with the kubernetes binaries and whose update policy is also consistent
-with the update of kubernetes cluster.
+shipped with the Kubernetes binaries and are considered an inherent part of the
+Kubernetes clusters. The add-ons are visible through the API (they can be listed
+using ```kubectl```), but manipulation of these objects is discouraged because
+the system will bring them back to the original state, in particular:
+* if an add-on is stopped, it will be restarted automatically
+* if an add-on is rolling-updated (for Replication Controlers), the system will stop the new version and
+  start the old one again (or perform rolling update to the old version, in the
+  future).
 
-On the cluster the addons are kept in ```/etc/kubernetes/addons``` on the master node, in yaml files
-(json is not supported at the moment).
+On the cluster, the add-ons are kept in ```/etc/kubernetes/addons``` on the master node, in yaml files
+(json is not supported at the moment). A system daemon periodically checks if
+the contents of this directory is consistent with the add-one objects on the API
+server. If any difference is spotted, the system updates the API objects
+accordingly. (Limitation: for now, the system compares only the names of objects
+in the directory and on the API server. So changes in parameters may not be
+noticed). So the only persistent way to make changes in add-ons is to update the
+manifests on the master server. But still, users are discouraged to do it
+on their own - they should rather wait for a new release of
+Kubernetes that will also contain new versions of add-ons.
+
 Each add-on must specify the following label: ````kubernetes.io/cluster-service: true````.
 Yaml files that do not define this label will be ignored.
 
@@ -13,14 +28,18 @@ The naming convention for Replication Controllers is
 ```<basename>-<version>```, where ```<basename>``` is the same in consecutive
 versions and ```<version>``` changes when the component is updated
 (```<version>``` must not contain ```-```). For instance,
-```heapseter-controller-v1``` and ```heapster-controller-12``` are the
-same controllers with two different versions, while ```heapseter-controller-v1```
+```heapster-controller-v1``` and ```heapster-controller-12``` are the
+same controllers with two different versions, while ```heapster-controller-v1```
 and ```heapster-newcontroller-12``` are treated as two different applications.
-For services it is just ```<basename>``` (with empty version number)
-because we do not expect the service
-name to change in consecutive versions. The naming convetion is important for add-on update.
+When a new version of a Replication Controller add-on is found, the system will
+stop the old (current) replication controller and start the new one
+(in the future, rolling update will be performed).
 
-# Add-on update
+For services, the naming scheme is just ```<basename>``` (with empty version number)
+because we do not expect the service name to change in consecutive versions (and
+rolling-update of services does not exist).
+
+# Add-on update procedure
 
 To update add-ons, just update the contents of ```/etc/kubernetes/addons```
 directory with the desired definition of add-ons. Then the system will take care
