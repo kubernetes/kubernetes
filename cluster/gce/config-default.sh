@@ -58,6 +58,7 @@ ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
 #   influxdb       - Heapster, InfluxDB, and Grafana 
 #   google         - Heapster, Google Cloud Monitoring, and Google Cloud Logging 
 #   googleinfluxdb - Enable influxdb and google (except GCM)
+#   standalone     - Heapster only. Metrics available via Heapster REST API.
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-googleinfluxdb}"
 
 # Optional: Enable node logging.

@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: ReplicationController
-metadata:
+metadata: 
   name: monitoring-heapster-v3
-  namespace: default 
+  namespace: default
   labels: 
     k8s-app: heapster
     version: v3
@@ -25,7 +25,6 @@ spec:
           command:
             - /heapster
             - --source=kubernetes:''
-            - --sink=influxdb:http://monitoring-influxdb:8086
           volumeMounts: 
             - name: ssl-certs
               mountPath: /etc/ssl/certs
@@ -33,10 +32,12 @@ spec:
             - name: monitoring-token
               mountPath: /etc/kubernetes/kubeconfig
               readOnly: true
+
       volumes: 
         - name: ssl-certs
           hostPath: 
-            path: "/etc/ssl/certs"
+            path: /etc/ssl/certs
         - name: monitoring-token
           secret:
             secretName: token-system-monitoring
+
