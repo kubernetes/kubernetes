@@ -72,7 +72,7 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should serve a basic endpoint from pods", func(done Done) {
+	It("should serve a basic endpoint from pods", func() {
 		serviceName := "endpoint-test2"
 		ns := namespaces[0]
 		labels := map[string]string{
@@ -133,14 +133,9 @@ var _ = Describe("Services", func() {
 		names = []string{}
 
 		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{})
+	})
 
-		// We deferred Gingko pieces that may Fail, we aren't done.
-		defer func() {
-			close(done)
-		}()
-	}, 240.0)
-
-	It("should serve multiport endpoints from pods", func(done Done) {
+	It("should serve multiport endpoints from pods", func() {
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
 		serviceName := "multi-endpoint-test"
 		ns := namespaces[0]
@@ -234,12 +229,7 @@ var _ = Describe("Services", func() {
 		names = []string{}
 
 		validateEndpointsOrFail(c, ns, serviceName, map[string][]int{})
-
-		// We deferred Gingko pieces that may Fail, we aren't done.
-		defer func() {
-			close(done)
-		}()
-	}, 240.0)
+	})
 
 	It("should be able to create a functioning external load balancer", func() {
 		if !providerIs("gce", "gke", "aws") {
