@@ -67,8 +67,10 @@ LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-elasticsearch}" # options: elas
 ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-true}"
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
-# Don't require https for registries in our local RFC1918 network
-EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
+# Optional: Don't require https for registries in our local RFC1918 network
+if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
+  EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
+fi
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
