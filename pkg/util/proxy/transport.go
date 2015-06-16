@@ -119,21 +119,17 @@ func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL) string {
 	if err != nil {
 		return targetURL
 	}
-	if url.Host != "" && url.Host != sourceURL.Host {
+
+	isDifferentHost := url.Host != "" && url.Host != sourceURL.Host
+	isRelative := !strings.HasPrefix(url.Path, "/")
+	if isDifferentHost || isRelative {
 		return targetURL
 	}
 
 	url.Scheme = t.Scheme
 	url.Host = t.Host
 	origPath := url.Path
-
-	if strings.HasPrefix(url.Path, "/") {
-		// The path is rooted at the host. Just add proxy prepend.
-		url.Path = path.Join(t.PathPrepend, url.Path)
-	} else {
-		// The path is relative to sourceURL.
-		url.Path = path.Join(t.PathPrepend, path.Dir(sourceURL.Path), url.Path)
-	}
+	url.Path = path.Join(t.PathPrepend, url.Path)
 
 	if strings.HasSuffix(origPath, "/") {
 		// Add back the trailing slash, which was stripped by path.Join().
@@ -144,10 +140,9 @@ func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL) string {
 }
 
 // updateURLs checks and updates any of n's attributes that are listed in tagsToAttrs.
-// Any URLs found are, if they're relative, updated with the necessary changes to make
-// a visit to that URL also go through the proxy.
-// sourceURL is the URL of the page which we're currently on; it's required to make
-// relative links work.
+// Any URLs found are, if they share the source host, updated with the necessary changes
+// to make a visit to that URL also go through the proxy.
+// sourceURL is the URL of the page which we're currently on.
 func (t *Transport) updateURLs(n *html.Node, sourceURL *url.URL) {
 	if n.Type != html.ElementNode {
 		return
