@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -422,6 +423,25 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 		}
 		return nil
 	})
+}
+
+func ChaodescribePod(pod *api.Pod) error {
+	fmt.Printf("Name:\t%s\n", pod.Name)
+	fmt.Printf("Image(s):\t%s\n", makeImageList(&pod.Spec))
+	fmt.Printf("Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
+	fmt.Printf("Labels:\t%s\n", formatLabels(pod.Labels))
+	fmt.Printf("Status:\t%s\n", string(pod.Status.Phase))
+	fmt.Printf("Containers:\n")
+	describeContainers(pod.Status.ContainerStatuses, os.Stdout)
+	if len(pod.Status.Conditions) > 0 {
+		fmt.Printf("Conditions:\n  Type\tStatus\n")
+		for _, c := range pod.Status.Conditions {
+			fmt.Printf("  %v \t%v \n",
+				c.Type,
+				c.Status)
+		}
+	}
+	return nil
 }
 
 type PersistentVolumeDescriber struct {

@@ -64,6 +64,8 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 )
 
 var (
@@ -236,6 +238,8 @@ func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.S
 		}
 		for i := range pods.Items {
 			pod := pods.Items[i]
+			fmt.Println("CHAO:")
+			kubectl.ChaodescribePod(&pod)
 			podString := fmt.Sprintf("%q/%q", pod.Namespace, pod.Name)
 			glog.Infof("Check whether pod %q exists on node %q", podString, pod.Spec.NodeName)
 			if len(pod.Spec.NodeName) == 0 {
