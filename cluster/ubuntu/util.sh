@@ -346,11 +346,14 @@ function kube-up {
   }
 
     ((ii=ii+1))
-        
   done
   wait
 
   verify-cluster
+  detect-master
+  export KUBE_MASTER_IP="${KUBE_MASTER_IP}:8080"
+  export CONTEXT="ubuntu"
+  create-kubeconfig
 }
 
 function provision-master() {

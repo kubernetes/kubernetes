@@ -65,7 +65,7 @@ function create-kubeconfig() {
     user_args+=(
      "--token=${KUBE_BEARER_TOKEN}"
     )
-  else
+  elif [[ ! -z "${KUBE_USER:-}" && ! -z "${KUBE_PASSWORD:-}" ]]; then
     user_args+=(
      "--username=${KUBE_USER}"
      "--password=${KUBE_PASSWORD}"
@@ -87,7 +87,7 @@ function create-kubeconfig() {
   # If we have a bearer token, also create a credential entry with basic auth
   # so that it is easy to discover the basic auth password for your cluster
   # to use in a web browser.
-  if [[ ! -z "${KUBE_BEARER_TOKEN:-}" ]]; then
+  if [[ ! -z "${KUBE_BEARER_TOKEN:-}" && ! -z "${KUBE_USER:-}" && ! -z "${KUBE_PASSWORD:-}" ]]; then
     "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
   fi
 

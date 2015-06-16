@@ -57,6 +57,9 @@ function kube-up() {
     sleep-status
     detect-master
     detect-minions
+
+    export KUBE_MASTER_IP="${KUBE_MASTER_IP}:8080"
+    export CONTEXT="juju"
 }
 
 function kube-down() {
