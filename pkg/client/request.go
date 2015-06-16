@@ -262,6 +262,16 @@ const (
 	ObjectNameField   = "metadata.name"
 	PodHost           = "spec.host"
 	SecretType        = "type"
+
+	EventReason                  = "reason"
+	EventSource                  = "source"
+	EventInvolvedKind            = "involvedObject.kind"
+	EventInvolvedNamespace       = "involvedObject.namespace"
+	EventInvolvedName            = "involvedObject.name"
+	EventInvolvedUID             = "involvedObject.uid"
+	EventInvolvedAPIVersion      = "involvedObject.apiVersion"
+	EventInvolvedResourceVersion = "involvedObject.resourceVersion"
+	EventInvolvedFieldPath       = "involvedObject.fieldPath"
 )
 
 type clientFieldNameToAPIVersionFieldName map[string]string
@@ -302,44 +312,6 @@ func (v versionToResourceToFieldMapping) filterField(apiVersion, resourceType, f
 }
 
 var fieldMappings = versionToResourceToFieldMapping{
-	"v1beta1": resourceTypeToFieldMapping{
-		"nodes": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   "name",
-			NodeUnschedulable: "unschedulable",
-		},
-		"minions": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   "name",
-			NodeUnschedulable: "unschedulable",
-		},
-		"pods": clientFieldNameToAPIVersionFieldName{
-			PodHost: "DesiredState.Host",
-		},
-		"secrets": clientFieldNameToAPIVersionFieldName{
-			SecretType: "type",
-		},
-		"serviceAccounts": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "name",
-		},
-	},
-	"v1beta2": resourceTypeToFieldMapping{
-		"nodes": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   "name",
-			NodeUnschedulable: "unschedulable",
-		},
-		"minions": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   "name",
-			NodeUnschedulable: "unschedulable",
-		},
-		"pods": clientFieldNameToAPIVersionFieldName{
-			PodHost: "DesiredState.Host",
-		},
-		"secrets": clientFieldNameToAPIVersionFieldName{
-			SecretType: "type",
-		},
-		"serviceAccounts": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "name",
-		},
-	},
 	"v1beta3": resourceTypeToFieldMapping{
 		"nodes": clientFieldNameToAPIVersionFieldName{
 			ObjectNameField:   "metadata.name",
@@ -357,6 +329,55 @@ var fieldMappings = versionToResourceToFieldMapping{
 		},
 		"serviceAccounts": clientFieldNameToAPIVersionFieldName{
 			ObjectNameField: "metadata.name",
+		},
+		"endpoints": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "metadata.name",
+		},
+		"events": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:              "metadata.name",
+			EventReason:                  "reason",
+			EventSource:                  "source",
+			EventInvolvedKind:            "involvedObject.kind",
+			EventInvolvedNamespace:       "involvedObject.namespace",
+			EventInvolvedName:            "involvedObject.name",
+			EventInvolvedUID:             "involvedObject.uid",
+			EventInvolvedAPIVersion:      "involvedObject.apiVersion",
+			EventInvolvedResourceVersion: "involvedObject.resourceVersion",
+			EventInvolvedFieldPath:       "involvedObject.fieldPath",
+		},
+	},
+	"v1": resourceTypeToFieldMapping{
+		"nodes": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:   "metadata.name",
+			NodeUnschedulable: "spec.unschedulable",
+		},
+		"minions": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:   "metadata.name",
+			NodeUnschedulable: "spec.unschedulable",
+		},
+		"pods": clientFieldNameToAPIVersionFieldName{
+			PodHost: "spec.host",
+		},
+		"secrets": clientFieldNameToAPIVersionFieldName{
+			SecretType: "type",
+		},
+		"serviceAccounts": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "metadata.name",
+		},
+		"endpoints": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "metadata.name",
+		},
+		"events": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:              "metadata.name",
+			EventReason:                  "reason",
+			EventSource:                  "source",
+			EventInvolvedKind:            "involvedObject.kind",
+			EventInvolvedNamespace:       "involvedObject.namespace",
+			EventInvolvedName:            "involvedObject.name",
+			EventInvolvedUID:             "involvedObject.uid",
+			EventInvolvedAPIVersion:      "involvedObject.apiVersion",
+			EventInvolvedResourceVersion: "involvedObject.resourceVersion",
+			EventInvolvedFieldPath:       "involvedObject.fieldPath",
 		},
 	},
 }
