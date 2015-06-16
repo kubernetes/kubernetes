@@ -117,7 +117,7 @@ type Config struct {
 	RestfulContainer *restful.Container
 
 	// If specified, requests will be allocated a random timeout between this value, and twice this value.
-	// Note that it is up to the request handlers to ignore or honor this timeout.
+	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
 	MinRequestTimeout int
 
 	// Number of masters running; all masters must be started with the
@@ -163,10 +163,11 @@ type Master struct {
 	serviceClusterIPRange *net.IPNet
 	serviceNodePortRange  util.PortRange
 	cacheTimeout          time.Duration
+	minRequestTimeout     time.Duration
 
 	mux                   apiserver.Mux
 	muxHelper             *apiserver.MuxHelper
-	handlerContainer      *apiserver.RestContainer
+	handlerContainer      *restful.Container
 	rootWebService        *restful.WebService
 	enableCoreControllers bool
 	enableLogsSupport     bool
@@ -210,6 +211,7 @@ type Master struct {
 	InsecureHandler http.Handler
 
 	// Used for secure proxy
+	dialer        apiserver.ProxyDialerFunc
 	tunnels       *util.SSHTunnelList
 	tunnelsLock   sync.Mutex
 	installSSHKey InstallSSHKey
@@ -333,7 +335,8 @@ func New(c *Config) *Master {
 		v1:                    !c.DisableV1,
 		requestContextMapper:  c.RequestContextMapper,
 
-		cacheTimeout: c.CacheTimeout,
+		cacheTimeout:      c.CacheTimeout,
+		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 
 		masterCount:         c.MasterCount,
 		externalHost:        c.ExternalHost,
@@ -355,7 +358,7 @@ func New(c *Config) *Master {
 		m.mux = mux
 		handlerContainer = NewHandlerContainer(mux)
 	}
-	m.handlerContainer = &apiserver.RestContainer{handlerContainer, c.MinRequestTimeout}
+	m.handlerContainer = handlerContainer
 	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
 	m.handlerContainer.Router(restful.CurlyRouter{})
 	m.muxHelper = &apiserver.MuxHelper{m.mux, []string{}}
@@ -493,9 +496,10 @@ func (m *Master) init(c *Config) {
 		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
 	}
 
-	var proxyDialer func(net, addr string) (net.Conn, error)
+	// establish the node proxy dialer
 	if len(c.SSHUser) > 0 {
 		glog.Infof("Setting up proxy: %s %s", c.SSHUser, c.SSHKeyfile)
+
 		// public keyfile is written last, so check for that.
 		publicKeyFile := c.SSHKeyfile + ".pub"
 		exists, err := util.FileExists(publicKeyFile)
@@ -509,14 +513,14 @@ func (m *Master) init(c *Config) {
 			}
 		}
 		m.tunnels = &util.SSHTunnelList{}
+		m.dialer = m.Dial
 		m.setupSecureProxy(c.SSHUser, c.SSHKeyfile, publicKeyFile)
-		proxyDialer = m.Dial
 
 		// This is pretty ugly.  A better solution would be to pull this all the way up into the
 		// server.go file.
 		httpKubeletClient, ok := c.KubeletClient.(*client.HTTPKubeletClient)
 		if ok {
-			httpKubeletClient.Config.Dial = m.Dial
+			httpKubeletClient.Config.Dial = m.dialer
 			transport, err := client.MakeTransport(httpKubeletClient.Config)
 			if err != nil {
 				glog.Errorf("Error setting up transport over SSH: %v", err)
@@ -530,29 +534,29 @@ func (m *Master) init(c *Config) {
 
 	apiVersions := []string{}
 	if m.v1beta3 {
-		if err := m.api_v1beta3().InstallREST(m.handlerContainer, proxyDialer); err != nil {
+		if err := m.api_v1beta3().InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup API v1beta3: %v", err)
 		}
 		apiVersions = append(apiVersions, "v1beta3")
 	}
 	if m.v1 {
-		if err := m.api_v1().InstallREST(m.handlerContainer, proxyDialer); err != nil {
+		if err := m.api_v1().InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup API v1: %v", err)
 		}
 		apiVersions = append(apiVersions, "v1")
 	}
 
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
-	apiserver.AddApiWebService(m.handlerContainer.Container, c.APIPrefix, apiVersions)
+	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
 	defaultVersion := m.defaultAPIGroupVersion()
 	requestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), defaultVersion.Mapper}
-	apiserver.InstallServiceErrorHandler(m.handlerContainer.Container, requestInfoResolver, apiVersions)
+	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
 
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
 	// Allow master to be embedded in contexts which already have something registered at the root
 	if c.EnableIndex {
-		m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer.Container, m.muxHelper))
+		m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
 	}
 
 	if c.EnableLogsSupport {
@@ -677,7 +681,7 @@ func (m *Master) InstallSwaggerAPI() {
 		SwaggerPath:     "/swaggerui/",
 		SwaggerFilePath: "/swagger-ui/",
 	}
-	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer.Container)
+	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
 }
 
 func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
@@ -723,6 +727,9 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
+
+		ProxyDialerFn:     m.dialer,
+		MinRequestTimeout: m.minRequestTimeout,
 	}
 }
 

@@ -109,6 +109,7 @@ type Mux interface {
 // It handles URLs of the form:
 // /${storage_key}[/${object_name}]
 // Where 'storage_key' points to a rest.Storage object stored in storage.
+// This object should contain all parameterization necessary for running a particular API version
 type APIGroupVersion struct {
 	Storage map[string]rest.Storage
 
@@ -131,7 +132,12 @@ type APIGroupVersion struct {
 
 	Admit   admission.Interface
 	Context api.RequestContextMapper
+
+	ProxyDialerFn     ProxyDialerFunc
+	MinRequestTimeout time.Duration
 }
+
+type ProxyDialerFunc func(network, addr string) (net.Conn, error)
 
 // TODO: Pipe these in through the apiserver cmd line
 const (
@@ -141,16 +147,10 @@ const (
 	MaxTimeoutSecs = 600
 )
 
-// restContainer is a wrapper around a generic restful Container that also contains a MinRequestTimeout
-type RestContainer struct {
-	*restful.Container
-	MinRequestTimeout int
-}
-
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash. A restful WebService is created for the group and version.
-func (g *APIGroupVersion) InstallREST(container *RestContainer, proxyDialer func(network, addr string) (net.Conn, error)) error {
+func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	info := &APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(g.Root, "/")), g.Mapper}
 
 	prefix := path.Join(g.Root, g.Version)
@@ -158,9 +158,10 @@ func (g *APIGroupVersion) InstallREST(container *RestContainer, proxyDialer func
 		group:             g,
 		info:              info,
 		prefix:            prefix,
-		minRequestTimeout: container.MinRequestTimeout,
+		minRequestTimeout: g.MinRequestTimeout,
+		proxyDialerFn:     g.ProxyDialerFn,
 	}
-	ws, registrationErrors := installer.Install(proxyDialer)
+	ws, registrationErrors := installer.Install()
 	container.Add(ws)
 	return errors.NewAggregate(registrationErrors)
 }

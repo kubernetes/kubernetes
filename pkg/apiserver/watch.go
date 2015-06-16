@@ -66,11 +66,11 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 }
 
 // serveWatch handles serving requests to the server
-func serveWatch(watcher watch.Interface, scope RequestScope, w http.ResponseWriter, req *restful.Request, minRequestTimeout int) {
+func serveWatch(watcher watch.Interface, scope RequestScope, w http.ResponseWriter, req *restful.Request, minRequestTimeout time.Duration) {
 	var timeout time.Duration
 	if minRequestTimeout > 0 {
 		// Each watch gets a random timeout between minRequestTimeout and 2*minRequestTimeout to avoid thundering herds.
-		timeout = time.Duration(minRequestTimeout+rand.Intn(minRequestTimeout)) * time.Second
+		timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
 	}
 	watchServer := &WatchServer{watcher, scope.Codec, func(obj runtime.Object) {
 		if err := setSelfLink(obj, req, scope.Namer); err != nil {

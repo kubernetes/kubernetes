@@ -18,12 +18,12 @@ package apiserver
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	gpath "path"
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -40,7 +40,8 @@ type APIInstaller struct {
 	group             *APIGroupVersion
 	info              *APIRequestInfoResolver
 	prefix            string // Path prefix where API resources are to be registered.
-	minRequestTimeout int
+	minRequestTimeout time.Duration
+	proxyDialerFn     ProxyDialerFunc
 }
 
 // Struct capturing information about an action ("GET", "POST", "WATCH", PROXY", etc).
@@ -55,13 +56,13 @@ type action struct {
 var errEmptyName = errors.NewBadRequest("name must be provided")
 
 // Installs handlers for API resources.
-func (a *APIInstaller) Install(proxyDialer func(network, addr string) (net.Conn, error)) (ws *restful.WebService, errors []error) {
+func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 	errors = make([]error, 0)
 
 	// Create the WebService.
 	ws = a.newWebService()
 
-	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info, proxyDialer})
+	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info, a.proxyDialerFn})
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
 	paths := make([]string, len(a.group.Storage))
