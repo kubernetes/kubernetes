@@ -54,7 +54,7 @@ var _ = Interface(&NsenterMounter{})
 const (
 	hostRootFsPath     = "/rootfs"
 	hostProcMountsPath = "/rootfs/proc/mounts"
-	nsenterPath        = "/nsenter"
+	nsenterPath        = "nsenter"
 )
 
 // Mount runs mount(8) in the host's root mount namespace.  Aside from this
@@ -94,6 +94,7 @@ func doNsenterMount(source, target, fstype string, options []string) error {
 func makeNsenterArgs(source, target, fstype string, options []string) []string {
 	nsenterArgs := []string{
 		"--mount=/rootfs/proc/1/ns/mnt",
+		"--",
 		"/usr/bin/mount",
 	}
 
@@ -106,6 +107,7 @@ func makeNsenterArgs(source, target, fstype string, options []string) []string {
 func (*NsenterMounter) Unmount(target string) error {
 	args := []string{
 		"--mount=/rootfs/proc/1/ns/mnt",
+		"--",
 		"/usr/bin/umount",
 		target,
 	}
@@ -133,7 +135,7 @@ func (*NsenterMounter) IsMountPoint(file string) (bool, error) {
 		return false, err
 	}
 
-	args := []string{"--mount=/rootfs/proc/1/ns/mnt", "/usr/bin/findmnt", "-o", "target", "--noheadings", "--target", file}
+	args := []string{"--mount=/rootfs/proc/1/ns/mnt", "--", "/usr/bin/findmnt", "-o", "target", "--noheadings", "--target", file}
 	glog.V(5).Infof("findmnt command: %v %v", nsenterPath, args)
 
 	exec := exec.New()
