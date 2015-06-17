@@ -29,7 +29,9 @@ type Capabilities struct {
 	HostNetworkSources []string
 }
 
+// TODO: Clean these up into a singleton
 var once sync.Once
+var lock sync.Mutex
 var capabilities *Capabilities
 
 // Initialize the capability set.  This can only be done once per binary, subsequent calls are ignored.
@@ -50,11 +52,16 @@ func Setup(allowPrivileged bool, hostNetworkSources []string) {
 
 // SetCapabilitiesForTests.  Convenience method for testing.  This should only be called from tests.
 func SetForTests(c Capabilities) {
+	lock.Lock()
+	defer lock.Unlock()
 	capabilities = &c
 }
 
 // Returns a read-only copy of the system capabilities.
 func Get() Capabilities {
+	lock.Lock()
+	defer lock.Unlock()
+	// This check prevents clobbering of capabilities that might've been set via SetForTests
 	if capabilities == nil {
 		Initialize(Capabilities{
 			AllowPrivileged:    false,
