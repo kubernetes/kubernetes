@@ -31,6 +31,8 @@ function verify-prereqs() {
 }
 
 function build-local() {
+    # Make a clean environment to avoid compiler errors.
+    make clean
     # Build the binaries locally that are used in the charms.
     make all WHAT="cmd/kube-apiserver cmd/kubectl cmd/kube-controller-manager plugin/cmd/kube-scheduler cmd/kubelet cmd/kube-proxy"
     OUTPUT_DIR=_output/local/bin/linux/amd64
