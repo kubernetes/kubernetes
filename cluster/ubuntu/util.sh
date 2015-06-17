@@ -146,39 +146,41 @@ function verify-cluster {
 
 function verify-master(){
   # verify master has all required daemons
-  echo "Validating master"
+  printf "Validating master"
   local -a required_daemon=("kube-apiserver" "kube-controller-manager" "kube-scheduler")
   local validated="1"
   until [[ "$validated" == "0" ]]; do
     validated="0"
     local daemon
     for daemon in "${required_daemon[@]}"; do
-      ssh "$MASTER" "pgrep -f ${daemon}" >/dev/null 2>&1 || {
+      ssh $SSH_OPTS "$MASTER" "pgrep -f ${daemon}" >/dev/null 2>&1 || {
         printf "."
         validated="1"
         sleep 2
       }
     done
   done
+  printf "\n"
 
 }
 
 function verify-minion(){
   # verify minion has all required daemons
-  echo "Validating ${1}"
+  printf "Validating ${1}"
   local -a required_daemon=("kube-proxy" "kubelet" "docker")
   local validated="1"
   until [[ "$validated" == "0" ]]; do
     validated="0"
     local daemon
     for daemon in "${required_daemon[@]}"; do
-      ssh "$1" "pgrep -f $daemon" >/dev/null 2>&1 || {
+      ssh $SSH_OPTS "$1" "pgrep -f $daemon" >/dev/null 2>&1 || {
         printf "."
         validated="1"
         sleep 2
       }
     done
   done
+  printf "\n"
 }
 
 function create-etcd-opts(){
