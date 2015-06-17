@@ -321,7 +321,11 @@ func (s *APIServer) Run(_ []string) error {
 
 	// Default to the private server key for service account token signing
 	if s.ServiceAccountKeyFile == "" && s.TLSPrivateKeyFile != "" {
-		s.ServiceAccountKeyFile = s.TLSPrivateKeyFile
+		if apiserver.IsValidServiceAccountKeyFile(s.TLSPrivateKeyFile) {
+			s.ServiceAccountKeyFile = s.TLSPrivateKeyFile
+		} else {
+			glog.Warning("no RSA key provided, service account token authentication disabled")
+		}
 	}
 	authenticator, err := apiserver.NewAuthenticator(s.BasicAuthFile, s.ClientCAFile, s.TokenAuthFile, s.ServiceAccountKeyFile, s.ServiceAccountLookup, helper)
 	if err != nil {
