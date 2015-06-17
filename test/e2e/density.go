@@ -93,7 +93,7 @@ var _ = Describe("Density", func() {
 		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
 		highLatencyRequests, err := HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
 		expectNoError(err)
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
 	})
 
 	// Tests with "Skipped" substring in their name will be skipped when running

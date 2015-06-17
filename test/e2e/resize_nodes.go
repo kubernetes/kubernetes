@@ -274,7 +274,7 @@ var _ = Describe("Nodes", func() {
 			Logf("starting test %s", testName)
 
 			if testContext.CloudConfig.NumNodes < 2 {
-				Failf("Failing test %s as it requires at lease 2 nodes (not %d)", testName, testContext.CloudConfig.NumNodes)
+				Failf("Failing test %s as it requires at least 2 nodes (not %d)", testName, testContext.CloudConfig.NumNodes)
 				return
 			}
 
@@ -301,10 +301,11 @@ var _ = Describe("Nodes", func() {
 
 		testName = "should be able to add nodes."
 		It(testName, func() {
+			// TODO: Bug here - testName is not correct
 			Logf("starting test %s", testName)
 
 			if testContext.CloudConfig.NumNodes < 2 {
-				Failf("Failing test %s as it requires at lease 2 nodes (not %d)", testName, testContext.CloudConfig.NumNodes)
+				Failf("Failing test %s as it requires at least 2 nodes (not %d)", testName, testContext.CloudConfig.NumNodes)
 				return
 			}
 
@@ -344,7 +345,7 @@ var _ = Describe("Nodes", func() {
 		testName = "should survive network partition."
 		It(testName, func() {
 			if testContext.CloudConfig.NumNodes < 2 {
-				By(fmt.Sprintf("skipping %s test, which requires at lease 2 nodes (not %d)",
+				By(fmt.Sprintf("skipping %s test, which requires at least 2 nodes (not %d)",
 					testName, testContext.CloudConfig.NumNodes))
 				return
 			}
@@ -356,7 +357,7 @@ var _ = Describe("Nodes", func() {
 			replicas := testContext.CloudConfig.NumNodes
 			createServeHostnameReplicationController(c, ns, name, replicas)
 			err := waitForPodsCreatedRunningResponding(c, ns, name, replicas)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
 			By("cause network partition on one node")
 			nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
@@ -389,6 +390,7 @@ var _ = Describe("Nodes", func() {
 			err = waitForPodsCreatedRunningResponding(c, ns, name, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
+			// TODO: We should do this cleanup even if one of the above fails
 			By("remove network partition")
 			undropCmd := "sudo iptables --delete OUTPUT 1"
 			if _, _, code, err := SSH(undropCmd, host, testContext.Provider); code != 0 || err != nil {
