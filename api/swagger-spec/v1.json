@@ -5,7 +5,727 @@
   "resourcePath": "/api/v1",
   "apis": [
    {
-    "path": "/api/v1/namespaces/{namespace}/bindings",
+    "path": "/api/v1/namespaces/{namespaces}/autoscalers",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "v1.AutoScalerList",
+      "method": "GET",
+      "summary": "list or watch objects of kind AutoScaler",
+      "nickname": "listAutoScaler",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.AutoScalerList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.AutoScaler",
+      "method": "POST",
+      "summary": "create a AutoScaler",
+      "nickname": "createAutoScaler",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.AutoScaler",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.AutoScaler"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/namespaces/{namespaces}/autoscalers",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of AutoScaler",
+      "nickname": "watchAutoScalerList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/namespaces/{namespaces}/autoscalers/{name}",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "v1.AutoScaler",
+      "method": "GET",
+      "summary": "read the specified AutoScaler",
+      "nickname": "readAutoScaler",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the AutoScaler",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.AutoScaler"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.AutoScaler",
+      "method": "PUT",
+      "summary": "replace the specified AutoScaler",
+      "nickname": "replaceAutoScaler",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.AutoScaler",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the AutoScaler",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.AutoScaler"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.AutoScaler",
+      "method": "PATCH",
+      "summary": "partially update the specified AutoScaler",
+      "nickname": "patchAutoScaler",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the AutoScaler",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "v1.Status",
+      "method": "DELETE",
+      "summary": "delete a AutoScaler",
+      "nickname": "deleteAutoScaler",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the AutoScaler",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Status"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/namespaces/{namespaces}/autoscalers/{name}",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch changes to an object of kind AutoScaler",
+      "nickname": "watchAutoScaler",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the AutoScaler",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/autoscalers",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "v1.AutoScalerList",
+      "method": "GET",
+      "summary": "list or watch objects of kind AutoScaler",
+      "nickname": "listAutoScaler",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.AutoScalerList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.AutoScaler",
+      "method": "POST",
+      "summary": "create a AutoScaler",
+      "nickname": "createAutoScaler",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.AutoScaler",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.AutoScaler"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/autoscalers",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "json.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of AutoScaler",
+      "nickname": "watchAutoScalerList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/namespaces/{namespaces}/autoscalers/{name}/status",
+    "description": "API at /api/v1 version v1",
+    "operations": [
+     {
+      "type": "v1.AutoScaler",
+      "method": "PUT",
+      "summary": "replace status of the specified AutoScaler",
+      "nickname": "replaceAutoScalerStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.AutoScaler",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the AutoScaler",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.AutoScaler"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/namespaces/{namespaces}/bindings",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -33,7 +753,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
+        "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -108,7 +828,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
+        "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -131,7 +851,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/componentstatuses/{name}",
+    "path": "/api/v1/namespaces/{namespaces}/componentstatuses/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -151,7 +871,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
+        "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -249,7 +969,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/endpoints",
+    "path": "/api/v1/namespaces/{namespaces}/endpoints",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -369,7 +1089,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespace}/endpoints",
+    "path": "/api/v1/watch/namespaces/{namespaces}/endpoints",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -444,7 +1164,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/endpoints/{name}",
+    "path": "/api/v1/namespaces/{namespaces}/endpoints/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -588,7 +1308,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Endpoints"
+        "responseModel": "v1.Event"
        }
       ],
       "produces": [
@@ -656,7 +1376,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespace}/endpoints/{name}",
+    "path": "/api/v1/watch/namespaces/{namespaces}/endpoints/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -873,7 +1593,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/events",
+    "path": "/api/v1/namespaces/{namespaces}/events",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -993,7 +1713,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespace}/events",
+    "path": "/api/v1/watch/namespaces/{namespaces}/events",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1068,7 +1788,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/events/{name}",
+    "path": "/api/v1/namespaces/{namespaces}/events/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1212,7 +1932,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Event"
+        "responseModel": "v1.LimitRange"
        }
       ],
       "produces": [
@@ -1272,7 +1992,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespace}/events/{name}",
+    "path": "/api/v1/watch/namespaces/{namespaces}/events/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1489,7 +2209,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/limitranges",
+    "path": "/api/v1/namespaces/{namespaces}/limitranges",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1541,7 +2261,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
+        "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1586,7 +2306,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
+        "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1609,7 +2329,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespace}/limitranges",
+    "path": "/api/v1/watch/namespaces/{namespaces}/limitranges",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1661,7 +2381,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
+        "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1684,7 +2404,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespace}/limitranges/{name}",
+    "path": "/api/v1/namespaces/{namespaces}/limitranges/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1704,7 +2424,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
+        "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1757,7 +2477,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
+        "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1810,7 +2530,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
+        "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1828,7 +2548,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.LimitRange"
+        "responseModel": "v1.Namespace"
        }
       ],
       "produces": [
@@ -1857,7 +2577,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
+        "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1888,7 +2608,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespace}/limitranges/{name}",
+    "path": "/api/v1/watch/namespaces/{namespaces}/limitranges/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1940,7 +2660,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespace",
+        "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -2396,7 +3116,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Namespace"
+        "responseModel": "v1.Node"
        }
       ],
       "produces": [
@@ -2904,7 +3624,7 @@
         "allowMultiple": false
        },
        {
-        "type": "api.Patch",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2924,7 +3644,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Node"
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -10937,10 +11657,10 @@
    }
   ],
   "models": {
-   "v1.Binding": {
-    "id": "v1.Binding",
+   "v1.AutoScalerList": {
+    "id": "v1.AutoScalerList",
     "required": [
-     "target"
+     "items"
     ],
     "properties": {
      "kind": {
@@ -10955,9 +11675,13 @@
       "$ref": "v1.ObjectMeta",
       "description": "standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
-     "target": {
-      "$ref": "v1.ObjectReference",
-      "description": "an object to bind to"
+     "spec": {
+      "$ref": "v1.AutoScalerSpec",
+      "description": "spec defines the auto-scaler targets and thresholds; http://docs.k8s.io/api-conventions.md#spec-and-status"
+     },
+     "status": {
+      "$ref": "v1.AutoScalerStatus",
+      "description": "most recent status of an auto-scaler, populated by the auto-scale manager; http://docs.k8s.io/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -10988,16 +11712,24 @@
       "type": "string",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
      },
-     "generation": {
+     "gracePeriodSeconds": {
       "type": "integer",
       "format": "int64",
-      "description": "a sequence number representing a specific generation of the desired state; populated by the system; read-only"
-     },
-     "creationTimestamp": {
+      "description": "the duration in seconds to wait before deleting this object; defaults to a per object value if not specified; zero means delete immediately"
+     }
+    }
+   },
+   "v1.Binding": {
+    "id": "v1.Binding",
+    "required": [
+     "target"
+    ],
+    "properties": {
+     "kind": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
-     "deletionTimestamp": {
+     "apiVersion": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
