@@ -33,9 +33,10 @@
 - hosts: masters
   sudo: yes
   roles:
-        - kubernetes-addons
+    - kubernetes-addons
   tags:
-        - addons
+    - addons
+    - dns
 
 # install kubernetes on the nodes
 - hosts: nodes

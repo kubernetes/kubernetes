@@ -42,3 +42,22 @@ flannel_prefix: 12
 # will give to each node on your network.  With these defaults you should have
 # room for 4096 nodes with 254 pods per node.
 flannel_host_prefix: 24
+
+# Turn this varable to 'false' to disable whole DNS configuration.
+dns_setup: true
+# How many replicas in the Replication Controller
+dns_replicas: 1
+
+# Internal DNS domain name.
+# This domain must not be used in your network. Services will be discoverable
+# under <service-name>.<namespace>.<domainname>, e.g.
+# myservice.default.kube.local
+dns_domain: kube.local
+
+# IP address of the DNS server.
+# Kubernetes will create a pod with several containers, serving as the DNS
+# server and expose it under this IP address. The IP address must be from
+# the range specified as kube_service_addresses above.
+# And this is the IP address you should use as address of the DNS server
+# in your containers.
+dns_server: 10.254.0.10

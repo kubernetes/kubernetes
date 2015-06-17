@@ -11,6 +11,10 @@
     state=directory
   sudo: no
 
+- include: dns.yml
+  when: dns_setup
+  tags: dns
+
 #- name: Get kube-addons script from Kubernetes
 #  get_url:
 #    url=https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/cluster/saltbase/salt/kube-addons/kube-addons.sh
@@ -37,7 +41,7 @@
   environment:
     TOKEN_DIR: "{{ kube_config_dir }}"
   with_items:
-    -
+    - "system:dns"
   register: gentoken
   changed_when: "'Added' in gentoken.stdout"
   notify:
