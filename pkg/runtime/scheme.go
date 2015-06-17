@@ -459,15 +459,12 @@ func (s *Scheme) DecodeInto(data []byte, obj Object) error {
 }
 
 // Copy does a deep copy of an API object.  Useful mostly for tests.
-// TODO(dbsmith): implement directly instead of via Encode/Decode
-// TODO(claytonc): Copy cannot be used for objects which do not encode type information, such
-// as lists of runtime.Objects
-func (s *Scheme) Copy(obj Object) (Object, error) {
-	data, err := s.EncodeToVersion(obj, "")
+func (s *Scheme) Copy(src Object) (Object, error) {
+	dst, err := s.raw.DeepCopy(src)
 	if err != nil {
 		return nil, err
 	}
-	return s.Decode(data)
+	return dst.(Object), nil
 }
 
 func (s *Scheme) CopyOrDie(obj Object) Object {
