@@ -603,7 +603,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -631,7 +631,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Endpoints"
        }
       ],
       "produces": [
@@ -1264,7 +1264,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1292,7 +1292,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Event"
        }
       ],
       "produces": [
@@ -1917,7 +1917,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1945,7 +1945,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.LimitRange"
        }
       ],
       "produces": [
@@ -2530,7 +2530,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2550,7 +2550,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Namespace"
        }
       ],
       "produces": [
@@ -3058,7 +3058,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3078,7 +3078,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Node"
        }
       ],
       "produces": [
@@ -3847,7 +3847,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3875,7 +3875,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.PersistentVolumeClaim"
        }
       ],
       "produces": [
@@ -4527,7 +4527,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4547,7 +4547,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.PersistentVolume"
        }
       ],
       "produces": [
@@ -5044,7 +5044,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5072,7 +5072,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Pod"
        }
       ],
       "produces": [
@@ -6469,7 +6469,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6497,7 +6497,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.PodTemplate"
        }
       ],
       "produces": [
@@ -7130,7 +7130,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7158,7 +7158,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.ReplicationController"
        }
       ],
       "produces": [
@@ -7791,7 +7791,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7819,7 +7819,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.ResourceQuota"
        }
       ],
       "produces": [
@@ -8511,7 +8511,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -8539,7 +8539,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Secret"
        }
       ],
       "produces": [
@@ -9172,7 +9172,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -9200,7 +9200,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.ServiceAccount"
        }
       ],
       "produces": [
@@ -9833,7 +9833,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -9861,7 +9861,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Service"
        }
       ],
       "produces": [
@@ -10841,6 +10841,10 @@
       "description": "the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"
      }
     }
+   },
+   "api.Patch": {
+    "id": "api.Patch",
+    "properties": {}
    },
    "v1beta3.Status": {
     "id": "v1beta3.Status",
