@@ -514,6 +514,7 @@ type podResponseChecker struct {
 	ns             string
 	label          labels.Selector
 	controllerName string
+	respondName    bool // Whether the pod should respond with its own name.
 	pods           *api.PodList
 }
 
@@ -535,16 +536,32 @@ func (r podResponseChecker) checkAllResponses() (done bool, err error) {
 			Do().
 			Raw()
 		if err != nil {
-			Logf("Controller %s: Failed to GET from replica %d (%s): %v:", r.controllerName, i+1, pod.Name, err)
+			Logf("Controller %s: Failed to GET from replica %d [%s]: %v:", r.controllerName, i+1, pod.Name, err)
 			continue
 		}
-		// The body should be the pod name.
-		if string(body) != pod.Name {
-			Logf("Controller %s: Replica %d expected response %s but got %s", r.controllerName, i+1, pod.Name, string(body))
-			continue
+		// The response checker expects the pod's name unless !respondName, in
+		// which case it just checks for a non-empty response.
+		got := string(body)
+		what := ""
+		if r.respondName {
+			what = "expected"
+			want := pod.Name
+			if got != want {
+				Logf("Controller %s: Replica %d [%s] expected response %q but got %q",
+					r.controllerName, i+1, pod.Name, want, got)
+				continue
+			}
+		} else {
+			what = "non-empty"
+			if len(got) == 0 {
+				Logf("Controller %s: Replica %d [%s] expected non-empty response",
+					r.controllerName, i+1, pod.Name)
+				continue
+			}
 		}
 		successes++
-		Logf("Controller %s: Got expected result from replica %d: %s, %d of %d required successes so far", r.controllerName, i+1, string(body), successes, len(r.pods.Items))
+		Logf("Controller %s: Got %s result from replica %d [%s]: %q, %d of %d required successes so far",
+			r.controllerName, what, i+1, pod.Name, got, successes, len(r.pods.Items))
 	}
 	if successes < len(r.pods.Items) {
 		return false, nil
@@ -1171,15 +1188,15 @@ func getSigner(provider string) (ssh.Signer, error) {
 }
 
 // checkPodsRunning returns whether all pods whose names are listed in podNames
-// are running and ready.
-func checkPodsRunningReady(c *client.Client, podNames []string, timeout time.Duration) bool {
+// in namespace ns are running and ready, using c and waiting at most timeout.
+func checkPodsRunningReady(c *client.Client, ns string, podNames []string, timeout time.Duration) bool {
 	np, desc := len(podNames), "running and ready"
 	Logf("Waiting up to %v for the following %d pods to be %s: %s", timeout, np, desc, podNames)
 	result := make(chan bool, len(podNames))
 	for ix := range podNames {
 		// Launch off pod readiness checkers.
 		go func(name string) {
-			err := waitForPodCondition(c, api.NamespaceDefault, name, desc, timeout, podRunningReady)
+			err := waitForPodCondition(c, ns, name, desc, timeout, podRunningReady)
 			result <- err == nil
 		}(podNames[ix])
 	}

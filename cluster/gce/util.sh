@@ -250,7 +250,7 @@ function detect-minion-names {
   MINION_NAMES=($(gcloud preview --project "${PROJECT}" instance-groups \
     --zone "${ZONE}" instances --group "${NODE_INSTANCE_PREFIX}-group" list \
     | cut -d'/' -f11))
-  echo "MINION_NAMES=${MINION_NAMES[*]}"
+  echo "MINION_NAMES=${MINION_NAMES[*]}" >&2
 }
 
 # Waits until the number of running nodes in the instance group is equal to NUM_NODES
@@ -415,8 +415,9 @@ function create-node-template {
     fi
   fi
 
-  local attempt=0
+  local attempt=1
   while true; do
+    echo "Attempt ${attempt} to create ${1}" >&2
     if ! gcloud compute instance-templates create "$1" \
       --project "${PROJECT}" \
       --machine-type "${MINION_SIZE}" \
@@ -428,12 +429,12 @@ function create-node-template {
       --network "${NETWORK}" \
       $2 \
       --can-ip-forward \
-      --metadata-from-file "$3","$4"; then
+      --metadata-from-file "$3","$4" >&2; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template $1 ${color_norm}" >&2
           exit 2
         fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create instance template $1. Retrying.${color_norm}" >&2
+        echo -e "${color_yellow}Attempt ${attempt} failed to create instance template $1. Retrying.${color_norm}" >&2
         attempt=$(($attempt+1))
     else
         break

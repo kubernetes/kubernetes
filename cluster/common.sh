@@ -179,13 +179,13 @@ function get-kubeconfig-bearertoken() {
 function set_binary_version() {
   if [[ "${1}" == "latest_stable" ]]; then
     KUBE_VERSION=$(gsutil cat gs://kubernetes-release/release/stable.txt)
-    echo "Using latest stable version: ${KUBE_VERSION}"
+    echo "Using latest stable version: ${KUBE_VERSION}" >&2
   elif [[ "${1}" == "latest_release" ]]; then
     KUBE_VERSION=$(gsutil cat gs://kubernetes-release/release/latest.txt)
-    echo "Using latest release version: ${KUBE_VERSION}"
+    echo "Using latest release version: ${KUBE_VERSION}" >&2
   elif [[ "${1}" == "latest_ci" ]]; then
     KUBE_VERSION=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
-    echo "Using latest ci version: ${KUBE_VERSION}"
+    echo "Using latest ci version: ${KUBE_VERSION}" >&2
   else
     KUBE_VERSION=${1}
   fi

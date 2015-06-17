@@ -155,7 +155,8 @@ func issueSSHCommand(node *api.Node, provider, cmd string) error {
 // failed step, it will return false through result and not run the rest.
 func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan bool) {
 	// Setup
-	ps := newPodStore(c, api.NamespaceDefault, labels.Everything(), fields.OneTermEqualSelector(client.PodHost, name))
+	ns := api.NamespaceDefault
+	ps := newPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(client.PodHost, name))
 	defer ps.Stop()
 
 	// Get the node initially.
@@ -183,7 +184,7 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 
 	// For each pod, we do a sanity check to ensure it's running / healthy
 	// now, as that's what we'll be checking later.
-	if !checkPodsRunningReady(c, podNames, podReadyBeforeTimeout) {
+	if !checkPodsRunningReady(c, ns, podNames, podReadyBeforeTimeout) {
 		result <- false
 		return
 	}
@@ -209,7 +210,7 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 
 	// Ensure all of the pods that we found on this node before the reboot are
 	// running / healthy.
-	if !checkPodsRunningReady(c, podNames, rebootPodReadyAgainTimeout) {
+	if !checkPodsRunningReady(c, ns, podNames, rebootPodReadyAgainTimeout) {
 		result <- false
 		return
 	}
