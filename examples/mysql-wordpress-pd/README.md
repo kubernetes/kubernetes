@@ -72,7 +72,7 @@ spec:
   containers: 
     - resources:
         limits :
-          cpu: 1
+          cpu: 0.5
       image: mysql
       name: mysql
       env:

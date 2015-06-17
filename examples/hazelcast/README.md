@@ -77,7 +77,7 @@ spec:
       containers: 
         - resources:
             limits:
-              cpu: 1
+              cpu: 0.5
           image: quay.io/pires/hazelcast-kubernetes:0.3.1
           name: hazelcast
           env:

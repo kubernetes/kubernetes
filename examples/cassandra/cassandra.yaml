@@ -10,7 +10,7 @@ spec:
     - /run.sh
     resources:
       limits:
-        cpu: "1"      
+        cpu: "0.5"
     image: gcr.io/google_containers/cassandra:v4
     name: cassandra
     ports:
