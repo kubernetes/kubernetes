@@ -52,6 +52,7 @@ function verify-prereqs {
       vmrun vmware_workstation vagrant-vmware-workstation
       prlctl parallels vagrant-parallels
       VBoxManage virtualbox ''
+      virsh libvirt vagrant-libvirt
   )
   local provider_found=''
   local provider_bin
