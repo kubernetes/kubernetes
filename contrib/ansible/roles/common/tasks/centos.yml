@@ -1,0 +1,3 @@
+---
+- name: CentOS | Install Testing centos7 repo for new tool versions
+  copy: src=virt7-testing.repo dest=/etc/yum.repos.d/virt7-testing.repo

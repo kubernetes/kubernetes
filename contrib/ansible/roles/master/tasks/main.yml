@@ -1,12 +1,9 @@
 ---
-- name: Install kubernetes
-  action: "{{ ansible_pkg_mgr }}"
-  args:
-    name: kubernetes-master
-    state: latest
-  notify:
-    - restart daemons
-  when: not is_atomic
+- include: generic-install.yml
+  when: not is_atomic and not ansible_distribution == "CentOS"
+
+- include: centos.yml
+  when: not is_atomic and ansible_distribution == "CentOS"
 
 - name: write the config file for the api server
   template: src=apiserver.j2 dest=/etc/kubernetes/apiserver
