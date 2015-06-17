@@ -29,6 +29,14 @@
   tags:
     - masters
 
+# launch addons, like dns
+- hosts: masters
+  sudo: yes
+  roles:
+        - kubernetes-addons
+  tags:
+        - addons
+
 # install kubernetes on the nodes
 - hosts: nodes
   sudo: yes

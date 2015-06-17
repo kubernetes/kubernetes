@@ -10,6 +10,10 @@
   notify:
     - restart apiserver
 
+- name: Ensure that a token auth file exists (addons may populate it)
+  file: path={{kube_config_dir }}/known_tokens.csv state=touch
+  changed_when: false
+
 - name: write the config file for the controller-manager
   template: src=controller-manager.j2 dest={{ kube_config_dir }}/controller-manager
   notify:

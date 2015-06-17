@@ -1,0 +1,12 @@
+[Unit]
+Description=Kubernetes Addon Object Manager
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+Environment="TOKEN_DIR={{ kube_config_dir }}"
+Environment="KUBECTL_BIN=/usr/bin/kubectl"
+Environment="KUBERNETES_MASTER_NAME={{ groups['masters'][0] }}"
+ExecStart={{ kube_script_dir }}/kube-addons.sh
+
+[Install]
+WantedBy=multi-user.target
