@@ -125,6 +125,7 @@ func testPreStop(c *client.Client, ns string) {
 			DoRaw(); err != nil {
 			By(fmt.Sprintf("Error validating prestop: %v", err))
 		} else {
+			Logf("Saw: %s", string(body))
 			state := State{}
 			err := json.Unmarshal(body, &state)
 			if err != nil {
@@ -134,7 +135,6 @@ func testPreStop(c *client.Client, ns string) {
 			if state.Received["prestop"] != 0 {
 				return true, nil
 			}
-			Logf("Saw: %s", string(body))
 		}
 		return false, nil
 	})
