@@ -837,7 +837,7 @@ function kube-down {
   fi
 
   # Delete firewall rule for minions.
-  if gcloud compute firewall-rules describe "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
+  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
     gcloud compute firewall-rules delete  \
       --project "${PROJECT}" \
       --quiet \
@@ -898,17 +898,17 @@ function check-resources {
     return 1
   fi
 
-  if gcloud compute instance-templates describe "${NODE_INSTANCE_PREFIX}-template" &>/dev/null; then
+  if gcloud compute instance-templates describe --project "${PROJECT}" "${NODE_INSTANCE_PREFIX}-template" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Instance template ${NODE_INSTANCE_PREFIX}-template"
     return 1
   fi
 
-  if gcloud compute instances describe "${MASTER_NAME}" --zone "${ZONE}" &>/dev/null; then
+  if gcloud compute instances describe --project "${PROJECT}" "${MASTER_NAME}" --zone "${ZONE}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Kubernetes master ${MASTER_NAME}"
     return 1
   fi
 
-  if gcloud compute disks describe "${MASTER_NAME}"-pd --zone "${ZONE}" &>/dev/null; then
+  if gcloud compute disks describe --project "${PROJECT}" "${MASTER_NAME}"-pd --zone "${ZONE}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Persistent disk ${MASTER_NAME}-pd"
     return 1
   fi
@@ -924,12 +924,12 @@ function check-resources {
     return 1
   fi
 
-  if gcloud compute firewall-rules describe "${MASTER_NAME}-https" &>/dev/null; then
+  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Firewal rules for ${MASTER_NAME}-https"
     return 1
   fi
 
-  if gcloud compute firewall-rules describe "${MINION_TAG}-all" &>/dev/null; then
+  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Firewal rules for ${MASTER_NAME}-all"
     return 1
   fi
@@ -943,7 +943,7 @@ function check-resources {
   fi
 
   local REGION=${ZONE%-*}
-  if gcloud compute addresses describe "${MASTER_NAME}-ip" --region "${REGION}" &>/dev/null; then
+  if gcloud compute addresses describe --project "${PROJECT}" "${MASTER_NAME}-ip" --region "${REGION}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Master's reserved IP"
     return 1
   fi
