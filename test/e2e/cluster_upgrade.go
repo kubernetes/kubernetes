@@ -38,29 +38,12 @@ import (
 
 var _ = Describe("Skipped", func() {
 	Describe("Cluster upgrade", func() {
-		svcName := "baz"
-		var podName string
-		framework := Framework{BaseName: "cluster-upgrade"}
-		var webserver *WebserverTest
 
-		BeforeEach(func() {
-			framework.beforeEach()
-			webserver = NewWebserverTest(framework.Client, framework.Namespace.Name, svcName)
-			pod := webserver.CreateWebserverPod()
-			podName = pod.Name
-			svc := webserver.BuildServiceSpec()
-			svc.Spec.Type = api.ServiceTypeLoadBalancer
-			webserver.CreateService(svc)
-		})
-
-		AfterEach(func() {
-			framework.afterEach()
-			webserver.Cleanup()
-		})
+		framework := NewFramework("cluster-upgrade")
 
 		Describe("kube-push", func() {
 			It("of master should maintain responsive services", func() {
-				testClusterUpgrade(framework, svcName, podName, func() {
+				testClusterUpgrade(framework, func() {
 					runUpgradeScript("hack/e2e-internal/e2e-push.sh", "-m")
 				})
 			})
@@ -72,7 +55,7 @@ var _ = Describe("Skipped", func() {
 					By(fmt.Sprintf("Skippingt test, which is not implemented for %s", testContext.Provider))
 					return
 				}
-				testClusterUpgrade(framework, svcName, podName, func() {
+				testClusterUpgrade(framework, func() {
 					runUpgradeScript("hack/e2e-internal/e2e-upgrade.sh", "-M", "-l")
 				})
 			})
@@ -80,24 +63,12 @@ var _ = Describe("Skipped", func() {
 	})
 })
 
-func testClusterUpgrade(framework Framework, svcName, podName string, upgrade func()) {
-	result, err := waitForLoadBalancerIngress(framework.Client, svcName, framework.Namespace.Name)
-	Expect(err).NotTo(HaveOccurred())
-	ingresses := result.Status.LoadBalancer.Ingress
-	if len(ingresses) != 1 {
-		Failf("Was expecting only 1 ingress IP but got %d (%v): %v", len(ingresses), ingresses, result)
-	}
-	ingress := ingresses[0]
-	ip := ingress.IP
-	if ip == "" {
-		ip = ingress.Hostname
-	}
+func testClusterUpgrade(framework *Framework, upgrade func()) {
+	By("Setting up test fixtures")
+	ip, svcName, rcName, podName := setupUpgradeFixtures(framework)
+	validateClusterUpgrade(framework, svcName, rcName, podName)
 
-	By("Waiting for pod to become reachable")
-	testLoadBalancerReachable(ingress, 80)
-	validateClusterUpgrade(framework, svcName, podName)
-
-	Logf("starting async validation")
+	Logf("Starting async validation")
 	httpClient := http.Client{Timeout: 2 * time.Second}
 	done := make(chan struct{}, 1)
 	// Let's make sure we've finished the heartbeat before shutting things down.
@@ -127,7 +98,7 @@ func testClusterUpgrade(framework Framework, svcName, podName string, upgrade fu
 	Logf("Upgrade complete.")
 
 	By("Validating post upgrade state")
-	validateClusterUpgrade(framework, svcName, podName)
+	validateClusterUpgrade(framework, svcName, rcName, podName)
 }
 
 func runUpgradeScript(scriptPath string, args ...string) {
@@ -144,18 +115,61 @@ func runUpgradeScript(scriptPath string, args ...string) {
 	}
 }
 
-func validateClusterUpgrade(framework Framework, svcName, podName string) {
-	pods, err := framework.Client.Pods(framework.Namespace.Name).List(labels.Everything(), fields.Everything())
+func validateClusterUpgrade(framework *Framework, svcName, rcName, podName string) {
+	rc, err := framework.Client.ReplicationControllers(framework.Namespace.Name).Get(rcName)
+	Expect(err).NotTo(HaveOccurred())
+
+	pods, err := framework.Client.Pods(framework.Namespace.Name).List(labels.Set(rc.Spec.Selector).AsSelector(), fields.Everything())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(pods.Items) == 1).Should(BeTrue())
-	if podName != pods.Items[0].Name {
-		Failf("pod name should not have changed")
+	if pods.Items[0].Name != podName {
+		Failf("pod name should not have changed: changed to '%s' from '%s'", pods.Items[0].Name, podName)
 	}
-	_, err = podRunningReady(&pods.Items[0])
+
+	isRunning, err := podRunningReady(&pods.Items[0])
 	Expect(err).NotTo(HaveOccurred())
+	Expect(isRunning).To(BeTrue())
+
 	svc, err := framework.Client.Services(framework.Namespace.Name).Get(svcName)
 	Expect(err).NotTo(HaveOccurred())
 	if svcName != svc.Name {
-		Failf("service name should not have changed")
+		Failf("Service name should not have changed")
 	}
+}
+
+func setupUpgradeFixtures(framework *Framework) (ip, svcName, rcName, podName string) {
+	svcName = "baz"
+	webserver := NewWebserverTest(framework.Client, framework.Namespace.Name, svcName)
+
+	svc := webserver.BuildServiceSpec()
+	svcName = svc.Name
+	svc.Spec.Type = api.ServiceTypeLoadBalancer
+	webserver.CreateService(svc)
+
+	rc := webserver.BuildReplicationController()
+	rc, err := framework.Client.ReplicationControllers(framework.Namespace.Name).Create(rc)
+	rcName = rc.Name
+	Expect(err).NotTo(HaveOccurred())
+
+	result, err := waitForLoadBalancerIngress(framework.Client, svcName, framework.Namespace.Name)
+	Expect(err).NotTo(HaveOccurred())
+	ingresses := result.Status.LoadBalancer.Ingress
+
+	if len(ingresses) != 1 {
+		Failf("Was expecting only 1 ingress IP but got %d (%v): %v", len(ingresses), ingresses, result)
+	}
+	ingress := ingresses[0]
+
+	testLoadBalancerReachable(ingress, 80)
+
+	pods, err := framework.Client.Pods(framework.Namespace.Name).List(labels.Set(rc.Spec.Selector).AsSelector(), fields.Everything())
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(pods.Items) == 1).Should(BeTrue())
+	podName = pods.Items[0].Name
+
+	ip = ingress.IP
+	if ip == "" {
+		ip = ingress.Hostname
+	}
+	return
 }
