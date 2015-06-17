@@ -42,6 +42,8 @@ const (
 	// docker memory resource container's hardlimit to workaround docker memory
 	// leakage issue. Please see kubernetes/issues/9881 for more detail.
 	DockerMemoryLimitThresholdPercent = 70
+	// The minimum memory limit allocated to docker container: 150Mi
+	MinDockerMemoryLimit = 150 * 1024 * 1024
 )
 
 // A non-user container tracked by the Kubelet.
@@ -90,7 +92,12 @@ func newContainerManager(cadvisorInterface cadvisor.Interface, dockerDaemonConta
 			capacity = CapacityFromMachineInfo(info)
 		}
 		memoryLimit := (int64(capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
-		glog.Infof("Configure resource-only container %s with memory limit: %d", dockerDaemonContainerName, memoryLimit)
+		if memoryLimit < MinDockerMemoryLimit {
+			glog.Warningf("Memory limit %d for container %s is too small, reset it to %d", memoryLimit, dockerDaemonContainerName, MinDockerMemoryLimit)
+			memoryLimit = MinDockerMemoryLimit
+		}
+
+		glog.V(2).Infof("Configure resource-only container %s with memory limit: %d", dockerDaemonContainerName, memoryLimit)
 
 		dockerContainer := &fs.Manager{
 			Cgroups: &configs.Cgroup{
