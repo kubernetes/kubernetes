@@ -5,25 +5,6 @@
     - group: root
     - mode: 755
 
-{% if grains['os_family'] == 'RedHat' %}
-
-/usr/lib/systemd/system/kube-master-addons.service:
-  file.managed:
-    - source: salt://kube-master-addons/kube-master-addons.service
-    - user: root
-    - group: root
-
-{% else %}
-
-/etc/init.d/kube-master-addons:
-  file.managed:
-    - source: salt://kube-master-addons/initd
-    - user: root
-    - group: root
-    - mode: 755
-
-{% endif %}
-
 # Used to restart kube-master-addons service each time salt is run
 # Actually, it doens't work (the service is not restarted),
 # but master-addon service always terminates after it does it job,
@@ -37,6 +18,29 @@ master-docker-image-tags:
   file.touch:
     - name: /srv/pillar/docker-images.sls
 
+{% if grains.get('is_systemd') %}
+
+{{ grains.get('systemd_system_path') }}/kube-master-addons.service:
+  file.managed:
+    - source: salt://kube-master-addons/kube-master-addons.service
+    - user: root
+    - group: root
+  cmd.run:
+      - name: /opt/kubernetes/helpers/services bounce kube-master-addons
+      - watch:
+        - file: master-docker-image-tags
+        - file: /etc/kubernetes/kube-master-addons.sh
+        - file: {{ grains.get('systemd_system_path') }}/kube-master-addons.service
+
+{% else %}
+
+/etc/init.d/kube-master-addons:
+  file.managed:
+    - source: salt://kube-master-addons/initd
+    - user: root
+    - group: root
+    - mode: 755
+
 kube-master-addons:
   service.running:
     - enable: True
@@ -44,3 +48,5 @@ kube-master-addons:
     - watch:
       - file: master-docker-image-tags
       - file: /etc/kubernetes/kube-master-addons.sh
+
+{% endif %}

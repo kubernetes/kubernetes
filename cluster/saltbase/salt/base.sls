@@ -11,3 +11,23 @@ pkg-core:
       - python-apt
       - glusterfs-client
 {% endif %}
+
+{% if grains['oscodename'] in [ 'vivid', 'jessie' ] %}
+is_systemd:
+  grains.present:
+    - value: True
+systemd_system_path:
+  grains.present:
+    - value: /lib/systemd/system
+{% elif grains['os_family'] == 'RedHat' %}
+is_systemd:
+  grains.present:
+    - value: True
+systemd_system_path:
+  grains.present:
+    - value: /usr/lib/systemd/system
+{% else %}
+is_systemd:
+  grains.present:
+    - value: False
+{% endif %}

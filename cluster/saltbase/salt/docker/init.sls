@@ -1,4 +1,4 @@
-{% if grains['os_family'] == 'RedHat' %}
+{% if grains.get('is_systemd') %}
 {% set environment_file = '/etc/sysconfig/docker' %}
 {% else %}
 {% set environment_file = '/etc/default/docker' %}
@@ -119,6 +119,26 @@ lxc-docker-{{ override_docker_ver }}:
       - lxc-docker-{{ override_docker_ver }}: /var/cache/docker-install/{{ override_deb }}
 {% endif %}
 
+# Default docker systemd unit file doesn't use an EnvironmentFile; replace it with one that does.
+{% if grains.get('is_systemd') %}
+
+{{ grains.get('systemd_system_path') }}/docker.service:
+  file.managed:
+    - source: salt://docker/docker.service
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - defaults:
+        environment_file: {{ environment_file }}
+  cmd.run:
+      - name: /opt/kubernetes/helpers/services bounce docker
+      - watch:
+        - file: {{ grains.get('systemd_system_path') }}/docker.service
+        - file: {{ environment_file }}
+
+{% else %}
+
 docker:
   service.running:
     - enable: True
@@ -128,6 +148,8 @@ docker:
 {% if override_docker_ver != '' %}
     - require:
       - pkg: lxc-docker-{{ override_docker_ver }}
+{% endif %}
+
 {% endif %}
 
 {% endif %}
