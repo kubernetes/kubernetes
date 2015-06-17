@@ -426,8 +426,7 @@ func convertStats(cont *info.ContainerInfo) []v2.ContainerStats {
 			stat.Memory = val.Memory
 		}
 		if stat.HasNetwork {
-			// TODO(rjnagal): Return stats about all network interfaces.
-			stat.Network = append(stat.Network, val.Network)
+			stat.Network.Interfaces = val.Network.Interfaces
 		}
 		if stat.HasFilesystem {
 			stat.Filesystem = val.Filesystem

@@ -25,16 +25,16 @@ import (
 	"github.com/google/cadvisor/utils"
 )
 
-// TODO(vmarmol): See about refactoring this class, we have an unecessary redirection of containerStorage and InMemoryStorage.
-// containerStorage is used to store per-container information
-type containerStorage struct {
+// TODO(vmarmol): See about refactoring this class, we have an unecessary redirection of containerCache and InMemoryCache.
+// containerCache is used to store per-container information
+type containerCache struct {
 	ref         info.ContainerReference
 	recentStats *utils.TimedStore
 	maxAge      time.Duration
 	lock        sync.RWMutex
 }
 
-func (self *containerStorage) AddStats(stats *info.ContainerStats) error {
+func (self *containerCache) AddStats(stats *info.ContainerStats) error {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
@@ -43,7 +43,7 @@ func (self *containerStorage) AddStats(stats *info.ContainerStats) error {
 	return nil
 }
 
-func (self *containerStorage) RecentStats(start, end time.Time, maxStats int) ([]*info.ContainerStats, error) {
+func (self *containerCache) RecentStats(start, end time.Time, maxStats int) ([]*info.ContainerStats, error) {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 	result := self.recentStats.InTimeRange(start, end, maxStats)
@@ -54,31 +54,31 @@ func (self *containerStorage) RecentStats(start, end time.Time, maxStats int) ([
 	return converted, nil
 }
 
-func newContainerStore(ref info.ContainerReference, maxAge time.Duration) *containerStorage {
-	return &containerStorage{
+func newContainerStore(ref info.ContainerReference, maxAge time.Duration) *containerCache {
+	return &containerCache{
 		ref:         ref,
 		recentStats: utils.NewTimedStore(maxAge, -1),
 		maxAge:      maxAge,
 	}
 }
 
-type InMemoryStorage struct {
-	lock                sync.RWMutex
-	containerStorageMap map[string]*containerStorage
-	maxAge              time.Duration
-	backend             storage.StorageDriver
+type InMemoryCache struct {
+	lock              sync.RWMutex
+	containerCacheMap map[string]*containerCache
+	maxAge            time.Duration
+	backend           storage.StorageDriver
 }
 
-func (self *InMemoryStorage) AddStats(ref info.ContainerReference, stats *info.ContainerStats) error {
-	var cstore *containerStorage
+func (self *InMemoryCache) AddStats(ref info.ContainerReference, stats *info.ContainerStats) error {
+	var cstore *containerCache
 	var ok bool
 
 	func() {
 		self.lock.Lock()
 		defer self.lock.Unlock()
-		if cstore, ok = self.containerStorageMap[ref.Name]; !ok {
+		if cstore, ok = self.containerCacheMap[ref.Name]; !ok {
 			cstore = newContainerStore(ref, self.maxAge)
-			self.containerStorageMap[ref.Name] = cstore
+			self.containerCacheMap[ref.Name] = cstore
 		}
 	}()
 
@@ -93,13 +93,13 @@ func (self *InMemoryStorage) AddStats(ref info.ContainerReference, stats *info.C
 	return cstore.AddStats(stats)
 }
 
-func (self *InMemoryStorage) RecentStats(name string, start, end time.Time, maxStats int) ([]*info.ContainerStats, error) {
-	var cstore *containerStorage
+func (self *InMemoryCache) RecentStats(name string, start, end time.Time, maxStats int) ([]*info.ContainerStats, error) {
+	var cstore *containerCache
 	var ok bool
 	err := func() error {
 		self.lock.RLock()
 		defer self.lock.RUnlock()
-		if cstore, ok = self.containerStorageMap[name]; !ok {
+		if cstore, ok = self.containerCacheMap[name]; !ok {
 			return fmt.Errorf("unable to find data for container %v", name)
 		}
 		return nil
@@ -111,9 +111,16 @@ func (self *InMemoryStorage) RecentStats(name string, start, end time.Time, maxS
 	return cstore.RecentStats(start, end, maxStats)
 }
 
-func (self *InMemoryStorage) Close() error {
+func (self *InMemoryCache) Close() error {
 	self.lock.Lock()
-	self.containerStorageMap = make(map[string]*containerStorage, 32)
+	self.containerCacheMap = make(map[string]*containerCache, 32)
+	self.lock.Unlock()
+	return nil
+}
+
+func (self *InMemoryCache) RemoveContainer(containerName string) error {
+	self.lock.Lock()
+	delete(self.containerCacheMap, containerName)
 	self.lock.Unlock()
 	return nil
 }
@@ -121,11 +128,11 @@ func (self *InMemoryStorage) Close() error {
 func New(
 	maxAge time.Duration,
 	backend storage.StorageDriver,
-) *InMemoryStorage {
-	ret := &InMemoryStorage{
-		containerStorageMap: make(map[string]*containerStorage, 32),
-		maxAge:              maxAge,
-		backend:             backend,
+) *InMemoryCache {
+	ret := &InMemoryCache{
+		containerCacheMap: make(map[string]*containerCache, 32),
+		maxAge:            maxAge,
+		backend:           backend,
 	}
 	return ret
 }

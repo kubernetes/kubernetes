@@ -192,6 +192,16 @@ const containersHtmlTemplate = `
 	  <div class="panel-heading">
             <h3 class="panel-title">Network</h3>
 	  </div>
+          <div class="panel-body">
+	    <div class="dropdown">
+              <button class="btn btn-default dropdown-toggle" type="button" id="network-selection-dropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <span id="network-selection-text"></span>
+                <span class="caret"></span>
+	      </button>
+              <ul id="network-selection" class="dropdown-menu" role="menu" aria-labelledby="network-selection-dropdown">
+              </ul>
+	    </div>
+          </div>
 	  <div class="panel-body">
             <h4>Throughput</h4>
             <div id="network-bytes-chart"></div>

@@ -18,8 +18,10 @@ package static
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
+	"path"
 )
 
 const StaticResource = "/static/"
@@ -44,6 +46,12 @@ func HandleRequest(w http.ResponseWriter, u *url.URL) error {
 	content, ok := staticFiles[resource]
 	if !ok {
 		return fmt.Errorf("unknown static resource %q", resource)
+	}
+
+	// Set Content-Type if we were able to detect it.
+	contentType := mime.TypeByExtension(path.Ext(resource))
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
 	}
 
 	_, err := w.Write([]byte(content))

@@ -375,9 +375,29 @@ function drawMemoryUsage(elementId, machineInfo, containerInfo) {
 	drawLineChart(titles, data, elementId, "Megabytes");
 }
 
+// Get the index of the interface with the specified name.
+function getNetworkInterfaceIndex(interfaceName, interfaces) {
+	for (var i = 0; i < interfaces.length; i++) {
+		if (interfaces[i].name == interfaceName) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 // Draw the graph for network tx/rx bytes.
 function drawNetworkBytes(elementId, machineInfo, stats) {
 	if (stats.spec.has_network && !hasResource(stats, "network")) {
+		return;
+	}
+
+	// Get interface index.
+	var interfaceIndex = -1;
+	if (stats.stats.length > 0) {
+		interfaceIndex = getNetworkInterfaceIndex(window.cadvisor.network.interface, stats.stats[0].network.interfaces);
+	}
+	if (interfaceIndex < 0) {
+		console.log("Unable to find interface\"", interfaceName, "\" in ", stats.stats.network);
 		return;
 	}
 
@@ -390,8 +410,8 @@ function drawNetworkBytes(elementId, machineInfo, stats) {
 
 		var elements = [];
 		elements.push(cur.timestamp);
-		elements.push((cur.network.tx_bytes - prev.network.tx_bytes) / intervalInSec);
-		elements.push((cur.network.rx_bytes - prev.network.rx_bytes) / intervalInSec);
+		elements.push((cur.network.interfaces[interfaceIndex].tx_bytes - prev.network.interfaces[interfaceIndex].tx_bytes) / intervalInSec);
+		elements.push((cur.network.interfaces[interfaceIndex].rx_bytes - prev.network.interfaces[interfaceIndex].rx_bytes) / intervalInSec);
 		data.push(elements);
 	}
 	drawLineChart(titles, data, elementId, "Bytes per second");
@@ -400,6 +420,16 @@ function drawNetworkBytes(elementId, machineInfo, stats) {
 // Draw the graph for network errors
 function drawNetworkErrors(elementId, machineInfo, stats) {
 	if (stats.spec.has_network && !hasResource(stats, "network")) {
+		return;
+	}
+
+	// Get interface index.
+	var interfaceIndex = -1;
+	if (stats.stats.length > 0) {
+		interfaceIndex = getNetworkInterfaceIndex(window.cadvisor.network.interface, stats.stats[0].network.interfaces);
+	}
+	if (interfaceIndex < 0) {
+		console.log("Unable to find interface\"", interfaceName, "\" in ", stats.stats.network);
 		return;
 	}
 
@@ -412,8 +442,8 @@ function drawNetworkErrors(elementId, machineInfo, stats) {
 
 		var elements = [];
 		elements.push(cur.timestamp);
-		elements.push((cur.network.tx_errors - prev.network.tx_errors) / intervalInSec);
-		elements.push((cur.network.rx_errors - prev.network.rx_errors) / intervalInSec);
+		elements.push((cur.network.interfaces[interfaceIndex].tx_errors - prev.network.interfaces[interfaceIndex].tx_errors) / intervalInSec);
+		elements.push((cur.network.interfaces[interfaceIndex].rx_errors - prev.network.interfaces[interfaceIndex].rx_errors) / intervalInSec);
 		data.push(elements);
 	}
 	drawLineChart(titles, data, elementId, "Errors per second");
@@ -478,7 +508,7 @@ function drawProcesses(isRoot, rootDir, processInfo) {
 	var titleTypes = ['string', 'number', 'number', 'string', 'number', 'number', 'number', 'number', 'string', 'string', 'string'];
 	var sortIndex = 4
 	if (isRoot) {
-		titles.push("Cgroup");
+		titles.push("Container");
 		titleTypes.push('string');
 	}
 	var data = []
@@ -618,6 +648,60 @@ function drawCharts(machineInfo, containerInfo) {
 	stepExecute(steps);
 }
 
+function setNetwork(interfaceName) {
+	$("#network-selection-text")
+		.empty()
+		.append($("<span>").text("Interface: "))
+		.append($("<b>").text(interfaceName));
+	window.cadvisor.network.interface = interfaceName;
+
+	// Draw the new stats.
+	refreshStats();
+}
+
+// Creates the network selection dropdown.
+function startNetwork(selectionElement, containerInfo) {
+	if (!hasResource(containerInfo, "network") || containerInfo.stats.length == 0
+		|| !containerInfo.stats[0].network.interfaces || containerInfo.stats[0].network.interfaces.length == 0) {
+		return;
+	}
+
+	window.cadvisor.network = {};
+	window.cadvisor.network.interface = "";
+
+	// Add all interfaces to the dropdown.
+	var el = $("#" + selectionElement);
+	for (var i = 0; i < containerInfo.stats[0].network.interfaces.length; i++) {
+		var interfaceName = containerInfo.stats[0].network.interfaces[i].name;
+		el.append($("<li>")
+			.attr("role", "presentation")
+			.append($("<a>")
+				.attr("role", "menuitem")
+				.attr("tabindex", -1)
+				.click(setNetwork.bind(null, interfaceName))
+				.text(interfaceName)));
+	}
+	setNetwork(containerInfo.stats[0].network.interfaces[0].name);
+}
+
+// Refresh the stats on the page.
+function refreshStats() {
+	var machineInfo = window.cadvisor.machineInfo;
+	getStats(window.cadvisor.rootDir, window.cadvisor.containerName, function(containerInfo){
+		if (window.cadvisor.firstRun) {
+			window.cadvisor.firstRun = false;
+
+			if (containerInfo.spec.has_filesystem) {
+				startFileSystemUsage("filesystem-usage", machineInfo, containerInfo);
+			}
+			if (containerInfo.spec.has_network) {
+				startNetwork("network-selection", containerInfo);
+			}
+		}
+			drawCharts(machineInfo, containerInfo);
+	});
+}
+
 // Executed when the page finishes loading.
 function startPage(containerName, hasCpu, hasMemory, rootDir, isRoot) {
 	// Don't fetch data if we don't have any resource.
@@ -628,6 +712,8 @@ function startPage(containerName, hasCpu, hasMemory, rootDir, isRoot) {
 	window.charts = {};
 	window.cadvisor = {};
 	window.cadvisor.firstRun = true;
+	window.cadvisor.rootDir = rootDir;
+	window.cadvisor.containerName = containerName;
 
 	// Draw process information at start and refresh every 60s.
 	getProcessInfo(rootDir, containerName, function(processInfo) {
@@ -641,15 +727,9 @@ function startPage(containerName, hasCpu, hasMemory, rootDir, isRoot) {
 
 	// Get machine info, then get the stats every 1s.
 	getMachineInfo(rootDir, function(machineInfo) {
+		window.cadvisor.machineInfo = machineInfo;
 		setInterval(function() {
-			getStats(rootDir, containerName, function(containerInfo){
-				if (window.cadvisor.firstRun && containerInfo.spec.has_filesystem) {
-					window.cadvisor.firstRun = false;
-					startFileSystemUsage("filesystem-usage", machineInfo, containerInfo);
-				}
-
-				drawCharts(machineInfo, containerInfo);
-			});
+			refreshStats();
 		}, 1000);
 	});
 }

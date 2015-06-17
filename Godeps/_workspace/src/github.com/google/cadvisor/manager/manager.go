@@ -18,6 +18,7 @@ package manager
 import (
 	"flag"
 	"fmt"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/golang/glog"
+	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/docker"
@@ -35,7 +37,6 @@ import (
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/info/v2"
-	"github.com/google/cadvisor/storage/memory"
 	"github.com/google/cadvisor/utils/cpuload"
 	"github.com/google/cadvisor/utils/oomparser"
 	"github.com/google/cadvisor/utils/sysfs"
@@ -113,8 +114,8 @@ type Manager interface {
 }
 
 // New takes a memory storage and returns a new manager.
-func New(memoryStorage *memory.InMemoryStorage, sysfs sysfs.SysFs) (Manager, error) {
-	if memoryStorage == nil {
+func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs) (Manager, error) {
+	if memoryCache == nil {
 		return nil, fmt.Errorf("manager requires memory storage")
 	}
 
@@ -130,12 +131,20 @@ func New(memoryStorage *memory.InMemoryStorage, sysfs sysfs.SysFs) (Manager, err
 	if err != nil {
 		return nil, err
 	}
+
+	// If cAdvisor was started with host's rootfs mounted, assume that its running
+	// in its own namespaces.
+	inHostNamespace := false
+	if _, err := os.Stat("/rootfs/proc"); os.IsNotExist(err) {
+		inHostNamespace = true
+	}
 	newManager := &manager{
 		containers:        make(map[namespacedContainerName]*containerData),
 		quitChannels:      make([]chan error, 0, 2),
-		memoryStorage:     memoryStorage,
+		memoryCache:       memoryCache,
 		fsInfo:            fsInfo,
 		cadvisorContainer: selfContainer,
+		inHostNamespace:   inHostNamespace,
 		startupTime:       time.Now(),
 	}
 
@@ -169,12 +178,13 @@ type namespacedContainerName struct {
 type manager struct {
 	containers             map[namespacedContainerName]*containerData
 	containersLock         sync.RWMutex
-	memoryStorage          *memory.InMemoryStorage
+	memoryCache            *memory.InMemoryCache
 	fsInfo                 fs.FsInfo
 	machineInfo            info.MachineInfo
 	versionInfo            info.VersionInfo
 	quitChannels           []chan error
 	cadvisorContainer      string
+	inHostNamespace        bool
 	dockerContainersRegexp *regexp.Regexp
 	loadReader             cpuload.CpuLoadReader
 	eventHandler           events.EventManager
@@ -217,7 +227,7 @@ func (self *manager) Start() error {
 	// Watch for OOMs.
 	err = self.watchForNewOoms()
 	if err != nil {
-		glog.Errorf("Failed to start OOM watcher, will not get OOM events: %v", err)
+		glog.Warningf("Could not configure a source for OOM detection, disabling OOM events: %v", err)
 	}
 
 	// If there are no factories, don't start any housekeeping and serve the information we do have.
@@ -361,9 +371,12 @@ func (self *manager) GetContainerSpec(containerName string, options v2.RequestOp
 func (self *manager) getV2Spec(cinfo *containerInfo) v2.ContainerSpec {
 	specV1 := self.getAdjustedSpec(cinfo)
 	specV2 := v2.ContainerSpec{
-		CreationTime: specV1.CreationTime,
-		HasCpu:       specV1.HasCpu,
-		HasMemory:    specV1.HasMemory,
+		CreationTime:  specV1.CreationTime,
+		HasCpu:        specV1.HasCpu,
+		HasMemory:     specV1.HasMemory,
+		HasFilesystem: specV1.HasFilesystem,
+		HasNetwork:    specV1.HasNetwork,
+		HasDiskIo:     specV1.HasDiskIo,
 	}
 	if specV1.HasCpu {
 		specV2.Cpu.Limit = specV1.Cpu.Limit
@@ -409,7 +422,7 @@ func (self *manager) containerDataToContainerInfo(cont *containerData, query *in
 		return nil, err
 	}
 
-	stats, err := self.memoryStorage.RecentStats(cinfo.Name, query.Start, query.End, query.NumStats)
+	stats, err := self.memoryCache.RecentStats(cinfo.Name, query.Start, query.End, query.NumStats)
 	if err != nil {
 		return nil, err
 	}
@@ -594,7 +607,7 @@ func (self *manager) getRequestedContainers(containerName string, options v2.Req
 func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 	var empty time.Time
 	// Get latest data from filesystems hanging off root container.
-	stats, err := self.memoryStorage.RecentStats("/", empty, empty, 1)
+	stats, err := self.memoryCache.RecentStats("/", empty, empty, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -668,7 +681,7 @@ func (m *manager) GetProcessList(containerName string, options v2.RequestOptions
 	// TODO(rjnagal): handle count? Only if we can do count by type (eg. top 5 cpu users)
 	ps := []v2.ProcessInfo{}
 	for _, cont := range conts {
-		ps, err = cont.GetProcessList()
+		ps, err = cont.GetProcessList(m.cadvisorContainer, m.inHostNamespace)
 		if err != nil {
 			return nil, err
 		}
@@ -693,7 +706,7 @@ func (m *manager) createContainer(containerName string) error {
 		return err
 	}
 	logUsage := *logCadvisorUsage && containerName == m.cadvisorContainer
-	cont, err := newContainerData(containerName, m.memoryStorage, handler, m.loadReader, logUsage, collectorManager)
+	cont, err := newContainerData(containerName, m.memoryCache, handler, m.loadReader, logUsage, collectorManager)
 	if err != nil {
 		return err
 	}

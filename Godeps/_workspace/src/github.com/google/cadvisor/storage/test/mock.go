@@ -29,11 +29,6 @@ func (self *MockStorageDriver) AddStats(ref info.ContainerReference, stats *info
 	return args.Error(0)
 }
 
-func (self *MockStorageDriver) RecentStats(containerName string, numStats int) ([]*info.ContainerStats, error) {
-	args := self.Called(containerName, numStats)
-	return args.Get(0).([]*info.ContainerStats), args.Error(1)
-}
-
 func (self *MockStorageDriver) Close() error {
 	if self.MockCloseMethod {
 		args := self.Called()

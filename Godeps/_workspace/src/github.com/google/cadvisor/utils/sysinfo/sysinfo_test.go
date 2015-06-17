@@ -110,7 +110,8 @@ func TestGetCacheInfo(t *testing.T) {
 }
 
 func TestGetNetworkStats(t *testing.T) {
-	expected_stats := info.NetworkStats{
+	expected_stats := info.InterfaceStats{
+		Name:      "eth0",
 		RxBytes:   1024,
 		RxPackets: 1024,
 		RxErrors:  1024,

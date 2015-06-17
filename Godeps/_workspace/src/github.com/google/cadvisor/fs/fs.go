@@ -75,8 +75,13 @@ func NewFsInfo(context Context) (FsInfo, error) {
 	partitions := make(map[string]partition, 0)
 	fsInfo := &RealFsInfo{}
 	fsInfo.labels = make(map[string]string, 0)
+	supportedFsType := map[string]bool{
+		// all ext systems are checked through prefix.
+		"btrfs": true,
+		"xfs":   true,
+	}
 	for _, mount := range mounts {
-		if !strings.HasPrefix(mount.Fstype, "ext") && mount.Fstype != "btrfs" {
+		if !strings.HasPrefix(mount.Fstype, "ext") && !supportedFsType[mount.Fstype] {
 			continue
 		}
 		// Avoid bind mounts.
