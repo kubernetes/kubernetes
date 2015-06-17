@@ -79,10 +79,16 @@ func (s *AWSCloud) CreateRoute(clusterName string, nameHint string, route *cloud
 		return err
 	}
 
+	name := route.TargetInstance
+	instance, err := s.getInstanceByDnsName(name)
+	if err != nil {
+		return err
+	}
+
 	request := &ec2.CreateRouteInput{}
 	// TODO: use ClientToken for idempotency?
 	request.DestinationCIDRBlock = aws.String(route.DestinationCIDR)
-	request.InstanceID = aws.String(route.TargetInstance)
+	request.InstanceID = instance.InstanceID
 	request.RouteTableID = table.RouteTableID
 
 	_, err = s.ec2.CreateRoute(request)
