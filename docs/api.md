@@ -45,7 +45,7 @@ Some other difference between v1beta3 and v1:
 * The `pod.spec.containers[*].privileged` and `pod.spec.containers[*].capabilities` properties are now nested under the `pod.spec.containers[*].securityContext` property. See [Security Contexts](security_context.md).
 * The `pod.spec.host` property is renamed to `pod.spec.nodeName`.
 * The `endpoints.subsets[*].addresses.IP` property is renamed to `endpoints.subsets[*].addresses.ip`.
-* The `pod.status.containerStatuses[*].state.termination` and `pod.status.containerStatuses[*].lastState.termination` properties are renamed to `pod.status.containerStatuses[*].state.terminated` and `pod.status.containerStatuses[*].state.terminated` respectively.
+* The `pod.status.containerStatuses[*].state.termination` and `pod.status.containerStatuses[*].lastState.termination` properties are renamed to `pod.status.containerStatuses[*].state.terminated` and `pod.status.containerStatuses[*].lastState.terminated` respectively.
 * The `pod.status.Condition` property is renamed to `pod.status.conditions`.
 * The `status.details.id` property is renamed to `status.details.name`.
 
