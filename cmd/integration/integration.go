@@ -239,7 +239,7 @@ func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.S
 		for i := range pods.Items {
 			pod := pods.Items[i]
 			fmt.Println("CHAO: in podsOnMinions")
-			kubectl.ChaodescribePod(&pod)
+			kubectl.ChaodescribePod(&pod, c, podNamespace)
 			podString := fmt.Sprintf("%q/%q", pod.Namespace, pod.Name)
 			glog.Infof("Check whether pod %q exists on node %q", podString, pod.Spec.NodeName)
 			if len(pod.Spec.NodeName) == 0 {
@@ -300,7 +300,7 @@ func podRunning(c *client.Client, podNamespace string, podName string) wait.Cond
 	return func() (bool, error) {
 		pod, err := c.Pods(podNamespace).Get(podName)
 		fmt.Println("CHAO: in podRunning")
-		kubectl.ChaodescribePod(pod)
+		kubectl.ChaodescribePod(pod, c, podNamespace)
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}

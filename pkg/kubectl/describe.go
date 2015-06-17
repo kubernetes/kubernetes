@@ -425,7 +425,7 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 	})
 }
 
-func ChaodescribePod(pod *api.Pod) error {
+func ChaodescribePod(pod *api.Pod, c *client.Client, namespace string) error {
 	fmt.Printf("Name:\t%s\n", pod.Name)
 	fmt.Printf("Image(s):\t%s\n", makeImageList(&pod.Spec))
 	fmt.Printf("Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
@@ -440,6 +440,18 @@ func ChaodescribePod(pod *api.Pod) error {
 				c.Type,
 				c.Status)
 		}
+	}
+
+	var events *api.EventList
+	if ref, err := api.GetReference(pod); err != nil {
+		glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
+	} else {
+		ref.Kind = ""
+		events, _ = c.Events(namespace).Search(ref)
+	}
+
+	if events != nil {
+		DescribeEvents(events, os.Stdout)
 	}
 	return nil
 }
