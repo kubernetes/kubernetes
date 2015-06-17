@@ -207,6 +207,29 @@ func (r *Result) Watch(resourceVersion string) (watch.Interface, error) {
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
 func AsVersionedObject(infos []*Info, forceList bool, version string) (runtime.Object, error) {
+	objects, err := AsVersionedObjects(infos, version)
+	if err != nil {
+		return nil, err
+	}
+
+	var object runtime.Object
+	if len(objects) == 1 && !forceList {
+		object = objects[0]
+	} else {
+		object = &api.List{Items: objects}
+		converted, err := tryConvert(api.Scheme, object, version, latest.Version)
+		if err != nil {
+			return nil, err
+		}
+		object = converted
+	}
+	return object, nil
+}
+
+// AsVersionedObjects converts a list of infos into versioned objects. The provided
+// version will be preferred as the conversion target, but the Object's mapping version will be
+// used if that version is not present.
+func AsVersionedObjects(infos []*Info, version string) ([]runtime.Object, error) {
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object == nil {
@@ -233,19 +256,7 @@ func AsVersionedObject(infos []*Info, forceList bool, version string) (runtime.O
 		}
 		objects = append(objects, converted)
 	}
-
-	var object runtime.Object
-	if len(objects) == 1 && !forceList {
-		object = objects[0]
-	} else {
-		object = &api.List{Items: objects}
-		converted, err := tryConvert(api.Scheme, object, version, latest.Version)
-		if err != nil {
-			return nil, err
-		}
-		object = converted
-	}
-	return object, nil
+	return objects, nil
 }
 
 // tryConvert attempts to convert the given object to the provided versions in order. This function assumes
