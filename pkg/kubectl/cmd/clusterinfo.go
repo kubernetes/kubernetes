@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 
@@ -82,9 +83,13 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 					link += "http://" + ip + ":" + strconv.Itoa(port.Port) + " "
 				}
 			} else {
-				link = client.Host + "/api/v1beta3/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+				link = client.Host + "/api/" + latest.Version + "/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
 			}
-			printService(out, service.ObjectMeta.Labels["kubernetes.io/name"], link)
+			name := service.ObjectMeta.Labels["kubernetes.io/name"]
+			if len(name) == 0 {
+				name = service.ObjectMeta.Name
+			}
+			printService(out, name, link)
 		}
 		return nil
 	})
