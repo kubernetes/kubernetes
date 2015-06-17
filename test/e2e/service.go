@@ -1088,6 +1088,7 @@ type WebserverTest struct {
 	TestId string
 	Labels map[string]string
 
+	podSpec  api.PodSpec
 	pods     map[string]bool
 	services map[string]bool
 
@@ -1104,7 +1105,14 @@ func NewWebserverTest(client *client.Client, namespace string, serviceName strin
 	t.Labels = map[string]string{
 		"testid": t.TestId,
 	}
-
+	t.podSpec = api.PodSpec{
+		Containers: []api.Container{
+			{
+				Name:  "webserver",
+				Image: "gcr.io/google_containers/test-webserver",
+			},
+		},
+	}
 	t.pods = make(map[string]bool)
 	t.services = make(map[string]bool)
 
@@ -1133,6 +1141,24 @@ func (t *WebserverTest) BuildServiceSpec() *api.Service {
 	return service
 }
 
+func (t *WebserverTest) BuildReplicationController() *api.ReplicationController {
+	return &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name: t.ServiceName,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: t.Labels,
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: t.Labels,
+				},
+				Spec: t.podSpec,
+			},
+		},
+	}
+}
+
 // Create a pod with the well-known webserver configuration, and record it for cleanup
 func (t *WebserverTest) CreateWebserverPod() *api.Pod {
 	name := t.ServiceName + "-" + strconv.Itoa(t.SequenceNext())
@@ -1145,14 +1171,7 @@ func (t *WebserverTest) CreateWebserverPod() *api.Pod {
 			Name:   name,
 			Labels: t.Labels,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name:  "webserver",
-					Image: "gcr.io/google_containers/test-webserver",
-				},
-			},
-		},
+		Spec: t.podSpec,
 	}
 	pod, err := t.CreatePod(pod)
 	if err != nil {
