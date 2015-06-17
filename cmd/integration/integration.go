@@ -74,6 +74,8 @@ var (
 	apiVersion string
 	// Limit the number of concurrent tests.
 	maxConcurrency int
+
+	//avgPodCreationTime time.Duration
 )
 
 type fakeKubeletClient struct{}
@@ -411,11 +413,13 @@ func runReplicationControllerTest(c *client.Client) {
 	//	- The scheduler must assign all pods to a minion
 	//	- The assignment must reflect in a `List` operation against the apiserver, for labels matching the selector
 	//  - We need to be able to query the kubelet on that minion for information about the pod
+
+	start := time.Now()
 	if err := wait.Poll(
 		time.Second, time.Second*30, podsOnMinions(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
 	}
-
+	fmt.Printf("CHAOTIME: it take rc.pod %v to run\n", time.Since(start))
 	glog.Infof("Pods created")
 }
 
@@ -493,7 +497,6 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 		glog.Fatalf("never found selflinktest service in namespace %s", namespace)
 	}
 	glog.Infof("Self link test passed in namespace %s", namespace)
-
 	// TODO: Should test PUT at some point, too.
 }
 
@@ -870,18 +873,24 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
+
+	start := time.Now()
 	if err := wait.Poll(time.Second, time.Second*30, podRunning(client, foo.Namespace, foo.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
+	fmt.Printf("CHAOTIME: it take phantom.foo %v to run\n", time.Since(start))
 
 	pod.ObjectMeta.Name = "phantom.bar"
 	bar, err := client.Pods(api.NamespaceDefault).Create(pod)
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
+
+	start = time.Now()
 	if err := wait.Poll(time.Second, time.Second*30, podRunning(client, bar.Namespace, bar.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
+	fmt.Printf("CHAOTIME: it take phantom.bar %v to run\n", time.Since(start))
 
 	// Delete a pod to free up room.
 	glog.Infof("Deleting pod %v", bar.Name)
@@ -895,10 +904,12 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
+
+	start = time.Now()
 	if err := wait.Poll(time.Second, time.Second*60, podRunning(client, baz.Namespace, baz.Name)); err != nil {
 		glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
 	}
-
+	fmt.Printf("CHAOTIME: it take phantom.baz %v to run\n", time.Since(start))
 	glog.Info("Scheduler doesn't make phantom pods: test passed.")
 }
 
