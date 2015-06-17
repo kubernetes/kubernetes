@@ -8,7 +8,7 @@
   command: /sbin/iptables -I INPUT 1 -p tcp --dport 8080 -j ACCEPT -m comment --comment "kube-apiserver"
   when: kube-apiserver not in iptablesrules.stdout
   notify:
-          - restart iptables
+    - restart iptables
 
 - name: Save iptables rules
   command: service iptables save

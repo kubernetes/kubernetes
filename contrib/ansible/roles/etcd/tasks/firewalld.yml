@@ -4,13 +4,13 @@
   # in case this is also a node where firewalld turned off
   ignore_errors: yes
   with_items:
-        - 2379
-        - 2380
+    - 2379
+    - 2380
 
 - name: Save firewalld port for etcd
   firewalld: port={{ item }}/tcp permanent=true state=enabled
   # in case this is also a node where firewalld turned off
   ignore_errors: yes
   with_items:
-        - 2379
-        - 2380
+    - 2379
+    - 2380

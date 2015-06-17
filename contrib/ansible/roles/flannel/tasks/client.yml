@@ -9,9 +9,9 @@
 - name: Install Flannel config file
   template: src=flanneld.j2 dest=/etc/sysconfig/flanneld
   notify:
-          - restart flannel
+    - restart flannel
 
 - name: Launch Flannel
   service: name=flanneld state=started enabled=yes
   notify:
-          - restart flannel
+    - restart flannel

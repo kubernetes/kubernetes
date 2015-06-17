@@ -5,4 +5,4 @@
 - name: write the global config file
   template: src=config.j2 dest=/etc/kubernetes/config
   notify:
-          - restart daemons
+    - restart daemons

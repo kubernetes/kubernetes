@@ -3,38 +3,38 @@
 - hosts: etcd
   sudo: yes
   roles:
-        - common
-        - etcd
+    - common
+    - etcd
   tags:
-        - etcd
+    - etcd
 
 # install flannel
 - hosts:
-        - etcd
-        - masters
-        - nodes
+    - etcd
+    - masters
+    - nodes
   sudo: yes
   roles:
-        - flannel
+    - flannel
   tags:
-        - flannel
+    - flannel
 
 # install kube master services
 - hosts: masters
   sudo: yes
   roles:
-        - common
-        - kubernetes
-        - master
+    - common
+    - kubernetes
+    - master
   tags:
-        - masters
+    - masters
 
 # install kubernetes on the nodes
 - hosts: nodes
   sudo: yes
   roles:
-        - common
-        - kubernetes
-        - node
+    - common
+    - kubernetes
+    - node
   tags:
-        - nodes
+    - nodes

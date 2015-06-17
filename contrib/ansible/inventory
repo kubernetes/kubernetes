@@ -1,10 +1,10 @@
-[etcd]
-10.0.0.2
 
 [masters]
-10.0.0.1
+kube-master-test-01.example.com
+
+[etcd]
+kube-master-test-01.example.com
 
 [nodes]
-10.0.0.3
-10.0.0.4
-10.0.0.5
+kube-minion-test-01.example.com
+kube-minion-test-02.example.com

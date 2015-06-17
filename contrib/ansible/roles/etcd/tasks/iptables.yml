@@ -11,7 +11,7 @@
   command: /sbin/iptables -I INPUT 1 -p tcp --dport {{ item }} -j ACCEPT -m comment --comment "etcd"
   when: etcd not in iptablesrules.stdout
   notify:
-          - Save iptables rules
+    - Save iptables rules
   with_items:
-          - 2379
-          - 2380
+    - 2379
+    - 2380

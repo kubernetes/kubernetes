@@ -2,21 +2,21 @@
 - name: Install kubernetes
   action: "{{ ansible_pkg_mgr }}"
   args:
-        name: kubernetes-node
-        state: latest
+    name: kubernetes-node
+    state: latest
   notify:
-        - restart daemons
+    - restart daemons
   when: not is_atomic
 
 - name: write the config files for kubelet
   template: src=kubelet.j2 dest=/etc/kubernetes/kubelet
   notify:
-          - restart kubelet
+    - restart kubelet
 
 - name: write the config files for proxy
   copy: src=proxy dest=/etc/kubernetes/proxy
   notify:
-          - restart proxy
+    - restart proxy
 
 - name: Enable kubelet
   service: name=kubelet enabled=yes state=started

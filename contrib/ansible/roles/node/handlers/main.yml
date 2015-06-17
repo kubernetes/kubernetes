@@ -2,8 +2,8 @@
 - name: restart daemons
   command: /bin/true
   notify:
-          - restart kubelet
-          - restart proxy
+    - restart kubelet
+    - restart proxy
 
 - name: restart kubelet
   service: name=kubelet state=restarted

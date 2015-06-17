@@ -11,7 +11,7 @@
   command: /sbin/iptables -I INPUT 1 -p tcp --dport 10250 -j ACCEPT -m comment --comment "kubelet"
   when: kubelet not in iptablesrules.stdout
   notify:
-          - restart iptables
+    - restart iptables
 
 - name: Save iptables rules
   command: service iptables save

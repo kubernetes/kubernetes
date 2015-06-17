@@ -2,26 +2,26 @@
 - name: Install kubernetes
   action: "{{ ansible_pkg_mgr }}"
   args:
-        name: kubernetes-master
-        state: latest
+    name: kubernetes-master
+    state: latest
   notify:
-        - restart daemons
+    - restart daemons
   when: not is_atomic
 
 - name: write the config file for the api server
   template: src=apiserver.j2 dest=/etc/kubernetes/apiserver
   notify:
-          - restart apiserver
+    - restart apiserver
 
 - name: write the config file for the controller-manager
   copy: src=controller-manager dest=/etc/kubernetes/controller-manager
   notify:
-          - restart controller-manager
+    - restart controller-manager
 
 - name: write the config file for the scheduler
   copy: src=scheduler dest=/etc/kubernetes/scheduler
   notify:
-          - restart scheduler
+    - restart scheduler
 
 - name: Enable apiserver
   service: name=kube-apiserver enabled=yes state=started
