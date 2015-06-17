@@ -2223,10 +2223,12 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, contai
 
 	podUID = kl.podManager.TranslatePodUID(podUID)
 
-	container, err := kl.findContainer(podFullName, podUID, containerName)
+	pods, err := kl.runtimeCache.GetPods()
 	if err != nil {
 		return nil, err
 	}
+	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
+	container := pod.FindContainerByName(containerName)
 	if container == nil {
 		return nil, ErrContainerNotFound
 	}
