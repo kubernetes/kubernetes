@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -37,6 +39,25 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+type podLatencyData struct {
+	Name    string
+	Latency time.Duration
+}
+
+type latencySlice []podLatencyData
+
+func (a latencySlice) Len() int           { return len(a) }
+func (a latencySlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a latencySlice) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
+
+func printLatencies(latencies []podLatencyData, header string) {
+	perc50 := latencies[len(latencies)/2].Latency
+	perc90 := latencies[(len(latencies)*9)/10].Latency
+	perc99 := latencies[(len(latencies)*99)/100].Latency
+	Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:len(latencies)])
+	Logf("perc50: %v, perc90: %v, perc99: %v", perc50, perc90, perc99)
+}
+
 // This test suite can take a long time to run, so by default it is added to
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
@@ -45,6 +66,7 @@ var _ = Describe("Density", func() {
 	var c *client.Client
 	var minionCount int
 	var RCName string
+	var additionalRCName string
 	var ns string
 	var uuid string
 
@@ -82,6 +104,13 @@ var _ = Describe("Density", func() {
 			expectNoError(err)
 		}
 
+		rc, err = c.ReplicationControllers(ns).Get(additionalRCName)
+		if err == nil && rc.Spec.Replicas != 0 {
+			By("Cleaning up the replication controller")
+			err := DeleteRC(c, ns, additionalRCName)
+			expectNoError(err)
+		}
+
 		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
 		if err := c.Namespaces().Delete(ns); err != nil {
 			Failf("Couldn't delete ns %s", err)
@@ -99,9 +128,11 @@ var _ = Describe("Density", func() {
 	// Tests with "Skipped" substring in their name will be skipped when running
 	// e2e test suite without --ginkgo.focus & --ginkgo.skip flags.
 	type Density struct {
-		skip          bool
-		podsPerMinion int
-		/* Controls how often the apiserver is polled for pods */
+		skip bool
+		// Controls if e2e latency tests should be run (they are slow)
+		runLatencyTest bool
+		podsPerMinion  int
+		// Controls how often the apiserver is polled for pods
 		interval time.Duration
 	}
 
@@ -109,12 +140,13 @@ var _ = Describe("Density", func() {
 		// This test should not be run in a regular jenkins run, because it is not isolated enough
 		// (metrics from other tests affects this one).
 		// TODO: Reenable once we can measure latency only from a single test.
-		{podsPerMinion: 3, skip: true, interval: 10 * time.Second},
-		{podsPerMinion: 30, skip: true, interval: 10 * time.Second},
+		// TODO: Expose runLatencyTest as ginkgo flag.
+		{podsPerMinion: 3, skip: true, runLatencyTest: false, interval: 10 * time.Second},
+		{podsPerMinion: 30, skip: true, runLatencyTest: false, interval: 10 * time.Second},
 		// More than 30 pods per node is outside our v1.0 goals.
 		// We might want to enable those tests in the future.
-		{podsPerMinion: 50, skip: true, interval: 10 * time.Second},
-		{podsPerMinion: 100, skip: true, interval: 1 * time.Second},
+		{podsPerMinion: 50, skip: true, runLatencyTest: false, interval: 10 * time.Second},
+		{podsPerMinion: 100, skip: true, runLatencyTest: false, interval: 1 * time.Second},
 	}
 
 	for _, testArg := range densityTests {
@@ -188,6 +220,138 @@ var _ = Describe("Density", func() {
 			// Tune the threshold for allowed failures.
 			badEvents := BadEvents(events)
 			Expect(badEvents).NotTo(BeNumerically(">", int(math.Floor(0.01*float64(totalPods)))))
+
+			if itArg.runLatencyTest {
+				Logf("Schedling additional Pods to measure startup latencies")
+
+				createTimes := make(map[string]util.Time, 0)
+				scheduleTimes := make(map[string]util.Time, 0)
+				runTimes := make(map[string]util.Time, 0)
+				watchTimes := make(map[string]util.Time, 0)
+
+				var mutex sync.Mutex
+				checkPod := func(p *api.Pod) {
+					mutex.Lock()
+					defer mutex.Unlock()
+					defer GinkgoRecover()
+
+					if p.Status.Phase == api.PodRunning {
+						if _, found := watchTimes[p.Name]; !found {
+							watchTimes[p.Name] = util.Now()
+							createTimes[p.Name] = p.CreationTimestamp
+							var startTime util.Time
+							for _, cs := range p.Status.ContainerStatuses {
+								if cs.State.Running != nil {
+									if startTime.Before(cs.State.Running.StartedAt) {
+										startTime = cs.State.Running.StartedAt
+									}
+								}
+							}
+							if startTime != util.NewTime(time.Time{}) {
+								runTimes[p.Name] = startTime
+							} else {
+								Failf("Pod %v is reported to be running, but none of its containers is", p.Name)
+							}
+						}
+					}
+				}
+
+				additionalNameStr := strconv.Itoa(minionCount) + "-" + string(util.NewUUID())
+				additionalRCName = "my-hostname-latency" + additionalNameStr
+				_, controller := framework.NewInformer(
+					&cache.ListWatch{
+						ListFunc: func() (runtime.Object, error) {
+							return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalRCName}), fields.Everything())
+						},
+						WatchFunc: func(rv string) (watch.Interface, error) {
+							return c.Pods(ns).Watch(labels.SelectorFromSet(labels.Set{"name": additionalRCName}), fields.Everything(), rv)
+						},
+					},
+					&api.Pod{},
+					time.Minute*5,
+					framework.ResourceEventHandlerFuncs{
+						AddFunc: func(obj interface{}) {
+							p, ok := obj.(*api.Pod)
+							Expect(ok).To(Equal(true))
+							go checkPod(p)
+						},
+						UpdateFunc: func(oldObj, newObj interface{}) {
+							p, ok := newObj.(*api.Pod)
+							Expect(ok).To(Equal(true))
+							go checkPod(p)
+						},
+					},
+				)
+
+				stopCh := make(chan struct{})
+				go controller.Run(stopCh)
+
+				config = RCConfig{Client: c,
+					Image:        "gcr.io/google_containers/pause:go",
+					Name:         additionalRCName,
+					Namespace:    ns,
+					PollInterval: itArg.interval,
+					Replicas:     minionCount,
+				}
+				expectNoError(RunRC(config))
+
+				Logf("Waiting for all Pods begin observed by the watch...")
+				for start := time.Now(); len(watchTimes) < minionCount && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
+				}
+				close(stopCh)
+
+				schedEvents, err := c.Events(ns).List(
+					labels.Everything(),
+					fields.Set{
+						"involvedObject.kind":      "Pod",
+						"involvedObject.namespace": ns,
+						"source":                   "scheduler",
+					}.AsSelector())
+				expectNoError(err)
+				for k := range createTimes {
+					for _, event := range schedEvents.Items {
+						if event.InvolvedObject.Name == k {
+							scheduleTimes[k] = event.FirstTimestamp
+							break
+						}
+					}
+				}
+
+				scheduleLag := make([]podLatencyData, 0)
+				startupLag := make([]podLatencyData, 0)
+				watchLag := make([]podLatencyData, 0)
+				schedToWatchLag := make([]podLatencyData, 0)
+				e2eLag := make([]podLatencyData, 0)
+
+				for name, create := range createTimes {
+					sched, ok := scheduleTimes[name]
+					Expect(ok).To(Equal(true))
+					run, ok := runTimes[name]
+					Expect(ok).To(Equal(true))
+					watch, ok := watchTimes[name]
+					Expect(ok).To(Equal(true))
+					scheduleLag = append(scheduleLag, podLatencyData{name, sched.Time.Sub(create.Time)})
+					startupLag = append(startupLag, podLatencyData{name, run.Time.Sub(sched.Time)})
+					watchLag = append(watchLag, podLatencyData{name, watch.Time.Sub(run.Time)})
+					schedToWatchLag = append(schedToWatchLag, podLatencyData{name, watch.Time.Sub(sched.Time)})
+					e2eLag = append(e2eLag, podLatencyData{name, watch.Time.Sub(create.Time)})
+				}
+
+				sort.Sort(latencySlice(scheduleLag))
+				sort.Sort(latencySlice(startupLag))
+				sort.Sort(latencySlice(watchLag))
+				sort.Sort(latencySlice(schedToWatchLag))
+				sort.Sort(latencySlice(e2eLag))
+
+				printLatencies(scheduleLag, "worst schedule latencies")
+				printLatencies(startupLag, "worst run-after-schedule latencies")
+				printLatencies(watchLag, "worst watch latencies")
+				printLatencies(schedToWatchLag, "worst scheduled-to-end total latencies")
+				printLatencies(e2eLag, "worst e2e total latencies")
+
+				Logf("Approx throughput: %v pods/min",
+					float64(minionCount)/(e2eLag[len(e2eLag)-1].Latency.Minutes()))
+			}
 		})
 	}
 })
