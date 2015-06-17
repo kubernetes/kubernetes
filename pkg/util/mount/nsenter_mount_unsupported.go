@@ -20,6 +20,10 @@ package mount
 
 type NsenterMounter struct{}
 
+func NewNsenterMounter() *NsenterMounter {
+	return &NsenterMounter{}
+}
+
 var _ = Interface(&NsenterMounter{})
 
 func (*NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
