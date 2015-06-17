@@ -120,11 +120,6 @@ func TestDecodePodList(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	parsed, podListOut, err := tryDecodePodList(json, noDefault)
-	if testapi.Version() == "v1beta1" {
-		// v1beta1 conversion leaves empty lists that should be nil
-		podListOut.Items[0].Spec.Containers[0].Resources.Limits = nil
-		podListOut.Items[0].Spec.Containers[0].Resources.Requests = nil
-	}
 	if !parsed {
 		t.Errorf("expected to have parsed file: (%s)", string(json))
 	}
