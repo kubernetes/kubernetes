@@ -18,7 +18,7 @@ Note: This redis-master is *not* highly available.  Making it highly available w
 
 Use (or just create) the file `examples/guestbook/redis-master-controller.json` which describes a single [pod](../../docs/pods.md) running a redis key-value server in a container:
 
-Note that, although the redis server runs just with a single replica, we use [replication controller](../../docs/replication-controller.md) to enforce that exactly one pod keeps running (e.g. in a event of node going down, the replication controller will ensure that the redis master gets restarted on a healthy node).   This could result in data loss.
+Note that, although the redis server runs just with a single replica, we use [replication controller](../../docs/replication-controller.md) to enforce that exactly one [pod](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md) keeps running (e.g. in a event of node going down, the replication controller will ensure that the redis master gets restarted on a healthy node).   This could result in data loss.
 
 
 ```js
@@ -98,7 +98,7 @@ CONTAINER ID        IMAGE                                  COMMAND              
 ### Step Two: Fire up the master service
 A Kubernetes '[service](../../docs/services.md)' is a named load balancer that proxies traffic to *one or more* containers. This is done using the *labels* metadata which we defined in the redis-master pod above.  As mentioned, in redis there is only one master, but we nevertheless still want to create a service for it.  Why?  Because it gives us a deterministic way to route to the single master using an elastic IP.
 
-The services in a Kubernetes cluster are discoverable inside other containers via environment variables.
+The [services](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md) in a Kubernetes cluster are discoverable inside other containers via environment variables.
 
 Services find the containers to load balance based on pod labels.
 

@@ -1,0 +1,16 @@
+{
+  "Items": [
+     {
+       "Words": ["pods", "Pods", "Pod", "pod"],
+       "Link":  "https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md"
+     },
+     {
+       "Words": ["services", "Services", "Service", "service"],
+       "Link":  "https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md"
+     },
+     {
+       "Words": ["replication controller", "Replication Controller"],
+       "Link":  "https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/replication-controller.md"
+     }
+  ]
+}
