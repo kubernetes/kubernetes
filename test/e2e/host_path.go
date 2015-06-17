@@ -57,7 +57,7 @@ var _ = Describe("hostDir", func() {
 		}
 	})
 
-	It("MOD volume on tmpfs should have the correct mode", func() {
+	It("should give a volume the correct mode", func() {
 		volumePath := "/test-volume"
 		source := &api.HostPathVolumeSource{
 			Path: "/tmp",
