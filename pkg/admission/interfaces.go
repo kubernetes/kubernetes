@@ -24,6 +24,10 @@ import (
 // Attributes is an interface used by AdmissionController to get information about a request
 // that is used to make an admission decision.
 type Attributes interface {
+	// GetName returns the name of the object as presented in the request.  On a CREATE operation, the client
+	// may omit name and rely on the server to generate the name.  If that is the case, this method will return
+	// the empty string
+	GetName() string
 	// GetNamespace is the namespace associated with the request (if any)
 	GetNamespace() string
 	// GetResource is the name of the resource being requested.  This is not the kind.  For example: pods
