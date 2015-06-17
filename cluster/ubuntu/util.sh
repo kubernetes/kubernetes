@@ -17,6 +17,8 @@
 # A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
 set -e
 
+source "${KUBE_ROOT}/cluster/common.sh"
+
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
 
 # use an array to record name and ip
