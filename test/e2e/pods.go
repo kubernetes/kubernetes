@@ -570,7 +570,7 @@ var _ = Describe("Pods", func() {
 					Containers: []api.Container{
 						{
 							Name:  "nginx",
-							Image: "nginx",
+							Image: "gcr.io/google_containers/nginx:1.7.9",
 						},
 					},
 				},
@@ -642,7 +642,7 @@ var _ = Describe("Pods", func() {
 					Containers: []api.Container{
 						{
 							Name:  "nginx",
-							Image: "nginx",
+							Image: "gcr.io/google_containers/nginx:1.7.9",
 							Ports: []api.Port{{ContainerPort: 80}},
 						},
 					},
