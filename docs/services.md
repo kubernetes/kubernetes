@@ -261,7 +261,7 @@ variables will not be populated.  DNS does not have this restriction.
 ### DNS
 
 An optional (though strongly recommended) [cluster
-add-on](../cluster/add-ons/README.md) is a DNS server.  The
+add-on](../cluster/addons/README.md) is a DNS server.  The
 DNS server watches the Kubernetes API for new `Services` and creates a set of
 DNS records for each.  If DNS has been enabled throughout the cluster then all
 `Pods` should be able to do name resolution of `Services` automatically.
