@@ -20,8 +20,9 @@ Selected volume types are described below.
 An EmptyDir volume is created when a Pod is bound to a Node.  It is initially empty, when the first Container command starts.  Containers in the same pod can all read and write the same files in the EmptyDir volume.  When a Pod is unbound, the data in the EmptyDir is deleted forever.
 
 Some uses for an EmptyDir are:
-  - scratch space, such as for a disk-based mergesort or checkpointing a long computation,
-  - a directory that a content-manager container fills with data while a webserver container serves the data.
+
+* scratch space, such as for a disk-based mergesort or checkpointing a long computation,
+* a directory that a content-manager container fills with data while a webserver container serves the data.
 
 Currently, the user cannot control what kind of media is used for an EmptyDir (see also the section _Resources_, below).  If the Kubelet is configured to use a disk drive, then all EmptyDir volumes will be created on that disk drive.  In the future, it is expected that Pods can control whether the EmptyDir is on a disk drive, SSD, or tmpfs.
 
@@ -29,12 +30,14 @@ Currently, the user cannot control what kind of media is used for an EmptyDir (s
 A Volume with a HostPath property allows access to files on the current node.
 
 Some uses for a HostPath are:
-  - running a container that needs access to Docker internals; use a HostPath of /var/lib/docker.
-  - running cAdvisor in a container; use a HostPath of /dev/cgroups.
+
+* running a container that needs access to Docker internals; use a HostPath of /var/lib/docker.
+* running cAdvisor in a container; use a HostPath of /dev/cgroups.
 
 Watch out when using this type of volume, because:
-  - pods with identical configuration (such as created from a podTemplate) may behave differently on different nodes due to different files on different nodes.
-  - When Kubernetes adds resource-aware scheduling, as is planned, it will not be able to account for resources used by a HostPath.
+
+* pods with identical configuration (such as created from a podTemplate) may behave differently on different nodes due to different files on different nodes.
+* When Kubernetes adds resource-aware scheduling, as is planned, it will not be able to account for resources used by a HostPath.
 
 ### GCEPersistentDisk
 __Important: You must create a PD using ```gcloud``` or the GCE API before you can use it__
@@ -43,12 +46,13 @@ A Volume with a GCEPersistentDisk property allows access to files on a Google Co
 [Persistent Disk](http://cloud.google.com/compute/docs/disks).
 
 There are some restrictions when using a GCEPersistentDisk:
-  - the nodes (what the kubelet runs on) need to be GCE VMs
-  - those VMs need to be in the same GCE project and zone as the PD
-  - avoid creating multiple pods that use the same Volume if any mount it read/write.
-    - if a pod P already mounts a volume read/write, and a second pod Q attempts to use the volume, regardless of if it tries to use it read-only or read/write, Q will fail.
-    - if a pod P already mounts a volume read-only, and a second pod Q attempts to use the volume read/write, Q will fail.
-    - replication controllers with replicas > 1 can only be created for pods that use read-only mounts.
+
+* the nodes (what the kubelet runs on) need to be GCE VMs
+* those VMs need to be in the same GCE project and zone as the PD
+* avoid creating multiple pods that use the same Volume if any mount it read/write.
+    * if a pod P already mounts a volume read/write, and a second pod Q attempts to use the volume, regardless of if it tries to use it read-only or read/write, Q will fail.
+    * if a pod P already mounts a volume read-only, and a second pod Q attempts to use the volume read/write, Q will fail.
+    * replication controllers with replicas > 1 can only be created for pods that use read-only mounts.
 
 #### Creating a PD
 Before you can use a GCE PD with a pod, you need to create it.
