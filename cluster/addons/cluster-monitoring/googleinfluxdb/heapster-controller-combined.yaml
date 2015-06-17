@@ -20,7 +20,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec: 
       containers: 
-        - image: gcr.io/google_containers/heapster:v0.14.1
+        - image: gcr.io/google_containers/heapster:v0.14.2
           name: heapster
           command:
             - /heapster
