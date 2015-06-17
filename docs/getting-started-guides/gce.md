@@ -118,7 +118,6 @@ You'll see see a list of pods that looks something like this (the name specifics
 
 ```shell
 NAME                                           READY     REASON    RESTARTS   AGE
-NAME                                           READY     REASON    RESTARTS   AGE
 elasticsearch-logging-v1-ab87r                 1/1       Running   0          1m
 elasticsearch-logging-v1-v9lqa                 1/1       Running   0          1m
 fluentd-elasticsearch-kubernetes-minion-419y   1/1       Running   0          12s
