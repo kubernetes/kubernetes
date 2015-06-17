@@ -20,7 +20,7 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range={{ kube_service_addresses }}"
 KUBE_ETCD_SERVERS="--etcd_servers=http://{{ groups['etcd'][0] }}:2379"
 
 # default admission control policies
-KUBE_ADMISSION_CONTROL="--admission_control=NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
+KUBE_ADMISSION_CONTROL="--admission_control=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota"
 
 # Add your own!
 KUBE_API_ARGS=""
