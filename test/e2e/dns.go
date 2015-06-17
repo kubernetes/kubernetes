@@ -18,6 +18,9 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -25,8 +28,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
-	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -237,7 +238,7 @@ var _ = Describe("DNS", func() {
 			Spec: api.ServiceSpec{
 				ClusterIP: "None",
 				Ports: []api.ServicePort{
-					{Port: 80, Name: "http", Protocol: "tcp"},
+					{Port: 80, Name: "http", Protocol: "TCP"},
 				},
 				Selector: testServiceSelector,
 			},
@@ -257,7 +258,7 @@ var _ = Describe("DNS", func() {
 			},
 			Spec: api.ServiceSpec{
 				Ports: []api.ServicePort{
-					{Port: 80, Name: "http", Protocol: "tcp"},
+					{Port: 80, Name: "http", Protocol: "TCP"},
 				},
 				Selector: testServiceSelector,
 			},
