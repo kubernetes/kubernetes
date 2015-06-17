@@ -94,7 +94,7 @@ So, to run this app in Kubernetes, simply run [The all in one k8petstore.sh shel
 
 Note that at the top of the script there are a few self explanatory parameters to set, among which the Public IPs parameter is where you can checkout the web ui (at $PUBLIC_IP:3000), which will show a plot and read outs of transaction throughput.
 
-In the mean time, because the public IP will be deprecated in Kubernetes v1, we provide another script k8petstore-loadbalancer.sh, which requests the cloud provider (e.g., GCE, AWS) to assign a public IP. You can find the assigned IP address in the output of the script. If your cloud provider does not support load balancer or you are not running Kubernetes on a cloud, you may want to use [NodePort](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#external-services) instead. 
+In the mean time, because the public IP will be deprecated in Kubernetes v1, we provide other 2 scripts k8petstore-loadbalancer.sh and k8petstore-nodeport.sh. As the names suggest, they rely on LoadBalancer and NodePort respectively. More details can be found [here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#external-services). 
 
 ## Future
 
