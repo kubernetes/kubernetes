@@ -133,7 +133,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		t:            t,
 	}
 	kubelet.volumeManager = newVolumeManager()
-	kubelet.containerManager, _ = newContainerManager("", "", "")
+	kubelet.containerManager, _ = newContainerManager(mockCadvisor, "", "", "")
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, fakeMirrorClient}
 }
 
@@ -243,7 +243,7 @@ func newTestKubeletWithFakeRuntime(t *testing.T) *TestKubeletWithFakeRuntime {
 		t:            t,
 	}
 	kubelet.volumeManager = newVolumeManager()
-	kubelet.containerManager, _ = newContainerManager("", "", "")
+	kubelet.containerManager, _ = newContainerManager(mockCadvisor, "", "", "")
 	return &TestKubeletWithFakeRuntime{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient}
 }
 

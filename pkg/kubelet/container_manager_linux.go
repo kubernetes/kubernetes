@@ -28,12 +28,20 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/cgroups/fs"
 	"github.com/docker/libcontainer/configs"
 	"github.com/golang/glog"
+)
+
+const (
+	// The percent of the machine memory capacity. The value is used to calculate
+	// docker memory resource container's hardlimit to workaround docker memory
+	// leakage issue. Please see kubernetes/issues/9881 for more detail.
+	DockerMemoryLimitThresholdPercent = 70
 )
 
 // A non-user container tracked by the Kubelet.
@@ -69,13 +77,31 @@ var _ containerManager = &containerManagerImpl{}
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func newContainerManager(dockerDaemonContainerName, systemContainerName, kubeletContainerName string) (containerManager, error) {
+func newContainerManager(cadvisorInterface cadvisor.Interface, dockerDaemonContainerName, systemContainerName, kubeletContainerName string) (containerManager, error) {
 	systemContainers := []*systemContainer{}
 
 	if dockerDaemonContainerName != "" {
 		cont := newSystemContainer(dockerDaemonContainerName)
+
+		info, err := cadvisorInterface.MachineInfo()
+		var capacity = api.ResourceList{}
+		if err != nil {
+		} else {
+			capacity = CapacityFromMachineInfo(info)
+		}
+		memoryLimit := (int64(capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
+		glog.Infof("Configure resource-only container %s with memory limit: %d", dockerDaemonContainerName, memoryLimit)
+
+		dockerContainer := &fs.Manager{
+			Cgroups: &configs.Cgroup{
+				Name:            dockerDaemonContainerName,
+				Memory:          memoryLimit,
+				MemorySwap:      -1,
+				AllowAllDevices: true,
+			},
+		}
 		cont.ensureStateFunc = func(manager *fs.Manager) error {
-			return ensureDockerInContainer(-900, createManager(dockerDaemonContainerName))
+			return ensureDockerInContainer(cadvisorInterface, -900, dockerContainer)
 		}
 		systemContainers = append(systemContainers, cont)
 	}
@@ -162,7 +188,7 @@ func (cm *containerManagerImpl) SystemContainersLimit() api.ResourceList {
 }
 
 // Ensures that the Docker daemon is in the desired container.
-func ensureDockerInContainer(oomScoreAdj int, manager *fs.Manager) error {
+func ensureDockerInContainer(cadvisor cadvisor.Interface, oomScoreAdj int, manager *fs.Manager) error {
 	// What container is Docker in?
 	out, err := exec.Command("pidof", "docker").Output()
 	if err != nil {
