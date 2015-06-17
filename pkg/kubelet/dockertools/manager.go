@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/lifecycle"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
@@ -722,6 +723,10 @@ func (dm *DockerManager) GetContainers(all bool) ([]*kubecontainer.Container, er
 }
 
 func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
+	start := time.Now()
+	defer func() {
+		metrics.ContainerManagerLatency.WithLabelValues("GetPods").Observe(metrics.SinceInMicroseconds(start))
+	}()
 	pods := make(map[types.UID]*kubecontainer.Pod)
 	var result []*kubecontainer.Pod
 
@@ -1159,6 +1164,11 @@ func (dm *DockerManager) killContainer(containerID types.UID) error {
 
 // Run a single container from a pod. Returns the docker container ID
 func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode string) (kubeletTypes.DockerID, error) {
+	start := time.Now()
+	defer func() {
+		metrics.ContainerManagerLatency.WithLabelValues("runContainerInPod").Observe(metrics.SinceInMicroseconds(start))
+	}()
+
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -1224,6 +1234,10 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
 func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.DockerID, error) {
+	start := time.Now()
+	defer func() {
+		metrics.ContainerManagerLatency.WithLabelValues("createPodInfraContainer").Observe(metrics.SinceInMicroseconds(start))
+	}()
 	// Use host networking if specified.
 	netNamespace := ""
 	var ports []api.ContainerPort
@@ -1299,6 +1313,11 @@ type PodContainerChangesSpec struct {
 }
 
 func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus) (PodContainerChangesSpec, error) {
+	start := time.Now()
+	defer func() {
+		metrics.ContainerManagerLatency.WithLabelValues("computePodContainerChanges").Observe(metrics.SinceInMicroseconds(start))
+	}()
+
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
 	glog.V(4).Infof("Syncing Pod %+v, podFullName: %q, uid: %q", pod, podFullName, uid)
@@ -1445,6 +1464,12 @@ func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container, pullS
 
 // Sync the running pod to match the specified desired pod.
 func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error {
+
+	start := time.Now()
+	defer func() {
+		metrics.ContainerManagerLatency.WithLabelValues("SyncPod").Observe(metrics.SinceInMicroseconds(start))
+	}()
+
 	podFullName := kubecontainer.GetPodFullName(pod)
 	containerChanges, err := dm.computePodContainerChanges(pod, runningPod, podStatus)
 	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
