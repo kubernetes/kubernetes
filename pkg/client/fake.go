@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -45,6 +46,10 @@ func (c *FakeRESTClient) Get() *Request {
 
 func (c *FakeRESTClient) Put() *Request {
 	return NewRequest(c, "PUT", &url.URL{Host: "localhost"}, testapi.Version(), c.Codec)
+}
+
+func (c *FakeRESTClient) Patch(_ api.PatchType) *Request {
+	return NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, testapi.Version(), c.Codec)
 }
 
 func (c *FakeRESTClient) Post() *Request {

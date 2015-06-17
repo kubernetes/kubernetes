@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -43,11 +44,10 @@ type Helper struct {
 // NewHelper creates a Helper from a ResourceMapping
 func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 	return &Helper{
-		RESTClient: client,
-		Resource:   mapping.Resource,
-		Codec:      mapping.Codec,
-		Versioner:  mapping.MetadataAccessor,
-
+		RESTClient:      client,
+		Resource:        mapping.Resource,
+		Codec:           mapping.Codec,
+		Versioner:       mapping.MetadataAccessor,
 		NamespaceScoped: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 	}
 }
@@ -132,6 +132,15 @@ func (m *Helper) Create(namespace string, modify bool, data []byte) (runtime.Obj
 
 func (m *Helper) createResource(c RESTClient, resource, namespace string, data []byte) (runtime.Object, error) {
 	return c.Post().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(data).Do().Get()
+}
+func (m *Helper) Patch(namespace, name string, pt api.PatchType, data []byte) (runtime.Object, error) {
+	return m.RESTClient.Patch(pt).
+		NamespaceIfScoped(namespace, m.NamespaceScoped).
+		Resource(m.Resource).
+		Name(name).
+		Body(data).
+		Do().
+		Get()
 }
 
 func (m *Helper) Update(namespace, name string, overwrite bool, data []byte) (runtime.Object, error) {
