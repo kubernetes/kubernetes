@@ -14,6 +14,14 @@ cluster_name: kube.local
 # If a password is needed to sudo to root that password must be set here
 #ansible_sudo_pass: password
 
+# A list of insecure registrys you night need to define
+insecure_registrys:
+#  - "gcr.io"
+
+# If you need a proxy for the docker daemon define these here
+#http_proxy: "http://proxy.example.com:3128"
+#https_proxy: "http://proxy.example.com:3128"
+
 # Kubernetes internal network for services.
 # Kubernetes services will get fake IP addresses from this range.
 # This range must not conflict with anything in your infrastructure. These
