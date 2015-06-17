@@ -17,9 +17,8 @@ Check the location and credentials that kubectl knows about with this command:
 ```
 kubectl config view
 ```
-.
 
-Many of the [examples](../examples/README.md) provide an introduction to using
+Many of the [examples](../examples/) provide an introduction to using
 kubectl and complete documentation is found in the [kubectl manual](../docs/kubectl.md).
 
 ### <a name="kubectlproxy"</a>Directly accessing the REST API
@@ -45,11 +44,11 @@ Run it like this:
 ```
 kubectl proxy --port=8080 &
 ```
-See [kubectl proxy](../docs/kubectl-proxy.md) for more details.
+See [kubectl proxy](../docs/kubectl_proxy.md) for more details.
 
 Then you can explore the API with curl, wget, or a browser, like so:
 ```
-$ curl http://localhost:8080/api
+$ curl http://localhost:8080/api/
 {
   "versions": [
     "v1"
@@ -105,7 +104,7 @@ will be routed to an apiserver.
 The recommended way to authenticate to the apiserver is with a
 [service account](../docs/service_accounts.md).  By default, a pod
 is associated with a service account, and a credential (token) for that
-service account is placed into the filetree of each container in that pod,
+service account is placed into the filesystem tree of each container in that pod,
 at `/var/run/secrets/kubernetes.io/serviceaccount`.
 
 From within a pod the recommended ways to connect to API are:
@@ -113,7 +112,7 @@ From within a pod the recommended ways to connect to API are:
     process within a container.  This proxies the
     kubernetes API to the localhost interface of the pod, so that other processes
     in any container of the pod can access it.  See this [example of using kubectl proxy
-    in a pod](../examples/kubectl-container/README.md).
+    in a pod](../examples/kubectl-container/).
   - use the Go client library, and create a client using the `client.NewInContainer()` factory.
     This handles locating and authenticating to the apiserver.
 
@@ -123,7 +122,8 @@ The previous section was about connecting the Kubernetes API server.  This secti
 connecting to other services running on Kubernetes cluster.  In kubernetes, the
 [nodes](../docs/node.md), [pods](../docs/pods.md) and [services](services.md) all have
 their own IPs.  In many cases, the node IPs, pod IPs, and some service IPs on a cluster will not be
-routable outside from a machine outside the cluster, such as your desktop machine. 
+routable, so they will not be reachable from a machine outside the cluster,
+such as your desktop machine.
 
 ### Ways to connect
 You have several options for connecting to nodes, pods and services from outside the cluster:
@@ -144,7 +144,7 @@ You have several options for connecting to nodes, pods and services from outside
       access to ports on the node IP, or for debugging.
     - Proxies may cause problems for some web applications.
     - Only works for HTTP/HTTPS.
-    - Described in [using the apiserver proxy](#apiserverproxy).
+    - Described [here](#apiserverproxy).
   - Access from a node or pod in the cluster.
     - Run a pod, and then connect to a shell in it using [kubectl exec](../docs/kubectl_exec.md).
       Connect to other nodes, pods, and services from that shell.
@@ -152,7 +152,7 @@ You have several options for connecting to nodes, pods and services from outside
       access cluster services.  This is a non-standard method, and will work on some clusters but
       not others.  Browsers and other tools may or may not be installed.  Cluster DNS may not work.
 
-### Discovering builtin services
+### <a name="apiserverproxy"></a>Discovering builtin services
 
 Typically, there are several services which are started on a cluster by default. Get a list of these
 with the `kubectl cluster-info` command:
@@ -175,9 +175,11 @@ at `https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch
 #### Manually constructing apiserver proxy URLs
 As mentioned above, you use the `kubectl cluster-info` command to retrieve the service's proxy URL. To create proxy URLs that include service endpoints, suffixes, and parameters, you simply append to the service's proxy URL:  
 `http://`*`kubernetes_master_address`*`/`*`service_path`*`/`*`service_name`*`/`*`service_endpoint-suffix-parameter`*
+<!--- TODO: update this part of doc because it doesn't seem to be valid. What
+about namespaces? 'proxy' verb? -->
+
 ##### Examples
  * To access the Elasticsearch service endpoint `_search?q=user:kimchy`, you would use:   `http://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_search?q=user:kimchy`
-
  * To access the Elasticsearch cluster health information `_cluster/health?pretty=true`, you would use:   `https://104.197.5.247/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_cluster/health?pretty=true`
   ```
   {
@@ -195,7 +197,7 @@ As mentioned above, you use the `kubectl cluster-info` command to retrieve the s
   ```
 
 #### Using web browsers to access services running on the cluster
-You may be able to put a apiserver proxy url into the address bar of a browser.  However:
+You may be able to put an apiserver proxy url into the address bar of a browser. However:
   - Web browsers cannot usually pass tokens, so you may need to use basic (password) auth.  Apiserver can be configured to accept basic auth,
     but your cluster may not be configured to accept basic auth.
   - Some web apps may not work, particularly those with client side javascript that construct urls in a
