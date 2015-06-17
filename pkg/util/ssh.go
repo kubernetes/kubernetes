@@ -182,12 +182,7 @@ func RunSSHCommand(cmd, host string, signer ssh.Signer) (string, string, int, er
 
 func MakePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 	// Create an actual signer.
-	file, err := os.Open(key)
-	if err != nil {
-		return nil, fmt.Errorf("error opening SSH key %s: '%v'", key, err)
-	}
-	defer file.Close()
-	buffer, err := ioutil.ReadAll(file)
+	buffer, err := ioutil.ReadFile(key)
 	if err != nil {
 		return nil, fmt.Errorf("error reading SSH key %s: '%v'", key, err)
 	}
@@ -202,6 +197,23 @@ func MakePrivateKeySignerFromBytes(buffer []byte) (ssh.Signer, error) {
 	return signer, nil
 }
 
+func ParsePublicKeyFromFile(keyFile string) (*rsa.PublicKey, error) {
+	buffer, err := ioutil.ReadFile(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading SSH key %s: '%v'", keyFile, err)
+	}
+	keyBlock, _ := pem.Decode(buffer)
+	key, err := x509.ParsePKIXPublicKey(keyBlock.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", keyFile, err)
+	}
+	rsaKey, ok := key.(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("SSH key could not be parsed as rsa public key")
+	}
+	return rsaKey, nil
+}
+
 type SSHTunnelEntry struct {
 	Address string
 	Tunnel  *SSHTunnel
@@ -211,17 +223,18 @@ type SSHTunnelList struct {
 	entries []SSHTunnelEntry
 }
 
-func MakeSSHTunnels(user, keyfile string, addresses []string) (*SSHTunnelList, error) {
+func MakeSSHTunnels(user, keyfile string, addresses []string) *SSHTunnelList {
 	tunnels := []SSHTunnelEntry{}
 	for ix := range addresses {
 		addr := addresses[ix]
 		tunnel, err := NewSSHTunnel(user, keyfile, addr)
 		if err != nil {
-			return nil, err
+			glog.Errorf("Failed to create tunnel for %q: %v", addr, err)
+			continue
 		}
 		tunnels = append(tunnels, SSHTunnelEntry{addr, tunnel})
 	}
-	return &SSHTunnelList{tunnels}, nil
+	return &SSHTunnelList{tunnels}
 }
 
 // Open attempts to open all tunnels in the list, and removes any tunnels that
@@ -290,7 +303,6 @@ func EncodePublicKey(public *rsa.PublicKey) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return pem.EncodeToMemory(&pem.Block{
 		Bytes: publicBytes,
 		Type:  "PUBLIC KEY",

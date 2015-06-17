@@ -18,13 +18,13 @@ package master
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"net/url"
+	"os"
 	rt "runtime"
 	"strconv"
 	"strings"
@@ -496,17 +496,20 @@ func (m *Master) init(c *Config) {
 	var proxyDialer func(net, addr string) (net.Conn, error)
 	if len(c.SSHUser) > 0 {
 		glog.Infof("Setting up proxy: %s %s", c.SSHUser, c.SSHKeyfile)
-		exists, err := util.FileExists(c.SSHKeyfile)
+		// public keyfile is written last, so check for that.
+		publicKeyFile := c.SSHKeyfile + ".pub"
+		exists, err := util.FileExists(publicKeyFile)
 		if err != nil {
 			glog.Errorf("Error detecting if key exists: %v", err)
 		} else if !exists {
 			glog.Infof("Key doesn't exist, attempting to create")
-			err := m.generateSSHKey(c.SSHUser, c.SSHKeyfile)
+			err := m.generateSSHKey(c.SSHUser, c.SSHKeyfile, publicKeyFile)
 			if err != nil {
 				glog.Errorf("Failed to create key pair: %v", err)
 			}
 		}
-		m.setupSecureProxy(c.SSHUser, c.SSHKeyfile)
+		m.tunnels = &util.SSHTunnelList{}
+		m.setupSecureProxy(c.SSHUser, c.SSHKeyfile, publicKeyFile)
 		proxyDialer = m.Dial
 
 		// This is pretty ugly.  A better solution would be to pull this all the way up into the
@@ -803,10 +806,7 @@ func (m *Master) getNodeAddresses() ([]string, error) {
 
 func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {
 	glog.Infof("replacing tunnels. New addrs: %v", newAddrs)
-	tunnels, err := util.MakeSSHTunnels(user, keyfile, newAddrs)
-	if err != nil {
-		return err
-	}
+	tunnels := util.MakeSSHTunnels(user, keyfile, newAddrs)
 	if err := tunnels.Open(); err != nil {
 		return err
 	}
@@ -843,11 +843,31 @@ func (m *Master) refreshTunnels(user, keyfile string) error {
 	return m.replaceTunnels(user, keyfile, addrs)
 }
 
-func (m *Master) setupSecureProxy(user, keyfile string) {
+func (m *Master) setupSecureProxy(user, privateKeyfile, publicKeyfile string) {
+	// Sync loop to ensure that the SSH key has been installed.
+	go util.Until(func() {
+		if m.installSSHKey == nil {
+			glog.Error("Won't attempt to install ssh key: installSSHKey function is nil")
+			return
+		}
+		key, err := util.ParsePublicKeyFromFile(publicKeyfile)
+		if err != nil {
+			glog.Errorf("Failed to load public key: %v", err)
+			return
+		}
+		keyData, err := util.EncodeSSHKey(key)
+		if err != nil {
+			glog.Errorf("Failed to encode public key: %v", err)
+			return
+		}
+		if err := m.installSSHKey(user, keyData); err != nil {
+			glog.Errorf("Failed to install ssh key: %v", err)
+		}
+	}, 5*time.Minute, util.NeverStop)
 	// Sync loop for tunnels
 	// TODO: switch this to watch.
 	go util.Until(func() {
-		if err := m.loadTunnels(user, keyfile); err != nil {
+		if err := m.loadTunnels(user, privateKeyfile); err != nil {
 			glog.Errorf("Failed to load SSH Tunnels: %v", err)
 		}
 		if m.tunnels != nil && m.tunnels.Len() != 0 {
@@ -860,27 +880,37 @@ func (m *Master) setupSecureProxy(user, keyfile string) {
 	// TODO: could make this more controller-ish
 	go util.Until(func() {
 		time.Sleep(5 * time.Minute)
-		if err := m.refreshTunnels(user, keyfile); err != nil {
+		if err := m.refreshTunnels(user, privateKeyfile); err != nil {
 			glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
 		}
 	}, 0*time.Second, util.NeverStop)
 }
 
-func (m *Master) generateSSHKey(user, keyfile string) error {
-	if m.installSSHKey == nil {
-		return errors.New("ssh install function is null")
-	}
-
+func (m *Master) generateSSHKey(user, privateKeyfile, publicKeyfile string) error {
 	private, public, err := util.GenerateKey(2048)
 	if err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(keyfile, util.EncodePrivateKey(private), 0600); err != nil {
+	// If private keyfile already exists, we must have only made it halfway
+	// through last time, so delete it.
+	exists, err := util.FileExists(privateKeyfile)
+	if err != nil {
+		glog.Errorf("Error detecting if private key exists: %v", err)
+	} else if exists {
+		glog.Infof("Private key exists, but public key does not")
+		if err := os.Remove(privateKeyfile); err != nil {
+			glog.Errorf("Failed to remove stale private key: %v", err)
+		}
+	}
+	if err := ioutil.WriteFile(privateKeyfile, util.EncodePrivateKey(private), 0600); err != nil {
 		return err
 	}
-	data, err := util.EncodeSSHKey(public)
+	publicKeyBytes, err := util.EncodePublicKey(public)
 	if err != nil {
 		return err
 	}
-	return m.installSSHKey(user, data)
+	if err := ioutil.WriteFile(publicKeyfile+".tmp", publicKeyBytes, 0600); err != nil {
+		return err
+	}
+	return os.Rename(publicKeyfile+".tmp", publicKeyfile)
 }
