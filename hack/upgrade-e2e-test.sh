@@ -14,16 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This runs e2e, does a checked upgrade of the MASTER using the locally built release, then runs e2e again.
-go run "$(dirname $0)/e2e.go" -v -build -up -version="v0.14.0" -test -check_version_skew=false
+# This does a checked upgrade of the MASTER using the locally built release, then runs e2e.
+echo "Running the checked master upgrade."
+go run "$(dirname $0)/e2e.go" -build -up -v -test -test_args='--ginkgo.focus=Skipped.*Cluster\supgrade.*gce-upgrade' -check_version_skew=false
 if [ $? -eq 0 ]; then
-	echo "Tests on initial version succeeded. Running the checked master upgrade."
-	go run "$(dirname $0)/e2e.go" -v --test --test_args='--ginkgo.focus=Skipped.*Cluster\supgrade.*gce-upgrade' -check_version_skew=false
+    echo "Master upgrade complete. Running e2e on the upgraded cluster."
+    go run "$(dirname $0)/e2e.go" -v -version="" -test -check_version_skew=false
 else
-	echo "Tests on initial version failed. Skipping tests on second version."
+    echo "Master upgrade failed."
 fi
-echo "Master upgrade complete. Running e2e on the upgraded cluster."
-go run "$(dirname $0)/e2e.go" -v -build -up -version="" -test -check_version_skew=false
-
 
 exit $?
