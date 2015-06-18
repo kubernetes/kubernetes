@@ -161,9 +161,9 @@ To find the URLs to access the Elasticsearch and Kibana viewer,
 ```
 $ kubectl cluster-info
 Kubernetes master is running at https://104.154.60.226
-Elasticsearch is running at https://104.154.60.226/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging
-Kibana is running at https://104.154.60.226/api/v1beta3/proxy/namespaces/default/services/kibana-logging
-KubeDNS is running at https://104.154.60.226/api/v1beta3/proxy/namespaces/default/services/kube-dns
+Elasticsearch is running at https://104.154.60.226/api/v1/proxy/namespaces/default/services/elasticsearch-logging
+Kibana is running at https://104.154.60.226/api/v1/proxy/namespaces/default/services/kibana-logging
+KubeDNS is running at https://104.154.60.226/api/v1/proxy/namespaces/default/services/kube-dns
 ```
 
 To find the user name and password to access the URLs,
