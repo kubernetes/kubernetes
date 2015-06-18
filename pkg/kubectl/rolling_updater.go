@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+		http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -87,21 +87,44 @@ func LoadExistingNextReplicationController(c *client.Client, namespace, newName 
 	return newRc, err
 }
 
-func CreateNewControllerFromCurrentController(c *client.Client, namespace, oldName, newName, image, deploymentKey string) (*api.ReplicationController, error) {
+func CreateNewControllerFromCurrentController(c *client.Client, namespace, oldName, newName, image, deploymentKey string, containerName string) (*api.ReplicationController, error) {
 	// load the old RC into the "new" RC
 	newRc, err := c.ReplicationControllers(namespace).Get(oldName)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(newRc.Spec.Template.Spec.Containers) > 1 {
-		// TODO: support multi-container image update.
-		return nil, goerrors.New("Image update is not supported for multi-container pods")
+	// targetContainer will hold the index of the container that should be updated.
+	var targetContainer int
+	var targetContainerFound bool
+
+	switch {
+	// Pod has no containers - abort. (Same as earlier behavior)
+	case len(newRc.Spec.Template.Spec.Containers) == 0:
+		return nil, goerrors.New(fmt.Sprintf("pod has no containers! (%v)", newRc))
+	// no container name specified, and only one container in Pod - update it. (same as earlier behavior)
+	case containerName == "" && len(newRc.Spec.Template.Spec.Containers) == 1:
+		targetContainer = 0
+	// no container name specified, and multiple containers in Pod - abort. (same as earlier behavior)
+	case containerName == "" && len(newRc.Spec.Template.Spec.Containers) > 1:
+		return nil, goerrors.New("container name must be specified to image update a multi-container pod")
+	// Find container by liternal name match. TODO - maybe this should be more general label matching?
+	case containerName != "":
+		for containerIndex := 0; containerIndex < len(newRc.Spec.Template.Spec.Containers); containerIndex++ {
+			if newRc.Spec.Template.Spec.Containers[containerIndex].Name == containerName {
+				targetContainer = containerIndex
+				targetContainerFound = true
+				break
+			}
+		}
+		if !targetContainerFound {
+			return nil, goerrors.New(fmt.Sprintf("container %s not found in replication controller '%v'", containerName, newRc.Name))
+		}
+	default:
+		return nil, goerrors.New("unknown failure generating replication controller")
 	}
-	if len(newRc.Spec.Template.Spec.Containers) == 0 {
-		return nil, goerrors.New(fmt.Sprintf("Pod has no containers! (%v)", newRc))
-	}
-	newRc.Spec.Template.Spec.Containers[0].Image = image
+
+	newRc.Spec.Template.Spec.Containers[targetContainer].Image = image
 
 	newHash, err := api.HashObject(newRc, c.Codec)
 	if err != nil {

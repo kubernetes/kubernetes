@@ -423,6 +423,7 @@ _kubectl_rolling-update()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--container-name=")
     flags+=("--deployment-label-key=")
     flags+=("--dry-run")
     flags+=("--filename=")

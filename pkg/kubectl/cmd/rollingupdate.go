@@ -74,6 +74,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("timeout", timeout, `Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to create the new controller.")
 	cmd.Flags().String("image", "", "Image to upgrade the controller to.  Can not be used with --filename/-f")
+	cmd.Flags().String("container-name", "", "Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod")
 	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
 	cmd.Flags().Bool("dry-run", false, "If true, print out the changes that would be made, but don't actually make them.")
 	cmd.Flags().Bool("rollback", false, "If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout")
@@ -81,32 +82,33 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func validateArguments(cmd *cobra.Command, args []string) (deploymentKey, filename, image, oldName string, err error) {
+func validateArguments(cmd *cobra.Command, args []string) (deploymentKey, filename, image, oldName string, containerName string, err error) {
 	deploymentKey = cmdutil.GetFlagString(cmd, "deployment-label-key")
 	filename = cmdutil.GetFlagString(cmd, "filename")
 	image = cmdutil.GetFlagString(cmd, "image")
+	containerName = cmdutil.GetFlagString(cmd, "container-name")
 
 	if len(deploymentKey) == 0 {
-		return "", "", "", "", cmdutil.UsageError(cmd, "--deployment-label-key can not be empty")
+		return "", "", "", "", "", cmdutil.UsageError(cmd, "--deployment-label-key can not be empty")
 	}
 	if len(filename) == 0 && len(image) == 0 {
-		return "", "", "", "", cmdutil.UsageError(cmd, "Must specify --filename or --image for new controller")
+		return "", "", "", "", "", cmdutil.UsageError(cmd, "Must specify --filename or --image for new controller")
 	}
 	if len(filename) != 0 && len(image) != 0 {
-		return "", "", "", "", cmdutil.UsageError(cmd, "--filename and --image can not both be specified")
+		return "", "", "", "", "", cmdutil.UsageError(cmd, "--filename and --image can not both be specified")
 	}
 	if len(args) < 1 {
-		return "", "", "", "", cmdutil.UsageError(cmd, "Must specify the controller to update")
+		return "", "", "", "", "", cmdutil.UsageError(cmd, "Must specify the controller to update")
 	}
 
-	return deploymentKey, filename, image, args[0], nil
+	return deploymentKey, filename, image, args[0], containerName, nil
 }
 
 func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	if os.Args[1] == "rollingupdate" {
 		printDeprecationWarning("rolling-update", "rollingupdate")
 	}
-	deploymentKey, filename, image, oldName, err := validateArguments(cmd, args)
+	deploymentKey, filename, image, oldName, containerName, err := validateArguments(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -190,7 +192,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		if newRc != nil {
 			fmt.Fprintf(out, "Found existing update in progress (%s), resuming.\n", newRc.Name)
 		} else {
-			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, cmdNamespace, oldName, newName, image, deploymentKey)
+			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, cmdNamespace, oldName, newName, image, deploymentKey, containerName)
 			if err != nil {
 				return err
 			}
