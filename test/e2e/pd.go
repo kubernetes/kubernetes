@@ -214,7 +214,12 @@ func deletePD(pdName string) error {
 		zone := testContext.CloudConfig.Zone
 
 		// TODO: make this hit the compute API directly.
-		return exec.Command("gcloud", "compute", "--project="+testContext.CloudConfig.ProjectID, "disks", "delete", "--zone="+zone, pdName).Run()
+		cmd := exec.Command("gcloud", "compute", "--project="+testContext.CloudConfig.ProjectID, "disks", "delete", "--zone="+zone, pdName)
+		data, err := cmd.CombinedOutput()
+		if err != nil {
+			Logf("Error deleting PD: %s (%v)", string(data), err)
+		}
+		return err
 	} else {
 		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
 		if !ok {
