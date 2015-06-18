@@ -587,6 +587,27 @@ function kube-up {
   find-release-tars
   upload-server-tars
 
+  local running_in_terminal=false
+  # May be false if tty is not allocated (for example with ssh -T).
+  if [ -t 1 ]; then
+    running_in_terminal=true
+  fi
+
+  if [[ ${running_in_terminal} == "true" || ${KUBE_UP_AUTOMATIC_CLEANUP} == "true" ]]; then 
+    if ! check-resources; then
+      local run_kube_down="n"
+      echo "${KUBE_RESOURCE_FOUND} found." >&2
+      # Get user input only if running in terminal.
+      if [[ ${running_in_terminal} == "true" && ${KUBE_UP_AUTOMATIC_CLEANUP} == "false" ]]; then
+        read -p "Would you like to shut down the old cluster (call kube-down)? [y/N] " run_kube_down
+      fi
+      if [[ ${run_kube_down} == "y" || ${run_kube_down} == "Y" || ${KUBE_UP_AUTOMATIC_CLEANUP} == "true" ]]; then
+        echo "... calling kube-down" >&2
+        kube-down
+      fi
+    fi
+  fi
+
   if ! gcloud compute networks --project "${PROJECT}" describe "${NETWORK}" &>/dev/null; then
     echo "Creating new network: ${NETWORK}"
     # The network needs to be created synchronously or we have a race. The
@@ -819,7 +840,7 @@ function kube-down {
   fi
 
   # Delete firewall rule for minions.
-  if gcloud compute firewall-rules describe "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
+  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
     gcloud compute firewall-rules delete  \
       --project "${PROJECT}" \
       --quiet \
@@ -858,6 +879,80 @@ function kube-down {
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
   clear-kubeconfig
   set -e
+}
+
+# Checks if there are any present resources related kubernetes cluster.
+#
+# Assumed vars:
+#   MASTER_NAME
+#   NODE_INSTANCE_PREFIX
+#   ZONE
+# Vars set:
+#   KUBE_RESOURCE_FOUND
+
+function check-resources {
+  detect-project
+
+  echo "Looking for already existing resources"
+  KUBE_RESOURCE_FOUND=""
+
+  if gcloud preview managed-instance-groups --project "${PROJECT}" --zone "${ZONE}" describe "${NODE_INSTANCE_PREFIX}-group" &>/dev/null; then
+    KUBE_RESOURCE_FOUND="Managed instance group ${NODE_INSTANCE_PREFIX}-group"
+    return 1
+  fi
+
+  if gcloud compute instance-templates describe --project "${PROJECT}" "${NODE_INSTANCE_PREFIX}-template" &>/dev/null; then
+    KUBE_RESOURCE_FOUND="Instance template ${NODE_INSTANCE_PREFIX}-template"
+    return 1
+  fi
+
+  if gcloud compute instances describe --project "${PROJECT}" "${MASTER_NAME}" --zone "${ZONE}" &>/dev/null; then
+    KUBE_RESOURCE_FOUND="Kubernetes master ${MASTER_NAME}"
+    return 1
+  fi
+
+  if gcloud compute disks describe --project "${PROJECT}" "${MASTER_NAME}"-pd --zone "${ZONE}" &>/dev/null; then
+    KUBE_RESOURCE_FOUND="Persistent disk ${MASTER_NAME}-pd"
+    return 1
+  fi
+
+  # Find out what minions are running.
+  local -a minions
+  minions=( $(gcloud compute instances list \
+                --project "${PROJECT}" --zone "${ZONE}" \
+                --regexp "${NODE_INSTANCE_PREFIX}-.+" \
+                | awk 'NR >= 2 { print $1 }') )
+  if (( "${#minions[@]}" > 0 )); then
+    KUBE_RESOURCE_FOUND="${#minions[@]} matching matching ${NODE_INSTANCE_PREFIX}-.+"
+    return 1
+  fi
+
+  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
+    KUBE_RESOURCE_FOUND="Firewal rules for ${MASTER_NAME}-https"
+    return 1
+  fi
+
+  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
+    KUBE_RESOURCE_FOUND="Firewal rules for ${MASTER_NAME}-all"
+    return 1
+  fi
+
+  local -a routes
+  routes=( $(gcloud compute routes list --project "${PROJECT}" \
+    --regexp "${INSTANCE_PREFIX}-minion-.{4}" | awk 'NR >= 2 { print $1 }') )
+  if (( "${#routes[@]}" > 0 )); then
+    KUBE_RESOURCE_FOUND="${#routes[@]} routes matching ${INSTANCE_PREFIX}-minion-.{4}"
+    return 1
+  fi
+
+  local REGION=${ZONE%-*}
+  if gcloud compute addresses describe --project "${PROJECT}" "${MASTER_NAME}-ip" --region "${REGION}" &>/dev/null; then
+    KUBE_RESOURCE_FOUND="Master's reserved IP"
+    return 1
+  fi
+
+  # No resources found.
+  return 0
 }
 
 # Prepare to push new binaries to kubernetes cluster

@@ -79,3 +79,6 @@ DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
 ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+
+# Optional: if set to true kube-up will automatically check for existing resources and clean them up.
+KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
