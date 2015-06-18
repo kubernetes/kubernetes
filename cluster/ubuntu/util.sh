@@ -17,8 +17,6 @@
 # A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
 set -e
 
-source "${KUBE_ROOT}/cluster/common.sh"
-
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
 
 # use an array to record name and ip
@@ -254,23 +252,11 @@ EOF
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-  local file="$HOME/.kubernetes_auth"
-  if [[ -r "$file" ]]; then
-    KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-    KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
-    return
+  get-kubeconfig-basicauth
+  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
+    KUBE_USER=admin
+    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
   fi
-  KUBE_USER=admin
-  KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-
-  # Store password for reuse.
-  cat << EOF > "$file"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD"
-}
-EOF
-  chmod 0600 "$file"
 }
 
 # Detect the IP for the master
@@ -353,8 +339,14 @@ function kube-up {
 
   verify-cluster
   detect-master
-  export KUBE_MASTER_IP="${KUBE_MASTER_IP}:8080"
   export CONTEXT="ubuntu"
+  export KUBE_SERVER="http://${KUBE_MASTER_IP}:8080"
+
+  source "${KUBE_ROOT}/cluster/common.sh"
+
+  # set kubernetes user and password
+  get-password
+
   create-kubeconfig
 }
 
