@@ -1,6 +1,6 @@
 ---
 - name: Get iptables rules
-  shell: iptables -L
+  command: iptables -L
   register: iptablesrules
   always_run: yes
 
