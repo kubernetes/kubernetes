@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -490,12 +489,7 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 			glog.Errorf("Could not get project: %v", err)
 			return false, nil
 		}
-		hostname, err := os.Hostname()
-		if err != nil {
-			glog.Errorf("Could not get hostname: %v", err)
-			return false, nil
-		}
-		keyString := fmt.Sprintf("%s:%s %s@%s", user, strings.TrimSpace(string(keyData)), user, hostname)
+		keyString := fmt.Sprintf("%s:%s %s@%s", user, strings.TrimSpace(string(keyData)), user, user)
 		found := false
 		for _, item := range project.CommonInstanceMetadata.Items {
 			if item.Key == "sshKeys" {
