@@ -499,7 +499,12 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 		found := false
 		for _, item := range project.CommonInstanceMetadata.Items {
 			if item.Key == "sshKeys" {
-				item.Value = addKey(item.Value, keyString)
+				if strings.Contains(item.Value, keyString) {
+					// We've already added the key
+					glog.Info("SSHKey already in project metadata")
+					return true, nil
+				}
+				item.Value = item.Value + "\n" + keyString
 				found = true
 				break
 			}
@@ -522,16 +527,9 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 			glog.Errorf("Could not Set Metadata: %v", err)
 			return false, nil
 		}
+		glog.Infof("Successfully added sshKey to project metadata")
 		return true, nil
 	})
-}
-
-func addKey(metadataBefore, keyString string) string {
-	if strings.Contains(metadataBefore, keyString) {
-		// We've already added this key
-		return metadataBefore
-	}
-	return metadataBefore + "\n" + keyString
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
