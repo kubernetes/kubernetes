@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -774,9 +775,23 @@ func findExternalAddress(node *api.Node) (string, error) {
 }
 
 func (m *Master) Dial(net, addr string) (net.Conn, error) {
-	m.tunnelsLock.Lock()
-	defer m.tunnelsLock.Unlock()
-	return m.tunnels.Dial(net, addr)
+	// Only lock while picking a tunnel.
+	tunnel, err := func() (util.SSHTunnelEntry, error) {
+		m.tunnelsLock.Lock()
+		defer m.tunnelsLock.Unlock()
+		return m.tunnels.PickRandomTunnel()
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	start := time.Now()
+	id := rand.Int63() // So you can match begins/ends in the log.
+	glog.V(3).Infof("[%x: %v] Dialing...", id, tunnel.Address)
+	defer func() {
+		glog.V(3).Infof("[%x: %v] Dialed in %v.", id, tunnel.Address, time.Now().Sub(start))
+	}()
+	return tunnel.Tunnel.Dial(net, addr)
 }
 
 func (m *Master) needToReplaceTunnels(addrs []string) bool {
