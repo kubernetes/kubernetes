@@ -18,7 +18,9 @@ package e2e
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -37,52 +39,23 @@ var _ = Describe("Proxy", func() {
 	}
 })
 
+const (
+	// Try all the proxy tests this many times (to catch even rare flakes).
+	proxyAttempts = 20
+	// Only print this many characters of the response (to keep the logs
+	// legible).
+	maxDisplayBodyLen = 100
+)
+
 func proxyContext(version string) {
 	f := NewFramework("proxy")
 	prefix := "/api/" + version
 
-	It("should proxy logs on node with explicit kubelet port", func() {
-		node, err := pickNode(f.Client)
-		Expect(err).NotTo(HaveOccurred())
-		// AbsPath preserves the trailing '/'.
-		body, err := f.Client.Get().AbsPath(prefix + "/proxy/nodes/" + node + ":10250/logs/").Do().Raw()
-		if len(body) > 0 {
-			if len(body) > 100 {
-				body = body[:100]
-				body = append(body, '.', '.', '.')
-			}
-			Logf("Got: %s", body)
-		}
-		Expect(err).NotTo(HaveOccurred())
-	})
+	It("should proxy logs on node with explicit kubelet port", func() { nodeProxyTest(f, version, ":10250/logs/") })
 
-	It("should proxy logs on node", func() {
-		node, err := pickNode(f.Client)
-		Expect(err).NotTo(HaveOccurred())
-		body, err := f.Client.Get().AbsPath(prefix + "/proxy/nodes/" + node + "/logs/").Do().Raw()
-		if len(body) > 0 {
-			if len(body) > 100 {
-				body = body[:100]
-				body = append(body, '.', '.', '.')
-			}
-			Logf("Got: %s", body)
-		}
-		Expect(err).NotTo(HaveOccurred())
-	})
+	It("should proxy logs on node", func() { nodeProxyTest(f, version, "/logs/") })
 
-	It("should proxy to cadvisor", func() {
-		node, err := pickNode(f.Client)
-		Expect(err).NotTo(HaveOccurred())
-		body, err := f.Client.Get().AbsPath(prefix + "/proxy/nodes/" + node + ":4194/containers/").Do().Raw()
-		if len(body) > 0 {
-			if len(body) > 100 {
-				body = body[:100]
-				body = append(body, '.', '.', '.')
-			}
-			Logf("Got: %s", body)
-		}
-		Expect(err).NotTo(HaveOccurred())
-	})
+	It("should proxy to cadvisor", func() { nodeProxyTest(f, version, ":4194/containers/") })
 
 	It("should proxy through a service and a pod", func() {
 		labels := map[string]string{"proxy-service-target": "true"}
@@ -118,13 +91,13 @@ func proxyContext(version string) {
 		pods := []*api.Pod{}
 		cfg := RCConfig{
 			Client:       f.Client,
-			Image:        "gcr.io/google_containers/porter:91d46193649807d1340b46797774d8b2",
+			Image:        "gcr.io/google_containers/porter:59ad46ed2c56ba50fa7f1dc176c07c37",
 			Name:         service.Name,
 			Namespace:    f.Namespace.Name,
 			Replicas:     1,
 			PollInterval: time.Second,
 			Env: map[string]string{
-				"SERVE_PORT_80":  "not accessible via service",
+				"SERVE_PORT_80":  `<a href="/rewriteme">test</a>`,
 				"SERVE_PORT_160": "foo",
 				"SERVE_PORT_162": "bar",
 			},
@@ -144,11 +117,11 @@ func proxyContext(version string) {
 		svcPrefix := prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + service.Name
 		podPrefix := prefix + "/proxy/namespaces/" + f.Namespace.Name + "/pods/" + pods[0].Name
 		expectations := map[string]string{
-			svcPrefix + ":portname1": "foo",
-			svcPrefix + ":portname2": "bar",
-			podPrefix + ":80":        "not accessible via service",
-			podPrefix + ":160":       "foo",
-			podPrefix + ":162":       "bar",
+			svcPrefix + ":portname1/": "foo",
+			svcPrefix + ":portname2/": "bar",
+			podPrefix + ":80/":        `<a href="` + podPrefix + `:80/rewriteme">test</a>`,
+			podPrefix + ":160/":       "foo",
+			podPrefix + ":162/":       "bar",
 			// TODO: below entries don't work, but I believe we should make them work.
 			// svcPrefix + ":80": "foo",
 			// svcPrefix + ":81": "bar",
@@ -156,22 +129,68 @@ func proxyContext(version string) {
 			// podPrefix + ":dest2": "bar",
 		}
 
+		wg := sync.WaitGroup{}
 		errors := []string{}
-		for path, val := range expectations {
-			body, err := f.Client.Get().AbsPath(path).Do().Raw()
-			if err != nil {
-				errors = append(errors, fmt.Sprintf("path %v gave error %v", path, err))
-				continue
-			}
-			if e, a := val, string(body); e != a {
-				errors = append(errors, fmt.Sprintf("path %v: wanted %v, got %v", path, e, a))
+		errLock := sync.Mutex{}
+		recordError := func(s string) {
+			errLock.Lock()
+			defer errLock.Unlock()
+			errors = append(errors, s)
+		}
+		for i := 0; i < proxyAttempts; i++ {
+			for path, val := range expectations {
+				wg.Add(1)
+				go func(i int, path, val string) {
+					defer wg.Done()
+					body, status, d, err := doProxy(f, path)
+					if err != nil {
+						recordError(fmt.Sprintf("%v: path %v gave error: %v", i, path, err))
+						return
+					}
+					if status != http.StatusOK {
+						recordError(fmt.Sprintf("%v: path %v gave status: %v", i, path, status))
+					}
+					if e, a := val, string(body); e != a {
+						recordError(fmt.Sprintf("%v: path %v: wanted %v, got %v", i, path, e, a))
+					}
+					if d > 15*time.Second {
+						recordError(fmt.Sprintf("%v: path %v took %v > 15s", i, path, d))
+					}
+				}(i, path, val)
+				time.Sleep(150 * time.Millisecond)
 			}
 		}
+		wg.Wait()
 
 		if len(errors) != 0 {
 			Fail(strings.Join(errors, "\n"))
 		}
 	})
+}
+
+func doProxy(f *Framework, path string) (body []byte, statusCode int, d time.Duration, err error) {
+	// About all of the proxy accesses in this file:
+	// * AbsPath is used because it preserves the trailing '/'.
+	// * Do().Raw() is used (instead of DoRaw()) because it will turn an
+	//   error from apiserver proxy into an actual error, and there is no
+	//   chance of the things we are talking to being confused for an error
+	//   that apiserver would have emitted.
+	start := time.Now()
+	body, err = f.Client.Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
+	d = time.Since(start)
+	if len(body) > 0 {
+		Logf("%v: %s (%v; %v)", path, truncate(body, maxDisplayBodyLen), statusCode, d)
+	}
+	return
+}
+
+func truncate(b []byte, maxLen int) []byte {
+	if len(b) <= maxLen-3 {
+		return b
+	}
+	b2 := append([]byte(nil), b[:maxLen-3]...)
+	b2 = append(b2, '.', '.', '.')
+	return b2
 }
 
 func pickNode(c *client.Client) (string, error) {
@@ -183,4 +202,16 @@ func pickNode(c *client.Client) (string, error) {
 		return "", fmt.Errorf("no nodes exist, can't test node proxy")
 	}
 	return nodes.Items[0].Name, nil
+}
+
+func nodeProxyTest(f *Framework, version, nodeDest string) {
+	prefix := "/api/" + version
+	node, err := pickNode(f.Client)
+	Expect(err).NotTo(HaveOccurred())
+	for i := 0; i < proxyAttempts; i++ {
+		_, status, d, err := doProxy(f, prefix+"/proxy/nodes/"+node+nodeDest)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(status).To(Equal(http.StatusOK))
+		Expect(d).To(BeNumerically("<", 15*time.Second))
+	}
 }
