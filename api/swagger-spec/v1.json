@@ -603,7 +603,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -631,7 +631,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.Endpoints"
        }
       ],
       "produces": [
@@ -1264,7 +1264,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1292,7 +1292,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.Event"
        }
       ],
       "produces": [
@@ -1917,7 +1917,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1945,7 +1945,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.LimitRange"
        }
       ],
       "produces": [
@@ -2530,7 +2530,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2550,7 +2550,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.Namespace"
        }
       ],
       "produces": [
@@ -3058,7 +3058,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3078,7 +3078,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.Node"
        }
       ],
       "produces": [
@@ -3847,7 +3847,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3875,7 +3875,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.PersistentVolumeClaim"
        }
       ],
       "produces": [
@@ -4527,7 +4527,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4547,7 +4547,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.PersistentVolume"
        }
       ],
       "produces": [
@@ -5044,7 +5044,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5072,7 +5072,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.Pod"
        }
       ],
       "produces": [
@@ -6755,7 +6755,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6783,7 +6783,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.PodTemplate"
        }
       ],
       "produces": [
@@ -7416,7 +7416,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7444,7 +7444,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.ReplicationController"
        }
       ],
       "produces": [
@@ -8077,7 +8077,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -8105,7 +8105,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.ResourceQuota"
        }
       ],
       "produces": [
@@ -8797,7 +8797,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -8825,7 +8825,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.Secret"
        }
       ],
       "produces": [
@@ -9458,7 +9458,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -9486,7 +9486,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.ServiceAccount"
        }
       ],
       "produces": [
@@ -10119,7 +10119,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -10147,7 +10147,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.Service"
        }
       ],
       "produces": [
@@ -11127,6 +11127,10 @@
       "description": "the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"
      }
     }
+   },
+   "api.Patch": {
+    "id": "api.Patch",
+    "properties": {}
    },
    "v1.Status": {
     "id": "v1.Status",
