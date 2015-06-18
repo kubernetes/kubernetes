@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-var base = "http://localhost:8001/api/v1beta3/";
+var base = "http://localhost:8001/api/v1/";
 
 var updateImage = function($http, server) {
   $http.get(base + "proxy/namespaces/default/pods/" + server.podName + "/data.json")
