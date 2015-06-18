@@ -2,7 +2,7 @@
 
 # The Kubernetes resource model
 
-To do good pod placement, Kubernetes needs to know how big pods are, as well as the sizes of the nodes onto which they are being placed.  The definition of "how big" is given by the Kubernetes resource model - the subject of this document.
+To do good pod placement, Kubernetes needs to know how big pods are, as well as the sizes of the nodes onto which they are being placed.  The definition of "how big" is given by the Kubernetes resource model &mdash; the subject of this document.
 
 The resource model aims to be:
 * simple, for common cases;
@@ -57,7 +57,7 @@ resourceRequirementSpec: [
 ]
 ```
 Where:
-* _request_ [optional]: the amount of resources being requested, or that were requested and have been allocated. Scheduler algorithms will use these quantities to test feasibility (whether a pod will fit onto a node).  If a container (or pod) tries to use more resources than its _request_, any associated SLOs are voided - e.g., the program it is running may be throttled (compressible resource types), or the attempt may be denied. If _request_ is omitted for a container, it defaults to _limit_ if that is explicitly specified, otherwise to an implementation-defined value; this will always be 0 for a user-defined resource type. If _request_ is omitted for a pod, it defaults to the sum of the (explicit or implicit) _request_ values for the containers it encloses.
+* _request_ [optional]: the amount of resources being requested, or that were requested and have been allocated. Scheduler algorithms will use these quantities to test feasibility (whether a pod will fit onto a node).  If a container (or pod) tries to use more resources than its _request_, any associated SLOs are voided &mdash; e.g., the program it is running may be throttled (compressible resource types), or the attempt may be denied. If _request_ is omitted for a container, it defaults to _limit_ if that is explicitly specified, otherwise to an implementation-defined value; this will always be 0 for a user-defined resource type. If _request_ is omitted for a pod, it defaults to the sum of the (explicit or implicit) _request_ values for the containers it encloses.
 
 * _limit_ [optional]: an upper bound or cap on the maximum amount of resources that will be made available to a container or pod; if a container or pod uses more resources than its _limit_, it may be terminated. The _limit_ defaults to "unbounded"; in practice, this probably means the capacity of an enclosing container, pod, or node, but may result in non-deterministic behavior, especially for memory.
 
@@ -90,13 +90,13 @@ The following resource types are predefined ("reserved") by Kubernetes in the `k
   * Units: Kubernetes Compute Unit seconds/second (i.e., CPU cores normalized to a canonical "Kubernetes CPU")
   * Internal representation: milli-KCUs
   * Compressible? yes
-  * Qualities: this is a placeholder for the kind of thing that may be supported in the future -- see [#147](https://github.com/GoogleCloudPlatform/kubernetes/issues/147)
+  * Qualities: this is a placeholder for the kind of thing that may be supported in the future &mdash; see [#147](https://github.com/GoogleCloudPlatform/kubernetes/issues/147)
     * [future] `schedulingLatency`: as per lmctfy
     * [future] `cpuConversionFactor`: property of a node: the speed of a CPU core on the node's processor divided by the speed of the canonical Kubernetes CPU (a floating point value; default = 1.0).
 
 To reduce performance portability problems for pods, and to avoid worse-case provisioning behavior, the units of CPU will be normalized to a canonical "Kubernetes Compute Unit" (KCU, pronounced ˈko͝oko͞o), which will roughly be equivalent to a single CPU hyperthreaded core for some recent x86 processor. The normalization may be implementation-defined, although some reasonable defaults will be provided in the open-source Kubernetes code.
 
-Note that requesting 2 KCU won't guarantee that precisely 2 physical cores will be allocated - control of aspects like this will be handled by resource _qualities_ (a future feature).
+Note that requesting 2 KCU won't guarantee that precisely 2 physical cores will be allocated &mdash; control of aspects like this will be handled by resource _qualities_ (a future feature).
 
 
 ### Memory

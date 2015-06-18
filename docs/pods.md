@@ -4,7 +4,7 @@ In Kubernetes, rather than individual application containers, _pods_ are the sma
 
 ## What is a _pod_?
 
-A _pod_ (as in a pod of whales or pea pod) corresponds to a colocated group of applications running with a shared context. Within that context, the applications may also have individual cgroup isolations applied. A pod models an application-specific "logical host" in a containerized environment. It may contain one or more applications which are relatively tightly coupled -- in a pre-container world, they would have executed on the same physical or virtual host.
+A _pod_ (as in a pod of whales or pea pod) corresponds to a colocated group of applications running with a shared context. Within that context, the applications may also have individual cgroup isolations applied. A pod models an application-specific "logical host" in a containerized environment. It may contain one or more applications which are relatively tightly coupled &mdash; in a pre-container world, they would have executed on the same physical or virtual host.
 
 The context of the pod can be defined as the conjunction of several Linux namespaces:
 
@@ -71,8 +71,8 @@ Pod is exposed as a primitive in order to facilitate:
 * scheduler and controller pluggability
 * support for pod-level operations without the need to "proxy" them via controller APIs  
 * decoupling of pod lifetime from controller lifetime, such as for bootstrapping
-* decoupling of controllers and services -- the endpoint controller just watches pods
-* clean composition of Kubelet-level functionality with cluster-level functionality -- Kubelet is effectively the "pod controller"
+* decoupling of controllers and services &mdash; the endpoint controller just watches pods
+* clean composition of Kubelet-level functionality with cluster-level functionality &mdash; Kubelet is effectively the "pod controller"
 * high-availability applications, which will expect pods to be replaced in advance of their termination and certainly in advance of deletion, such as in the case of planned evictions, image prefetching, or live pod migration [#3949](https://github.com/GoogleCloudPlatform/kubernetes/issues/3949)
 
 The current best practice for pets is to create a replication controller with `replicas` equal to `1` and a corresponding service. If you find this cumbersome, please comment on [issue #260](https://github.com/GoogleCloudPlatform/kubernetes/issues/260). 
