@@ -49,7 +49,7 @@ func testAdmission(t *testing.T, pod *api.Pod, shouldAccept bool) {
 		client: mockClient,
 	}
 	req := &rest.ConnectRequest{Name: pod.Name, ResourcePath: "pods/exec"}
-	err := handler.Admit(admission.NewAttributesRecord(req, "Pod", "test", "pods", admission.Connect, nil))
+	err := handler.Admit(admission.NewAttributesRecord(req, "Pod", "test", "pods", "exec", admission.Connect, nil))
 	if shouldAccept && err != nil {
 		t.Errorf("Unexpected error returned from admission handler: %v", err)
 	}
