@@ -101,7 +101,8 @@ func (util *RBDUtil) AttachDisk(rbd rbd) error {
 	// mount it
 	globalPDPath := rbd.manager.MakeGlobalPDName(rbd)
 	mountpoint, err := rbd.mounter.IsMountPoint(globalPDPath)
-	if err != nil {
+	// in the first time, the path shouldn't exist and IsMountPoint is expected to get NotExist
+	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("rbd: %s failed to check mountpoint", globalPDPath)
 	}
 	if mountpoint {
