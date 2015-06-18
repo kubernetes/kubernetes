@@ -127,7 +127,7 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
             #       code=400,message=cluster.cluster_api_versionmustbeoneof:
             #       0.15.0,0.16.0.
             # The command should error, so we throw an || true on there.
-            msg=$(gcloud alpha container clusters create this-wont-work \
+            msg=$(gcloud ${CMD_GROUP:-alpha} container clusters create this-wont-work \
                 --zone=us-central1-f --cluster-api-version=0.0.0 2>&1 \
                 | tr -d '[[:space:]]') || true
             # Strip out everything before the final colon, which gives us just
