@@ -48,6 +48,12 @@ type limitRanger struct {
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
 func (l *limitRanger) Admit(a admission.Attributes) (err error) {
+
+	// Ignore all calls to subresources
+	if a.GetSubresource() != "" {
+		return nil
+	}
+
 	obj := a.GetObject()
 	resource := a.GetResource()
 	name := "Unknown"
