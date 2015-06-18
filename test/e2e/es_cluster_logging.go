@@ -240,6 +240,19 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	missing := 0
 	expected := nodeCount * countTo
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(10 * time.Second) {
+
+		// Debugging code to report the status of the elasticsearch logging endpoints.
+		esPods, err := f.Client.Pods(api.NamespaceDefault).List(labels.Set{"k8s-app": "elasticsearch-logging"}.AsSelector(), fields.Everything())
+		if err != nil {
+			Logf("Attempt to list Elasticsearch nodes encountered a problem -- may retry: %v", err)
+			continue
+		} else {
+			for i, pod := range esPods.Items {
+				Logf("pod %d: %s PodIP %s phase %s condition %+v", i, pod.Name, pod.Status.PodIP, pod.Status.Phase,
+					pod.Status.Conditions)
+			}
+		}
+
 		// Ask Elasticsearch to return all the log lines that were tagged with the underscore
 		// verison of the name. Ask for twice as many log lines as we expect to check for
 		// duplication bugs.
