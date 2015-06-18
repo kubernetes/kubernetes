@@ -258,13 +258,14 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		updateCleanupPolicy = kubectl.RenameRollingUpdateCleanupPolicy
 	}
 	config := &kubectl.RollingUpdaterConfig{
-		Out:           out,
-		OldRc:         oldRc,
-		NewRc:         newRc,
-		UpdatePeriod:  period,
-		Interval:      interval,
-		Timeout:       timeout,
-		CleanupPolicy: updateCleanupPolicy,
+		Out:            out,
+		OldRc:          oldRc,
+		NewRc:          newRc,
+		UpdatePeriod:   period,
+		Interval:       interval,
+		Timeout:        timeout,
+		CleanupPolicy:  updateCleanupPolicy,
+		UpdateAcceptor: kubectl.DefaultUpdateAcceptor,
 	}
 	if cmdutil.GetFlagBool(cmd, "rollback") {
 		kubectl.AbortRollingUpdate(config)
