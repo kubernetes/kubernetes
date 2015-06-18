@@ -495,6 +495,11 @@ func (m *Master) init(c *Config) {
 
 	var proxyDialer func(net, addr string) (net.Conn, error)
 	if len(c.SSHUser) > 0 {
+		// Usernames are capped @ 32
+		if len(c.SSHUser) > 32 {
+			glog.Warning("SSH User is too long, truncating to 32 chars")
+			c.SSHUser = c.SSHUser[0:32]
+		}
 		glog.Infof("Setting up proxy: %s %s", c.SSHUser, c.SSHKeyfile)
 		exists, err := util.FileExists(c.SSHKeyfile)
 		if err != nil {
