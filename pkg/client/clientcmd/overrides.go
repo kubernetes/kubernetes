@@ -31,6 +31,7 @@ type ConfigOverrides struct {
 	ClusterInfo    clientcmdapi.Cluster
 	Context        clientcmdapi.Context
 	CurrentContext string
+	HttpDebug      bool
 }
 
 // ConfigOverrideFlags holds the flag names to be used for binding command line flags.  Notice that this structure tightly
@@ -40,6 +41,7 @@ type ConfigOverrideFlags struct {
 	ClusterOverrideFlags ClusterOverrideFlags
 	ContextOverrideFlags ContextOverrideFlags
 	CurrentContext       FlagInfo
+	HttpDebug            FlagInfo
 }
 
 // AuthOverrideFlags holds the flag names to be used for binding command line flags for AuthInfo objects
@@ -117,6 +119,7 @@ const (
 	FlagBearerToken  = "token"
 	FlagUsername     = "username"
 	FlagPassword     = "password"
+	FlagHttpDebug    = "http-debug"
 )
 
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
@@ -147,6 +150,7 @@ func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
 		ClusterOverrideFlags: RecommendedClusterOverrideFlags(prefix),
 		ContextOverrideFlags: RecommendedContextOverrideFlags(prefix),
 		CurrentContext:       FlagInfo{prefix + FlagContext, "", "", "The name of the kubeconfig context to use"},
+		HttpDebug:            FlagInfo{prefix + FlagHttpDebug, "", "false", "If true, enables logging of dumps of all requests and responses, including body"},
 	}
 }
 
@@ -182,6 +186,7 @@ func BindOverrideFlags(overrides *ConfigOverrides, flags *pflag.FlagSet, flagNam
 	BindClusterFlags(&overrides.ClusterInfo, flags, flagNames.ClusterOverrideFlags)
 	BindContextFlags(&overrides.Context, flags, flagNames.ContextOverrideFlags)
 	flagNames.CurrentContext.BindStringFlag(flags, &overrides.CurrentContext)
+	flagNames.HttpDebug.BindBoolFlag(flags, &overrides.HttpDebug)
 }
 
 // BindFlags is a convenience method to bind the specified flags to their associated variables

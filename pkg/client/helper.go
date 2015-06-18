@@ -88,6 +88,9 @@ type Config struct {
 
 	// Maximum burst for throttle
 	Burst int
+
+	// Enable http debug mode
+	HttpDebug bool
 }
 
 type KubeletConfig struct {
@@ -362,8 +365,11 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 		return nil, err
 	}
 
-	// TODO: use the config context to wrap a transport
+	if config.HttpDebug {
+		transport = NewDebuggingRoundTripper(os.Stderr, transport)
+	}
 
+	// TODO: use the config context to wrap a transport
 	return transport, nil
 }
 

@@ -20,8 +20,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 )
 
 type userAgentRoundTripper struct {
@@ -71,6 +73,44 @@ func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 	req = cloneRequest(req)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.bearer))
 	return rt.rt.RoundTrip(req)
+}
+
+type debuggingRoundTripper struct {
+	out io.Writer
+	rt  http.RoundTripper
+}
+
+func NewDebuggingRoundTripper(out io.Writer, rt http.RoundTripper) http.RoundTripper {
+	return &debuggingRoundTripper{out, rt}
+}
+
+const (
+	httpDebugTemplate = `HTTP_DEBUG - %v:
+----------------
+%v
+----------------
+`
+)
+
+func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	reqBytes, reqDumpErr := httputil.DumpRequest(req, true)
+	if reqDumpErr != nil {
+		fmt.Fprintf(rt.out, httpDebugTemplate, "Request", reqDumpErr)
+	} else {
+		fmt.Fprintf(rt.out, httpDebugTemplate, "Request", string(reqBytes))
+	}
+	resp, respErr := rt.rt.RoundTrip(req)
+	if respErr != nil {
+		fmt.Fprintf(rt.out, httpDebugTemplate, "Response", respErr)
+		return resp, respErr
+	}
+	respBytes, respDumpErr := httputil.DumpResponse(resp, true)
+	if respDumpErr != nil {
+		fmt.Fprintf(rt.out, httpDebugTemplate, "Response", respDumpErr)
+	} else {
+		fmt.Fprintf(rt.out, httpDebugTemplate, "Response", string(respBytes))
+	}
+	return resp, nil
 }
 
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
