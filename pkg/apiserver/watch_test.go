@@ -166,14 +166,20 @@ func TestWatchHTTP(t *testing.T) {
 
 func TestWatchParamParsing(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
+	handler := handle(map[string]rest.Storage{
+		"simples":     simpleStorage,
+		"simpleroots": simpleStorage,
+	})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/api/" + testVersion + "/watch/simples"
+
+	rootPath := "/api/" + testVersion + "/watch/simples"
+	namespacedPath := "/api/" + testVersion + "/watch/namespaces/other/simpleroots"
 
 	table := []struct {
+		path            string
 		rawQuery        string
 		resourceVersion string
 		labelSelector   string
@@ -181,29 +187,62 @@ func TestWatchParamParsing(t *testing.T) {
 		namespace       string
 	}{
 		{
+			path:            rootPath,
 			rawQuery:        "resourceVersion=1234",
 			resourceVersion: "1234",
 			labelSelector:   "",
 			fieldSelector:   "",
 			namespace:       api.NamespaceAll,
 		}, {
-			rawQuery:        "namespace=default&resourceVersion=314159&fields=Host%3D&labels=name%3Dfoo",
+			path:            rootPath,
+			rawQuery:        "resourceVersion=314159&fields=Host%3D&labels=name%3Dfoo",
 			resourceVersion: "314159",
 			labelSelector:   "name=foo",
 			fieldSelector:   "Host=",
-			namespace:       api.NamespaceDefault,
+			namespace:       api.NamespaceAll,
 		}, {
-			rawQuery:        "namespace=watchother&fields=id%3dfoo&resourceVersion=1492",
+			path:            rootPath,
+			rawQuery:        "fields=id%3dfoo&resourceVersion=1492",
 			resourceVersion: "1492",
 			labelSelector:   "",
 			fieldSelector:   "id=foo",
-			namespace:       "watchother",
+			namespace:       api.NamespaceAll,
 		}, {
+			path:            rootPath,
 			rawQuery:        "",
 			resourceVersion: "",
 			labelSelector:   "",
 			fieldSelector:   "",
 			namespace:       api.NamespaceAll,
+		},
+		{
+			path:            namespacedPath,
+			rawQuery:        "resourceVersion=1234",
+			resourceVersion: "1234",
+			labelSelector:   "",
+			fieldSelector:   "",
+			namespace:       "other",
+		}, {
+			path:            namespacedPath,
+			rawQuery:        "resourceVersion=314159&fields=Host%3D&labels=name%3Dfoo",
+			resourceVersion: "314159",
+			labelSelector:   "name=foo",
+			fieldSelector:   "Host=",
+			namespace:       "other",
+		}, {
+			path:            namespacedPath,
+			rawQuery:        "fields=id%3dfoo&resourceVersion=1492",
+			resourceVersion: "1492",
+			labelSelector:   "",
+			fieldSelector:   "id=foo",
+			namespace:       "other",
+		}, {
+			path:            namespacedPath,
+			rawQuery:        "",
+			resourceVersion: "",
+			labelSelector:   "",
+			fieldSelector:   "",
+			namespace:       "other",
 		},
 	}
 
@@ -212,6 +251,7 @@ func TestWatchParamParsing(t *testing.T) {
 		simpleStorage.requestedFieldSelector = fields.Everything()
 		simpleStorage.requestedResourceVersion = "5" // Prove this is set in all cases
 		simpleStorage.requestedResourceNamespace = ""
+		dest.Path = item.path
 		dest.RawQuery = item.rawQuery
 		resp, err := http.Get(dest.String())
 		if err != nil {

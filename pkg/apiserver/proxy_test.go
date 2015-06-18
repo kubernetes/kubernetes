@@ -86,9 +86,6 @@ func TestProxy(t *testing.T) {
 		namespaceHandler := handleNamespaced(map[string]rest.Storage{"foo": simpleStorage})
 		namespaceServer := httptest.NewServer(namespaceHandler)
 		defer namespaceServer.Close()
-		legacyNamespaceHandler := handle(map[string]rest.Storage{"foo": simpleStorage})
-		legacyNamespaceServer := httptest.NewServer(legacyNamespaceHandler)
-		defer legacyNamespaceServer.Close()
 
 		// test each supported URL pattern for finding the redirection resource in the proxy in a particular namespace
 		serverPatterns := []struct {
@@ -96,7 +93,6 @@ func TestProxy(t *testing.T) {
 			proxyTestPattern string
 		}{
 			{namespaceServer, "/api/version2/proxy/namespaces/" + item.reqNamespace + "/foo/id" + item.path},
-			{legacyNamespaceServer, "/api/version/proxy/foo/id" + item.path + "?namespace=" + item.reqNamespace},
 		}
 
 		for _, serverPattern := range serverPatterns {
