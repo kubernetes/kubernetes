@@ -115,6 +115,10 @@ type ObjectMeta struct {
 	// resource or set of resources. Only servers will generate resource versions.
 	ResourceVersion string `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"`
 
+	// A sequence number representing a specific generation of the desired state.
+	// Currently only implemented by replication controllers.
+	Generation int64 `json:"generation,omitempty" description:"a sequence number representing a specific generation of the desired state; populated by the system; read-only"`
+
 	// CreationTimestamp is a timestamp representing the server time when this object was
 	// created. It is not guaranteed to be set in happens-before order across separate operations.
 	// Clients may not set this value. It is represented in RFC3339 form and is in UTC.
@@ -1005,6 +1009,9 @@ type ReplicationControllerSpec struct {
 type ReplicationControllerStatus struct {
 	// Replicas is the number of actual replicas.
 	Replicas int `json:"replicas" description:"most recently oberved number of replicas"`
+
+	// ObservedGeneration is the most recent generation observed by the controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" description:"reflects the generation of the most recently observed replication controller"`
 }
 
 // ReplicationController represents the configuration of a replication controller.

@@ -485,6 +485,15 @@ __EOF__
 
   kube::log::status "Testing kubectl(${version}:replicationcontrollers)"
 
+  ### Create and stop controller, make sure it doesn't leak pods
+  # Pre-condition: no replication controller is running
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
+  kubectl stop rc frontend "${kube_flags[@]}"
+  # Post-condition: no pods from frontend controller
+  kube::test::get_object_assert 'pods -l "name=frontend"' "{{range.items}}{{$id_field}}:{{end}}" ''
+
   ### Create replication controller frontend from JSON
   # Pre-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''

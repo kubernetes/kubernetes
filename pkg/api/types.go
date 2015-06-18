@@ -117,6 +117,10 @@ type ObjectMeta struct {
 	// resource or set of resources. Only servers will generate resource versions.
 	ResourceVersion string `json:"resourceVersion,omitempty"`
 
+	// A sequence number representing a specific generation of the desired state.
+	// Currently only implemented by replication controllers.
+	Generation int64 `json:"generation,omitempty"`
+
 	// CreationTimestamp is a timestamp representing the server time when this object was
 	// created. It is not guaranteed to be set in happens-before order across separate operations.
 	// Clients may not set this value. It is represented in RFC3339 form and is in UTC.
@@ -998,6 +1002,9 @@ type ReplicationControllerSpec struct {
 type ReplicationControllerStatus struct {
 	// Replicas is the number of actual replicas.
 	Replicas int `json:"replicas"`
+
+	// ObservedGeneration is the most recent generation observed by the controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // ReplicationController represents the configuration of a replication controller.

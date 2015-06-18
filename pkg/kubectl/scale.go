@@ -161,7 +161,10 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 		return err
 	}
 	if waitForReplicas != nil {
-		rc := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: name}}
+		rc, err := scaler.c.GetReplicationController(namespace, name)
+		if err != nil {
+			return err
+		}
 		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
 			scaler.c.ControllerHasDesiredReplicas(rc))
 	}

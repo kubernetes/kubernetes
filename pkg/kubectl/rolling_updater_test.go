@@ -142,7 +142,9 @@ func TestUpdate(t *testing.T) {
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 3 gets for each scale
+				// 4 gets for each scale
+				{newRc(1, 1), nil},
+				{newRc(1, 1), nil},
 				{newRc(1, 1), nil},
 				{newRc(1, 1), nil},
 				{newRc(1, 1), nil},
@@ -164,7 +166,10 @@ Update succeeded. Deleting foo-v1
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 3 gets for each scale
+				// 4 gets for each scale
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
@@ -195,7 +200,10 @@ Update succeeded. Deleting foo-v1
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 3 gets for each scale
+				// 4 gets for each scale
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
@@ -214,6 +222,7 @@ Update succeeded. Deleting foo-v1
 				{newRc(7, 7), nil},
 				{newRc(7, 7), nil},
 				{newRc(7, 7), nil},
+				{newRc(7, 7), nil},
 				// cleanup annotations
 				{newRc(7, 7), nil},
 				{newRc(7, 7), nil},
@@ -229,7 +238,10 @@ Update succeeded. Deleting foo-v1
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 3 gets for each update
+				// 4 gets for each update
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
@@ -245,6 +257,8 @@ Update succeeded. Deleting foo-v1
 				{oldRc(5), nil},
 				{oldRc(5), nil},
 				// stop oldRc
+				{oldRc(0), nil},
+				{oldRc(0), nil},
 				{oldRc(0), nil},
 				{oldRc(0), nil},
 				// cleanup annotations

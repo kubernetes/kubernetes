@@ -991,6 +991,7 @@ func deepCopy_api_ObjectMeta(in ObjectMeta, out *ObjectMeta, c *conversion.Clone
 	out.SelfLink = in.SelfLink
 	out.UID = in.UID
 	out.ResourceVersion = in.ResourceVersion
+	out.Generation = in.Generation
 	if err := deepCopy_util_Time(in.CreationTimestamp, &out.CreationTimestamp, c); err != nil {
 		return err
 	}
@@ -1598,6 +1599,7 @@ func deepCopy_api_ReplicationControllerSpec(in ReplicationControllerSpec, out *R
 
 func deepCopy_api_ReplicationControllerStatus(in ReplicationControllerStatus, out *ReplicationControllerStatus, c *conversion.Cloner) error {
 	out.Replicas = in.Replicas
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 

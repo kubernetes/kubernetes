@@ -339,7 +339,7 @@ func TestCreateReplica(t *testing.T) {
 	}
 }
 
-func TestControllerNoReplicaUpdate(t *testing.T) {
+func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	// Setup a fake server to listen for requests, and run the rc manager in steady state
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
@@ -365,6 +365,18 @@ func TestControllerNoReplicaUpdate(t *testing.T) {
 	if fakeHandler.RequestReceived != nil {
 		t.Errorf("Unexpected update when pods and rcs are in a steady state")
 	}
+
+	// This response body is just so we don't err out decoding the http response, all
+	// we care about is the request body sent below.
+	response := runtime.EncodeOrDie(testapi.Codec(), &api.ReplicationController{})
+	fakeHandler.ResponseBody = response
+
+	rc.Generation = rc.Generation + 1
+	manager.syncReplicationController(getKey(rc, t))
+
+	rc.Status.ObservedGeneration = rc.Generation
+	updatedRc := runtime.EncodeOrDie(testapi.Codec(), rc)
+	fakeHandler.ValidateRequest(t, testapi.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name), "PUT", &updatedRc)
 }
 
 func TestControllerUpdateReplicas(t *testing.T) {
@@ -383,9 +395,12 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
 	rc := newReplicationController(5)
 	manager.controllerStore.Store.Add(rc)
-	rc.Status = api.ReplicationControllerStatus{Replicas: 2}
+	rc.Status = api.ReplicationControllerStatus{Replicas: 2, ObservedGeneration: 0}
+	rc.Generation = 1
 	newPodList(manager.podStore.Store, 4, api.PodRunning, rc)
-	response := runtime.EncodeOrDie(testapi.Codec(), rc)
+
+	// This response body is just so we don't err out decoding the http response
+	response := runtime.EncodeOrDie(testapi.Codec(), &api.ReplicationController{})
 	fakeHandler.ResponseBody = response
 
 	fakePodControl := FakePodControl{}
@@ -393,8 +408,9 @@ func TestControllerUpdateReplicas(t *testing.T) {
 
 	manager.syncReplicationController(getKey(rc, t))
 
-	// Status.Replicas should go up from 2->4 even though we created 5-4=1 pod
-	rc.Status = api.ReplicationControllerStatus{Replicas: 4}
+	// 1. Status.Replicas should go up from 2->4 even though we created 5-4=1 pod.
+	// 2. Every update to the status should include the Generation of the spec.
+	rc.Status = api.ReplicationControllerStatus{Replicas: 4, ObservedGeneration: 1}
 
 	decRc := runtime.EncodeOrDie(testapi.Codec(), rc)
 	fakeHandler.ValidateRequest(t, testapi.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name), "PUT", &decRc)
