@@ -162,8 +162,11 @@ func TestCreateCleanWithPrefix(t *testing.T) {
 		{"anything.com:8080", "anything.com:8080", ""},
 		{"anything.com", "anything.com", ""},
 		{"anything", "anything", ""},
-		{"", "http://localhost:8080", ""},
 	}
+
+	// WARNING: EnvVarCluster.Server is set during package loading time and can not be overriden by os.Setenv inside this test
+	EnvVarCluster.Server = ""
+	tt = append(tt, struct{ server, host, prefix string }{"", "http://localhost:8080", ""})
 
 	for _, tc := range tt {
 		config := createValidTestConfig()
