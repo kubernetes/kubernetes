@@ -302,16 +302,9 @@ func TestTokenCreation(t *testing.T) {
 
 			AddedSecret: serviceAccountTokenSecret(),
 			ExpectedActions: []testclient.FakeAction{
+				{Action: "get-serviceaccount", Value: "default"},
 				{Action: "delete-secret", Value: "token-secret-1"},
 			},
-		},
-		"added secret without serviceaccount with unsynced service account store": {
-			ClientObjects: []runtime.Object{serviceAccountTokenSecret()},
-
-			ServiceAccountsSyncPending: true,
-
-			AddedSecret:     serviceAccountTokenSecret(),
-			ExpectedActions: []testclient.FakeAction{},
 		},
 		"added secret with serviceaccount": {
 			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
@@ -334,16 +327,9 @@ func TestTokenCreation(t *testing.T) {
 
 			UpdatedSecret: serviceAccountTokenSecret(),
 			ExpectedActions: []testclient.FakeAction{
+				{Action: "get-serviceaccount", Value: "default"},
 				{Action: "delete-secret", Value: "token-secret-1"},
 			},
-		},
-		"updated secret without serviceaccount with unsynced service account store": {
-			ClientObjects: []runtime.Object{serviceAccountTokenSecret()},
-
-			ServiceAccountsSyncPending: true,
-
-			UpdatedSecret:   serviceAccountTokenSecret(),
-			ExpectedActions: []testclient.FakeAction{},
 		},
 		"updated secret with serviceaccount": {
 			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
