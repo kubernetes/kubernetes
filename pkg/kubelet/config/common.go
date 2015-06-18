@@ -33,16 +33,16 @@ import (
 	"github.com/golang/glog"
 )
 
-// Generate a pod name that is unique among nodes by appending the hostname.
-func generatePodName(name, hostname string) string {
-	return fmt.Sprintf("%s-%s", name, hostname)
+// Generate a pod name that is unique among nodes by appending the nodeName.
+func generatePodName(name, nodeName string) string {
+	return fmt.Sprintf("%s-%s", name, nodeName)
 }
 
-func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) error {
+func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
 		if isFile {
-			fmt.Fprintf(hasher, "host:%s", hostname)
+			fmt.Fprintf(hasher, "host:%s", nodeName)
 			fmt.Fprintf(hasher, "file:%s", source)
 		} else {
 			fmt.Fprintf(hasher, "url:%s", source)
@@ -57,7 +57,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) er
 	if len(pod.Name) == 0 {
 		pod.Name = string(pod.UID)
 	}
-	pod.Name = generatePodName(pod.Name, hostname)
+	pod.Name = generatePodName(pod.Name, nodeName)
 	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
 
 	if pod.Namespace == "" {
@@ -66,7 +66,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) er
 	glog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
 
 	// Set the Host field to indicate this pod is scheduled on the current node.
-	pod.Spec.NodeName = hostname
+	pod.Spec.NodeName = nodeName
 
 	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
 	return nil

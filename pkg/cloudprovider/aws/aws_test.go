@@ -412,7 +412,7 @@ func TestList(t *testing.T) {
 		Value: aws.String("foo"),
 	}
 	instance0.Tags = []*ec2.Tag{&tag0}
-	instance0.PrivateDNSName = aws.String("instance1")
+	instance0.InstanceID = aws.String("instance0")
 	state0 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -424,7 +424,7 @@ func TestList(t *testing.T) {
 		Value: aws.String("bar"),
 	}
 	instance1.Tags = []*ec2.Tag{&tag1}
-	instance1.PrivateDNSName = aws.String("instance2")
+	instance1.InstanceID = aws.String("instance1")
 	state1 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -436,7 +436,7 @@ func TestList(t *testing.T) {
 		Value: aws.String("baz"),
 	}
 	instance2.Tags = []*ec2.Tag{&tag2}
-	instance2.PrivateDNSName = aws.String("instance3")
+	instance2.InstanceID = aws.String("instance2")
 	state2 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -448,7 +448,7 @@ func TestList(t *testing.T) {
 		Value: aws.String("quux"),
 	}
 	instance3.Tags = []*ec2.Tag{&tag3}
-	instance3.PrivateDNSName = aws.String("instance4")
+	instance3.InstanceID = aws.String("instance3")
 	state3 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -462,8 +462,8 @@ func TestList(t *testing.T) {
 		expect []string
 	}{
 		{"blahonga", []string{}},
-		{"quux", []string{"instance4"}},
-		{"a", []string{"instance2", "instance3"}},
+		{"quux", []string{"instance3"}},
+		{"a", []string{"instance1", "instance2"}},
 	}
 
 	for _, item := range table {
@@ -493,7 +493,7 @@ func TestNodeAddresses(t *testing.T) {
 	var instance1 ec2.Instance
 
 	//0
-	instance0.PrivateDNSName = aws.String("instance1")
+	instance0.InstanceID = aws.String("instance-same")
 	instance0.PrivateIPAddress = aws.String("192.168.0.1")
 	instance0.PublicIPAddress = aws.String("1.2.3.4")
 	instance0.InstanceType = aws.String("c3.large")
@@ -503,7 +503,7 @@ func TestNodeAddresses(t *testing.T) {
 	instance0.State = &state0
 
 	//1
-	instance1.PrivateDNSName = aws.String("instance1")
+	instance1.InstanceID = aws.String("instance-same")
 	instance1.PrivateIPAddress = aws.String("192.168.0.2")
 	instance1.InstanceType = aws.String("c3.large")
 	state1 := ec2.InstanceState{
@@ -514,19 +514,19 @@ func TestNodeAddresses(t *testing.T) {
 	instances := []*ec2.Instance{&instance0, &instance1}
 
 	aws1 := mockInstancesResp([]*ec2.Instance{})
-	_, err1 := aws1.NodeAddresses("instance")
+	_, err1 := aws1.NodeAddresses("instance-mismatch")
 	if err1 == nil {
 		t.Errorf("Should error when no instance found")
 	}
 
 	aws2 := mockInstancesResp(instances)
-	_, err2 := aws2.NodeAddresses("instance1")
+	_, err2 := aws2.NodeAddresses("instance-same")
 	if err2 == nil {
 		t.Errorf("Should error when multiple instances found")
 	}
 
 	aws3 := mockInstancesResp(instances[0:1])
-	addrs3, err3 := aws3.NodeAddresses("instance1")
+	addrs3, err3 := aws3.NodeAddresses("instance-same")
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
 	}
@@ -562,7 +562,7 @@ func TestGetResources(t *testing.T) {
 	var instance2 ec2.Instance
 
 	//0
-	instance0.PrivateDNSName = aws.String("m3.medium")
+	instance0.InstanceID = aws.String("m3.medium")
 	instance0.InstanceType = aws.String("m3.medium")
 	state0 := ec2.InstanceState{
 		Name: aws.String("running"),
@@ -570,7 +570,7 @@ func TestGetResources(t *testing.T) {
 	instance0.State = &state0
 
 	//1
-	instance1.PrivateDNSName = aws.String("r3.8xlarge")
+	instance1.InstanceID = aws.String("r3.8xlarge")
 	instance1.InstanceType = aws.String("r3.8xlarge")
 	state1 := ec2.InstanceState{
 		Name: aws.String("running"),
@@ -578,7 +578,7 @@ func TestGetResources(t *testing.T) {
 	instance1.State = &state1
 
 	//2
-	instance2.PrivateDNSName = aws.String("unknown.type")
+	instance2.InstanceID = aws.String("unknown.type")
 	instance2.InstanceType = aws.String("unknown.type")
 	state2 := ec2.InstanceState{
 		Name: aws.String("running"),

@@ -259,6 +259,8 @@ func (s *KubeletExecutorServer) Run(hks hyperkube.Interface, _ []string) error {
 		DockerExecHandler:         dockerExecHandler,
 	}
 
+	kcfg.NodeName = kcfg.Hostname
+
 	err = app.RunKubelet(&kcfg, app.KubeletBuilder(func(kc *app.KubeletConfig) (app.KubeletBootstrap, *kconfig.PodConfig, error) {
 		return s.createAndInitKubelet(kc, hks, clientConfig, shutdownCloser)
 	}))
@@ -319,6 +321,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 
 	klet, err := kubelet.NewMainKubelet(
 		kc.Hostname,
+		kc.NodeName,
 		kc.DockerClient,
 		kubeClient,
 		kc.RootDirectory,
