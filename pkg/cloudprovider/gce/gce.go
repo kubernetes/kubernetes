@@ -483,11 +483,6 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 	return res, nil
 }
 
-// Implementation of Instances.CurrentNodeName
-func (gce *GCECloud) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
-}
-
 func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return wait.Poll(2*time.Second, 30*time.Second, func() (bool, error) {
 		project, err := gce.service.Projects.Get(gce.projectID).Do()
