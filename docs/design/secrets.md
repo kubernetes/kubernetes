@@ -147,7 +147,8 @@ have different preferences for the central store of secret data.  Some possibili
 
 1.  An etcd collection alongside the storage for other API resources
 2.  A collocated [HSM](http://en.wikipedia.org/wiki/Hardware_security_module)
-3.  An external datastore such as an external etcd, RDBMS, etc.
+3.  A secrets server like [Vault](https://www.vaultproject.io/) or [Keywhiz](https://square.github.io/keywhiz/)
+4.  An external datastore such as an external etcd, RDBMS, etc.
 
 #### Size limit for secrets
 
