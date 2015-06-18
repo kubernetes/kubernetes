@@ -459,8 +459,10 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
+		glog.V(8).Infof("Request Body: %s", string(data))
 		r.body = bytes.NewBuffer(data)
 	case []byte:
+		glog.V(8).Infof("Request Body: %s", string(t))
 		r.body = bytes.NewBuffer(t)
 	case io.Reader:
 		r.body = t
@@ -470,6 +472,7 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
+		glog.V(8).Infof("Request Body: %s", string(data))
 		r.body = bytes.NewBuffer(data)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
@@ -756,6 +759,8 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			body = data
 		}
 	}
+	glog.V(8).Infof("Response Body: %s", string(body))
+
 	// Did the server give us a status response?
 	isStatusResponse := false
 	var status api.Status
@@ -811,6 +816,8 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 			body = data
 		}
 	}
+	glog.V(8).Infof("Response Body: %s", string(body))
+
 	message := "unknown"
 	if isTextResponse(resp) {
 		message = strings.TrimSpace(string(body))
