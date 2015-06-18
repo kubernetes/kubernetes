@@ -5,7 +5,7 @@
 Processes in Pods may need to call the Kubernetes API.  For example:
   - scheduler
   - replication controller
-  - minion controller
+  - node controller
   - a map-reduce type framework which has a controller that then tries to make a dynamically determined number of workers and watch them
   - continuous build and push system
   - monitoring system

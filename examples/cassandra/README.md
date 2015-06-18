@@ -128,7 +128,7 @@ Of course, a single node cluster isn't particularly interesting.  The real power
 
 In Kubernetes a _[Replication Controller](../../docs/replication-controller.md)_ is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
 
-Replication Controllers will "adopt" existing pods that match their selector query, so let's create a Replication Controller with a single replica to adopt our existing Cassandra Pod.
+Replication controllers will "adopt" existing pods that match their selector query, so let's create a replication controller with a single replica to adopt our existing Cassandra pod.
 
 ```yaml
 apiVersion: v1
@@ -172,7 +172,7 @@ spec:
           emptyDir: {}
 ```
 
-The bulk of the replication controller config is actually identical to the Cassandra pod declaration above, it simply gives the controller a recipe to use when creating new pods.  The other parts are the ```replicaSelector``` which contains the controller's selector query, and the ```replicas``` parameter which specifies the desired number of replicas, in this case 1.
+Most of this replication controller definition is identical to the Cassandra pod definition above, it simply gives the resplication controller a recipe to use when it creates new Cassandra pods.  The other differentiating parts are the ```selector``` attribute which contains the controller's selector query, and the ```replicas``` attribute which specifies the desired number of replicas, in this case 1.
 
 Create this controller:
 

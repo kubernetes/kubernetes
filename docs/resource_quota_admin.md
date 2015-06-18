@@ -97,7 +97,7 @@ Sometimes more complex policies may be desired, such as:
     limit to prevent accidental resource exhaustion.
 
 Such policies could be implemented using ResourceQuota as a building-block, by
-writing a controller which watches the quota usage and adjusts the quota
+writing a 'controller' which watches the quota usage and adjusts the quota
 hard limits of each namespace.
 
 

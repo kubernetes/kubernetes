@@ -28,9 +28,9 @@ Kinds are grouped into three categories:
 
    Creating an API object is a record of intent - once created, the system will work to ensure that resource exists. All API objects have common metadata.
 
-   An object may have multiple resources that clients can use to perform specific actions than create, update, delete, or get.
+   An object may have multiple resources that clients can use to perform specific actions that create, update, delete, or get.
 
-   Examples: Pods, ReplicationControllers, Services, Namespaces, Nodes
+   Examples: `Pods`, `ReplicationControllers`, `Services`, `Namespaces`, `Nodes`
 
 2. **Lists** are collections of **resources** of one (usually) or more (occasionally) kinds.
 
@@ -301,13 +301,14 @@ Late Initialization
 Late initialization is when resource fields are set by a system controller
 after an object is created/updated.
 
-For example, the scheduler sets the pod.spec.nodeName field after the pod is created.
+For example, the scheduler sets the `pod.spec.nodeName` field after the pod is created.
 
 Late-initializers should only make the following types of modifications:
-  - Setting previously unset fields
-  - Adding keys to maps
-  - Adding values to arrays which have mergeable semantics (`patchStrategy:"merge"` attribute in
-  go definition of type).
+ - Setting previously unset fields
+ - Adding keys to maps
+ - Adding values to arrays which have mergeable semantics (`patchStrategy:"merge"` attribute in
+  the type definition).
+  
 These conventions:
  1. allow a user (with sufficient privilege) to override any system-default behaviors by setting
     the fields that would otherwise have been defaulted.
@@ -318,7 +319,7 @@ These conventions:
 
 Although the apiserver Admission Control stage acts prior to object creation,
 Admission Control plugins should follow the Late Initialization conventions
-too, to allow their implementation to be later moved to a controller, or to client libraries.
+too, to allow their implementation to be later moved to a 'controller', or to client libraries.
 
 Concurrency Control and Consistency
 -----------------------------------

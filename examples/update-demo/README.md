@@ -38,7 +38,7 @@ I0218 15:18:31.623279   67480 proxy.go:36] Starting to serve on localhost:8001
 
 Now visit the the [demo website](http://localhost:8001/static).  You won't see anything much quite yet.
 
-### Step Two: Run the controller
+### Step Two: Run the replication controller
 Now we will turn up two replicas of an image.  They all serve on internal port 80.
 
 ```bash
@@ -47,7 +47,7 @@ $ ./kubectl create -f examples/update-demo/nautilus-rc.yaml
 
 After pulling the image from the Docker Hub to your worker nodes (which may take a minute or so) you'll see a couple of squares in the UI detailing the pods that are running along with the image that they are serving up.  A cute little nautilus.
 
-### Step Three: Try scaling the controller
+### Step Three: Try scaling the replication controller
 
 Now we will increase the number of replicas from two to four:
 
@@ -76,7 +76,7 @@ Watch the [demo website](http://localhost:8001/static/index.html), it will updat
 $ ./kubectl stop rc update-demo-kitten
 ```
 
-This will first 'stop' the replication controller by turning the target number of replicas to 0.  It'll then delete that controller.
+This first stops the replication controller by turning the target number of replicas to 0 and then deletes the controller.
 
 ### Step Six: Cleanup
 
