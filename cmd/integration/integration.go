@@ -416,7 +416,7 @@ func runReplicationControllerTest(c *client.Client) {
 
 	start := time.Now()
 	if err := wait.Poll(
-		time.Second, time.Second*60, podsOnMinions(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
+		time.Second, time.Second*300, podsOnMinions(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
 	}
 	fmt.Printf("CHAOTIME: it take rc.pod %v to run\n", time.Since(start))
@@ -875,7 +875,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	}
 
 	start := time.Now()
-	if err := wait.Poll(time.Second, time.Second*60, podRunning(client, foo.Namespace, foo.Name)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*300, podRunning(client, foo.Namespace, foo.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 	fmt.Printf("CHAOTIME: it take phantom.foo %v to run\n", time.Since(start))
@@ -887,7 +887,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	}
 
 	start = time.Now()
-	if err := wait.Poll(time.Second, time.Second*60, podRunning(client, bar.Namespace, bar.Name)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*300, podRunning(client, bar.Namespace, bar.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 	fmt.Printf("CHAOTIME: it take phantom.bar %v to run\n", time.Since(start))
@@ -906,7 +906,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	}
 
 	start = time.Now()
-	if err := wait.Poll(time.Second, time.Second*60, podRunning(client, baz.Namespace, baz.Name)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*300, podRunning(client, baz.Namespace, baz.Name)); err != nil {
 		glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
 	}
 	fmt.Printf("CHAOTIME: it take phantom.baz %v to run\n", time.Since(start))
