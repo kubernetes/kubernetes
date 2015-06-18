@@ -199,7 +199,9 @@ function set_binary_version() {
 #   PROJECT
 # Vars set:
 #   SERVER_BINARY_TAR_URL
+#   SERVER_BINARY_TAR_HASH
 #   SALT_TAR_URL
+#   SALT_TAR_HASH
 function tars_from_version() {
   if [[ -z "${KUBE_VERSION-}" ]]; then
     find-release-tars
@@ -214,9 +216,19 @@ function tars_from_version() {
     echo "Version doesn't match regexp" >&2
     exit 1
   fi
+  until SERVER_BINARY_TAR_HASH=$(curl --fail --silent "${SERVER_BINARY_TAR_URL}.sha1"); do
+    echo "Failure trying to curl release .sha1"
+  done
+  until SALT_TAR_HASH=$(curl --fail --silent "${SALT_TAR_URL}.sha1"); do
+    echo "Failure trying to curl Salt tar .sha1"
+  done
 
-  if ! curl -Ss --range 0-1 ${SERVER_BINARY_TAR_URL} >&/dev/null; then
+  if ! curl -Ss --range 0-1 "${SERVER_BINARY_TAR_URL}" >&/dev/null; then
     echo "Can't find release at ${SERVER_BINARY_TAR_URL}" >&2
+    exit 1
+  fi
+  if ! curl -Ss --range 0-1 "${SALT_TAR_URL}" >&/dev/null; then
+    echo "Can't find Salt tar at ${SALT_TAR_URL}" >&2
     exit 1
   fi
 }
