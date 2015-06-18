@@ -77,6 +77,12 @@ func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile, serviceAccountKeyF
 	}
 }
 
+// IsValidServiceAccountKeyFile returns true if a valid public RSA key can be read from the given file
+func IsValidServiceAccountKeyFile(file string) bool {
+	_, err := serviceaccount.ReadPublicKey(file)
+	return err == nil
+}
+
 // newAuthenticatorFromBasicAuthFile returns an authenticator.Request or an error
 func newAuthenticatorFromBasicAuthFile(basicAuthFile string) (authenticator.Request, error) {
 	basicAuthenticator, err := passwordfile.NewCSV(basicAuthFile)
