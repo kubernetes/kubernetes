@@ -378,6 +378,7 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
 	return waitForPodCondition(c, namespace, podName, "running", podStartTimeout, func(pod *api.Pod) (bool, error) {
 		if pod.Status.Phase == api.PodRunning {
+			Logf("Found pod '%s' on node '%s'", podName, pod.Spec.NodeName)
 			return true, nil
 		}
 		if pod.Status.Phase == api.PodFailed {
