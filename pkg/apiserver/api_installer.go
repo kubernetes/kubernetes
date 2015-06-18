@@ -250,7 +250,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	actions := []action{}
 
 	// Get the list of actions for the given scope.
-	if scope.Name() != meta.RESTScopeNameNamespace {
+	switch scope.Name() {
+	case meta.RESTScopeNameRoot:
 		// Handle non-namespace scoped resources like nodes.
 		resourcePath := resource
 		resourceParams := params
@@ -283,61 +284,55 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer}, isConnecter && connectSubpath)
+		break
+	case meta.RESTScopeNameNamespace:
+		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
+		namespaceParam := ws.PathParameter(scope.ArgumentName(), scope.ParamDescription()).DataType("string")
+		namespacedPath := scope.ParamName() + "/{" + scope.ArgumentName() + "}/" + resource
+		namespaceParams := []*restful.Parameter{namespaceParam}
 
-	} else {
-		// Handle namespace scoped resources like pods.
-		if scope.ParamPath() {
-			// Handle the case when namespace is part of the path.
-			// Handler for standard REST verbs (GET, PUT, POST and DELETE).
-			namespaceParam := ws.PathParameter(scope.ParamName(), scope.ParamDescription()).DataType("string")
-			namespacedPath := scope.ParamName() + "/{" + scope.ParamName() + "}/" + resource
-			namespaceParams := []*restful.Parameter{namespaceParam}
-
-			resourcePath := namespacedPath
-			resourceParams := namespaceParams
-			itemPath := namespacedPath + "/{name}"
-			nameParams := append(namespaceParams, nameParam)
-			proxyParams := append(nameParams, pathParam)
-			if hasSubresource {
-				itemPath = itemPath + "/" + subresource
-				resourcePath = itemPath
-				resourceParams = nameParams
-			}
-			namer := scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), false}
-
-			// Add actions at the resource path: /api/apiVersion/namespaces/{namespaces}/resource
-			actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
-			actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
-			// DEPRECATED
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
-
-			// Add actions at the item path: /api/apiVersion/namespaces/{namespaces}/resource/{name}
-			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
-			if getSubpath {
-				actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
-			}
-			actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
-			actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
-			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
-			actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
-			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
-			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
-			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
-			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer}, isConnecter && connectSubpath)
-
-			// list or post across namespace.
-			// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
-			// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
-			if !hasSubresource {
-				namer = scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), true}
-				actions = appendIf(actions, action{"LIST", resource, params, namer}, isLister)
-				actions = appendIf(actions, action{"POST", resource, params, namer}, isCreater)
-				actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer}, allowWatchList)
-			}
-		} else {
-			// Legacy behavior: Namespace as param is no longer supported
-			return fmt.Errorf("namespace as a parameter is no longer supported")
+		resourcePath := namespacedPath
+		resourceParams := namespaceParams
+		itemPath := namespacedPath + "/{name}"
+		nameParams := append(namespaceParams, nameParam)
+		proxyParams := append(nameParams, pathParam)
+		if hasSubresource {
+			itemPath = itemPath + "/" + subresource
+			resourcePath = itemPath
+			resourceParams = nameParams
 		}
+		namer := scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), false}
+
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
+		// DEPRECATED
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
+
+		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
+		if getSubpath {
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
+		}
+		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
+		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
+		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
+		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer}, isConnecter && connectSubpath)
+
+		// list or post across namespace.
+		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
+		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
+		if !hasSubresource {
+			namer = scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), true}
+			actions = appendIf(actions, action{"LIST", resource, params, namer}, isLister)
+			actions = appendIf(actions, action{"POST", resource, params, namer}, isCreater)
+			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer}, allowWatchList)
+		}
+		break
+	default:
+		return fmt.Errorf("unsupported restscope: %s", scope.Name())
 	}
 
 	// Create Routes for the actions.
@@ -658,7 +653,7 @@ func (n scopeNaming) Namespace(req *restful.Request) (namespace string, err erro
 	if n.allNamespaces {
 		return "", nil
 	}
-	namespace = req.PathParameter(n.scope.ParamName())
+	namespace = req.PathParameter(n.scope.ArgumentName())
 	if len(namespace) == 0 {
 		// a URL was constructed without the namespace, or this method was invoked
 		// on an object without a namespace path parameter.
@@ -694,7 +689,7 @@ func (n scopeNaming) GenerateLink(req *restful.Request, obj runtime.Object) (pat
 		return "", "", errEmptyName
 	}
 	path = strings.Replace(n.itemPath, "{name}", name, 1)
-	path = strings.Replace(path, "{"+n.scope.ParamName()+"}", namespace, 1)
+	path = strings.Replace(path, "{"+n.scope.ArgumentName()+"}", namespace, 1)
 	return path, "", nil
 }
 

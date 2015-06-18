@@ -115,10 +115,8 @@ type RESTScope interface {
 	// ParamName is the optional name of the parameter that should be inserted in the resource url
 	// If empty, no param will be inserted
 	ParamName() string
-	// ParamPath is a boolean that controls how the parameter is manifested in resource paths
-	// If true, this parameter is encoded in path (i.e. /{paramName}/{paramValue})
-	// If false, this parameter is encoded in query (i.e. ?{paramName}={paramValue})
-	ParamPath() bool
+	// ArgumentName is the optional name that should be used for the variable holding the value.
+	ArgumentName() string
 	// ParamDescription is the optional description to use to document the parameter in api documentation
 	ParamDescription() string
 }
