@@ -1567,7 +1567,6 @@ func validateFinalizerName(stringValue string) errs.ValidationErrorList {
 
 // ValidateNamespaceUpdate tests to make sure a namespace update can be applied.
 // newNamespace is updated with fields that cannot be changed
-// TODO The syntax here is the reverse of the (old, new) pattern in most other validation.  Fix this.
 func ValidateNamespaceUpdate(newNamespace *api.Namespace, oldNamespace *api.Namespace) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta).Prefix("metadata")...)
