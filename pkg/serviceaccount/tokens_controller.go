@@ -171,6 +171,7 @@ func (e *TokensController) serviceAccountDeleted(obj interface{}) {
 		return
 	}
 	for _, secret := range secrets {
+		glog.V(4).Infof("Deleting secret %s/%s because service account %s was deleted", secret.Namespace, secret.Name, serviceAccount.Name)
 		if err := e.deleteSecret(secret); err != nil {
 			glog.Errorf("Error deleting secret %s/%s: %v", secret.Namespace, secret.Name, err)
 		}
@@ -190,6 +191,10 @@ func (e *TokensController) secretAdded(obj interface{}) {
 		if !e.serviceAccountsSynced() {
 			return
 		}
+		glog.V(2).Infof(
+			"Deleting new secret %s/%s because service account %s (uid=%s) was not found",
+			secret.Namespace, secret.Name,
+			secret.Annotations[api.ServiceAccountNameKey], secret.Annotations[api.ServiceAccountUIDKey])
 		if err := e.deleteSecret(secret); err != nil {
 			glog.Errorf("Error deleting secret %s/%s: %v", secret.Namespace, secret.Name, err)
 		}
@@ -211,6 +216,10 @@ func (e *TokensController) secretUpdated(oldObj interface{}, newObj interface{})
 		if !e.serviceAccountsSynced() {
 			return
 		}
+		glog.V(2).Infof(
+			"Deleting updated secret %s/%s because service account %s (uid=%s) was not found",
+			newSecret.Namespace, newSecret.Name,
+			newSecret.Annotations[api.ServiceAccountNameKey], newSecret.Annotations[api.ServiceAccountUIDKey])
 		if err := e.deleteSecret(newSecret); err != nil {
 			glog.Errorf("Error deleting secret %s/%s: %v", newSecret.Namespace, newSecret.Name, err)
 		}
