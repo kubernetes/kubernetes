@@ -7,25 +7,23 @@ A Pod specifies which Volumes its containers need in its [spec.volumes](http://k
 
 A process in a Container sees a filesystem view composed from two sources: a single Docker image and zero or more Volumes.  A [Docker image](https://docs.docker.com/userguide/dockerimages/) is at the root of the file hierarchy.  Any Volumes are mounted at points on the Docker image;  Volumes do not mount on other Volumes and do not have hard links to other Volumes.  Each container in the Pod independently specifies where on its image to mount each Volume.  This is specified in each container's VolumeMounts property.
 
-## Resources
-
-The storage media (Disk, SSD, or memory) of a volume is determined by the media of the filesystem holding the kubelet root dir (typically `/var/lib/kubelet`).
-There is no limit on how much space an EmptyDir or HostPath volume can consume, and no isolation between containers or between pods.
-
-In the future, we expect that EmptyDir and HostPath volumes will be able to request a certain amount of space using a [resource](./resources.md) specification, and to select the type of media to use, for clusters that have several media types.
 ## Types of Volumes
 
-Kubernetes currently supports multiple types of Volumes. The community welcomes additional contributions.
+Kubernetes currently supports multiple types of Volumes: emptyDir,
+gcePersistentDisk, awsElasticBlockStore, gitRepo, secret, nfs, iscsi,
+glusterfs, persistentVolumeClaim, rbd. The community welcomes additional contributions.
+
+Selected volume types are described below.
 
 ### EmptyDir
 
-An EmptyDir volume is created when a Pod is bound to a Node.  It is initially empty, when the first Container command starts.  Containers in the same pod can all read and write the same files in the EmptyDir.  When a Pod is unbound, the data in the EmptyDir is deleted forever.
+An EmptyDir volume is created when a Pod is bound to a Node.  It is initially empty, when the first Container command starts.  Containers in the same pod can all read and write the same files in the EmptyDir volume.  When a Pod is unbound, the data in the EmptyDir is deleted forever.
 
 Some uses for an EmptyDir are:
-  - scratch space, such as for a disk-based mergesort or checkpointing a long computation.
+  - scratch space, such as for a disk-based mergesort or checkpointing a long computation,
   - a directory that a content-manager container fills with data while a webserver container serves the data.
 
-Currently, the user cannot control what kind of media is used for an EmptyDir.  If the Kubelet is configured to use a disk drive, then all EmptyDirectories will be created on that disk drive.  In the future, it is expected that Pods can control whether the EmptyDir is on a disk drive, SSD, or tmpfs.
+Currently, the user cannot control what kind of media is used for an EmptyDir (see also the section _Resources_, below).  If the Kubelet is configured to use a disk drive, then all EmptyDir volumes will be created on that disk drive.  In the future, it is expected that Pods can control whether the EmptyDir is on a disk drive, SSD, or tmpfs.
 
 ### HostPath
 A Volume with a HostPath property allows access to files on the current node.
@@ -89,5 +87,17 @@ In this example one can see that a `volumeMount` called "nfs" is being mounted o
 The volume "nfs" is defined as type `nfs`, with the NFS server serving from `nfs-server.default.kube.local` and exporting directory `/` as the share.
 The mount being created in this example is not read only.
 
+### Secrets
+
+Secret volumes are used to pass sensitive information, such as passwords, to
+pods that mount these volumes. Secrets are described [here](secrets.md).
+
+
+## Resources
+
+The storage media (Disk, SSD, or memory) of an EmptyDir volume is determined by the media of the filesystem holding the kubelet root dir (typically `/var/lib/kubelet`).
+There is no limit on how much space an EmptyDir or HostPath volume can consume, and no isolation between containers or between pods.
+
+In the future, we expect that EmptyDir and HostPath volumes will be able to request a certain amount of space using a [resource](./resources.md) specification, and to select the type of media to use, for clusters that have several media types.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/volumes.md?pixel)]()
