@@ -48,7 +48,7 @@ func NewCmdUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: update_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunUpdate(f, out, cmd, args, filenames)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckCustomErr("Update failed", err)
 		},
 	}
 	usage := "Filename, directory, or URL to file to use to update the resource."
