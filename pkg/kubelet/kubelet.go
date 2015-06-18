@@ -749,6 +749,11 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 
 // registerWithApiserver registers the node with the cluster master.
 func (kl *Kubelet) registerWithApiserver() {
+	if _, err := kl.kubeClient.Nodes().Get(kl.hostname); err == nil {
+		glog.V(2).Infof("Node found, skipping registration with ApiServer")
+		return
+	}
+	glog.V(2).Infof("Node not found, registering with ApiServer")
 	step := 100 * time.Millisecond
 	for {
 		time.Sleep(step)
