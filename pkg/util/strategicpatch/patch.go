@@ -100,6 +100,11 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 			original[k] = patchV
 			continue
 		}
+		// If the data type is a pointer, resolve the element.
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+
 		// If they're both maps or lists, recurse into the value.
 		// First find the fieldPatchStrategy and fieldPatchMergeKey.
 		fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, k)
