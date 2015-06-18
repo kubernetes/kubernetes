@@ -74,7 +74,7 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod,
 	}
 
 	if pv.Spec.ClaimRef.UID != claim.UID {
-		glog.Errorf("Excepted volume.Spec.ClaimRef.UID %+v but have %+v", pv.Spec.ClaimRef.UID, claim.UID)
+		glog.Errorf("Expected volume.Spec.ClaimRef.UID %+v but have %+v", pv.Spec.ClaimRef.UID, claim.UID)
 		return nil, err
 	}
 
