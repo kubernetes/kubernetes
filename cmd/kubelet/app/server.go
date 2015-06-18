@@ -566,7 +566,7 @@ func SimpleKubelet(client *client.Client,
 func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
 
-	if kcfg.NodeName == "" {
+	if len(kcfg.NodeName) == 0 {
 		// Query the cloud provider for our node name, default to Hostname
 		nodeName := kcfg.Hostname
 		if kcfg.Cloud != nil {
@@ -589,7 +589,7 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) error {
 
 	eventBroadcaster := record.NewBroadcaster()
 	kcfg.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet", Host: kcfg.NodeName})
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(glog.V(3).Infof)
 	if kcfg.KubeClient != nil {
 		glog.V(4).Infof("Sending events to api server.")
 		eventBroadcaster.StartRecordingToSink(kcfg.KubeClient.Events(""))
