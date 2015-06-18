@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
@@ -36,7 +37,10 @@ JSON and YAML formats are accepted.`
 $ kubectl update -f pod.json
 
 // Update a pod based on the JSON passed into stdin.
-$ cat pod.json | kubectl update -f -`
+$ cat pod.json | kubectl update -f -
+
+// Partially update a node using strategic merge patch
+kubectl --api-version=v1 update node k8s-node-1 --patch='{"spec":{"unschedulable":true}}'`
 )
 
 func NewCmdUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -54,9 +58,8 @@ func NewCmdUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to file to use to update the resource."
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmd.MarkFlagRequired("filename")
-	// TODO: re-enable --patch and make it use strategic-merge-patch
-	// cmd.Flags().String("patch", "", "A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.")
-	// cmd.MarkFlagRequired("patch")
+	cmd.Flags().String("patch", "", "A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.")
+	cmd.MarkFlagRequired("patch")
 	return cmd
 }
 
@@ -71,7 +74,7 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return err
 	}
 
-	/* patch := cmdutil.GetFlagString(cmd, "patch")
+	patch := cmdutil.GetFlagString(cmd, "patch")
 	if len(filenames) == 0 && len(patch) == 0 {
 		return cmdutil.UsageError(cmd, "Must specify --filename or --patch to update")
 	}
@@ -87,7 +90,7 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		}
 		fmt.Fprintf(out, "%s\n", name)
 		return nil
-	} */
+	}
 	if len(filenames) == 0 {
 		return cmdutil.UsageError(cmd, "Must specify --filename to update")
 	}
@@ -154,21 +157,6 @@ func updateWithPatch(cmd *cobra.Command, args []string, f *cmdutil.Factory, patc
 	name, namespace := infos[0].Name, infos[0].Namespace
 
 	helper := resource.NewHelper(client, mapping)
-	obj, err := helper.Get(namespace, name)
-	if err != nil {
-		return "", err
-	}
-
-	patchedObj, err := cmdutil.Merge(obj, patch, mapping.Kind)
-	if err != nil {
-		return "", err
-	}
-
-	data, err := helper.Codec.Encode(patchedObj)
-	if err != nil {
-		return "", err
-	}
-
-	_, err = helper.Update(namespace, name, true, data)
+	_, err = helper.Patch(namespace, name, api.StrategicMergePatchType, []byte(patch))
 	return name, err
 }

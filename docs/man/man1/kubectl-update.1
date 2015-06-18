@@ -28,6 +28,10 @@ JSON and YAML formats are accepted.
 \fB\-h\fP, \fB\-\-help\fP=false
     help for update
 
+.PP
+\fB\-\-patch\fP=""
+    A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
@@ -137,6 +141,9 @@ $ kubectl update \-f pod.json
 
 // Update a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl update \-f \-
+
+// Partially update a node using strategic merge patch
+kubectl \-\-api\-version=v1 update node k8s\-node\-1 \-\-patch='\{"spec":\{"unschedulable":true\}\}'
 
 .fi
 .RE
