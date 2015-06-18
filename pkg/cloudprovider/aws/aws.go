@@ -86,6 +86,10 @@ type EC2 interface {
 	DescribeSubnets(*ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error)
 
 	CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error)
+
+	DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error)
+	CreateRoute(request *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error)
+	DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error)
 }
 
 // This is a simple pass-through of the ELB client interface, which allows for testing
@@ -393,6 +397,23 @@ func (s *awsSdkEC2) CreateTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOut
 	return s.ec2.CreateTags(request)
 }
 
+func (s *awsSdkEC2) DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error) {
+	// Not paged
+	response, err := s.ec2.DescribeRouteTables(request)
+	if err != nil {
+		return nil, fmt.Errorf("error listing AWS route tables: %v", err)
+	}
+	return response.RouteTables, nil
+}
+
+func (s *awsSdkEC2) CreateRoute(request *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error) {
+	return s.ec2.CreateRoute(request)
+}
+
+func (s *awsSdkEC2) DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error) {
+	return s.ec2.DeleteRoute(request)
+}
+
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		creds := credentials.NewChainCredentials(
@@ -550,7 +571,7 @@ func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
 
 // Routes returns an implementation of Routes for Amazon Web Services.
 func (aws *AWSCloud) Routes() (cloudprovider.Routes, bool) {
-	return nil, false
+	return aws, true
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
