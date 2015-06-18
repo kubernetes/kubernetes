@@ -353,6 +353,18 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 			transport = http.DefaultTransport
 		}
 	}
+
+	switch {
+	case bool(glog.V(9)):
+		transport = NewDebuggingRoundTripper(transport, CurlCommand, URLTiming, ResponseHeaders)
+	case bool(glog.V(8)):
+		transport = NewDebuggingRoundTripper(transport, JustURL, RequestHeaders, ResponseStatus, ResponseHeaders)
+	case bool(glog.V(7)):
+		transport = NewDebuggingRoundTripper(transport, JustURL, RequestHeaders, ResponseStatus)
+	case bool(glog.V(6)):
+		transport = NewDebuggingRoundTripper(transport, URLTiming)
+	}
+
 	if config.WrapTransport != nil {
 		transport = config.WrapTransport(transport)
 	}
