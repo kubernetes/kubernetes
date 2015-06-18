@@ -1663,6 +1663,11 @@ func (kl *Kubelet) admitPods(allPods []*api.Pod, podSyncTypes map[types.UID]Sync
 func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	glog.Info("Starting kubelet main sync loop.")
 	for {
+		if !kl.containerRuntimeUp() {
+			time.Sleep(5 * time.Second)
+			glog.Infof("Skipping pod synchronization, container runtime is not up.")
+			continue
+		}
 		unsyncedPod := false
 		podSyncTypes := make(map[types.UID]SyncPodType)
 		select {
@@ -1923,11 +1928,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	}
 
 	// Check whether container runtime can be reported as up.
-	containerRuntimeUp := func() bool {
-		kl.runtimeMutex.Lock()
-		defer kl.runtimeMutex.Unlock()
-		return kl.lastTimestampRuntimeUp.Add(kl.runtimeUpThreshold).After(time.Now())
-	}()
+	containerRuntimeUp := kl.containerRuntimeUp()
 
 	currentTime := util.Now()
 	var newNodeReadyCondition api.NodeCondition
@@ -1988,6 +1989,12 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		oldNodeUnschedulable = node.Spec.Unschedulable
 	}
 	return nil
+}
+
+func (kl *Kubelet) containerRuntimeUp() bool {
+	kl.runtimeMutex.Lock()
+	defer kl.runtimeMutex.Unlock()
+	return kl.lastTimestampRuntimeUp.Add(kl.runtimeUpThreshold).After(time.Now())
 }
 
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
