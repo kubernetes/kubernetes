@@ -588,13 +588,17 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
+// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (aws *AWSCloud) ExternalID(name string) (string, error) {
-	// TODO: Do we need to verify it exists, or can we just return name
-	inst, err := aws.getInstanceById(name)
+	// We must verify that the instance still exists
+	instance, err := aws.getInstanceById(name)
 	if err != nil {
 		return "", err
 	}
-	return orEmpty(inst.InstanceID), nil
+	if instance == nil || !isAlive(instance) {
+		return "", cloudprovider.InstanceNotFound
+	}
+	return orEmpty(instance.InstanceID), nil
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
