@@ -16,7 +16,7 @@ This is a somewhat long tutorial.  If you want to jump straight to the "do it no
 In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.  In this simple case, we define a single container running Cassandra for our pod:
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   labels:
@@ -29,7 +29,7 @@ spec:
     resources:
       limits:
         cpu: "0.5"
-    image: gcr.io/google_containers/cassandra:v3
+    image: gcr.io/google_containers/cassandra:v4
     name: cassandra
     ports:
     - name: cql
@@ -44,8 +44,6 @@ spec:
       value: 512M
     - name: HEAP_NEWSIZE
       value: 100M
-    - name: KUBERNETES_API_PROTOCOL
-      value: http
   volumes:
     - name: data
       emptyDir: {}
@@ -76,7 +74,7 @@ In Kubernetes a _[Service](../../docs/services.md)_ describes a set of Pods that
 
 Here is the service description:
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata:
   labels:
@@ -85,7 +83,6 @@ metadata:
 spec:
   ports:
     - port: 9042
-      targetPort: 9042
   selector:
     name: cassandra
 ```
@@ -134,7 +131,7 @@ In Kubernetes a _[Replication Controller](../../docs/replication-controller.md)_
 Replication Controllers will "adopt" existing pods that match their selector query, so let's create a Replication Controller with a single replica to adopt our existing Cassandra Pod.
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
@@ -157,12 +154,10 @@ spec:
               cpu: 0.5
           env:
             - name: MAX_HEAP_SIZE
-              key: MAX_HEAP_SIZE
               value: 512M
             - name: HEAP_NEWSIZE
-              key: HEAP_NEWSIZE
               value: 100M
-          image: "gcr.io/google_containers/cassandra:v3"
+          image: gcr.io/google_containers/cassandra:v4
           name: cassandra
           ports:
             - containerPort: 9042
