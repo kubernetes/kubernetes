@@ -5850,7 +5850,24 @@
       "method": "GET",
       "summary": "connect GET requests to exec of Pod",
       "nickname": "connectGetPodExec",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5920,7 +5937,24 @@
       "method": "GET",
       "summary": "connect GET requests to portforward of Pod",
       "nickname": "connectGetPodPortforward",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5939,7 +5973,24 @@
       "method": "GET",
       "summary": "connect GET requests to proxy of Pod",
       "nickname": "connectGetPodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5952,7 +6003,24 @@
       "method": "POST",
       "summary": "connect POST requests to proxy of Pod",
       "nickname": "connectPostPodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5965,7 +6033,24 @@
       "method": "PUT",
       "summary": "connect PUT requests to proxy of Pod",
       "nickname": "connectPutPodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5978,7 +6063,24 @@
       "method": "DELETE",
       "summary": "connect DELETE requests to proxy of Pod",
       "nickname": "connectDeletePodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5991,7 +6093,24 @@
       "method": "HEAD",
       "summary": "connect HEAD requests to proxy of Pod",
       "nickname": "connectHeadPodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -6004,7 +6123,24 @@
       "method": "OPTIONS",
       "summary": "connect OPTIONS requests to proxy of Pod",
       "nickname": "connectOptionsPodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -6023,7 +6159,32 @@
       "method": "GET",
       "summary": "connect GET requests to proxy of Pod",
       "nickname": "connectGetPodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -6036,7 +6197,32 @@
       "method": "POST",
       "summary": "connect POST requests to proxy of Pod",
       "nickname": "connectPostPodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -6049,7 +6235,32 @@
       "method": "PUT",
       "summary": "connect PUT requests to proxy of Pod",
       "nickname": "connectPutPodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -6062,7 +6273,32 @@
       "method": "DELETE",
       "summary": "connect DELETE requests to proxy of Pod",
       "nickname": "connectDeletePodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -6075,7 +6311,32 @@
       "method": "HEAD",
       "summary": "connect HEAD requests to proxy of Pod",
       "nickname": "connectHeadPodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -6088,7 +6349,32 @@
       "method": "OPTIONS",
       "summary": "connect OPTIONS requests to proxy of Pod",
       "nickname": "connectOptionsPodProxy",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],

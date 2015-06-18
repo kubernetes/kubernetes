@@ -278,7 +278,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer}, isConnecter && connectSubpath)
 
 	} else {
 		// v1beta3+ format with namespace in path
@@ -316,7 +316,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
-			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
+			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer}, isConnecter && connectSubpath)
 
 			// list or post across namespace.
 			// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
@@ -556,6 +556,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 						return err
 					}
 				}
+				addParams(route, action.Params)
 				ws.Route(route)
 			}
 		default:
