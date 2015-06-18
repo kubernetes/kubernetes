@@ -268,7 +268,7 @@ var _ = Describe("Density", func() {
 						},
 					},
 					&api.Pod{},
-					time.Minute*5,
+					0,
 					framework.ResourceEventHandlerFuncs{
 						AddFunc: func(obj interface{}) {
 							p, ok := obj.(*api.Pod)
