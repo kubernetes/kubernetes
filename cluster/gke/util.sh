@@ -99,7 +99,7 @@ function verify-prereqs() {
     sudo_prefix="sudo"
   fi
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update preview || true
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update alpha|| true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update "${CMD_GROUP}"|| true
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update kubectl|| true
   ${sudo_prefix} gcloud ${gcloud_prompt:-} components update || true
 }
