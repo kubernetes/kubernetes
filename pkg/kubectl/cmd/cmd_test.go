@@ -264,9 +264,10 @@ func ExamplePrintReplicationControllerWithNamespace() {
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	ctrl := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			Namespace: "beep",
-			Labels:    map[string]string{"foo": "bar"},
+			Name:              "foo",
+			Namespace:         "beep",
+			Labels:            map[string]string{"foo": "bar"},
+			CreationTimestamp: util.Time{time.Now().AddDate(-10, 0, 0)},
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
@@ -291,8 +292,8 @@ func ExamplePrintReplicationControllerWithNamespace() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAMESPACE   CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS
-	// beep        foo          foo            someimage   foo=bar    1
+	// NAMESPACE   CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS   AGE
+	// beep        foo          foo            someimage   foo=bar    1          10y
 }
 
 func ExamplePrintPodWithWideFormat() {
@@ -342,8 +343,9 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 		Items: []api.Service{
 			{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "svc1",
-					Namespace: "ns1",
+					Name:              "svc1",
+					Namespace:         "ns1",
+					CreationTimestamp: util.Time{time.Now().AddDate(-10, 0, 0)},
 					Labels: map[string]string{
 						"l1": "value",
 					},
@@ -362,8 +364,9 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 			},
 			{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "svc2",
-					Namespace: "ns2",
+					Name:              "svc2",
+					Namespace:         "ns2",
+					CreationTimestamp: util.Time{time.Now().AddDate(-10, 0, 0)},
 					Labels: map[string]string{
 						"l1": "dolla-bill-yall",
 					},
@@ -388,10 +391,10 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// |NAMESPACE   NAME      LABELS               SELECTOR   IP(S)      PORT(S)    L1|
-	// |ns1         svc1      l1=value             s=magic    10.1.1.1   53/UDP     value|
+	// |NAMESPACE   NAME      LABELS               SELECTOR   IP(S)      PORT(S)    AGE       L1|
+	// |ns1         svc1      l1=value             s=magic    10.1.1.1   53/UDP     10y       value|
 	// |                                                                 53/TCP     |
-	// |ns2         svc2      l1=dolla-bill-yall   s=kazam    10.1.1.2   80/TCP     dolla-bill-yall|
+	// |ns2         svc2      l1=dolla-bill-yall   s=kazam    10.1.1.2   80/TCP     10y       dolla-bill-yall|
 	// |                                                                 8080/TCP   |
 	// ||
 }
