@@ -25,7 +25,7 @@ container:
 
 push:
 	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' to see a suggestion))
-	gcloud preview docker push $(REPO)/porter:$(TAG)
+	gcloud docker push $(REPO)/porter:$(TAG)
 
 clean:
 	rm -f porter

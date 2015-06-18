@@ -9,7 +9,7 @@ image: mt
 	sudo docker build -t gcr.io/google_containers/mounttest:$(TAG) .
 
 push: image
-	gcloud preview docker push gcr.io/google_containers/mounttest:$(TAG)
+	gcloud docker push gcr.io/google_containers/mounttest:$(TAG)
 
 clean:
 	rm -f mt

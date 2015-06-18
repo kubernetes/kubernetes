@@ -34,4 +34,4 @@ build:
 
 
 push:
-	gcloud preview docker push gcr.io/google_containers/fluentd-gcp:$(TAG)
+	gcloud docker push gcr.io/google_containers/fluentd-gcp:$(TAG)

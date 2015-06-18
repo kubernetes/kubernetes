@@ -10,7 +10,7 @@ container: webserver
 	docker build -t gcr.io/google_containers/nettest:$(TAG) .
 
 push: container
-	gcloud preview docker push gcr.io/google_containers/nettest:$(TAG)
+	gcloud docker push gcr.io/google_containers/nettest:$(TAG)
 
 clean:
 	rm -f webserver
