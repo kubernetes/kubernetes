@@ -93,6 +93,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.os = kubecontainer.FakeOS{}
 
 	kubelet.hostname = testKubeletHostname
+	kubelet.nodeName = testKubeletHostname
 	kubelet.runtimeUpThreshold = maxWaitForContainerRuntime
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
@@ -204,6 +205,7 @@ func newTestKubeletWithFakeRuntime(t *testing.T) *TestKubeletWithFakeRuntime {
 	kubelet.os = kubecontainer.FakeOS{}
 
 	kubelet.hostname = testKubeletHostname
+	kubelet.nodeName = testKubeletHostname
 	kubelet.runtimeUpThreshold = maxWaitForContainerRuntime
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
