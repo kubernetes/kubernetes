@@ -95,6 +95,7 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 		clientConfig.Host = u.String()
 	}
 	clientConfig.Version = configClusterInfo.APIVersion
+	clientConfig.HttpDebug = config.overrides.HttpDebug
 
 	// only try to read the auth information if we are secure
 	if client.IsConfigTransportTLS(*clientConfig) {
