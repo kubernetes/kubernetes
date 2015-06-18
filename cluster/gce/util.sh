@@ -178,10 +178,11 @@ function copy-if-not-staged() {
   if already-staged "${tar}" "${hash}"; then
     echo "+++ $(basename ${tar}) already staged ('rm ${tar}.sha1' to force)"
   else
-    echo "${server_hash}" > "${tar}.sha1"
+    echo "${hash}" > "${tar}.sha1"
     gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
     gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha1" >/dev/null 2>&1
-    echo "${server_hash}" > "${tar}.uploaded.sha1"
+    echo "${hash}" > "${tar}.uploaded.sha1"
+    echo "+++ $(basename ${tar}) uploaded (sha1 = ${hash})"
   fi
 }
 
@@ -194,10 +195,14 @@ function copy-if-not-staged() {
 #   SALT_TAR
 # Vars set:
 #   SERVER_BINARY_TAR_URL
+#   SERVER_BINARY_TAR_HASH
 #   SALT_TAR_URL
+#   SALT_TAR_HASH
 function upload-server-tars() {
   SERVER_BINARY_TAR_URL=
+  SERVER_BINARY_TAR_HASH=
   SALT_TAR_URL=
+  SALT_TAR_HASH=
 
   local project_hash
   if which md5 > /dev/null 2>&1; then
@@ -220,16 +225,14 @@ function upload-server-tars() {
 
   local -r staging_path="${staging_bucket}/devel${KUBE_GCS_STAGING_PATH_SUFFIX}"
 
-  local server_hash
-  local salt_hash
-  server_hash=$(sha1sum-file "${SERVER_BINARY_TAR}")
-  salt_hash=$(sha1sum-file "${SALT_TAR}")
+  SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
+  SALT_TAR_HASH=$(sha1sum-file "${SALT_TAR}")
 
   echo "+++ Staging server tars to Google Storage: ${staging_path}"
   local server_binary_gs_url="${staging_path}/${SERVER_BINARY_TAR##*/}"
   local salt_gs_url="${staging_path}/${SALT_TAR##*/}"
-  copy-if-not-staged "${staging_path}" "${server_binary_gs_url}" "${SERVER_BINARY_TAR}" "${server_hash}"
-  copy-if-not-staged "${staging_path}" "${salt_gs_url}" "${SALT_TAR}" "${salt_hash}"
+  copy-if-not-staged "${staging_path}" "${server_binary_gs_url}" "${SERVER_BINARY_TAR}" "${SERVER_BINARY_TAR_HASH}"
+  copy-if-not-staged "${staging_path}" "${salt_gs_url}" "${SALT_TAR}" "${SALT_TAR_HASH}"
 
   # Convert from gs:// URL to an https:// URL
   SERVER_BINARY_TAR_URL="${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}"
