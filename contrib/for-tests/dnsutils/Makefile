@@ -5,4 +5,4 @@ image:
 	docker build -t gcr.io/google_containers/dnsutils .
 
 push:
-	gcloud preview docker push gcr.io/google_containers/dnsutils
+	gcloud docker push gcr.io/google_containers/dnsutils

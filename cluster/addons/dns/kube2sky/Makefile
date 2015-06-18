@@ -16,7 +16,7 @@ container: kube2sky
 	docker build -t $(PREFIX)/kube2sky:$(TAG) .
 
 push:
-	gcloud preview docker push $(PREFIX)/kube2sky:$(TAG)
+	gcloud docker push $(PREFIX)/kube2sky:$(TAG)
 
 clean:
 	rm -f kube2sky

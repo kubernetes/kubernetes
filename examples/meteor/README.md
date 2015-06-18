@@ -92,7 +92,7 @@ your app image with your project ID, and push to GCR. Replace
 `<project>` with your project ID.
 ```
 docker tag my-meteor gcr.io/<project>/my-meteor
-gcloud preview docker push gcr.io/<project>/my-meteor
+gcloud docker push gcr.io/<project>/my-meteor
 ```
 
 Running

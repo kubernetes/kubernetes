@@ -7,7 +7,7 @@ backend container.
 GCR
 ---
     docker build -t gcr.io/<project-name>/show .
-    gcloud preview docker push gcr.io/<project-name>/show
+    gcloud docker push gcr.io/<project-name>/show
 
 Docker Hub
 ----------
