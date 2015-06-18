@@ -132,13 +132,15 @@ func newRc(replicas int, desired int) *api.ReplicationController {
 }
 
 func TestUpdate(t *testing.T) {
+	Accepted, Rejected := true, false
 	tests := []struct {
 		oldRc, newRc *api.ReplicationController
+		accepted     bool
 		responses    []fakeResponse
 		output       string
 	}{
 		{
-			oldRc(1), newRc(1, 1),
+			oldRc(1), newRc(1, 1), Accepted,
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
@@ -157,10 +159,11 @@ func TestUpdate(t *testing.T) {
 			},
 			`Creating foo-v2
 Updating foo-v1 replicas: 0, foo-v2 replicas: 1
+Performing acceptance check of foo-v2
 Update succeeded. Deleting foo-v1
 `,
 		}, {
-			oldRc(2), newRc(2, 2),
+			oldRc(2), newRc(2, 2), Accepted,
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
@@ -187,11 +190,12 @@ Update succeeded. Deleting foo-v1
 			},
 			`Creating foo-v2
 Updating foo-v1 replicas: 1, foo-v2 replicas: 1
+Performing acceptance check of foo-v2
 Updating foo-v1 replicas: 0, foo-v2 replicas: 2
 Update succeeded. Deleting foo-v1
 `,
 		}, {
-			oldRc(2), newRc(7, 7),
+			oldRc(2), newRc(7, 7), Accepted,
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
@@ -220,12 +224,13 @@ Update succeeded. Deleting foo-v1
 			},
 			`Creating foo-v2
 Updating foo-v1 replicas: 1, foo-v2 replicas: 1
+Performing acceptance check of foo-v2
 Updating foo-v1 replicas: 0, foo-v2 replicas: 2
 Scaling foo-v2 replicas: 2 -> 7
 Update succeeded. Deleting foo-v1
 `,
 		}, {
-			oldRc(7), newRc(2, 2),
+			oldRc(7), newRc(2, 2), Accepted,
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
@@ -253,9 +258,24 @@ Update succeeded. Deleting foo-v1
 			},
 			`Creating foo-v2
 Updating foo-v1 replicas: 6, foo-v2 replicas: 1
+Performing acceptance check of foo-v2
 Updating foo-v1 replicas: 5, foo-v2 replicas: 2
 Stopping foo-v1 replicas: 5 -> 0
 Update succeeded. Deleting foo-v1
+`,
+		}, {
+			oldRc(7), newRc(2, 2), Rejected,
+			[]fakeResponse{
+				// no existing newRc
+				{nil, fmt.Errorf("not found")},
+				// 3 gets for each update
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
+			},
+			`Creating foo-v2
+Updating foo-v1 replicas: 6, foo-v2 replicas: 1
+Performing acceptance check of foo-v2
 `,
 		},
 	}
@@ -274,9 +294,21 @@ Update succeeded. Deleting foo-v1
 			Interval:      time.Millisecond,
 			Timeout:       time.Millisecond,
 			CleanupPolicy: DeleteRollingUpdateCleanupPolicy,
+			UpdateAcceptor: &testAcceptor{
+				accept: func(rc *api.ReplicationController) error {
+					if test.accepted {
+						return nil
+					}
+					return fmt.Errorf("rejecting controller %s", rc.Name)
+				},
+			},
 		}
-		if err := updater.Update(config); err != nil {
+		err := updater.Update(config)
+		if err != nil && test.accepted {
 			t.Errorf("Update failed: %v", err)
+		}
+		if err == nil && !test.accepted {
+			t.Errorf("Expected update to fail")
 		}
 		if buffer.String() != test.output {
 			t.Errorf("Bad output. expected:\n%s\ngot:\n%s", test.output, buffer.String())
@@ -840,4 +872,12 @@ func (c *rollingUpdaterClientImpl) DeleteReplicationController(namespace, name s
 
 func (c *rollingUpdaterClientImpl) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
 	return c.ControllerHasDesiredReplicasFn(rc)
+}
+
+type testAcceptor struct {
+	accept func(*api.ReplicationController) error
+}
+
+func (a *testAcceptor) Accept(rc *api.ReplicationController) error {
+	return a.accept(rc)
 }
