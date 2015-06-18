@@ -185,7 +185,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 }
 
 // ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.
-func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout int) restful.RouteFunction {
+func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
