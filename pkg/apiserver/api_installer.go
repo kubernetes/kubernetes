@@ -250,6 +250,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	// Get the list of actions for the given scope.
 	if scope.Name() != meta.RESTScopeNameNamespace {
+		// Handle non-namespace scoped resources like nodes.
 		resourcePath := resource
 		resourceParams := params
 		itemPath := resourcePath + "/{name}"
@@ -263,10 +264,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
+		// Add actions at the resource path: /api/apiVersion/resource
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
 		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
+		// Add actions at the item path: /api/apiVersion/resource/{name}
 		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
 		if getSubpath {
 			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
@@ -281,8 +284,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer}, isConnecter && connectSubpath)
 
 	} else {
-		// v1beta3+ format with namespace in path
+		// Handle namespace scoped resources like pods.
 		if scope.ParamPath() {
+			// Handle the case when namespace is part of the path.
 			// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 			namespaceParam := ws.PathParameter(scope.ParamName(), scope.ParamDescription()).DataType("string")
 			namespacedPath := scope.ParamName() + "/{" + scope.ParamName() + "}/" + resource
@@ -300,11 +304,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			namer := scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), false}
 
+			// Add actions at the resource path: /api/apiVersion/namespaces/{namespaces}/resource
 			actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
 			actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
 			// DEPRECATED
 			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
+			// Add actions at the item path: /api/apiVersion/namespaces/{namespaces}/resource/{name}
 			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
 			if getSubpath {
 				actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
@@ -319,13 +325,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer}, isConnecter && connectSubpath)
 
 			// list or post across namespace.
+			// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 			// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
-			namer = scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), true}
-			actions = appendIf(actions, action{"LIST", resource, params, namer}, isLister)
-			actions = appendIf(actions, action{"POST", resource, params, namer}, isCreater)
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer}, allowWatchList)
+			if !hasSubresource {
+				namer = scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), true}
+				actions = appendIf(actions, action{"LIST", resource, params, namer}, isLister)
+				actions = appendIf(actions, action{"POST", resource, params, namer}, isCreater)
+				actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer}, allowWatchList)
+			}
 		} else {
-			// Namespace as param is no longer supported
+			// Legacy behavior: Namespace as param is no longer supported
 			return fmt.Errorf("namespace as a parameter is no longer supported")
 		}
 	}

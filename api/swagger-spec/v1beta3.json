@@ -5675,43 +5675,6 @@
       "consumes": [
        "*/*"
       ]
-     },
-     {
-      "type": "v1beta3.Binding",
-      "method": "POST",
-      "summary": "create binding of a Binding",
-      "nickname": "createBindingBinding",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta3.Binding",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta3.Binding"
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
      }
     ]
    },
