@@ -34,14 +34,14 @@ import (
 
 type sourceFile struct {
 	path     string
-	nodeName string
+	hostname string
 	updates  chan<- interface{}
 }
 
-func NewSourceFile(path string, nodeName string, period time.Duration, updates chan<- interface{}) {
+func NewSourceFile(path string, hostname string, period time.Duration, updates chan<- interface{}) {
 	config := &sourceFile{
 		path:     path,
-		nodeName: nodeName,
+		hostname: hostname,
 		updates:  updates,
 	}
 	glog.V(1).Infof("Watching path %q", path)
@@ -55,7 +55,7 @@ func (s *sourceFile) run() {
 }
 
 func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
-	return applyDefaults(pod, source, true, s.nodeName)
+	return applyDefaults(pod, source, true, s.hostname)
 }
 
 func (s *sourceFile) extractFromPath() error {

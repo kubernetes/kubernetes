@@ -380,11 +380,6 @@ func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
 
-// Implementation of Instances.CurrentNodeName
-func (i *Instances) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
-}
-
 func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
 	glog.V(2).Infof("GetNodeResources(%v) called", name)
 

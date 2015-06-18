@@ -33,15 +33,15 @@ import (
 
 type sourceURL struct {
 	url      string
-	nodeName string
+	hostname string
 	updates  chan<- interface{}
 	data     []byte
 }
 
-func NewSourceURL(url, nodeName string, period time.Duration, updates chan<- interface{}) {
+func NewSourceURL(url, hostname string, period time.Duration, updates chan<- interface{}) {
 	config := &sourceURL{
 		url:      url,
-		nodeName: nodeName,
+		hostname: hostname,
 		updates:  updates,
 		data:     nil,
 	}
@@ -56,7 +56,7 @@ func (s *sourceURL) run() {
 }
 
 func (s *sourceURL) applyDefaults(pod *api.Pod) error {
-	return applyDefaults(pod, s.url, false, s.nodeName)
+	return applyDefaults(pod, s.url, false, s.hostname)
 }
 
 func (s *sourceURL) extractFromURL() error {

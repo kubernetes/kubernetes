@@ -149,11 +149,6 @@ func (f *FakeCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
 
-// Implementation of Instances.CurrentNodeName
-func (f *FakeCloud) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
-}
-
 // NodeAddresses is a test-spy implementation of Instances.NodeAddresses.
 // It adds an entry "node-addresses" into the internal method call record.
 func (f *FakeCloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {

@@ -135,11 +135,6 @@ func (v *VagrantCloud) AddSSHKeyToAllInstances(user string, keyData []byte) erro
 	return errors.New("unimplemented")
 }
 
-// Implementation of Instances.CurrentNodeName
-func (v *VagrantCloud) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
-}
-
 // NodeAddresses returns the NodeAddresses of a particular machine instance.
 func (v *VagrantCloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
 	// Due to vagrant not running with a dedicated DNS setup, we return the IP address of a minion as its hostname at this time

@@ -78,11 +78,6 @@ func newMesosCloud(configReader io.Reader) (*MesosCloud, error) {
 	}
 }
 
-// Implementation of Instances.CurrentNodeName
-func (c *MesosCloud) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
-}
-
 func (c *MesosCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
