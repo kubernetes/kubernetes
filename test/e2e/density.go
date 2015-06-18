@@ -66,7 +66,7 @@ var _ = Describe("Density", func() {
 	var c *client.Client
 	var minionCount int
 	var RCName string
-	var additionalRCName string
+	var additionalPodsPrefix string
 	var ns string
 	var uuid string
 
@@ -104,11 +104,10 @@ var _ = Describe("Density", func() {
 			expectNoError(err)
 		}
 
-		rc, err = c.ReplicationControllers(ns).Get(additionalRCName)
-		if err == nil && rc.Spec.Replicas != 0 {
-			By("Cleaning up the replication controller")
-			err := DeleteRC(c, ns, additionalRCName)
-			expectNoError(err)
+		By("Removing additional pods if any")
+		for i := 1; i <= minionCount; i++ {
+			name := additionalPodsPrefix + "-" + strconv.Itoa(i)
+			c.Pods(ns).Delete(name, nil)
 		}
 
 		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
@@ -256,15 +255,14 @@ var _ = Describe("Density", func() {
 					}
 				}
 
-				additionalNameStr := strconv.Itoa(minionCount) + "-" + string(util.NewUUID())
-				additionalRCName = "my-hostname-latency" + additionalNameStr
+				additionalPodsPrefix = "density-latency-pod-" + string(util.NewUUID())
 				_, controller := framework.NewInformer(
 					&cache.ListWatch{
 						ListFunc: func() (runtime.Object, error) {
-							return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalRCName}), fields.Everything())
+							return c.Pods(ns).List(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything())
 						},
 						WatchFunc: func(rv string) (watch.Interface, error) {
-							return c.Pods(ns).Watch(labels.SelectorFromSet(labels.Set{"name": additionalRCName}), fields.Everything(), rv)
+							return c.Pods(ns).Watch(labels.SelectorFromSet(labels.Set{"name": additionalPodsPrefix}), fields.Everything(), rv)
 						},
 					},
 					&api.Pod{},
@@ -286,14 +284,18 @@ var _ = Describe("Density", func() {
 				stopCh := make(chan struct{})
 				go controller.Run(stopCh)
 
-				config = RCConfig{Client: c,
-					Image:        "gcr.io/google_containers/pause:go",
-					Name:         additionalRCName,
-					Namespace:    ns,
-					PollInterval: itArg.interval,
-					Replicas:     minionCount,
+				// Create some additional pods with throughput ~5 pods/sec.
+				var wg sync.WaitGroup
+				wg.Add(minionCount)
+				podLabels := map[string]string{
+					"name": additionalPodsPrefix,
 				}
-				expectNoError(RunRC(config))
+				for i := 1; i <= minionCount; i++ {
+					name := additionalPodsPrefix + "-" + strconv.Itoa(i)
+					go createRunningPod(&wg, c, name, ns, "gcr.io/google_containers/pause:go", podLabels)
+					time.Sleep(200 * time.Millisecond)
+				}
+				wg.Wait()
 
 				Logf("Waiting for all Pods begin observed by the watch...")
 				for start := time.Now(); len(watchTimes) < minionCount && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
@@ -355,3 +357,28 @@ var _ = Describe("Density", func() {
 		})
 	}
 })
+
+func createRunningPod(wg *sync.WaitGroup, c *client.Client, name, ns, image string, labels map[string]string) {
+	defer GinkgoRecover()
+	defer wg.Done()
+	pod := &api.Pod{
+		TypeMeta: api.TypeMeta{
+			Kind: "Pod",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  name,
+					Image: image,
+				},
+			},
+		},
+	}
+	_, err := c.Pods(ns).Create(pod)
+	expectNoError(err)
+	expectNoError(waitForPodRunningInNamespace(c, name, ns))
+}
