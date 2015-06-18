@@ -8,23 +8,62 @@ Official releases are built in Docker containers.  Details are [here](../../buil
 
 Kubernetes is written in [Go](http://golang.org) programming language. If you haven't set up Go development environment, please follow [this instruction](http://golang.org/doc/code.html) to install go tool and set up GOPATH. Ensure your version of Go is at least 1.3.
 
-## Clone kubernetes into GOPATH
+## Git Setup
 
-We highly recommend to put kubernetes' code into your GOPATH. For example, the following commands will download kubernetes' code under the current user's GOPATH (Assuming there's only one directory in GOPATH.):
+Below, we outline one of the more common git workflows that core developers use. Other git workflows are also valid.
+
+### Visual overview
+![Git workflow](git_workflow.png)
+
+### Fork the main repository
+
+1. Go to https://github.com/GoogleCloudPlatform/kubernetes
+2. Click the "Fork" button (at the top right)
+
+### Clone your fork
+
+The commands below require that you have $GOPATH set ([$GOPATH docs](https://golang.org/doc/code.html#GOPATH)). We highly recommend you put kubernetes' code into your GOPATH. Note: the commands below will not work if there is more than one directory in your `$GOPATH`.
 
 ```
-$ echo $GOPATH
-/home/user/goproj
 $ mkdir -p $GOPATH/src/github.com/GoogleCloudPlatform/
 $ cd $GOPATH/src/github.com/GoogleCloudPlatform/
-$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git
+# Replace "$YOUR_GITHUB_USERNAME" below with your github username
+$ git clone https://github.com/$YOUR_GITHUB_USERNAME/kubernetes.git
+$ cd kubernetes
+$ git remote add upstream 'https://github.com/GoogleCloudPlatform/kubernetes.git'
 ```
 
-The commands above will not work if there are more than one directory in ``$GOPATH``.
+### Create a branch and make changes
 
-If you plan to do development, read about the
-[Kubernetes Github Flow](https://docs.google.com/presentation/d/1HVxKSnvlc2WJJq8b9KCYtact5ZRrzDzkWgKEfm0QO_o/pub?start=false&loop=false&delayms=3000),
-and then clone your own fork of Kubernetes as described there.
+```
+$ git checkout -b myfeature
+# Make your code changes
+```
+
+### Keeping your development fork in sync
+
+```
+$ git fetch upstream
+$ git rebase upstream/master
+```
+
+Note: If you have write access to the main repository at github.com/GoogleCloudPlatform/kubernetes, you should modify your git configuration so that you can't accidentally push to upstream:
+
+```
+git remote set-url --push upstream no_push
+```
+
+### Commiting changes to your fork
+
+```
+$ git commit
+$ git push -f origin myfeature
+```
+
+### Creating a pull request
+1. Visit http://github.com/$YOUR_GITHUB_USERNAME/kubernetes
+2. Click the "Compare and pull request" button next to your "myfeature" branch.
+
 
 ## godep and dependency management
 
@@ -239,28 +278,6 @@ See [conformance-test.sh](../../hack/conformance-test.sh).
 
 ## Testing out flaky tests
 [Instructions here](flaky-tests.md)
-
-## Keeping your development fork in sync
-
-One time after cloning your forked repo:
-
-```
-git remote add upstream https://github.com/GoogleCloudPlatform/kubernetes.git
-```
-
-Then each time you want to sync to upstream:
-
-```
-git fetch upstream
-git rebase upstream/master
-```
-
-If you have write access to the main repository, you should modify your git configuration so that
-you can't accidentally push to upstream:
-
-```
-git remote set-url --push upstream no_push
-```
 
 ## Regenerating the CLI documentation
 
