@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 )
 
@@ -45,6 +46,41 @@ func TestAdmissionIgnoresDelete(t *testing.T) {
 	if err != nil {
 		t.Errorf("ResourceQuota should admit all deletes: %v", err)
 	}
+}
+
+func TestAdmissionIgnoresSubresources(t *testing.T) {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	handler := createResourceQuota(&testclient.Fake{}, indexer)
+
+	quota := &api.ResourceQuota{}
+	quota.Name = "quota"
+	quota.Namespace = "test"
+	quota.Status = api.ResourceQuotaStatus{
+		Hard: api.ResourceList{},
+		Used: api.ResourceList{},
+	}
+	quota.Status.Hard[api.ResourceMemory] = resource.MustParse("2Gi")
+	quota.Status.Used[api.ResourceMemory] = resource.MustParse("1Gi")
+
+	indexer.Add(quota)
+
+	newPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: quota.Namespace},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "2Gi")}},
+		}}
+
+	err := handler.Admit(admission.NewAttributesRecord(newPod, "Pod", newPod.Namespace, "pods", "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected an error because the pod exceeded allowed quota")
+	}
+
+	err = handler.Admit(admission.NewAttributesRecord(newPod, "Pod", newPod.Namespace, "pods", "subresource", admission.Create, nil))
+	if err != nil {
+		t.Errorf("Did not expect an error because the action went to a subresource: %v", err)
+	}
+
 }
 
 func TestIncrementUsagePods(t *testing.T) {

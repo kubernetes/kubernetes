@@ -80,6 +80,10 @@ var resourceToResourceName = map[string]api.ResourceName{
 }
 
 func (q *quota) Admit(a admission.Attributes) (err error) {
+	if a.GetSubresource() != "" {
+		return nil
+	}
+
 	if a.GetOperation() == "DELETE" {
 		return nil
 	}
