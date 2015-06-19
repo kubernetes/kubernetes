@@ -6,6 +6,8 @@ Docs in this directory relate to developing Kubernetes.
 
 * **Development Guide** ([development.md](development.md)): Setting up your environment tests.
 
+* **Making release notes** ([making-release-notes.md](making-release-notes.md)): Generating release nodes for a new release.
+
 * **Hunting flaky tests** ([flaky-tests.md](flaky-tests.md)): We have a goal of 99.9% flake free tests.
   Here's how to run your tests many times.
 

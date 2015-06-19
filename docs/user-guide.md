@@ -58,14 +58,22 @@ kubernetes API, or to contribute directly to the kubernetes project.
 * **Glossary** ([glossary.md](glossary.md)): Terms and concepts.
 
 ## Further reading
-
+<!--- make sure all documents from the docs directory are linked somewhere.
+This one-liner (execute in docs/ dir) prints unlinked documents (only from this
+dir - no recursion):
+for i in *.md; do grep -r $i . | grep -v "^\./$i" > /dev/null; rv=$?; if [[ $rv -ne 0 ]]; then echo $i; fi; done
+-->
 
 * **Annotations** ([annotations.md](annotations.md)): Attaching
   arbitrary non-identifying metadata.
 
+* **Downward API** ([downward_api.md](downward_api.md)): Accessing system
+  configuration from a pod without accessing Kubernetes API (see also
+  [container-environment.md](container-environment.md)).
+
 * **Kubernetes Container Environment** ([container-environment.md](container-environment.md)):
   Describes the environment for Kubelet managed containers on a Kubernetes
-  node.
+  node (see also [downward_api.md](downward_api.md)).
 
 * **DNS Integration with SkyDNS** ([dns.md](dns.md)):
   Resolving a DNS name directly to a Kubernetes service.
@@ -82,6 +90,9 @@ kubernetes API, or to contribute directly to the kubernetes project.
   projects, teams, or customers to share a kubernetes cluster.
 
 * **Networking** ([networking.md](networking.md)): Pod networking overview.
+
+* **Services and firewalls** ([services-firewalls.md](services-firewalls.md)): How
+  to use firewalls.
 
 * **The Kubernetes Resource Model** ([resources.md](resources.md)):
   Provides resource information such as size, type, and quantity to assist in
