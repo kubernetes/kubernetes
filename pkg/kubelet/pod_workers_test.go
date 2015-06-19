@@ -165,9 +165,9 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}
 
-	desiredPods := map[types.UID]empty{}
-	desiredPods[types.UID(2)] = empty{}
-	desiredPods[types.UID(14)] = empty{}
+	desiredPods := map[types.UID]Empty{}
+	desiredPods[types.UID(2)] = Empty{}
+	desiredPods[types.UID(14)] = Empty{}
 	podWorkers.ForgetNonExistingPodWorkers(desiredPods)
 	if len(podWorkers.podUpdates) != 2 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
@@ -179,7 +179,7 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 		t.Errorf("No updates channel for pod 14")
 	}
 
-	podWorkers.ForgetNonExistingPodWorkers(map[types.UID]empty{})
+	podWorkers.ForgetNonExistingPodWorkers(map[types.UID]Empty{})
 	if len(podWorkers.podUpdates) != 0 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}

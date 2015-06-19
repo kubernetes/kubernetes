@@ -734,6 +734,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		MaxPerPodContainer: kc.MaxPerPodContainerCount,
 		MaxContainers:      kc.MaxContainerCount,
 	}
+	// TODO: Make this a part of the KubeletConfig
+	stopCh := make(chan struct{})
 
 	pc = makePodSourceConfig(kc)
 	k, err = kubelet.NewMainKubelet(
@@ -772,7 +774,9 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.SystemContainer,
 		kc.ConfigureCBR0,
 		kc.MaxPods,
-		kc.DockerExecHandler)
+		kc.DockerExecHandler,
+		stopCh,
+	)
 
 	if err != nil {
 		return nil, nil, err

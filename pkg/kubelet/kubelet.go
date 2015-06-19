@@ -148,7 +148,8 @@ func NewMainKubelet(
 	systemContainer string,
 	configureCBR0 bool,
 	pods int,
-	dockerExecHandler dockertools.ExecHandler) (*Kubelet, error) {
+	dockerExecHandler dockertools.ExecHandler,
+	stopCh chan struct{}) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -172,7 +173,7 @@ func NewMainKubelet(
 				return kubeClient.Services(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), resourceVersion)
 			},
 		}
-		cache.NewReflector(listWatch, &api.Service{}, serviceStore, 0).Run()
+		cache.NewReflector(listWatch, &api.Service{}, serviceStore, 0).RunUntil(stopCh)
 	}
 	serviceLister := &cache.StoreToServiceLister{serviceStore}
 
@@ -189,7 +190,7 @@ func NewMainKubelet(
 				return kubeClient.Nodes().Watch(labels.Everything(), fieldSelector, resourceVersion)
 			},
 		}
-		cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).Run()
+		cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).RunUntil(stopCh)
 	}
 	nodeLister := &cache.StoreToNodeLister{nodeStore}
 
@@ -239,7 +240,7 @@ func NewMainKubelet(
 		clusterDomain:                  clusterDomain,
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
-		nodeLister:                     nodeLister,
+		NodeLister:                     nodeLister,
 		runtimeMutex:                   sync.Mutex{},
 		runtimeUpThreshold:             maxWaitForContainerRuntime,
 		lastTimestampRuntimeUp:         time.Time{},
@@ -356,6 +357,7 @@ type serviceLister interface {
 	List() (api.ServiceList, error)
 }
 
+// nodeLister is a testing abstraction for the methods of a StoreToNodeLister used by the kubelet.
 type nodeLister interface {
 	List() (machines api.NodeList, err error)
 	GetNodeInfo(id string) (*api.Node, error)
@@ -403,7 +405,7 @@ type Kubelet struct {
 
 	masterServiceNamespace string
 	serviceLister          serviceLister
-	nodeLister             nodeLister
+	NodeLister             nodeLister
 
 	// Last timestamp when runtime responsed on ping.
 	// Mutex is used to protect this value.
@@ -636,7 +638,7 @@ func (kl *Kubelet) GetNode() (*api.Node, error) {
 	if kl.standaloneMode {
 		return nil, errors.New("no node entry for kubelet in standalone mode")
 	}
-	l, err := kl.nodeLister.List()
+	l, err := kl.NodeLister.List()
 	if err != nil {
 		return nil, errors.New("cannot list nodes")
 	}
@@ -662,6 +664,22 @@ func (kl *Kubelet) StartGarbageCollection() {
 			glog.Errorf("Image garbage collection failed: %v", err)
 		}
 	}, 5*time.Minute)
+}
+
+// GetPodStatusChannel retruns a channel on which to receive status updates. Only used for testing.
+func (kl *Kubelet) GetPodStatusChannel() chan PodStatusSyncRequest {
+	return kl.statusManager.podStatusChannel
+}
+
+// GetContainerRuntime returns the container runtime used by the kubelet. Only used for testing.
+func (kl *Kubelet) GetContainerRuntime() kubecontainer.Runtime {
+	return kl.containerRuntime
+}
+
+// StartStatusManager starts the status manager, which listens for pod updates to send to the apiserver. Only used for testing
+// since the kubelet always starts the status manager.
+func (kl *Kubelet) StartStatusManager() {
+	kl.statusManager.Start()
 }
 
 // Run starts the kubelet reacting to config updates
@@ -1077,7 +1095,7 @@ func (kl *Kubelet) killPod(pod kubecontainer.Pod) error {
 	return kl.containerRuntime.KillPod(pod)
 }
 
-type empty struct{}
+type Empty struct{}
 
 // makePodDataDirs creates the dirs for the pod datas.
 func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
@@ -1357,6 +1375,11 @@ func (kl *Kubelet) filterOutTerminatedPods(allPods []*api.Pod) []*api.Pod {
 	return pods
 }
 
+// NotifyPodWorker notifies the appropriate pod worker about a pod event. Isolated into a function for testing.
+func (kl *Kubelet) NotifyPodWorker(pod, mirrorPod *api.Pod, updateCompleteFn func()) {
+	kl.podWorkers.UpdatePod(pod, mirrorPod, updateCompleteFn)
+}
+
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
 func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncPodType,
 	mirrorPods map[string]*api.Pod, start time.Time) error {
@@ -1373,10 +1396,9 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncP
 
 	// Handles pod admission.
 	pods := kl.admitPods(allPods, podSyncTypes)
-
 	glog.V(4).Infof("Desired: %#v", pods)
 	var err error
-	desiredPods := make(map[types.UID]empty)
+	desiredPods := make(map[types.UID]Empty)
 
 	runningPods, err := kl.runtimeCache.GetPods()
 	if err != nil {
@@ -1388,10 +1410,10 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncP
 	for _, pod := range pods {
 		podFullName := kubecontainer.GetPodFullName(pod)
 		uid := pod.UID
-		desiredPods[uid] = empty{}
+		desiredPods[uid] = Empty{}
 
 		// Run the sync in an async manifest worker.
-		kl.podWorkers.UpdatePod(pod, mirrorPods[podFullName], func() {
+		kl.NotifyPodWorker(pod, mirrorPods[podFullName], func() {
 			metrics.PodWorkerLatency.WithLabelValues(podSyncTypes[pod.UID].String()).Observe(metrics.SinceInMicroseconds(start))
 		})
 
@@ -1411,7 +1433,7 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncP
 	}
 
 	// Kill containers associated with unwanted pods.
-	err = kl.killUnwantedPods(desiredPods, runningPods)
+	err = kl.KillUnwantedPods(desiredPods, runningPods)
 	if err != nil {
 		glog.Errorf("Failed killing unwanted containers: %v", err)
 	}
@@ -1452,8 +1474,8 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncP
 	return err
 }
 
-// killUnwantedPods kills the unwanted, running pods in parallel.
-func (kl *Kubelet) killUnwantedPods(desiredPods map[types.UID]empty,
+// KillUnwantedPods kills the unwanted, running pods in parallel.
+func (kl *Kubelet) KillUnwantedPods(desiredPods map[types.UID]Empty,
 	runningPods []*kubecontainer.Pod) error {
 	ch := make(chan error, len(runningPods))
 	defer close(ch)

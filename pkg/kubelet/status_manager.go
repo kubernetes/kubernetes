@@ -28,9 +28,9 @@ import (
 	"github.com/golang/glog"
 )
 
-type podStatusSyncRequest struct {
-	pod    *api.Pod
-	status api.PodStatus
+type PodStatusSyncRequest struct {
+	Pod    *api.Pod
+	Status api.PodStatus
 }
 
 // Updates pod statuses in apiserver. Writes only when new status has changed.
@@ -40,20 +40,19 @@ type statusManager struct {
 	// Map from pod full name to sync status of the corresponding pod.
 	podStatusesLock  sync.RWMutex
 	podStatuses      map[string]api.PodStatus
-	podStatusChannel chan podStatusSyncRequest
+	podStatusChannel chan PodStatusSyncRequest
 }
 
 func newStatusManager(kubeClient client.Interface) *statusManager {
 	return &statusManager{
 		kubeClient:       kubeClient,
 		podStatuses:      make(map[string]api.PodStatus),
-		podStatusChannel: make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
+		podStatusChannel: make(chan PodStatusSyncRequest, 1000), // Buffer up to 1000 statuses
 	}
 }
 
 func (s *statusManager) Start() {
 	// syncBatch blocks when no updates are available, we can run it in a tight loop.
-	glog.Info("Starting to sync pod status with apiserver")
 	go util.Forever(func() {
 		err := s.syncBatch()
 		if err != nil {
@@ -98,7 +97,7 @@ func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 
 	if !found || !reflect.DeepEqual(oldStatus, status) {
 		s.podStatuses[podFullName] = status
-		s.podStatusChannel <- podStatusSyncRequest{pod, status}
+		s.podStatusChannel <- PodStatusSyncRequest{pod, status}
 	} else {
 		glog.V(3).Infof("Ignoring same pod status for %s - old: %s new: %s", podFullName, oldStatus, status)
 	}
@@ -125,9 +124,9 @@ func (s *statusManager) RemoveOrphanedStatuses(podFullNames map[string]bool) {
 // syncBatch syncs pods statuses with the apiserver.
 func (s *statusManager) syncBatch() error {
 	syncRequest := <-s.podStatusChannel
-	pod := syncRequest.pod
+	pod := syncRequest.Pod
 	podFullName := kubecontainer.GetPodFullName(pod)
-	status := syncRequest.status
+	status := syncRequest.Status
 
 	var err error
 	statusPod := &api.Pod{

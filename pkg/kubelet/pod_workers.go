@@ -31,7 +31,7 @@ import (
 // PodWorkers is an abstract interface for testability.
 type PodWorkers interface {
 	UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete func())
-	ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty)
+	ForgetNonExistingPodWorkers(desiredPods map[types.UID]Empty)
 }
 
 type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod, SyncPodType) error
@@ -171,7 +171,7 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete 
 	}
 }
 
-func (p *podWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty) {
+func (p *podWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]Empty) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	for key, channel := range p.podUpdates {
