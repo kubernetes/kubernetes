@@ -18,6 +18,7 @@ package kubectl
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -94,8 +95,10 @@ func (f *FilterServer) accept(method, path, host string) bool {
 }
 
 func (f *FilterServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if f.accept(req.Method, req.URL.Path, req.Host) {
+	host, _, _ := net.SplitHostPort(req.Host)
+	if f.accept(req.Method, req.URL.Path, host) {
 		f.delegate.ServeHTTP(rw, req)
+		return
 	}
 	rw.WriteHeader(http.StatusForbidden)
 	rw.Write([]byte("<h3>Unauthorized</h3>"))
