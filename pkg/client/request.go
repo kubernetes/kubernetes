@@ -260,7 +260,7 @@ const (
 	// Will be automatically emitted as the correct name for the API version.
 	NodeUnschedulable = "spec.unschedulable"
 	ObjectNameField   = "metadata.name"
-	PodHost           = "spec.host"
+	PodHost           = "spec.nodeName"
 	SecretType        = "type"
 
 	EventReason                  = "reason"
@@ -351,12 +351,8 @@ var fieldMappings = versionToResourceToFieldMapping{
 			ObjectNameField:   "metadata.name",
 			NodeUnschedulable: "spec.unschedulable",
 		},
-		"minions": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   "metadata.name",
-			NodeUnschedulable: "spec.unschedulable",
-		},
 		"pods": clientFieldNameToAPIVersionFieldName{
-			PodHost: "spec.host",
+			PodHost: "spec.nodeName",
 		},
 		"secrets": clientFieldNameToAPIVersionFieldName{
 			SecretType: "type",

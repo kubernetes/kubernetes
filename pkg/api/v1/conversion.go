@@ -42,7 +42,7 @@ func addConversionFuncs() {
 			case "metadata.name",
 				"metadata.namespace",
 				"status.phase",
-				"spec.host":
+				"spec.nodeName":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
