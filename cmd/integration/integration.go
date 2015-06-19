@@ -395,8 +395,10 @@ func runReplicationControllerTest(c *client.Client) {
 	}
 	glog.Infof("Done creating replication controllers")
 
-	// Give the controllers some time to actually create the pods
-	if err := wait.Poll(time.Second, time.Second*30, client.ControllerHasDesiredReplicas(c, updated)); err != nil {
+	// In practice the controller doesn't need 60s to create a handful of pods, but network latencies on CI
+	// systems have been observed to vary unpredictably, so give the controller enough time to create pods.
+	// Our e2e scalability tests will catch controllers that are *actually* slow.
+	if err := wait.Poll(time.Second, time.Second*60, client.ControllerHasDesiredReplicas(c, updated)); err != nil {
 		glog.Fatalf("FAILED: pods never created %v", err)
 	}
 

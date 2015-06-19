@@ -280,6 +280,55 @@ func TestEtcdControllerValidatesNamespaceOnUpdate(t *testing.T) {
 	}
 }
 
+func TestGenerationNumber(t *testing.T) {
+	storage, _ := newStorage(t)
+	modifiedSno := validController
+	modifiedSno.Generation = 100
+	modifiedSno.Status.ObservedGeneration = 10
+	ctx := api.NewDefaultContext()
+	rc, err := createController(storage, modifiedSno, t)
+	ctrl, err := storage.Get(ctx, rc.Name)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	controller, _ := ctrl.(*api.ReplicationController)
+
+	// Generation initialization
+	if controller.Generation != 1 && controller.Status.ObservedGeneration != 0 {
+		t.Fatalf("Unexpected generation number %v, status generation %v", controller.Generation, controller.Status.ObservedGeneration)
+	}
+
+	// Updates to spec should increment the generation number
+	controller.Spec.Replicas += 1
+	storage.Update(ctx, controller)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	ctrl, err = storage.Get(ctx, rc.Name)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	controller, _ = ctrl.(*api.ReplicationController)
+	if controller.Generation != 2 || controller.Status.ObservedGeneration != 0 {
+		t.Fatalf("Unexpected generation, spec: %v, status: %v", controller.Generation, controller.Status.ObservedGeneration)
+	}
+
+	// Updates to status should not increment either spec or status generation numbers
+	controller.Status.Replicas += 1
+	storage.Update(ctx, controller)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	ctrl, err = storage.Get(ctx, rc.Name)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	controller, _ = ctrl.(*api.ReplicationController)
+	if controller.Generation != 2 || controller.Status.ObservedGeneration != 0 {
+		t.Fatalf("Unexpected generation number, spec: %v, status: %v", controller.Generation, controller.Status.ObservedGeneration)
+	}
+}
+
 // TestEtcdGetControllerDifferentNamespace ensures same-name controllers in different namespaces do not clash
 func TestEtcdGetControllerDifferentNamespace(t *testing.T) {
 	storage, fakeClient := newStorage(t)

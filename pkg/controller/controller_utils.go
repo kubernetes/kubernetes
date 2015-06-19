@@ -304,14 +304,24 @@ func filterActivePods(pods []api.Pod) []*api.Pod {
 // updateReplicaCount attempts to update the Status.Replicas of the given controller, with a single GET/PUT retry.
 func updateReplicaCount(rcClient client.ReplicationControllerInterface, controller api.ReplicationController, numReplicas int) (updateErr error) {
 	// This is the steady state. It happens when the rc doesn't have any expectations, since
-	// we do a periodic relist every 30s.
-	if controller.Status.Replicas == numReplicas {
+	// we do a periodic relist every 30s. If the generations differ but the replicas are
+	// the same, a caller might've resized to the same replica count.
+	if controller.Status.Replicas == numReplicas &&
+		controller.Generation == controller.Status.ObservedGeneration {
 		return nil
 	}
+	// Save the generation number we acted on, otherwise we might wrongfully indicate
+	// that we've seen a spec update when we retry.
+	// TODO: This can clobber an update if we allow multiple agents to write to the
+	// same status.
+	generation := controller.Generation
+
 	var getErr error
-	glog.V(4).Infof("Updating replica count for rc: %v, %d->%d", controller.Name, controller.Status.Replicas, numReplicas)
 	for i, rc := 0, &controller; ; i++ {
-		rc.Status.Replicas = numReplicas
+		glog.V(4).Infof("Updating replica count for rc: %v, %d->%d (need %d), sequence No: %v->%v",
+			controller.Name, controller.Status.Replicas, numReplicas, controller.Spec.Replicas, controller.Status.ObservedGeneration, generation)
+
+		rc.Status = api.ReplicationControllerStatus{Replicas: numReplicas, ObservedGeneration: generation}
 		_, updateErr = rcClient.Update(rc)
 		if updateErr == nil || i >= updateRetries {
 			return updateErr

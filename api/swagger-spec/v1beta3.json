@@ -10828,6 +10828,11 @@
       "type": "string",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
+     "generation": {
+      "type": "integer",
+      "format": "int64",
+      "description": "a sequence number representing a specific generation of the desired state; populated by the system; read-only"
+     },
      "creationTimestamp": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
@@ -12957,6 +12962,11 @@
       "type": "integer",
       "format": "int32",
       "description": "most recently oberved number of replicas"
+     },
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "reflects the generation of the most recently observed replication controller"
      }
     }
    },
