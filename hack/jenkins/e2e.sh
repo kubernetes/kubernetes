@@ -136,7 +136,7 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
             else
               create_args+=("--cluster-api-version=0.0.0")
             fi
-            msg=$(gcloud ${CMD_GROUP:-alpha} container clusters create "$(create_args[@])" 2>&1 \
+            msg=$(gcloud ${CMD_GROUP:-alpha} container clusters create "${create_args[@]}" 2>&1 \
                 | tr -d '[[:space:]]') || true
             # Strip out everything before the final colon, which gives us just
             # the allowed versions; something like "0.15.0,0.16.0." or "0.16.0."
