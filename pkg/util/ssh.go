@@ -150,6 +150,8 @@ type sshDialer interface {
 // Real implementation of sshDialer
 type realSSHDialer struct{}
 
+var _ sshDialer = &realSSHDialer{}
+
 func (d *realSSHDialer) Dial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
 	return ssh.Dial(network, addr, config)
 }
