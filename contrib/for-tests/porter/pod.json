@@ -2,51 +2,33 @@
   "kind": "Pod",
   "apiVersion": "v1",
   "metadata": {
-    "name": "kubectl-tester"
+    "name": "porter"
   },
   "spec": {
     "containers": [
       {
-        "name": "bb",
-        "image": "gcr.io/google_containers/busybox",
-        "command": [
-          "sh", "-c", "sleep 5; wget -O - ${KUBERNETES_RO_SERVICE_HOST}:${KUBERNETES_RO_SERVICE_PORT}/api/v1/pods/; sleep 10000"
+        "name": "porter",
+        "image": "gcr.io/google_containers/porter:91d46193649807d1340b46797774d8b2",
+        "env": [
+          {
+            "name": "SERVE_PORT_80",
+            "value": "foo"
+          },
+          {
+            "name": "SERVE_PORT_81",
+            "value": "<html><head></head><body><a href=\"/rewriteme\">rewritten link</a></body></html>"
+          }
         ],
         "ports": [
           {
-            "containerPort": 8080
-          }
-        ],
-        "env": [
-          {
-            "name": "KUBERNETES_RO_SERVICE_HOST",
-            "value": "127.0.0.1"
+            "name": "p80",
+            "containerPort": 80
           },
           {
-            "name": "KUBERNETES_RO_SERVICE_PORT",
-            "value": "8001"
-          }
-        ],
-        "volumeMounts": [
-          {
-            "name": "test-volume",
-            "mountPath": "/mount/test-volume"
+            "name": "p81",
+            "containerPort": 81
           }
         ]
-      },
-      {
-        "name": "kubectl",
-        "image": "gcr.io/google_containers/kubectl:v0.18.0-120-gaeb4ac55ad12b1-dirty",
-        "imagePullPolicy": "Always",
-        "args": [
-          "proxy", "-p", "8001"
-        ]
-      }
-    ],
-    "volumes": [
-      {
-        "name": "test-volume",
-        "emptyDir": {}
       }
     ]
   }
