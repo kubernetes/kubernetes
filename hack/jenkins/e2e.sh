@@ -127,8 +127,16 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
             #       code=400,message=cluster.cluster_api_versionmustbeoneof:
             #       0.15.0,0.16.0.
             # The command should error, so we throw an || true on there.
-            msg=$(gcloud ${CMD_GROUP:-alpha} container clusters create this-wont-work \
-                --zone=us-central1-f --cluster-api-version=0.0.0 2>&1 \
+            create_args=(
+              "this-wont-work"
+              "--zone=us-central1-f"
+            )
+            if [[ ! -z "${DOGFOOD_GCLOUD:-}" ]]; then
+              create_args+=("--cluster-version=0.0.0")
+            else
+              create_args+=("--cluster-api-version=0.0.0")
+            fi
+            msg=$(gcloud ${CMD_GROUP:-alpha} container clusters create "$(create_args[@])" 2>&1 \
                 | tr -d '[[:space:]]') || true
             # Strip out everything before the final colon, which gives us just
             # the allowed versions; something like "0.15.0,0.16.0." or "0.16.0."
