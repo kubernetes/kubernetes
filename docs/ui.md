@@ -12,9 +12,9 @@ kubectl proxy --www=www/app --www-prefix=/
 
 You should now be able to access it by visiting [localhost:8001](http://localhost:8001/).
 
-You can also use other web servers to serve the contents of the www/app directory, as described [here](../www/README.md#serving-the-app-during-development). 
+You can also use other web servers to serve the contents of the www/app directory, as described [here](../www/README.md#serving-the-app-during-development).
 
 ### Running remotely
-When Kubernetes is deployed remotely, the api server deploys the UI. To access it, visit `/ui`, which redirects to `/api/v1/proxy/namespaces/default/services/kube-ui/#/dashboard/`, on your master server.
+When Kubernetes is deployed remotely, the UI is deployed as a cluster addon. To access it, visit `/ui`, which redirects to `/api/v1/proxy/namespaces/default/services/kube-ui/#/dashboard/`, on your master server.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/ui.md?pixel)]()
