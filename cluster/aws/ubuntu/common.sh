@@ -25,7 +25,6 @@ function detect-minion-image() {
 }
 
 function generate-minion-user-data {
-  i=$1
   # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
   echo "#! /bin/bash"
   echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
@@ -37,8 +36,7 @@ function generate-minion-user-data {
 }
 
 function check-minion() {
-  local minion_name=$1
-  local minion_ip=$2
+  local minion_ip=$1
 
   local output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@$minion_ip sudo docker ps -a 2>/dev/null)
   if [[ -z "${output}" ]]; then

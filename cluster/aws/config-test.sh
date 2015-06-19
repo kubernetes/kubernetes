@@ -34,7 +34,6 @@ IAM_PROFILE_MINION="kubernetes-minion"
 LOG="/dev/null"
 
 MASTER_NAME="${INSTANCE_PREFIX}-master"
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
 MINION_SCOPES=""
