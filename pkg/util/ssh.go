@@ -32,8 +32,29 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 )
+
+var (
+	tunnelOpenCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "ssh_tunnel_open_count",
+			Help: "Counter of ssh tunnel total open attempts",
+		},
+	)
+	tunnelOpenFailCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "ssh_tunnel_open_fail_count",
+			Help: "Counter of ssh tunnel failed open attempts",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(tunnelOpenCounter)
+	prometheus.MustRegister(tunnelOpenFailCounter)
+}
 
 // TODO: Unit tests for this code, we can spin up a test SSH server with instructions here:
 // https://godoc.org/golang.org/x/crypto/ssh#ServerConn
@@ -83,7 +104,9 @@ func makeSSHTunnel(user string, signer ssh.Signer, host string) (*SSHTunnel, err
 func (s *SSHTunnel) Open() error {
 	var err error
 	s.client, err = ssh.Dial("tcp", net.JoinHostPort(s.Host, s.SSHPort), s.Config)
+	tunnelOpenCounter.Inc()
 	if err != nil {
+		tunnelOpenFailCounter.Inc()
 		return err
 	}
 	return nil
@@ -97,6 +120,9 @@ func (s *SSHTunnel) Dial(network, address string) (net.Conn, error) {
 }
 
 func (s *SSHTunnel) tunnel(conn net.Conn, remoteHost, remotePort string) error {
+	if s.client == nil {
+		return errors.New("tunnel is not opened.")
+	}
 	tunnel, err := s.client.Dial("tcp", net.JoinHostPort(remoteHost, remotePort))
 	if err != nil {
 		return err
@@ -107,6 +133,9 @@ func (s *SSHTunnel) tunnel(conn net.Conn, remoteHost, remotePort string) error {
 }
 
 func (s *SSHTunnel) Close() error {
+	if s.client == nil {
+		return errors.New("Cannot close tunnel. Tunnel was not opened.")
+	}
 	if err := s.client.Close(); err != nil {
 		return err
 	}
@@ -178,9 +207,11 @@ type SSHTunnelEntry struct {
 	Tunnel  *SSHTunnel
 }
 
-type SSHTunnelList []SSHTunnelEntry
+type SSHTunnelList struct {
+	entries []SSHTunnelEntry
+}
 
-func MakeSSHTunnels(user, keyfile string, addresses []string) (SSHTunnelList, error) {
+func MakeSSHTunnels(user, keyfile string, addresses []string) (*SSHTunnelList, error) {
 	tunnels := []SSHTunnelEntry{}
 	for ix := range addresses {
 		addr := addresses[ix]
@@ -190,14 +221,23 @@ func MakeSSHTunnels(user, keyfile string, addresses []string) (SSHTunnelList, er
 		}
 		tunnels = append(tunnels, SSHTunnelEntry{addr, tunnel})
 	}
-	return tunnels, nil
+	return &SSHTunnelList{tunnels}, nil
 }
 
-func (l SSHTunnelList) Open() error {
-	for ix := range l {
-		if err := l[ix].Tunnel.Open(); err != nil {
-			return err
+// Open attempts to open all tunnels in the list, and removes any tunnels that
+// failed to open.
+func (l *SSHTunnelList) Open() error {
+	var openTunnels []SSHTunnelEntry
+	for ix := range l.entries {
+		if err := l.entries[ix].Tunnel.Open(); err != nil {
+			glog.Errorf("Failed to open tunnel %v: %v", l.entries[ix], err)
+		} else {
+			openTunnels = append(openTunnels, l.entries[ix])
 		}
+	}
+	l.entries = openTunnels
+	if len(l.entries) == 0 {
+		return errors.New("Failed to open any tunnels.")
 	}
 	return nil
 }
@@ -205,10 +245,11 @@ func (l SSHTunnelList) Open() error {
 // Close asynchronously closes all tunnels in the list after waiting for 1
 // minute. Tunnels will still be open upon this function's return, but should
 // no longer be used.
-func (l SSHTunnelList) Close() {
-	for ix := range l {
-		entry := l[ix]
+func (l *SSHTunnelList) Close() {
+	for ix := range l.entries {
+		entry := l.entries[ix]
 		go func() {
+			defer HandleCrash()
 			time.Sleep(1 * time.Minute)
 			if err := entry.Tunnel.Close(); err != nil {
 				glog.Errorf("Failed to close tunnel %v: %v", entry, err)
@@ -217,20 +258,24 @@ func (l SSHTunnelList) Close() {
 	}
 }
 
-func (l SSHTunnelList) Dial(network, addr string) (net.Conn, error) {
-	if len(l) == 0 {
+func (l *SSHTunnelList) Dial(network, addr string) (net.Conn, error) {
+	if len(l.entries) == 0 {
 		return nil, fmt.Errorf("Empty tunnel list.")
 	}
-	return l[mathrand.Int()%len(l)].Tunnel.Dial(network, addr)
+	return l.entries[mathrand.Int()%len(l.entries)].Tunnel.Dial(network, addr)
 }
 
-func (l SSHTunnelList) Has(addr string) bool {
-	for ix := range l {
-		if l[ix].Address == addr {
+func (l *SSHTunnelList) Has(addr string) bool {
+	for ix := range l.entries {
+		if l.entries[ix].Address == addr {
 			return true
 		}
 	}
 	return false
+}
+
+func (l *SSHTunnelList) Len() int {
+	return len(l.entries)
 }
 
 func EncodePrivateKey(private *rsa.PrivateKey) []byte {

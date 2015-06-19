@@ -485,7 +485,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 		// Create pod infra container.
 		"create", "start", "inspect_container",
 		// Create container.
-		"create", "start",
+		"create", "start", "inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
 		// Get pods for deleting orphaned volumes.

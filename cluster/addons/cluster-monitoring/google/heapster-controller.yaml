@@ -1,30 +1,30 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata: 
-  name: monitoring-heapster-v1
+  name: monitoring-heapster-v3
   namespace: default
   labels: 
     k8s-app: heapster
-    version: v1
+    version: v3
     kubernetes.io/cluster-service: "true"
 spec: 
   replicas: 1
   selector: 
     k8s-app: heapster
-    version: v1
+    version: v3
   template: 
     metadata: 
       labels: 
         k8s-app: heapster
-        version: v1
+        version: v3
         kubernetes.io/cluster-service: "true"
     spec: 
       containers: 
-        - image: gcr.io/google_containers/heapster:v0.13.0
+        - image: gcr.io/google_containers/heapster:v0.14.1
           name: heapster
           command:
             - /heapster
-            - --source=kubernetes:https://kubernetes
+            - --source=kubernetes:''
             - --sink=gcm
             - --sink=gcl
             - --poll_duration=2m

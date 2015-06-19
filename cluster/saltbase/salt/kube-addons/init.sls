@@ -33,6 +33,29 @@ addon-dir-create:
     - file_mode: 644
 {% endif %}
 
+{% if pillar.get('enable_cluster_monitoring', '').lower() == 'standalone' %}
+/etc/kubernetes/addons/cluster-monitoring/standalone:
+  file.recurse:
+    - source: salt://kube-addons/cluster-monitoring/standalone
+    - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - user: root
+    - group: root
+    - dir_mode: 755
+    - file_mode: 644
+{% endif %}
+
+{% if pillar.get('enable_cluster_monitoring', '').lower() == 'googleinfluxdb' %}
+/etc/kubernetes/addons/cluster-monitoring/googleinfluxdb:
+  file.recurse:
+    - source: salt://kube-addons/cluster-monitoring
+    - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - exclude_pat: E@(^.+heapster-controller\.yaml$|^.+heapster-controller\.json$)
+    - user: root
+    - group: root
+    - dir_mode: 755
+    - file_mode: 644
+{% endif %}
+
 {% if pillar.get('enable_cluster_dns', '').lower() == 'true' %}
 /etc/kubernetes/addons/dns/skydns-svc.yaml:
   file.managed:

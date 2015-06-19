@@ -501,7 +501,7 @@ EOF
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   cloud_config: /etc/gce.conf
   advertise_address: '${EXTERNAL_IP}'
-  proxy_ssh_user: '${INSTANCE_PREFIX}'
+  proxy_ssh_user: '${PROXY_SSH_USER}'
 EOF
   fi
 }

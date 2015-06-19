@@ -210,7 +210,7 @@ type Master struct {
 	InsecureHandler http.Handler
 
 	// Used for secure proxy
-	tunnels       util.SSHTunnelList
+	tunnels       *util.SSHTunnelList
 	tunnelsLock   sync.Mutex
 	installSSHKey InstallSSHKey
 }
@@ -495,6 +495,11 @@ func (m *Master) init(c *Config) {
 
 	var proxyDialer func(net, addr string) (net.Conn, error)
 	if len(c.SSHUser) > 0 {
+		// Usernames are capped @ 32
+		if len(c.SSHUser) > 32 {
+			glog.Warning("SSH User is too long, truncating to 32 chars")
+			c.SSHUser = c.SSHUser[0:32]
+		}
 		glog.Infof("Setting up proxy: %s %s", c.SSHUser, c.SSHKeyfile)
 		exists, err := util.FileExists(c.SSHKeyfile)
 		if err != nil {
@@ -772,7 +777,7 @@ func (m *Master) Dial(net, addr string) (net.Conn, error) {
 }
 
 func (m *Master) needToReplaceTunnels(addrs []string) bool {
-	if len(m.tunnels) != len(addrs) {
+	if m.tunnels == nil || m.tunnels.Len() != len(addrs) {
 		return true
 	}
 	// TODO (cjcullen): This doesn't need to be n^2
@@ -807,7 +812,9 @@ func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {
 	if err != nil {
 		return err
 	}
-	tunnels.Open()
+	if err := tunnels.Open(); err != nil {
+		return err
+	}
 	if m.tunnels != nil {
 		m.tunnels.Close()
 	}
@@ -844,31 +851,24 @@ func (m *Master) refreshTunnels(user, keyfile string) error {
 func (m *Master) setupSecureProxy(user, keyfile string) {
 	// Sync loop for tunnels
 	// TODO: switch this to watch.
-	go func() {
-		for {
-			if err := m.loadTunnels(user, keyfile); err != nil {
-				glog.Errorf("Failed to load SSH Tunnels: %v", err)
-			}
-			var sleep time.Duration
-			if len(m.tunnels) == 0 {
-				sleep = time.Second
-			} else {
-				// tunnels could lag behind current set of nodes
-				sleep = 10 * time.Second
-			}
-			time.Sleep(sleep)
+	go util.Until(func() {
+		if err := m.loadTunnels(user, keyfile); err != nil {
+			glog.Errorf("Failed to load SSH Tunnels: %v", err)
 		}
-	}()
+		if m.tunnels != nil && m.tunnels.Len() != 0 {
+			// Sleep for 10 seconds if we have some tunnels.
+			// TODO (cjcullen): tunnels can lag behind actually existing nodes.
+			time.Sleep(9 * time.Second)
+		}
+	}, 1*time.Second, util.NeverStop)
 	// Refresh loop for tunnels
 	// TODO: could make this more controller-ish
-	go func() {
-		for {
-			time.Sleep(5 * time.Minute)
-			if err := m.refreshTunnels(user, keyfile); err != nil {
-				glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
-			}
+	go util.Until(func() {
+		time.Sleep(5 * time.Minute)
+		if err := m.refreshTunnels(user, keyfile); err != nil {
+			glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
 		}
-	}()
+	}, 0*time.Second, util.NeverStop)
 }
 
 func (m *Master) generateSSHKey(user, keyfile string) error {

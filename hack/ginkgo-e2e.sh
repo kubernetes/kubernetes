@@ -83,6 +83,10 @@ else
   NODE_INSTANCE_GROUP=""
 fi
 
+if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+  detect-node-instance-group
+fi
+
 ginkgo_args=()
 if [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
   ginkgo_args+=("-p")
