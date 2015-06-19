@@ -274,7 +274,7 @@ func TestTransformResponse(t *testing.T) {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
 		result := r.transformResponse(test.Response, &http.Request{})
-		response, created, err := result.body, result.created, result.err
+		response, created, err := result.body, result.statusCode == http.StatusCreated, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)

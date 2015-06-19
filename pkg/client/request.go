@@ -803,9 +803,9 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 	}
 
 	return Result{
-		body:    body,
-		created: resp.StatusCode == http.StatusCreated,
-		codec:   r.codec,
+		body:       body,
+		statusCode: resp.StatusCode,
+		codec:      r.codec,
 	}
 }
 
@@ -879,9 +879,9 @@ func retryAfterSeconds(resp *http.Response) (int, bool) {
 
 // Result contains the result of calling Request.Do().
 type Result struct {
-	body    []byte
-	created bool
-	err     error
+	body       []byte
+	err        error
+	statusCode int
 
 	codec runtime.Codec
 }
@@ -899,6 +899,13 @@ func (r Result) Get() (runtime.Object, error) {
 	return r.codec.Decode(r.body)
 }
 
+// StatusCode returns the HTTP status code of the request. (Only valid if no
+// error was returned.)
+func (r Result) StatusCode(statusCode *int) Result {
+	*statusCode = r.statusCode
+	return r
+}
+
 // Into stores the result into obj, if possible.
 func (r Result) Into(obj runtime.Object) error {
 	if r.err != nil {
@@ -910,7 +917,7 @@ func (r Result) Into(obj runtime.Object) error {
 // WasCreated updates the provided bool pointer to whether the server returned
 // 201 created or a different response.
 func (r Result) WasCreated(wasCreated *bool) Result {
-	*wasCreated = r.created
+	*wasCreated = r.statusCode == http.StatusCreated
 	return r
 }
 
