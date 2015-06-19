@@ -39,6 +39,11 @@ var _ = Describe("Cluster level logging using Elasticsearch", func() {
 	})
 })
 
+const (
+	esKey   = "k8s-app"
+	esValue = "elasticsearch-logging"
+)
+
 func bodyToJSON(body []byte) (map[string]interface{}, error) {
 	var r map[string]interface{}
 	if err := json.Unmarshal(body, &r); err != nil {
@@ -75,7 +80,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 
 	// Wait for the Elasticsearch pods to enter the running state.
 	By("Checking to make sure the Elasticsearch pods are running")
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "elasticsearch-logging"}))
+	label := labels.SelectorFromSet(labels.Set(map[string]string{esKey: esValue}))
 	pods, err := f.Client.Pods(api.NamespaceDefault).List(label, fields.Everything())
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
@@ -242,7 +247,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(10 * time.Second) {
 
 		// Debugging code to report the status of the elasticsearch logging endpoints.
-		esPods, err := f.Client.Pods(api.NamespaceDefault).List(labels.Set{"k8s-app": "elasticsearch-logging"}.AsSelector(), fields.Everything())
+		esPods, err := f.Client.Pods(api.NamespaceDefault).List(labels.Set{esKey: esValue}.AsSelector(), fields.Everything())
 		if err != nil {
 			Logf("Attempt to list Elasticsearch nodes encountered a problem -- may retry: %v", err)
 			continue
