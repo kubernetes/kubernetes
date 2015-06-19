@@ -18,6 +18,7 @@ package clientcmd
 
 import (
 	"io"
+	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
@@ -45,11 +46,6 @@ func NewInteractiveDeferredLoadingClientConfig(loadingRules *ClientConfigLoading
 }
 
 func (config DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
-	// Are we running in a cluster? If so, use that.
-	icc := inClusterClientConfig{}
-	if icc.Possible() {
-		return icc, nil
-	}
 	mergedConfig, err := config.loadingRules.Load()
 	if err != nil {
 		return nil, err
@@ -80,8 +76,18 @@ func (config DeferredLoadingClientConfig) ClientConfig() (*client.Config, error)
 	if err != nil {
 		return nil, err
 	}
+	mergedConfig, err := mergedClientConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	// Are we running in a cluster and were no other configs found? If so, use the in-cluster-config.
+	icc := inClusterClientConfig{}
+	defaultConfig, err := DefaultClientConfig.ClientConfig()
+	if icc.Possible() && err == nil && reflect.DeepEqual(mergedConfig, defaultConfig) {
+		return icc.ClientConfig()
+	}
 
-	return mergedClientConfig.ClientConfig()
+	return mergedConfig, nil
 }
 
 // Namespace implements KubeConfig

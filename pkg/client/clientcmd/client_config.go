@@ -37,6 +37,8 @@ var (
 
 	// EnvVarCluster allows overriding the DefaultCluster using an envvar for the server name
 	EnvVarCluster = clientcmdapi.Cluster{Server: os.Getenv("KUBERNETES_MASTER")}
+
+	DefaultClientConfig = DirectClientConfig{*clientcmdapi.NewConfig(), "", &ConfigOverrides{}, nil}
 )
 
 // ClientConfig is used to make it easy to get an api server client
