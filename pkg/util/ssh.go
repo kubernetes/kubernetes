@@ -81,8 +81,8 @@ func NewSSHTunnel(user, keyfile, host string) (*SSHTunnel, error) {
 	return makeSSHTunnel(user, signer, host)
 }
 
-func NewSSHTunnelFromBytes(user string, buffer []byte, host string) (*SSHTunnel, error) {
-	signer, err := MakePrivateKeySignerFromBytes(buffer)
+func NewSSHTunnelFromBytes(user string, privateKey []byte, host string) (*SSHTunnel, error) {
+	signer, err := MakePrivateKeySignerFromBytes(privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -214,11 +214,13 @@ func ParsePublicKeyFromFile(keyFile string) (*rsa.PublicKey, error) {
 	return rsaKey, nil
 }
 
+// Should be thread safe.
 type SSHTunnelEntry struct {
 	Address string
 	Tunnel  *SSHTunnel
 }
 
+// Not thread safe!
 type SSHTunnelList struct {
 	entries []SSHTunnelEntry
 }
@@ -271,11 +273,23 @@ func (l *SSHTunnelList) Close() {
 	}
 }
 
+/* this will make sense if we move the lock into SSHTunnelList.
 func (l *SSHTunnelList) Dial(network, addr string) (net.Conn, error) {
 	if len(l.entries) == 0 {
-		return nil, fmt.Errorf("Empty tunnel list.")
+		return nil, fmt.Errorf("empty tunnel list.")
 	}
-	return l.entries[mathrand.Int()%len(l.entries)].Tunnel.Dial(network, addr)
+	n := mathrand.Intn(len(l.entries))
+	return l.entries[n].Tunnel.Dial(network, addr)
+}
+*/
+
+// Returns a random tunnel, xor an error if there are none.
+func (l *SSHTunnelList) PickRandomTunnel() (SSHTunnelEntry, error) {
+	if len(l.entries) == 0 {
+		return SSHTunnelEntry{}, fmt.Errorf("empty tunnel list.")
+	}
+	n := mathrand.Intn(len(l.entries))
+	return l.entries[n], nil
 }
 
 func (l *SSHTunnelList) Has(addr string) bool {
