@@ -30,8 +30,8 @@ function detect-minion-image (){
 
 function generate-minion-user-data() {
   i=$1
+  # TODO(bakins): Is this actually used?
   MINION_PRIVATE_IP=$INTERNAL_IP_BASE.1${i}
-  MINION_IP_RANGE=${MINION_IP_RANGES[$i]}
 
   # this is a bit of a hack. We make all of our "variables" in
   # our cloud config controlled by env vars from this script
@@ -44,7 +44,6 @@ function generate-minion-user-data() {
       DNS_SERVER_IP=$(yaml-quote ${DNS_SERVER_IP:-})
       DNS_DOMAIN=$(yaml-quote ${DNS_DOMAIN:-})
       MASTER_IP=$(yaml-quote ${MASTER_INTERNAL_IP})
-      MINION_IP_RANGE=$(yaml-quote ${MINION_IP_RANGE})
       MINION_IP=$(yaml-quote ${MINION_PRIVATE_IP})
       KUBELET_TOKEN=$(yaml-quote ${KUBELET_TOKEN:-})
       KUBE_PROXY_TOKEN=$(yaml-quote ${KUBE_PROXY_TOKEN:-})
