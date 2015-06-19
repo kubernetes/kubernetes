@@ -70,7 +70,7 @@ function provision-network {
     NODE_INDEX=0
     for remote_ip in "${CONTAINER_IPS[@]}"
     do
-        if [ "\${remote_ip}" == "${NODE_IP}" ]; then
+        if [ "${remote_ip}" == "${NODE_IP}" ]; then
              ovs-ofctl -O OpenFlow13 add-flow ${OVS_SWITCH} "table=0,ip,in_port=10,nw_dst=${CONTAINER_SUBNETS[${NODE_INDEX}]},actions=output:9"
              ovs-ofctl -O OpenFlow13 add-flow ${OVS_SWITCH} "table=0,arp,in_port=10,nw_dst=${CONTAINER_SUBNETS[${NODE_INDEX}]},actions=output:9"
         else
