@@ -82,7 +82,7 @@ __custom_func() {
 	    __kubectl_get_resource
             return
             ;;
-	kubectl_log)
+	kubectl_logs)
 	    __kubectl_require_pod_and_container
 	    return
 	    ;;
