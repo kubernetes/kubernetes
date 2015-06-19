@@ -20,6 +20,10 @@
   notify:
     - restart scheduler
 
+- name: add cap_net_bind_service to kube-apiserver
+  capabilities: path=/usr/bin/kube-apiserver capability=cap_net_bind_service=ep state=present
+  when: not is_atomic
+
 - name: Enable apiserver
   service: name=kube-apiserver enabled=yes state=started
 
