@@ -24,13 +24,11 @@ import (
 )
 
 func (s *AWSCloud) findRouteTable(clusterName string) (*ec2.RouteTable, error) {
-	request := &ec2.DescribeRouteTablesInput{}
-	filters := []*ec2.Filter{}
 	// This should be unnecessary (we already filter on TagNameKubernetesCluster,
 	// and something is broken if cluster name doesn't match, but anyway...
 	// TODO: All clouds should be cluster-aware by default
-	filters = append(filters, newEc2Filter("tag:"+TagNameKubernetesCluster, clusterName))
-	request.Filters = s.addFilters(filters)
+	filters := []*ec2.Filter{newEc2Filter("tag:"+TagNameKubernetesCluster, clusterName)}
+	request := &ec2.DescribeRouteTablesInput{Filters: s.addFilters(filters)}
 
 	tables, err := s.ec2.DescribeRouteTables(request)
 	if err != nil {
