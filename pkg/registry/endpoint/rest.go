@@ -73,6 +73,10 @@ func (endpointsStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object
 	return append(errorList, validation.ValidateEndpointsUpdate(old.(*api.Endpoints), obj.(*api.Endpoints))...)
 }
 
+func (endpointsStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
 // MatchEndpoints returns a generic matcher for a given label and field selector.
 func MatchEndpoints(label labels.Selector, field fields.Selector) generic.Matcher {
 	return &generic.SelectionPredicate{label, field, EndpointsAttributes}

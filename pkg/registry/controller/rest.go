@@ -97,6 +97,10 @@ func (rcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field
 	return append(validationErrorList, updateErrorList...)
 }
 
+func (rcStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
 // ControllerToSelectableFields returns a label set that represents the object.
 func ControllerToSelectableFields(controller *api.ReplicationController) fields.Set {
 	return fields.Set{

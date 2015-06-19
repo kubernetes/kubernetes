@@ -81,6 +81,10 @@ func (podStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fiel
 	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
 }
 
+func (podStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
 // CheckGracefulDelete allows a pod to be gracefully deleted.
 func (podStrategy) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool {
 	return false

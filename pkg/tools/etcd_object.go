@@ -18,12 +18,11 @@ package tools
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-
-	"github.com/coreos/go-etcd/etcd"
 )
 
 // APIObjectVersioner implements versioning and extracting etcd node information
@@ -31,18 +30,17 @@ import (
 type APIObjectVersioner struct{}
 
 // UpdateObject implements EtcdVersioner
-func (a APIObjectVersioner) UpdateObject(obj runtime.Object, node *etcd.Node) error {
+func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Time, resourceVersion uint64) error {
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
 		return err
 	}
-	if ttl := node.Expiration; ttl != nil {
-		objectMeta.DeletionTimestamp = &util.Time{*node.Expiration}
+	if expiration != nil {
+		objectMeta.DeletionTimestamp = &util.Time{*expiration}
 	}
-	version := node.ModifiedIndex
 	versionString := ""
-	if version != 0 {
-		versionString = strconv.FormatUint(version, 10)
+	if resourceVersion != 0 {
+		versionString = strconv.FormatUint(resourceVersion, 10)
 	}
 	objectMeta.ResourceVersion = versionString
 	return nil

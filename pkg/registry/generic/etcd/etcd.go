@@ -271,6 +271,14 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	if err != nil {
 		return nil, false, err
 	}
+	// If AllowUnconditionalUpdate() is true and the object specified by the user does not have a resource version,
+	// then we populate it with the latest version.
+	// Else, we check that the version specified by the user matches the version of latest etcd object.
+	resourceVersion, err := e.Helper.Versioner.ObjectResourceVersion(obj)
+	if err != nil {
+		return nil, false, err
+	}
+	doUnconditionalUpdate := resourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 	// TODO: expose TTL
 	creating := false
 	out := e.NewFunc()
@@ -295,13 +303,21 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		}
 
 		creating = false
-		newVersion, err := e.Helper.Versioner.ObjectResourceVersion(obj)
-		if err != nil {
-			return nil, nil, err
-		}
-		if newVersion != version {
-			// TODO: return the most recent version to a client?
-			return nil, nil, kubeerr.NewConflict(e.EndpointName, name, fmt.Errorf("the object has been modified; please apply your changes to the latest version and try again"))
+		if doUnconditionalUpdate {
+			// Update the object's resource version to match the latest etcd object's resource version.
+			err = e.Helper.Versioner.UpdateObject(obj, res.Expiration, res.ResourceVersion)
+			if err != nil {
+				return nil, nil, err
+			}
+		} else {
+			// Check if the object's resource version matches the latest resource version.
+			newVersion, err := e.Helper.Versioner.ObjectResourceVersion(obj)
+			if err != nil {
+				return nil, nil, err
+			}
+			if newVersion != version {
+				return nil, nil, kubeerr.NewConflict(e.EndpointName, name, fmt.Errorf("the object has been modified; please apply your changes to the latest version and try again"))
+			}
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, nil, err

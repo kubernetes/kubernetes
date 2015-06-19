@@ -22,7 +22,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/coreos/go-etcd/etcd"
 )
 
 func TestObjectVersioner(t *testing.T) {
@@ -34,7 +33,7 @@ func TestObjectVersioner(t *testing.T) {
 		t.Errorf("unexpected version: %d %v", ver, err)
 	}
 	obj := &TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}
-	if err := v.UpdateObject(obj, &etcd.Node{ModifiedIndex: 5}); err != nil {
+	if err := v.UpdateObject(obj, nil, 5); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if obj.ResourceVersion != "5" || obj.DeletionTimestamp != nil {
@@ -42,7 +41,7 @@ func TestObjectVersioner(t *testing.T) {
 	}
 	now := util.Time{time.Now()}
 	obj = &TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}
-	if err := v.UpdateObject(obj, &etcd.Node{ModifiedIndex: 5, Expiration: &now.Time}); err != nil {
+	if err := v.UpdateObject(obj, &now.Time, 5); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if obj.ResourceVersion != "5" || *obj.DeletionTimestamp != now {
