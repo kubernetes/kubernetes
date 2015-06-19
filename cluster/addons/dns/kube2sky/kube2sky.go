@@ -48,7 +48,7 @@ import (
 var (
 	argDomain              = flag.String("domain", "cluster.local", "domain under which to create names")
 	argEtcdMutationTimeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
-	argEtcdServer          = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
+	argEtcdServer          = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server. Env variables in this flag will be expanded.")
 	argKubecfgFile         = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes service")
 	argKubeMasterURL       = flag.String("kube_master_url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 )
@@ -504,7 +504,7 @@ func main() {
 		domain:              domain,
 		etcdMutationTimeout: *argEtcdMutationTimeout,
 	}
-	if ks.etcdClient, err = newEtcdClient(*argEtcdServer); err != nil {
+	if ks.etcdClient, err = newEtcdClient(os.ExpandEnv(*argEtcdServer)); err != nil {
 		glog.Fatalf("Failed to create etcd client - %v", err)
 	}
 
