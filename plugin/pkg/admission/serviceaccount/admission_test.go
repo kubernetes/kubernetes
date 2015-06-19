@@ -93,7 +93,7 @@ func TestRejectsMirrorPodWithServiceAccount(t *testing.T) {
 			},
 		},
 		Spec: api.PodSpec{
-			ServiceAccount: "default",
+			ServiceAccountName: "default",
 		},
 	}
 	attrs := admission.NewAttributesRecord(pod, "Pod", "myns", string(api.ResourcePods), admission.Create, nil)
@@ -143,8 +143,8 @@ func TestAssignsDefaultServiceAccountAndToleratesMissingAPIToken(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if pod.Spec.ServiceAccount != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccount)
+	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
 	}
 }
 
@@ -167,8 +167,8 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if pod.Spec.ServiceAccount != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccount)
+	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
 	}
 }
 
@@ -248,8 +248,8 @@ func TestAutomountsAPIToken(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if pod.Spec.ServiceAccount != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccount)
+	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
 	}
 	if len(pod.Spec.Volumes) != 1 {
 		t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
@@ -326,8 +326,8 @@ func TestRespectsExistingMount(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if pod.Spec.ServiceAccount != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccount)
+	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
 	}
 	if len(pod.Spec.Volumes) != 0 {
 		t.Fatalf("Expected 0 volumes (shouldn't create a volume for a secret we don't need), got %d", len(pod.Spec.Volumes))

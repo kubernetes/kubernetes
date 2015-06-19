@@ -1052,7 +1052,7 @@ func TestValidatePodSpec(t *testing.T) {
 			NodeName:              "foobar",
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
-			ServiceAccount:        "acct",
+			ServiceAccountName:    "acct",
 		},
 		{ // Populate HostNetwork.
 			Containers: []api.Container{
@@ -1094,10 +1094,10 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 		"bad service account name": {
-			Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			RestartPolicy:  api.RestartPolicyAlways,
-			DNSPolicy:      api.DNSClusterFirst,
-			ServiceAccount: "invalidName",
+			Containers:         []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy:      api.RestartPolicyAlways,
+			DNSPolicy:          api.DNSClusterFirst,
+			ServiceAccountName: "invalidName",
 		},
 		"bad restart policy": {
 			RestartPolicy: "UnknowPolicy",
