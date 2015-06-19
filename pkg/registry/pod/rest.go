@@ -123,7 +123,7 @@ func MatchPod(label labels.Selector, field fields.Selector) generic.Matcher {
 func PodToSelectableFields(pod *api.Pod) fields.Set {
 	return fields.Set{
 		"metadata.name": pod.Name,
-		"spec.host":     pod.Spec.NodeName,
+		"spec.nodeName": pod.Spec.NodeName,
 		"status.phase":  string(pod.Status.Phase),
 	}
 }

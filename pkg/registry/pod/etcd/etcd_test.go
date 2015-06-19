@@ -323,13 +323,13 @@ func TestListPodListSelection(t *testing.T) {
 			field:       "status.phase=Failed",
 			expectedIDs: util.NewStringSet("baz"),
 		}, {
-			field:       "spec.host=barhost",
+			field:       "spec.nodeName=barhost",
 			expectedIDs: util.NewStringSet("bar"),
 		}, {
-			field:       "spec.host=",
+			field:       "spec.nodeName=",
 			expectedIDs: util.NewStringSet("foo", "baz", "qux", "zot"),
 		}, {
-			field:       "spec.host!=",
+			field:       "spec.nodeName!=",
 			expectedIDs: util.NewStringSet("bar"),
 		},
 	}
