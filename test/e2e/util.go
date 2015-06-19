@@ -87,6 +87,7 @@ const (
 type CloudConfig struct {
 	ProjectID         string
 	Zone              string
+	Cluster           string
 	MasterName        string
 	NodeInstanceGroup string
 	NumNodes          int

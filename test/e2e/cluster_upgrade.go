@@ -19,6 +19,7 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os/exec"
 	"path"
@@ -35,53 +36,172 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// version applies to upgrades; kube-push always pushes local binaries.
-const version = "latest_ci"
+const (
+	// version applies to upgrades; kube-push always pushes local binaries.
+	version       = "latest_ci"
+	versionURLFmt = "https://storage.googleapis.com/kubernetes-release/%s/%s.txt"
+)
+
+// realVersion turns a version constant--one accepted by cluster/gce/upgrade.sh--
+// into a deployable version string.
+//
+// NOTE: KEEP THIS LIST UP-TO-DATE WITH THE CODE BELOW.
+// The version strings supported are:
+// - "latest_stable"   (returns a string like "0.18.2")
+// - "latest_release"  (returns a string like "0.19.1")
+// - "latest_ci"       (returns a string like "0.19.1-669-gabac8c8")
+func realVersion(s string) (string, error) {
+	bucket, file := "", ""
+	switch s {
+	// NOTE: IF YOU CHANGE THE FOLLOWING LIST, ALSO UPDATE cluster/gce/upgrade.sh
+	case "latest_stable":
+		bucket, file = "release", "stable"
+	case "latest_release":
+		bucket, file = "release", "latest"
+	case "latest_ci":
+		bucket, file = "ci", "latest"
+	default:
+		return "", fmt.Errorf("version %s is not supported", s)
+	}
+
+	url := fmt.Sprintf(versionURLFmt, bucket, file)
+	var v string
+	Logf("Fetching version from %s", url)
+	c := &http.Client{Timeout: 2 * time.Second}
+	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+		r, err := c.Get(url)
+		if err != nil {
+			Logf("Error reaching %s: %v", url, err)
+			return false, nil
+		}
+		if r.StatusCode != http.StatusOK {
+			Logf("Bad response; status: %d, response: %v", r.StatusCode, r)
+			return false, nil
+		}
+		defer r.Body.Close()
+		b, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			Logf("Could not read response body: %v", err)
+			return false, nil
+		}
+		v = strings.TrimSpace(string(b))
+		return true, nil
+	}); err != nil {
+		return "", fmt.Errorf("failed to fetch real version from %s", url)
+	}
+	// Versions start with "v", so remove that.
+	return strings.TrimPrefix(v, "v"), nil
+}
 
 // The following upgrade functions are passed into the framework below and used
 // to do the actual upgrades.
+var masterUpgrade = func(v string) error {
+	switch testContext.Provider {
+	case "gce":
+		// TODO(mbforbes): Make master upgrade GCE use the provided version.
+		return masterUpgradeGCE()
+	case "gke":
+		return masterUpgradeGKE(v)
+	default:
+		return fmt.Errorf("masterUpgrade() is not implemented for provider %s", testContext.Provider)
+	}
+}
 
-var masterUpgrade = func() error {
-	_, _, err := runScript("hack/e2e-internal/e2e-upgrade.sh", "-M", version)
+func masterUpgradeGCE() error {
+	_, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-upgrade.sh"), "-M", version)
 	return err
 }
 
-var masterPush = func() error {
-	_, _, err := runScript("hack/e2e-internal/e2e-push.sh", "-m")
+func masterUpgradeGKE(v string) error {
+	Logf("Upgrading master to %q", v)
+	_, _, err := runCmd("gcloud", "beta", "container",
+		fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
+		"clusters",
+		"upgrade",
+		testContext.CloudConfig.Cluster,
+		"--master",
+		fmt.Sprintf("--cluster-version=%s", v))
 	return err
 }
 
-var nodeUpgrade = func(f Framework, replicas int) error {
-	Logf("Preparing node upgarde by creating new instance template")
-	stdout, _, err := runScript("hack/e2e-internal/e2e-upgrade.sh", "-P", version)
+var masterPush = func(_ string) error {
+	// TODO(mbforbes): Make master push use the provided version.
+	_, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-push.sh"), "-m")
+	return err
+}
+
+var nodeUpgrade = func(f Framework, replicas int, v string) error {
+	// Perform the upgrade.
+	var err error
+	switch testContext.Provider {
+	case "gce":
+		// TODO(mbforbes): Make node upgrade GCE use the provided version.
+		err = nodeUpgradeGCE()
+	case "gke":
+		err = nodeUpgradeGKE(v)
+	default:
+		err = fmt.Errorf("nodeUpgrade() is not implemented for provider %s", testContext.Provider)
+	}
+	if err != nil {
+		return err
+	}
+
+	// Wait for it to complete and validate nodes and pods are healthy.
+	Logf("Waiting up to %v for all nodes to be ready after the upgrade", restartNodeReadyAgainTimeout)
+	if _, err := checkNodesReady(f.Client, restartNodeReadyAgainTimeout, testContext.CloudConfig.NumNodes); err != nil {
+		return err
+	}
+	Logf("Waiting up to %v for all pods to be running and ready after the upgrade", restartPodReadyAgainTimeout)
+	return waitForPodsRunningReady(f.Namespace.Name, replicas, restartPodReadyAgainTimeout)
+}
+
+func nodeUpgradeGCE() error {
+	Logf("Preparing node upgarde by creating new instance template for %q", version)
+	stdout, _, err := runCmd(path.Join(testContext.RepoRoot, "hack/e2e-internal/e2e-upgrade.sh"), "-P", version)
 	if err != nil {
 		return err
 	}
 	tmpl := strings.TrimSpace(stdout)
 
-	Logf("Performing a node upgrade to %s; waiting at most %v per node", tmpl, restartPerNodeTimeout)
+	Logf("Performing a node upgrade to %q; waiting at most %v per node", tmpl, restartPerNodeTimeout)
 	if err := migRollingUpdate(tmpl, restartPerNodeTimeout); err != nil {
 		return fmt.Errorf("error doing node upgrade via a migRollingUpdate to %s: %v", tmpl, err)
 	}
+	return nil
+}
 
-	Logf("Waiting up to %v for all nodes to be ready after the upgrade", restartNodeReadyAgainTimeout)
-	if _, err := checkNodesReady(f.Client, restartNodeReadyAgainTimeout, testContext.CloudConfig.NumNodes); err != nil {
-		return err
-	}
-
-	Logf("Waiting up to %v for all pods to be running and ready after the upgrade", restartPodReadyAgainTimeout)
-	return waitForPodsRunningReady(f.Namespace.Name, replicas, restartPodReadyAgainTimeout)
+func nodeUpgradeGKE(v string) error {
+	Logf("Upgrading nodes to %q", v)
+	_, _, err := runCmd("gcloud", "beta", "container",
+		fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
+		"clusters",
+		"upgrade",
+		testContext.CloudConfig.Cluster,
+		fmt.Sprintf("--cluster-version=%s", v))
+	return err
 }
 
 var _ = Describe("Skipped", func() {
+
 	Describe("Cluster upgrade", func() {
 		svcName, replicas := "baz", 2
-		var rcName, ip string
+		var rcName, ip, v string
 		var ingress api.LoadBalancerIngress
 		f := Framework{BaseName: "cluster-upgrade"}
 		var w *WebserverTest
 
 		BeforeEach(func() {
+			// The version is determined once at the beginning of the test so that
+			// the master and nodes won't be skewed if the value changes during the
+			// test.
+			// TODO(mbforbes): Use this version for GCE as well.
+			By(fmt.Sprintf("Getting real version for %q", version))
+			var err error
+			v, err = realVersion(version)
+			expectNoError(err)
+
 			By("Setting up the service, RC, and pods")
 			f.beforeEach()
 			w = NewWebserverTest(f.Client, f.Namespace.Name, svcName)
@@ -119,83 +239,91 @@ var _ = Describe("Skipped", func() {
 
 		Describe("kube-push", func() {
 			It("of master should maintain responsive services", func() {
+				if !providerIs("gce") {
+					By(fmt.Sprintf("Skipping kube-push test, which is not implemented for %s", testContext.Provider))
+					return
+				}
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")
-				testMasterUpgrade(ip, masterPush)
+				testMasterUpgrade(ip, v, masterPush)
 				By("Validating cluster after master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 			})
 		})
 
-		Describe("gce-upgrade-master", func() {
+		Describe("upgrade-master", func() {
 			It("should maintain responsive services", func() {
-				// TODO(mbforbes): Add GKE support.
-				if !providerIs("gce") {
+				if !providerIs("gce", "gke") {
 					By(fmt.Sprintf("Skipping upgrade test, which is not implemented for %s", testContext.Provider))
 					return
 				}
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")
-				testMasterUpgrade(ip, masterUpgrade)
+				testMasterUpgrade(ip, v, masterUpgrade)
 				By("Validating cluster after master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 			})
 		})
 
-		Describe("gce-upgrade-cluster", func() {
+		Describe("upgrade-cluster", func() {
 			var tmplBefore, tmplAfter string
 			BeforeEach(func() {
-				By("Getting the node template before the upgrade")
-				var err error
-				tmplBefore, err = migTemplate()
-				expectNoError(err)
+				if providerIs("gce") {
+					By("Getting the node template before the upgrade")
+					var err error
+					tmplBefore, err = migTemplate()
+					expectNoError(err)
+				}
 			})
 
 			AfterEach(func() {
-				By("Cleaning up any unused node templates")
-				var err error
-				tmplAfter, err = migTemplate()
-				if err != nil {
-					Logf("Could not get node template post-upgrade; may have leaked template %s", tmplBefore)
-					return
-				}
-				if tmplBefore == tmplAfter {
-					// The node upgrade failed so there's no need to delete
-					// anything.
-					Logf("Node template %s is still in use; not cleaning up", tmplBefore)
-					return
-				}
-				// TODO(mbforbes): Distinguish between transient failures
-				// and "cannot delete--in use" errors and retry on the
-				// former.
-				Logf("Deleting node template %s", tmplBefore)
-				o, err := exec.Command("gcloud", "compute", "instance-templates",
-					fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
-					"delete",
-					tmplBefore).CombinedOutput()
-				if err != nil {
-					Logf("gcloud compute instance-templates delete %s call failed with err: %v, output: %s",
-						tmplBefore, err, string(o))
-					Logf("May have leaked %s", tmplBefore)
+				if providerIs("gce") {
+					By("Cleaning up any unused node templates")
+					var err error
+					tmplAfter, err = migTemplate()
+					if err != nil {
+						Logf("Could not get node template post-upgrade; may have leaked template %s", tmplBefore)
+						return
+					}
+					if tmplBefore == tmplAfter {
+						// The node upgrade failed so there's no need to delete
+						// anything.
+						Logf("Node template %s is still in use; not cleaning up", tmplBefore)
+						return
+					}
+					// TODO(mbforbes): Distinguish between transient failures
+					// and "cannot delete--in use" errors and retry on the
+					// former.
+					// TODO(mbforbes): Call this with retryCmd().
+					Logf("Deleting node template %s", tmplBefore)
+					o, err := exec.Command("gcloud", "compute", "instance-templates",
+						fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
+						"delete",
+						tmplBefore).CombinedOutput()
+					if err != nil {
+						Logf("gcloud compute instance-templates delete %s call failed with err: %v, output: %s",
+							tmplBefore, err, string(o))
+						Logf("May have leaked %s", tmplBefore)
+					}
 				}
 			})
 
 			It("should maintain a functioning cluster", func() {
-				// TODO(mbforbes): Add GKE support.
-				if !providerIs("gce") {
+				if !providerIs("gce", "gke") {
 					By(fmt.Sprintf("Skipping upgrade test, which is not implemented for %s", testContext.Provider))
 					return
 				}
+
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")
-				testMasterUpgrade(ip, masterUpgrade)
+				testMasterUpgrade(ip, v, masterUpgrade)
 				By("Validating cluster after master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a node upgrade")
-				testNodeUpgrade(f, nodeUpgrade, replicas)
+				testNodeUpgrade(f, nodeUpgrade, replicas, v)
 				By("Validating cluster after node upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 			})
@@ -203,7 +331,7 @@ var _ = Describe("Skipped", func() {
 	})
 })
 
-func testMasterUpgrade(ip string, mUp func() error) {
+func testMasterUpgrade(ip, v string, mUp func(v string) error) {
 	Logf("Starting async validation")
 	httpClient := http.Client{Timeout: 2 * time.Second}
 	done := make(chan struct{}, 1)
@@ -237,35 +365,53 @@ func testMasterUpgrade(ip string, mUp func() error) {
 	}, 200*time.Millisecond, done)
 
 	Logf("Starting master upgrade")
-	expectNoError(mUp())
+	expectNoError(mUp(v))
 	done <- struct{}{}
 	Logf("Stopping async validation")
 	wg.Wait()
+
+	// TODO(mbforbes): Validate that:
+	// - the master software version truly changed
+
 	Logf("Master upgrade complete")
 }
 
-func testNodeUpgrade(f Framework, nUp func(f Framework, n int) error, replicas int) {
+func testNodeUpgrade(f Framework, nUp func(f Framework, n int, v string) error, replicas int, v string) {
 	Logf("Starting node upgrade")
-	expectNoError(nUp(f, replicas))
+	expectNoError(nUp(f, replicas, v))
 	Logf("Node upgrade complete")
 
 	// TODO(mbforbes): Validate that:
 	// - the node software version truly changed
-
 }
 
-// runScript runs script on testContext.RepoRoot using args and returns
-// stdout, stderr, and error.
-func runScript(script string, args ...string) (string, string, error) {
-	Logf("Running %s %v", script, args)
+// retryCmd runs cmd using args and retries it for up to singleCallTimeout if
+// it returns an error. It returns stdout and stderr.
+func retryCmd(command string, args ...string) (string, string, error) {
+	var err error
+	stdout, stderr := "", ""
+	wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+		stdout, stderr, err = runCmd(command, args...)
+		if err != nil {
+			Logf("Got %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
+	return stdout, stderr, err
+}
+
+// runCmd runs cmd using args and returns stdout and stderr.
+func runCmd(command string, args ...string) (string, string, error) {
+	Logf("Running %s %v", command, args)
 	var bout, berr bytes.Buffer
-	cmd := exec.Command(path.Join(testContext.RepoRoot, script), args...)
+	cmd := exec.Command(command, args...)
 	cmd.Stdout, cmd.Stderr = &bout, &berr
 	err := cmd.Run()
 	stdout, stderr := bout.String(), berr.String()
 	if err != nil {
 		return "", "", fmt.Errorf("error running %s %v; got error %v, stdout %q, stderr %q",
-			script, args, err, stdout, stderr)
+			command, args, err, stdout, stderr)
 	}
 	Logf("stdout: %s", stdout)
 	Logf("stderr: %s", stderr)

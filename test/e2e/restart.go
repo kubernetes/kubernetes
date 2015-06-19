@@ -251,6 +251,7 @@ func migTemplate() (string, error) {
 	var errLast error
 	var templ string
 	key := "instanceTemplate"
+	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
 	if wait.Poll(poll, singleCallTimeout, func() (bool, error) {
 		// TODO(mbforbes): make this hit the compute API directly instead of
 		// shelling out to gcloud.
@@ -289,6 +290,7 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 	var errLast error
 	var id string
 	prefix, suffix := "Started [", "]."
+	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
 	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
 		// TODO(mbforbes): make this hit the compute API directly instead of
 		//                 shelling out to gcloud.
@@ -345,6 +347,7 @@ func migRollingUpdatePoll(id string, nt time.Duration) error {
 	start, timeout := time.Now(), nt*time.Duration(testContext.CloudConfig.NumNodes)
 	var errLast error
 	Logf("Waiting up to %v for MIG rolling update to complete.", timeout)
+	// TODO(mbforbes): Refactor this to use cluster_upgrade.go:retryCmd(...)
 	if wait.Poll(restartPoll, timeout, func() (bool, error) {
 		o, err := exec.Command("gcloud", "preview", "rolling-updates",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
