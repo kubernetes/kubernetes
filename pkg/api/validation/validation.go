@@ -945,8 +945,11 @@ func validateImagePullSecrets(imagePullSecrets []api.LocalObjectReference) errs.
 func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec).Prefix("spec")...)
-
+	if reflect.DeepEqual(&api.PodSpec{}, &pod.Spec) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec", &pod.Spec, "spec must be non-empty"))
+	} else {
+		allErrs = append(allErrs, ValidatePodSpec(&pod.Spec).Prefix("spec")...)
+	}
 	return allErrs
 }
 
@@ -1050,6 +1053,11 @@ var supportedServiceType = util.NewStringSet(string(api.ServiceTypeClusterIP), s
 func ValidateService(service *api.Service) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName).Prefix("metadata")...)
+
+	if reflect.DeepEqual(&api.ServiceSpec{}, &service.Spec) {
+		// Everything after this is based on Spec
+		return append(allErrs, errs.NewFieldInvalid("spec", &service.Spec, "spec must be non-empty"))
+	}
 
 	if len(service.Spec.Ports) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.ports"))
@@ -1176,8 +1184,11 @@ func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErro
 func ValidateReplicationController(controller *api.ReplicationController) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&controller.ObjectMeta, true, ValidateReplicationControllerName).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
-
+	if reflect.DeepEqual(&api.ReplicationControllerSpec{}, &controller.Spec) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec", &controller.Spec, "spec must be non-empty"))
+	} else {
+		allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
+	}
 	return allErrs
 }
 
