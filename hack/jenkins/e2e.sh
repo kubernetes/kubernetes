@@ -116,8 +116,15 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
         export KUBE_SKIP_UPDATE=y
         sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update -q" || true
 
-        # For GKE, we can get the server-specified version.
-        if [[ ${JENKINS_USE_SERVER_VERSION:-} =~ ^[yY]$ ]]; then
+        if [[ ! -z ${JENKINS_EXPLICIT_VERSION:-} ]]; then
+            # Use an explicit pinned version like "ci/v0.10.0-101-g6c814c4" or
+            # "release/v0.19.1"
+            IFS='/' read -a varr <<< "${JENKINS_EXPLICIT_VERSION}"
+            bucket="${varr[0]}"
+            githash="${varr[1]}"
+            echo "$bucket / $githash"
+        elif [[ ${JENKINS_USE_SERVER_VERSION:-} =~ ^[yY]$ ]]; then
+            # For GKE, we can get the server-specified version.
             # We'll pull our TARs for tests from the release bucket.
             bucket="release"
 
