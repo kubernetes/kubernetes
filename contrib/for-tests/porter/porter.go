@@ -33,7 +33,10 @@ const prefix = "SERVE_PORT_"
 
 func main() {
 	for _, vk := range os.Environ() {
-		parts := strings.Split(vk, "=")
+		// Put everything before the first = sign in parts[0], and
+		// everything else in parts[1] (even if there are multiple =
+		// characters).
+		parts := strings.SplitN(vk, "=", 2)
 		key := parts[0]
 		value := parts[1]
 		if strings.HasPrefix(key, prefix) {
