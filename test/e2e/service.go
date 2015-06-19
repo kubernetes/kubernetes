@@ -22,13 +22,10 @@ import (
 	"math/rand"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -277,7 +274,7 @@ var _ = Describe("Services", func() {
 		}
 
 		By("creating pod to be part of service " + serviceName)
-		t.CreateWebserverPod()
+		t.CreateWebserverRC(1)
 
 		By("hitting the pod through the service's NodePort")
 		testReachable(pickMinionIP(c), port.NodePort)
@@ -324,7 +321,7 @@ var _ = Describe("Services", func() {
 		}
 
 		By("creating pod to be part of service " + serviceName)
-		t.CreateWebserverPod()
+		t.CreateWebserverRC(1)
 
 		By("hitting the pod through the service's NodePort")
 		ip := pickMinionIP(c)
@@ -365,7 +362,7 @@ var _ = Describe("Services", func() {
 		}
 
 		By("creating pod to be part of service " + t.ServiceName)
-		t.CreateWebserverPod()
+		t.CreateWebserverRC(1)
 
 		By("changing service " + serviceName + " to type=NodePort")
 		service.Spec.Type = api.ServiceTypeNodePort
@@ -515,7 +512,7 @@ var _ = Describe("Services", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating pod to be part of service " + t.ServiceName)
-		t.CreateWebserverPod()
+		t.CreateWebserverRC(1)
 
 		if service.Spec.Type != api.ServiceTypeLoadBalancer {
 			Failf("got unexpected Spec.Type for LoadBalancer service: %v", service)
@@ -1011,11 +1008,12 @@ func testReachable(ip string, port int) {
 		Failf("Got port==0 for reachability check (%s)", url)
 	}
 
-	By(fmt.Sprintf("Checking reachability of %s", url))
+	By(fmt.Sprintf("Waiting up to %v for %s to be reachable", podStartTimeout, url))
+	start := time.Now()
 	expectNoError(wait.Poll(poll, podStartTimeout, func() (bool, error) {
 		resp, err := httpGetNoConnectionPool(url)
 		if err != nil {
-			Logf("Got error waiting for reachability of %s: %v", url, err)
+			Logf("Got error waiting for reachability of %s: %v (%v)", url, err, time.Since(start))
 			return false, nil
 		}
 		defer resp.Body.Close()
@@ -1044,7 +1042,7 @@ func testNotReachable(ip string, port int) {
 		Failf("Got port==0 for non-reachability check (%s)", url)
 	}
 
-	By(fmt.Sprintf("Checking that %s is not reachable", url))
+	By(fmt.Sprintf("Waiting up to %v for %s to be *not* reachable", podStartTimeout, url))
 	expectNoError(wait.Poll(poll, podStartTimeout, func() (bool, error) {
 		resp, err := httpGetNoConnectionPool(url)
 		if err != nil {
@@ -1086,11 +1084,10 @@ type WebserverTest struct {
 	TestId string
 	Labels map[string]string
 
-	pods     map[string]bool
+	rcs      map[string]bool
 	services map[string]bool
-
-	// Used for generating e.g. unique pod names
-	sequence int32
+	name     string
+	image    string
 }
 
 func NewWebserverTest(client *client.Client, namespace string, serviceName string) *WebserverTest {
@@ -1103,15 +1100,13 @@ func NewWebserverTest(client *client.Client, namespace string, serviceName strin
 		"testid": t.TestId,
 	}
 
-	t.pods = make(map[string]bool)
+	t.rcs = make(map[string]bool)
 	t.services = make(map[string]bool)
 
-	return t
-}
+	t.name = "webserver"
+	t.image = "gcr.io/google_containers/test-webserver"
 
-func (t *WebserverTest) SequenceNext() int {
-	n := atomic.AddInt32(&t.sequence, 1)
-	return int(n)
+	return t
 }
 
 // Build default config for a service (which can then be changed)
@@ -1131,43 +1126,27 @@ func (t *WebserverTest) BuildServiceSpec() *api.Service {
 	return service
 }
 
-// Create a pod with the well-known webserver configuration, and record it for cleanup
-func (t *WebserverTest) CreateWebserverPod() *api.Pod {
-	name := t.ServiceName + "-" + strconv.Itoa(t.SequenceNext())
-	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: latest.Version,
-		},
-		ObjectMeta: api.ObjectMeta{
-			Name:   name,
-			Labels: t.Labels,
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name:  "webserver",
-					Image: "gcr.io/google_containers/test-webserver",
-				},
-			},
-		},
-	}
-	pod, err := t.CreatePod(pod)
+// CreateWebserverRC creates rc-backed pods with the well-known webserver
+// configuration and records it for cleanup.
+func (t *WebserverTest) CreateWebserverRC(replicas int) *api.ReplicationController {
+	rcSpec := rcByName(t.name, replicas, t.image, t.Labels)
+	rcAct, err := t.createRC(rcSpec)
 	if err != nil {
-		Failf("Failed to create pod %s: %v", pod.Name, err)
+		Failf("Failed to create rc %s: %v", rcSpec.Name, err)
 	}
-	expectNoError(waitForPodRunningInNamespace(t.Client, pod.Name, t.Namespace))
-	return pod
+	if err := verifyPods(t.Client, t.Namespace, t.name, false, replicas); err != nil {
+		Failf("Failed to create %d pods with name %s: %v", replicas, t.name, err)
+	}
+	return rcAct
 }
 
-// Create a pod, and record it for cleanup
-func (t *WebserverTest) CreatePod(pod *api.Pod) (*api.Pod, error) {
-	podClient := t.Client.Pods(t.Namespace)
-	result, err := podClient.Create(pod)
+// createRC creates a replication controller and records it for cleanup.
+func (t *WebserverTest) createRC(rc *api.ReplicationController) (*api.ReplicationController, error) {
+	rc, err := t.Client.ReplicationControllers(t.Namespace).Create(rc)
 	if err == nil {
-		t.pods[pod.Name] = true
+		t.rcs[rc.Name] = true
 	}
-	return result, err
+	return rc, err
 }
 
 // Create a service, and record it for cleanup
@@ -1190,12 +1169,21 @@ func (t *WebserverTest) DeleteService(serviceName string) error {
 
 func (t *WebserverTest) Cleanup() []error {
 	var errs []error
-
-	for podName := range t.pods {
-		podClient := t.Client.Pods(t.Namespace)
-		By("deleting pod " + podName + " in namespace " + t.Namespace)
-		err := podClient.Delete(podName, nil)
+	for rcName := range t.rcs {
+		By("stopping RC " + rcName + " in namespace " + t.Namespace)
+		// First, resize the RC to 0.
+		old, err := t.Client.ReplicationControllers(t.Namespace).Get(rcName)
 		if err != nil {
+			errs = append(errs, err)
+		}
+		old.Spec.Replicas = 0
+		if _, err := t.Client.ReplicationControllers(t.Namespace).Update(old); err != nil {
+			errs = append(errs, err)
+		}
+		// TODO(mbforbes): Wait.
+
+		// Then, delete the RC altogether.
+		if err := t.Client.ReplicationControllers(t.Namespace).Delete(rcName); err != nil {
 			errs = append(errs, err)
 		}
 	}

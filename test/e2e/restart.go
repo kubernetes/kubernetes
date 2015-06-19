@@ -86,7 +86,8 @@ var _ = Describe("Restart", func() {
 		for i, p := range pods {
 			podNamesBefore[i] = p.ObjectMeta.Name
 		}
-		if !checkPodsRunningReady(c, podNamesBefore, podReadyBeforeTimeout) {
+		ns := api.NamespaceDefault
+		if !checkPodsRunningReady(c, ns, podNamesBefore, podReadyBeforeTimeout) {
 			Failf("At least one pod wasn't running and ready at test start.")
 		}
 
@@ -115,7 +116,7 @@ var _ = Describe("Restart", func() {
 		podNamesAfter, err := waitForNPods(ps, len(podNamesBefore), restartPodReadyAgainTimeout)
 		Expect(err).NotTo(HaveOccurred())
 		remaining := restartPodReadyAgainTimeout - time.Since(podCheckStart)
-		if !checkPodsRunningReady(c, podNamesAfter, remaining) {
+		if !checkPodsRunningReady(c, ns, podNamesAfter, remaining) {
 			Failf("At least one pod wasn't running and ready after the restart.")
 		}
 	})
@@ -166,7 +167,8 @@ func checkNodesReady(c *client.Client, nt time.Duration, expect int) ([]string, 
 			return false, nil
 		}
 		if len(nodeList.Items) != expect {
-			errLast = fmt.Errorf("expected to find %d nodes but found only %d", expect, len(nodeList.Items))
+			errLast = fmt.Errorf("expected to find %d nodes but found only %d (%v elapsed)",
+				expect, len(nodeList.Items), time.Since(start))
 			Logf("%v", errLast)
 			return false, nil
 		}
@@ -180,6 +182,7 @@ func checkNodesReady(c *client.Client, nt time.Duration, expect int) ([]string, 
 		return nodeNames, fmt.Errorf("couldn't find %d nodes within %v; last error: %v",
 			expect, nt, errLast)
 	}
+	Logf("Successfully found %d nodes", expect)
 
 	// Next, ensure in parallel that all the nodes are ready. We subtract the
 	// time we spent waiting above.
@@ -209,28 +212,32 @@ func checkNodesReady(c *client.Client, nt time.Duration, expect int) ([]string, 
 func restartNodes(provider string, nt time.Duration) error {
 	switch provider {
 	case "gce":
-		return migRollingUpdate(nt)
+		return migRollingUpdateSelf(nt)
 	default:
 		return fmt.Errorf("restartNodes(...) not implemented for %s", provider)
 	}
 }
 
-// migRollingUpdate starts a MIG rolling update and waits up to nt times the
-// nubmer of nodes for it to complete.
-func migRollingUpdate(nt time.Duration) error {
+func migRollingUpdateSelf(nt time.Duration) error {
 	By("getting the name of the template for the managed instance group")
-	templ, err := migTemplate()
+	tmpl, err := migTemplate()
 	if err != nil {
 		return fmt.Errorf("couldn't get MIG template name: %v", err)
 	}
+	return migRollingUpdate(tmpl, nt)
+}
 
-	By("starting the managed instance group rolling update")
-	id, err := migRollingUpdateStart(templ, nt)
+// migRollingUpdate starts a MIG rolling update, upgrading the nodes to a new
+// instance template named tmpl, and waits up to nt times the nubmer of nodes
+// for it to complete.
+func migRollingUpdate(tmpl string, nt time.Duration) error {
+	By(fmt.Sprintf("starting the MIG rolling update to %s", tmpl))
+	id, err := migRollingUpdateStart(tmpl, nt)
 	if err != nil {
 		return fmt.Errorf("couldn't start the MIG rolling update: %v", err)
 	}
 
-	By("polling the managed instance group rolling update until it completes")
+	By(fmt.Sprintf("polling the MIG rolling update (%s) until it completes", id))
 	if err := migRollingUpdatePoll(id, nt); err != nil {
 		return fmt.Errorf("err waiting until update completed: %v", err)
 	}
@@ -284,7 +291,9 @@ func migRollingUpdateStart(templ string, nt time.Duration) (string, error) {
 	prefix, suffix := "Started [", "]."
 	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
 		// TODO(mbforbes): make this hit the compute API directly instead of
-		// shelling out to gcloud.
+		//                 shelling out to gcloud.
+		// NOTE(mbforbes): If you are changing this gcloud command, update
+		//                 cluster/gce/upgrade.sh to match this EXACTLY.
 		o, err := exec.Command("gcloud", "preview", "rolling-updates",
 			fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 			fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
@@ -361,6 +370,7 @@ func migRollingUpdatePoll(id string, nt time.Duration) error {
 	}) != nil {
 		return fmt.Errorf("timeout waiting %v for MIG rolling update to complete. Last error: %v", timeout, errLast)
 	}
+	Logf("MIG rolling update complete after %v", time.Since(start))
 	return nil
 }
 

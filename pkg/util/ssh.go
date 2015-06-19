@@ -142,6 +142,8 @@ func (s *SSHTunnel) Close() error {
 	return nil
 }
 
+// RunSSHCommand returns the stdout, stderr, and exit code from running cmd on
+// host along with any SSH-level error.
 func RunSSHCommand(cmd, host string, signer ssh.Signer) (string, string, int, error) {
 	// Setup the config, dial the server, and open a session.
 	config := &ssh.ClientConfig{
