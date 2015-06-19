@@ -171,6 +171,7 @@ func (e *TokensController) serviceAccountDeleted(obj interface{}) {
 		return
 	}
 	for _, secret := range secrets {
+		glog.V(4).Infof("Deleting secret %s/%s because service account %s was deleted", secret.Namespace, secret.Name, serviceAccount.Name)
 		if err := e.deleteSecret(secret); err != nil {
 			glog.Errorf("Error deleting secret %s/%s: %v", secret.Namespace, secret.Name, err)
 		}
@@ -180,16 +181,16 @@ func (e *TokensController) serviceAccountDeleted(obj interface{}) {
 // secretAdded reacts to a Secret create by ensuring the referenced ServiceAccount exists, and by adding a token to the secret if needed
 func (e *TokensController) secretAdded(obj interface{}) {
 	secret := obj.(*api.Secret)
-	serviceAccount, err := e.getServiceAccount(secret)
+	serviceAccount, err := e.getServiceAccount(secret, true)
 	if err != nil {
 		glog.Error(err)
 		return
 	}
 	if serviceAccount == nil {
-		// We shouldn't delete a secret based on an invalid serviceAccount reference until the serviceAccount store is synced
-		if !e.serviceAccountsSynced() {
-			return
-		}
+		glog.V(2).Infof(
+			"Deleting new secret %s/%s because service account %s (uid=%s) was not found",
+			secret.Namespace, secret.Name,
+			secret.Annotations[api.ServiceAccountNameKey], secret.Annotations[api.ServiceAccountUIDKey])
 		if err := e.deleteSecret(secret); err != nil {
 			glog.Errorf("Error deleting secret %s/%s: %v", secret.Namespace, secret.Name, err)
 		}
@@ -201,16 +202,16 @@ func (e *TokensController) secretAdded(obj interface{}) {
 // secretUpdated reacts to a Secret update (or re-list) by deleting the secret (if the referenced ServiceAccount does not exist)
 func (e *TokensController) secretUpdated(oldObj interface{}, newObj interface{}) {
 	newSecret := newObj.(*api.Secret)
-	newServiceAccount, err := e.getServiceAccount(newSecret)
+	newServiceAccount, err := e.getServiceAccount(newSecret, true)
 	if err != nil {
 		glog.Error(err)
 		return
 	}
 	if newServiceAccount == nil {
-		// We shouldn't delete a secret based on an invalid serviceAccount reference until the serviceAccount store is synced
-		if !e.serviceAccountsSynced() {
-			return
-		}
+		glog.V(2).Infof(
+			"Deleting updated secret %s/%s because service account %s (uid=%s) was not found",
+			newSecret.Namespace, newSecret.Name,
+			newSecret.Annotations[api.ServiceAccountNameKey], newSecret.Annotations[api.ServiceAccountUIDKey])
 		if err := e.deleteSecret(newSecret); err != nil {
 			glog.Errorf("Error deleting secret %s/%s: %v", newSecret.Namespace, newSecret.Name, err)
 		}
@@ -228,7 +229,7 @@ func (e *TokensController) secretDeleted(obj interface{}) {
 		return
 	}
 
-	serviceAccount, err := e.getServiceAccount(secret)
+	serviceAccount, err := e.getServiceAccount(secret, false)
 	if err != nil {
 		glog.Error(err)
 		return
@@ -399,7 +400,7 @@ func (e *TokensController) removeSecretReferenceIfNeeded(serviceAccount *api.Ser
 
 // getServiceAccount returns the ServiceAccount referenced by the given secret. If the secret is not
 // of type ServiceAccountToken, or if the referenced ServiceAccount does not exist, nil is returned
-func (e *TokensController) getServiceAccount(secret *api.Secret) (*api.ServiceAccount, error) {
+func (e *TokensController) getServiceAccount(secret *api.Secret, fetchOnCacheMiss bool) (*api.ServiceAccount, error) {
 	name, uid := serviceAccountNameAndUID(secret)
 	if len(name) == 0 {
 		return nil, nil
@@ -420,6 +421,21 @@ func (e *TokensController) getServiceAccount(secret *api.Secret) (*api.ServiceAc
 		if len(uid) > 0 && uid != string(serviceAccount.UID) {
 			// If UID is specified, it must match
 			continue
+		}
+		return serviceAccount, nil
+	}
+
+	if fetchOnCacheMiss {
+		serviceAccount, err := e.client.ServiceAccounts(secret.Namespace).Get(name)
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		if len(uid) > 0 && uid != string(serviceAccount.UID) {
+			// If UID is specified, it must match
+			return nil, nil
 		}
 		return serviceAccount, nil
 	}
