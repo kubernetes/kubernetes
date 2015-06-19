@@ -4,4 +4,4 @@
 # defaults from config and apiserver should be adequate
 
 # Add your own!
-KUBE_CONTROLLER_MANAGER_ARGS=""
+KUBE_CONTROLLER_MANAGER_ARGS="--kubeconfig={{ kube_config_dir }}/controller-manager.kubeconfig"

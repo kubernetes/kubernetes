@@ -1,0 +1,49 @@
+---
+#- name: Get create cert script from Kubernetes
+#  get_url:
+#    url=https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/cluster/saltbase/salt/generate-cert/make-cert.sh
+#    dest={{ kube_script_dir }}/make-cert.sh mode=0500
+#    force=yes
+
+#- name: Get create ca cert script from Kubernetes
+#  get_url:
+#    url=https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/cluster/saltbase/salt/generate-cert/make-ca-cert.sh
+#    dest={{ kube_script_dir }}/make-ca-cert.sh mode=0500
+#    force=yes
+
+- name: HACK | overwrite make-cert.sh from local copy
+  copy:
+    src=make-cert.sh
+    dest={{ kube_script_dir }}
+    mode=0500
+  changed_when: false
+
+- name: HACK | overwrite make-ca-cert.sh from local copy
+  copy:
+    src=make-ca-cert.sh
+    dest={{ kube_script_dir }}
+    mode=0500
+  changed_when: false
+
+# FIXME This only generates a cert for one master...
+- name: Run create cert script on master
+  command:
+    "{{ kube_script_dir }}/make-ca-cert.sh {{ inventory_hostname }}"
+  args:
+    creates: "{{ kube_cert_dir }}/server.cert"
+  environment:
+    CERT_DIR: "{{ kube_cert_dir }}"
+    CERT_GROUP: "{{ kube_cert_group }}"
+
+- name: Verify certificate permissions
+  file:
+    path={{ item }}
+    group={{ kube_cert_group }}
+    owner=kube
+    mode=0440
+  with_items:
+    - "{{ kube_cert_dir }}/ca.crt"
+    - "{{ kube_cert_dir }}/server.cert"
+    - "{{ kube_cert_dir }}/server.key"
+    - "{{ kube_cert_dir }}/kubecfg.crt"
+    - "{{ kube_cert_dir }}/kubecfg.key"

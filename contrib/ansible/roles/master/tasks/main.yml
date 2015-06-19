@@ -6,23 +6,33 @@
   when: not is_atomic and ansible_distribution == "CentOS"
 
 - name: write the config file for the api server
-  template: src=apiserver.j2 dest=/etc/kubernetes/apiserver
+  template: src=apiserver.j2 dest={{ kube_config_dir }}/apiserver
   notify:
     - restart apiserver
 
 - name: write the config file for the controller-manager
-  copy: src=controller-manager dest=/etc/kubernetes/controller-manager
+  template: src=controller-manager.j2 dest={{ kube_config_dir }}/controller-manager
   notify:
     - restart controller-manager
 
 - name: write the config file for the scheduler
-  copy: src=scheduler dest=/etc/kubernetes/scheduler
+  template: src=scheduler.j2 dest={{ kube_config_dir }}/scheduler
   notify:
     - restart scheduler
 
 - name: add cap_net_bind_service to kube-apiserver
   capabilities: path=/usr/bin/kube-apiserver capability=cap_net_bind_service=ep state=present
   when: not is_atomic
+
+- name: write the kubecfg (auth) file for controller-manager
+  template: src=controller-manager.kubeconfig.j2 dest={{ kube_config_dir }}/controller-manager.kubeconfig
+  notify:
+    - restart controller-manager
+
+- name: write the kubecfg (auth) file for scheduler
+  template: src=scheduler.kubeconfig.j2 dest={{ kube_config_dir }}/scheduler.kubeconfig
+  notify:
+    - restart scheduler
 
 - name: Enable apiserver
   service: name=kube-apiserver enabled=yes state=started

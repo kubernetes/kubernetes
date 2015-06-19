@@ -6,12 +6,22 @@
   when: not is_atomic and ansible_distribution == "CentOS"
 
 - name: write the config files for kubelet
-  template: src=kubelet.j2 dest=/etc/kubernetes/kubelet
+  template: src=kubelet.j2 dest={{ kube_config_dir }}/kubelet
   notify:
     - restart kubelet
 
 - name: write the config files for proxy
-  copy: src=proxy dest=/etc/kubernetes/proxy
+  template: src=proxy.j2 dest={{ kube_config_dir }}/proxy
+  notify:
+    - restart proxy
+
+- name: write the kubecfg (auth) file for kubelet
+  template: src=kubelet.kubeconfig.j2 dest={{ kube_config_dir }}/kubelet.kubeconfig
+  notify:
+    - restart kubelet
+
+- name: write the kubecfg (auth) file for kube-proxy
+  template: src=proxy.kubeconfig.j2 dest={{ kube_config_dir }}/proxy.kubeconfig
   notify:
     - restart proxy
 
