@@ -91,6 +91,14 @@ func expectPodUpdate(t *testing.T, ch <-chan kubelet.PodUpdate, expected ...kube
 	for i := range expected {
 		update := <-ch
 		sort.Sort(sortedPods(update.Pods))
+		// Clear the annotation field before the comparision.
+		// TODO: consider mock out recordFirstSeen in config.go
+		for _, pod := range update.Pods {
+			delete(pod.Annotations, kubelet.ConfigFirstSeenAnnotationKey)
+		}
+		for _, pod := range expected[i].Pods {
+			delete(pod.Annotations, kubelet.ConfigFirstSeenAnnotationKey)
+		}
 		if !api.Semantic.DeepEqual(expected[i], update) {
 			t.Fatalf("Expected %#v, Got %#v", expected[i], update)
 		}

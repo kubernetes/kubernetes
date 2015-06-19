@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/config"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -183,6 +184,11 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	return nil
 }
 
+// recordFirstSeenTime records the first seen time of this pod.
+func recordFirstSeenTime(pod *api.Pod) {
+	pod.Annotations[kubelet.ConfigFirstSeenAnnotationKey] = kubeletTypes.NewTimestamp().GetString()
+}
+
 func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes *kubelet.PodUpdate) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
@@ -223,6 +229,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				ref.Annotations = make(map[string]string)
 			}
 			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
+			recordFirstSeenTime(ref)
 			pods[name] = ref
 			adds.Pods = append(adds.Pods, ref)
 		}
@@ -265,6 +272,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				ref.Annotations = make(map[string]string)
 			}
 			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
+			recordFirstSeenTime(ref)
 			pods[name] = ref
 			adds.Pods = append(adds.Pods, ref)
 		}
