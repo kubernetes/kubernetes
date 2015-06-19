@@ -39,8 +39,16 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// NodeStartupThreshold is a rough estimate of the time allocated for a pod to start on a node.
+const NodeStartupThreshold = 4 * time.Second
+
+// podLatencyData encapsulates pod startup latency information.
 type podLatencyData struct {
-	Name    string
+	// Name of the pod
+	Name string
+	// Node this pod was running on
+	Node string
+	// Latency information related to pod startuptime
 	Latency time.Duration
 }
 
@@ -224,6 +232,7 @@ var _ = Describe("Density", func() {
 				Logf("Schedling additional Pods to measure startup latencies")
 
 				createTimes := make(map[string]util.Time, 0)
+				nodes := make(map[string]string, 0)
 				scheduleTimes := make(map[string]util.Time, 0)
 				runTimes := make(map[string]util.Time, 0)
 				watchTimes := make(map[string]util.Time, 0)
@@ -238,6 +247,7 @@ var _ = Describe("Density", func() {
 						if _, found := watchTimes[p.Name]; !found {
 							watchTimes[p.Name] = util.Now()
 							createTimes[p.Name] = p.CreationTimestamp
+							nodes[p.Name] = p.Spec.NodeName
 							var startTime util.Time
 							for _, cs := range p.Status.ContainerStatuses {
 								if cs.State.Running != nil {
@@ -332,11 +342,14 @@ var _ = Describe("Density", func() {
 					Expect(ok).To(Equal(true))
 					watch, ok := watchTimes[name]
 					Expect(ok).To(Equal(true))
-					scheduleLag = append(scheduleLag, podLatencyData{name, sched.Time.Sub(create.Time)})
-					startupLag = append(startupLag, podLatencyData{name, run.Time.Sub(sched.Time)})
-					watchLag = append(watchLag, podLatencyData{name, watch.Time.Sub(run.Time)})
-					schedToWatchLag = append(schedToWatchLag, podLatencyData{name, watch.Time.Sub(sched.Time)})
-					e2eLag = append(e2eLag, podLatencyData{name, watch.Time.Sub(create.Time)})
+					node, ok := nodes[name]
+					Expect(ok).To(Equal(true))
+
+					scheduleLag = append(scheduleLag, podLatencyData{name, node, sched.Time.Sub(create.Time)})
+					startupLag = append(startupLag, podLatencyData{name, node, run.Time.Sub(sched.Time)})
+					watchLag = append(watchLag, podLatencyData{name, node, watch.Time.Sub(run.Time)})
+					schedToWatchLag = append(schedToWatchLag, podLatencyData{name, node, watch.Time.Sub(sched.Time)})
+					e2eLag = append(e2eLag, podLatencyData{name, node, watch.Time.Sub(create.Time)})
 				}
 
 				sort.Sort(latencySlice(scheduleLag))
@@ -350,6 +363,13 @@ var _ = Describe("Density", func() {
 				printLatencies(watchLag, "worst watch latencies")
 				printLatencies(schedToWatchLag, "worst scheduled-to-end total latencies")
 				printLatencies(e2eLag, "worst e2e total latencies")
+
+				// Log suspicious latency metrics/docker errors from all nodes that had slow startup times
+				for _, l := range startupLag {
+					if l.Latency > NodeStartupThreshold {
+						HighLatencyKubeletOperations(c, 1*time.Second, l.Node)
+					}
+				}
 
 				Logf("Approx throughput: %v pods/min",
 					float64(minionCount)/(e2eLag[len(e2eLag)-1].Latency.Minutes()))
