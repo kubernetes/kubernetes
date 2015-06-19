@@ -7,6 +7,11 @@
 {% set cloud_config = "" -%}
 {% set cloud_config_mount = "" -%}
 {% set cloud_config_volume = "" -%}
+{% set configure_cbr0 = "" -%}
+
+{% if grains['roles'][0] == 'kubernetes-master' -%}
+  {% set configure_cbr0 = "--configure-cbr0=false" -%}
+{% endif -%}
 
 {% if grains.cloud is defined -%}
   {% set cloud_provider = "--cloud_provider=" + grains.cloud -%}
@@ -86,7 +91,7 @@
 {% endif -%}
 
 {% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + " " + basic_auth_file + " " + min_request_timeout -%}
-{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure_port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
+{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure_port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options + " " + configure_cbr0 -%}
 
 {
 "apiVersion": "v1beta3",
