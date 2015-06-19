@@ -11,6 +11,7 @@
    * [Ruby2](https://github.com/abonas/kubeclient)
    * [PHP](https://github.com/devstub/kubernetes-api-php-client)
    * [Node.js](https://github.com/tenxcloud/node-kubernetes-client)
+   * [Perl](https://metacpan.org/pod/Net::Kubernetes)
 
 
 
