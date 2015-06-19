@@ -96,7 +96,7 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 		timeout = Timeout + time.Duration(10*rc.Spec.Replicas)*time.Second
 	}
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
-	waitForReplicas := NewRetryParams(reaper.pollInterval, timeout)
+	waitForReplicas := NewWait()
 	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil {
 		return "", err
 	}

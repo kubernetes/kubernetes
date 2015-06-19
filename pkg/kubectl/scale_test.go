@@ -74,7 +74,7 @@ func TestReplicationControllerScale(t *testing.T) {
 	scaler.Scale("default", name, count, &preconditions, nil, nil)
 
 	if len(fake.Actions) != 2 {
-		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
+		t.Fatalf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
 	}
 	if fake.Actions[0].Action != "get-replicationController" || fake.Actions[0].Value != name {
 		t.Errorf("unexpected action: %v, expected get-replicationController %s", fake.Actions[0], name)
@@ -97,7 +97,7 @@ func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 	scaler.Scale("default", name, count, &preconditions, nil, nil)
 
 	if len(fake.Actions) != 1 {
-		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
+		t.Fatalf("unexpected actions: %v, expected 1 action (get)", fake.Actions)
 	}
 	if fake.Actions[0].Action != "get-replicationController" || fake.Actions[0].Value != name {
 		t.Errorf("unexpected action: %v, expected get-replicationController %s", fake.Actions[0], name)
