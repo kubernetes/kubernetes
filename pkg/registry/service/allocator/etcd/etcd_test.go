@@ -17,11 +17,11 @@ limitations under the License.
 package etcd
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/coreos/go-etcd/etcd"
 
-	"fmt"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
@@ -54,7 +54,7 @@ func key() string {
 func TestEmpty(t *testing.T) {
 	storage, _, ecli := newStorage(t)
 	ecli.ExpectNotFoundGet(key())
-	if _, err := storage.Allocate(1); fmt.Sprintf("%v", err) != "cannot allocate resources of type serviceipallocation at this time" {
+	if _, err := storage.Allocate(1); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocation at this time") {
 		t.Fatal(err)
 	}
 }

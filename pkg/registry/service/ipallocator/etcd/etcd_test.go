@@ -18,11 +18,11 @@ package etcd
 
 import (
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/coreos/go-etcd/etcd"
 
-	"fmt"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
@@ -66,7 +66,7 @@ func key() string {
 func TestEmpty(t *testing.T) {
 	storage, _, ecli := newStorage(t)
 	ecli.ExpectNotFoundGet(key())
-	if err := storage.Allocate(net.ParseIP("192.168.1.2")); fmt.Sprintf("%v", err) != "cannot allocate resources of type serviceipallocation at this time" {
+	if err := storage.Allocate(net.ParseIP("192.168.1.2")); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocation at this time") {
 		t.Fatal(err)
 	}
 }

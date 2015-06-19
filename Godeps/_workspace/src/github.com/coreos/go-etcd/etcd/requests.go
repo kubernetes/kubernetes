@@ -327,10 +327,16 @@ func (c *Client) SendRequest(rr *RawRequest) (*RawResponse, error) {
 func DefaultCheckRetry(cluster *Cluster, numReqs int, lastResp http.Response,
 	err error) error {
 
+	if numReqs > 2*len(cluster.Machines) {
+		errStr := fmt.Sprintf("failed to propose on members %v twice [last error: %v]", cluster.Machines, err)
+		return newError(ErrCodeEtcdNotReachable, errStr, 0)
+	}
+
 	if isEmptyResponse(lastResp) {
 		// always retry if it failed to get response from one machine
 		return nil
-	} else if !shouldRetry(lastResp) {
+	}
+	if !shouldRetry(lastResp) {
 		body := []byte("nil")
 		if lastResp.Body != nil {
 			if b, err := ioutil.ReadAll(lastResp.Body); err == nil {
@@ -340,16 +346,8 @@ func DefaultCheckRetry(cluster *Cluster, numReqs int, lastResp http.Response,
 		errStr := fmt.Sprintf("unhandled http status [%s] with body [%s]", http.StatusText(lastResp.StatusCode), body)
 		return newError(ErrCodeUnhandledHTTPStatus, errStr, 0)
 	}
-
-	if numReqs > 2*len(cluster.Machines) {
-		errStr := fmt.Sprintf("failed to propose on members %v twice [last error: %v]", cluster.Machines, err)
-		return newError(ErrCodeEtcdNotReachable, errStr, 0)
-	}
-	if shouldRetry(lastResp) {
-		// sleep some time and expect leader election finish
-		time.Sleep(time.Millisecond * 200)
-	}
-
+	// sleep some time and expect leader election finish
+	time.Sleep(time.Millisecond * 200)
 	logger.Warning("bad response status code", lastResp.StatusCode)
 	return nil
 }

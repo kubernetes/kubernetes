@@ -78,7 +78,17 @@ func (c *Repair) RunOnce() error {
 	// and the release code must not release services that have had IPs allocated but not yet been created
 	// See #8295
 
-	latest, err := c.alloc.Get()
+	// If etcd server is not running we should wait for some time and fail only then. This is particularly
+	// important when we start apiserver and etcd at the same time.
+	var latest *api.RangeAllocation
+	var err error
+	for i := 0; i < 10; i++ {
+		if latest, err = c.alloc.Get(); err != nil {
+			time.Sleep(time.Second)
+		} else {
+			break
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}
