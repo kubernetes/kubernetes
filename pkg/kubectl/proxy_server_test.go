@@ -98,10 +98,10 @@ func TestAccept(t *testing.T) {
 			acceptPaths:  DefaultPathAcceptRE,
 			rejectPaths:  DefaultPathRejectRE,
 			acceptHosts:  DefaultHostAcceptRE,
-			path:         "/foo/v1/pods",
+			path:         "/ui",
 			host:         "localhost",
 			method:       "GET",
-			expectAccept: false,
+			expectAccept: true,
 		},
 		{
 			acceptPaths:  DefaultPathAcceptRE,
@@ -230,7 +230,7 @@ func TestAPIRequests(t *testing.T) {
 
 	// httptest.NewServer should always generate a valid URL.
 	target, _ := url.Parse(ts.URL)
-	proxy := newProxyServer(target)
+	proxy := newProxy(target)
 
 	tests := []struct{ method, body string }{
 		{"GET", ""},
@@ -291,7 +291,7 @@ func TestPathHandling(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%#v: %v", item, err)
 			}
-			pts := httptest.NewServer(p.mux)
+			pts := httptest.NewServer(p.handler)
 			defer pts.Close()
 
 			r, err := http.Get(pts.URL + item.reqPath)
