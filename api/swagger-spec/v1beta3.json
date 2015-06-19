@@ -3365,6 +3365,36 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Node",
+      "nickname": "proxyOPTIONSNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -3465,6 +3495,28 @@
       "method": "HEAD",
       "summary": "proxy HEAD requests to Node",
       "nickname": "proxyHEADNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Node",
+      "nickname": "proxyOPTIONSNode",
       "parameters": [
        {
         "type": "string",
@@ -5415,6 +5467,44 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Pod",
+      "nickname": "proxyOPTIONSPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -5547,6 +5637,36 @@
       "method": "HEAD",
       "summary": "proxy HEAD requests to Pod",
       "nickname": "proxyHEADPod",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Pod",
+      "nickname": "proxyOPTIONSPod",
       "parameters": [
        {
         "type": "string",
@@ -10445,6 +10565,44 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Service",
+      "nickname": "proxyOPTIONSService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -10577,6 +10735,36 @@
       "method": "HEAD",
       "summary": "proxy HEAD requests to Service",
       "nickname": "proxyHEADService",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Service",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Service",
+      "nickname": "proxyOPTIONSService",
       "parameters": [
        {
         "type": "string",
