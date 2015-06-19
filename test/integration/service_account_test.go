@@ -254,8 +254,8 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if createdPod.Spec.ServiceAccount != expectedServiceAccount {
-		t.Fatalf("Expected %s, got %s", expectedServiceAccount, createdPod.Spec.ServiceAccount)
+	if createdPod.Spec.ServiceAccountName != expectedServiceAccount {
+		t.Fatalf("Expected %s, got %s", expectedServiceAccount, createdPod.Spec.ServiceAccountName)
 	}
 	if !api.Semantic.DeepEqual(&expectedVolumes, &createdPod.Spec.Volumes) {
 		t.Fatalf("Expected\n\t%#v\n\tgot\n\t%#v", expectedVolumes, createdPod.Spec.Volumes)
