@@ -67,6 +67,10 @@ const (
 	// Realistic value of the burstReplica field for the replication manager based off
 	// performance requirements for kubernetes 1.0.
 	BurstReplicas = 500
+
+	// We must avoid counting pods until the pod store has synced. If it hasn't synced, to
+	// avoid a hot loop, we'll wait this long between checks.
+	PodStoreSyncedPollPeriod = 100 * time.Millisecond
 )
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored
@@ -80,6 +84,11 @@ type ReplicationManager struct {
 	burstReplicas int
 	// To allow injection of syncReplicationController for testing.
 	syncHandler func(rcKey string) error
+
+	// podStoreSynced returns true if the pod store has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	podStoreSynced func() bool
+
 	// A TTLCache of pod creates/deletes each rc expects to see
 	expectations RCExpectationsManager
 	// A store of controllers, populated by the rcController
@@ -167,6 +176,7 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 	)
 
 	rm.syncHandler = rm.syncReplicationController
+	rm.podStoreSynced = rm.podController.HasSynced
 	return rm
 }
 
@@ -366,6 +376,13 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		return err
 	}
 	controller := *obj.(*api.ReplicationController)
+	if !rm.podStoreSynced() {
+		// Sleep so we give the pod reflector goroutine a chance to run.
+		time.Sleep(PodStoreSyncedPollPeriod)
+		glog.Infof("Waiting for pods controller to sync, requeuing rc %v", controller.Name)
+		rm.enqueueController(&controller)
+		return nil
+	}
 
 	// Check the expectations of the rc before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
