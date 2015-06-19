@@ -36,6 +36,8 @@ const (
 	NodeList
 	NodeField
 	NodeFilter
+	NodeInt
+	NodeFloat
 )
 
 var NodeTypeName = map[NodeType]string{
@@ -44,6 +46,8 @@ var NodeTypeName = map[NodeType]string{
 	NodeList:   "NodeList",
 	NodeField:  "NodeField",
 	NodeFilter: "NodeFilter",
+	NodeInt:    "NodeInt",
+	NodeFloat:  "NodeFloat",
 }
 
 type Node interface {
@@ -123,18 +127,46 @@ func (a *ArrayNode) String() string {
 // FilterNode holds operand and operator information for filter
 type FilterNode struct {
 	NodeType
-	Left, Operator, Right string
+	Left     *ListNode
+	Right    *ListNode
+	Operator string
 }
 
-func newFilter(left, operator, right string) *FilterNode {
+func newFilter(left, right *ListNode, operator string) *FilterNode {
 	return &FilterNode{
 		NodeType: NodeFilter,
 		Left:     left,
-		Operator: operator,
 		Right:    right,
+		Operator: operator,
 	}
 }
 
 func (f *FilterNode) String() string {
 	return fmt.Sprintf("%s: %s %s %s", f.Type(), f.Left, f.Operator, f.Right)
+}
+
+type IntNode struct {
+	NodeType
+	Value int
+}
+
+func newInt(num int) *IntNode {
+	return &IntNode{NodeType: NodeInt, Value: num}
+}
+
+func (i *IntNode) String() string {
+	return fmt.Sprintf("%s: %d", i.Type(), i.Value)
+}
+
+type FloatNode struct {
+	NodeType
+	Value float64
+}
+
+func newFloat(num float64) *FloatNode {
+	return &FloatNode{NodeType: NodeFloat, Value: num}
+}
+
+func (i *FloatNode) String() string {
+	return fmt.Sprintf("%s: %f", i.Type(), i.Value)
 }

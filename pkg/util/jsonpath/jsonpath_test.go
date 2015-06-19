@@ -31,9 +31,11 @@ type jsonpathTest struct {
 var jsonpathTests = []jsonpathTest{
 	{"plain", "hello jsonpath", nil, "hello jsonpath"},
 	{"variable", "hello ${.v}", A{v: "world"}, "hello world"},
+	{"dict", "${.key}", map[string]string{"key": "value"}, "value"},
 	{"nest", "hello ${.a.v}", B{a: A{v: "world"}}, "hello world"},
 	{"quote", `${"${"}`, nil, "${"},
 	{"array", "${[0:2]}", []string{"Monday", "Tudesday"}, "[Monday, Tudesday]"},
+	{"filter", "${[?(@<5)]}", []int{2, 6, 3, 7}, "[2, 3]"},
 }
 
 // only for test use
@@ -57,7 +59,7 @@ func TestJSONPath(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err = j.Execute(buf, test.input)
 		if err != nil {
-			t.Errorf("in %s, execute error %v", err)
+			t.Errorf("in %s, execute error %v", test.name, err)
 		}
 		out := buf.String()
 		if out != test.expect {

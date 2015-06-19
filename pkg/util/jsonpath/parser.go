@@ -134,12 +134,18 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 	switch r := p.next(); {
 	case r == eof || isEndOfLine(r):
 		return fmt.Errorf("unclosed action")
+	case r == '@': //the current object, just pass it
+		p.consumeText()
 	case r == '[':
 		return p.parseArray(cur)
 	case r == '"':
 		return p.parseQuote(cur)
 	case r == '.':
 		return p.parseField(cur)
+	case r == '+' || r == '-' || unicode.IsDigit(r):
+		p.backup()
+		return p.parseNumber(cur)
+
 	default:
 		return fmt.Errorf("unrecognized charactor in action: %#U", r)
 	}
@@ -152,6 +158,33 @@ func (p *Parser) parseRightDelim(cur *ListNode) error {
 	p.consumeText()
 	cur = p.Root
 	return p.parseText(cur)
+}
+
+// parseNumber scans number
+func (p *Parser) parseNumber(cur *ListNode) error {
+	r := p.peek()
+	if r == '+' || r == '-' {
+		r = p.next()
+	}
+	for {
+		r = p.next()
+		if r != '.' && !unicode.IsDigit(r) {
+			p.backup()
+			break
+		}
+	}
+	value := p.consumeText()
+	i, err := strconv.Atoi(value)
+	if err == nil {
+		cur.append(newInt(i))
+		return p.parseInsideAction(cur)
+	}
+	d, err := strconv.ParseFloat(value, 64)
+	if err == nil {
+		cur.append(newFloat(d))
+		return p.parseInsideAction(cur)
+	}
+	return fmt.Errorf("cannot parse number %s", value)
 }
 
 // parseArray scans array index selection
@@ -212,9 +245,21 @@ Loop:
 	text = string(text[:len(text)-2])
 	value := reg.FindStringSubmatch(text)
 	if value == nil {
-		cur.append(newFilter(text, "exist", ""))
+		parser, err := Parse("text", fmt.Sprintf("${%s}", text))
+		if err != nil {
+			return err
+		}
+		cur.append(newFilter(parser.Root, nil, "exist"))
 	} else {
-		cur.append(newFilter(value[1], value[2], value[3]))
+		leftParser, err := Parse("left", fmt.Sprintf("${%s}", value[1]))
+		if err != nil {
+			return err
+		}
+		rightParser, err := Parse("right", fmt.Sprintf("${%s}", value[3]))
+		if err != nil {
+			return err
+		}
+		cur.append(newFilter(leftParser.Root, rightParser.Root, value[2]))
 	}
 	return p.parseInsideAction(cur)
 }

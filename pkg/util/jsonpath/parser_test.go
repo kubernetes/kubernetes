@@ -34,9 +34,11 @@ var parserTests = []parserTest{
 	{"quote", `hello ${"${"}`,
 		[]Node{newText("hello "), newList(), newText("${")}},
 	{"array", `hello ${[1:3]}`,
-		[]Node{newText("hello "), newList(), newArray([3]ParamsEntry{{1, true}, {3, true}, {0, false}})}},
+		[]Node{newText("hello "), newList(),
+			newArray([3]ParamsEntry{{1, true}, {3, true}, {0, false}})}},
 	{"filter", `${[?(@.price<3)]}`,
-		[]Node{newList(), newFilter("@.price", "<", "3")}},
+		[]Node{newList(), newFilter(newList(), newList(), "<"), newList(),
+			newList(), newField("price"), newList(), newList(), newInt(3)}},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {
@@ -45,6 +47,9 @@ func collectNode(nodes []Node, cur Node) []Node {
 		for _, node := range cur.(*ListNode).Nodes {
 			nodes = collectNode(nodes, node)
 		}
+	} else if cur.Type() == NodeFilter {
+		nodes = collectNode(nodes, cur.(*FilterNode).Left)
+		nodes = collectNode(nodes, cur.(*FilterNode).Right)
 	}
 	return nodes
 }
@@ -61,7 +66,7 @@ func TestParser(t *testing.T) {
 		}
 		for i, expect := range test.nodes {
 			if result[i].String() != expect.String() {
-				t.Errorf("in %s, expect %v, got %v", test.name, expect, result[i])
+				t.Errorf("in %s, %dth node, expect %v, got %v", test.name, i, expect, result[i])
 			}
 		}
 	}
