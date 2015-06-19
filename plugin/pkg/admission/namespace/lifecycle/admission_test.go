@@ -75,4 +75,17 @@ func TestAdmission(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler: %v", err)
 	}
+
+	// verify delete of namespace default can never proceed
+	err = handler.Admit(admission.NewAttributesRecord(nil, "Namespace", "", api.NamespaceDefault, "namespaces", "", admission.Delete, nil))
+	if err == nil {
+		t.Errorf("Expected an error that this namespace can never be deleted")
+	}
+
+	// verify delete of namespace other than default can proceed
+	err = handler.Admit(admission.NewAttributesRecord(nil, "Namespace", "", "other", "namespaces", "", admission.Delete, nil))
+	if err != nil {
+		t.Errorf("Did not expect an error %v", err)
+	}
+
 }
