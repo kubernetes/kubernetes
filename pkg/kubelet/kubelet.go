@@ -1176,7 +1176,9 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	var podStatus api.PodStatus
 	if updateType == SyncPodCreate {
 		podStatus = pod.Status
-		glog.V(3).Infof("Not generating pod status for new pod %v", podFullName)
+		podStatus.StartTime = &util.Time{start}
+		kl.statusManager.SetPodStatus(pod, podStatus)
+		glog.V(3).Infof("Not generating pod status for new pod %q", podFullName)
 	} else {
 		var err error
 		podStatus, err = kl.generatePodStatus(pod)
