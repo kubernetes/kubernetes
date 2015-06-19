@@ -278,10 +278,12 @@ func performTemporaryNetworkFailure(c *client.Client, ns, rcName string, replica
 	}
 	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
 
-	// TODO: The use of MasterName will cause iptables to do a DNS lookup to
+	// TODO marekbiskup 2015-06-19 #10085
+	// The use of MasterName will cause iptables to do a DNS lookup to
 	// resolve the name to an IP address, which will slow down the test
 	// and cause it to fail if DNS is absent or broken.
 	// Use the IP address instead.
+
 	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump DROP", testContext.CloudConfig.MasterName)
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
@@ -456,11 +458,13 @@ var _ = Describe("Nodes", func() {
 			}
 		})
 
-		// TODO: this test has nothing to do with resizing nodes so it should be moved elsewhere.
-		// TODO: two things are tested here:
+		// TODO marekbiskup 2015-06-19 #10085
+		// This test has nothing to do with resizing nodes so it should be moved elsewhere.
+		// Two things are tested here:
 		// 1. pods from a uncontactable nodes are rescheduled
 		// 2. when a node joins the cluster, it can host new pods.
 		// Factor out the cases into two separate tests.
+
 		testName = "Uncontactable nodes, have their pods recreated by a replication controller, and can host new pods after rejoining."
 		It(testName, func() {
 			if testContext.CloudConfig.NumNodes < 2 {
