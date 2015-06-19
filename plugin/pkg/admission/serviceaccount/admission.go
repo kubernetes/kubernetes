@@ -150,7 +150,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
 	if _, isMirrorPod := pod.Annotations[kubelet.ConfigMirrorAnnotationKey]; isMirrorPod {
-		if len(pod.Spec.ServiceAccount) != 0 {
+		if len(pod.Spec.ServiceAccountName) != 0 {
 			return admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference service accounts"))
 		}
 		for _, volume := range pod.Spec.Volumes {
@@ -162,17 +162,17 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	}
 
 	// Set the default service account if needed
-	if len(pod.Spec.ServiceAccount) == 0 {
-		pod.Spec.ServiceAccount = DefaultServiceAccountName
+	if len(pod.Spec.ServiceAccountName) == 0 {
+		pod.Spec.ServiceAccountName = DefaultServiceAccountName
 	}
 
 	// Ensure the referenced service account exists
-	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccount)
+	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccount, err))
+		return admission.NewForbidden(a, fmt.Errorf("Error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
 	}
 	if serviceAccount == nil {
-		return admission.NewForbidden(a, fmt.Errorf("Missing service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccount, err))
+		return admission.NewForbidden(a, fmt.Errorf("Missing service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
 	}
 
 	if s.LimitSecretReferences {

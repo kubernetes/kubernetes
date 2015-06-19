@@ -963,9 +963,9 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, "nodeSelector")...)
 	allErrs = append(allErrs, validateHostNetwork(spec.HostNetwork, spec.Containers).Prefix("hostNetwork")...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets).Prefix("imagePullSecrets")...)
-	if len(spec.ServiceAccount) > 0 {
-		if ok, msg := ValidateServiceAccountName(spec.ServiceAccount, false); !ok {
-			allErrs = append(allErrs, errs.NewFieldInvalid("serviceAccount", spec.ServiceAccount, msg))
+	if len(spec.ServiceAccountName) > 0 {
+		if ok, msg := ValidateServiceAccountName(spec.ServiceAccountName, false); !ok {
+			allErrs = append(allErrs, errs.NewFieldInvalid("serviceAccountName", spec.ServiceAccountName, msg))
 		}
 	}
 
