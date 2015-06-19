@@ -2235,6 +2235,9 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16
 		return err
 	}
 	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
+	if pod.IsEmpty() {
+		return fmt.Errorf("pod not found (%q)", podFullName)
+	}
 	return kl.runner.PortForward(&pod, port, stream)
 }
 

@@ -19,6 +19,7 @@ package container
 import (
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -280,6 +281,11 @@ func (p *Pod) FindContainerByName(containerName string) *Container {
 		}
 	}
 	return nil
+}
+
+// IsEmpty returns true if the pod is empty.
+func (p *Pod) IsEmpty() bool {
+	return reflect.DeepEqual(p, &Pod{})
 }
 
 // GetPodFullName returns a name that uniquely identifies a pod.
