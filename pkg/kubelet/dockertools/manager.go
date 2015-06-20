@@ -474,15 +474,6 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	return &podStatus, nil
 }
 
-func (dm *DockerManager) GetPodInfraContainer(pod kubecontainer.Pod) (kubecontainer.Container, error) {
-	for _, container := range pod.Containers {
-		if container.Name == PodInfraContainerName {
-			return *container, nil
-		}
-	}
-	return kubecontainer.Container{}, fmt.Errorf("unable to find pod infra container for pod %v", pod.ID)
-}
-
 // makeEnvList converts EnvVar list to a list of strings, in the form of
 // '<key>=<value>', which can be understood by docker.
 func makeEnvList(envs []kubecontainer.EnvVar) (result []string) {
@@ -1464,7 +1455,6 @@ func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container, pullS
 
 // Sync the running pod to match the specified desired pod.
 func (dm *DockerManager) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus, pullSecrets []api.Secret) error {
-
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("SyncPod").Observe(metrics.SinceInMicroseconds(start))
