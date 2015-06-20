@@ -2,5 +2,10 @@ DOCKER_OPTS=""
 {% if grains.docker_opts is defined and grains.docker_opts %}
 DOCKER_OPTS="${DOCKER_OPTS} {{grains.docker_opts}}"
 {% endif %}
-DOCKER_OPTS="${DOCKER_OPTS} --bridge cbr0 --iptables=false --ip-masq=false"
+
+{% set docker_bridge = "" %}
+{% if grains['roles'][0] == 'kubernetes-pool' %}
+  {% set docker_bridge = "--bridge cbr0" %}
+{% endif %} 
+DOCKER_OPTS="${DOCKER_OPTS} {{docker_bridge}} --iptables=false --ip-masq=false"
 DOCKER_NOFILE=1000000
