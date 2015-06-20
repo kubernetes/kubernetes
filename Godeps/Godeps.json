@@ -132,7 +132,7 @@
 			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
 		},
 		{
-			"ImportPath": "github.com/cpuguy83/go-md2man/mangen",
+			"ImportPath": "github.com/cpuguy83/go-md2man",
 			"Comment": "v1.0.2-5-g2831f11",
 			"Rev": "2831f11f66ff4008f10e2cd7ed9a85e3d3fc2bed"
 		},
