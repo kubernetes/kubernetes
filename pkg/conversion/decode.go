@@ -80,6 +80,17 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 // If obj's version doesn't match that in data, an attempt will be made to convert
 // data into obj's version.
 func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
+	return s.DecodeIntoWithSpecifiedVersionKind(data, obj, "", "")
+}
+
+// DecodeIntoWithSpecifiedVersionKind compares the passed in specifiedVersion and
+// specifiedKind with data.Version and data.Kind, defaulting data.Version and
+// data.Kind to the specified value if they are empty, or generating an error if
+// data.Version and data.Kind are not empty and differ from the specified value.
+// The function then implements the functionality of DecodeInto.
+// If specifiedVersion and specifiedKind are empty, the function degenerates to
+// DecodeInto.
+func (s *Scheme) DecodeIntoWithSpecifiedVersionKind(data []byte, obj interface{}, specifiedVersion, specifiedKind string) error {
 	if len(data) == 0 {
 		return errors.New("empty input")
 	}
@@ -87,6 +98,19 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 	if err != nil {
 		return err
 	}
+	if dataVersion == "" {
+		dataVersion = specifiedVersion
+	}
+	if dataKind == "" {
+		dataKind = specifiedKind
+	}
+	if len(specifiedVersion) > 0 && (dataVersion != specifiedVersion) {
+		return errors.New(fmt.Sprintf("The apiVersion in the data (%s) does not match the specified apiVersion(%s)", dataVersion, specifiedVersion))
+	}
+	if len(specifiedKind) > 0 && (dataKind != specifiedKind) {
+		return errors.New(fmt.Sprintf("The kind in the data (%s) does not match the specified kind(%s)", dataKind, specifiedKind))
+	}
+
 	objVersion, objKind, err := s.ObjectVersionAndKind(obj)
 	if err != nil {
 		return err
