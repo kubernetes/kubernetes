@@ -18,7 +18,6 @@ package host_path
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -142,7 +141,7 @@ func (r *hostPathRecycler) GetPath() string {
 // Recycle blocks until the pod has completed or any error occurs.
 // The scrubber pod's is expected to succeed within 30 seconds when testing localhost.
 func (r *hostPathRecycler) Recycle() error {
-	timeout := int64(30 * time.Second)
+	timeout := int64(30)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "pv-scrubber-" + util.ShortenString(r.name, 44) + "-",

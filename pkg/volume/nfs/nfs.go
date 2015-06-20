@@ -19,7 +19,6 @@ package nfs
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -249,7 +248,7 @@ func (r *nfsRecycler) GetPath() string {
 // Recycle blocks until the pod has completed or any error occurs.
 // The scrubber pod's is expected to succeed within 5 minutes else an error will be returned
 func (r *nfsRecycler) Recycle() error {
-	timeout := int64(300 * time.Second) // 5 minutes
+	timeout := int64(300) // 5 minutes
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "pv-scrubber-" + util.ShortenString(r.name, 44) + "-",
