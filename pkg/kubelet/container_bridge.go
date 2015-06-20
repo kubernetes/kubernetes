@@ -19,6 +19,7 @@ package kubelet
 import (
 	"bytes"
 	"net"
+	"os"
 	"os/exec"
 	"regexp"
 
@@ -27,8 +28,39 @@ import (
 
 var cidrRegexp = regexp.MustCompile(`inet ([0-9a-fA-F.:]*/[0-9]*)`)
 
+func createCBR0(wantCIDR *net.IPNet) error {
+	// recreate cbr0 with wantCIDR
+	if err := exec.Command("brctl", "addbr", "cbr0").Run(); err != nil {
+		glog.Error(err)
+		return err
+	}
+	if err := exec.Command("ip", "addr", "add", wantCIDR.String(), "dev", "cbr0").Run(); err != nil {
+		glog.Error(err)
+		return err
+	}
+	if err := exec.Command("ip", "link", "set", "dev", "cbr0", "up").Run(); err != nil {
+		glog.Error(err)
+		return err
+	}
+	// restart docker
+	if err := exec.Command("service", "docker", "restart").Run(); err != nil {
+		glog.Error(err)
+		// For now just log the error. The containerRuntime check will catch docker failures.
+		// TODO (dawnchen) figure out what we should do for rkt here.
+	}
+	glog.V(2).Info("Recreated cbr0 and restarted docker")
+	return nil
+}
+
 func ensureCbr0(wantCIDR *net.IPNet) error {
-	if !cbr0CidrCorrect(wantCIDR) {
+	exists, err := cbr0Exists()
+	if err != nil {
+		return err
+	}
+	if !exists {
+		glog.V(2).Infof("CBR0 doesn't exist, attempting to create it with range: %s", wantCIDR)
+		return createCBR0(wantCIDR)
+	} else if !cbr0CidrCorrect(wantCIDR) {
 		glog.V(2).Infof("Attempting to recreate cbr0 with address range: %s", wantCIDR)
 
 		// delete cbr0
@@ -40,28 +72,20 @@ func ensureCbr0(wantCIDR *net.IPNet) error {
 			glog.Error(err)
 			return err
 		}
-		// recreate cbr0 with wantCIDR
-		if err := exec.Command("brctl", "addbr", "cbr0").Run(); err != nil {
-			glog.Error(err)
-			return err
-		}
-		if err := exec.Command("ip", "addr", "add", wantCIDR.String(), "dev", "cbr0").Run(); err != nil {
-			glog.Error(err)
-			return err
-		}
-		if err := exec.Command("ip", "link", "set", "dev", "cbr0", "up").Run(); err != nil {
-			glog.Error(err)
-			return err
-		}
-		// restart docker
-		if err := exec.Command("service", "docker", "restart").Run(); err != nil {
-			glog.Error(err)
-			// For now just log the error. The containerRuntime check will catch docker failures.
-			// TODO (dawnchen) figure out what we should do for rkt here.
-		}
-		glog.V(2).Info("Recreated cbr0 and restarted docker")
+		return createCBR0(wantCIDR)
 	}
 	return nil
+}
+
+func cbr0Exists() (bool, error) {
+	_, err := os.Stat("/sys/class/net/cbr0")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func cbr0CidrCorrect(wantCIDR *net.IPNet) bool {

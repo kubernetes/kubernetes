@@ -17,9 +17,11 @@ limitations under the License.
 package kubelet
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -58,6 +60,8 @@ func (s *statusManager) Start() {
 		err := s.syncBatch()
 		if err != nil {
 			glog.Warningf("Failed to updated pod status: %v", err)
+			// Errors and tight-looping are bad, m-kay
+			time.Sleep(30 * time.Second)
 		}
 	}, 0)
 }
@@ -124,6 +128,9 @@ func (s *statusManager) RemoveOrphanedStatuses(podFullNames map[string]bool) {
 
 // syncBatch syncs pods statuses with the apiserver.
 func (s *statusManager) syncBatch() error {
+	if s.kubeClient == nil {
+		return errors.New("Kubernetes client is nil, skipping pod status updates")
+	}
 	syncRequest := <-s.podStatusChannel
 	pod := syncRequest.pod
 	podFullName := kubecontainer.GetPodFullName(pod)
