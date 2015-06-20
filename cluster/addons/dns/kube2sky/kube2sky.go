@@ -46,10 +46,11 @@ import (
 )
 
 var (
+	// TODO: switch to pflag and make - and _ equivalent.
 	argDomain              = flag.String("domain", "cluster.local", "domain under which to create names")
 	argEtcdMutationTimeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
 	argEtcdServer          = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
-	argKubecfgFile         = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes service")
+	argKubecfgFile         = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes master service; --kube_master_url overrides the URL part of this; if neither this nor --kube_master_url are provided, defaults to service account tokens")
 	argKubeMasterURL       = flag.String("kube_master_url", "", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
 )
 
@@ -405,7 +406,7 @@ func newEtcdClient(etcdServer string) (*etcd.Client, error) {
 	return client, nil
 }
 
-func getKubeMasterURL() (string, error) {
+func expandKubeMasterURL() (string, error) {
 	parsedURL, err := url.Parse(os.ExpandEnv(*argKubeMasterURL))
 	if err != nil {
 		return "", fmt.Errorf("failed to parse --kube_master_url %s - %v", *argKubeMasterURL, err)
@@ -423,31 +424,34 @@ func newKubeClient() (*kclient.Client, error) {
 		err       error
 		masterURL string
 	)
+	// If the user specified --kube_master_url, expand env vars and verify it.
 	if *argKubeMasterURL != "" {
-		masterURL, err = getKubeMasterURL()
+		masterURL, err = expandKubeMasterURL()
 		if err != nil {
 			return nil, err
 		}
 	}
-	if *argKubecfgFile == "" {
-		if masterURL == "" {
-			return nil, fmt.Errorf("--kube_master_url must be set when --kubecfg_file is not set")
-		}
+	if masterURL != "" && *argKubecfgFile == "" {
+		// Only --kube_master_url was provided.
 		config = &kclient.Config{
 			Host:    masterURL,
-			Version: "v1beta3",
+			Version: "v1",
 		}
 	} else {
+		// We either have:
+		//  1) --kube_master_url and --kubecfg_file
+		//  2) just --kubecfg_file
+		//  3) neither flag
+		// In any case, the logic is the same.  If (3), this will automatically
+		// fall back on the service account token.
 		overrides := &kclientcmd.ConfigOverrides{}
-		if masterURL != "" {
-			overrides.ClusterInfo.Server = masterURL
-		}
-		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-			&kclientcmd.ClientConfigLoadingRules{ExplicitPath: *argKubecfgFile},
-			overrides).ClientConfig(); err != nil {
+		overrides.ClusterInfo.Server = masterURL                                     // might be "", but that is OK
+		rules := &kclientcmd.ClientConfigLoadingRules{ExplicitPath: *argKubecfgFile} // might be "", but that is OK
+		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig(); err != nil {
 			return nil, err
 		}
 	}
+
 	glog.Infof("Using %s for kubernetes master", config.Host)
 	glog.Infof("Using kubernetes API %s", config.Version)
 	return kclient.New(config)
