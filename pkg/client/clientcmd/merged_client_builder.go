@@ -20,6 +20,8 @@ import (
 	"io"
 	"reflect"
 
+	"github.com/golang/glog"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 )
@@ -84,6 +86,7 @@ func (config DeferredLoadingClientConfig) ClientConfig() (*client.Config, error)
 	icc := inClusterClientConfig{}
 	defaultConfig, err := DefaultClientConfig.ClientConfig()
 	if icc.Possible() && err == nil && reflect.DeepEqual(mergedConfig, defaultConfig) {
+		glog.V(2).Info("no kubeconfig could be created, falling back to service account.")
 		return icc.ClientConfig()
 	}
 
