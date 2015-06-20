@@ -18,7 +18,6 @@
 # Specifically, the following environment variables are assumed:
 # - CLUSTER_NAME  (the name of the cluster)
 
-MASTER_NAME="k8s-${CLUSTER_NAME}-master"
 ZONE="${ZONE:-us-central1-f}"
 NUM_MINIONS="${NUM_MINIONS:-2}"
 CLUSTER_API_VERSION="${CLUSTER_API_VERSION:-}"

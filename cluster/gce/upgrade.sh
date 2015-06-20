@@ -44,6 +44,7 @@ function usage() {
   echo "(... Fetching current release versions ...)"
   echo ""
 
+  # NOTE: IF YOU CHANGE THE FOLLOWING LIST, ALSO UPDATE test/e2e/cluster_upgrade.go
   local latest_release
   local latest_stable
   local latest_ci
@@ -53,7 +54,7 @@ function usage() {
   latest_ci=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
 
   echo "To upgrade to:"
-  echo "  latest stable: ${0} ${latest_stable}"
+  echo "  latest stable:  ${0} ${latest_stable}"
   echo "  latest release: ${0} ${latest_release}"
   echo "  latest ci:      ${0} ${latest_ci}"
 }
