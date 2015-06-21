@@ -62,9 +62,10 @@ var jsonpathTests = []jsonpathTest{
 	{"dict", "${.key}", map[string]string{"key": "value"}, "value"},
 	{"nest", "${.Bicycle.Color}", storeData, "red"},
 	{"quote", `${"${"}`, nil, "${"},
-	{"array", "${[0:2]}", []string{"Monday", "Tudesday"}, "[Monday, Tudesday]"},
-	{"bookauthors", "${.Book[*].Author}", storeData, "[Nigel Rees, Evelyn Waugh, Herman Melville]"},
-	{"filter", "${[?(@<5)]}", []int{2, 6, 3, 7}, "[2, 3]"},
+	{"array", "${[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday"},
+	{"allarray", "${.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville"},
+	{"allfileds", "${.Bicycle.*}", storeData, "red 19.95"},
+	{"filter", "${[?(@<5)]}", []int{2, 6, 3, 7}, "2 3"},
 }
 
 func TestJSONPath(t *testing.T) {

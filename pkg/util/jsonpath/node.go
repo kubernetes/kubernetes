@@ -38,16 +38,18 @@ const (
 	NodeFilter
 	NodeInt
 	NodeFloat
+	NodeWildcard
 )
 
 var NodeTypeName = map[NodeType]string{
-	NodeText:   "NodeText",
-	NodeArray:  "NodeArray",
-	NodeList:   "NodeList",
-	NodeField:  "NodeField",
-	NodeFilter: "NodeFilter",
-	NodeInt:    "NodeInt",
-	NodeFloat:  "NodeFloat",
+	NodeText:     "NodeText",
+	NodeArray:    "NodeArray",
+	NodeList:     "NodeList",
+	NodeField:    "NodeField",
+	NodeFilter:   "NodeFilter",
+	NodeInt:      "NodeInt",
+	NodeFloat:    "NodeFloat",
+	NodeWildcard: "NodeWildcard",
 }
 
 type Node interface {
@@ -171,4 +173,17 @@ func newFloat(num float64) *FloatNode {
 
 func (i *FloatNode) String() string {
 	return fmt.Sprintf("%s: %f", i.Type(), i.Value)
+}
+
+// WildcardNode means a wildcard
+type WildcardNode struct {
+	NodeType
+}
+
+func newWildcard() *WildcardNode {
+	return &WildcardNode{NodeType: NodeWildcard}
+}
+
+func (i *WildcardNode) String() string {
+	return fmt.Sprintf("%s: %f", i.Type())
 }

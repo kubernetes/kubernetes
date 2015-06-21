@@ -283,7 +283,7 @@ Loop:
 	return p.parseInsideAction(cur)
 }
 
-// parseField scans a field: .Alphanumeric.
+// parseField scans a field: .Alphanumeric or .*
 func (p *Parser) parseField(cur *ListNode) error {
 	if r := p.peek(); isTerminator(r) {
 		newNode := newText(p.consumeText())
@@ -293,7 +293,7 @@ func (p *Parser) parseField(cur *ListNode) error {
 	var r rune
 	for {
 		r = p.next()
-		if !isAlphaNumeric(r) {
+		if r != '*' && !isAlphaNumeric(r) {
 			p.backup()
 			break
 		}
@@ -301,9 +301,12 @@ func (p *Parser) parseField(cur *ListNode) error {
 	if r := p.peek(); !isTerminator(r) {
 		return fmt.Errorf("bad character %#U", r)
 	}
-	value := p.consumeText()
-	newNode := newField(value[1:])
-	cur.append(newNode)
+	value := p.consumeText()[1:]
+	if value == "*" {
+		cur.append(newWildcard())
+	} else {
+		cur.append(newField(value))
+	}
 	return p.parseInsideAction(cur)
 }
 

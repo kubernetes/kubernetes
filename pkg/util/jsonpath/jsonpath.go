@@ -27,7 +27,6 @@ import (
 type JSONPath struct {
 	name   string
 	parser *Parser
-	wr     io.Writer
 }
 
 func NewJSONPath(n string) *JSONPath {
@@ -42,39 +41,48 @@ func (j *JSONPath) Parse(text string) (err error) {
 	return
 }
 
+// Execute bounds data into template and write the result
 func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
 	if j.parser == nil {
 		return fmt.Errorf("%s is an incomplete jsonpath template", j.name)
 	}
-	j.wr = wr
-	return j.walkTree(reflect.ValueOf(data))
+	for _, node := range j.parser.Root.Nodes {
+		results, err := j.walk([]reflect.Value{reflect.ValueOf(data)}, node)
+		if err != nil {
+			return nil
+		}
+		err = j.PrintResults(wr, results)
+		if err != nil {
+			return nil
+		}
+	}
+	return nil
 }
 
-// walkTree visits the parsed tree from root and write the result
-func (j *JSONPath) walkTree(value reflect.Value) error {
-	for _, node := range j.parser.Root.Nodes {
-		result, err := j.walk(value, node)
+// PrintResults write the results into writer
+func (j *JSONPath) PrintResults(wr io.Writer, results []reflect.Value) error {
+	for i, r := range results {
+		text, err := j.evalToText(r)
 		if err != nil {
 			return err
 		}
-		text, err := j.evalToText(result)
-		if err != nil {
-			return err
+		if i != len(results)-1 {
+			text = append(text, ' ')
 		}
-		if _, err = j.wr.Write(text); err != nil {
+		if _, err = wr.Write(text); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// walk visits subtree rooted at the given node in DFS order
-func (j *JSONPath) walk(value reflect.Value, node Node) (reflect.Value, error) {
+// walk visits tree rooted at the given node in DFS order
+func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, error) {
 	switch node := node.(type) {
 	case *ListNode:
 		return j.evalList(value, node)
 	case *TextNode:
-		return reflect.ValueOf(string(node.Text)), nil
+		return []reflect.Value{reflect.ValueOf(string(node.Text))}, nil
 	case *FieldNode:
 		return j.evalField(value, node)
 	case *ArrayNode:
@@ -82,16 +90,36 @@ func (j *JSONPath) walk(value reflect.Value, node Node) (reflect.Value, error) {
 	case *FilterNode:
 		return j.evalFilter(value, node)
 	case *IntNode:
-		return reflect.ValueOf(node.Value), nil
+		return j.evalInt(value, node)
 	case *FloatNode:
-		return reflect.ValueOf(node.Value), nil
+		return j.evalFloat(value, node)
+	case *WildcardNode:
+		return j.evalWildcard(value, node)
 	default:
-		return reflect.Value{}, fmt.Errorf("unexpect Node %v", node)
+		return value, fmt.Errorf("unexpect Node %v", node)
 	}
 }
 
+// evalInt evalutes IntNode
+func (j *JSONPath) evalInt(input []reflect.Value, node *IntNode) ([]reflect.Value, error) {
+	result := []reflect.Value{}
+	for range input {
+		result = append(result, reflect.ValueOf(node.Value))
+	}
+	return result, nil
+}
+
+// evalFloat evalutes FloatNode
+func (j *JSONPath) evalFloat(input []reflect.Value, node *FloatNode) ([]reflect.Value, error) {
+	result := []reflect.Value{}
+	for range input {
+		result = append(result, reflect.ValueOf(node.Value))
+	}
+	return result, nil
+}
+
 // evalList evaluates ListNode
-func (j *JSONPath) evalList(value reflect.Value, node *ListNode) (reflect.Value, error) {
+func (j *JSONPath) evalList(value []reflect.Value, node *ListNode) ([]reflect.Value, error) {
 	var err error
 	curValue := value
 	for _, node := range node.Nodes {
@@ -104,110 +132,120 @@ func (j *JSONPath) evalList(value reflect.Value, node *ListNode) (reflect.Value,
 }
 
 // evalArray evaluates ArrayNode
-func (j *JSONPath) evalArray(value reflect.Value, node *ArrayNode) (reflect.Value, error) {
-	if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
-		return value, fmt.Errorf("%v is not array or slice", value)
+func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.Value, error) {
+	result := []reflect.Value{}
+	for _, value := range input {
+		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
+			return input, fmt.Errorf("%v is not array or slice", value)
+		}
+		if !node.Params[0].Exists {
+			node.Params[0].Value = 0
+		}
+		if !node.Params[1].Exists {
+			node.Params[1].Value = value.Len()
+		}
+		if !node.Params[2].Exists {
+			value = value.Slice(node.Params[0].Value, node.Params[1].Value)
+		} else {
+			value = value.Slice3(node.Params[0].Value, node.Params[1].Value, node.Params[2].Value)
+		}
+		for i := 0; i < value.Len(); i++ {
+			result = append(result, value.Index(i))
+		}
 	}
-	if !node.Params[0].Exists {
-		node.Params[0].Value = 0
-	}
-	if !node.Params[1].Exists {
-		node.Params[1].Value = value.Len()
-	}
-	if !node.Params[2].Exists {
-		return value.Slice(node.Params[0].Value, node.Params[1].Value), nil
-	} else {
-		return value.Slice3(node.Params[0].Value, node.Params[1].Value, node.Params[2].Value), nil
-	}
+	return result, nil
 }
 
 // evalField evaluates filed of struct or key of map.
-// If input is array, it will extract value of each element, return result as array.
-func (j *JSONPath) evalField(value reflect.Value, node *FieldNode) (reflect.Value, error) {
-	var result reflect.Value
-
-	if value.Kind() == reflect.Array || value.Kind() == reflect.Slice {
-		if value.Len() == 0 {
-			return result, nil
+func (j *JSONPath) evalField(input []reflect.Value, node *FieldNode) ([]reflect.Value, error) {
+	results := []reflect.Value{}
+	for _, value := range input {
+		var result reflect.Value
+		if value.Kind() == reflect.Struct {
+			result = value.FieldByName(node.Value)
+		} else if value.Kind() == reflect.Map {
+			result = value.MapIndex(reflect.ValueOf(node.Value))
 		}
-		for i := 0; i < value.Len(); i++ {
-			cur := value.Index(i)
-			var temp reflect.Value
-			if cur.Kind() == reflect.Struct {
-				temp = cur.FieldByName(node.Value)
-			} else if cur.Kind() == reflect.Map {
-				temp = cur.MapIndex(reflect.ValueOf(node.Value))
-			}
-			if !temp.IsValid() {
-				return result, fmt.Errorf("in %v, %s is not found", cur, node.Value)
-			}
-			if !result.IsValid() {
-				result = reflect.MakeSlice(reflect.SliceOf(temp.Type()), 0, 0)
-			}
-			result = reflect.Append(result, temp)
+		if !result.IsValid() {
+			return results, fmt.Errorf("in %v, %s is not found", value, node.Value)
 		}
-		return result, nil
+		results = append(results, result)
 	}
+	return results, nil
+}
 
-	if value.Kind() == reflect.Struct {
-		result = value.FieldByName(node.Value)
-	} else if value.Kind() == reflect.Map {
-		result = value.MapIndex(reflect.ValueOf(node.Value))
+// evalWildcard extrac all contents of the given value
+func (j *JSONPath) evalWildcard(input []reflect.Value, node *WildcardNode) ([]reflect.Value, error) {
+	results := []reflect.Value{}
+	for _, value := range input {
+		kind := value.Kind()
+		if kind == reflect.Struct {
+			for i := 0; i < value.NumField(); i++ {
+				results = append(results, value.Field(i))
+			}
+		} else if kind == reflect.Map {
+			for _, key := range value.MapKeys() {
+				results = append(results, value.MapIndex(key))
+			}
+		} else if kind == reflect.Array || kind == reflect.Slice || kind == reflect.String {
+			for i := 0; i < value.Len(); i++ {
+				results = append(results, value.Index(i))
+			}
+		}
 	}
-	if !result.IsValid() {
-		return result, fmt.Errorf("in %v, %s is not found", value, node.Value)
-	}
-	return result, nil
+	return results, nil
 }
 
 // evalFilter filter array according to FilterNode
-func (j *JSONPath) evalFilter(value reflect.Value, node *FilterNode) (reflect.Value, error) {
-	if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
-		return value, fmt.Errorf("%v is not array or slice", value)
-	}
-	var result reflect.Value
-	if value.Len() == 0 {
-		return result, nil
-	}
-
-	result = reflect.MakeSlice(reflect.SliceOf(value.Index(0).Type()), 0, 0)
-	for i := 0; i < value.Len(); i++ {
-		cur := value.Index(i)
-		left, err := j.evalList(cur, node.Left)
+func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflect.Value, error) {
+	results := []reflect.Value{}
+	for _, value := range input {
+		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
+			return input, fmt.Errorf("%v is not array or slice", value)
+		}
+		temp := []reflect.Value{}
+		for i := 0; i < value.Len(); i++ {
+			temp = append(temp, value.Index(i))
+		}
+		lefts, err := j.evalList(temp, node.Left)
 		if err != nil {
-			return value, err
+			return input, err
 		}
-		right, err := j.evalList(cur, node.Right)
+		rights, err := j.evalList(temp, node.Right)
 		if err != nil {
-			return value, err
+			return input, err
 		}
-		pass := false
-		switch node.Operator {
-		case "<":
-			pass, err = less(left, right)
-		case ">":
-			pass, err = greater(left, right)
-		case "==":
-			pass, err = equal(left, right)
-		case "!=":
-			pass, err = notEqual(left, right)
-		case "<=":
-			pass, err = lessEqual(left, right)
-		case ">=":
-			pass, err = greaterEqual(left, right)
-		case "exists":
-			pass = left.IsValid()
-		default:
-			return result, fmt.Errorf("unrecognized filter operator %s", node.Operator)
-		}
-		if err != nil {
-			return result, err
-		}
-		if pass {
-			result = reflect.Append(result, cur)
+		for i := 0; i < value.Len(); i++ {
+			left := lefts[i]
+			right := rights[i]
+			pass := false
+			switch node.Operator {
+			case "<":
+				pass, err = less(left, right)
+			case ">":
+				pass, err = greater(left, right)
+			case "==":
+				pass, err = equal(left, right)
+			case "!=":
+				pass, err = notEqual(left, right)
+			case "<=":
+				pass, err = lessEqual(left, right)
+			case ">=":
+				pass, err = greaterEqual(left, right)
+			case "exists":
+				pass = left.IsValid()
+			default:
+				return results, fmt.Errorf("unrecognized filter operator %s", node.Operator)
+			}
+			if err != nil {
+				return results, err
+			}
+			if pass {
+				results = append(results, value.Index(i))
+			}
 		}
 	}
-	return result, nil
+	return results, nil
 }
 
 // evalToText translates reflect value to corresponding text
