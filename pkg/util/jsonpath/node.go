@@ -104,7 +104,7 @@ func (f *FieldNode) String() string {
 // ParamsEntry holds param information for ArrayNode
 type ParamsEntry struct {
 	Value  int
-	Exists bool
+	Exists bool //whether the value is captured or just the default 0
 }
 
 // ArrayNode holds start, end, step information for array index selection
@@ -145,6 +145,7 @@ func (f *FilterNode) String() string {
 	return fmt.Sprintf("%s: %s %s %s", f.Type(), f.Left, f.Operator, f.Right)
 }
 
+// IntNode holds interger value
 type IntNode struct {
 	NodeType
 	Value int
@@ -158,6 +159,7 @@ func (i *IntNode) String() string {
 	return fmt.Sprintf("%s: %d", i.Type(), i.Value)
 }
 
+// FloatNode holds float value
 type FloatNode struct {
 	NodeType
 	Value float64

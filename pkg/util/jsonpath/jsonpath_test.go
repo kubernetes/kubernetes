@@ -28,25 +28,43 @@ type jsonpathTest struct {
 	expect   string
 }
 
+type book struct {
+	Category string
+	Author   string
+	Title    string
+	Price    float32
+}
+
+type bicycle struct {
+	Color string
+	Price float32
+}
+
+type store struct {
+	Book    []book
+	Bicycle bicycle
+	Name    string
+}
+
+var storeData store = store{
+	Name: "jsonpath",
+	Book: []book{
+		{"reference", "Nigel Rees", "Sayings of the Centurey", 8.95},
+		{"fiction", "Evelyn Waugh", "Sword of Honour", 12.99},
+		{"fiction", "Herman Melville", "Moby Dick", 8.99},
+	},
+	Bicycle: bicycle{"red", 19.95},
+}
+
 var jsonpathTests = []jsonpathTest{
 	{"plain", "hello jsonpath", nil, "hello jsonpath"},
-	{"variable", "hello ${.v}", A{v: "world"}, "hello world"},
+	{"variable", "hello ${.Name}", storeData, "hello jsonpath"},
 	{"dict", "${.key}", map[string]string{"key": "value"}, "value"},
-	{"nest", "hello ${.a.v}", B{a: A{v: "world"}}, "hello world"},
+	{"nest", "${.Bicycle.Color}", storeData, "red"},
 	{"quote", `${"${"}`, nil, "${"},
 	{"array", "${[0:2]}", []string{"Monday", "Tudesday"}, "[Monday, Tudesday]"},
+	{"bookauthors", "${.Book[*].Author}", storeData, "[Nigel Rees, Evelyn Waugh, Herman Melville]"},
 	{"filter", "${[?(@<5)]}", []int{2, 6, 3, 7}, "[2, 3]"},
-}
-
-// only for test use
-type A struct {
-	v string
-}
-
-// only for test use
-type B struct {
-	v string
-	a A
 }
 
 func TestJSONPath(t *testing.T) {

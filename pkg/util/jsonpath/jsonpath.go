@@ -121,9 +121,34 @@ func (j *JSONPath) evalArray(value reflect.Value, node *ArrayNode) (reflect.Valu
 	}
 }
 
-// evalField evaluates filed of struct or key of map
+// evalField evaluates filed of struct or key of map.
+// If input is array, it will extract value of each element, return result as array.
 func (j *JSONPath) evalField(value reflect.Value, node *FieldNode) (reflect.Value, error) {
 	var result reflect.Value
+
+	if value.Kind() == reflect.Array || value.Kind() == reflect.Slice {
+		if value.Len() == 0 {
+			return result, nil
+		}
+		for i := 0; i < value.Len(); i++ {
+			cur := value.Index(i)
+			var temp reflect.Value
+			if cur.Kind() == reflect.Struct {
+				temp = cur.FieldByName(node.Value)
+			} else if cur.Kind() == reflect.Map {
+				temp = cur.MapIndex(reflect.ValueOf(node.Value))
+			}
+			if !temp.IsValid() {
+				return result, fmt.Errorf("in %v, %s is not found", cur, node.Value)
+			}
+			if !result.IsValid() {
+				result = reflect.MakeSlice(reflect.SliceOf(temp.Type()), 0, 0)
+			}
+			result = reflect.Append(result, temp)
+		}
+		return result, nil
+	}
+
 	if value.Kind() == reflect.Struct {
 		result = value.FieldByName(node.Value)
 	} else if value.Kind() == reflect.Map {

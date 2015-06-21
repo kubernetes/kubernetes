@@ -200,6 +200,9 @@ Loop:
 	}
 	text := p.consumeText()
 	text = string(text[1 : len(text)-1])
+	if text == "*" {
+		text = ":"
+	}
 	reg := regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:[\d]*)?$`)
 	value := reg.FindStringSubmatch(text)
 	if value == nil {
@@ -310,7 +313,7 @@ func isTerminator(r rune) bool {
 		return true
 	}
 	switch r {
-	case eof, '.', ',', '|', ':', ')', '(':
+	case eof, '.', ',', '|', ':', ')', '(', '[', ']':
 		return true
 	}
 	// Does r start the delimiter? This can be ambiguous (with delim=="//", $x/2 will
