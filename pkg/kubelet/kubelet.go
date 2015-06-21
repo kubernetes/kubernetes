@@ -1816,11 +1816,14 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
 }
 
 func (kl *Kubelet) updateRuntimeUp() {
+	start := time.Now()
 	err := waitUntilRuntimeIsUp(kl.containerRuntime, 100*time.Millisecond)
 	kl.runtimeMutex.Lock()
 	defer kl.runtimeMutex.Unlock()
 	if err == nil {
 		kl.lastTimestampRuntimeUp = time.Now()
+	} else {
+		glog.Errorf("Container runtime sanity check failed after %v, err: %v", time.Since(start), err)
 	}
 }
 
