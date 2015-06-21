@@ -19,7 +19,11 @@ package types
 import (
 	"net/http"
 	"time"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
+
+// TODO: Reconcile custom types in kubelet/types and this subpackage
 
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
 type DockerID string
@@ -55,4 +59,14 @@ func (t *Timestamp) Get() time.Time {
 // layout.
 func (t *Timestamp) GetString() string {
 	return t.time.Format(time.RFC3339Nano)
+}
+
+// A type to help sort container statuses based on container names.
+type SortedContainerStatuses []api.ContainerStatus
+
+func (s SortedContainerStatuses) Len() int      { return len(s) }
+func (s SortedContainerStatuses) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+func (s SortedContainerStatuses) Less(i, j int) bool {
+	return s[i].Name < s[j].Name
 }

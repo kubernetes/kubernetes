@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -470,7 +471,9 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		}
 		podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, *status)
 	}
-
+	// TODO: Move this to a custom equals method on the pod status. A container manager
+	// shouldn't have to guarantee order.
+	sort.Sort(kubeletTypes.SortedContainerStatuses(podStatus.ContainerStatuses))
 	return &podStatus, nil
 }
 
