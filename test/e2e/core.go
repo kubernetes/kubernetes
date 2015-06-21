@@ -62,6 +62,7 @@ func coreDump(dir string) {
 	ix := strings.LastIndex(config.Host, "/")
 	master := net.JoinHostPort(config.Host[ix+1:], "22")
 	cmds = []command{
+		{"cat /var/log/kubelet.log", "kubelet"},
 		{"cat /var/log/kube-apiserver.log", "kube-apiserver"},
 		{"cat /var/log/kube-scheduler.log", "kube-scheduler"},
 		{"cat /var/log/kube-controller-manager.log", "kube-controller-manager"},
