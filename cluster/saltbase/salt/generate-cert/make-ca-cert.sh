@@ -46,7 +46,7 @@ if [[ -n "${extra_sans}" ]]; then
   sans="${sans},${extra_sans}"
 fi
 
-tmpdir=$(mktemp -d --tmpdir kubernetes_cacert.XXXXXX)
+tmpdir=$(mktemp -d -t kubernetes_cacert.XXXXXX)
 trap 'rm -rf "${tmpdir}"' EXIT
 cd "${tmpdir}"
 
