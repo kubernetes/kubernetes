@@ -19,17 +19,19 @@ This is an example of a simple secret, in json format:
   "metadata" : {
     "name": "mysecret",
     "namespace": "myns"
-  },  
+  },
   "data": {
     "username": "dmFsdWUtMQ0K",
-    "password": "dmFsdWUtMg0KDQo="
+    "password": "dmFsdWUtMg0K"
   }
 }
 ```
 
 The data field is a map.  Its keys must match
 [DNS_SUBDOMAIN](design/identifiers.md), except that leading dots are also
-allowed.  The values are arbitrary data, encoded using base64.
+allowed.  The values are arbitrary data, encoded using base64. The values of
+username and password in the example above, before base64 encoding,
+are `value-1` and `value-2`, respectively, with carriage return and newline characters at the end.
 
 This is an example of a pod that uses a secret, in json format:
 ```json
@@ -81,6 +83,21 @@ not common ways to create pods.)
 
 ### Consuming Secret Values
 
+Inside the container that mounts a secret volume, the secret keys appear as
+files and the secret values are base-64 decoded and stored inside these files.
+This is the result of commands
+executed inside the container from the example above:
+
+```
+$ ls /etc/foo/
+username
+password
+$ cat /etc/foo/username
+value-1
+$ cat /etc/foo/password
+value-2
+```
+
 The program in a container is responsible for reading the secret(s) from the
 files.  Currently, if a program expects a secret to be stored in an environment
 variable, then the user needs to modify the image to populate the environment
@@ -107,7 +124,8 @@ the original pod must be deleted, and a new pod (perhaps with an identical
 workflow as deploying a new container image.  The `kubectl rolling-update`
 command can be used ([man page](kubectl_rolling-update.md)).
 
-The `resourceVersion` of the secret is not specified when it is referenced.
+The [`resourceVersion`](api-conventions.md#concurrency-control-and-consistency)
+of the secret is not specified when it is referenced.
 Therefore, if a secret is updated at about the same time as pods are starting,
 then it is not defined which version of the secret will be used for the pod. It
 is not possible currently to check what resource version of a secret object was
