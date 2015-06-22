@@ -19,11 +19,13 @@ package kubelet
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -49,6 +51,16 @@ func newStatusManager(kubeClient client.Interface) *statusManager {
 		podStatuses:      make(map[string]api.PodStatus),
 		podStatusChannel: make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
 	}
+}
+
+// isStatusEqual returns true if the given pod statuses are equal, false otherwise.
+// This method sorts container statuses so order does not affect equality.
+func isStatusEqual(oldStatus, status *api.PodStatus) bool {
+	sort.Sort(kubeletTypes.SortedContainerStatuses(status.ContainerStatuses))
+	sort.Sort(kubeletTypes.SortedContainerStatuses(oldStatus.ContainerStatuses))
+
+	// TODO: More sophisticated equality checking.
+	return reflect.DeepEqual(status, oldStatus)
 }
 
 func (s *statusManager) Start() {
@@ -102,7 +114,7 @@ func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	// Currently this routine is not called for the same pod from multiple
 	// workers and/or the kubelet but dropping the lock before sending the
 	// status down the channel feels like an easy way to get a bullet in foot.
-	if !found || !reflect.DeepEqual(oldStatus, status) {
+	if !found || !isStatusEqual(&oldStatus, &status) {
 		s.podStatuses[podFullName] = status
 		s.podStatusChannel <- podStatusSyncRequest{pod, status}
 	} else {

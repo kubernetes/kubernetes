@@ -471,8 +471,9 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		}
 		podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, *status)
 	}
-	// TODO: Move this to a custom equals method on the pod status. A container manager
-	// shouldn't have to guarantee order.
+	// Sort the container statuses since clients of this interface expect the list
+	// of containers in a pod to behave like the output of `docker list`, which has a
+	// deterministic order.
 	sort.Sort(kubeletTypes.SortedContainerStatuses(podStatus.ContainerStatuses))
 	return &podStatus, nil
 }

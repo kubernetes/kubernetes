@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -158,4 +159,36 @@ func TestSyncBatch(t *testing.T) {
 		t.Errorf("unexpected syncing error: %v", err)
 	}
 	verifyActions(t, syncer.kubeClient, []string{"get-pod", "update-status-pod"})
+}
+
+// shuffle returns a new shuffled list of container statuses.
+func shuffle(statuses []api.ContainerStatus) []api.ContainerStatus {
+	numStatuses := len(statuses)
+	randIndexes := rand.Perm(numStatuses)
+	shuffled := make([]api.ContainerStatus, numStatuses)
+	for i := 0; i < numStatuses; i++ {
+		shuffled[i] = statuses[randIndexes[i]]
+	}
+	return shuffled
+}
+
+func TestStatusEquality(t *testing.T) {
+	containerStatus := []api.ContainerStatus{}
+	for i := 0; i < 10; i++ {
+		s := api.ContainerStatus{
+			Name: fmt.Sprintf("container%d", i),
+		}
+		containerStatus = append(containerStatus, s)
+	}
+	podStatus := api.PodStatus{
+		ContainerStatuses: containerStatus,
+	}
+	for i := 0; i < 10; i++ {
+		oldPodStatus := api.PodStatus{
+			ContainerStatuses: shuffle(podStatus.ContainerStatuses),
+		}
+		if !isStatusEqual(&oldPodStatus, &podStatus) {
+			t.Fatalf("Order of container statuses should not affect equality.")
+		}
+	}
 }
