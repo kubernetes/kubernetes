@@ -112,7 +112,7 @@ func TestDeleteObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
@@ -141,7 +141,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
 	filenames := cmd.Flags().Lookup("filename").Value.(*util.StringList)
 	err := RunDelete(f, buf, cmd, []string{}, *filenames)
@@ -169,7 +169,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("ignore-not-found", "true")
 	cmd.Run(cmd, []string{})
@@ -202,8 +202,8 @@ func TestDeleteMultipleObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
@@ -235,8 +235,8 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("cascade", "false")
 	filenames := cmd.Flags().Lookup("filename").Value.(*util.StringList)
 	t.Logf("filenames: %v\n", filenames)

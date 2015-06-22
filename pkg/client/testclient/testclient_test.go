@@ -28,7 +28,7 @@ import (
 
 func TestNewClient(t *testing.T) {
 	o := NewObjects(api.Scheme, api.Scheme)
-	if err := AddObjectsFromPath("../../../examples/guestbook/frontend-service.json", o, api.Scheme); err != nil {
+	if err := AddObjectsFromPath("../../../examples/guestbook/frontend-service.yaml", o, api.Scheme); err != nil {
 		t.Fatal(err)
 	}
 	client := &Fake{ReactFn: ObjectReaction(o, latest.RESTMapper)}

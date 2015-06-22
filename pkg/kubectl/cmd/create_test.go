@@ -58,7 +58,7 @@ func TestCreateObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdCreate(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
@@ -90,8 +90,8 @@ func TestCreateMultipleObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdCreate(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
 	cmd.Run(cmd, []string{})
 
 	// Names should come from the REST response, NOT the files

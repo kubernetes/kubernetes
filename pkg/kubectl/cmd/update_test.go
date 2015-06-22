@@ -48,7 +48,7 @@ func TestUpdateObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdUpdate(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
@@ -84,8 +84,8 @@ func TestUpdateMultipleObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdUpdate(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "replicationcontrollers/rc1\nservices/baz\n" {
