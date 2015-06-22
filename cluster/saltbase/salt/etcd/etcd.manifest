@@ -7,7 +7,7 @@
 "containers":[
     {
     "name": "etcd-container",
-    "image": "gcr.io/google_containers/etcd:2.0.9.1",
+    "image": "gcr.io/google_containers/etcd:2.0.12",
     "command": [
               "/bin/sh",
               "-c",
