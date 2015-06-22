@@ -147,6 +147,7 @@ func NewMainKubelet(
 	dockerDaemonContainer string,
 	systemContainer string,
 	configureCBR0 bool,
+	podCIDR string,
 	pods int,
 	dockerExecHandler dockertools.ExecHandler) (*Kubelet, error) {
 	if rootDirectory == "" {
@@ -261,6 +262,7 @@ func NewMainKubelet(
 		cgroupRoot:                     cgroupRoot,
 		mounter:                        mounter,
 		configureCBR0:                  configureCBR0,
+		podCIDR:                        podCIDR,
 		pods:                           pods,
 	}
 
@@ -316,6 +318,10 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("failed to create the Container Manager: %v", err)
 	}
 	klet.containerManager = containerManager
+
+	// Start syncing node status immediately, this may set up things the runtime needs to run.
+	go klet.syncNodeStatus()
+	go klet.syncNetworkStatus()
 
 	// Wait for the runtime to be up with a timeout.
 	if err := waitUntilRuntimeIsUp(klet.containerRuntime, maxWaitForContainerRuntime); err != nil {
@@ -411,6 +417,9 @@ type Kubelet struct {
 	runtimeUpThreshold     time.Duration
 	lastTimestampRuntimeUp time.Time
 
+	// Network Status information
+	networkConfigured bool
+
 	// Volume plugins.
 	volumePluginMgr volume.VolumePluginMgr
 
@@ -488,6 +497,7 @@ type Kubelet struct {
 	// Whether or not kubelet should take responsibility for keeping cbr0 in
 	// the correct state.
 	configureCBR0 bool
+	podCIDR       string
 
 	// Number of Pods which can be run by this Kubelet
 	pods int
@@ -703,7 +713,6 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 	}
 
 	go util.Until(kl.updateRuntimeUp, 5*time.Second, util.NeverStop)
-	go kl.syncNodeStatus()
 	// Run the system oom watcher forever.
 	kl.statusManager.Start()
 	kl.syncLoop(updates, kl)
@@ -1695,6 +1704,10 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 			glog.Infof("Skipping pod synchronization, container runtime is not up.")
 			continue
 		}
+		if !kl.networkConfigured {
+			time.Sleep(5 * time.Second)
+			glog.Infof("Skipping pod synchronization, network is not configured")
+		}
 		unsyncedPod := false
 		podSyncTypes := make(map[types.UID]SyncPodType)
 		select {
@@ -1871,6 +1884,22 @@ func (kl *Kubelet) recordNodeStatusEvent(event string) {
 // Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
 var oldNodeUnschedulable bool
 
+func (kl *Kubelet) syncNetworkStatus() {
+	for {
+		networkConfigured := true
+		if kl.configureCBR0 {
+			if len(kl.podCIDR) == 0 {
+				networkConfigured = false
+			} else if err := kl.reconcileCBR0(kl.podCIDR); err != nil {
+				networkConfigured = false
+				glog.Errorf("Error configuring cbr0: %v", err)
+			}
+		}
+		kl.networkConfigured = networkConfigured
+		time.Sleep(30 * time.Second)
+	}
+}
+
 // setNodeStatus fills in the Status fields of the given Node, overwriting
 // any fields that are currently set.
 func (kl *Kubelet) setNodeStatus(node *api.Node) error {
@@ -1901,16 +1930,6 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 			} else {
 				node.Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: addrs[0].String()}}
 			}
-		}
-	}
-
-	networkConfigured := true
-	if kl.configureCBR0 {
-		if len(node.Spec.PodCIDR) == 0 {
-			networkConfigured = false
-		} else if err := kl.reconcileCBR0(node.Spec.PodCIDR); err != nil {
-			networkConfigured = false
-			glog.Errorf("Error configuring cbr0: %v", err)
 		}
 	}
 
@@ -1961,7 +1980,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	currentTime := util.Now()
 	var newNodeReadyCondition api.NodeCondition
 	var oldNodeReadyConditionStatus api.ConditionStatus
-	if containerRuntimeUp && networkConfigured {
+	if containerRuntimeUp && kl.networkConfigured {
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
@@ -1973,7 +1992,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		if !containerRuntimeUp {
 			reasons = append(reasons, "container runtime is down")
 		}
-		if !networkConfigured {
+		if !kl.networkConfigured {
 			reasons = append(reasons, "network not configured correctly")
 		}
 		newNodeReadyCondition = api.NodeCondition{
@@ -2035,6 +2054,8 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	if node == nil {
 		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
+	kl.podCIDR = node.Spec.PodCIDR
+
 	if err := kl.setNodeStatus(node); err != nil {
 		return err
 	}
