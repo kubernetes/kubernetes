@@ -1,9 +1,8 @@
-## Getting started on Rackspace
+Getting started on Rackspace
+----------------------------
 
-## Contents
+**Table of Contents**
 
-    - [Getting started on Rackspace](#getting-started-on-rackspace)
-    - [Contents](#contents)
     - [Introduction](#introduction)
     - [Prerequisites](#prerequisites)
     - [Provider: Rackspace](#provider-rackspace)

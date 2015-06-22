@@ -1,10 +1,12 @@
-#Getting started on [Fedora](http://fedoraproject.org)
+Getting started on [Fedora](http://fedoraproject.org)
+-----------------------------------------------------
 
-## Contents
+**Table of Contents**
 
-- [Getting started on [Fedora](http://fedoraproject.org)](#getting-started-on-fedorahttpfedoraprojectorg)
-    - [Contents](#contents)
+    - [Prerequisites](#prerequisites)
     - [Instructions](#instructions)
+## Prerequisites
+1. You need 2 or more machines with Fedora installed.
 
 ## Instructions
 

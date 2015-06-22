@@ -1,16 +1,15 @@
-## Getting started with Juju
+Getting started with Juju
+-------------------------
 
 Juju handles provisioning machines and deploying complex systems to a
 wide number of clouds, supporting service orchestration once the bundle of
 services has been deployed.
 
-## Contents
+**Table of Contents**
 
-    - [Getting started with Juju](#getting-started-with-juju)
-    - [Contents](#contents)
-        - [Prerequisites](#prerequisites)
-            - [On Ubuntu](#on-ubuntu)
-            - [With Docker](#with-docker)
+    - [Prerequisites](#prerequisites)
+       - [On Ubuntu](#on-ubuntu)
+       - [With Docker](#with-docker)
     - [Launch Kubernetes cluster](#launch-kubernetes-cluster)
     - [Exploring the cluster](#exploring-the-cluster)
     - [Run some containers!](#run-some-containers)
@@ -21,13 +20,13 @@ services has been deployed.
         - [Cloud compatibility](#cloud-compatibility)
 
 
-### Prerequisites
+## Prerequisites
 
 > Note: If you're running kube-up, on ubuntu - all of the dependencies
 > will be handled for you. You may safely skip to the section:
 > [Launch Kubernetes Cluster](#launch-kubernetes-cluster)
 
-#### On Ubuntu
+### On Ubuntu
 
 [Install the Juju client](https://juju.ubuntu.com/install) on your
 local ubuntu system:
@@ -37,7 +36,7 @@ local ubuntu system:
     sudo apt-get install juju-core juju-quickstart
 
 
-#### With Docker
+### With Docker
 
 If you are not using ubuntu or prefer the isolation of docker, you may
 run the following:

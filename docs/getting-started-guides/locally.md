@@ -1,9 +1,8 @@
-## Getting started locally
+Getting started locally
+-----------------------
 
-## Contents
+**Table of Contents**
 
-- [Getting started locally](#getting-started-locally)
-- [Contents](#contents)
     - [Requirements](#requirements)
         - [Linux](#linux)
         - [Docker](#docker)
@@ -11,7 +10,6 @@
         - [go](#go)
     - [Starting the cluster](#starting-the-cluster)
     - [Running a container](#running-a-container)
-- [introspect kubernetes!](#introspect-kubernetes)
     - [Running a user defined pod](#running-a-user-defined-pod)
     - [Troubleshooting](#troubleshooting)
         - [I cannot reach service IPs on the network.](#i-cannot-reach-service-ips-on-the-network)

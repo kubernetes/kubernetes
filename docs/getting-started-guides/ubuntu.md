@@ -1,16 +1,13 @@
-## Kubernetes Deployment On Bare-metal Ubuntu Nodes
+Kubernetes Deployment On Bare-metal Ubuntu Nodes
+------------------------------------------------
 
-## Contents
-
-    - [Kubernetes Deployment On Bare-metal Ubuntu Nodes](#kubernetes-deployment-on-bare-metal-ubuntu-nodes)
-    - [Contents](#contents)
-    - [Introduction](#introduction)
-        - [**Prerequisites：**](#prerequisites)
-        - [**Main Steps**](#main-steps)
-            - [I. Make *kubernetes* , *etcd* and *flanneld* binaries](#i-make-kubernetes--etcd-and-flanneld-binaries)
-            - [II. Configure and start the kubernetes cluster](#ii-configure-and-start-the-kubernetes-cluster)
-            - [IV. Deploy addons](#iv-deploy-addons)
-            - [IV. Trouble Shooting](#iv-trouble-shooting)
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+    - [Starting a Cluster](#starting-a-cluster)
+        - [Make *kubernetes* , *etcd* and *flanneld* binaries](#make-kubernetes--etcd-and-flanneld-binaries)
+        - [Configure and start the kubernetes cluster](#configure-and-start-the-kubernetes-cluster)
+        - [Deploy addons](#deploy-addons)
+        - [Trouble Shooting](#trouble-shooting)
 
 ## Introduction
 
@@ -18,7 +15,7 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ma
 
 [Cloud team from Zhejiang University](https://github.com/ZJU-SEL) will maintain this work.
 
-### **Prerequisites：**
+## Prerequisites
 *1 The minion nodes have installed docker version 1.2+ and bridge-utils to manipulate linux bridge* 
 
 *2 All machines can communicate with each other, no need to connect Internet (should use private docker registry in this case)*
@@ -30,8 +27,8 @@ This document describes how to deploy kubernetes on ubuntu nodes, including 1 ma
 *5 All the remote servers can be ssh logged in without a password by using key authentication* 
 
 
-### **Main Steps**
-#### I. Make *kubernetes* , *etcd* and *flanneld* binaries
+### Starting a Cluster
+#### Make *kubernetes* , *etcd* and *flanneld* binaries
 
 First clone the kubernetes github repo, `$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
 then `$ cd kubernetes/cluster/ubuntu`.
@@ -44,7 +41,7 @@ Please make sure that there are `kube-apiserver`, `kube-controller-manager`, `ku
 
 > We used flannel here because we want to use overlay network, but please remember it is not the only choice, and it is also not a k8s' necessary dependence. Actually you can just build up k8s cluster natively, or use flannel, Open vSwitch or any other SDN tool you like, we just choose flannel here as a example.
 
-#### II. Configure and start the kubernetes cluster
+#### Configure and start the kubernetes cluster
 An example cluster is listed as below:
 
 | IP Address|Role |      
@@ -126,7 +123,7 @@ NAME            LABELS                                 STATUS
 Also you can run kubernetes [guest-example](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook) to build a redis backend cluster on the k8s．
 
 
-#### IV. Deploy addons
+#### Deploy addons
 
 After the previous parts, you will have a working k8s cluster, this part will teach you how to deploy addons like dns onto the existing cluster.
 
@@ -160,7 +157,7 @@ $ KUBERNETES_PROVIDER=ubuntu ./deployAddons.sh
 After some time, you can use `$ kubectl get pods` to see the dns pod is running in the cluster. Done!
 
 
-#### IV. Trouble Shooting
+#### Trouble Shooting
 
 Generally, what this approach did is quite simple: 
 

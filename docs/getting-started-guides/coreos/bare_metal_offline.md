@@ -1,12 +1,11 @@
-# Bare Metal CoreOS with Kubernetes (OFFLINE)
+Bare Metal CoreOS with Kubernetes (OFFLINE)
+------------------------------------------
 Deploy a CoreOS running Kubernetes environment. This particular guild is made to help those in an OFFLINE system, wither for testing a POC before the real deal, or you are restricted to be totally offline for your applications.
 
-## Contents
+**Table of Contents**
 
-- [Bare Metal CoreOS with Kubernetes (OFFLINE)](#bare-metal-coreos-with-kubernetes-offline)
-    - [Contents](#contents)
+    - [Prerequisites](#prerequisites)
     - [High Level Design](#high-level-design)
-    - [Pre-requisites](#pre-requisites)
     - [This Guides variables](#this-guides-variables)
     - [Setup PXELINUX CentOS](#setup-pxelinux-centos)
     - [Adding CoreOS to PXE](#adding-coreos-to-pxe)
@@ -23,6 +22,10 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
     - [Helping commands for debugging](#helping-commands-for-debugging)
 
 
+## Prerequisites
+1. Installed *CentOS 6* for PXE server
+2. At least two bare metal nodes to work with
+
 ## High Level Design
 1. Manage the tftp directory 
   * /tftpboot/(coreos)(centos)(RHEL)
@@ -32,10 +35,6 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 4. Setup nodes to deploy CoreOS creating a etcd cluster. 
 5. Have no access to the public [etcd discovery tool](https://discovery.etcd.io/). 
 6. Installing the CoreOS slaves to become Kubernetes minions.
-
-## Pre-requisites
-1. Installed *CentOS 6* for PXE server
-2. At least two bare metal nodes to work with
 
 ## This Guides variables
 | Node Description              | MAC               | IP          |
