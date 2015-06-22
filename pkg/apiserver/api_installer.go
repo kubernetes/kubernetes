@@ -547,6 +547,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
 			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
 			addProxyRoute(ws, "HEAD", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
+			addProxyRoute(ws, "OPTIONS", a.prefix, action.Path, proxyHandler, kind, resource, subresource, hasSubresource, action.Params)
 		case "CONNECT":
 			for _, method := range connecter.ConnectMethods() {
 				doc := "connect " + method + " requests to " + kind
