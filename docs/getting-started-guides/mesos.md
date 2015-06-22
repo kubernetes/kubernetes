@@ -1,9 +1,8 @@
-## Getting started with Kubernetes on Mesos
+Getting started with Kubernetes on Mesos
+----------------------------------------
 
-## Contents
+**Table of Contents**
 
-    - [Getting started with Kubernetes on Mesos](#getting-started-with-kubernetes-on-mesos)
-    - [Contents](#contents)
     - [About Kubernetes on Mesos](#about-kubernetes-on-mesos)
         - [Prerequisites](#prerequisites)
         - [Deploy Kubernetes-Mesos](#deploy-kubernetes-mesos)
@@ -13,8 +12,6 @@
     - [Spin up a pod](#spin-up-a-pod)
     - [Run the Example Guestbook App](#run-the-example-guestbook-app)
             - [Test Guestbook App](#test-guestbook-app)
-- [determine the internal port for the frontend service](#determine-the-internal-port-for-the-frontend-service)
-- [open up access to the internal port for the frontend service](#open-up-access-to-the-internal-port-for-the-frontend-service)
 
 ## About Kubernetes on Mesos
 <!-- TODO: Update, clean up. -->

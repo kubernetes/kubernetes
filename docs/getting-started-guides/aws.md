@@ -1,9 +1,8 @@
-# Getting started on AWS EC2
+Getting started on AWS EC2
+--------------------------
 
-## Contents
+**Table of Contents**
 
-- [Getting started on AWS EC2](#getting-started-on-aws-ec2)
-    - [Contents](#contents)
     - [Prerequisites](#prerequisites)
     - [Cluster turnup](#cluster-turnup)
         - [Supported procedure: `get-kube`](#supported-procedure-get-kube)

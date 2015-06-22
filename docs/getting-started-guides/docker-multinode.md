@@ -1,18 +1,21 @@
-# Running Multi-Node Kubernetes Using Docker
+Running Multi-Node Kubernetes Using Docker
+------------------------------------------
 
 _Note_:
 These instructions are somewhat significantly more advanced than the [single node](docker.md) instructions.  If you are
 interested in just starting to explore Kubernetes, we recommend that you start there.
 
-## Table of Contents
+**Table of Contents**
 
-- [Running Multi-Node Kubernetes Using Docker](#running-multi-node-kubernetes-using-docker)
-  - [Table of Contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
   - [Overview](#overview)
     - [Bootstrap Docker](#bootstrap-docker)
   - [Master Node](#master-node)
   - [Adding a worker node](#adding-a-worker-node)
   - [Testing your cluster](#testing-your-cluster)
+
+## Prerequisites
+1. You need a machine with docker installed.
 
 ## Overview
 This guide will set up a 2-node kubernetes cluster, consisting of a _master_ node which hosts the API server and orchestrates work

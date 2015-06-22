@@ -1,14 +1,13 @@
-## Getting started with vSphere
+Getting started with vSphere
+-------------------------------
 
 The example below creates a Kubernetes cluster with 4 worker node Virtual
 Machines and a master Virtual Machine (i.e. 5 VMs in your cluster). This
 cluster is set up and controlled from your workstation (or wherever you find
 convenient).
 
-## Contents
+**Table of Contents**
 
-- [Getting started with vSphere](#getting-started-with-vsphere)
-- [Contents](#contents)
     - [Prerequisites](#prerequisites)
     - [Setup](#setup)
     - [Starting a cluster](#starting-a-cluster)

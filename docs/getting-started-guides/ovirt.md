@@ -1,13 +1,11 @@
-# Getting started on oVirt
+Getting started on oVirt
+------------------------
 
-## Contents
+**Table of Contents**
 
-- [Getting started on oVirt](#getting-started-on-ovirt)
-    - [Contents](#contents)
     - [What is oVirt](#what-is-ovirt)
     - [oVirt Cloud Provider Deployment](#ovirt-cloud-provider-deployment)
     - [Using the oVirt Cloud Provider](#using-the-ovirt-cloud-provider)
-- [Search query used to find nodes](#search-query-used-to-find-nodes)
     - [oVirt Cloud Provider Screencast](#ovirt-cloud-provider-screencast)
 
 ## What is oVirt

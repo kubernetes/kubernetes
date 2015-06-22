@@ -1,30 +1,22 @@
-## Deploying Kubernetes on [CloudStack](http://cloudstack.apache.org)
+Getting started on [CloudStack](http://cloudstack.apache.org)
+------------------------------------------------------------
 
-## Contents
+**Table of Contents**
 
-- [Deploying Kubernetes on [CloudStack](http://cloudstack.apache.org)](#deploying-kubernetes-on-cloudstackhttpcloudstackapacheorg)
-- [Contents](#contents)
-- [Introduction](#introduction)
-- [Ansible playbook](#ansible-playbook)
+    - [Introduction](#introduction)
     - [Prerequisites](#prerequisites)
     - [Clone the playbook](#clone-the-playbook)
     - [Create a Kubernetes cluster](#create-a-kubernetes-cluster)
 
-## Introduction
+### Introduction
 
 CloudStack is a software to build public and private clouds based on hardware virtualization principles (traditional IaaS). To deploy Kubernetes on CloudStack there are several possibilities depending on the Cloud being used and what images are made available. [Exoscale](http://exoscale.ch) for instance makes a [CoreOS](http://coreos.com) template available, therefore instructions to deploy Kubernetes on coreOS can be used. CloudStack also has a vagrant plugin available, hence Vagrant could be used to deploy Kubernetes either using the existing shell provisioner or using new Salt based recipes.
 
 [CoreOS](http://coreos.com) templates for CloudStack are built [nightly](http://stable.release.core-os.net/amd64-usr/current/). CloudStack operators need to [register](http://docs.cloudstack.apache.org/projects/cloudstack-administration/en/latest/templates.html) this template in their cloud before proceeding with these Kubernetes deployment instructions.
 
-There are currently two deployment techniques.
+This guide uses an [Ansible playbook](https://github.com/runseb/ansible-kubernetes).
+This is a completely automated, a single playbook deploys Kubernetes based on the coreOS [instructions](http://docs.k8s.io/getting-started-guides/coreos/coreos_multinode_cluster.md).
 
-* [Kubernetes on Exoscale](https://github.com/runseb/kubernetes-exoscale).
-   This uses [libcloud](http://libcloud.apache.org) to launch CoreOS instances and pass the appropriate cloud-config setup using userdata. Several manual steps are required. This is obsoleted by the Ansible playbook detailed below.
-
-* [Ansible playbook](https://github.com/runseb/ansible-kubernetes).
-  This is completely automated, a single playbook deploys Kubernetes based on the coreOS [instructions](http://docs.k8s.io/getting-started-guides/coreos/coreos_multinode_cluster.md).
-
-## Ansible playbook
 
 This [Ansible](http://ansibleworks.com) playbook deploys Kubernetes on a CloudStack based Cloud using CoreOS images. The playbook, creates an ssh key pair, creates a security group and associated rules and finally starts coreOS instances configured via cloud-init.
 

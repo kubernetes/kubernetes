@@ -1,23 +1,23 @@
-# Getting started on Microsoft Azure
+Getting started on Microsoft Azure
+----------------------------------
 
-## Contents
+**Table of Contents**
 
-- [Getting started on Microsoft Azure](#getting-started-on-microsoft-azure)
-    - [Contents](#contents)
-    - [Azure Prerequisites](#azure-prerequisites)
-    - [Prerequisites for your workstation](#prerequisites-for-your-workstation)
+    - [Prerequisites](#prerequisites)
     - [Setup](#setup)
     - [Getting started with your cluster](#getting-started-with-your-cluster)
     - [Tearing down the cluster](#tearing-down-the-cluster)
 
 
-## Azure Prerequisites
+## Prerequisites
+
+** Azure Prerequisites**
 
 1. You need an Azure account. Visit http://azure.microsoft.com/ to get started.
 2. Install and configure the Azure cross-platform command-line interface. http://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
 3. Make sure you have a default account set in the Azure cli, using `azure account set`
 
-## Prerequisites for your workstation
+**Prerequisites for your workstation**
 
 1. Be running a Linux or Mac OS X.
 2. Get or build a [binary release](binary_release.md)
