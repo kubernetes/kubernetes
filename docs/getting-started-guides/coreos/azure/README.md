@@ -1,5 +1,17 @@
 # Kubernetes on Azure with CoreOS and [Weave](http://weave.works)
 
+## Contents
+
+- [Kubernetes on Azure with CoreOS and [Weave](http://weave.works)](#kubernetes-on-azure-with-coreos-and-weavehttpweaveworks)
+    - [Contents](#contents)
+    - [Introduction](#introduction)
+    - [Let's go!](#lets-go)
+    - [Deploying the workload](#deploying-the-workload)
+    - [Scaling](#scaling)
+    - [Exposing the app to the outside world](#exposing-the-app-to-the-outside-world)
+    - [Next steps](#next-steps)
+    - [Tear down...](#tear-down)
+
 ## Introduction
 
 In this guide I will demonstrate how to deploy a Kubernetes cluster to Azure cloud. You will be using CoreOS with Weave, which implements simple and secure networking, in a transparent, yet robust way. The purpose of this guide is to provide an out-of-the-box implementation that can ultimately be taken into production with little change. It will demonstrate how to provision a dedicated Kubernetes master and etcd nodes, and show how to scale the cluster with ease.

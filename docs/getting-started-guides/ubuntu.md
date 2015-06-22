@@ -1,4 +1,18 @@
-# Kubernetes Deployment On Bare-metal Ubuntu Nodes
+## Kubernetes Deployment On Bare-metal Ubuntu Nodes
+
+## Contents
+
+    - [Kubernetes Deployment On Bare-metal Ubuntu Nodes](#kubernetes-deployment-on-bare-metal-ubuntu-nodes)
+    - [Contents](#contents)
+    - [Introduction](#introduction)
+        - [**Prerequisites：**](#prerequisites)
+        - [**Main Steps**](#main-steps)
+            - [I. Make *kubernetes* , *etcd* and *flanneld* binaries](#i-make-kubernetes--etcd-and-flanneld-binaries)
+            - [II. Configure and start the kubernetes cluster](#ii-configure-and-start-the-kubernetes-cluster)
+            - [IV. Deploy addons](#iv-deploy-addons)
+            - [IV. Trouble Shooting](#iv-trouble-shooting)
+
+## Introduction
 
 This document describes how to deploy kubernetes on ubuntu nodes, including 1 master node and 3 minion nodes, and people uses this approach can scale to **any number of minion nodes** by changing some settings with ease. The original idea was heavily inspired by @jainvipin 's ubuntu single node work, which has been merge into this document.
 

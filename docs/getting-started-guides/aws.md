@@ -1,5 +1,19 @@
 # Getting started on AWS EC2
 
+## Contents
+
+- [Getting started on AWS EC2](#getting-started-on-aws-ec2)
+    - [Contents](#contents)
+    - [Prerequisites](#prerequisites)
+    - [Cluster turnup](#cluster-turnup)
+        - [Supported procedure: `get-kube`](#supported-procedure-get-kube)
+        - [Alternatives](#alternatives)
+    - [Getting started with your cluster](#getting-started-with-your-cluster)
+        - [Command line administration tool: `kubectl`](#command-line-administration-tool-kubectl)
+        - [Examples](#examples)
+    - [Tearing down the cluster](#tearing-down-the-cluster)
+    - [Further reading](#further-reading)
+
 ## Prerequisites
 
 1. You need an AWS account. Visit [http://aws.amazon.com](http://aws.amazon.com) to get started

@@ -1,4 +1,12 @@
-##Getting started on [Fedora](http://fedoraproject.org)
+#Getting started on [Fedora](http://fedoraproject.org)
+
+## Contents
+
+- [Getting started on [Fedora](http://fedoraproject.org)](#getting-started-on-fedorahttpfedoraprojectorg)
+    - [Contents](#contents)
+    - [Instructions](#instructions)
+
+## Instructions
 
 This is a getting started guide for Fedora.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...
 

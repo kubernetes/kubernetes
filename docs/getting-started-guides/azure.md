@@ -1,12 +1,23 @@
-## Getting started on Microsoft Azure
+# Getting started on Microsoft Azure
 
-### Azure Prerequisites
+## Contents
+
+- [Getting started on Microsoft Azure](#getting-started-on-microsoft-azure)
+    - [Contents](#contents)
+    - [Azure Prerequisites](#azure-prerequisites)
+    - [Prerequisites for your workstation](#prerequisites-for-your-workstation)
+    - [Setup](#setup)
+    - [Getting started with your cluster](#getting-started-with-your-cluster)
+    - [Tearing down the cluster](#tearing-down-the-cluster)
+
+
+## Azure Prerequisites
 
 1. You need an Azure account. Visit http://azure.microsoft.com/ to get started.
 2. Install and configure the Azure cross-platform command-line interface. http://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
 3. Make sure you have a default account set in the Azure cli, using `azure account set`
 
-### Prerequisites for your workstation
+## Prerequisites for your workstation
 
 1. Be running a Linux or Mac OS X.
 2. Get or build a [binary release](binary_release.md)
@@ -14,7 +25,7 @@
 installed](https://docs.docker.com/installation/).  On Mac OS X you can use
 [boot2docker](http://boot2docker.io/).
 
-### Setup
+## Setup
 The cluster setup scripts can setup Kubernetes for multiple targets. First modify `cluster/kube-env.sh` to specify azure:
 
     KUBERNETES_PROVIDER="azure"
@@ -37,12 +48,12 @@ You can then use the `cluster/kube-*.sh` scripts to manage your azure cluster, s
 The script above will start (by default) a single master VM along with 4 worker VMs.  You
 can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
 
-### Getting started with your cluster
+## Getting started with your cluster
 See [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
 
 For more complete applications, please look in the [examples directory](../../examples).
 
-### Tearing down the cluster
+## Tearing down the cluster
 ```
 cluster/kube-down.sh
 ```
