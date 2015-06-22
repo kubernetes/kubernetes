@@ -1,0 +1,51 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# All Vagrant configuration is done below. The "2" in Vagrant.configure
+# configures the configuration version (we support older styles for
+# backwards compatibility). Please don't change it unless you know what
+# you're doing.
+Vagrant.configure(2) do |config|
+  config.vm.box = "chef/centos-7.0"
+
+#  config.vm.network "public_network"
+
+  config.vm.define "master", primary: true do |master|
+    master.vm.hostname = "master.vms.local"
+    master.vm.network "private_network", ip: "192.168.1.100"
+  end
+
+  (1..1).each do |i|
+    config.vm.define "node-#{i}" do |node|
+      node.vm.hostname = "node-#{i}.vms.local"
+      node.vm.network "private_network", ip: "192.168.1.1#{i}"
+      node.vm.provision :ansible do |ansible|
+        ansible.groups = {
+          "masters" => ["master"],
+          "nodes" => ["node-1", "node-2"],
+          "etcd" => ["master"]
+        }
+        ansible.host_key_checking = false
+        ansible.extra_vars = {
+          ansible_ssh_user: 'vagrant',
+          ansible_ssh_pass: 'vagrant',
+          user: 'vagrant'
+        }
+        #ansible.verbose = 'vvv'
+        ansible.playbook = "../cluster.yml"
+        ansible.inventory_path = "vinventory"
+
+        ansible.limit = 'all'
+      end
+    end
+  end
+
+
+  config.vm.provider "virtualbox" do |vb|
+    # Display the VirtualBox GUI when booting the machine
+    vb.gui = false
+    # Customize the amount of memory on the VM:
+    vb.memory = "2048"
+    # vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+  end
+end
