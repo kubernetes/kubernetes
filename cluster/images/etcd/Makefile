@@ -1,8 +1,8 @@
 .PHONY:	clean build push
 
 IMAGE = etcd
-TAG = 2.0.9.1
-ETCD_VERSION = 2.0.9
+TAG = 2.0.12
+ETCD_VERSION = 2.0.12
 OUTPUT_DIR = $(IMAGE)-v$(ETCD_VERSION)-linux-amd64
 
 clean:
@@ -16,6 +16,6 @@ build: clean
 	docker build -t gcr.io/google_containers/$(IMAGE):$(TAG) .
 
 push: build
-	gcloud preview docker push gcr.io/google_containers/$(IMAGE):$(TAG)
+	gcloud docker push gcr.io/google_containers/$(IMAGE):$(TAG)
 
 all:	push
