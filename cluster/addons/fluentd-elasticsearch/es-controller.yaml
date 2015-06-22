@@ -1,4 +1,4 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: elasticsearch-logging-v1
@@ -21,14 +21,7 @@ spec:
     spec:
       containers:
       - image: gcr.io/google_containers/elasticsearch:1.4
-        name: elasticsearch-logging
-        livenessProbe:
-          name: es-liveness
-          httpGet:
-            path: /
-            port: 9200
-          initialDelaySeconds: 30
-          timeoutSeconds: 5          
+        name: elasticsearch-logging         
         ports:
         - containerPort: 9200
           name: es-port
