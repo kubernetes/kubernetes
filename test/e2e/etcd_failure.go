@@ -123,7 +123,10 @@ func checkExistingRCRecovers(f Framework) {
 	By("deleting pods from existing replication controller")
 	expectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
 		pods, err := podClient.List(rcSelector, fields.Everything())
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			Logf("apiserver returned error, as expected before recovery: %v", err)
+			return false, nil
+		}
 		if len(pods.Items) == 0 {
 			return false, nil
 		}
@@ -131,6 +134,7 @@ func checkExistingRCRecovers(f Framework) {
 			err = podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 			Expect(err).NotTo(HaveOccurred())
 		}
+		Logf("apiserver has recovered")
 		return true, nil
 	}))
 
