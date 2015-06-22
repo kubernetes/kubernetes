@@ -299,6 +299,28 @@ func TestKubeletDirsCompat(t *testing.T) {
 
 var emptyPodUIDs map[types.UID]SyncPodType
 
+func TestSyncLoopTimeUpdate(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kubelet := testKubelet.kubelet
+
+	loopTime1 := kubelet.LatestLoopEntryTime()
+	if !loopTime1.IsZero() {
+		t.Errorf("Unexpected sync loop time: %s, expected 0", loopTime1)
+	}
+
+	kubelet.syncLoopIteration(make(chan PodUpdate), kubelet)
+	loopTime2 := kubelet.LatestLoopEntryTime()
+	if loopTime2.IsZero() {
+		t.Errorf("Unexpected sync loop time: 0, expected non-zero value.")
+	}
+	kubelet.syncLoopIteration(make(chan PodUpdate), kubelet)
+	loopTime3 := kubelet.LatestLoopEntryTime()
+	if !loopTime3.After(loopTime1) {
+		t.Errorf("Sync Loop Time was not updated correctly. Second update timestamp should be greater than first update timestamp")
+	}
+}
+
 func TestSyncPodsStartPod(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)

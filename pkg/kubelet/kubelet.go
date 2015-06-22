@@ -262,6 +262,7 @@ func NewMainKubelet(
 		mounter:                        mounter,
 		configureCBR0:                  configureCBR0,
 		pods:                           pods,
+		syncLoopMonitor:                util.AtomicValue{},
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -491,6 +492,9 @@ type Kubelet struct {
 
 	// Number of Pods which can be run by this Kubelet
 	pods int
+
+	// Monitor Kubelet's sync loop
+	syncLoopMonitor util.AtomicValue
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1690,41 +1694,58 @@ func (kl *Kubelet) admitPods(allPods []*api.Pod, podSyncTypes map[types.UID]Sync
 func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	glog.Info("Starting kubelet main sync loop.")
 	for {
-		if !kl.containerRuntimeUp() {
-			time.Sleep(5 * time.Second)
-			glog.Infof("Skipping pod synchronization, container runtime is not up.")
-			continue
+		kl.syncLoopIteration(updates, handler)
+	}
+}
+
+func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandler) {
+	kl.syncLoopMonitor.Store(time.Now())
+	if !kl.containerRuntimeUp() {
+		time.Sleep(5 * time.Second)
+		glog.Infof("Skipping pod synchronization, container runtime is not up.")
+		return
+	}
+	unsyncedPod := false
+	podSyncTypes := make(map[types.UID]SyncPodType)
+	select {
+	case u, ok := <-updates:
+		if !ok {
+			glog.Errorf("Update channel is closed. Exiting the sync loop.")
+			return
 		}
-		unsyncedPod := false
-		podSyncTypes := make(map[types.UID]SyncPodType)
+		kl.podManager.UpdatePods(u, podSyncTypes)
+		unsyncedPod = true
+		kl.syncLoopMonitor.Store(time.Now())
+	case <-time.After(kl.resyncInterval):
+		glog.V(4).Infof("Periodic sync")
+	}
+	start := time.Now()
+	// If we already caught some update, try to wait for some short time
+	// to possibly batch it with other incoming updates.
+	for unsyncedPod {
 		select {
-		case u, ok := <-updates:
-			if !ok {
-				glog.Errorf("Update channel is closed. Exiting the sync loop.")
-				return
-			}
+		case u := <-updates:
 			kl.podManager.UpdatePods(u, podSyncTypes)
-			unsyncedPod = true
-		case <-time.After(kl.resyncInterval):
-			glog.V(4).Infof("Periodic sync")
-		}
-		start := time.Now()
-		// If we already caught some update, try to wait for some short time
-		// to possibly batch it with other incoming updates.
-		for unsyncedPod {
-			select {
-			case u := <-updates:
-				kl.podManager.UpdatePods(u, podSyncTypes)
-			case <-time.After(5 * time.Millisecond):
-				// Break the for loop.
-				unsyncedPod = false
-			}
-		}
-		pods, mirrorPods := kl.podManager.GetPodsAndMirrorMap()
-		if err := handler.SyncPods(pods, podSyncTypes, mirrorPods, start); err != nil {
-			glog.Errorf("Couldn't sync containers: %v", err)
+			kl.syncLoopMonitor.Store(time.Now())
+		case <-time.After(5 * time.Millisecond):
+			// Break the for loop.
+			unsyncedPod = false
 		}
 	}
+	pods, mirrorPods := kl.podManager.GetPodsAndMirrorMap()
+	kl.syncLoopMonitor.Store(time.Now())
+	if err := handler.SyncPods(pods, podSyncTypes, mirrorPods, start); err != nil {
+		glog.Errorf("Couldn't sync containers: %v", err)
+	}
+	kl.syncLoopMonitor.Store(time.Now())
+}
+
+func (kl *Kubelet) LatestLoopEntryTime() time.Time {
+	val := kl.syncLoopMonitor.Load()
+	if val == nil {
+		return time.Time{}
+	}
+	return val.(time.Time)
 }
 
 // Returns the container runtime version for this Kubelet.
@@ -2272,6 +2293,10 @@ func (kl *Kubelet) BirthCry() {
 
 func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
 	return kl.streamingConnectionIdleTimeout
+}
+
+func (kl *Kubelet) ResyncInterval() time.Duration {
+	return kl.resyncInterval
 }
 
 // GetContainerInfo returns stats (from Cadvisor) for a container.
