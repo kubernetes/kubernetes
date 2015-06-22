@@ -156,7 +156,7 @@ var _ = Describe("Density", func() {
 		// TODO: Reenable once we can measure latency only from a single test.
 		// TODO: Expose runLatencyTest as ginkgo flag.
 		{podsPerMinion: 3, skip: true, runLatencyTest: false, interval: 10 * time.Second},
-		{podsPerMinion: 30, skip: true, runLatencyTest: false, interval: 10 * time.Second},
+		{podsPerMinion: 30, skip: true, runLatencyTest: true, interval: 10 * time.Second},
 		// More than 30 pods per node is outside our v1.0 goals.
 		// We might want to enable those tests in the future.
 		{podsPerMinion: 50, skip: true, runLatencyTest: false, interval: 10 * time.Second},
