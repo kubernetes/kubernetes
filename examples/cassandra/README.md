@@ -63,9 +63,8 @@ After a few moments, you should be able to see the pod running, plus its single 
 
 ```sh
 $ kubectl get pods cassandra
-POD         IP           CONTAINER(S)   IMAGE(S)                  HOST                                    LABELS           STATUS    CREATED      MESSAGE
-cassandra   10.244.3.3                                            kubernetes-minion-sft2/104.197.42.181   name=cassandra   Running   21 seconds
-                         cassandra      gcr.io/google_containers/cassandra:v3                                                            Running   3 seconds
+NAME        READY     REASON    RESTARTS   AGE
+cassandra   1/1       Running   0          55s
 ```
 
 
@@ -97,28 +96,29 @@ $ kubectl create -f cassandra-service.yaml
 Once the service is created, you can query it's endpoints:
 ```sh
 $ kubectl get endpoints cassandra -o yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Endpoints
 metadata:
-  creationTimestamp: 2015-04-23T17:21:27Z
+  creationTimestamp: 2015-06-21T22:34:12Z
+  labels:
+    name: cassandra
   name: cassandra
   namespace: default
-  resourceVersion: "857"
-  selfLink: /api/v1beta3/namespaces/default/endpoints/cassandra
-  uid: 2c7d36bf-e9dd-11e4-a7ed-42010af011dd
+  resourceVersion: "944373"
+  selfLink: /api/v1/namespaces/default/endpoints/cassandra
+  uid: a3d6c25f-1865-11e5-a34e-42010af01bcc
 subsets:
 - addresses:
-  - IP: 10.244.3.3
+  - ip: 10.244.3.15
     targetRef:
       kind: Pod
       name: cassandra
       namespace: default
-      resourceVersion: "769"
-      uid: d185872c-e9dc-11e4-a7ed-42010af011dd
+      resourceVersion: "944372"
+      uid: 9ef9895d-1865-11e5-a34e-42010af01bcc
   ports:
   - port: 9042
     protocol: TCP
-
 ```
 
 You can see that the _Service_ has found the pod we created in step one.
@@ -191,13 +191,9 @@ Now if you list the pods in your cluster, and filter to the label ```name=cassan
 
 ```sh
 $ kubectl get pods -l="name=cassandra"
-
-POD                 IP              CONTAINER(S)   IMAGE(S)                 HOST                                    LABELS           STATUS    CREATED      MESSAGE
-cassandra           10.244.3.3                                              kubernetes-minion-sft2/104.197.42.181   name=cassandra   Running   7 minutes
-                                    cassandra      gcr.io/google_containers/cassandra:v3                                                           Running   7 minutes
-cassandra-gnhk8     10.244.0.5                                              kubernetes-minion-dqz3/104.197.2.71     name=cassandra   Running   About a minute
-                                    cassandra      gcr.io/google_containers/cassandra:v3                                                           Running   51 seconds
-
+NAME              READY     REASON    RESTARTS   AGE
+cassandra         1/1       Running   0          3m
+cassandra-af6h5   1/1       Running   0          28s
 ```
 
 Notice that one of the pods has the human readable name ```cassandra``` that you specified in your config before, and one has a random string, since it was named by the replication controller.
