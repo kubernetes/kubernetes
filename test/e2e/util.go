@@ -1161,7 +1161,9 @@ func SSH(cmd, host, provider string) (string, string, int, error) {
 		return "", "", 0, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
 	}
 
-	return util.RunSSHCommand(cmd, host, signer)
+	user := os.Getenv("KUBE_SSH_USER")
+	// RunSSHCommand will default to Getenv("USER") if user == ""
+	return util.RunSSHCommand(cmd, user, host, signer)
 }
 
 // getSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
