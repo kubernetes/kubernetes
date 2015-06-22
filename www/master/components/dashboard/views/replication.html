@@ -63,7 +63,7 @@
               </div>
 
               <div ng-repeat="(label, value) in replicationController.spec.selector">
-                <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=pod">{{label}}={{value}}</a>
+                <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=pod">{{label}}: {{value}}</a>
               </div>
             </td>
           </tr>

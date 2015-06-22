@@ -31,6 +31,11 @@
                   {{port.name}}:
                 </span>
                 {{port.port}}/{{port.protocol}}
+
+                <div ng-show="port.nodePort && port.nodePort != 0">
+                  Node Port: {{port.nodePort}}/{{port.protocol}}
+                </div>
+
              </div>
             </td>
           </tr>
@@ -43,10 +48,12 @@
             </td>
           </tr>
 
-          <tr ng-show="service.spec.publicIPs">
-            <td class="name">Public IPs</td>
+          <tr ng-show="service.status.loadBalancer.ingress">
+            <td class="name">LoadBalancer Ingress</td>
             <td class="value">
-              {{service.spec.publicIPs | join:', '}}
+              <span ng-repeat="lb in service.status.loadBalancer.ingress">
+                {{lb.ip || lb.hostname}}{{$last ? '' : ', '}}
+              </span>
             </td>
           </tr>
 
@@ -74,7 +81,6 @@
               </span>
             </td>
           </tr>
-
 
           <tr>
             <td class="name">Related Pods</td>
