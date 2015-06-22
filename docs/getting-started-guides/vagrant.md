@@ -180,7 +180,7 @@ NAME                                   IMAGE(S)            HOST                 
 You need to wait for the provisioning to complete, you can monitor the nodes by doing:
 
 ```sh
-$ sudo salt '*minion-1' cmd.run 'docker images'
+$ vagrant ssh minion-1 -c 'sudo docker images'
 kubernetes-minion-1:
     REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
     <none>              <none>              96864a7d2df3        26 hours ago        204.4 MB
@@ -191,7 +191,7 @@ kubernetes-minion-1:
 Once the docker image for nginx has been downloaded, the container will start and you can list it:
 
 ```sh
-$ sudo salt '*minion-1' cmd.run 'docker ps'
+$ vagrant ssh minion-1 -c 'sudo docker ps'
 kubernetes-minion-1:
     CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
     dbe79bf6e25b        nginx:latest              "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f
