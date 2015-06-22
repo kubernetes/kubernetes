@@ -86,6 +86,13 @@ var _ = Describe("Density", func() {
 		expectNoError(err)
 		minionCount = len(minions.Items)
 		Expect(minionCount).NotTo(BeZero())
+
+		// Terminating a namespace (deleting the remaining objects from it - which
+		// generally means events) can affect the current run. Thus we wait for all
+		// terminating namespace to be finally deleted before starting this test.
+		err = deleteTestingNS(c)
+		expectNoError(err)
+
 		nsForTesting, err := createTestingNS("density", c)
 		ns = nsForTesting.Name
 		expectNoError(err)

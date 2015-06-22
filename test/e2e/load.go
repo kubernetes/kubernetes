@@ -63,6 +63,13 @@ var _ = Describe("Load capacity", func() {
 		expectNoError(err)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
+
+		// Terminating a namespace (deleting the remaining objects from it - which
+		// generally means events) can affect the current run. Thus we wait for all
+		// terminating namespace to be finally deleted before starting this test.
+		err = deleteTestingNS(c)
+		expectNoError(err)
+
 		nsForTesting, err := createTestingNS("load", c)
 		ns = nsForTesting.Name
 		expectNoError(err)

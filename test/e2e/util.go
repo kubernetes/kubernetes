@@ -376,6 +376,32 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 	return got, nil
 }
 
+// deleteTestingNS checks whether all e2e based existing namespaces are in the Terminating state
+// and waits until they are finally deleted.
+func deleteTestingNS(c *client.Client) error {
+	Logf("Waiting for terminating namespaces to be deleted...")
+	for start := time.Now(); time.Since(start) < 30*time.Minute; time.Sleep(15 * time.Second) {
+		namespaces, err := c.Namespaces().List(labels.Everything(), fields.Everything())
+		if err != nil {
+			Logf("Listing namespaces failed: %v", err)
+			continue
+		}
+		terminating := 0
+		for _, ns := range namespaces.Items {
+			if strings.HasPrefix(ns.ObjectMeta.Name, "e2e-tests-") {
+				if ns.Status.Phase == api.NamespaceActive {
+					return fmt.Errorf("Namespace %s is active", ns)
+				}
+				terminating++
+			}
+		}
+		if terminating == 0 {
+			return nil
+		}
+	}
+	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
+}
+
 func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
 	return waitForPodCondition(c, namespace, podName, "running", podStartTimeout, func(pod *api.Pod) (bool, error) {
 		if pod.Status.Phase == api.PodRunning {
