@@ -230,10 +230,8 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should be able to create a functioning external load balancer", func() {
-		if !providerIs("gce", "gke", "aws") {
-			By(fmt.Sprintf("Skipping service external load balancer test; uses ServiceTypeLoadBalancer, a (gce|gke|aws) feature"))
-			return
-		}
+		// requires ExternalLoadBalancer
+		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		serviceName := "external-lb-test"
 		ns := namespaces[0]
@@ -741,10 +739,8 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
-		if !providerIs("gce", "gke", "aws") {
-			By(fmt.Sprintf("Skipping service namespace collision test; uses ServiceTypeLoadBalancer, a (gce|gke|aws) feature"))
-			return
-		}
+		// requires ExternalLoadBalancer
+		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		serviceNames := []string{"s0"} // Could add more here, but then it takes longer.
 		labels := map[string]string{

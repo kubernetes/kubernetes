@@ -144,10 +144,8 @@ var _ = Describe("DNS", func() {
 	f := NewFramework("dns")
 
 	It("should provide DNS for the cluster", func() {
-		if providerIs("vagrant") {
-			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
-			return
-		}
+		// TODO: support DNS on vagrant #3580
+		SkipIfProviderIs("vagrant")
 
 		podClient := f.Client.Pods(api.NamespaceDefault)
 
@@ -208,11 +206,10 @@ var _ = Describe("DNS", func() {
 
 		Logf("DNS probes using %s succeeded\n", pod.Name)
 	})
+
 	It("should provide DNS for services", func() {
-		if providerIs("vagrant") {
-			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
-			return
-		}
+		// TODO: support DNS on vagrant #3580
+		SkipIfProviderIs("vagrant")
 
 		podClient := f.Client.Pods(api.NamespaceDefault)
 

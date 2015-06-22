@@ -103,10 +103,8 @@ var _ = Describe("Networking", func() {
 
 	//Now we can proceed with the test.
 	It("should function for intra-pod communication", func() {
-		if testContext.Provider == "vagrant" {
-			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
-			return
-		}
+		// TODO: support DNS on vagrant #3580
+		SkipIfProviderIs("vagrant")
 
 		By(fmt.Sprintf("Creating a service named %q in namespace %q", svcname, f.Namespace.Name))
 		svc, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{

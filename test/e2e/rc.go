@@ -47,11 +47,9 @@ var _ = Describe("ReplicationController", func() {
 	})
 
 	It("should serve a basic image on each replica with a private image", func() {
-		if !providerIs("gce", "gke") {
-			By(fmt.Sprintf("Skipping private variant, which is only supported for providers gce and gke (not %s)",
-				testContext.Provider))
-			return
-		}
+		// requires private images
+		SkipUnlessProviderIs("gce", "gke")
+
 		ServeImageOrFail(c, "private", "gcr.io/_b_k8s_authenticated_test/serve_hostname:1.1")
 	})
 })

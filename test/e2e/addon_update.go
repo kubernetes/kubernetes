@@ -232,10 +232,7 @@ var _ = Describe("Addon update", func() {
 
 		// This test requires SSH, so the provider check should be identical to
 		// those tests.
-		if !providerIs("gce") {
-			Logf(fmt.Sprintf("Skipping test, which is not implemented for %s", testContext.Provider))
-			return
-		}
+		SkipUnlessProviderIs("gce")
 
 		temporaryRemotePathPrefix := "addon-test-dir"
 		temporaryRemotePath := temporaryRemotePathPrefix + "/" + dir                  // in home directory on kubernetes-master

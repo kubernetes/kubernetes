@@ -39,7 +39,6 @@ var _ = Describe("Pod Disks", func() {
 		podClient client.PodInterface
 		host0Name string
 		host1Name string
-		numHosts  int
 	)
 
 	BeforeEach(func() {
@@ -47,29 +46,21 @@ var _ = Describe("Pod Disks", func() {
 		c, err = loadClient()
 		expectNoError(err)
 
+		SkipUnlessNodeCountIsAtLeast(2)
+
 		podClient = c.Pods(api.NamespaceDefault)
 
 		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		expectNoError(err, "Failed to list nodes for e2e cluster.")
 
-		numHosts = len(nodes.Items)
+		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")
 
-		if len(nodes.Items) >= 2 {
-			host1Name = nodes.Items[1].ObjectMeta.Name
-		}
-		if len(nodes.Items) >= 1 {
-			host0Name = nodes.Items[0].ObjectMeta.Name
-		}
+		host0Name = nodes.Items[0].ObjectMeta.Name
+		host1Name = nodes.Items[1].ObjectMeta.Name
 	})
 
 	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host", func() {
-		if !providerIs("gce", "aws") {
-			By(fmt.Sprintf("Skipping PD test, which is only supported for providers gce & aws (not %s)",
-				testContext.Provider))
-			return
-		}
-
-		Expect(numHosts >= 2).To(BeTrue(), "At least 2 nodes required")
+		SkipUnlessProviderIs("gce", "aws")
 
 		By("creating PD")
 		diskName, err := createPD()
@@ -122,13 +113,7 @@ var _ = Describe("Pod Disks", func() {
 	})
 
 	It("should schedule a pod w/ a readonly PD on two hosts, then remove both.", func() {
-		if testContext.Provider != "gce" {
-			By(fmt.Sprintf("Skipping PD test, which is only supported for provider gce (not %s)",
-				testContext.Provider))
-			return
-		}
-
-		Expect(numHosts >= 2).To(BeTrue(), "At least 2 nodes required")
+		SkipUnlessProviderIs("gce")
 
 		By("creating PD")
 		diskName, err := createPD()

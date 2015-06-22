@@ -182,6 +182,28 @@ func Failf(format string, a ...interface{}) {
 	Fail(fmt.Sprintf(format, a...), 1)
 }
 
+func Skipf(format string, args ...interface{}) {
+	Skip(fmt.Sprintf(format, args...))
+}
+
+func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
+	if testContext.CloudConfig.NumNodes < minNodeCount {
+		Skipf("Requires at least %d nodes (not %d)", minNodeCount, testContext.CloudConfig.NumNodes)
+	}
+}
+
+func SkipIfProviderIs(unsupportedProviders ...string) {
+	if providerIs(unsupportedProviders...) {
+		Skipf("Not supported for providers %v (found %s)", unsupportedProviders, testContext.Provider)
+	}
+}
+
+func SkipUnlessProviderIs(supportedProviders ...string) {
+	if !providerIs(supportedProviders...) {
+		Skipf("Only supported for providers %v (not %s)", supportedProviders, testContext.Provider)
+	}
+}
+
 func providerIs(providers ...string) bool {
 	for _, provider := range providers {
 		if strings.ToLower(provider) == strings.ToLower(testContext.Provider) {
