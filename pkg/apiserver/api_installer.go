@@ -365,6 +365,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		APIVersion:       a.group.Version,
 		ServerAPIVersion: serverVersion,
 		Resource:         resource,
+		Subresource:      subresource,
 		Kind:             kind,
 	}
 	for _, action := range actions {
