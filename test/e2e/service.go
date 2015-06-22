@@ -1008,9 +1008,10 @@ func testReachable(ip string, port int) {
 		Failf("Got port==0 for reachability check (%s)", url)
 	}
 
-	By(fmt.Sprintf("Waiting up to %v for %s to be reachable", podStartTimeout, url))
+	desc := fmt.Sprintf("url %s:%d to be reachable", ip, port)
+	By(fmt.Sprintf("Waiting up to %v for %s", podStartTimeout, desc))
 	start := time.Now()
-	expectNoError(wait.Poll(poll, podStartTimeout, func() (bool, error) {
+	expectNoError(wait.PollMsg(desc, poll, podStartTimeout, func() (bool, error) {
 		resp, err := httpGetNoConnectionPool(url)
 		if err != nil {
 			Logf("Got error waiting for reachability of %s: %v (%v)", url, err, time.Since(start))
@@ -1042,8 +1043,9 @@ func testNotReachable(ip string, port int) {
 		Failf("Got port==0 for non-reachability check (%s)", url)
 	}
 
-	By(fmt.Sprintf("Waiting up to %v for %s to be *not* reachable", podStartTimeout, url))
-	expectNoError(wait.Poll(poll, podStartTimeout, func() (bool, error) {
+	desc := fmt.Sprintf("url %s:%d is *not* reachable", ip, port)
+	By(fmt.Sprintf("Waiting up to %v for %s", podStartTimeout, desc))
+	expectNoError(wait.PollMsg(desc, poll, podStartTimeout, func() (bool, error) {
 		resp, err := httpGetNoConnectionPool(url)
 		if err != nil {
 			Logf("Successfully waited for the url %s to be unreachable.", url)

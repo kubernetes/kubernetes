@@ -438,8 +438,9 @@ func waitForPodSuccess(c *client.Client, podName string, contName string) error 
 func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
 	var p *api.Pod = nil
-	err := wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
-		Logf("Waiting for pod %s to appear on node %s", rcName, node)
+	conditionDescription := fmt.Sprintf("pod %s to appear on node %s", rcName, node)
+	err := wait.PollMsg(conditionDescription, 10*time.Second, 5*time.Minute, func() (bool, error) {
+		Logf("Waiting for %s", conditionDescription)
 		pods, err := c.Pods(ns).List(label, fields.Everything())
 		if err != nil {
 			return false, err
@@ -460,8 +461,9 @@ func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, er
 // In case of failure or too long waiting time, an error is returned.
 func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
-	return wait.Poll(20*time.Second, 5*time.Minute, func() (bool, error) {
-		Logf("Waiting for pod %s to disappear", podName)
+	conditionDescription := fmt.Sprintf("pod %s to disappear", podName)
+	return wait.PollMsg(conditionDescription, 20*time.Second, 5*time.Minute, func() (bool, error) {
+		Logf("Waiting for %s", conditionDescription)
 		pods, err := c.Pods(ns).List(label, fields.Everything())
 		if err != nil {
 			return false, err
@@ -483,7 +485,13 @@ func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error
 
 // waits until the service appears (exists == true), or disappears (exists == false)
 func waitForService(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	return wait.Poll(interval, timeout, func() (bool, error) {
+	var conditionDesc string
+	if exist {
+		conditionDesc = fmt.Sprintf("service %s/%s is present", namespace, name)
+	} else {
+		conditionDesc = fmt.Sprintf("service %s/%s is not present", namespace, name)
+	}
+	return wait.PollMsg(conditionDesc, interval, timeout, func() (bool, error) {
 		_, err := c.Services(namespace).Get(name)
 		if err != nil {
 			Logf("Get service %s in namespace %s failed (%v).", name, namespace, err)
@@ -497,7 +505,13 @@ func waitForService(c *client.Client, namespace, name string, exist bool, interv
 
 // waits until the RC appears (exists == true), or disappears (exists == false)
 func waitForReplicationController(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	return wait.Poll(interval, timeout, func() (bool, error) {
+	var conditionDesc string
+	if exist {
+		conditionDesc = fmt.Sprintf("Replication Controller %s/%s is present", namespace, name)
+	} else {
+		conditionDesc = fmt.Sprintf("Replication Controller %s/%s is not present", namespace, name)
+	}
+	return wait.PollMsg(conditionDesc, interval, timeout, func() (bool, error) {
 		_, err := c.ReplicationControllers(namespace).Get(name)
 		if err != nil {
 			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
