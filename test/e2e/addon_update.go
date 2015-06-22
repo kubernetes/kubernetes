@@ -181,7 +181,7 @@ spec:
 `
 
 var addonTestPollInterval = 3 * time.Second
-var addonTestPollTimeout = 1 * time.Minute
+var addonTestPollTimeout = 3 * time.Minute
 var addonNamespace = api.NamespaceDefault // addons are in the default namespace
 
 type stringPair struct {
