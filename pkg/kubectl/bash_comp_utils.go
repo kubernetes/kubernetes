@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 // A set of common functions needed by cmd/kubectl and pkg/kubectl packages.
+
 package kubectl
 
 import (
@@ -35,6 +36,18 @@ func AddJsonFilenameFlag(cmd *cobra.Command, value *util.StringList, usage strin
 		Value:       value,
 		DefValue:    value.String(),
 		Annotations: annotation,
+	}
+	cmd.Flags().AddFlag(flag)
+}
+
+// AddLabelsToColumnsFlag added a user flag to print resource labels into columns. Currently used in kubectl get command
+func AddLabelsToColumnsFlag(cmd *cobra.Command, value *util.StringList, usage string) {
+	flag := &pflag.Flag{
+		Name:      "label-columns",
+		Shorthand: "L",
+		Usage:     usage,
+		Value:     value,
+		DefValue:  value.String(),
 	}
 	cmd.Flags().AddFlag(flag)
 }

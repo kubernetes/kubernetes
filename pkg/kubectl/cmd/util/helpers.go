@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/evanphx/json-patch"
 
@@ -248,6 +249,15 @@ func getFlag(cmd *cobra.Command, flag string) *pflag.Flag {
 func GetFlagString(cmd *cobra.Command, flag string) string {
 	f := getFlag(cmd, flag)
 	return f.Value.String()
+}
+
+// GetFlagStringList can be used to accept multiple argument with flag repetition (e.g. -f arg1 -f arg2 ...)
+func GetFlagStringList(cmd *cobra.Command, flag string) util.StringList {
+	f := cmd.Flags().Lookup(flag)
+	if f == nil {
+		return util.StringList{}
+	}
+	return *f.Value.(*util.StringList)
 }
 
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
