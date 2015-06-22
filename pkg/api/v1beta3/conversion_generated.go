@@ -1345,6 +1345,7 @@ func convert_api_PodStatus_To_v1beta3_PodStatus(in *api.PodStatus, out *PodStatu
 		out.Conditions = nil
 	}
 	out.Message = in.Message
+	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
 	if in.StartTime != nil {
@@ -3409,6 +3410,7 @@ func convert_v1beta3_PodStatus_To_api_PodStatus(in *PodStatus, out *api.PodStatu
 		out.Conditions = nil
 	}
 	out.Message = in.Message
+	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
 	if in.StartTime != nil {

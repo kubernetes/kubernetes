@@ -1584,9 +1584,11 @@ func (kl *Kubelet) handleOutOfDisk(pods []*api.Pod, podSyncTypes map[types.UID]S
 		pod := pods[i]
 		// Only reject pods that didn't start yet.
 		if podSyncTypes[pod.UID] == SyncPodCreate {
-			kl.recorder.Eventf(pod, "OutOfDisk", "Cannot start the pod due to lack of disk space.")
+			reason := "OutOfDisk"
+			kl.recorder.Eventf(pod, reason, "Cannot start the pod due to lack of disk space.")
 			kl.statusManager.SetPodStatus(pod, api.PodStatus{
 				Phase:   api.PodFailed,
+				Reason:  reason,
 				Message: "Pod cannot be started due to lack of disk space."})
 			continue
 		}
@@ -1621,23 +1623,29 @@ func (kl *Kubelet) checkNodeSelectorMatching(pods []*api.Pod) (fitting []*api.Po
 func (kl *Kubelet) handleNotFittingPods(pods []*api.Pod) []*api.Pod {
 	fitting, notFitting := checkHostPortConflicts(pods)
 	for _, pod := range notFitting {
-		kl.recorder.Eventf(pod, "hostPortConflict", "Cannot start the pod due to host port conflict.")
+		reason := "HostPortConflict"
+		kl.recorder.Eventf(pod, reason, "Cannot start the pod due to host port conflict.")
 		kl.statusManager.SetPodStatus(pod, api.PodStatus{
 			Phase:   api.PodFailed,
+			Reason:  reason,
 			Message: "Pod cannot be started due to host port conflict"})
 	}
 	fitting, notFitting = kl.checkNodeSelectorMatching(fitting)
 	for _, pod := range notFitting {
-		kl.recorder.Eventf(pod, "nodeSelectorMismatching", "Cannot start the pod due to node selector mismatch.")
+		reason := "NodeSelectorMismatching"
+		kl.recorder.Eventf(pod, reason, "Cannot start the pod due to node selector mismatch.")
 		kl.statusManager.SetPodStatus(pod, api.PodStatus{
 			Phase:   api.PodFailed,
+			Reason:  reason,
 			Message: "Pod cannot be started due to node selector mismatch"})
 	}
 	fitting, notFitting = kl.checkCapacityExceeded(fitting)
 	for _, pod := range notFitting {
-		kl.recorder.Eventf(pod, "capacityExceeded", "Cannot start the pod due to exceeded capacity.")
+		reason := "CapacityExceeded"
+		kl.recorder.Eventf(pod, reason, "Cannot start the pod due to exceeded capacity.")
 		kl.statusManager.SetPodStatus(pod, api.PodStatus{
 			Phase:   api.PodFailed,
+			Reason:  reason,
 			Message: "Pod cannot be started due to exceeded capacity"})
 	}
 	return fitting
@@ -2138,9 +2146,11 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	// TODO: Consider include the container information.
 	if kl.pastActiveDeadline(pod) {
-		kl.recorder.Eventf(pod, "deadline", "Pod was active on the node longer than specified deadline")
+		reason := "DeadlineExceeded"
+		kl.recorder.Eventf(pod, reason, "Pod was active on the node longer than specified deadline")
 		return api.PodStatus{
 			Phase:   api.PodFailed,
+			Reason:  reason,
 			Message: "Pod was active on the node longer than specified deadline"}, nil
 	}
 
@@ -2153,13 +2163,14 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 		if strings.Contains(err.Error(), "resource temporarily unavailable") {
 			// Leave upstream layer to decide what to do
 			return api.PodStatus{}, err
-		} else {
-			pendingStatus := api.PodStatus{
-				Phase:   api.PodPending,
-				Message: fmt.Sprintf("Query container info failed with error (%v)", err),
-			}
-			return pendingStatus, nil
 		}
+
+		pendingStatus := api.PodStatus{
+			Phase:   api.PodPending,
+			Reason:  "GeneralError",
+			Message: fmt.Sprintf("Query container info failed with error (%v)", err),
+		}
+		return pendingStatus, nil
 	}
 
 	// Assume info is ready to process

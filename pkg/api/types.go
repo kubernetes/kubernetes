@@ -911,6 +911,8 @@ type PodStatus struct {
 	Conditions []PodCondition `json:"conditions,omitempty"`
 	// A human readable message indicating details about why the pod is in this state.
 	Message string `json:"message,omitempty"`
+	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'
+	Reason string `json:"reason,omitempty" description:"(brief-CamelCase) reason indicating details about why the pod is in this condition"`
 
 	HostIP string `json:"hostIP,omitempty"`
 	PodIP  string `json:"podIP,omitempty"`

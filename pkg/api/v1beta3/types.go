@@ -917,6 +917,8 @@ type PodStatus struct {
 	Conditions []PodCondition `json:"Condition,omitempty" description:"current service state of pod" patchStrategy:"merge" patchMergeKey:"type"`
 	// A human readable message indicating details about why the pod is in this state.
 	Message string `json:"message,omitempty" description:"human readable message indicating details about why the pod is in this condition"`
+	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'
+	Reason string `json:"reason,omitempty" description:"(brief-CamelCase) reason indicating details about why the pod is in this condition"`
 
 	HostIP string `json:"hostIP,omitempty" description:"IP address of the host to which the pod is assigned; empty if not yet scheduled"`
 	PodIP  string `json:"podIP,omitempty" description:"IP address allocated to the pod; routable at least within the cluster; empty if not yet allocated"`

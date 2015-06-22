@@ -979,11 +979,11 @@ func TestPrintPod(t *testing.T) {
 					Phase: "podPhase",
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
-						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "containerWaitingReason"}}, RestartCount: 3},
+						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
 					},
 				},
 			},
-			"test2\t1/2\tcontainerWaitingReason\t6\t",
+			"test2\t1/2\tContainerWaitingReason\t6\t",
 		},
 		{
 			// Test the same as the above but with Terminated state and the first container overwrites the rest
@@ -993,12 +993,12 @@ func TestPrintPod(t *testing.T) {
 				Status: api.PodStatus{
 					Phase: "podPhase",
 					ContainerStatuses: []api.ContainerStatus{
-						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "containerWaitingReason"}}, RestartCount: 3},
-						{State: api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "containerTerminatedReason"}}, RestartCount: 3},
+						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
+						{State: api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "ContainerTerminatedReason"}}, RestartCount: 3},
 					},
 				},
 			},
-			"test3\t0/2\tcontainerWaitingReason\t6\t",
+			"test3\t0/2\tContainerWaitingReason\t6\t",
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1014,6 +1014,22 @@ func TestPrintPod(t *testing.T) {
 				},
 			},
 			"test4\t1/2\tpodPhase\t6\t",
+		},
+		{
+			// Test ready is not enough for reporting running
+			api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: "test5"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Reason: "OutOfDisk",
+					Phase:  "podPhase",
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{Ready: true, RestartCount: 3},
+					},
+				},
+			},
+			"test5\t1/2\tOutOfDisk\t6\t",
 		},
 	}
 
