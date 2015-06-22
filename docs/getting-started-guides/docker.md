@@ -1,4 +1,19 @@
-## Running kubernetes locally via Docker
+# Running kubernetes locally via Docker
+
+## Contents
+
+- [Running kubernetes locally via Docker](#running-kubernetes-locally-via-docker)
+    - [Contents](#contents)
+    - [Setting up a Cluster](#setting-up-a-cluster)
+        - [Step One: Run etcd](#step-one-run-etcd)
+        - [Step Two: Run the master](#step-two-run-the-master)
+        - [Step Three: Run the service proxy](#step-three-run-the-service-proxy)
+        - [Test it out](#test-it-out)
+        - [Run an application](#run-an-application)
+        - [Expose it as a service:](#expose-it-as-a-service)
+        - [A note on turning down your cluster](#a-note-on-turning-down-your-cluster)
+
+## Setting up a Cluster
 
 The following instructions show you how to set up a simple, single node kubernetes cluster using Docker.
 

@@ -4,6 +4,22 @@ Juju handles provisioning machines and deploying complex systems to a
 wide number of clouds, supporting service orchestration once the bundle of
 services has been deployed.
 
+## Contents
+
+    - [Getting started with Juju](#getting-started-with-juju)
+    - [Contents](#contents)
+        - [Prerequisites](#prerequisites)
+            - [On Ubuntu](#on-ubuntu)
+            - [With Docker](#with-docker)
+    - [Launch Kubernetes cluster](#launch-kubernetes-cluster)
+    - [Exploring the cluster](#exploring-the-cluster)
+    - [Run some containers!](#run-some-containers)
+    - [Scale out cluster](#scale-out-cluster)
+    - [Launch the "k8petstore" example app](#launch-the-k8petstore-example-app)
+    - [Tear down cluster](#tear-down-cluster)
+    - [More Info](#more-info)
+        - [Cloud compatibility](#cloud-compatibility)
+
 
 ### Prerequisites
 
