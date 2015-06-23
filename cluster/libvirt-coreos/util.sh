@@ -330,8 +330,8 @@ function test-teardown {
 
 # Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
 function get-password {
-  export KUBE_USER=''
-  export KUBE_PASSWORD=''
+  export KUBE_USER='libvirt-coreos'
+  export KUBE_PASSWORD='libvirt-coreos'
 }
 
 # SSH to a node by name or IP ($1) and run a command ($2).
