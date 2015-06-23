@@ -300,7 +300,7 @@ function detect-ubuntu-image () {
 # Hopefully this will be done by the aws cli tool one day: https://github.com/aws/aws-cli/issues/191
 function get-aws-fingerprint {
   local -r pubkey_path=$1
-  ssh-keygen -f ${pubkey_path} -e -m PKCS8  | openssl pkey -pubin -outform DER | openssl md5 -c | sed -e 's/(stdin)= //g'
+  ssh-keygen -f ${pubkey_path} -e -m PKCS8  | openssl rsa -pubin -outform DER | openssl md5 -c | sed -e 's/(stdin)= //g'
 }
 
 # Import an SSH public key to AWS.
