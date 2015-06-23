@@ -11,7 +11,6 @@
 - hosts: etcd
   sudo: yes
   roles:
-    - common
     - etcd
   tags:
     - etcd
@@ -31,8 +30,6 @@
 - hosts: masters
   sudo: yes
   roles:
-    - common
-    - kubernetes
     - master
   tags:
     - masters
@@ -50,8 +47,6 @@
 - hosts: nodes
   sudo: yes
   roles:
-    - common
-    - kubernetes
     - node
   tags:
     - nodes
