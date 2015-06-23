@@ -1215,6 +1215,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	if containerInfo.State.Pid == 0 {
 		return "", fmt.Errorf("failed to get init PID for Docker container %q", string(id))
 	}
+
 	if container.Name == PodInfraContainerName {
 		util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
 	} else {
@@ -1224,7 +1225,34 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 		util.ApplyOomScoreAdj(containerInfo.State.Pid, userContainerOomScoreAdj)
 	}
 
+	// ABHI Create nsenter command
+	go dm.unmountDockerManagedResolvFile(containerInfo.State.Pid, container.Name)
 	return kubeletTypes.DockerID(id), err
+}
+
+func (dm *DockerManager) unmountDockerManagedResolvFile(pid int, containerName string) {
+	args := []string{"-m", "-u", "-n", "-i", "-p", "-t", fmt.Sprintf("%d", pid), "umount", "/etc/resolv.conf"}
+	// TODO use exec.LookPath
+	nsenterCommand := exec.Command("nsenter", args...)
+
+	lsCommand := exec.Command("nsenter", "-m", "-t", fmt.Sprintf("%d", pid), "ls", "/etc/resolv.conf")
+	// commandString := fmt.Sprint("nsenter -m -u -n -i -p -t ", pid, " umount /etc/resolv.conf")
+	for i := 0; i < 30; i++ {
+		err := lsCommand.Run()
+		if err != nil {
+			glog.Errorf("ABHI: waiting for docker to mount on /etc/resolv.conf, before we umount it")
+			time.Sleep(time.Second)
+			continue
+		}
+		err = nsenterCommand.Run()
+		if err == nil {
+			glog.Errorf("ABHI: successful umount for pid:%v, container:%s", pid, containerName)
+			return
+		}
+		glog.Errorf("ABHI: unsuccessful umount for pid:%v with error:%v", pid, err)
+		time.Sleep(time.Second)
+	}
+	glog.Errorf("ABHI: failed to switch resolv.conf for %s", containerName)
 }
 
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.

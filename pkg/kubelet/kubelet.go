@@ -20,6 +20,7 @@ package kubelet
 // contrib/mesos/pkg/executor/.
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -888,8 +889,37 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 		if err != nil {
 			return nil, err
 		}
+		dnsFilePath := path.Join(kl.getPodDir(pod.UID), "resolv.conf")
+		glog.Errorf("ABHI: Creating DNS File: %q", dnsFilePath)
+		err = kl.createDNSFile(dnsFilePath, opts.DNS, opts.DNSSearch)
+		if err != nil {
+			return nil, err
+		}
+		opts.Mounts = append(opts.Mounts, kubecontainer.Mount{
+			Name:          "dnsresolv",
+			ContainerPath: "/etc/resolv.conf",
+			HostPath:      dnsFilePath,
+			ReadOnly:      true,
+		})
 	}
+
 	return opts, nil
+}
+
+func (kl *Kubelet) createDNSFile(fileName string, DNS, DNSSearch []string) error {
+	var buffer bytes.Buffer
+	for _, nameserver := range DNS {
+		buffer.WriteString(fmt.Sprintln("nameserver ", nameserver))
+	}
+	for i, search := range DNSSearch {
+		if i == 0 {
+			buffer.WriteString("search ")
+		}
+		buffer.WriteString(search + " ")
+	}
+	buffer.WriteString("\noptions ndots:3\n")
+
+	return ioutil.WriteFile(fileName, buffer.Bytes(), 0644)
 }
 
 var masterServices = util.NewStringSet("kubernetes")
