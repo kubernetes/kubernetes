@@ -64,7 +64,7 @@ func NewStorage(h tools.EtcdHelper, connection client.ConnectionInfoGetter) (*RE
 			return obj.(*api.Node).Name, nil
 		},
 		PredicateFunc: minion.MatchNode,
-		EndpointName:  "minion",
+		EndpointName:  "node",
 
 		CreateStrategy: minion.Strategy,
 		UpdateStrategy: minion.Strategy,
