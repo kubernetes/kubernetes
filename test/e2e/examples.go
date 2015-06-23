@@ -194,7 +194,7 @@ var _ = Describe("Examples e2e", func() {
 
 			By("starting workers")
 			runKubectl("create", "-f", workerControllerJson, nsFlag)
-			ScaleRC(c, ns, "spark-worker-controller", 2)
+			ScaleRC(c, ns, "spark-worker-controller", 2, true)
 			forEachPod(c, ns, "name", "spark-worker", func(pod api.Pod) {
 				_, err := lookForStringInLog(ns, pod.Name, "spark-worker", "Successfully registered with master", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -223,7 +223,7 @@ var _ = Describe("Examples e2e", func() {
 
 			By("create and scale rc")
 			runKubectl("create", "-f", controllerYaml, nsFlag)
-			err = ScaleRC(c, ns, "cassandra", 2)
+			err = ScaleRC(c, ns, "cassandra", 2, true)
 			Expect(err).NotTo(HaveOccurred())
 			forEachPod(c, ns, "name", "cassandra", func(pod api.Pod) {
 				_, err = lookForStringInLog(ns, pod.Name, "cassandra", "Listening for thrift clients", serverStartTimeout)
@@ -384,7 +384,7 @@ var _ = Describe("Examples e2e", func() {
 			checkDbInstances()
 
 			By("scaling rethinkdb")
-			ScaleRC(c, ns, "rethinkdb-rc", 2)
+			ScaleRC(c, ns, "rethinkdb-rc", 2, true)
 			checkDbInstances()
 
 			By("starting admin")
@@ -421,7 +421,7 @@ var _ = Describe("Examples e2e", func() {
 			})
 
 			By("scaling hazelcast")
-			ScaleRC(c, ns, "hazelcast", 2)
+			ScaleRC(c, ns, "hazelcast", 2, true)
 			forEachPod(c, ns, "name", "hazelcast", func(pod api.Pod) {
 				_, err := lookForStringInLog(ns, pod.Name, "hazelcast", "Members [2]", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())

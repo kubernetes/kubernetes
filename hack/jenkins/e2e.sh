@@ -97,6 +97,7 @@ GCE_DEFAULT_SKIP_TESTS=(
 # -flaky- build variants.
 GCE_FLAKY_TESTS=(
     "Autoscaling"
+    "DaemonRestart"
     "ResourceUsage"
     )
 
@@ -117,6 +118,7 @@ GCE_PARALLEL_SKIP_TESTS=(
 
 # Tests which are known to be flaky when run in parallel.
 GCE_PARALLEL_FLAKY_TESTS=(
+    "DaemonRestart"
     "Elasticsearch"
     "PD"
     "ServiceAccounts"
@@ -133,7 +135,7 @@ GCE_SOAK_CONTINUOUS_SKIP_TESTS=(
     "Density.*30\spods"
     "Elasticsearch"
     "Etcd.*SIGKILL"
-    "external\sload\sbalancer"    
+    "external\sload\sbalancer"
     "identically\snamed\sservices"
     "network\spartition"
     "Reboot"

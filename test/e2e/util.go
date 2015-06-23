@@ -1376,7 +1376,7 @@ func getNodeEvents(c *client.Client, nodeName string) []api.Event {
 	return events.Items
 }
 
-func ScaleRC(c *client.Client, ns, name string, size uint) error {
+func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	By(fmt.Sprintf("%v Scaling replication controller %s in namespace %s to %d", time.Now(), name, ns, size))
 	scaler, err := kubectl.ScalerFor("ReplicationController", kubectl.NewScalerClient(c))
 	if err != nil {
@@ -1386,6 +1386,9 @@ func ScaleRC(c *client.Client, ns, name string, size uint) error {
 	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
 	if err = scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
 		return err
+	}
+	if !wait {
+		return nil
 	}
 	return waitForRCPodsRunning(c, ns, name)
 }
