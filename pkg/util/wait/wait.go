@@ -18,6 +18,7 @@ package wait
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -51,6 +52,13 @@ func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
 	return WaitFor(poller(interval, timeout), condition)
 }
 
+// Like Poll, but takes a message that is returned with the error (therefore the Msg suffix)
+// The message should be a description of the condition, e.g. "pod is running",
+// so that the entire message is "timed out waiting for the condition: pod is running".
+func PollMsg(conditionDescription string, interval, timeout time.Duration, condition ConditionFunc) error {
+	return WaitForMsg(conditionDescription, poller(interval, timeout), condition)
+}
+
 // WaitFunc creates a channel that receives an item every time a test
 // should be executed and is closed when the last test should be invoked.
 type WaitFunc func() <-chan struct{}
@@ -76,6 +84,19 @@ func WaitFor(wait WaitFunc, c ConditionFunc) error {
 		}
 	}
 	return ErrWaitTimeout
+}
+
+// As WaitFor, but replaces ErrWaitTimeout (returned on timeout) with a custom message
+// that includes the conditionDescription.
+func WaitForMsg(conditionDescription string, wait WaitFunc, c ConditionFunc) error {
+	// actuall it should be the other way around: waitFor should be implemented
+	// in terms of waitForMsg (with an empty message).
+	// But WaitFor is used in production code and I don't want to change it now.
+	err := WaitFor(wait, c)
+	if err == ErrWaitTimeout {
+		return errors.New(fmt.Sprintf("timed out waiting for the condition: %s", conditionDescription))
+	}
+	return err
 }
 
 // poller returns a WaitFunc that will send to the channel every

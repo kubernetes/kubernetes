@@ -256,7 +256,7 @@ func podsResponding(c *client.Client, ns, name string, wantName bool, pods *api.
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	return wait.Poll(retryInterval, retryTimeout, podResponseChecker{c, ns, label, name, wantName, pods}.checkAllResponses)
+	return wait.PollMsg("pods are responding", retryInterval, retryTimeout, podResponseChecker{c, ns, label, name, wantName, pods}.checkAllResponses)
 }
 
 func verifyPods(c *client.Client, ns, name string, wantName bool, replicas int) error {

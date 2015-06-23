@@ -18,6 +18,7 @@ package wait
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -128,56 +129,107 @@ func TestPollForever(t *testing.T) {
 	<-complete
 }
 
+type WaitForTestCase struct {
+	F       ConditionFunc
+	Ticks   int
+	Invoked int
+	Err     bool // set to false if you set the timeout
+	Timeout bool
+}
+
+func runWaitForTestCase(t *testing.T, testCase WaitForTestCase, description string) {
+	invocations := 0
+	ticker := fakeTicker(testCase.Ticks)
+	err := WaitFor(ticker, func() (bool, error) {
+		invocations++
+		return testCase.F()
+	})
+	switch {
+	case testCase.Err:
+		if err == nil {
+			t.Errorf("WaitFor: %s: Expected error, got nil", description)
+			return
+		}
+	case testCase.Timeout:
+		if err != ErrWaitTimeout {
+			t.Errorf("WaitFor: %s: Expected timeout error, got %#v", description, err)
+			return
+		}
+	case true:
+		if err != nil {
+			t.Errorf("WaitFor: %s: Expected no error, got: %#v", description, err)
+			return
+		}
+	}
+	if invocations != testCase.Invoked {
+		t.Errorf("%s: Expected %d invocations, called %d", description, testCase.Invoked, invocations)
+	}
+}
+
+func runWaitForMsgTestCase(t *testing.T, testCase WaitForTestCase, description string) {
+	invocations := 0
+	ticker := fakeTicker(testCase.Ticks)
+	err := WaitForMsg(description, ticker, func() (bool, error) {
+		invocations++
+		return testCase.F()
+	})
+	switch {
+	case testCase.Err:
+		if err == nil {
+			t.Errorf("WaitForMsg: %s: Expected error, got nil", description)
+			return
+		}
+	case testCase.Timeout:
+		if err == nil || !strings.Contains(err.Error(), description) {
+			t.Errorf("WaitForMsg: %s: Expected timeout error to contains '%s', got %#v", description, description, err)
+			return
+		}
+	case true:
+		if err != nil {
+			t.Errorf("WaitForMsg: %s: Expected no error, got: %#v", description, err)
+			return
+		}
+	}
+	if invocations != testCase.Invoked {
+		t.Errorf("WaitForMsg: %s: Expected %d invocations, called %d", description, testCase.Invoked, invocations)
+	}
+	if invocations != testCase.Invoked {
+		t.Errorf("WaitForMsg: %s: Expected %d invocations, called %d", description, testCase.Invoked, invocations)
+	}
+}
+
 func TestWaitFor(t *testing.T) {
-	var invocations int
-	testCases := map[string]struct {
-		F       ConditionFunc
-		Ticks   int
-		Invoked int
-		Err     bool
-	}{
+	testCases := map[string]WaitForTestCase{
 		"invoked once": {
 			ConditionFunc(func() (bool, error) {
-				invocations++
 				return true, nil
 			}),
 			2,
 			1,
 			false,
+			false,
 		},
 		"invoked and returns a timeout": {
 			ConditionFunc(func() (bool, error) {
-				invocations++
 				return false, nil
 			}),
 			2,
 			3,
+			false,
 			true,
 		},
 		"returns immediately on error": {
 			ConditionFunc(func() (bool, error) {
-				invocations++
 				return false, errors.New("test")
 			}),
 			2,
 			1,
 			true,
+			false,
 		},
 	}
 	for k, c := range testCases {
-		invocations = 0
-		ticker := fakeTicker(c.Ticks)
-		err := WaitFor(ticker, c.F)
-		switch {
-		case c.Err && err == nil:
-			t.Errorf("%s: Expected error, got nil", k)
-			continue
-		case !c.Err && err != nil:
-			t.Errorf("%s: Expected no error, got: %#v", k, err)
-			continue
-		}
-		if invocations != c.Invoked {
-			t.Errorf("%s: Expected %d invocations, called %d", k, c.Invoked, invocations)
-		}
+		runWaitForTestCase(t, c, k)
+		runWaitForMsgTestCase(t, c, k)
 	}
 }
