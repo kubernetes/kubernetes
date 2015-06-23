@@ -37,26 +37,26 @@ This [guide](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examp
 To show the health check is actually working, first create the pods:
 ```
 # kubectl create -f exec-liveness.yaml
-# cluster/kbuectl.sh create -f http-liveness.yaml
+# kubectl create -f http-liveness.yaml
 ```
 
 Check the status of the pods once they are created:
 ```
 # kubectl get pods
 POD             IP           CONTAINER(S)   IMAGE(S)                            HOST                                     LABELS          STATUS    CREATED     MESSAGE
-liveness-exec   10.244.3.7                                                      kubernetes-minion-f08h/130.211.122.180   test=liveness   Running   3 seconds   
-                             liveness       gcr.io/google_containers/busybox                                                             Running   2 seconds   
-liveness-http   10.244.0.8                                                      kubernetes-minion-0bks/104.197.10.10     test=liveness   Running   3 seconds   
-                             liveness       gcr.io/google_containers/liveness                                                            Running   2 seconds   
+liveness-exec   10.244.3.7                                                      kubernetes-minion-f08h/130.211.122.180   test=liveness   Running   3 seconds
+                             liveness       gcr.io/google_containers/busybox                                                             Running   2 seconds
+liveness-http   10.244.0.8                                                      kubernetes-minion-0bks/104.197.10.10     test=liveness   Running   3 seconds
+                             liveness       gcr.io/google_containers/liveness                                                            Running   2 seconds
 ```
 
 Check the status half a minute later, you will see the termination messages:
 ```
 # kubectl get pods
 POD             IP           CONTAINER(S)   IMAGE(S)                            HOST                                     LABELS          STATUS    CREATED      MESSAGE
-liveness-exec   10.244.3.7                                                      kubernetes-minion-f08h/130.211.122.180   test=liveness   Running   34 seconds   
+liveness-exec   10.244.3.7                                                      kubernetes-minion-f08h/130.211.122.180   test=liveness   Running   34 seconds
                              liveness       gcr.io/google_containers/busybox                                                             Running   3 seconds    last termination: exit code 137
-liveness-http   10.244.0.8                                                      kubernetes-minion-0bks/104.197.10.10     test=liveness   Running   34 seconds   
+liveness-http   10.244.0.8                                                      kubernetes-minion-0bks/104.197.10.10     test=liveness   Running   34 seconds
                              liveness       gcr.io/google_containers/liveness                                                            Running   13 seconds   last termination: exit code 2
 ```
 The termination messages indicate that the liveness probes have failed, and the containers have been killed and recreated.
