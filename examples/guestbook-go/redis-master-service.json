@@ -4,7 +4,7 @@
    "metadata":{
       "name":"redis-master",
       "labels":{
-         "name":"redis",
+         "app":"redis",
          "role":"master"
       }
    },
@@ -16,7 +16,7 @@
         }
       ],
       "selector":{
-         "name":"redis",
+         "app":"redis",
          "role":"master"
       }
    }

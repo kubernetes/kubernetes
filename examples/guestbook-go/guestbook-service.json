@@ -4,7 +4,7 @@
    "metadata":{
       "name":"guestbook",
       "labels":{
-         "name":"guestbook"
+         "app":"guestbook"
       }
    },
    "spec":{
@@ -15,7 +15,7 @@
          }
       ],
       "selector":{
-         "name":"guestbook"
+         "app":"guestbook"
       },
       "type": "LoadBalancer"
    }
