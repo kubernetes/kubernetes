@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -47,46 +48,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	// TODO(a-robinson): Add unit tests for the handling of these metrics once
-	// the upstream library supports it.
-	requestCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "apiserver_request_count",
-			Help: "Counter of apiserver requests broken out for each verb, API resource, client, and HTTP response code.",
-		},
-		[]string{"verb", "resource", "client", "code"},
-	)
-	requestLatencies = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name: "apiserver_request_latencies",
-			Help: "Response latency distribution in microseconds for each verb, resource and client.",
-			// Use buckets ranging from 125 ms to 8 seconds.
-			Buckets: prometheus.ExponentialBuckets(125000, 2.0, 7),
-		},
-		[]string{"verb", "resource"},
-	)
-	requestLatenciesSummary = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Name: "apiserver_request_latencies_summary",
-			Help: "Response latency summary in microseconds for each verb and resource.",
-		},
-		[]string{"verb", "resource"},
-	)
-)
-
 func init() {
-	prometheus.MustRegister(requestCounter)
-	prometheus.MustRegister(requestLatencies)
-	prometheus.MustRegister(requestLatenciesSummary)
-}
-
-// monitor is a helper function for each HTTP request handler to use for
-// instrumenting basic request counter and latency metrics.
-func monitor(verb, resource *string, client string, httpCode *int, reqStart time.Time) {
-	requestCounter.WithLabelValues(*verb, *resource, client, strconv.Itoa(*httpCode)).Inc()
-	requestLatencies.WithLabelValues(*verb, *resource).Observe(float64((time.Since(reqStart)) / time.Microsecond))
-	requestLatenciesSummary.WithLabelValues(*verb, *resource).Observe(float64((time.Since(reqStart)) / time.Microsecond))
+	metrics.Register()
 }
 
 // monitorFilter creates a filter that reports the metrics for a given resource and action.
@@ -95,7 +58,7 @@ func monitorFilter(action, resource string) restful.FilterFunction {
 		reqStart := time.Now()
 		chain.ProcessFilter(req, res)
 		httpCode := res.StatusCode()
-		monitor(&action, &resource, util.GetClient(req.Request), &httpCode, reqStart)
+		metrics.Monitor(&action, &resource, util.GetClient(req.Request), &httpCode, reqStart)
 	}
 }
 
@@ -168,10 +131,13 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 
 // TODO: document all handlers
 // InstallSupport registers the APIServer support functions
-func InstallSupport(mux Mux, ws *restful.WebService) {
+func InstallSupport(mux Mux, ws *restful.WebService, enableResettingMetrics bool) {
 	// TODO: convert healthz and metrics to restful and remove container arg
 	healthz.InstallHandler(mux)
 	mux.Handle("/metrics", prometheus.Handler())
+	if enableResettingMetrics {
+		mux.HandleFunc("/resetMetrics", metrics.Reset)
+	}
 
 	// Set up a service to return the git code version.
 	ws.Path("/version")
