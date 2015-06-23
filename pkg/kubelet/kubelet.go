@@ -1850,6 +1850,23 @@ func (kl *Kubelet) GetPods() []*api.Pod {
 	return kl.podManager.GetPods()
 }
 
+// GetRunningPods returns all pods running on kubelet from looking at the
+// container runtime cache. This function converts kubecontainer.Pod to
+// api.Pod, so only the fields that exist in both kubecontainer.Pod and
+// api.Pod are considered meaningful.
+func (kl *Kubelet) GetRunningPods() ([]*api.Pod, error) {
+	pods, err := kl.runtimeCache.GetPods()
+	if err != nil {
+		return nil, err
+	}
+
+	apiPods := make([]*api.Pod, 0, len(pods))
+	for _, pod := range pods {
+		apiPods = append(apiPods, pod.ToAPIPod())
+	}
+	return apiPods, nil
+}
+
 func (kl *Kubelet) GetPodByFullName(podFullName string) (*api.Pod, bool) {
 	return kl.podManager.GetPodByFullName(podFullName)
 }

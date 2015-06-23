@@ -284,6 +284,24 @@ func (p *Pod) FindContainerByName(containerName string) *Container {
 	return nil
 }
 
+// ToAPIPod converts Pod to api.Pod. Note that if a field in api.Pod has no
+// corresponding field in Pod, the field would not be populated.
+func (p *Pod) ToAPIPod() *api.Pod {
+	var pod api.Pod
+	pod.UID = p.ID
+	pod.Name = p.Name
+	pod.Namespace = p.Namespace
+	pod.Status = p.Status
+
+	for _, c := range p.Containers {
+		var container api.Container
+		container.Name = c.Name
+		container.Image = c.Image
+		pod.Spec.Containers = append(pod.Spec.Containers, container)
+	}
+	return &pod
+}
+
 // IsEmpty returns true if the pod is empty.
 func (p *Pod) IsEmpty() bool {
 	return reflect.DeepEqual(p, &Pod{})

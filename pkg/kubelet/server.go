@@ -101,6 +101,7 @@ type HostInterface interface {
 	GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error)
 	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
 	GetPods() []*api.Pod
+	GetRunningPods() ([]*api.Pod, error)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
@@ -148,6 +149,8 @@ func (s *Server) InstallDebuggingHandlers() {
 	s.mux.HandleFunc("/logs/", s.handleLogs)
 	s.mux.HandleFunc("/containerLogs/", s.handleContainerLogs)
 	s.mux.Handle("/metrics", prometheus.Handler())
+	// The /runningpods endpoint is used for testing only.
+	s.mux.HandleFunc("/runningpods", s.handleRunningPods)
 
 	s.mux.HandleFunc("/debug/pprof/", pprof.Index)
 	s.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
@@ -280,14 +283,38 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// handlePods returns a list of pod bound to the Kubelet and their spec
-func (s *Server) handlePods(w http.ResponseWriter, req *http.Request) {
-	pods := s.host.GetPods()
+// encodePods creates an api.PodList object from pods and returns the encoded
+// PodList.
+func encodePods(pods []*api.Pod) (data []byte, err error) {
 	podList := new(api.PodList)
 	for _, pod := range pods {
 		podList.Items = append(podList.Items, *pod)
 	}
-	data, err := latest.Codec.Encode(podList)
+	return latest.Codec.Encode(podList)
+}
+
+// handlePods returns a list of pods bound to the Kubelet and their spec.
+func (s *Server) handlePods(w http.ResponseWriter, req *http.Request) {
+	pods := s.host.GetPods()
+	data, err := encodePods(pods)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	w.Header().Add("Content-type", "application/json")
+	w.Write(data)
+}
+
+// handleRunningPods returns a list of pods running on Kubelet. The list is
+// provided by the container runtime, and is different from the list returned
+// by handlePods, which is a set of desired pods to run.
+func (s *Server) handleRunningPods(w http.ResponseWriter, req *http.Request) {
+	pods, err := s.host.GetRunningPods()
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	data, err := encodePods(pods)
 	if err != nil {
 		s.error(w, err)
 		return
