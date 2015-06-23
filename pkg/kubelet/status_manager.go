@@ -100,7 +100,7 @@ func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 		s.podStatuses[podFullName] = status
 		s.podStatusChannel <- podStatusSyncRequest{pod, status}
 	} else {
-		glog.V(3).Infof("Ignoring same pod status for %s - old: %s new: %s", podFullName, oldStatus, status)
+		glog.V(3).Infof("Ignoring same pod status for %q - old: %+v new: %+v", podFullName, oldStatus, status)
 	}
 }
 
