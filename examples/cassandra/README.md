@@ -44,6 +44,10 @@ spec:
       value: 512M
     - name: HEAP_NEWSIZE
       value: 100M
+    - name: POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
   volumes:
     - name: data
       emptyDir: {}
@@ -51,7 +55,7 @@ spec:
 
 There are a few things to note in this description.  First is that we are running the ```kubernetes/cassandra``` image.  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The ```KubernetesSeedProvider``` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later)
 
-You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```).  We also tell Kubernetes that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 0.5 cpu (0.5 core).
+You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```) and adding information about the [namespace](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/namespaces.md).  We also tell Kubernetes that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 0.5 cpu (0.5 core).
 
 Given this configuration, we can create the pod from a file specification as follows
 
@@ -157,6 +161,10 @@ spec:
               value: 512M
             - name: HEAP_NEWSIZE
               value: 100M
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           image: gcr.io/google_containers/cassandra:v4
           name: cassandra
           ports:

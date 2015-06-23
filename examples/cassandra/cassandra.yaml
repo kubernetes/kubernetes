@@ -26,6 +26,10 @@ spec:
       value: 512M
     - name: HEAP_NEWSIZE
       value: 100M
+    - name: POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
   volumes:
     - name: data
       emptyDir: {}
