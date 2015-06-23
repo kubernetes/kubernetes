@@ -321,8 +321,8 @@ func NewMainKubelet(
 	klet.containerManager = containerManager
 
 	// Start syncing node status immediately, this may set up things the runtime needs to run.
+	go util.Until(klet.syncNetworkStatus, 30*time.Second, util.NeverStop)
 	go klet.syncNodeStatus()
-	go klet.syncNetworkStatus()
 
 	// Wait for the runtime to be up with a timeout.
 	if err := waitUntilRuntimeIsUp(klet.containerRuntime, maxWaitForContainerRuntime); err != nil {
@@ -419,7 +419,8 @@ type Kubelet struct {
 	lastTimestampRuntimeUp time.Time
 
 	// Network Status information
-	networkConfigured bool
+	networkConfigMutex sync.Mutex
+	networkConfigured  bool
 
 	// Volume plugins.
 	volumePluginMgr volume.VolumePluginMgr
@@ -717,6 +718,7 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 	}
 
 	go util.Until(kl.updateRuntimeUp, 5*time.Second, util.NeverStop)
+
 	// Run the system oom watcher forever.
 	kl.statusManager.Start()
 	kl.syncLoop(updates, kl)
@@ -1714,9 +1716,10 @@ func (kl *Kubelet) syncLoopIteration(updates <-chan PodUpdate, handler SyncHandl
 		glog.Infof("Skipping pod synchronization, container runtime is not up.")
 		return
 	}
-	if !kl.networkConfigured {
+	if !kl.doneNetworkConfigure() {
 		time.Sleep(5 * time.Second)
 		glog.Infof("Skipping pod synchronization, network is not configured")
+		return
 	}
 	unsyncedPod := false
 	podSyncTypes := make(map[types.UID]SyncPodType)
@@ -1871,6 +1874,7 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 		glog.V(5).Info("PodCIDR not set. Will not configure cbr0.")
 		return nil
 	}
+	glog.V(5).Infof("PodCIDR is set to %q", podCIDR)
 	_, cidr, err := net.ParseCIDR(podCIDR)
 	if err != nil {
 		return err
@@ -1906,19 +1910,19 @@ func (kl *Kubelet) recordNodeStatusEvent(event string) {
 var oldNodeUnschedulable bool
 
 func (kl *Kubelet) syncNetworkStatus() {
-	for {
-		networkConfigured := true
-		if kl.configureCBR0 {
-			if len(kl.podCIDR) == 0 {
-				networkConfigured = false
-			} else if err := kl.reconcileCBR0(kl.podCIDR); err != nil {
-				networkConfigured = false
-				glog.Errorf("Error configuring cbr0: %v", err)
-			}
+	kl.networkConfigMutex.Lock()
+	defer kl.networkConfigMutex.Unlock()
+
+	networkConfigured := true
+	if kl.configureCBR0 {
+		if len(kl.podCIDR) == 0 {
+			networkConfigured = false
+		} else if err := kl.reconcileCBR0(kl.podCIDR); err != nil {
+			networkConfigured = false
+			glog.Errorf("Error configuring cbr0: %v", err)
 		}
-		kl.networkConfigured = networkConfigured
-		time.Sleep(30 * time.Second)
 	}
+	kl.networkConfigured = networkConfigured
 }
 
 // setNodeStatus fills in the Status fields of the given Node, overwriting
@@ -1997,11 +2001,13 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 
 	// Check whether container runtime can be reported as up.
 	containerRuntimeUp := kl.containerRuntimeUp()
+	// Check whether network is configured properly
+	networkConfigured := kl.doneNetworkConfigure()
 
 	currentTime := util.Now()
 	var newNodeReadyCondition api.NodeCondition
 	var oldNodeReadyConditionStatus api.ConditionStatus
-	if containerRuntimeUp && kl.networkConfigured {
+	if containerRuntimeUp && networkConfigured {
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
@@ -2013,7 +2019,7 @@ func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 		if !containerRuntimeUp {
 			reasons = append(reasons, "container runtime is down")
 		}
-		if !kl.networkConfigured {
+		if !networkConfigured {
 			reasons = append(reasons, "network not configured correctly")
 		}
 		newNodeReadyCondition = api.NodeCondition{
@@ -2063,6 +2069,12 @@ func (kl *Kubelet) containerRuntimeUp() bool {
 	kl.runtimeMutex.Lock()
 	defer kl.runtimeMutex.Unlock()
 	return kl.lastTimestampRuntimeUp.Add(kl.runtimeUpThreshold).After(time.Now())
+}
+
+func (kl *Kubelet) doneNetworkConfigure() bool {
+	kl.networkConfigMutex.Lock()
+	defer kl.networkConfigMutex.Unlock()
+	return kl.networkConfigured
 }
 
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0

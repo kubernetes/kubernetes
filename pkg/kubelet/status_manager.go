@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -60,8 +59,6 @@ func (s *statusManager) Start() {
 		err := s.syncBatch()
 		if err != nil {
 			glog.Warningf("Failed to updated pod status: %v", err)
-			// Errors and tight-looping are bad, m-kay
-			time.Sleep(30 * time.Second)
 		}
 	}, 0)
 }

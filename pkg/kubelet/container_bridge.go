@@ -23,6 +23,7 @@ import (
 	"os/exec"
 	"regexp"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -43,10 +44,16 @@ func createCBR0(wantCIDR *net.IPNet) error {
 		return err
 	}
 	// restart docker
-	if err := exec.Command("service", "docker", "restart").Run(); err != nil {
-		glog.Error(err)
-		// For now just log the error. The containerRuntime check will catch docker failures.
-		// TODO (dawnchen) figure out what we should do for rkt here.
+	// For now just log the error. The containerRuntime check will catch docker failures.
+	// TODO (dawnchen) figure out what we should do for rkt here.
+	if util.UsingSystemdInitSystem() {
+		if err := exec.Command("systemctl", "restart", "docker").Run(); err != nil {
+			glog.Error(err)
+		}
+	} else {
+		if err := exec.Command("service", "docker", "restart").Run(); err != nil {
+			glog.Error(err)
+		}
 	}
 	glog.V(2).Info("Recreated cbr0 and restarted docker")
 	return nil
@@ -60,7 +67,8 @@ func ensureCbr0(wantCIDR *net.IPNet) error {
 	if !exists {
 		glog.V(2).Infof("CBR0 doesn't exist, attempting to create it with range: %s", wantCIDR)
 		return createCBR0(wantCIDR)
-	} else if !cbr0CidrCorrect(wantCIDR) {
+	}
+	if !cbr0CidrCorrect(wantCIDR) {
 		glog.V(2).Infof("Attempting to recreate cbr0 with address range: %s", wantCIDR)
 
 		// delete cbr0
@@ -78,8 +86,7 @@ func ensureCbr0(wantCIDR *net.IPNet) error {
 }
 
 func cbr0Exists() (bool, error) {
-	_, err := os.Stat("/sys/class/net/cbr0")
-	if err != nil {
+	if _, err := os.Stat("/sys/class/net/cbr0"); err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
@@ -103,6 +110,7 @@ func cbr0CidrCorrect(wantCIDR *net.IPNet) bool {
 		return false
 	}
 	cbr0CIDR.IP = cbr0IP
+
 	glog.V(5).Infof("Want cbr0 CIDR: %s, have cbr0 CIDR: %s", wantCIDR, cbr0CIDR)
 	return wantCIDR.IP.Equal(cbr0IP) && bytes.Equal(wantCIDR.Mask, cbr0CIDR.Mask)
 }

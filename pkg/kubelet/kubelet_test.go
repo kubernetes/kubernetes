@@ -127,6 +127,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	}
 	kubelet.volumeManager = newVolumeManager()
 	kubelet.containerManager, _ = newContainerManager(mockCadvisor, "", "", "")
+	kubelet.networkConfigured = true
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient}
 }
 
