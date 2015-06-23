@@ -1,7 +1,7 @@
 ---
 - name: Open firewalld port for etcd
   firewalld: port={{ item }}/tcp permanent=false state=enabled
-  # in case this is also a minion where firewalld turned off
+  # in case this is also a node where firewalld turned off
   ignore_errors: yes
   with_items:
         - 2379
@@ -9,7 +9,7 @@
 
 - name: Save firewalld port for etcd
   firewalld: port={{ item }}/tcp permanent=true state=enabled
-  # in case this is also a minion where firewalld turned off
+  # in case this is also a node where firewalld turned off
   ignore_errors: yes
   with_items:
         - 2379
