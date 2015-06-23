@@ -63,13 +63,18 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		return
 	}
 
+	// graceTime is how long to keep retrying requests for status information.
+	const graceTime = 2 * time.Minute
+	// ingestionTimeout is how long to keep retrying to wait for all the
+	// logs to be ingested.
+	const ingestionTimeout = 3 * time.Minute
+
 	// Check for the existence of the Elasticsearch service.
 	By("Checking the Elasticsearch service exists.")
 	s := f.Client.Services(api.NamespaceDefault)
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
-	const graceTime = 10 * time.Minute
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		if _, err = s.Get("elasticsearch-logging"); err == nil {
 			break
@@ -139,14 +144,20 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// Now assume we really are talking to an Elasticsearch instance.
 	// Check the cluster health.
 	By("Checking health of Elasticsearch service.")
-	body, err := f.Client.Get().
-		Namespace(api.NamespaceDefault).
-		Prefix("proxy").
-		Resource("services").
-		Name("elasticsearch-logging").
-		Suffix("_cluster/health").
-		Param("health", "pretty").
-		DoRaw()
+	var body []byte
+	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
+		body, err = f.Client.Get().
+			Namespace(api.NamespaceDefault).
+			Prefix("proxy").
+			Resource("services").
+			Name("elasticsearch-logging").
+			Suffix("_cluster/health").
+			Param("health", "pretty").
+			DoRaw()
+		if err == nil {
+			break
+		}
+	}
 	Expect(err).NotTo(HaveOccurred())
 
 	health, err := bodyToJSON(body)
@@ -244,7 +255,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	By("Checking all the log lines were ingested into Elasticsearch")
 	missing := 0
 	expected := nodeCount * countTo
-	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(10 * time.Second) {
+	for start := time.Now(); time.Since(start) < ingestionTimeout; time.Sleep(10 * time.Second) {
 
 		// Debugging code to report the status of the elasticsearch logging endpoints.
 		esPods, err := f.Client.Pods(api.NamespaceDefault).List(labels.Set{esKey: esValue}.AsSelector(), fields.Everything())
