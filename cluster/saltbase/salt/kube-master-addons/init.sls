@@ -37,10 +37,19 @@ master-docker-image-tags:
   file.touch:
     - name: /srv/pillar/docker-images.sls
 
+# Current containervm image by default has both docker and kubelet
+# running. But during cluster creation stage, docker and kubelet
+# could be overwritten completely, or restarted due flag changes.
+# The ordering of salt states for service docker, kubelet and
+# master-addon below is very important to avoid the race between
+# salt restart docker or kubelet and kubelet start master components.
 kube-master-addons:
   service.running:
     - enable: True
     - restart: True
+    - require:
+      - service: docker
+      - service: kubelet
     - watch:
       - file: master-docker-image-tags
       - file: /etc/kubernetes/kube-master-addons.sh
