@@ -145,13 +145,13 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachin
 	err = r.store.Helper.GuaranteedUpdate(podKey, &api.Pod{}, false, tools.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
-			return nil, fmt.Errorf("unexpected object: %#v", obj)
+			return nil, errors.NewInternalError(fmt.Errorf("received object is not of type pod: %#v", obj))
 		}
 		if pod.DeletionTimestamp != nil {
-			return nil, fmt.Errorf("pod %s is being deleted, cannot be assigned to a host", pod.Name)
+			return nil, errors.NewConflict("pod", podID, fmt.Errorf("pod %s is being deleted, cannot be assigned to a host", pod.Name))
 		}
 		if pod.Spec.NodeName != oldMachine {
-			return nil, fmt.Errorf("pod %v is already assigned to node %q", pod.Name, pod.Spec.NodeName)
+			return nil, errors.NewConflict("pod", podID, fmt.Errorf("pod %v is already assigned to node %q", pod.Name, pod.Spec.NodeName))
 		}
 		pod.Spec.NodeName = machine
 		if pod.Annotations == nil {
@@ -222,7 +222,7 @@ func (r *LogREST) New() runtime.Object {
 func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtime.Object, error) {
 	logOpts, ok := opts.(*api.PodLogOptions)
 	if !ok {
-		return nil, fmt.Errorf("Invalid options object: %#v", opts)
+		return nil, errors.NewInternalError(fmt.Errorf("received object is not of type PodLogOptions: %#v", opts))
 	}
 	location, transport, err := pod.LogLocation(r.store, r.kubeletConn, ctx, name, logOpts)
 	if err != nil {
@@ -270,7 +270,7 @@ func (r *ProxyREST) NewConnectOptions() (runtime.Object, bool, string) {
 func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object) (rest.ConnectHandler, error) {
 	proxyOpts, ok := opts.(*api.PodProxyOptions)
 	if !ok {
-		return nil, fmt.Errorf("Invalid options object: %#v", opts)
+		return nil, errors.NewInternalError(fmt.Errorf("received object is not of type PodProxyOptions: %#v", opts))
 	}
 	location, _, err := pod.ResourceLocation(r.store, ctx, id)
 	if err != nil {
@@ -300,7 +300,7 @@ func (r *ExecREST) New() runtime.Object {
 func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object) (rest.ConnectHandler, error) {
 	execOpts, ok := opts.(*api.PodExecOptions)
 	if !ok {
-		return nil, fmt.Errorf("Invalid options object: %#v", opts)
+		return nil, errors.NewInternalError(fmt.Errorf("received object is not of type PodExecOptions: %#v", opts))
 	}
 	location, transport, err := pod.ExecLocation(r.store, r.kubeletConn, ctx, name, execOpts)
 	if err != nil {

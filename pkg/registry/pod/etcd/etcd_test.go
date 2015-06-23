@@ -153,7 +153,7 @@ func TestCreateRegistryError(t *testing.T) {
 
 	pod := validNewPod()
 	_, err := storage.Create(api.NewDefaultContext(), pod)
-	if err != fakeEtcdClient.Err {
+	if !errors.IsInternalServerError(err) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

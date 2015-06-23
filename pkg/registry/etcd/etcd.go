@@ -108,7 +108,10 @@ func (r *Registry) CreateService(ctx api.Context, svc *api.Service) (*api.Servic
 	}
 	out := &api.Service{}
 	err = r.CreateObj(key, svc, out, 0)
-	return out, etcderr.InterpretCreateError(err, "service", svc.Name)
+	if err != nil {
+		err = etcderr.InterpretCreateError(err, "Service", svc.Name)
+	}
+	return out, err
 }
 
 // GetService obtains a Service specified by its name.
@@ -120,7 +123,7 @@ func (r *Registry) GetService(ctx api.Context, name string) (*api.Service, error
 	var svc api.Service
 	err = r.ExtractObj(key, &svc, false)
 	if err != nil {
-		return nil, etcderr.InterpretGetError(err, "service", name)
+		return nil, etcderr.InterpretGetError(err, "Service", name)
 	}
 	return &svc, nil
 }
@@ -133,7 +136,7 @@ func (r *Registry) DeleteService(ctx api.Context, name string) error {
 	}
 	err = r.Delete(key, true)
 	if err != nil {
-		return etcderr.InterpretDeleteError(err, "service", name)
+		return etcderr.InterpretDeleteError(err, "Service", name)
 	}
 
 	// TODO: can leave dangling endpoints, and potentially return incorrect
@@ -153,12 +156,15 @@ func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) (*api.Servic
 	}
 	out := &api.Service{}
 	err = r.SetObj(key, svc, out, 0)
-	return out, etcderr.InterpretUpdateError(err, "service", svc.Name)
+	if err != nil {
+		err = etcderr.InterpretUpdateError(err, "Service", svc.Name)
+	}
+	return out, err
 }
 
 // WatchServices begins watching for new, changed, or deleted service configurations.
 func (r *Registry) WatchServices(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	version, err := tools.ParseWatchResourceVersion(resourceVersion, "service")
+	version, err := tools.ParseWatchResourceVersion(resourceVersion, "Service")
 	if err != nil {
 		return nil, err
 	}

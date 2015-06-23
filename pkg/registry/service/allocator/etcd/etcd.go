@@ -17,7 +17,6 @@ limitations under the License.
 package etcd
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -31,7 +30,8 @@ import (
 )
 
 var (
-	errorUnableToAllocate = errors.New("unable to allocate")
+	// Placeholder error that should not be surfaced to the user.
+	errorUnableToAllocate = k8serr.NewInternalError(fmt.Errorf("unable to allocate"))
 )
 
 // Etcd exposes a service.Allocator that is backed by etcd.
@@ -121,6 +121,9 @@ func (e *Etcd) AllocateNext() (int, bool, error) {
 		}
 		return nil
 	})
+	if err != nil && err.Error() == errorUnableToAllocate.Error() {
+		err = nil
+	}
 	return offset, ok, err
 }
 
@@ -161,7 +164,10 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 			return existing, nil
 		}),
 	)
-	return etcderr.InterpretUpdateError(err, e.kind, "")
+	if err != nil {
+		err = etcderr.InterpretUpdateError(err, e.kind, "")
+	}
+	return err
 }
 
 // Refresh reloads the RangeAllocation from etcd.
