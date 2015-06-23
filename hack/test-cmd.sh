@@ -399,7 +399,7 @@ for version in "${kube_api_versions[@]}"; do
   # Pre-condition: Only the default kubernetes services are running
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Command
-  kubectl create -f examples/guestbook/redis-master-service.json "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/redis-master-service.yaml "${kube_flags[@]}"
   # Post-condition: redis-master service is running
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:'
   # Describe command should print detailed information
@@ -465,8 +465,8 @@ __EOF__
   # Pre-condition: Only the default kubernetes services are running
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Command
-  kubectl create -f examples/guestbook/redis-master-service.json "${kube_flags[@]}"
-  kubectl create -f examples/guestbook/redis-slave-service.json "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/redis-master-service.yaml "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/redis-slave-service.yaml "${kube_flags[@]}"
   # Post-condition: redis-master and redis-slave services are running
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-slave:'
 
@@ -489,7 +489,7 @@ __EOF__
   # Pre-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
   kubectl stop rc frontend "${kube_flags[@]}"
   # Post-condition: no pods from frontend controller
   kube::test::get_object_assert 'pods -l "name=frontend"' "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -498,7 +498,7 @@ __EOF__
   # Pre-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
   # Post-condition: frontend replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # Describe command should print detailed information
@@ -566,8 +566,8 @@ __EOF__
   # Pre-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
-  kubectl create -f examples/guestbook/redis-slave-controller.json "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/frontend-controller.yaml "${kube_flags[@]}"
+  kubectl create -f examples/guestbook/redis-slave-controller.yaml "${kube_flags[@]}"
   # Post-condition: frontend and redis-slave
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
 
