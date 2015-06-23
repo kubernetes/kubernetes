@@ -15,7 +15,7 @@
 
 # collect information about what packages are installed
 - include: rpm.yml
-  when: ansible_pkg_mgr == "yum"
+  when: ansible_pkg_mgr == "yum" or ansible_pkg_mgr == "dnf"
 
 - include: centos.yml
   when: ansible_distribution == "CentOS"

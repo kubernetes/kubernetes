@@ -1,4 +1,12 @@
 ---
+- hosts: all
+  gather_facts: false
+  sudo: yes
+  roles:
+    - pre-ansible
+  tags:
+    - pre-ansible
+
 # Install etcd
 - hosts: etcd
   sudo: yes
