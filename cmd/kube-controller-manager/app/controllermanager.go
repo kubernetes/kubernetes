@@ -23,6 +23,8 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -73,6 +75,7 @@ type CMServer struct {
 	DeletingPodsQps         float32
 	DeletingPodsBurst       int
 	ServiceAccountKeyFile   string
+	RootCAFile              string
 
 	ClusterName       string
 	ClusterCIDR       util.IPNet
@@ -156,6 +159,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
 }
 
 // Run runs the CMServer.  This should never exit.
@@ -243,6 +247,20 @@ func (s *CMServer) Run(_ []string) error {
 	}
 	pvRecycler.Run()
 
+	var rootCA []byte
+
+	if s.RootCAFile != "" {
+		rootCA, err := ioutil.ReadFile(s.RootCAFile)
+		if err != nil {
+			return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
+		}
+		if _, err := util.CertsFromPEM(rootCA); err != nil {
+			return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
+		}
+	} else {
+		rootCA = kubeconfig.CAData
+	}
+
 	if len(s.ServiceAccountKeyFile) > 0 {
 		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
 		if err != nil {
@@ -250,9 +268,10 @@ func (s *CMServer) Run(_ []string) error {
 		} else {
 			serviceaccount.NewTokensController(
 				kubeClient,
-				serviceaccount.DefaultTokenControllerOptions(
-					serviceaccount.JWTTokenGenerator(privateKey),
-				),
+				serviceaccount.TokensControllerOptions{
+					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
+					RootCA:         rootCA,
+				},
 			).Run()
 		}
 	}

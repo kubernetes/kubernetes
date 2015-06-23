@@ -44,11 +44,8 @@ type TokensControllerOptions struct {
 	// SecretResync is the time.Duration at which to fully re-list secrets.
 	// If zero, re-list will be delayed as long as possible
 	SecretResync time.Duration
-}
-
-// DefaultTokenControllerOptions returns
-func DefaultTokenControllerOptions(tokenGenerator TokenGenerator) TokensControllerOptions {
-	return TokensControllerOptions{TokenGenerator: tokenGenerator}
+	// This CA will be added in the secretes of service accounts
+	RootCA []byte
 }
 
 // NewTokensController returns a new *TokensController.
@@ -56,6 +53,7 @@ func NewTokensController(cl client.Interface, options TokensControllerOptions) *
 	e := &TokensController{
 		client: cl,
 		token:  options.TokenGenerator,
+		rootCA: options.RootCA,
 	}
 
 	e.serviceAccounts, e.serviceAccountController = framework.NewIndexerInformer(
@@ -109,6 +107,8 @@ type TokensController struct {
 
 	client client.Interface
 	token  TokenGenerator
+
+	rootCA []byte
 
 	serviceAccounts cache.Indexer
 	secrets         cache.Indexer
@@ -293,6 +293,9 @@ func (e *TokensController) createSecret(serviceAccount *api.ServiceAccount) erro
 		return err
 	}
 	secret.Data[api.ServiceAccountTokenKey] = []byte(token)
+	if e.rootCA != nil && len(e.rootCA) > 0 {
+		secret.Data[api.ServiceAccountRootCAKey] = e.rootCA
+	}
 
 	// Save the secret
 	if _, err := e.client.Secrets(serviceAccount.Namespace).Create(secret); err != nil {
@@ -336,6 +339,9 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAcco
 	tokenData, ok := secret.Data[api.ServiceAccountTokenKey]
 	if ok && len(tokenData) > 0 {
 		return nil
+	}
+	if e.rootCA != nil && len(e.rootCA) > 0 {
+		secret.Data[api.ServiceAccountRootCAKey] = e.rootCA
 	}
 
 	// Generate the token
