@@ -1992,3 +1992,61 @@ func TestSyncPodWithTerminationLog(t *testing.T) {
 		t.Errorf("Unexpected container path: %s", parts[1])
 	}
 }
+
+func TestGetPodStatusSortedContainers(t *testing.T) {
+	dm, fakeDocker := newTestDockerManager()
+	dockerInspect := map[string]*docker.Container{}
+	dockerList := []docker.APIContainers{}
+	specContainerList := []api.Container{}
+	expectedOrder := []string{}
+
+	numContainers := 10
+	podName := "foo"
+	podNs := "test"
+	podUID := "uid1"
+	fakeConfig := &docker.Config{
+		Image: "some:latest",
+	}
+
+	for i := 0; i < numContainers; i++ {
+		id := fmt.Sprintf("%v", i)
+		containerName := fmt.Sprintf("%vcontainer", id)
+		expectedOrder = append(expectedOrder, containerName)
+		dockerInspect[id] = &docker.Container{
+			ID:     id,
+			Name:   containerName,
+			Config: fakeConfig,
+			Image:  fmt.Sprintf("%vimageid", id),
+		}
+		dockerList = append(dockerList, docker.APIContainers{
+			ID:    id,
+			Names: []string{fmt.Sprintf("/k8s_%v_%v_%v_%v_42", containerName, podName, podNs, podUID)},
+		})
+		specContainerList = append(specContainerList, api.Container{Name: containerName})
+	}
+
+	fakeDocker.ContainerMap = dockerInspect
+	fakeDocker.ContainerList = dockerList
+	fakeDocker.ClearCalls()
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       types.UID(podUID),
+			Name:      podName,
+			Namespace: podNs,
+		},
+		Spec: api.PodSpec{
+			Containers: specContainerList,
+		},
+	}
+	for i := 0; i < 5; i++ {
+		status, err := dm.GetPodStatus(pod)
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+		for i, c := range status.ContainerStatuses {
+			if expectedOrder[i] != c.Name {
+				t.Fatalf("Container status not sorted, expected %v at index %d, but found %v", expectedOrder[i], i, c.Name)
+			}
+		}
+	}
+}
