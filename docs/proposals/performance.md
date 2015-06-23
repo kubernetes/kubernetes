@@ -1,4 +1,4 @@
-# Post-1.0 performance/scalability impovement ideas
+# Post-1.0 performance/scalability improvement ideas
 
 This document is a collection of ideas for improving Kubernetes
 performance/scalability post-1.0. Feel free to add to it. Please
@@ -11,11 +11,11 @@ The next performance/scalability goal is 1000 nodes with 30 pods/node. We may wi
 
 ## Ideas
 
-1. Change communication between apiserver and etcd to proto-based once v3 etcd is available [#8132](https://github.com/GoogleCloudPlatform/kubernetes/issues/8132) @wojtekt
+1. Change communication between apiserver and etcd to proto-based once v3 etcd is available [#8132](https://github.com/GoogleCloudPlatform/kubernetes/issues/8132) @wojtek-t
 2. Use BSON (http://bsonspec.org/) [#8132](https://github.com/GoogleCloudPlatform/kubernetes/issues/8132) @lavalamp
-3. Eliminate "internal" representation and thus conversions [#8190](https://github.com/GoogleCloudPlatform/kubernetes/issues/8132) @briangrant
+3. Eliminate "internal" representation and thus conversions [#8190](https://github.com/GoogleCloudPlatform/kubernetes/issues/8132) @bgrant0607
 4. Alternative JSON parsers [#3338](https://github.com/GoogleCloudPlatform/kubernetes/issues/3338) @lavalamp
 5. Watch improvements
    - implement watch at API server level [#8132](https://github.com/GoogleCloudPlatform/kubernetes/issues/8132) @wojtek-t
-   - watch based on label query [#3295](https://github.com/GoogleCloudPlatform/kubernetes/issues/3295) @lavalamp
+   - watch based on label query [#3295](https://github.com/GoogleCloudPlatform/kubernetes/issues/3295) @lavalamp \(previous bullet is a prerequisite\)
 6. Change to proto for all cases, if necessary [#8132](https://github.com/GoogleCloudPlatform/kubernetes/issues/8132)
