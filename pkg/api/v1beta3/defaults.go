@@ -40,6 +40,10 @@ func addDefaultingFuncs() {
 					obj.Labels = labels
 				}
 			}
+			if obj.Spec.Replicas == nil {
+				obj.Spec.Replicas = new(int)
+				*obj.Spec.Replicas = 0
+			}
 		},
 		func(obj *Volume) {
 			if util.AllPtrFieldsNil(&obj.VolumeSource) {
