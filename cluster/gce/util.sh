@@ -542,8 +542,12 @@ function write-node-env {
 #   KUBECFG_CERT_BASE64
 #   KUBECFG_KEY_BASE64
 function create-certs {
-  local cert_ip
-  cert_ip="${1}"
+  local -r cert_ip="${1}"
+
+  local octects=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
+  ((octects[3]+=1))
+  local -r service_ip=$(echo "${octects[*]}" | sed 's/ /./g')
+  local -r sans="IP:${cert_ip},IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
 
   # Note: This was heavily cribbed from make-ca-cert.sh
   (cd "${KUBE_TEMP}"
@@ -552,7 +556,7 @@ function create-certs {
     cd easy-rsa-master/easyrsa3
     ./easyrsa init-pki > /dev/null 2>&1
     ./easyrsa --batch "--req-cn=${cert_ip}@$(date +%s)" build-ca nopass > /dev/null 2>&1
-    ./easyrsa --subject-alt-name=IP:"${cert_ip}",DNS:kubernetes,DNS:"${MASTER_NAME}" build-server-full "${MASTER_NAME}" nopass > /dev/null 2>&1
+    ./easyrsa --subject-alt-name="${sans}" build-server-full "${MASTER_NAME}" nopass > /dev/null 2>&1
     ./easyrsa build-client-full kubelet nopass > /dev/null 2>&1
     ./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1) || {
     # If there was an error in the subshell, just die.
@@ -594,7 +598,7 @@ function kube-up {
     running_in_terminal=true
   fi
 
-  if [[ ${running_in_terminal} == "true" || ${KUBE_UP_AUTOMATIC_CLEANUP} == "true" ]]; then 
+  if [[ ${running_in_terminal} == "true" || ${KUBE_UP_AUTOMATIC_CLEANUP} == "true" ]]; then
     if ! check-resources; then
       local run_kube_down="n"
       echo "${KUBE_RESOURCE_FOUND} found." >&2
