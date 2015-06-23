@@ -4,22 +4,20 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 
 **Table of Contents**
 
-    - [Prerequisites](#prerequisites)
-    - [High Level Design](#high-level-design)
-    - [This Guides variables](#this-guides-variables)
-    - [Setup PXELINUX CentOS](#setup-pxelinux-centos)
-    - [Adding CoreOS to PXE](#adding-coreos-to-pxe)
-    - [DHCP configuration](#dhcp-configuration)
-    - [Kubernetes](#kubernetes)
-    - [Cloud Configs](#cloud-configs)
-        - [master.yml](#masteryml)
-- [cloud-config](#cloud-config)
-        - [node.yml](#nodeyml)
-- [cloud-config](#cloud-config)
-    - [New pxelinux.cfg file](#new-pxelinuxcfg-file)
-    - [Specify the pxelinux targets](#specify-the-pxelinux-targets)
-    - [Creating test pod](#creating-test-pod)
-    - [Helping commands for debugging](#helping-commands-for-debugging)
+- [Prerequisites](#prerequisites)
+- [High Level Design](#high-level-design)
+- [This Guides variables](#this-guides-variables)
+- [Setup PXELINUX CentOS](#setup-pxelinux-centos)
+- [Adding CoreOS to PXE](#adding-coreos-to-pxe)
+- [DHCP configuration](#dhcp-configuration)
+- [Kubernetes](#kubernetes)
+- [Cloud Configs](#cloud-configs)
+    - [master.yml](#masteryml)
+    - [node.yml](#nodeyml)
+- [New pxelinux.cfg file](#new-pxelinuxcfg-file)
+- [Specify the pxelinux targets](#specify-the-pxelinux-targets)
+- [Creating test pod](#creating-test-pod)
+- [Helping commands for debugging](#helping-commands-for-debugging)
 
 
 ## Prerequisites

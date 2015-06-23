@@ -7,17 +7,17 @@ services has been deployed.
 
 **Table of Contents**
 
-    - [Prerequisites](#prerequisites)
-       - [On Ubuntu](#on-ubuntu)
-       - [With Docker](#with-docker)
-    - [Launch Kubernetes cluster](#launch-kubernetes-cluster)
-    - [Exploring the cluster](#exploring-the-cluster)
-    - [Run some containers!](#run-some-containers)
-    - [Scale out cluster](#scale-out-cluster)
-    - [Launch the "k8petstore" example app](#launch-the-k8petstore-example-app)
-    - [Tear down cluster](#tear-down-cluster)
-    - [More Info](#more-info)
-        - [Cloud compatibility](#cloud-compatibility)
+- [Prerequisites](#prerequisites)
+   - [On Ubuntu](#on-ubuntu)
+   - [With Docker](#with-docker)
+- [Launch Kubernetes cluster](#launch-kubernetes-cluster)
+- [Exploring the cluster](#exploring-the-cluster)
+- [Run some containers!](#run-some-containers)
+- [Scale out cluster](#scale-out-cluster)
+- [Launch the "k8petstore" example app](#launch-the-k8petstore-example-app)
+- [Tear down cluster](#tear-down-cluster)
+- [More Info](#more-info)
+    - [Cloud compatibility](#cloud-compatibility)
 
 
 ## Prerequisites

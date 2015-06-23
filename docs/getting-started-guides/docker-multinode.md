@@ -7,12 +7,12 @@ interested in just starting to explore Kubernetes, we recommend that you start t
 
 **Table of Contents**
 
-  - [Prerequisites](#prerequisites)
-  - [Overview](#overview)
-    - [Bootstrap Docker](#bootstrap-docker)
-  - [Master Node](#master-node)
-  - [Adding a worker node](#adding-a-worker-node)
-  - [Testing your cluster](#testing-your-cluster)
+- [Prerequisites](#prerequisites)
+- [Overview](#overview)
+  - [Bootstrap Docker](#bootstrap-docker)
+- [Master Node](#master-node)
+- [Adding a worker node](#adding-a-worker-node)
+- [Testing your cluster](#testing-your-cluster)
 
 ## Prerequisites
 1. You need a machine with docker installed.

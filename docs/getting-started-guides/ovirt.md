@@ -3,10 +3,10 @@ Getting started on oVirt
 
 **Table of Contents**
 
-    - [What is oVirt](#what-is-ovirt)
-    - [oVirt Cloud Provider Deployment](#ovirt-cloud-provider-deployment)
-    - [Using the oVirt Cloud Provider](#using-the-ovirt-cloud-provider)
-    - [oVirt Cloud Provider Screencast](#ovirt-cloud-provider-screencast)
+- [What is oVirt](#what-is-ovirt)
+- [oVirt Cloud Provider Deployment](#ovirt-cloud-provider-deployment)
+- [Using the oVirt Cloud Provider](#using-the-ovirt-cloud-provider)
+- [oVirt Cloud Provider Screencast](#ovirt-cloud-provider-screencast)
 
 ## What is oVirt
 
