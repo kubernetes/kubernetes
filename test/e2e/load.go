@@ -73,6 +73,8 @@ var _ = Describe("Load capacity", func() {
 		nsForTesting, err := createTestingNS("load", c)
 		ns = nsForTesting.Name
 		expectNoError(err)
+
+		expectNoError(resetMetrics(c))
 	})
 
 	// TODO add flag that allows to skip cleanup on failure
@@ -85,7 +87,6 @@ var _ = Describe("Load capacity", func() {
 		}
 
 		// Verify latency metrics
-		// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
 		highLatencyRequests, err := HighLatencyRequests(c, 1*time.Second, util.NewStringSet("events"))
 		expectNoError(err, "Too many instances metrics above the threshold")
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))

@@ -1395,6 +1395,19 @@ func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResou
 	return len(badMetrics), nil
 }
 
+// Reset latency metrics in apiserver.
+func resetMetrics(c *client.Client) error {
+	Logf("Resetting latency metrics in apiserver...")
+	body, err := c.Get().AbsPath("/resetMetrics").DoRaw()
+	if err != nil {
+		return err
+	}
+	if string(body) != "metrics reset\n" {
+		return fmt.Errorf("Unexpected response: ", string(body))
+	}
+	return nil
+}
+
 // Retrieve metrics information
 func getMetrics(c *client.Client) (string, error) {
 	body, err := c.Get().AbsPath("/metrics").DoRaw()
