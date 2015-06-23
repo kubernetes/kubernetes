@@ -552,7 +552,7 @@ func (m *Master) init(c *Config) {
 		apiVersions = append(apiVersions, "v1")
 	}
 
-	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
+	apiserver.InstallSupport(m.muxHelper, m.rootWebService, c.EnableProfiling)
 	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
 	defaultVersion := m.defaultAPIGroupVersion()
 	requestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), defaultVersion.Mapper}

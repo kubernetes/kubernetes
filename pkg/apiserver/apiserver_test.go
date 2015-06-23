@@ -230,7 +230,7 @@ func handleInternal(legacy bool, storage map[string]rest.Storage, admissionContr
 		panic(fmt.Sprintf("unable to install container %s: %v", group.Version, err))
 	}
 	ws := new(restful.WebService)
-	InstallSupport(mux, ws)
+	InstallSupport(mux, ws, false)
 	container.Add(ws)
 	return &defaultAPIServer{mux, group, container}
 }
