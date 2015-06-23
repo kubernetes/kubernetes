@@ -69,6 +69,10 @@ type Info struct {
 	// Optional, Source is the filename or URL to template file (.json or .yaml),
 	// or stdin to use to handle the resource
 	Source string
+	// Optional, this is the provided object in a versioned type before defaulting
+	// and conversions into its corresponding internal type. This is useful for
+	// reflecting on user intent which may be lost after defaulting and conversions.
+	VersionedObject interface{}
 	// Optional, this is the most recent value returned by the server if available
 	runtime.Object
 	// Optional, this is the most recent resource version the server knows about for

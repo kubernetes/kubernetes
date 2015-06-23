@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
@@ -64,13 +65,19 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	name, _ := mapping.MetadataAccessor.Name(obj)
 	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
 	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
-	return &Info{
-		Mapping:   mapping,
-		Client:    client,
-		Namespace: namespace,
-		Name:      name,
-		Source:    source,
 
+	var versionedObject interface{}
+
+	if vo, _, _, err := api.Scheme.Raw().DecodeToVersionedObject(data); err == nil {
+		versionedObject = vo
+	}
+	return &Info{
+		Mapping:         mapping,
+		Client:          client,
+		Namespace:       namespace,
+		Name:            name,
+		Source:          source,
+		VersionedObject: versionedObject,
 		Object:          obj,
 		ResourceVersion: resourceVersion,
 	}, nil
