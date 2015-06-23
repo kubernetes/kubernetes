@@ -181,7 +181,7 @@ spec:
 `
 
 var addonTestPollInterval = 3 * time.Second
-var addonTestPollTimeout = 3 * time.Minute
+var addonTestPollTimeout = 1 * time.Minute
 var addonNamespace = api.NamespaceDefault // addons are in the default namespace
 
 type stringPair struct {
@@ -211,6 +211,8 @@ var _ = Describe("Addon update", func() {
 		namespace, err = createTestingNS("addon-update-test", c)
 		Expect(err).NotTo(HaveOccurred())
 
+		// Reduce the addon update intervals so that we have faster response
+		// to changes in the addon directory.
 		// do not use "service" command because it clears the environment variables
 		sshExecAndVerify(sshClient, "sudo TEST_ADDON_CHECK_INTERVAL_SEC=1 /etc/init.d/kube-addons restart")
 	})
@@ -361,7 +363,7 @@ func getSSHClient() (*ssh.Client, error) {
 func sshExecAndVerify(client *ssh.Client, cmd string) {
 	_, _, rc, err := sshExec(client, cmd)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(rc).To(Equal(0))
+	Expect(rc).To(Equal(0), "error return code from executing command on the cluster: %s", cmd)
 }
 
 func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {

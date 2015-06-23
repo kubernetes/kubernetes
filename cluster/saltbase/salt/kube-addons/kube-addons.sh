@@ -120,7 +120,7 @@ function create-resource-from-string() {
 # The business logic for whether a given object should be created
 # was already enforced by salt, and /etc/kubernetes/addons is the
 # managed result is of that. Start everything below that directory.
-echo "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC}=="
+echo "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC} =="
 
 # Load the kube-env, which has all the environment variables we care
 # about, in a flat yaml format.
@@ -150,6 +150,7 @@ echo "== default service account has token ${token_found} =="
 # NOTE: needs to run as root to read this file.
 # Read each line in the csv file of tokens.
 # Expect errors when the script is started again.
+# NOTE: secrets are created asynchronously, in background.
 while read line; do
   # Split each line into the token and username.
   IFS=',' read -a parts <<< "${line}"
@@ -176,7 +177,14 @@ done
 # Check if the configuration has changed recently - in case the user
 # created/updated/deleted the files on the master.
 while true; do
+  start_sec=$(date +"%s")
   #kube-addon-update.sh must be deployed in the same directory as this file
-  `dirname $0`/kube-addon-update.sh /etc/kubernetes/addons
-  sleep $ADDON_CHECK_INTERVAL_SEC
+  `dirname $0`/kube-addon-update.sh /etc/kubernetes/addons ${ADDON_CHECK_INTERVAL_SEC}
+  end_sec=$(date +"%s")
+  len_sec=$((${end_sec}-${start_sec}))
+  # subtract the time passed from the sleep time
+  if [[ ${len_sec} -lt ${ADDON_CHECK_INTERVAL_SEC} ]]; then
+    sleep_time=$((${ADDON_CHECK_INTERVAL_SEC}-${len_sec}))
+    sleep ${sleep_time}
+  fi
 done
