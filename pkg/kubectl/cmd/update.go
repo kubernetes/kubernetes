@@ -111,11 +111,11 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	return r.Visit(func(info *resource.Info) error {
 		data, err := info.Mapping.Codec.Encode(info.Object)
 		if err != nil {
-			return err
+			return cmdutil.AddSourceToErr("updating", info.Source, err)
 		}
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Update(info.Namespace, info.Name, true, data)
 		if err != nil {
-			return err
+			return cmdutil.AddSourceToErr("updating", info.Source, err)
 		}
 		info.Refresh(obj, true)
 		printObjectSpecificMessage(obj, out)

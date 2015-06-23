@@ -66,6 +66,9 @@ type Info struct {
 	Namespace string
 	Name      string
 
+	// Optional, Source is the filename or URL to template file (.json or .yaml),
+	// or stdin to use to handle the resource
+	Source string
 	// Optional, this is the most recent value returned by the server if available
 	runtime.Object
 	// Optional, this is the most recent resource version the server knows about for
