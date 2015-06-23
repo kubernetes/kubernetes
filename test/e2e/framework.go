@@ -99,9 +99,9 @@ func (f *Framework) WaitForPodRunning(podName string) error {
 	return waitForPodRunningInNamespace(f.Client, podName, f.Namespace.Name)
 }
 
-// Runs the given pod and verifies that its output matches the desired output.
-func (f *Framework) TestContainerOutput(scenarioName string, pod *api.Pod, expectedOutput []string) {
-	testContainerOutputInNamespace(scenarioName, f.Client, pod, expectedOutput, f.Namespace.Name)
+// Runs the given pod and verifies that the output of exact container matches the desired output.
+func (f *Framework) TestContainerOutput(scenarioName string, pod *api.Pod, containerIndex int, expectedOutput []string) {
+	testContainerOutputInNamespace(scenarioName, f.Client, pod, containerIndex, expectedOutput, f.Namespace.Name)
 }
 
 // WaitForAnEndpoint waits for at least one endpoint to become available in the

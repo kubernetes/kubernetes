@@ -41,7 +41,7 @@ var _ = Describe("EmptyDir volumes", func() {
 			fmt.Sprintf("--fs_type=%v", volumePath),
 			fmt.Sprintf("--file_mode=%v", volumePath),
 		}
-		f.TestContainerOutput("emptydir r/w on tmpfs", pod, []string{
+		f.TestContainerOutput("emptydir r/w on tmpfs", pod, 0, []string{
 			"mount type of \"/test-volume\": tmpfs",
 			"mode of file \"/test-volume\": dtrwxrwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
 		})
@@ -60,7 +60,7 @@ var _ = Describe("EmptyDir volumes", func() {
 			fmt.Sprintf("--rw_new_file=%v", filePath),
 			fmt.Sprintf("--file_mode=%v", filePath),
 		}
-		f.TestContainerOutput("emptydir r/w on tmpfs", pod, []string{
+		f.TestContainerOutput("emptydir r/w on tmpfs", pod, 0, []string{
 			"mount type of \"/test-volume\": tmpfs",
 			"mode of file \"/test-volume/test-file\": -rw-r--r--",
 			"content of file \"/test-volume/test-file\": mount-tester new file",

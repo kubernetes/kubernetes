@@ -772,14 +772,14 @@ func runKubectl(args ...string) string {
 }
 
 // testContainerOutput runs testContainerOutputInNamespace with the default namespace.
-func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string) {
-	testContainerOutputInNamespace(scenarioName, c, pod, expectedOutput, api.NamespaceDefault)
+func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string) {
+	testContainerOutputInNamespace(scenarioName, c, pod, containerIndex, expectedOutput, api.NamespaceDefault)
 }
 
 // testContainerOutputInNamespace runs the given pod in the given namespace and waits
-// for the first container in the podSpec to move into the 'Success' status.  It retrieves
-// the container log and searches for lines of expected output.
-func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string, ns string) {
+// for all of the containers in the podSpec to move into the 'Success' status.  It retrieves
+// the exact container log and searches for lines of expected output.
+func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
 	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
 
 	defer c.Pods(ns).Delete(pod.Name, nil)
@@ -787,10 +787,17 @@ func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *
 		Failf("Failed to create pod: %v", err)
 	}
 
-	containerName := pod.Spec.Containers[0].Name
-
 	// Wait for client pod to complete.
-	expectNoError(waitForPodSuccessInNamespace(c, pod.Name, containerName, ns))
+	var containerName string
+	for id, container := range pod.Spec.Containers {
+		expectNoError(waitForPodSuccessInNamespace(c, pod.Name, container.Name, ns))
+		if id == containerIndex {
+			containerName = container.Name
+		}
+	}
+	if containerName == "" {
+		Failf("Invalid container index: %d", containerIndex)
+	}
 
 	// Grab its logs.  Get host first.
 	podStatus, err := c.Pods(ns).Get(pod.Name)
