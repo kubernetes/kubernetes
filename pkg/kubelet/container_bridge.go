@@ -85,6 +85,9 @@ func ensureCbr0(wantCIDR *net.IPNet) error {
 	return nil
 }
 
+// Check if cbr0 network interface is configured or not, and take action
+// when the configuration is missing on the node, and propagate the rest
+// error to kubelet to handle.
 func cbr0Exists() (bool, error) {
 	if _, err := os.Stat("/sys/class/net/cbr0"); err != nil {
 		if os.IsNotExist(err) {
