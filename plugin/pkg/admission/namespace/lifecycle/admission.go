@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -29,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -42,11 +44,21 @@ func init() {
 // It enforces life-cycle constraints around a Namespace depending on its Phase
 type lifecycle struct {
 	*admission.Handler
-	client client.Interface
-	store  cache.Store
+	client             client.Interface
+	store              cache.Store
+	immortalNamespaces util.StringSet
 }
 
 func (l *lifecycle) Admit(a admission.Attributes) (err error) {
+
+	// prevent deletion of immortal namespaces
+	if a.GetOperation() == admission.Delete {
+		if a.GetKind() == "Namespace" && l.immortalNamespaces.Has(a.GetName()) {
+			return errors.NewForbidden(a.GetKind(), a.GetName(), fmt.Errorf("namespace can never be deleted"))
+		}
+		return nil
+	}
+
 	defaultVersion, kind, err := latest.RESTMapper.VersionAndKindForResource(a.GetResource())
 	if err != nil {
 		return admission.NewForbidden(a, err)
@@ -96,8 +108,9 @@ func NewLifecycle(c client.Interface) admission.Interface {
 	)
 	reflector.Run()
 	return &lifecycle{
-		Handler: admission.NewHandler(admission.Create),
-		client:  c,
-		store:   store,
+		Handler:            admission.NewHandler(admission.Create, admission.Delete),
+		client:             c,
+		store:              store,
+		immortalNamespaces: util.NewStringSet(api.NamespaceDefault),
 	}
 }
