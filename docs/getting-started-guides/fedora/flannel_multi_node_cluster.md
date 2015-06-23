@@ -3,11 +3,11 @@ Kubernetes multiple nodes cluster with flannel on Fedora
 
 **Table of Contents**
 
-    - [Introduction](#introduction)
-    - [Prerequisites](#prerequisites)
-    - [Master Setup](#master-setup)
-    - [Node Setup](#node-setup)
-    - [**Test the cluster and flannel configuration**](#test-the-cluster-and-flannel-configuration)
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [Master Setup](#master-setup)
+- [Node Setup](#node-setup)
+- [**Test the cluster and flannel configuration**](#test-the-cluster-and-flannel-configuration)
 
 ## Introduction
 

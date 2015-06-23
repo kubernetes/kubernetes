@@ -8,10 +8,10 @@ convenient).
 
 **Table of Contents**
 
-    - [Prerequisites](#prerequisites)
-    - [Setup](#setup)
-    - [Starting a cluster](#starting-a-cluster)
-    - [Extra: debugging deployment failure](#extra-debugging-deployment-failure)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Starting a cluster](#starting-a-cluster)
+- [Extra: debugging deployment failure](#extra-debugging-deployment-failure)
 
 ### Prerequisites
 

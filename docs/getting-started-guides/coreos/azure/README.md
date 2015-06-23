@@ -3,14 +3,14 @@ Kubernetes on Azure with CoreOS and [Weave](http://weave.works)
 
 **Table of Contents**
 
-    - [Introduction](#introduction)
-    - [Prerequisites](#prerequisites)
-    - [Let's go!](#lets-go)
-    - [Deploying the workload](#deploying-the-workload)
-    - [Scaling](#scaling)
-    - [Exposing the app to the outside world](#exposing-the-app-to-the-outside-world)
-    - [Next steps](#next-steps)
-    - [Tear down...](#tear-down)
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [Let's go!](#lets-go)
+- [Deploying the workload](#deploying-the-workload)
+- [Scaling](#scaling)
+- [Exposing the app to the outside world](#exposing-the-app-to-the-outside-world)
+- [Next steps](#next-steps)
+- [Tear down...](#tear-down)
 
 ## Introduction
 

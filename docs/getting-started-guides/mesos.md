@@ -3,15 +3,15 @@ Getting started with Kubernetes on Mesos
 
 **Table of Contents**
 
-    - [About Kubernetes on Mesos](#about-kubernetes-on-mesos)
-        - [Prerequisites](#prerequisites)
-        - [Deploy Kubernetes-Mesos](#deploy-kubernetes-mesos)
-        - [Deploy etcd](#deploy-etcd)
-        - [Start Kubernetes-Mesos Services](#start-kubernetes-mesos-services)
-            - [Validate KM Services](#validate-km-services)
-    - [Spin up a pod](#spin-up-a-pod)
-    - [Run the Example Guestbook App](#run-the-example-guestbook-app)
-            - [Test Guestbook App](#test-guestbook-app)
+- [About Kubernetes on Mesos](#about-kubernetes-on-mesos)
+    - [Prerequisites](#prerequisites)
+    - [Deploy Kubernetes-Mesos](#deploy-kubernetes-mesos)
+    - [Deploy etcd](#deploy-etcd)
+    - [Start Kubernetes-Mesos Services](#start-kubernetes-mesos-services)
+        - [Validate KM Services](#validate-km-services)
+- [Spin up a pod](#spin-up-a-pod)
+- [Run the Example Guestbook App](#run-the-example-guestbook-app)
+        - [Test Guestbook App](#test-guestbook-app)
 
 ## About Kubernetes on Mesos
 <!-- TODO: Update, clean up. -->

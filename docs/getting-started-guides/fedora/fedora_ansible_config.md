@@ -5,12 +5,12 @@ Configuring kubernetes on Fedora via Ansible offers a simple way to quickly crea
 
 **Table of Contents**
 
-    - [Prerequisites](#prerequisites)
-    - [Architecture of the cluster](#architecture-of-the-cluster)
-    - [Configuring ssh access to the cluster](#configuring-ssh-access-to-the-cluster)
-    - [Configuring the internal kubernetes network](#configuring-the-internal-kubernetes-network)
-    - [Setting up the cluster](#setting-up-the-cluster)
-    - [Testing and using your new cluster](#testing-and-using-your-new-cluster)
+- [Prerequisites](#prerequisites)
+- [Architecture of the cluster](#architecture-of-the-cluster)
+- [Configuring ssh access to the cluster](#configuring-ssh-access-to-the-cluster)
+- [Configuring the internal kubernetes network](#configuring-the-internal-kubernetes-network)
+- [Setting up the cluster](#setting-up-the-cluster)
+- [Testing and using your new cluster](#testing-and-using-your-new-cluster)
 
 ##Prerequisites
 

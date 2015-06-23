@@ -3,20 +3,20 @@ Getting started locally
 
 **Table of Contents**
 
-    - [Requirements](#requirements)
-        - [Linux](#linux)
-        - [Docker](#docker)
-        - [etcd](#etcd)
-        - [go](#go)
-    - [Starting the cluster](#starting-the-cluster)
-    - [Running a container](#running-a-container)
-    - [Running a user defined pod](#running-a-user-defined-pod)
-    - [Troubleshooting](#troubleshooting)
-        - [I cannot reach service IPs on the network.](#i-cannot-reach-service-ips-on-the-network)
-        - [I cannot create a replication controller with replica size greater than 1!  What gives?](#i-cannot-create-a-replication-controller-with-replica-size-greater-than-1--what-gives)
-        - [I changed Kubernetes code, how do I run it?](#i-changed-kubernetes-code-how-do-i-run-it)
-        - [kubectl claims to start a container but `get pods` and `docker ps` don't show it.](#kubectl-claims-to-start-a-container-but-get-pods-and-docker-ps-dont-show-it)
-        - [The pods fail to connect to the services by host names](#the-pods-fail-to-connect-to-the-services-by-host-names)
+- [Requirements](#requirements)
+    - [Linux](#linux)
+    - [Docker](#docker)
+    - [etcd](#etcd)
+    - [go](#go)
+- [Starting the cluster](#starting-the-cluster)
+- [Running a container](#running-a-container)
+- [Running a user defined pod](#running-a-user-defined-pod)
+- [Troubleshooting](#troubleshooting)
+    - [I cannot reach service IPs on the network.](#i-cannot-reach-service-ips-on-the-network)
+    - [I cannot create a replication controller with replica size greater than 1!  What gives?](#i-cannot-create-a-replication-controller-with-replica-size-greater-than-1--what-gives)
+    - [I changed Kubernetes code, how do I run it?](#i-changed-kubernetes-code-how-do-i-run-it)
+    - [kubectl claims to start a container but `get pods` and `docker ps` don't show it.](#kubectl-claims-to-start-a-container-but-get-pods-and-docker-ps-dont-show-it)
+    - [The pods fail to connect to the services by host names](#the-pods-fail-to-connect-to-the-services-by-host-names)
 
 ### Requirements
 
