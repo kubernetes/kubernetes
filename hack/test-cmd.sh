@@ -25,16 +25,54 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/test.sh"
 
+# Stops the running kubectl proxy, if there is one.
+function stop-proxy()
+{
+  [[ -n "${PROXY_PID-}" ]] && kill "${PROXY_PID}" 1>&2 2>/dev/null
+  PROXY_PID=
+}
+
+# Starts "kubect proxy" to test the client proxy. You may pass options, e.g.
+# --api-prefix.
+function start-proxy()
+{
+  stop-proxy
+
+  kube::log::status "Starting kubectl proxy"
+  # the --www and --www-prefix are just to make something definitely show up for
+  # wait_for_url to see.
+  kubectl proxy -p ${PROXY_PORT} --www=. --www-prefix=/healthz "$@" 1>&2 &
+  PROXY_PID=$!
+  kube::util::wait_for_url "http://127.0.0.1:${PROXY_PORT}/healthz" "kubectl proxy $@"
+}
+
 function cleanup()
 {
-    [[ -n ${APISERVER_PID-} ]] && kill ${APISERVER_PID} 1>&2 2>/dev/null
-    [[ -n ${CTLRMGR_PID-} ]] && kill ${CTLRMGR_PID} 1>&2 2>/dev/null
-    [[ -n ${KUBELET_PID-} ]] && kill ${KUBELET_PID} 1>&2 2>/dev/null
+  [[ -n "${APISERVER_PID-}" ]] && kill "${APISERVER_PID}" 1>&2 2>/dev/null
+  [[ -n "${CTLRMGR_PID-}" ]] && kill "${CTLRMGR_PID}" 1>&2 2>/dev/null
+  [[ -n "${KUBELET_PID-}" ]] && kill "${KUBELET_PID}" 1>&2 2>/dev/null
+  stop-proxy
 
-    kube::etcd::cleanup
-    rm -rf "${KUBE_TEMP}"
+  kube::etcd::cleanup
+  rm -rf "${KUBE_TEMP}"
 
-    kube::log::status "Clean up complete"
+  kube::log::status "Clean up complete"
+}
+
+# Executes curl against the proxy. $1 is the path to use, $2 is the desired
+# return code. Prints a helpful message on failure.
+function check-curl-proxy-code()
+{
+  local status
+  local -r address=$1
+  local -r desired=$2
+  local -r full_address="${PROXY_HOST}:${PROXY_PORT}${address}"
+  status=$(curl -w "%{http_code}" --silent --output /dev/null "${full_address}")
+  if [ "${status}" == "${desired}" ]; then
+    return 0
+  fi
+  echo "For address ${full_address}, got ${status} but wanted ${desired}"
+  return 1
 }
 
 trap cleanup EXIT SIGINT
@@ -49,6 +87,8 @@ API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 KUBELET_HEALTHZ_PORT=${KUBELET_HEALTHZ_PORT:-10248}
 CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
+PROXY_PORT=${PROXY_PORT:-8001}
+PROXY_HOST=127.0.0.1 # kubectl only serves on localhost.
 
 # Check kubectl
 kube::log::status "Running kubectl with no options"
@@ -145,6 +185,38 @@ for version in "${kube_api_versions[@]}"; do
 
   # Passing no arguments to create is an error
   ! kubectl create
+
+  #######################
+  # kubectl local proxy #
+  #######################
+
+  # Make sure the UI can be proxied
+  start-proxy --api-prefix=/
+  check-curl-proxy-code /ui 301
+  check-curl-proxy-code /metrics 200
+  if [[ -n "${version}" ]]; then
+    check-curl-proxy-code /api/${version}/namespaces 200
+  fi
+  stop-proxy
+
+  # Default proxy locks you into the /api path (legacy behavior)
+  start-proxy
+  check-curl-proxy-code /ui 404
+  check-curl-proxy-code /metrics 404
+  check-curl-proxy-code /api/ui 404
+  if [[ -n "${version}" ]]; then
+    check-curl-proxy-code /api/${version}/namespaces 200
+  fi
+  stop-proxy
+
+  # Custom paths let you see everything.
+  start-proxy --api-prefix=/custom
+  check-curl-proxy-code /custom/ui 301
+  check-curl-proxy-code /custom/metrics 200
+  if [[ -n "${version}" ]]; then
+    check-curl-proxy-code /custom/api/${version}/namespaces 200
+  fi
+  stop-proxy
 
   ###########################
   # POD creation / deletion #
