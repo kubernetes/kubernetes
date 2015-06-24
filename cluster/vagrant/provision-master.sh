@@ -226,12 +226,12 @@ EOF
   done
 fi
 
-# Configure nginx authorization
-mkdir -p /srv/salt-overlay/salt/nginx
-if [[ ! -f /srv/salt-overlay/salt/nginx/htpasswd ]]; then
-  python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
-    -b -c "/srv/salt-overlay/salt/nginx/htpasswd" \
-    "$MASTER_USER" "$MASTER_PASSWD"
+
+readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
+if [ ! -e "${BASIC_AUTH_FILE}" ]; then
+  mkdir -p /srv/salt-overlay/salt/kube-apiserver
+  (umask 077;
+    echo "${MASTER_USER},${MASTER_PASSWD},admin" > "${BASIC_AUTH_FILE}")
 fi
 
 echo "Running release install script"
