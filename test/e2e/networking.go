@@ -50,6 +50,36 @@ var _ = Describe("Networking", func() {
 		}
 	})
 
+	It("should provide Internet connection for containers", func() {
+		By("Running container which pings google.com")
+		podName := "ping-test"
+		contName := "ping-test-container"
+		pod := &api.Pod{
+			TypeMeta: api.TypeMeta{
+				Kind: "Pod",
+			},
+			ObjectMeta: api.ObjectMeta{
+				Name: podName,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    contName,
+						Image:   "gcr.io/google_containers/busybox",
+						Command: []string{"ping", "-c", "3", "-w", "10", "google.com"},
+					},
+				},
+				RestartPolicy: api.RestartPolicyNever,
+			},
+		}
+		_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
+		expectNoError(err)
+		defer f.Client.Pods(f.Namespace.Name).Delete(podName, nil)
+
+		By("Verify that the pod succeed")
+		expectNoError(waitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name))
+	})
+
 	// First test because it has no dependencies on variables created later on.
 	It("should provide unchanging, static URL paths for kubernetes api services.", func() {
 		tests := []struct {
