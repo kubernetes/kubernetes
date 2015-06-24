@@ -126,8 +126,8 @@ func printObjectSpecificMessage(obj runtime.Object, out io.Writer) {
 			An external load-balanced service was created.  On many platforms (e.g. Google Compute Engine),
 			you will also need to explicitly open a Firewall rule for the service port(s) (%s) to serve traffic.
 
-			See https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/services-firewall.md for more details.
-			`, makePortsString(obj.Spec.Ports))
+			See https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/services-firewalls.md for more details.
+			`, makePortsString(obj.Spec.Ports, false))
 			out.Write([]byte(msg))
 		}
 		if obj.Spec.Type == api.ServiceTypeNodePort {
@@ -136,17 +136,23 @@ func printObjectSpecificMessage(obj runtime.Object, out io.Writer) {
 				If you want to expose this service to the external internet, you may need to set up
 				firewall rules for the service port(s) (%s) to serve traffic.
 				
-				See https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/services-firewall.md for more details.
-				`, makePortsString(obj.Spec.Ports))
+				See https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/services-firewalls.md for more details.
+				`, makePortsString(obj.Spec.Ports, true))
 			out.Write([]byte(msg))
 		}
 	}
 }
 
-func makePortsString(ports []api.ServicePort) string {
+func makePortsString(ports []api.ServicePort, useNodePort bool) string {
 	pieces := make([]string, len(ports))
 	for ix := range ports {
-		pieces[ix] = fmt.Sprintf("%s:%d", strings.ToLower(string(ports[ix].Protocol)), ports[ix].Port)
+		var port int
+		if useNodePort {
+			port = ports[ix].NodePort
+		} else {
+			port = ports[ix].Port
+		}
+		pieces[ix] = fmt.Sprintf("%s:%d", strings.ToLower(string(ports[ix].Protocol)), port)
 	}
 	return strings.Join(pieces, ",")
 }
