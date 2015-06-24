@@ -364,6 +364,7 @@ function provision-master() {
                             create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
+                            create-flanneld-opts; \
                             sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
                             && sudo mkdir -p /opt/bin/ && sudo cp ~/kube/master/* /opt/bin/; \
                             sudo service etcd start;"

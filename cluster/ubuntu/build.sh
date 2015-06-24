@@ -36,6 +36,7 @@ if [ ! -f flannel.tar.gz ] ; then
     curl -L  https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz -o flannel.tar.gz
     tar xzf flannel.tar.gz
 fi
+cp flannel-${FLANNEL_VERSION}/flanneld binaries/master
 cp flannel-${FLANNEL_VERSION}/flanneld binaries/minion
 
 # ectd
