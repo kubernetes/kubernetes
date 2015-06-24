@@ -35,7 +35,7 @@ import (
 // TODO: it would probably be slightly better to build up the objects
 // in the code and then serialize to yaml.
 var addon_controller_v1 = `
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: addon-test-v1
@@ -65,7 +65,7 @@ spec:
 `
 
 var addon_controller_v2 = `
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: addon-test-v2
@@ -95,7 +95,7 @@ spec:
 `
 
 var addon_service_v1 = `
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata:
   name: addon-test
@@ -114,7 +114,7 @@ spec:
 `
 
 var addon_service_v2 = `
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata:
   name: addon-test-updated
@@ -134,7 +134,7 @@ spec:
 `
 
 var invalid_addon_controller_v1 = `
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: invalid-addon-test-v1
@@ -163,7 +163,7 @@ spec:
 `
 
 var invalid_addon_service_v1 = `
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata:
   name: ivalid-addon-test
