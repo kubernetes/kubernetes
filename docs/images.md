@@ -25,7 +25,7 @@ Credentials can be provided in several ways:
   - Pre-pulling Images
     - all pods can use any images cached on a node
     - requires root access to all nodes to setup
-  - Specifying ImagePullKeys on a Pod
+  - Specifying ImagePullSecrets on a Pod
     - only pods which provide own keys can access the private registry
 Each option is described in more detail below.
    
@@ -68,42 +68,45 @@ This can be used to preload certain images for speed or as an alternative to aut
 
 All pods will have read access to any pre-pulled images.
 
-### Specifying ImagePullKeys on a Pod
+### Specifying ImagePullSecrets on a Pod
 Kubernetes supports specifying registry keys on a pod.
 
 First, create a `.dockercfg`, such as running `docker login <registry.domain>`.
-Then put the resulting `.dockercfg` file into a [secret resource](../docs/secret.md).  For example:
+Then put the resulting `.dockercfg` file into a [secret resource](../docs/secrets.md).  For example:
 ```
-cat > dockercfg <<EOF
-{ 
-   "https://docker.io/thisisfake": { 
-     "email": "bob@example.com", 
-     "auth": "secret" 
-   } 
-}
-EOF
-$ cat dockercfg | base64
-eyAKICAgImh0dHBzOi8vZG9ja2VyLmlvL3RoaXNpc2Zha2UiOiB7IAogICAgICJlbWFpbCI6ICJib2JAZXhhbXBsZS5jb20iLCAKICAgICAiYXV0aCI6ICJzZWNyZXQiIAogICB9Cn0K
+$ docker login
+Username: janedoe
+Password: ●●●●●●●●●●●
+Email: jdoe@example.com
+WARNING: login credentials saved in /Users/jdoe/.dockercfg.
+Login Succeeded
 
-cat > secret.json <<EOF
-{
-  "apiVersion": "v1",
-  "kind": "Secret",
-  "metadata" : {
-    "name": "myregistrykey",
-  },  
-  "type": "kubernetes.io/dockercfg",
-  "data": {
-    ".dockercfg":
-      "eyAKICAgImh0dHBzOi8vZG9ja2VyLmlvL3RoaXNpc2Zha2UiOiB7IAogICAgICJlbWFpbCI6ICJib2JAZXhhbXBsZS5jb20iLCAKICAgICAiYXV0aCI6ICJzZWNyZXQiIAogICB9Cn0K",
-  }
-}
-EOF
-This process only needs to be done one time (per namespace).
+$ echo $(cat ~/.dockercfg)
+{ "https://index.docker.io/v1/": { "auth": "ZmFrZXBhc3N3b3JkMTIK", "email": "jdoe@example.com" } }
 
-$ kubectl create -f secret.json
+$ cat ~/.dockercfg | base64
+eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
+
+$ cat > image-pull-secret.yaml <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: myregistrykey
+data:
+  .dockercfg: eyAiaHR0cHM6Ly9pbmRleC5kb2NrZXIuaW8vdjEvIjogeyAiYXV0aCI6ICJabUZyWlhCaGMzTjNiM0prTVRJSyIsICJlbWFpbCI6ICJqZG9lQGV4YW1wbGUuY29tIiB9IH0K
+type: kubernetes.io/dockercfg
+EOF
+
+$ kubectl create -f image-pull-secret.yaml
 secrets/myregistrykey
+$
 ```
+
+If you get the error message `error: no objects passed to create`, it may mean the base64 encoded string is invalid. 
+If you get an error message like `Secret "myregistrykey" is invalid: data[.dockercfg]: invalid value ...` it means
+the data was successfully un-base64 encoded, but could not be parsed as a dockercfg file.
+
+This process only needs to be done one time (per namespace).
 
 Now, you can create pods which reference that secret by adding an `imagePullSecrets`
 section to a pod definition.
@@ -115,7 +118,7 @@ metadata:
 spec:
   containers:
     - name: foo
-      image: registry.example.com/bar/fo
+      image: janedoe/awesomeapp:v1
   imagePullSecrets:
     - name: myregistrykey
 ```
