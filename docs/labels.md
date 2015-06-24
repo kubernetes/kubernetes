@@ -82,8 +82,8 @@ _Set-based_ requirements can be mixed with _equality-based_ requirements. For ex
 
 LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter. Both requirements are permitted:
 
-   * _equality-based_ requirements: `?label-selector=key1%3Dvalue1,key2%3Dvalue2`
-   * _set-based_ requirements: `?label-selector=key+in+%28value1%2Cvalue2%29%2Ckey2+notin+%28value3`
+   * _equality-based_ requirements: `?labelSelector=key1%3Dvalue1,key2%3Dvalue2`
+   * _set-based_ requirements: `?labelSelector=key+in+%28value1%2Cvalue2%29%2Ckey2+notin+%28value3%29`
 
 Kubernetes also currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationcontroller`s:
 
