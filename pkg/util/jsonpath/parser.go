@@ -122,13 +122,16 @@ func (p *Parser) parseLeftDelim(cur *ListNode) error {
 }
 
 func (p *Parser) parseInsideAction(cur *ListNode) error {
-	if strings.HasPrefix(p.input[p.pos:], rightDelim) {
-		return p.parseRightDelim(cur)
+
+	prefixMap := map[string]func(*ListNode) error{
+		rightDelim: p.parseRightDelim,
+		"[?(":      p.parseFilter,
+		"..":       p.parseRecursive,
 	}
-	if strings.HasPrefix(p.input[p.pos:], "[?(") {
-		p.pos += len("[?(")
-		p.consumeText()
-		return p.parseFilter(cur)
+	for prefix, parseFunc := range prefixMap {
+		if strings.HasPrefix(p.input[p.pos:], prefix) {
+			return parseFunc(cur)
+		}
 	}
 
 	switch r := p.next(); {
@@ -158,6 +161,17 @@ func (p *Parser) parseRightDelim(cur *ListNode) error {
 	p.consumeText()
 	cur = p.Root
 	return p.parseText(cur)
+}
+
+// parseRecursive scans the recursive desent operator ..
+func (p *Parser) parseRecursive(cur *ListNode) error {
+	p.pos += len("..")
+	p.consumeText()
+	cur.append(newRecursive())
+	if r := p.peek(); isAlphaNumeric(r) {
+		return p.parseField(cur)
+	}
+	return p.parseInsideAction(cur)
 }
 
 // parseNumber scans number
@@ -230,6 +244,7 @@ Loop:
 
 // parseFilter scans filter inside array selection
 func (p *Parser) parseFilter(cur *ListNode) error {
+	p.pos += len("[?(")
 	p.consumeText()
 Loop:
 	for {
@@ -285,11 +300,7 @@ Loop:
 
 // parseField scans a field: .Alphanumeric or .*
 func (p *Parser) parseField(cur *ListNode) error {
-	if r := p.peek(); isTerminator(r) {
-		newNode := newText(p.consumeText())
-		cur.append(newNode)
-		return p.parseInsideAction(cur)
-	}
+	p.consumeText()
 	var r rune
 	for {
 		r = p.next()
@@ -301,7 +312,7 @@ func (p *Parser) parseField(cur *ListNode) error {
 	if r := p.peek(); !isTerminator(r) {
 		return fmt.Errorf("bad character %#U", r)
 	}
-	value := p.consumeText()[1:]
+	value := p.consumeText()
 	if value == "*" {
 		cur.append(newWildcard())
 	} else {

@@ -49,11 +49,11 @@ func (j *JSONPath) Execute(wr io.Writer, data interface{}) error {
 	for _, node := range j.parser.Root.Nodes {
 		results, err := j.walk([]reflect.Value{reflect.ValueOf(data)}, node)
 		if err != nil {
-			return nil
+			return err
 		}
 		err = j.PrintResults(wr, results)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 	return nil
@@ -95,6 +95,8 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 		return j.evalFloat(value, node)
 	case *WildcardNode:
 		return j.evalWildcard(value, node)
+	case *RecursiveNode:
+		return j.evalRecursive(value, node)
 	default:
 		return value, fmt.Errorf("unexpect Node %v", node)
 	}
@@ -166,10 +168,12 @@ func (j *JSONPath) evalField(input []reflect.Value, node *FieldNode) ([]reflect.
 		} else if value.Kind() == reflect.Map {
 			result = value.MapIndex(reflect.ValueOf(node.Value))
 		}
-		if !result.IsValid() {
-			return results, fmt.Errorf("in %v, %s is not found", value, node.Value)
+		if result.IsValid() {
+			results = append(results, result)
 		}
-		results = append(results, result)
+	}
+	if len(results) == 0 {
+		return results, fmt.Errorf("%s is not found", node.Value)
 	}
 	return results, nil
 }
@@ -194,6 +198,34 @@ func (j *JSONPath) evalWildcard(input []reflect.Value, node *WildcardNode) ([]re
 		}
 	}
 	return results, nil
+}
+
+// evalRecursive visit the given value recursively and push all of them to result
+func (j *JSONPath) evalRecursive(input []reflect.Value, node *RecursiveNode) ([]reflect.Value, error) {
+	result := []reflect.Value{}
+	for _, value := range input {
+		results := []reflect.Value{}
+		kind := value.Kind()
+		if kind == reflect.Struct {
+			for i := 0; i < value.NumField(); i++ {
+				results = append(results, value.Field(i))
+			}
+		} else if kind == reflect.Map {
+			for _, key := range value.MapKeys() {
+				results = append(results, value.MapIndex(key))
+			}
+		} else if kind == reflect.Array || kind == reflect.Slice || kind == reflect.String {
+			for i := 0; i < value.Len(); i++ {
+				results = append(results, value.Index(i))
+			}
+		}
+		if len(results) != 0 {
+			result = append(result, value)
+			output, _ := j.evalRecursive(results, node)
+			result = append(result, output...)
+		}
+	}
+	return result, nil
 }
 
 // evalFilter filter array according to FilterNode
@@ -289,7 +321,8 @@ func (j *JSONPath) evalToText(v reflect.Value) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			buffer.Write(text)
+			pair := fmt.Sprintf("%s: %s", v.Type().Field(i).Name, text)
+			buffer.WriteString(pair)
 			if i != v.NumField()-1 {
 				buffer.WriteString(", ")
 			}

@@ -27,12 +27,10 @@ type parserTest struct {
 }
 
 var parserTests = []parserTest{
-	{"plain", `hello jsonpath`,
-		[]Node{newText("hello jsonpath")}},
+	{"plain", `hello jsonpath`, []Node{newText("hello jsonpath")}},
 	{"variable", `hello ${.jsonpath}`,
 		[]Node{newText("hello "), newList(), newField("jsonpath")}},
-	{"quote", `${"${"}`,
-		[]Node{newList(), newText("${")}},
+	{"quote", `${"${"}`, []Node{newList(), newText("${")}},
 	{"array", `${[1:3]}`,
 		[]Node{newList(), newArray([3]ParamsEntry{{1, true}, {3, true}, {0, false}})}},
 	{"allarray", `${.book[*].author}`,
@@ -43,6 +41,9 @@ var parserTests = []parserTest{
 	{"filter", `${[?(@.price<3)]}`,
 		[]Node{newList(), newFilter(newList(), newList(), "<"), newList(),
 			newList(), newField("price"), newList(), newList(), newInt(3)}},
+	{"recursive", `${..}`, []Node{newList(), newRecursive()}},
+	{"recurField", `${..price}`,
+		[]Node{newList(), newRecursive(), newField("price")}},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {

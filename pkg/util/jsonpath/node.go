@@ -39,17 +39,19 @@ const (
 	NodeInt
 	NodeFloat
 	NodeWildcard
+	NodeRecursive
 )
 
 var NodeTypeName = map[NodeType]string{
-	NodeText:     "NodeText",
-	NodeArray:    "NodeArray",
-	NodeList:     "NodeList",
-	NodeField:    "NodeField",
-	NodeFilter:   "NodeFilter",
-	NodeInt:      "NodeInt",
-	NodeFloat:    "NodeFloat",
-	NodeWildcard: "NodeWildcard",
+	NodeText:      "NodeText",
+	NodeArray:     "NodeArray",
+	NodeList:      "NodeList",
+	NodeField:     "NodeField",
+	NodeFilter:    "NodeFilter",
+	NodeInt:       "NodeInt",
+	NodeFloat:     "NodeFloat",
+	NodeWildcard:  "NodeWildcard",
+	NodeRecursive: "NodeRecursive",
 }
 
 type Node interface {
@@ -147,7 +149,7 @@ func (f *FilterNode) String() string {
 	return fmt.Sprintf("%s: %s %s %s", f.Type(), f.Left, f.Operator, f.Right)
 }
 
-// IntNode holds interger value
+// IntNode holds integer value
 type IntNode struct {
 	NodeType
 	Value int
@@ -185,5 +187,18 @@ func newWildcard() *WildcardNode {
 }
 
 func (i *WildcardNode) String() string {
-	return fmt.Sprintf("%s: %f", i.Type())
+	return fmt.Sprintf("%s", i.Type())
+}
+
+// RecursiveNode means a recursive descent operator
+type RecursiveNode struct {
+	NodeType
+}
+
+func newRecursive() *RecursiveNode {
+	return &RecursiveNode{NodeType: NodeRecursive}
+}
+
+func (r *RecursiveNode) String() string {
+	return fmt.Sprintf("%s", r.Type())
 }
