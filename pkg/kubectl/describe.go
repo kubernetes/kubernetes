@@ -409,7 +409,7 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 		fmt.Fprintf(out, "IP:\t%s\n", pod.Status.PodIP)
 		fmt.Fprintf(out, "Replication Controllers:\t%s\n", printReplicationControllersByLabels(rcs))
 		fmt.Fprintf(out, "Containers:\n")
-		describeContainers(pod.Status.ContainerStatuses, out)
+		describeContainers(pod, out)
 		if len(pod.Status.Conditions) > 0 {
 			fmt.Fprint(out, "Conditions:\n  Type\tStatus\n")
 			for _, c := range pod.Status.Conditions {
@@ -473,39 +473,55 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string) (strin
 	})
 }
 
-func describeContainers(containers []api.ContainerStatus, out io.Writer) {
-	for _, container := range containers {
+func describeContainers(pod *api.Pod, out io.Writer) {
+	statuses := map[string]api.ContainerStatus{}
+	for _, status := range pod.Status.ContainerStatuses {
+		statuses[status.Name] = status
+	}
+
+	for _, container := range pod.Spec.Containers {
+		status := statuses[container.Name]
+		state := status.State
+
 		fmt.Fprintf(out, "  %v:\n", container.Name)
 		fmt.Fprintf(out, "    Image:\t%s\n", container.Image)
+
+		if len(container.Resources.Limits) > 0 {
+			fmt.Fprintf(out, "    Limits:\n")
+		}
+		for name, quantity := range container.Resources.Limits {
+			fmt.Fprintf(out, "      %s:\t%s\n", name, quantity.String())
+		}
+
 		switch {
-		case container.State.Running != nil:
+		case state.Running != nil:
 			fmt.Fprintf(out, "    State:\tRunning\n")
-			fmt.Fprintf(out, "      Started:\t%v\n", container.State.Running.StartedAt.Time.Format(time.RFC1123Z))
-		case container.State.Waiting != nil:
+			fmt.Fprintf(out, "      Started:\t%v\n", state.Running.StartedAt.Time.Format(time.RFC1123Z))
+		case state.Waiting != nil:
 			fmt.Fprintf(out, "    State:\tWaiting\n")
-			if container.State.Waiting.Reason != "" {
-				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Waiting.Reason)
+			if state.Waiting.Reason != "" {
+				fmt.Fprintf(out, "      Reason:\t%s\n", state.Waiting.Reason)
 			}
-		case container.State.Terminated != nil:
+		case state.Terminated != nil:
 			fmt.Fprintf(out, "    State:\tTerminated\n")
-			if container.State.Terminated.Reason != "" {
-				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Terminated.Reason)
+			if state.Terminated.Reason != "" {
+				fmt.Fprintf(out, "      Reason:\t%s\n", state.Terminated.Reason)
 			}
-			if container.State.Terminated.Message != "" {
-				fmt.Fprintf(out, "      Message:\t%s\n", container.State.Terminated.Message)
+			if state.Terminated.Message != "" {
+				fmt.Fprintf(out, "      Message:\t%s\n", state.Terminated.Message)
 			}
-			fmt.Fprintf(out, "      Exit Code:\t%d\n", container.State.Terminated.ExitCode)
-			if container.State.Terminated.Signal > 0 {
-				fmt.Fprintf(out, "      Signal:\t%d\n", container.State.Terminated.Signal)
+			fmt.Fprintf(out, "      Exit Code:\t%d\n", state.Terminated.ExitCode)
+			if state.Terminated.Signal > 0 {
+				fmt.Fprintf(out, "      Signal:\t%d\n", state.Terminated.Signal)
 			}
-			fmt.Fprintf(out, "      Started:\t%s\n", container.State.Terminated.StartedAt.Time.Format(time.RFC1123Z))
-			fmt.Fprintf(out, "      Finished:\t%s\n", container.State.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
+			fmt.Fprintf(out, "      Started:\t%s\n", state.Terminated.StartedAt.Time.Format(time.RFC1123Z))
+			fmt.Fprintf(out, "      Finished:\t%s\n", state.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
 		default:
 			fmt.Fprintf(out, "    State:\tWaiting\n")
 		}
 
-		fmt.Fprintf(out, "    Ready:\t%v\n", printBool(container.Ready))
-		fmt.Fprintf(out, "    Restart Count:\t%d\n", container.RestartCount)
+		fmt.Fprintf(out, "    Ready:\t%v\n", printBool(status.Ready))
+		fmt.Fprintf(out, "    Restart Count:\t%d\n", status.RestartCount)
 	}
 }
 
