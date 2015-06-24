@@ -98,11 +98,7 @@ var _ = Describe("Density", func() {
 		expectNoError(err)
 		uuid = string(util.NewUUID())
 
-		// Print latency metrics before the test.
-		// TODO: Remove this once we reset metrics before the test.
-		_, err = HighLatencyRequests(c, 3*time.Second, util.NewStringSet("events"))
-		expectNoError(err)
-
+		expectNoError(resetMetrics(c))
 		expectNoError(os.Mkdir(fmt.Sprintf(testContext.OutputDir+"/%s", uuid), 0777))
 		expectNoError(writePerfData(c, fmt.Sprintf(testContext.OutputDir+"/%s", uuid), "before"))
 	})
