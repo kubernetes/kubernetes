@@ -47,9 +47,6 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
 
 
-# When set to true, Docker Cache is enabled by default as part of the cluster bring up.
-ENABLE_DOCKER_REGISTRY_CACHE=true
-
 # Optional: Install node monitoring.
 ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
 

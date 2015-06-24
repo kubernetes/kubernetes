@@ -550,13 +550,6 @@ function salt-docker-opts() {
     DOCKER_OPTS="${EXTRA_DOCKER_OPTS}"
   fi
 
-  # Decide whether to enable the cache
-  if [[ "${ENABLE_DOCKER_REGISTRY_CACHE}" == "true" ]]; then
-    REGION=$(echo "${ZONE}" | cut -f 1,2 -d -)
-    echo "Enable docker registry cache at region: " $REGION
-    DOCKER_OPTS="${DOCKER_OPTS} --registry-mirror='https://${REGION}.docker-cache.clustermaster.net'"
-  fi
-
   if [[ -n "{DOCKER_OPTS}" ]]; then
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
