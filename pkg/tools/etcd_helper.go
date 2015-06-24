@@ -17,6 +17,7 @@ limitations under the License.
 package tools
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -722,4 +723,20 @@ func NewEtcdClientStartServerIfNecessary(server string) (EtcdClient, error) {
 
 	servers := []string{server}
 	return etcd.NewClient(servers), nil
+}
+
+type etcdHealth struct {
+	// Note this has to be public so the json library can modify it.
+	Health string `json:health`
+}
+
+func EtcdHealthCheck(data []byte) error {
+	obj := etcdHealth{}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+	if obj.Health != "true" {
+		return fmt.Errorf("Unhealthy status: %s", obj.Health)
+	}
+	return nil
 }

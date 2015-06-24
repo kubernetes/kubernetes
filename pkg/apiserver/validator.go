@@ -33,11 +33,14 @@ type httpGet interface {
 	Get(url string) (*http.Response, error)
 }
 
+type ValidatorFn func([]byte) error
+
 type Server struct {
 	Addr        string
 	Port        int
 	Path        string
 	EnableHTTPS bool
+	Validate    ValidatorFn
 }
 
 type ServerStatus struct {
@@ -84,6 +87,11 @@ func (server *Server) DoServerCheck(rt http.RoundTripper) (probe.Result, string,
 	if resp.StatusCode != http.StatusOK {
 		return probe.Failure, string(data),
 			fmt.Errorf("unhealthy http status code: %d (%s)", resp.StatusCode, resp.Status)
+	}
+	if server.Validate != nil {
+		if err := server.Validate(data); err != nil {
+			return probe.Failure, string(data), err
+		}
 	}
 	return probe.Success, string(data), nil
 }
