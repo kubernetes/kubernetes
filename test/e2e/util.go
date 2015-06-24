@@ -1004,8 +1004,8 @@ func RunRC(config RCConfig) error {
 			}
 		}
 
-		Logf("%v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d unknown ",
-			time.Now(), len(pods), config.Replicas, running, pending, waiting, inactive, unknown)
+		Logf("%v %v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d unknown ",
+			time.Now(), rc.Name, len(pods), config.Replicas, running, pending, waiting, inactive, unknown)
 		if config.PodStatusFile != nil {
 			fmt.Fprintf(config.PodStatusFile, "%s, %d, running, %d, pending, %d, waiting, %d, inactive, %d, unknown\n", time.Now(), running, pending, waiting, inactive, unknown)
 		}
