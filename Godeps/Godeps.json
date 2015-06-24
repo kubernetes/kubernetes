@@ -89,6 +89,11 @@
 			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
 		},
 		{
+			"ImportPath": "github.com/aws/aws-sdk-go/service/autoscaling",
+			"Comment": "v0.6.0-7-gcea3a42",
+			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"
+		},
+		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/ec2",
 			"Comment": "v0.6.0-7-gcea3a42",
 			"Rev": "cea3a425fc2d887d102e406ec2f8b37a57abd82f"

@@ -33,6 +33,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 
@@ -52,6 +53,7 @@ const TagNameKubernetesCluster = "KubernetesCluster"
 type AWSServices interface {
 	Compute(region string) (EC2, error)
 	LoadBalancing(region string) (ELB, error)
+	Autoscaling(region string) (ASG, error)
 	Metadata() AWSMetadata
 }
 
@@ -103,6 +105,12 @@ type ELB interface {
 	DeregisterInstancesFromLoadBalancer(*elb.DeregisterInstancesFromLoadBalancerInput) (*elb.DeregisterInstancesFromLoadBalancerOutput, error)
 }
 
+// This is a simple pass-through of the Autoscaling client interface, which allows for testing
+type ASG interface {
+	UpdateAutoScalingGroup(*autoscaling.UpdateAutoScalingGroupInput) (*autoscaling.UpdateAutoScalingGroupOutput, error)
+	DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGroupsInput) (*autoscaling.DescribeAutoScalingGroupsOutput, error)
+}
+
 // Abstraction over the AWS metadata service
 type AWSMetadata interface {
 	// Query the EC2 metadata service (used to discover instance-id etc)
@@ -114,6 +122,7 @@ type VolumeOptions struct {
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
+// TODO: Allow other clouds to implement this
 type Volumes interface {
 	// Attach the disk to the specified instance
 	// instanceName can be empty to mean "the instance on which we are running"
@@ -128,10 +137,26 @@ type Volumes interface {
 	DeleteVolume(volumeName string) error
 }
 
+// InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
+// TODO: Allow other clouds to implement this
+type InstanceGroups interface {
+	// Set the size to the fixed size
+	ResizeInstanceGroup(instanceGroupName string, size int) error
+	// Queries the cloud provider for information about the specified instance group
+	DescribeInstanceGroup(instanceGroupName string) (InstanceGroupInfo, error)
+}
+
+// InstanceGroupInfo is returned by InstanceGroups.Describe, and exposes information about the group.
+type InstanceGroupInfo interface {
+	// The number of instances currently running under control of this group
+	CurrentSize() (int, error)
+}
+
 // AWSCloud is an implementation of Interface, TCPLoadBalancer and Instances for Amazon Web Services.
 type AWSCloud struct {
 	awsServices      AWSServices
 	ec2              EC2
+	asg              ASG
 	cfg              *AWSCloudConfig
 	availabilityZone string
 	region           string
@@ -181,6 +206,14 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 		Credentials: p.creds,
 	})
 	return elbClient, nil
+}
+
+func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
+	client := autoscaling.New(&aws.Config{
+		Region:      regionName,
+		Credentials: p.creds,
+	})
+	return client, nil
 }
 
 func (p *awsSDKProvider) Metadata() AWSMetadata {
@@ -512,10 +545,19 @@ func newAWSCloud(config io.Reader, awsServices AWSServices) (*AWSCloud, error) {
 	}
 
 	ec2, err := awsServices.Compute(regionName)
+	if err != nil {
+		return nil, fmt.Errorf("error creating AWS EC2 client: %v", err)
+	}
+
+	asg, err := awsServices.Autoscaling(regionName)
+	if err != nil {
+		return nil, fmt.Errorf("error creating AWS autoscaling client: %v", err)
+	}
 
 	awsCloud := &AWSCloud{
 		awsServices:      awsServices,
 		ec2:              ec2,
+		asg:              asg,
 		cfg:              cfg,
 		region:           regionName,
 		availabilityZone: zone,
