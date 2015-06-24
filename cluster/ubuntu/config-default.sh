@@ -17,9 +17,9 @@
 ## Contains configuration values for the Ubuntu cluster
 
 # Define all your cluster nodes, MASTER node comes first"
-# And separated with blank space like <user_1@ip_1> <user_2@ip_2> <user_3@ip_3> 
+# And separated with blank space like <user_1@ip_1> <user_2@ip_2> <user_3@ip_3>
 export nodes="vcap@10.10.103.250 vcap@10.10.103.162 vcap@10.10.103.223"
-# Define all your nodes role: a(master) or i(minion) or ai(both master and minion), must be the order same 
+# Define all your nodes role: a(master) or i(minion) or ai(both master and minion), must be the order same
 export roles=("ai" "i" "i")
 # Define minion numbers
 export NUM_MINIONS=${NUM_MINIONS:-3}

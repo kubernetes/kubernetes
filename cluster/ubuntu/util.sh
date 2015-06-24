@@ -40,36 +40,36 @@ function setClusterInfo() {
   ii=0
   for i in $nodes
   do
-      name="infra"$ii
-      nodeIP=${i#*@}
+    name="infra"$ii
+    nodeIP=${i#*@}
 
-      item="$name=http://$nodeIP:2380"
-      if [ "$ii" == 0 ]; then 
-          CLUSTER=$item
-      else
-          CLUSTER="$CLUSTER,$item"
-      fi
-      mm[$nodeIP]=$name
+    item="$name=http://$nodeIP:2380"
+    if [ "$ii" == 0 ]; then
+      CLUSTER=$item
+    else
+      CLUSTER="$CLUSTER,$item"
+    fi
+    mm[$nodeIP]=$name
 
-      if [ "${roles[${ii}]}" == "ai" ]; then
-        MASTER_IP=$nodeIP
-        MASTER=$i
+    if [ "${roles[${ii}]}" == "ai" ]; then
+      MASTER_IP=$nodeIP
+      MASTER=$i
+      MINION_IPS="$nodeIP"
+    elif [ "${roles[${ii}]}" == "a" ]; then
+      MASTER_IP=$nodeIP
+      MASTER=$i
+    elif [ "${roles[${ii}]}" == "i" ]; then
+      if [ -z "${MINION_IPS}" ];then
         MINION_IPS="$nodeIP"
-      elif [ "${roles[${ii}]}" == "a" ]; then 
-        MASTER_IP=$nodeIP
-        MASTER=$i
-      elif [ "${roles[${ii}]}" == "i" ]; then
-        if [ -z "${MINION_IPS}" ];then
-          MINION_IPS="$nodeIP"
-        else
-          MINION_IPS="$MINION_IPS,$nodeIP"
-        fi
       else
-        echo "unsupported role for ${i}. please check"
-        exit 1
+        MINION_IPS="$MINION_IPS,$nodeIP"
       fi
+    else
+      echo "unsupported role for ${i}. please check"
+      exit 1
+    fi
 
-      ((ii=ii+1))
+    ((ii=ii+1))
   done
 
 }
@@ -93,7 +93,7 @@ function verify-prereqs {
   if [[ "${rc}" -eq 1 ]]; then
     # Try adding one of the default identities, with or without passphrase.
     ssh-add || true
-  fi 
+  fi
   # Expect at least one identity to be available.
   if ! ssh-add -L 1> /dev/null 2> /dev/null; then
     echo "Could not find or add an SSH identity."
@@ -122,7 +122,7 @@ function verify-cluster {
   for i in ${nodes}
   do
     if [ "${roles[${ii}]}" == "a" ]; then
-      verify-master 
+      verify-master
     elif [ "${roles[${ii}]}" == "i" ]; then
       verify-minion $i
     elif [ "${roles[${ii}]}" == "ai" ]; then
@@ -153,7 +153,7 @@ function verify-master(){
     validated="0"
     local daemon
     for daemon in "${required_daemon[@]}"; do
-        ssh "$MASTER" "pgrep -f ${daemon}" >/dev/null 2>&1 || {
+      ssh "$MASTER" "pgrep -f ${daemon}" >/dev/null 2>&1 || {
         printf "."
         validated="1"
         sleep 2
@@ -172,7 +172,7 @@ function verify-minion(){
     validated="0"
     local daemon
     for daemon in "${required_daemon[@]}"; do
-        ssh "$1" "pgrep -f $daemon" >/dev/null 2>&1 || {
+      ssh "$1" "pgrep -f $daemon" >/dev/null 2>&1 || {
         printf "."
         validated="1"
         sleep 2
@@ -287,7 +287,7 @@ function detect-minions {
 
   KUBE_MINION_IP_ADDRESSES=()
   setClusterInfo
-  
+
   ii=0
   for i in ${nodes}
   do
@@ -320,18 +320,18 @@ function kube-up {
 
   for i in ${nodes}
   do
-  {
-    if [ "${roles[${ii}]}" == "a" ]; then
-      provision-master 
-    elif [ "${roles[${ii}]}" == "i" ]; then
-      provision-minion $i 
-    elif [ "${roles[${ii}]}" == "ai" ]; then
-      provision-masterandminion
-    else
-      echo "unsupported role for ${i}. please check"
-      exit 1
-    fi
-  }
+    {
+      if [ "${roles[${ii}]}" == "a" ]; then
+        provision-master
+      elif [ "${roles[${ii}]}" == "i" ]; then
+        provision-minion $i
+      elif [ "${roles[${ii}]}" == "ai" ]; then
+        provision-masterandminion
+      else
+        echo "unsupported role for ${i}. please check"
+        exit 1
+      fi
+    }
 
     ((ii=ii+1))
   done
@@ -353,7 +353,7 @@ function kube-up {
 function provision-master() {
   # copy the binaries and scripts to the ~/kube directory on the master
   echo "Deploying master on machine ${MASTER_IP}"
-  echo 
+  echo
   ssh $SSH_OPTS $MASTER "mkdir -p ~/kube/default"
   scp -r $SSH_OPTS ubuntu/config-default.sh ubuntu/util.sh ubuntu/master/* ubuntu/binaries/master/ "${MASTER}:~/kube"
 
@@ -371,17 +371,17 @@ function provision-master() {
 }
 
 function provision-minion() {
-    # copy the binaries and scripts to the ~/kube directory on the minion
-    echo "Deploying minion on machine ${1#*@}"
-    echo
-    ssh $SSH_OPTS $1 "mkdir -p ~/kube/default"
-    scp -r $SSH_OPTS ubuntu/config-default.sh ubuntu/util.sh ubuntu/reconfDocker.sh ubuntu/minion/* ubuntu/binaries/minion "${1}:~/kube"
+  # copy the binaries and scripts to the ~/kube directory on the minion
+  echo "Deploying minion on machine ${1#*@}"
+  echo
+  ssh $SSH_OPTS $1 "mkdir -p ~/kube/default"
+  scp -r $SSH_OPTS ubuntu/config-default.sh ubuntu/util.sh ubuntu/reconfDocker.sh ubuntu/minion/* ubuntu/binaries/minion "${1}:~/kube"
 
-    # remote login to MASTER and use sudo to configue k8s master
-    ssh $SSH_OPTS -t $1 "source ~/kube/util.sh; \
+  # remote login to MASTER and use sudo to configue k8s master
+  ssh $SSH_OPTS -t $1 "source ~/kube/util.sh; \
                          setClusterInfo; \
                          create-etcd-opts "${mm[${1#*@}]}" "${1#*@}" "${CLUSTER}"; \
-                         create-kubelet-opts "${1#*@}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}"; 
+                         create-kubelet-opts "${1#*@}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";
                          create-kube-proxy-opts "${MASTER_IP}"; \
                          create-flanneld-opts; \
                          sudo -p '[sudo] password to copy files and start minion: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
@@ -393,10 +393,10 @@ function provision-minion() {
 function provision-masterandminion() {
   # copy the binaries and scripts to the ~/kube directory on the master
   echo "Deploying master and minion on machine ${MASTER_IP}"
-  echo 
+  echo
   ssh $SSH_OPTS $MASTER "mkdir -p ~/kube/default"
   scp -r $SSH_OPTS ubuntu/config-default.sh ubuntu/util.sh ubuntu/master/* ubuntu/reconfDocker.sh ubuntu/minion/* ubuntu/binaries/master/ ubuntu/binaries/minion "${MASTER}:~/kube"
-  
+
   # remote login to the node and use sudo to configue k8s
   ssh $SSH_OPTS -t $MASTER "source ~/kube/util.sh; \
                             setClusterInfo; \
@@ -404,7 +404,7 @@ function provision-masterandminion() {
                             create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
-                            create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";                     
+                            create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";
                             create-kube-proxy-opts "${MASTER_IP}";\
                             create-flanneld-opts; \
                             sudo -p '[sudo] password to copy files and start node: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
@@ -419,10 +419,10 @@ function kube-down {
   source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
   for i in ${nodes}; do
-  {
-    echo "Cleaning on node ${i#*@}"
-    ssh -t $i 'pgrep etcd && sudo -p "[sudo] password for cleaning etcd data: " service etcd stop && sudo rm -rf /infra*'
-  } 
+    {
+      echo "Cleaning on node ${i#*@}"
+      ssh -t $i 'pgrep etcd && sudo -p "[sudo] password for cleaning etcd data: " service etcd stop && sudo rm -rf /infra*'
+    }
   done
   wait
 }
