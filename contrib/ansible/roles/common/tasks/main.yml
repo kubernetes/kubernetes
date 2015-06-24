@@ -13,9 +13,23 @@
     is_atomic: true
   when: s.stat.exists
 
+- name: Determine if has rpm
+  stat: path=/usr/bin/rpm
+  register: s
+  changed_when: false
+
+- name: Init the has_rpm fact
+  set_fact:
+    has_rpm: false
+
+- name: Set the has_rpm fact
+  set_fact:
+    has_rpm: true
+  when: s.stat.exists
+
 # collect information about what packages are installed
 - include: rpm.yml
-  when: ansible_pkg_mgr == "yum" or ansible_pkg_mgr == "dnf"
+  when: has_rpm
 
 - include: centos.yml
   when: ansible_distribution == "CentOS"
