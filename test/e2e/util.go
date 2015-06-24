@@ -379,8 +379,21 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 // deleteTestingNS checks whether all e2e based existing namespaces are in the Terminating state
 // and waits until they are finally deleted.
 func deleteTestingNS(c *client.Client) error {
+	// TODO: Since we don't have support for bulk resource deletion in the API,
+	// while deleting a namespace we are deleting all objects from that namespace
+	// one by one (one deletion == one API call). This basically exposes us to
+	// throttling - currently controller-manager has a limit of max 20 QPS.
+	// Once #10217 is implemented and used in namespace-controller, deleting all
+	// object from a given namespace should be much faster and we will be able
+	// to lower this timeout.
+	// However, now Density test is producing ~26000 events and Load capacity test
+	// is producing ~35000 events, thus assuming there are no other requests it will
+	// take ~30 minutes to fully delete the namespace. Thus I'm setting it to 60
+	// minutes to avoid any timeouts here.
+	timeout := 60 * time.Minute
+
 	Logf("Waiting for terminating namespaces to be deleted...")
-	for start := time.Now(); time.Since(start) < 30*time.Minute; time.Sleep(15 * time.Second) {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(15 * time.Second) {
 		namespaces, err := c.Namespaces().List(labels.Everything(), fields.Everything())
 		if err != nil {
 			Logf("Listing namespaces failed: %v", err)
