@@ -1918,6 +1918,10 @@ func (kl *Kubelet) syncNetworkStatus() {
 
 	networkConfigured := true
 	if kl.configureCBR0 {
+		if err := ensureIPTablesMasqRule(); err != nil {
+			networkConfigured = false
+			glog.Errorf("Error on adding ip table rules: %v", err)
+		}
 		if len(kl.podCIDR) == 0 {
 			networkConfigured = false
 		} else if err := kl.reconcileCBR0(kl.podCIDR); err != nil {

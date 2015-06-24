@@ -39,7 +39,7 @@ func createCBR0(wantCIDR *net.IPNet) error {
 		glog.Error(err)
 		return err
 	}
-	if err := exec.Command("ip", "link", "set", "dev", "cbr0", "up").Run(); err != nil {
+	if err := exec.Command("ip", "link", "set", "dev", "cbr0", "mtu", "1460", "up").Run(); err != nil {
 		glog.Error(err)
 		return err
 	}
@@ -116,4 +116,19 @@ func cbr0CidrCorrect(wantCIDR *net.IPNet) bool {
 
 	glog.V(5).Infof("Want cbr0 CIDR: %s, have cbr0 CIDR: %s", wantCIDR, cbr0CIDR)
 	return wantCIDR.IP.Equal(cbr0IP) && bytes.Equal(wantCIDR.Mask, cbr0CIDR.Mask)
+}
+
+// TODO(dawnchen): Using pkg/util/iptables
+func ensureIPTablesMasqRule() error {
+	// Check if the MASQUERADE rule exist or not
+	if err := exec.Command("iptables", "-t", "nat", "-C", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE", "!", "-d", "10.0.0.0/8").Run(); err == nil {
+		// The MASQUERADE rule exists
+		return nil
+	}
+
+	glog.Infof("MASQUERADE rule doesn't exist, recreate it")
+	if err := exec.Command("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE", "!", "-d", "10.0.0.0/8").Run(); err != nil {
+		return err
+	}
+	return nil
 }

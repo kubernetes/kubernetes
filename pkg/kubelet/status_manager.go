@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -144,7 +143,8 @@ func (s *statusManager) RemoveOrphanedStatuses(podFullNames map[string]bool) {
 // syncBatch syncs pods statuses with the apiserver.
 func (s *statusManager) syncBatch() error {
 	if s.kubeClient == nil {
-		return errors.New("Kubernetes client is nil, skipping pod status updates")
+		glog.V(4).Infof("Kubernetes client is nil, skipping pod status updates")
+		return nil
 	}
 	syncRequest := <-s.podStatusChannel
 	pod := syncRequest.pod

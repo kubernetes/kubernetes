@@ -205,7 +205,7 @@ func CompileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
 // TODO(dchen1107): realiably detects the init system using on the system:
 // systemd, upstart, initd, etc.
 func UsingSystemdInitSystem() bool {
-	if _, err := os.Stat("/run/systemd/system"); err != nil {
+	if _, err := os.Stat("/run/systemd/system"); err == nil {
 		return true
 	}
 
