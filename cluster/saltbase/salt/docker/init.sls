@@ -48,6 +48,11 @@ net.ipv4.ip_forward:
   sysctl.present:
     - value: 1
 
+cbr0:
+  container_bridge.ensure:
+    - cidr: {{ grains['cbr-cidr'] }}
+    - mtu: 1460
+
 {{ environment_file }}:
   file.managed:
     - source: salt://docker/docker-defaults
@@ -119,6 +124,7 @@ docker:
     - enable: True
     - watch:
       - file: {{ environment_file }}
+      - container_bridge: cbr0
 {% if override_docker_ver != '' %}
     - require:
       - pkg: lxc-docker-{{ override_docker_ver }}
