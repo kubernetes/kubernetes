@@ -183,9 +183,6 @@ func Failf(format string, a ...interface{}) {
 }
 
 func providerIs(providers ...string) bool {
-	if testContext.Provider == "" {
-		Fail("testContext.Provider is not defined")
-	}
 	for _, provider := range providers {
 		if strings.ToLower(provider) == strings.ToLower(testContext.Provider) {
 			return true
