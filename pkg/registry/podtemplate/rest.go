@@ -69,6 +69,10 @@ func (podTemplateStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Obje
 	return validation.ValidatePodTemplateUpdate(obj.(*api.PodTemplate), old.(*api.PodTemplate))
 }
 
+func (podTemplateStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
 // MatchPodTemplate returns a generic matcher for a given label and field selector.
 func MatchPodTemplate(label labels.Selector, field fields.Selector) generic.Matcher {
 	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {

@@ -19,6 +19,7 @@ package tools
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
+	"time"
 )
 
 const (
@@ -66,7 +67,7 @@ type EtcdVersioner interface {
 	// UpdateObject sets etcd storage metadata into an API object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
 	// from etcd.
-	UpdateObject(obj runtime.Object, node *etcd.Node) error
+	UpdateObject(obj runtime.Object, expiration *time.Time, resourceVersion uint64) error
 	// UpdateList sets the resource version into an API list object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
 	// from etcd.

@@ -82,6 +82,10 @@ func (nodeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fie
 	return append(errorList, validation.ValidateNodeUpdate(old.(*api.Node), obj.(*api.Node))...)
 }
 
+func (nodeStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
 type nodeStatusStrategy struct {
 	nodeStrategy
 }

@@ -68,6 +68,10 @@ func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielder
 	return validation.ValidateServiceAccountUpdate(old.(*api.ServiceAccount), obj.(*api.ServiceAccount))
 }
 
+func (strategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
 // Matcher returns a generic matcher for a given label and field selector.
 func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
 	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
