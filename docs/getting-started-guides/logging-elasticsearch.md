@@ -217,6 +217,15 @@ regulary refreshed. Here is a typical view of ingested logs from the Kibana view
 
 ![Kibana logs](kibana-logs.png)
 
+Another way to access Elasticsearch and Kibana in the cluster is to use `kubectl proxy` which will serve
+a local proxy to the remote master:
+
+```
+$ kubectl proxy
+Starting to serve on localhost:8001
+```
+
+Now you can visit the URL [http://localhost:8001/api/v1/proxy/namespaces/default/services/elasticsearch-logging](http://localhost:8001/api/v1/proxy/namespaces/default/services/elasticsearch-logging) to contact Elasticsearch and [http://localhost:8001/api/v1/proxy/namespaces/default/services/kibana-logging](http://localhost:8001/api/v1/proxy/namespaces/default/services/kibana-logging) to access the Kibana viewer.
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/logging-elasticsearch.md?pixel)]()
