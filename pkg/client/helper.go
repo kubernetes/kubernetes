@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -236,17 +237,24 @@ func NewOrDie(c *Config) *Client {
 // running inside a pod running on kuberenetes. It will return an error if
 // called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
-	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountTokenKey)
 	if err != nil {
 		return nil, err
 	}
+	tlsClientConfig := TLSClientConfig{}
+	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
+	if _, err := util.CertPoolFromFile(rootCAFile); err != nil {
+		glog.Errorf("expected to load root ca config from %s, but got err: %v", rootCAFile, err)
+	} else {
+		tlsClientConfig.CAFile = rootCAFile
+	}
+
 	return &Config{
 		// TODO: switch to using cluster DNS.
-		Host:        "https://" + net.JoinHostPort(os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")),
-		Version:     "v1beta3",
-		BearerToken: string(token),
-		// TODO: package certs along with the token
-		Insecure: true,
+		Host:            "https://" + net.JoinHostPort(os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")),
+		Version:         "v1beta3",
+		BearerToken:     string(token),
+		TLSClientConfig: tlsClientConfig,
 	}, nil
 }
 
