@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-var base = "http://localhost:8001/api/v1/";
+var base = "/api/v1/";
 
 var updateImage = function($http, server) {
   $http.get(base + "proxy/namespaces/default/pods/" + server.podName + "/data.json")
@@ -33,7 +33,7 @@ var updateServer = function($http, server) {
     .success(function(data) {
       console.log(data);
       server.labels = data.metadata.labels;
-      server.host = data.spec.host.split('.')[0];
+      server.host = data.status.hostIP.split('.')[0];
       server.status = data.status.phase;
       server.dockerImage = data.status.containerStatuses[0].image;
       updateImage($http, server);
