@@ -4,18 +4,18 @@
    "metadata":{
       "name":"guestbook",
       "labels":{
-         "name":"guestbook"
+         "app":"guestbook"
       }
    },
    "spec":{
       "replicas":3,
       "selector":{
-         "name":"guestbook"
+         "app":"guestbook"
       },
       "template":{
          "metadata":{
             "labels":{
-               "name":"guestbook"
+               "app":"guestbook"
             }
          },
          "spec":{

@@ -5,20 +5,20 @@
    "metadata":{
       "name":"redis-master",
       "labels":{
-         "name":"redis",
+         "app":"redis",
          "role":"master"
       }
    },
    "spec":{
       "replicas":1,
       "selector":{
-         "name":"redis",
+         "app":"redis",
          "role":"master"
       },
       "template":{
          "metadata":{
             "labels":{
-               "name":"redis",
+               "app":"redis",
                "role":"master"
             }
          },
