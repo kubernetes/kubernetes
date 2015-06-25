@@ -73,6 +73,8 @@ type Transport struct {
 	Scheme      string
 	Host        string
 	PathPrepend string
+
+	http.RoundTripper
 }
 
 // RoundTrip implements the http.RoundTripper interface
@@ -86,7 +88,11 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("X-Forwarded-Host", t.Host)
 	req.Header.Set("X-Forwarded-Proto", t.Scheme)
 
-	resp, err := http.DefaultTransport.RoundTrip(req)
+	rt := t.RoundTripper
+	if rt == nil {
+		rt = http.DefaultTransport
+	}
+	resp, err := rt.RoundTrip(req)
 
 	if err != nil {
 		message := fmt.Sprintf("Error: '%s'\nTrying to reach: '%v'", err.Error(), req.URL.String())

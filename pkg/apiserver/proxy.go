@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -55,6 +56,8 @@ type ProxyHandler struct {
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	proxyHandlerTraceID := rand.Int63()
+
 	var verb string
 	var apiResource string
 	var httpCode int
@@ -108,7 +111,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	location, transport, err := redirector.ResourceLocation(ctx, id)
+	location, roundTripper, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
 		status := errToAPIStatus(err)
@@ -123,8 +126,11 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// If we have a custom dialer, and no pre-existing transport, initialize it to use the dialer.
-	if transport == nil && r.dial != nil {
-		transport = &http.Transport{Dial: r.dial}
+	if roundTripper == nil && r.dial != nil {
+		glog.V(5).Infof("[%x: %v] making a dial-only transport...", proxyHandlerTraceID, req.URL)
+		roundTripper = &http.Transport{Dial: r.dial}
+	} else if roundTripper != nil {
+		glog.V(5).Infof("[%x: %v] using transport %T...", proxyHandlerTraceID, req.URL, roundTripper)
 	}
 
 	// Default to http
@@ -158,7 +164,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
 	// That proxy needs to be modified to support multiple backends, not just 1.
-	if r.tryUpgrade(w, req, newReq, location, transport) {
+	if r.tryUpgrade(w, req, newReq, location, roundTripper) {
 		return
 	}
 
@@ -175,19 +181,33 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	start := time.Now()
+	glog.V(4).Infof("[%x] Beginning proxy %s...", proxyHandlerTraceID, req.URL)
+	defer func() {
+		glog.V(4).Infof("[%x] Proxy %v finished %v.", proxyHandlerTraceID, req.URL, time.Now().Sub(start))
+	}()
+
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: location.Scheme, Host: location.Host})
-	if transport == nil {
+	alreadyRewriting := false
+	if roundTripper != nil {
+		_, alreadyRewriting = roundTripper.(*proxyutil.Transport)
+		glog.V(5).Infof("[%x] Not making a reriting transport for proxy %s...", proxyHandlerTraceID, req.URL)
+	}
+	if !alreadyRewriting {
+		glog.V(5).Infof("[%x] making a transport for proxy %s...", proxyHandlerTraceID, req.URL)
 		prepend := path.Join(r.prefix, resource, id)
 		if len(namespace) > 0 {
 			prepend = path.Join(r.prefix, "namespaces", namespace, resource, id)
 		}
-		transport = &proxyutil.Transport{
-			Scheme:      req.URL.Scheme,
-			Host:        req.URL.Host,
-			PathPrepend: prepend,
+		pTransport := &proxyutil.Transport{
+			Scheme:       req.URL.Scheme,
+			Host:         req.URL.Host,
+			PathPrepend:  prepend,
+			RoundTripper: roundTripper,
 		}
+		roundTripper = pTransport
 	}
-	proxy.Transport = transport
+	proxy.Transport = roundTripper
 	proxy.FlushInterval = 200 * time.Millisecond
 	proxy.ServeHTTP(w, newReq)
 }
