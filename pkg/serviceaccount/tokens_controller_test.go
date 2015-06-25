@@ -378,7 +378,7 @@ func TestTokenCreation(t *testing.T) {
 
 		client := testclient.NewSimpleFake(tc.ClientObjects...)
 
-		controller := NewTokensController(client, DefaultTokenControllerOptions(generator))
+		controller := NewTokensController(client, TokensControllerOptions{TokenGenerator: generator})
 
 		// Tell the token controller whether its stores have been synced
 		controller.serviceAccountsSynced = func() bool { return !tc.ServiceAccountsSyncPending }
