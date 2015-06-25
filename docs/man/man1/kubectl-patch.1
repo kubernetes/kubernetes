@@ -3,24 +3,33 @@
 
 .SH NAME
 .PP
-kubectl \- kubectl controls the Kubernetes cluster manager
+kubectl patch \- Update field(s) of a resource by stdin.
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl\fP [OPTIONS]
+\fBkubectl patch\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-kubectl controls the Kubernetes cluster manager.
+Update field(s) of a resource using strategic merge patch
 
 .PP
-Find more information at 
-\[la]https://github.com/GoogleCloudPlatform/kubernetes\[ra].
+JSON and YAML formats are accepted.
 
 
 .SH OPTIONS
+.PP
+\fB\-h\fP, \fB\-\-help\fP=false
+    help for patch
+
+.PP
+\fB\-p\fP, \fB\-\-patch\fP=""
+    The patch to be appied to the resource JSON file.
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
 \fB\-\-alsologtostderr\fP=false
     log to standard error as well as files
@@ -48,10 +57,6 @@ Find more information at
 .PP
 \fB\-\-context\fP=""
     The name of the kubeconfig context to use
-
-.PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for kubectl
 
 .PP
 \fB\-\-insecure\-skip\-tls\-verify\fP=false
@@ -122,9 +127,22 @@ Find more information at
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+
+// Partially update a node using strategic merge patch
+kubectl patch node k8s\-node\-1 \-p '\{"spec":\{"unschedulable":true\}\}'
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBkubectl\-get(1)\fP, \fBkubectl\-describe(1)\fP, \fBkubectl\-create(1)\fP, \fBkubectl\-replace(1)\fP, \fBkubectl\-patch(1)\fP, \fBkubectl\-delete(1)\fP, \fBkubectl\-namespace(1)\fP, \fBkubectl\-logs(1)\fP, \fBkubectl\-rolling\-update(1)\fP, \fBkubectl\-scale(1)\fP, \fBkubectl\-exec(1)\fP, \fBkubectl\-port\-forward(1)\fP, \fBkubectl\-proxy(1)\fP, \fBkubectl\-run(1)\fP, \fBkubectl\-stop(1)\fP, \fBkubectl\-expose(1)\fP, \fBkubectl\-label(1)\fP, \fBkubectl\-config(1)\fP, \fBkubectl\-cluster\-info(1)\fP, \fBkubectl\-api\-versions(1)\fP, \fBkubectl\-version(1)\fP,
+\fBkubectl(1)\fP,
 
 
 .SH HISTORY

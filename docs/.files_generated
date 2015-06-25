@@ -18,6 +18,7 @@ kubectl_get.md
 kubectl_label.md
 kubectl_logs.md
 kubectl_namespace.md
+kubectl_patch.md
 kubectl_port-forward.md
 kubectl_proxy.md
 kubectl_replace.md
