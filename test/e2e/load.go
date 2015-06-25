@@ -157,6 +157,7 @@ func generateRCConfigsForGroup(c *client.Client, ns, groupName string, size, cou
 			Client:    c,
 			Name:      groupName + "-" + strconv.Itoa(i),
 			Namespace: ns,
+			Timeout:   10 * time.Minute,
 			Image:     image,
 			Replicas:  size,
 		}

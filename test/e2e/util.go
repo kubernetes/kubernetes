@@ -157,6 +157,7 @@ type RCConfig struct {
 	Name          string
 	Namespace     string
 	PollInterval  time.Duration
+	Timeout       time.Duration
 	PodStatusFile *os.File
 	Replicas      int
 
@@ -966,10 +967,14 @@ func RunRC(config RCConfig) error {
 	if interval <= 0 {
 		interval = 10 * time.Second
 	}
+	timeout := config.Timeout
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
 	oldPods := make([]*api.Pod, 0)
 	oldRunning := 0
 	lastChange := time.Now()
-	for oldRunning != config.Replicas && time.Since(lastChange) < 5*time.Minute {
+	for oldRunning != config.Replicas && time.Since(lastChange) < timeout {
 		time.Sleep(interval)
 
 		running := 0
