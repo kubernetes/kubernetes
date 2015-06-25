@@ -1,0 +1,18 @@
+language: go
+
+go:
+  - 1.4
+
+install:
+  - go get github.com/coreos/etcd
+  - go get github.com/coreos/go-etcd/etcd
+  - go get github.com/coreos/go-systemd/activation
+  - go get github.com/miekg/dns
+  - go get github.com/rcrowley/go-metrics
+  - go get github.com/prometheus/client_golang/prometheus
+  - go get github.com/rcrowley/go-metrics/stathat
+
+before_script:
+  - go build -o $HOME/gopath/src/github.com/coreos/etcd/etcd.run github.com/coreos/etcd
+  - $HOME/gopath/src/github.com/coreos/etcd/etcd.run &
+  - sleep 2

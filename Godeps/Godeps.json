@@ -122,6 +122,11 @@
 			"Rev": "6fe83ccda8fb9b7549c9ab4ba47f47858bc950aa"
 		},
 		{
+			"ImportPath": "github.com/coreos/go-systemd/activation",
+			"Comment": "v2-27-g97e243d",
+			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
+		},
+		{
 			"ImportPath": "github.com/coreos/go-systemd/daemon",
 			"Comment": "v2-27-g97e243d",
 			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
@@ -139,6 +144,7 @@
 		{
 			"ImportPath": "github.com/cpuguy83/go-md2man",
 			"Comment": "v1.0.2-5-g2831f11",
+			"Comment": "need to manage this manuallyuntil call-site is fixed",
 			"Rev": "2831f11f66ff4008f10e2cd7ed9a85e3d3fc2bed"
 		},
 		{
@@ -461,6 +467,10 @@
 			"Rev": "f3ced00552c1c7d4a6184500af9062cfb4ff4463"
 		},
 		{
+			"ImportPath": "github.com/rcrowley/go-metrics",
+			"Rev": "a5cfc242a56ba7fa70b785f678d6214837bf93b9"
+		},
+		{
 			"ImportPath": "github.com/russross/blackfriday",
 			"Comment": "v1.2-42-g77efab5",
 			"Rev": "77efab57b2f74dd3f9051c79752b2e8995c8b789"
@@ -474,7 +484,7 @@
 			"Rev": "9a8b7d4e8f347bfa230879db9d7d4e4d9e19f962"
 		},
 		{
-			"ImportPath": "github.com/skynetservices/skydns/msg",
+			"ImportPath": "github.com/skynetservices/skydns",
 			"Comment": "2.5.1a",
 			"Rev": "1be70b5b8aa07acccd972146d84011b670af88b4"
 		},
@@ -485,6 +495,10 @@
 		{
 			"ImportPath": "github.com/spf13/pflag",
 			"Rev": "b91b2a94780f4e6b4d3b0c12fd9b5f4b05b1aa45"
+		},
+		{
+			"ImportPath": "github.com/stathat/go",
+			"Rev": "01d012b9ee2ecc107cb28b6dd32d9019ed5c1d77"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",
