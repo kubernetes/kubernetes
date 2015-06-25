@@ -183,11 +183,7 @@ func nodeProxyRequest(c *client.Client, node, endpoint string) client.Result {
 }
 
 // Retrieve metrics from the kubelet server of the given node.
-<<<<<<< HEAD
 func getKubeletMetricsThroughProxy(c *client.Client, node string) (string, error) {
-=======
-func getKubeletMetrics(c *client.Client, node string) (string, error) {
->>>>>>> Density logging
 	metric, err := nodeProxyRequest(c, node, "metrics").Raw()
 	if err != nil {
 		return "", err

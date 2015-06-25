@@ -1133,7 +1133,6 @@ func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 }
 
 func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
-	// TODO: Actually log running pods instead of the pods in the pod manager.
 	for _, n := range nodeNames {
 		Logf("\nLogging pods the kubelet thinks is on node %v", n)
 		podList, err := GetKubeletPods(c, n)
@@ -1142,9 +1141,7 @@ func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
 			continue
 		}
 		for _, p := range podList.Items {
-			// If the pod is in pending it's probably not going to have a starttime or container statuses, since
-			// we're only checking the pod manager. This should change.
-			Logf("%v started at %v (%d containers)", p.Name, p.Status.StartTime, len(p.Status.ContainerStatuses))
+			Logf("%v started at %v (%d container statuses recorded)", p.Name, p.Status.StartTime, len(p.Status.ContainerStatuses))
 			for _, c := range p.Status.ContainerStatuses {
 				Logf("\tContainer %v ready: %v, restart count %v",
 					c.Name, c.Ready, c.RestartCount)
@@ -1153,7 +1150,6 @@ func dumpNodeDebugInfo(c *client.Client, nodeNames []string) {
 		HighLatencyKubeletOperations(c, 10*time.Second, n)
 		// TODO: Log node resource info
 	}
-
 }
 
 func ScaleRC(c *client.Client, ns, name string, size uint) error {
