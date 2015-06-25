@@ -26,7 +26,7 @@ import (
 type restScope struct {
 	name             RESTScopeName
 	paramName        string
-	paramPath        bool
+	argumentName     string
 	paramDescription string
 }
 
@@ -36,24 +36,17 @@ func (r *restScope) Name() RESTScopeName {
 func (r *restScope) ParamName() string {
 	return r.paramName
 }
-func (r *restScope) ParamPath() bool {
-	return r.paramPath
+func (r *restScope) ArgumentName() string {
+	return r.argumentName
 }
 func (r *restScope) ParamDescription() string {
 	return r.paramDescription
 }
 
-var RESTScopeNamespaceLegacy = &restScope{
-	name:             RESTScopeNameNamespace,
-	paramName:        "namespace",
-	paramPath:        false,
-	paramDescription: "object name and auth scope, such as for teams and projects",
-}
-
 var RESTScopeNamespace = &restScope{
 	name:             RESTScopeNameNamespace,
 	paramName:        "namespaces",
-	paramPath:        true,
+	argumentName:     "namespace",
 	paramDescription: "object name and auth scope, such as for teams and projects",
 }
 
