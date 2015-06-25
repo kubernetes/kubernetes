@@ -278,20 +278,28 @@ function wait_for_service_down() {
 #   $5: pod IDs (sorted)
 function verify_from_container() {
   echo "waiting for $1 at $2:$3"
-  results=($(ssh-to-node "${test_node}" "
-      set -e;
-      sudo docker pull gcr.io/google_containers/busybox >/dev/null;
-      sudo docker run gcr.io/google_containers/busybox sh -c '
-          for i in $(seq -s' ' 1 $(($4*3))); do
-            if wget -q -T 3 -O - http://$2:$3; then
-              echo
-            else
-              exit 1
-            fi
-          done
-      '" | sort -r -n | uniq)) \
-      || error "testing $1 VIP from container failed"
-  found_pods=$(sort_args "${results[@]}")
+  # TODO: Reduce this interval once we have a sense for the latency distribution.
+  for x in {0..9}; do
+    results=($(ssh-to-node "${test_node}" "
+        set -e;
+        sudo docker pull gcr.io/google_containers/busybox >/dev/null;
+        sudo docker run gcr.io/google_containers/busybox sh -c '
+            for i in $(seq -s' ' 1 $(($4*3))); do
+              if wget -q -T 3 -O - http://$2:$3; then
+                echo
+              else
+                exit 1
+              fi
+            done
+        '" | sort -r -n | uniq)) \
+        || error "testing $1 VIP from container failed"
+    found_pods=$(sort_args "${results[@]}")
+    if [[ "${found_pods}" == "$5" ]]; then
+      break
+    fi
+    echo "waiting for services iteration $x"
+    sleep 5
+  done
   if [[ "${found_pods}" != "$5" ]]; then
     echo "expected '$5', got '${found_pods}'"
     error "$1: failed to verify VIP from container"
