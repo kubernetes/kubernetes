@@ -217,7 +217,7 @@ type URLVisitor struct {
 func (v *URLVisitor) Visit(fn VisitorFunc) error {
 	res, err := http.Get(v.URL.String())
 	if err != nil {
-		return fmt.Errorf("unable to access URL %q: %v\n", v.URL, err)
+		return err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
@@ -415,7 +415,7 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 	} else {
 		var err error
 		if f, err = os.Open(v.Path); err != nil {
-			return fmt.Errorf("unable to open %q: %v", v.Path, err)
+			return err
 		}
 	}
 	defer f.Close()
@@ -464,12 +464,12 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 			continue
 		}
 		if err := ValidateSchema(ext.RawJSON, v.Schema); err != nil {
-			return err
+			return fmt.Errorf("error validating %q: %v", v.Source, err)
 		}
 		info, err := v.InfoForData(ext.RawJSON, v.Source)
 		if err != nil {
 			if v.IgnoreErrors {
-				fmt.Fprintf(os.Stderr, "error: could not read an encoded object from %s: %v\n", v.Source, err)
+				fmt.Fprintf(os.Stderr, "error: could not read an encoded object: %v\n", err)
 				glog.V(4).Infof("Unreadable: %s", string(ext.RawJSON))
 				continue
 			}
