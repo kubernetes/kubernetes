@@ -59,7 +59,7 @@ export KUBERNETES_PROVIDER=vagrant
 ./cluster/kube-up.sh
 ```
 
-By default, each VM in the cluster is running Fedora, and all of the Kubernetes services are installed into systemd.
+By default, each VM in the cluster is running Fedora.
 
 To access the master or any minion:
 
@@ -75,26 +75,37 @@ vagrant ssh minion-2
 vagrant ssh minion-3
 ```
 
+Each node in the cluster installs the docker daemon and the kubelet.
+
+The master node instantiates the Kubernetes master components as pods on the machine.
+
 To view the service status and/or logs on the kubernetes-master:
+
 ```sh
 vagrant ssh master
-[vagrant@kubernetes-master ~] $ sudo systemctl status kube-apiserver
-[vagrant@kubernetes-master ~] $ sudo journalctl -r -u kube-apiserver
+[vagrant@kubernetes-master ~] $ sudo su
 
-[vagrant@kubernetes-master ~] $ sudo systemctl status kube-controller-manager
-[vagrant@kubernetes-master ~] $ sudo journalctl -r -u kube-controller-manager
+[root@kubernetes-master ~] $ systemctl status kubelet
+[root@kubernetes-master ~] $ journalctl -ru kubelet
 
-[vagrant@kubernetes-master ~] $ sudo systemctl status etcd
-[vagrant@kubernetes-master ~] $ sudo systemctl status nginx
+[root@kubernetes-master ~] $ systemctl status docker
+[root@kubernetes-master ~] $ journalctl -ru docker
+
+[root@kubernetes-master ~] $ tail -f /var/log/kube-apiserver.log
+[root@kubernetes-master ~] $ tail -f /var/log/kube-controller-manager.log
+[root@kubernetes-master ~] $ tail -f /var/log/kube-scheduler.log
 ```
 
 To view the services on any of the kubernetes-minion(s):
 ```sh
 vagrant ssh minion-1
-[vagrant@kubernetes-minion-1] $ sudo systemctl status docker
-[vagrant@kubernetes-minion-1] $ sudo journalctl -r -u docker
-[vagrant@kubernetes-minion-1] $ sudo systemctl status kubelet
-[vagrant@kubernetes-minion-1] $ sudo journalctl -r -u kubelet
+[vagrant@kubernetes-master ~] $ sudo su
+
+[root@kubernetes-master ~] $ systemctl status kubelet
+[root@kubernetes-master ~] $ journalctl -ru kubelet
+
+[root@kubernetes-master ~] $ systemctl status docker
+[root@kubernetes-master ~] $ journalctl -ru docker
 ```
 
 ### Interacting with your Kubernetes cluster with Vagrant.
