@@ -80,6 +80,10 @@ Value defaults to empty string.
 Setting this variable to a string containing bash code allows the user to do some additional system configuration of
 every minion.
 
+## EXTRA_MASTER_USER_DATA
+
+This is the same thing as `EXTRA_MINION_USER_DATA` but for the master instead.
+
 **KUBE_OS_DISTRIBUTION**
 
 The distribution to use.  Valid options: `wheezy`, `ubuntu`, `coreos`.

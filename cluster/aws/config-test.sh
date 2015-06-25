@@ -93,4 +93,5 @@ RKT_VERSION="${KUBE_RKT_VERSION:-0.5.5}"
 
 # Extra shell code to be appended to the end of the aws user-data
 # passed to minions on creation.
-EXTRA_MINION_USER_DATA=''
+EXTRA_MINION_USER_DATA="${KUBE_EXTRA_MINION_USER_DATA:-}"
+EXTRA_MASTER_USER_DATA="${KUBE_EXTRA_MASTER_USER_DATA:-}"
