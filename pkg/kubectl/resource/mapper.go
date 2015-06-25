@@ -69,6 +69,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		Client:    client,
 		Namespace: namespace,
 		Name:      name,
+		Source:    source,
 
 		Object:          obj,
 		ResourceVersion: resourceVersion,

@@ -97,11 +97,11 @@ func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList) err
 	err = r.Visit(func(info *resource.Info) error {
 		data, err := info.Mapping.Codec.Encode(info.Object)
 		if err != nil {
-			return err
+			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, data)
 		if err != nil {
-			return err
+			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 		count++
 		info.Refresh(obj, true)

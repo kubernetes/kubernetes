@@ -48,6 +48,21 @@ type debugError interface {
 	DebugError() (msg string, args []interface{})
 }
 
+// AddSourceToErr adds handleResourcePrefix and source string to error message.
+// verb is the string like "creating", "deleting" etc.
+// souce is the filename or URL to the template file(*.json or *.yaml), or stdin to use to handle the resource.
+func AddSourceToErr(verb string, source string, err error) error {
+	if source != "" {
+		if statusError, ok := err.(*errors.StatusError); ok {
+			status := statusError.Status()
+			status.Message = fmt.Sprintf("error when %s %q: %v", verb, source, status.Message)
+			return &errors.StatusError{status}
+		}
+		return fmt.Errorf("error when %s %q: %v", verb, source, err)
+	}
+	return err
+}
+
 // CheckErr prints a user friendly error to STDERR and exits with a non-zero
 // exit code. Unrecognized errors will be printed with an "error: " prefix.
 //
