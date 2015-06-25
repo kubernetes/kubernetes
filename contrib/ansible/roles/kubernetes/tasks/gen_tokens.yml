@@ -6,12 +6,12 @@
     mode=u+x
 
 - name: Generate tokens for master components
-  command: "{{ kube_script_dir }}/kube-gen-token.sh {{ item }}"
+  command: "{{ kube_script_dir }}/kube-gen-token.sh {{ item[0] }}-{{ item[1] }}"
   environment:
     TOKEN_DIR: "{{ kube_token_dir }}"
-  with_items:
-    - "system:controller_manager"
-    - "system:scheduler"
+  with_nested:
+    - [ "system:controller_manager", "system:scheduler" ]
+    - "{{ groups['masters'] }}"
   register: gentoken
   changed_when: "'Added' in gentoken.stdout"
   notify:

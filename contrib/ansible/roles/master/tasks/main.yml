@@ -21,15 +21,24 @@
 - name: Enable apiserver
   service: name=kube-apiserver enabled=yes state=started
 
+- name: Get the node token values
+  slurp:
+    src: "{{ kube_token_dir }}/{{ item }}-{{ inventory_hostname }}.token"
+  with_items:
+    - "system:controller_manager"
+    - "system:scheduler"
+  register: tokens
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Set token facts
+  set_fact:
+    controller_manager_token: "{{ tokens.results[0].content|b64decode }}"
+    scheduler_token: "{{ tokens.results[1].content|b64decode }}"
+
 - name: write the config file for the controller-manager
   template: src=controller-manager.j2 dest={{ kube_config_dir }}/controller-manager
   notify:
     - restart controller-manager
-
-- name: Get the controller-manager token value
-  slurp:
-    src: "{{ kube_token_dir }}/system:controller_manager.token"
-  register: controller_manager_token
 
 - name: write the kubecfg (auth) file for controller-manager
   template: src=controller-manager.kubeconfig.j2 dest={{ kube_config_dir }}/controller-manager.kubeconfig
@@ -43,11 +52,6 @@
   template: src=scheduler.j2 dest={{ kube_config_dir }}/scheduler
   notify:
     - restart scheduler
-
-- name: Get the scheduler token value
-  slurp:
-    src: "{{ kube_token_dir }}/system:scheduler.token"
-  register: scheduler_token
 
 - name: write the kubecfg (auth) file for scheduler
   template: src=scheduler.kubeconfig.j2 dest={{ kube_config_dir }}/scheduler.kubeconfig
