@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   name: monitoring-influx-grafana-v1
-  namespace: default 
+  namespace: kube-system
   labels: 
     k8s-app: influxGrafana
     version: v1
@@ -42,7 +42,7 @@ spec:
               memory: 100Mi
           env: 
             - name: INFLUXDB_EXTERNAL_URL
-              value: /api/v1/proxy/namespaces/default/services/monitoring-influxdb:api/db/
+              value: /api/v1/proxy/namespaces/kube-system/services/monitoring-influxdb:api/db/
             - name: INFLUXDB_HOST
               value: monitoring-influxdb
             - name: INFLUXDB_PORT

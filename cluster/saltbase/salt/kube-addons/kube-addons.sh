@@ -21,6 +21,8 @@ KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 
 ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-600}
 
+SYSTEM_NAMESPACE=kube-system
+
 function create-kubeconfig-secret() {
   local -r token=$1
   local -r username=$2
@@ -47,6 +49,7 @@ contexts:
 - context:
     cluster: local
     user: ${username}
+    namespace: ${SYSTEM_NAMESPACE} 
   name: service-account-context
 current-context: service-account-context
 EOF
@@ -67,6 +70,7 @@ contexts:
 - context:
     cluster: local
     user: ${username}
+    namespace: ${SYSTEM_NAMESPACE}
   name: service-account-context
 current-context: service-account-context
 EOF
@@ -82,36 +86,39 @@ metadata:
   name: token-${safe_username}
 type: Opaque
 EOF
-  create-resource-from-string "${secretyaml}" 100 10 "Secret-for-token-for-user-${username}" &
-# TODO: label the secrets with special label so kubectl does not show these?
+  create-resource-from-string "${secretyaml}" 100 10 "Secret-for-token-for-user-${username}" "${SYSTEM_NAMESPACE}" &
 }
 
 # $1 filename of addon to start.
 # $2 count of tries to start the addon.
 # $3 delay in seconds between two consecutive tries
+# $4 namespace
 function start_addon() {
   local -r addon_filename=$1;
   local -r tries=$2;
   local -r delay=$3;
+  local -r namespace=$4
 
-  create-resource-from-string "$(cat ${addon_filename})" "${tries}" "${delay}" "${addon_filename}"
+  create-resource-from-string "$(cat ${addon_filename})" "${tries}" "${delay}" "${addon_filename}" "${namespace}"
 }
 
 # $1 string with json or yaml.
 # $2 count of tries to start the addon.
 # $3 delay in seconds between two consecutive tries
-# $3 name of this object to use when logging about it.
+# $4 name of this object to use when logging about it.
+# $5 namespace for this object
 function create-resource-from-string() {
   local -r config_string=$1;
   local tries=$2;
   local -r delay=$3;
   local -r config_name=$4;
+  local -r namespace=$5;
   while [ ${tries} -gt 0 ]; do
-    echo "${config_string}" | ${KUBECTL} create -f - && \
-        echo "== Successfully started ${config_name} at $(date -Is)" && \
+    echo "${config_string}" | ${KUBECTL} --namespace="${namespace}" create -f - && \
+        echo "== Successfully started ${config_name} in namespace ${namespace} at $(date -Is)" && \
         return 0;
     let tries=tries-1;
-    echo "== Failed to start ${config_name} at $(date -Is). ${tries} tries remaining. =="
+    echo "== Failed to start ${config_name} in namespace ${namespace} at $(date -Is). ${tries} tries remaining. =="
     sleep ${delay};
   done
   return 1;
@@ -143,6 +150,8 @@ done
 
 echo "== default service account has token ${token_found} =="
 
+start_addon /etc/kubernetes/addons/namespace.yaml 100 10 "" &
+
 # Generate secrets for "internal service accounts".
 # TODO(etune): move to a completely yaml/object based
 # workflow so that service accounts can be created
@@ -162,7 +171,7 @@ while read line; do
   else
     # Set the server to https://kubernetes. Pods/components that
     # do not have DNS available will have to override the server.
-    create-kubeconfig-secret "${token}" "${username}" "https://kubernetes"
+    create-kubeconfig-secret "${token}" "${username}" "https://kubernetes.default"
   fi
 done < /srv/kubernetes/known_tokens.csv
 
@@ -170,7 +179,7 @@ done < /srv/kubernetes/known_tokens.csv
 # are defined in a namespace other than default, we should still create the limits for the
 # default namespace.
 for obj in $(find /etc/kubernetes/admission-controls \( -name \*.yaml -o -name \*.json \)); do
-  start_addon ${obj} 100 10 &
+  start_addon ${obj} 100 10 default &
   echo "++ obj ${obj} is created ++"
 done
 

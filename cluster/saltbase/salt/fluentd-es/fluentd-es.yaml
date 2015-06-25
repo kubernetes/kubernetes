@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: fluentd-elasticsearch
+  namespace: kube-system
 spec:
   containers:
   - name: fluentd-elasticsearch
