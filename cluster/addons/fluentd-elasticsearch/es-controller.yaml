@@ -21,7 +21,11 @@ spec:
     spec:
       containers:
       - image: gcr.io/google_containers/elasticsearch:1.4
-        name: elasticsearch-logging         
+        name: elasticsearch-logging
+          resources:
+            limits:
+              cpu: 100m
+              memory: 60Mi
         ports:
         - containerPort: 9200
           name: es-port
