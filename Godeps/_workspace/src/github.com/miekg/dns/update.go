@@ -1,38 +1,3 @@
-// DYNAMIC UPDATES
-//
-// Dynamic updates reuses the DNS message format, but renames three of
-// the sections. Question is Zone, Answer is Prerequisite, Authority is
-// Update, only the Additional is not renamed. See RFC 2136 for the gory details.
-//
-// You can set a rather complex set of rules for the existence of absence of
-// certain resource records or names in a zone to specify if resource records
-// should be added or removed. The table from RFC 2136 supplemented with the Go
-// DNS function shows which functions exist to specify the prerequisites.
-//
-// 3.2.4 - Table Of Metavalues Used In Prerequisite Section
-//
-//   CLASS    TYPE     RDATA    Meaning                    Function
-//   --------------------------------------------------------------
-//   ANY      ANY      empty    Name is in use             dns.NameUsed
-//   ANY      rrset    empty    RRset exists (value indep) dns.RRsetUsed
-//   NONE     ANY      empty    Name is not in use         dns.NameNotUsed
-//   NONE     rrset    empty    RRset does not exist       dns.RRsetNotUsed
-//   zone     rrset    rr       RRset exists (value dep)   dns.Used
-//
-// The prerequisite section can also be left empty.
-// If you have decided on the prerequisites you can tell what RRs should
-// be added or deleted. The next table shows the options you have and
-// what functions to call.
-//
-// 3.4.2.6 - Table Of Metavalues Used In Update Section
-//
-//   CLASS    TYPE     RDATA    Meaning                     Function
-//   ---------------------------------------------------------------
-//   ANY      ANY      empty    Delete all RRsets from name dns.RemoveName
-//   ANY      rrset    empty    Delete an RRset             dns.RemoveRRset
-//   NONE     rrset    rr       Delete an RR from RRset     dns.Remove
-//   zone     rrset    rr       Add to an RRset             dns.Insert
-//
 package dns
 
 // NameUsed sets the RRs in the prereq section to
@@ -104,18 +69,9 @@ func (u *Msg) Insert(rr []RR) {
 
 // RemoveRRset creates a dynamic update packet that deletes an RRset, see RFC 2136 section 2.5.2.
 func (u *Msg) RemoveRRset(rr []RR) {
-	m := make(map[RR_Header]struct{})
-	u.Ns = make([]RR, 0, len(rr))
-	for _, r := range rr {
-		h := *r.Header().copyHeader()
-		h.Class = ClassANY
-		h.Ttl = 0
-		h.Rdlength = 0
-		if _, ok := m[h]; ok {
-			continue
-		}
-		m[h] = struct{}{}
-		u.Ns = append(u.Ns, &ANY{h})
+	u.Ns = make([]RR, len(rr))
+	for i, r := range rr {
+		u.Ns[i] = &ANY{Hdr: RR_Header{Name: r.Header().Name, Ttl: 0, Rrtype: r.Header().Rrtype, Class: ClassANY}}
 	}
 }
 

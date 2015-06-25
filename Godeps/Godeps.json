@@ -415,7 +415,7 @@
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
-			"Rev": "3f504e8dabd5d562e997d19ce0200aa41973e1b2"
+			"Rev": "6da0cd2c927d5cb11255c468b5c3a1744c3351b1"
 		},
 		{
 			"ImportPath": "github.com/mitchellh/mapstructure",

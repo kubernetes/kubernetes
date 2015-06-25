@@ -24,7 +24,9 @@ func (dns *Msg) SetReply(request *Msg) *Msg {
 	return dns
 }
 
-// SetQuestion creates a question message.
+// SetQuestion creates a question message, it sets the Question
+// section, generates an Id and sets the RecursionDesired (RD)
+// bit to true.
 func (dns *Msg) SetQuestion(z string, t uint16) *Msg {
 	dns.Id = Id()
 	dns.RecursionDesired = true
@@ -33,7 +35,9 @@ func (dns *Msg) SetQuestion(z string, t uint16) *Msg {
 	return dns
 }
 
-// SetNotify creates a notify message.
+// SetNotify creates a notify message, it sets the Question
+// section, generates an Id and sets the Authoritative (AA)
+// bit to true.
 func (dns *Msg) SetNotify(z string) *Msg {
 	dns.Opcode = OpcodeNotify
 	dns.Authoritative = true
@@ -73,13 +77,15 @@ func (dns *Msg) SetUpdate(z string) *Msg {
 }
 
 // SetIxfr creates message for requesting an IXFR.
-func (dns *Msg) SetIxfr(z string, serial uint32) *Msg {
+func (dns *Msg) SetIxfr(z string, serial uint32, ns, mbox string) *Msg {
 	dns.Id = Id()
 	dns.Question = make([]Question, 1)
 	dns.Ns = make([]RR, 1)
 	s := new(SOA)
 	s.Hdr = RR_Header{z, TypeSOA, ClassINET, defaultTtl, 0}
 	s.Serial = serial
+	s.Ns = ns
+	s.Mbox = mbox
 	dns.Question[0] = Question{z, TypeIXFR, ClassINET}
 	dns.Ns[0] = s
 	return dns
@@ -182,7 +188,7 @@ func IsFqdn(s string) bool {
 	return s[l-1] == '.'
 }
 
-// Fqdns return the fully qualified domain name from s.
+// Fqdn return the fully qualified domain name from s.
 // If s is already fully qualified, it behaves as the identity function.
 func Fqdn(s string) string {
 	if IsFqdn(s) {

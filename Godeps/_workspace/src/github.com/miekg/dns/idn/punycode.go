@@ -216,8 +216,9 @@ func decode(b []byte) []byte {
 	}
 	out := make([]rune, 0, len(b))
 	b = b[len(_PREFIX):]
-	for pos, x := range b {
-		if x == _DELIMITER {
+	for pos := len(b) - 1; pos >= 0; pos-- {
+		// only last delimiter is our interest
+		if b[pos] == _DELIMITER {
 			out = append(out, bytes.Runes(b[:pos])...)
 			b = b[pos+1:] // trim source string
 			break

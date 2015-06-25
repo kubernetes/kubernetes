@@ -1,21 +1,6 @@
 language: go
 go:
-  - 1.2
   - 1.3
-env:
-  # "gvm update" resets GOOS and GOARCH environment variable, workaround it by setting
-  # BUILD_GOOS and BUILD_GOARCH and overriding GOARCH and GOOS in the build script
-  global:
-    - BUILD_GOARCH=amd64
-  matrix:
-    - BUILD_GOOS=linux
-    - BUILD_GOOS=darwin
-    - BUILD_GOOS=windows
+  - 1.4
 script:
-  - gvm cross $BUILD_GOOS $BUILD_GOARCH
-  - GOARCH=$BUILD_GOARCH GOOS=$BUILD_GOOS go build
-
-  # only test on linux
-  # also specify -short; the crypto tests fail in weird ways *sometimes*
-  # See issue #151
-  - if [ $BUILD_GOOS == "linux" ]; then GOARCH=$BUILD_GOARCH GOOS=$BUILD_GOOS go test -short -bench=.; fi
+  - go test -short -bench=.

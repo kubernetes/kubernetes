@@ -9,10 +9,12 @@ var testcases = [][2]string{
 	{"", ""},
 	{"a", "a"},
 	{"A-B", "a-b"},
+	{"A-B-C", "a-b-c"},
 	{"AbC", "abc"},
 	{"я", "xn--41a"},
 	{"zя", "xn--z-0ub"},
 	{"ЯZ", "xn--z-zub"},
+	{"а-я", "xn----7sb8g"},
 	{"إختبار", "xn--kgbechtv"},
 	{"آزمایشی", "xn--hgbk6aj7f53bba"},
 	{"测试", "xn--0zwm56d"},
@@ -24,6 +26,7 @@ var testcases = [][2]string{
 	{"טעסט", "xn--deba0ad"},
 	{"テスト", "xn--zckzah"},
 	{"பரிட்சை", "xn--hlcj6aya9esc7a"},
+	{"mamão-com-açúcar", "xn--mamo-com-acar-yeb1e6q"},
 }
 
 func TestEncodeDecodePunycode(t *testing.T) {

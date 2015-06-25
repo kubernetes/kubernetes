@@ -6,9 +6,12 @@ import (
 	"crypto/rsa"
 	"io"
 	"math/big"
+	"strconv"
 	"strings"
 )
 
+// NewPrivateKey returns a PrivateKey by parsing the string s.
+// s should be in the same form of the BIND private key files.
 func (k *DNSKEY) NewPrivateKey(s string) (PrivateKey, error) {
 	if s[len(s)-1] != '\n' { // We need a closing newline
 		return k.ReadPrivateKey(strings.NewReader(s+"\n"), "")
@@ -18,8 +21,8 @@ func (k *DNSKEY) NewPrivateKey(s string) (PrivateKey, error) {
 
 // ReadPrivateKey reads a private key from the io.Reader q. The string file is
 // only used in error reporting.
-// The public key must be
-// known, because some cryptographic algorithms embed the public inside the privatekey.
+// The public key must be known, because some cryptographic algorithms embed
+// the public inside the privatekey.
 func (k *DNSKEY) ReadPrivateKey(q io.Reader, file string) (PrivateKey, error) {
 	m, e := parseKey(q, file)
 	if m == nil {
@@ -32,57 +35,63 @@ func (k *DNSKEY) ReadPrivateKey(q io.Reader, file string) (PrivateKey, error) {
 		return nil, ErrPrivKey
 	}
 	// TODO(mg): check if the pubkey matches the private key
-	switch m["algorithm"] {
-	case "3 (DSA)":
-		p, e := readPrivateKeyDSA(m)
-		if e != nil {
-			return nil, e
-		}
-		if !k.setPublicKeyInPrivate(p) {
-			return nil, ErrKey
-		}
-		return p, e
-	case "1 (RSAMD5)":
-		fallthrough
-	case "5 (RSASHA1)":
-		fallthrough
-	case "7 (RSASHA1NSEC3SHA1)":
-		fallthrough
-	case "8 (RSASHA256)":
-		fallthrough
-	case "10 (RSASHA512)":
-		p, e := readPrivateKeyRSA(m)
-		if e != nil {
-			return nil, e
-		}
-		if !k.setPublicKeyInPrivate(p) {
-			return nil, ErrKey
-		}
-		return p, e
-	case "12 (ECC-GOST)":
-		p, e := readPrivateKeyGOST(m)
-		if e != nil {
-			return nil, e
-		}
-		// setPublicKeyInPrivate(p)
-		return p, e
-	case "13 (ECDSAP256SHA256)":
-		fallthrough
-	case "14 (ECDSAP384SHA384)":
-		p, e := readPrivateKeyECDSA(m)
-		if e != nil {
-			return nil, e
-		}
-		if !k.setPublicKeyInPrivate(p) {
-			return nil, ErrKey
-		}
-		return p, e
+	algo, err := strconv.Atoi(strings.SplitN(m["algorithm"], " ", 2)[0])
+	if err != nil {
+		return nil, ErrPrivKey
 	}
-	return nil, ErrPrivKey
+	switch uint8(algo) {
+	case DSA:
+		priv, e := readPrivateKeyDSA(m)
+		if e != nil {
+			return nil, e
+		}
+		pub := k.publicKeyDSA()
+		if pub == nil {
+			return nil, ErrKey
+		}
+		priv.PublicKey = *pub
+		return (*DSAPrivateKey)(priv), e
+	case RSAMD5:
+		fallthrough
+	case RSASHA1:
+		fallthrough
+	case RSASHA1NSEC3SHA1:
+		fallthrough
+	case RSASHA256:
+		fallthrough
+	case RSASHA512:
+		priv, e := readPrivateKeyRSA(m)
+		if e != nil {
+			return nil, e
+		}
+		pub := k.publicKeyRSA()
+		if pub == nil {
+			return nil, ErrKey
+		}
+		priv.PublicKey = *pub
+		return (*RSAPrivateKey)(priv), e
+	case ECCGOST:
+		return nil, ErrPrivKey
+	case ECDSAP256SHA256:
+		fallthrough
+	case ECDSAP384SHA384:
+		priv, e := readPrivateKeyECDSA(m)
+		if e != nil {
+			return nil, e
+		}
+		pub := k.publicKeyECDSA()
+		if pub == nil {
+			return nil, ErrKey
+		}
+		priv.PublicKey = *pub
+		return (*ECDSAPrivateKey)(priv), e
+	default:
+		return nil, ErrPrivKey
+	}
 }
 
 // Read a private key (file) string and create a public key. Return the private key.
-func readPrivateKeyRSA(m map[string]string) (PrivateKey, error) {
+func readPrivateKeyRSA(m map[string]string) (*rsa.PrivateKey, error) {
 	p := new(rsa.PrivateKey)
 	p.Primes = []*big.Int{nil, nil}
 	for k, v := range m {
@@ -119,7 +128,7 @@ func readPrivateKeyRSA(m map[string]string) (PrivateKey, error) {
 	return p, nil
 }
 
-func readPrivateKeyDSA(m map[string]string) (PrivateKey, error) {
+func readPrivateKeyDSA(m map[string]string) (*dsa.PrivateKey, error) {
 	p := new(dsa.PrivateKey)
 	p.X = big.NewInt(0)
 	for k, v := range m {
@@ -137,7 +146,7 @@ func readPrivateKeyDSA(m map[string]string) (PrivateKey, error) {
 	return p, nil
 }
 
-func readPrivateKeyECDSA(m map[string]string) (PrivateKey, error) {
+func readPrivateKeyECDSA(m map[string]string) (*ecdsa.PrivateKey, error) {
 	p := new(ecdsa.PrivateKey)
 	p.D = big.NewInt(0)
 	// TODO: validate that the required flags are present
@@ -156,11 +165,6 @@ func readPrivateKeyECDSA(m map[string]string) (PrivateKey, error) {
 	return p, nil
 }
 
-func readPrivateKeyGOST(m map[string]string) (PrivateKey, error) {
-	// TODO(miek)
-	return nil, nil
-}
-
 // parseKey reads a private key from r. It returns a map[string]string,
 // with the key-value pairs, or an error when the file is not correct.
 func parseKey(r io.Reader, file string) (map[string]string, error) {
@@ -173,9 +177,9 @@ func parseKey(r io.Reader, file string) (map[string]string, error) {
 	for l := range c {
 		// It should alternate
 		switch l.value {
-		case _KEY:
+		case zKey:
 			k = l.token
-		case _VALUE:
+		case zValue:
 			if k == "" {
 				return nil, &ParseError{file, "no private key seen", l}
 			}
@@ -205,14 +209,14 @@ func klexer(s *scan, c chan lex) {
 			}
 			l.token = str
 			if key {
-				l.value = _KEY
+				l.value = zKey
 				c <- l
 				// Next token is a space, eat it
 				s.tokenText()
 				key = false
 				str = ""
 			} else {
-				l.value = _VALUE
+				l.value = zValue
 			}
 		case ';':
 			commt = true
@@ -221,7 +225,7 @@ func klexer(s *scan, c chan lex) {
 				// Reset a comment
 				commt = false
 			}
-			l.value = _VALUE
+			l.value = zValue
 			l.token = str
 			c <- l
 			str = ""
@@ -238,7 +242,7 @@ func klexer(s *scan, c chan lex) {
 	if len(str) > 0 {
 		// Send remainder
 		l.token = str
-		l.value = _VALUE
+		l.value = zValue
 		c <- l
 	}
 }

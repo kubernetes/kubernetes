@@ -10,9 +10,12 @@ import (
 )
 
 type (
-	Type  uint16 // Type is a DNS type.
-	Class uint16 // Class is a DNS class.
-	Name  string // Name is a DNS domain name.
+	// Type is a DNS type.
+	Type uint16
+	// Class is a DNS class.
+	Class uint16
+	// Name is a DNS domain name.
+	Name string
 )
 
 // Packet formats
@@ -20,6 +23,7 @@ type (
 // Wire constants and supported types.
 const (
 	// valid RR_Header.Rrtype and Question.qtype
+
 	TypeNone       uint16 = 0
 	TypeA          uint16 = 1
 	TypeNS         uint16 = 2
@@ -91,7 +95,9 @@ const (
 
 	TypeTKEY uint16 = 249
 	TypeTSIG uint16 = 250
+
 	// valid Question.Qtype only
+
 	TypeIXFR  uint16 = 251
 	TypeAXFR  uint16 = 252
 	TypeMAILB uint16 = 253
@@ -105,6 +111,7 @@ const (
 	TypeReserved uint16 = 65535
 
 	// valid Question.Qclass
+
 	ClassINET   = 1
 	ClassCSNET  = 2
 	ClassCHAOS  = 3
@@ -113,6 +120,7 @@ const (
 	ClassANY    = 255
 
 	// Msg.rcode
+
 	RcodeSuccess        = 0
 	RcodeFormatError    = 1
 	RcodeServerFailure  = 2
@@ -133,11 +141,11 @@ const (
 	RcodeBadAlg         = 21
 	RcodeBadTrunc       = 22 // TSIG
 
-	// Opcode
+	// Opcode, there is no 3
+
 	OpcodeQuery  = 0
 	OpcodeIQuery = 1
 	OpcodeStatus = 2
-	// There is no 3
 	OpcodeNotify = 4
 	OpcodeUpdate = 5
 )
@@ -198,7 +206,8 @@ var CertTypeToString = map[uint16]string{
 
 var StringToCertType = reverseInt16(CertTypeToString)
 
-// DNS queries.
+// Question holds a DNS question. There can be multiple questions in the
+// question section of a message. Usually there is just one.
 type Question struct {
 	Name   string `dns:"cdomain-name"` // "cdomain-name" specifies encoding (and may be compressed)
 	Qtype  uint16
@@ -246,8 +255,10 @@ type HINFO struct {
 
 func (rr *HINFO) Header() *RR_Header { return &rr.Hdr }
 func (rr *HINFO) copy() RR           { return &HINFO{*rr.Hdr.copyHeader(), rr.Cpu, rr.Os} }
-func (rr *HINFO) String() string     { return rr.Hdr.String() + rr.Cpu + " " + rr.Os }
-func (rr *HINFO) len() int           { return rr.Hdr.len() + len(rr.Cpu) + len(rr.Os) }
+func (rr *HINFO) String() string {
+	return rr.Hdr.String() + sprintTxt([]string{rr.Cpu, rr.Os})
+}
+func (rr *HINFO) len() int { return rr.Hdr.len() + len(rr.Cpu) + len(rr.Os) }
 
 type MB struct {
 	Hdr RR_Header
@@ -490,6 +501,34 @@ func sprintName(s string) string {
 	return string(dst)
 }
 
+func sprintCAAValue(s string) string {
+	src := []byte(s)
+	dst := make([]byte, 0, len(src))
+	dst = append(dst, '"')
+	for i := 0; i < len(src); {
+		if i+1 < len(src) && src[i] == '\\' && src[i+1] == '.' {
+			dst = append(dst, src[i:i+2]...)
+			i += 2
+		} else {
+			b, n := nextByte(src, i)
+			if n == 0 {
+				i++ // dangling back slash
+			} else if b == '.' {
+				dst = append(dst, b)
+			} else {
+				if b < ' ' || b > '~' {
+					dst = appendByte(dst, b)
+				} else {
+					dst = append(dst, b)
+				}
+			}
+			i += n
+		}
+	}
+	dst = append(dst, '"')
+	return string(dst)
+}
+
 func sprintTxt(txt []string) string {
 	var out []byte
 	for i, s := range txt {
@@ -532,19 +571,22 @@ func appendTXTStringByte(s []byte, b byte) []byte {
 		return append(s, '\\', b)
 	}
 	if b < ' ' || b > '~' {
-		var buf [3]byte
-		bufs := strconv.AppendInt(buf[:0], int64(b), 10)
-		s = append(s, '\\')
-		for i := 0; i < 3-len(bufs); i++ {
-			s = append(s, '0')
-		}
-		for _, r := range bufs {
-			s = append(s, r)
-		}
-		return s
-
+		return appendByte(s, b)
 	}
 	return append(s, b)
+}
+
+func appendByte(s []byte, b byte) []byte {
+	var buf [3]byte
+	bufs := strconv.AppendInt(buf[:0], int64(b), 10)
+	s = append(s, '\\')
+	for i := 0; i < 3-len(bufs); i++ {
+		s = append(s, '0')
+	}
+	for _, r := range bufs {
+		s = append(s, r)
+	}
+	return s
 }
 
 func nextByte(b []byte, offset int) (byte, int) {
@@ -801,7 +843,7 @@ func cmToM(m, e uint8) string {
 	s := fmt.Sprintf("%d", m)
 	for e > 2 {
 		s += "0"
-		e -= 1
+		e--
 	}
 	return s
 }
@@ -838,7 +880,7 @@ func (rr *LOC) String() string {
 	lon = lon % LOC_HOURS
 	s += fmt.Sprintf("%02d %02d %0.3f %s ", h, m, (float64(lon) / 1000), ew)
 
-	var alt float64 = float64(rr.Altitude) / 100
+	var alt = float64(rr.Altitude) / 100
 	alt -= LOC_ALTITUDEBASE
 	if rr.Altitude%100 != 0 {
 		s += fmt.Sprintf("%.2fm ", alt)
@@ -1029,30 +1071,59 @@ func (rr *SSHFP) String() string {
 }
 
 type IPSECKEY struct {
-	Hdr         RR_Header
-	Precedence  uint8
+	Hdr        RR_Header
+	Precedence uint8
+	// GatewayType: 1: A record, 2: AAAA record, 3: domainname.
+	// 0 is use for no type and GatewayName should be "." then.
 	GatewayType uint8
 	Algorithm   uint8
-	Gateway     string `dns:"ipseckey"`
+	// Gateway can be an A record, AAAA record or a domain name.
+	GatewayA    net.IP `dns:"a"`
+	GatewayAAAA net.IP `dns:"aaaa"`
+	GatewayName string `dns:"domain-name"`
 	PublicKey   string `dns:"base64"`
 }
 
 func (rr *IPSECKEY) Header() *RR_Header { return &rr.Hdr }
 func (rr *IPSECKEY) copy() RR {
-	return &IPSECKEY{*rr.Hdr.copyHeader(), rr.Precedence, rr.GatewayType, rr.Algorithm, rr.Gateway, rr.PublicKey}
+	return &IPSECKEY{*rr.Hdr.copyHeader(), rr.Precedence, rr.GatewayType, rr.Algorithm, rr.GatewayA, rr.GatewayAAAA, rr.GatewayName, rr.PublicKey}
 }
 
 func (rr *IPSECKEY) String() string {
-	return rr.Hdr.String() + strconv.Itoa(int(rr.Precedence)) +
+	s := rr.Hdr.String() + strconv.Itoa(int(rr.Precedence)) +
 		" " + strconv.Itoa(int(rr.GatewayType)) +
-		" " + strconv.Itoa(int(rr.Algorithm)) +
-		" " + rr.Gateway +
-		" " + rr.PublicKey
+		" " + strconv.Itoa(int(rr.Algorithm))
+	switch rr.GatewayType {
+	case 0:
+		fallthrough
+	case 3:
+		s += " " + rr.GatewayName
+	case 1:
+		s += " " + rr.GatewayA.String()
+	case 2:
+		s += " " + rr.GatewayAAAA.String()
+	default:
+		s += " ."
+	}
+	s += " " + rr.PublicKey
+	return s
 }
 
 func (rr *IPSECKEY) len() int {
-	return rr.Hdr.len() + 3 + len(rr.Gateway) + 1 +
-		base64.StdEncoding.DecodedLen(len(rr.PublicKey))
+	l := rr.Hdr.len() + 3 + 1
+	switch rr.GatewayType {
+	default:
+		fallthrough
+	case 0:
+		fallthrough
+	case 3:
+		l += len(rr.GatewayName)
+	case 1:
+		l += 4
+	case 2:
+		l += 16
+	}
+	return l + base64.StdEncoding.DecodedLen(len(rr.PublicKey))
 }
 
 type KEY struct {
@@ -1108,14 +1179,13 @@ func (rr *RKEY) String() string {
 }
 
 type NSAP struct {
-	Hdr    RR_Header
-	Length uint8
-	Nsap   string
+	Hdr  RR_Header
+	Nsap string
 }
 
 func (rr *NSAP) Header() *RR_Header { return &rr.Hdr }
-func (rr *NSAP) copy() RR           { return &NSAP{*rr.Hdr.copyHeader(), rr.Length, rr.Nsap} }
-func (rr *NSAP) String() string     { return rr.Hdr.String() + strconv.Itoa(int(rr.Length)) + " " + rr.Nsap }
+func (rr *NSAP) copy() RR           { return &NSAP{*rr.Hdr.copyHeader(), rr.Nsap} }
+func (rr *NSAP) String() string     { return rr.Hdr.String() + "0x" + rr.Nsap }
 func (rr *NSAP) len() int           { return rr.Hdr.len() + 1 + len(rr.Nsap) + 1 }
 
 type NSAPPTR struct {
@@ -1394,6 +1464,7 @@ func (rr *WKS) String() (s string) {
 	if rr.Address != nil {
 		s += rr.Address.String()
 	}
+	// TODO(miek): missing protocol here, see /etc/protocols
 	for i := 0; i < len(rr.BitMap); i++ {
 		// should lookup the port
 		s += " " + strconv.Itoa(int(rr.BitMap[i]))
@@ -1487,8 +1558,6 @@ func (rr *EUI64) copy() RR           { return &EUI64{*rr.Hdr.copyHeader(), rr.Ad
 func (rr *EUI64) String() string     { return rr.Hdr.String() + euiToString(rr.Address, 64) }
 func (rr *EUI64) len() int           { return rr.Hdr.len() + 8 }
 
-// Support in incomplete - just handle it as unknown record
-/*
 type CAA struct {
 	Hdr   RR_Header
 	Flag  uint8
@@ -1498,14 +1567,9 @@ type CAA struct {
 
 func (rr *CAA) Header() *RR_Header { return &rr.Hdr }
 func (rr *CAA) copy() RR           { return &CAA{*rr.Hdr.copyHeader(), rr.Flag, rr.Tag, rr.Value} }
-func (rr *CAA) len() int           { return rr.Hdr.len() + 1 + len(rr.Tag) + 1 + len(rr.Value) }
+func (rr *CAA) len() int           { return rr.Hdr.len() + 1 + len(rr.Tag) + len(rr.Value)/2 }
+func (rr *CAA) String() string     { return rr.Hdr.String() + strconv.Itoa(int(rr.Flag)) + " " + rr.Tag + " " + sprintCAAValue(rr.Value) }
 
-func (rr *CAA) String() string {
-	s := rr.Hdr.String() + strconv.FormatInt(int64(rr.Flag), 10) + " " + rr.Tag
-	s += strconv.QuoteToASCII(rr.Value)
-	return s
-}
-*/
 
 type UID struct {
 	Hdr RR_Header
@@ -1628,10 +1692,10 @@ func copyIP(ip net.IP) net.IP {
 
 // Map of constructors for each RR type.
 var typeToRR = map[uint16]func() RR{
-	TypeA:     func() RR { return new(A) },
-	TypeAAAA:  func() RR { return new(AAAA) },
-	TypeAFSDB: func() RR { return new(AFSDB) },
-	//	TypeCAA:        func() RR { return new(CAA) },
+	TypeA:          func() RR { return new(A) },
+	TypeAAAA:       func() RR { return new(AAAA) },
+	TypeAFSDB:      func() RR { return new(AFSDB) },
+	TypeCAA:        func() RR { return new(CAA) },
 	TypeCDS:        func() RR { return new(CDS) },
 	TypeCERT:       func() RR { return new(CERT) },
 	TypeCNAME:      func() RR { return new(CNAME) },
@@ -1648,6 +1712,7 @@ var typeToRR = map[uint16]func() RR{
 	TypeEID:        func() RR { return new(EID) },
 	TypeHINFO:      func() RR { return new(HINFO) },
 	TypeHIP:        func() RR { return new(HIP) },
+	TypeIPSECKEY:   func() RR { return new(IPSECKEY) },
 	TypeKX:         func() RR { return new(KX) },
 	TypeL32:        func() RR { return new(L32) },
 	TypeL64:        func() RR { return new(L64) },
