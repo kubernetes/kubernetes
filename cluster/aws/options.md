@@ -70,7 +70,7 @@ will run on this storage if available, as typically the root disk is comparative
 
 If your machines don't have any ephemeral disks, this will default to the aufs driver on your root disk (with no LVM).
 
-## KUGE_EXTRA_MINION_USER_DATA and KUGE_EXTRA_MASTER_USER_DATA
+## KUBE_EXTRA_MINION_USER_DATA and KUBE_EXTRA_MASTER_USER_DATA
 Note: Not currently supported by CoreOS
 
 If set to non-empty the contents of this variable will be appended to the end of the  the miinion or master user-data 
