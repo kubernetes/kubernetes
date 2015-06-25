@@ -14,15 +14,24 @@
 - include: centos.yml
   when: not is_atomic and ansible_distribution == "CentOS"
 
+- name: Get the node token values
+  slurp:
+    src: "{{ kube_token_dir }}/{{ item }}-{{ inventory_hostname }}.token"
+  with_items:
+    - "system:kubelet"
+    - "system:proxy"
+  register: tokens
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Set token facts
+  set_fact:
+    kubelet_token: "{{ tokens.results[0].content|b64decode }}"
+    proxy_token: "{{ tokens.results[1].content|b64decode }}"
+
 - name: write the config files for kubelet
   template: src=kubelet.j2 dest={{ kube_config_dir }}/kubelet
   notify:
     - restart kubelet
-
-- name: Get the kubelet token value
-  slurp:
-    src: "{{ kube_token_dir }}/system:kubelet.token"
-  register: kubelet_token
 
 - name: write the kubecfg (auth) file for kubelet
   template: src=kubelet.kubeconfig.j2 dest={{ kube_config_dir }}/kubelet.kubeconfig
@@ -36,11 +45,6 @@
   template: src=proxy.j2 dest={{ kube_config_dir }}/proxy
   notify:
     - restart proxy
-
-- name: Get the proxy token value
-  slurp:
-    src: "{{ kube_token_dir }}/system:proxy.token"
-  register: proxy_token
 
 - name: write the kubecfg (auth) file for kube-proxy
   template: src=proxy.kubeconfig.j2 dest={{ kube_config_dir }}/proxy.kubeconfig

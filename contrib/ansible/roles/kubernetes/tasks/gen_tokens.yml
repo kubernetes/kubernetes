@@ -18,12 +18,12 @@
     - restart daemons
 
 - name: Generate tokens for node components
-  command: "{{ kube_script_dir }}/kube-gen-token.sh {{ item }}"
+  command: "{{ kube_script_dir }}/kube-gen-token.sh {{ item[0] }}-{{ item[1] }}"
   environment:
     TOKEN_DIR: "{{ kube_token_dir }}"
-  with_items:
-    - "system:kubelet"
-    - "system:proxy"
+  with_nested:
+    - [ 'system:kubelet', 'system:proxy' ]
+    - "{{ groups['nodes'] }}"
   register: gentoken
   changed_when: "'Added' in gentoken.stdout"
   notify:
