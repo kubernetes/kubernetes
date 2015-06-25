@@ -25,6 +25,25 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 )
 
+func TestFormatURL(t *testing.T) {
+	testCases := []struct {
+		scheme string
+		host   string
+		port   int
+		path   string
+		result string
+	}{
+		{"http", "localhost", 93, "", "http://localhost:93"},
+		{"https", "localhost", 93, "/path", "https://localhost:93/path"},
+	}
+	for _, test := range testCases {
+		url := formatURL(test.scheme, test.host, test.port, test.path)
+		if url.String() != test.result {
+			t.Errorf("Expected %s, got %s", test.result, url.String())
+		}
+	}
+}
+
 func TestFindPortByName(t *testing.T) {
 	container := api.Container{
 		Ports: []api.ContainerPort{
@@ -39,9 +58,9 @@ func TestFindPortByName(t *testing.T) {
 		},
 	}
 	want := 8080
-	got := findPortByName(container, "foo")
-	if got != want {
-		t.Errorf("Expected %v, got %v", want, got)
+	got, err := findPortByName(container, "foo")
+	if got != want || err != nil {
+		t.Errorf("Expected %v, got %v, err: %v", want, got, err)
 	}
 }
 
@@ -73,13 +92,23 @@ func TestGetURLParts(t *testing.T) {
 				},
 			},
 		}
-		p, err := extractPort(test.probe.Port, container)
+
+		scheme := test.probe.Scheme
+		if scheme == "" {
+			scheme = api.URISchemeHTTP
+		}
+		host := test.probe.Host
+		if host == "" {
+			host = state.PodIP
+		}
+		port, err := extractPort(test.probe.Port, container)
 		if test.ok && err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		host, port, path := extractGetParams(test.probe, state, p)
+		path := test.probe.Path
+
 		if !test.ok && err == nil {
-			t.Errorf("Expected error for %+v, got %s:%d/%s", test, host, port, path)
+			t.Errorf("Expected error for %+v, got %s%s:%d/%s", test, scheme, host, port, path)
 		}
 		if test.ok {
 			if host != test.host || port != test.port || path != test.path {

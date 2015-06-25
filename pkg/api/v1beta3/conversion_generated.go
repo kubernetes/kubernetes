@@ -450,6 +450,7 @@ func convert_api_HTTPGetAction_To_v1beta3_HTTPGetAction(in *api.HTTPGetAction, o
 		return err
 	}
 	out.Host = in.Host
+	out.Scheme = URIScheme(in.Scheme)
 	return nil
 }
 
@@ -2515,6 +2516,7 @@ func convert_v1beta3_HTTPGetAction_To_api_HTTPGetAction(in *HTTPGetAction, out *
 		return err
 	}
 	out.Host = in.Host
+	out.Scheme = api.URIScheme(in.Scheme)
 	return nil
 }
 

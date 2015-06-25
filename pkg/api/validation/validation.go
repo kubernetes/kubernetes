@@ -762,6 +762,10 @@ func validateHTTPGetAction(http *api.HTTPGetAction) errs.ValidationErrorList {
 	} else if http.Port.Kind == util.IntstrString && len(http.Port.StrVal) == 0 {
 		allErrors = append(allErrors, errs.NewFieldRequired("port"))
 	}
+	supportedSchemes := util.NewStringSet(string(api.URISchemeHTTP), string(api.URISchemeHTTPS))
+	if !supportedSchemes.Has(string(http.Scheme)) {
+		allErrors = append(allErrors, errs.NewFieldInvalid("scheme", http.Scheme, fmt.Sprintf("must be one of %v", supportedSchemes.List())))
+	}
 	return allErrors
 }
 

@@ -88,7 +88,7 @@ func runApiServer(etcdClient tools.EtcdClient, addr net.IP, port int, masterServ
 		EtcdHelper: helper,
 		KubeletClient: &client.HTTPKubeletClient{
 			Client: http.DefaultClient,
-			Port:   10250,
+			Config: &client.KubeletConfig{Port: 10250},
 		},
 		EnableCoreControllers: true,
 		EnableLogsSupport:     false,
