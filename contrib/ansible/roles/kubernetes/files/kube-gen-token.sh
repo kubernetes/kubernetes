@@ -21,10 +21,11 @@ create_accounts=($@)
 
 touch "${token_file}"
 for account in "${create_accounts[@]}"; do
-  if grep "${account}" "${token_file}" ; then
+  if grep ",${account}," "${token_file}" ; then
     continue
   fi
   token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   echo "${token},${account},${account}" >> "${token_file}"
+  echo "${token}" > "${token_dir}/${account}.token"
   echo "Added ${account}"
 done

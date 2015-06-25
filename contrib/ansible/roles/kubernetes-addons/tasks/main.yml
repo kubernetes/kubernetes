@@ -33,13 +33,10 @@
 - name: HACK | copy local kube-addon-update.sh
   copy: src=kube-addon-update.sh dest={{ kube_script_dir }}/kube-addon-update.sh mode=0755
 
-- name: Copy script to create known_tokens.csv
-  copy: src=kube-gen-token.sh dest={{ kube_script_dir }}/kube-gen-token.sh mode=0755
-
-- name: Run kube-gen-token script to create {{ kube_config_dir }}/known_tokens.csv
+- name: Run kube-gen-token script to create {{ kube_token_dir }}/known_tokens.csv
   command: "{{ kube_script_dir }}/kube-gen-token.sh {{ item }}"
   environment:
-    TOKEN_DIR: "{{ kube_config_dir }}"
+    TOKEN_DIR: "{{ kube_token_dir }}"
   with_items:
     - "system:dns"
   register: gentoken

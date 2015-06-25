@@ -1,0 +1,30 @@
+---
+- name: Copy the token gen script
+  copy:
+    src=kube-gen-token.sh
+    dest={{ kube_script_dir }}
+    mode=u+x
+
+- name: Generate tokens for master components
+  command: "{{ kube_script_dir }}/kube-gen-token.sh {{ item }}"
+  environment:
+    TOKEN_DIR: "{{ kube_token_dir }}"
+  with_items:
+    - "system:controller_manager"
+    - "system:scheduler"
+  register: gentoken
+  changed_when: "'Added' in gentoken.stdout"
+  notify:
+    - restart daemons
+
+- name: Generate tokens for node components
+  command: "{{ kube_script_dir }}/kube-gen-token.sh {{ item }}"
+  environment:
+    TOKEN_DIR: "{{ kube_token_dir }}"
+  with_items:
+    - "system:kubelet"
+    - "system:proxy"
+  register: gentoken
+  changed_when: "'Added' in gentoken.stdout"
+  notify:
+    - restart daemons

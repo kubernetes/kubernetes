@@ -14,6 +14,8 @@ kube_config_dir: /etc/kubernetes
 # This is where all the cert scripts and certs will be located
 kube_cert_dir: "{{ kube_config_dir }}/certs"
 
+# This is where all of the bearer tokens will be stored
+kube_token_dir: "{{ kube_config_dir }}/tokens"
 
 # This is the group that the cert creation scripts chgrp the
 # cert files to. Not really changable...
