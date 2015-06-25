@@ -77,7 +77,7 @@
 {% endif -%}
 
 {% set pod_cidr = "" %}
-{% if grains['roles'][0] == 'kubernetes-master' %}
+{% if grains['roles'][0] == 'kubernetes-master' and grains.get('cbr-cidr') %}
   {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
 {% endif %} 
 
