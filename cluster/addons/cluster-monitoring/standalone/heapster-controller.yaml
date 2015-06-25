@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: ReplicationController
-metadata:
+metadata: 
   name: monitoring-heapster-v5
-  namespace: default
+  namespace: kube-system
   labels:
     k8s-app: heapster
     version: v5
