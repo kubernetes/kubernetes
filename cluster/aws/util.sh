@@ -30,8 +30,13 @@ ASG_NAME="${NODE_INSTANCE_PREFIX}-group"
 # We could allow the master disk volume id to be specified in future
 MASTER_DISK_ID=
 
+# Defaults: ubuntu -> vivid
+if [[ "${KUBE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+  KUBE_OS_DISTRIBUTION=vivid
+fi
+
 case "${KUBE_OS_DISTRIBUTION}" in
-  ubuntu|wheezy|jessie|vivid|coreos)
+  trusty|wheezy|jessie|vivid|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
     ;;
   *)
@@ -221,8 +226,8 @@ function detect-security-groups {
 #   AWS_IMAGE
 function detect-image () {
 case "${KUBE_OS_DISTRIBUTION}" in
-  ubuntu|coreos)
-    detect-ubuntu-image
+  trusty|coreos)
+    detect-trusty-image
     ;;
   vivid)
     detect-vivid-image
@@ -240,12 +245,12 @@ case "${KUBE_OS_DISTRIBUTION}" in
 esac
 }
 
-# Detects the AMI to use for ubuntu (considering the region)
+# Detects the AMI to use for trusty (considering the region)
 # Used by CoreOS & Ubuntu
 #
 # Vars set:
 #   AWS_IMAGE
-function detect-ubuntu-image () {
+function detect-trusty-image () {
   # This is the ubuntu 14.04 image for <region>, amd64, hvm:ebs-ssd
   # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
   # This will need to be updated from time to time as amis are deprecated
