@@ -99,7 +99,7 @@ CONTAINER ID        IMAGE                             COMMAND     CREATED       
 If you read logs of the phabricator container you will notice the following error message:
 
 ```bash
-$ kubectl log phabricator-controller-02qp4
+$ kubectl logs phabricator-controller-02qp4
 [...]
 Raw MySQL Error: Attempt to connect to root@173.194.252.142 failed with error
 #2013: Lost connection to MySQL server at 'reading initial communication

@@ -116,7 +116,7 @@ $ kubectl get pods
 You can take a look at the logs for a pod by using `kubectl.sh log`.  For example:
 
 ```shell
-$ kubectl log mysql
+$ kubectl logs mysql
 ```
 
 If you want to do deeper troubleshooting, e.g. if it seems a container is not staying up, you can also ssh in to the node that a pod is running on.  There, you can run `sudo -s`, then `docker ps -a` to see all the containers.  You can then inspect the logs of containers that have exited, via `docker logs <container_id>`.  (You can also find some relevant logs under `/var/log`, e.g. `docker.log` and `kubelet.log`).

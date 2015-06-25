@@ -131,7 +131,7 @@ You should now get a pod provisioned whose name begins with openshift.
 ```shell
 $ cluster/kubectl.sh get pods | grep openshift
 $ cluster/kubectl.sh log openshift-t7147 origin
-Running: cluster/../cluster/gce/../../cluster/../_output/dockerized/bin/linux/amd64/kubectl log openshift-t7t47 origin
+Running: cluster/../cluster/gce/../../cluster/../_output/dockerized/bin/linux/amd64/kubectl logs openshift-t7t47 origin
 2015-04-30T15:26:00.454146869Z I0430 15:26:00.454005       1 start_master.go:296] Starting an OpenShift master, reachable at 0.0.0.0:8443 (etcd: [https://10.0.27.2:4001])
 2015-04-30T15:26:00.454231211Z I0430 15:26:00.454223       1 start_master.go:297] OpenShift master public address is https://104.197.73.241:8443
 ```
