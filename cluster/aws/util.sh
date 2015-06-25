@@ -27,6 +27,9 @@ ALLOCATE_NODE_CIDRS=true
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 ASG_NAME="${NODE_INSTANCE_PREFIX}-group"
 
+# We could allow the master disk volume id to be specified in future
+MASTER_DISK_ID=
+
 case "${KUBE_OS_DISTRIBUTION}" in
   ubuntu|wheezy|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
@@ -55,7 +58,7 @@ MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 # Be sure to map all the ephemeral drives.  We can specify more than we actually have.
 # TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
 #  only affects the big storage instance types, which aren't a typical use case right now.
-BLOCK_DEVICE_MAPPINGS="{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sdf\",\"VirtualName\":\"ephemeral3\"}"
+BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sdf\",\"VirtualName\":\"ephemeral3\"}]"
 
 function json_val {
     python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
@@ -358,6 +361,34 @@ function authorize-security-group-ingress {
       echo "Output: ${output}"
       exit 1
     fi
+  fi
+}
+
+# Gets master persistent volume, if exists
+# Sets MASTER_DISK_ID
+function find-master-pd {
+  local name=${MASTER_NAME}-pd
+  if [[ -z "${MASTER_DISK_ID}" ]]; then
+    MASTER_DISK_ID=`$AWS_CMD --output text describe-volumes \
+                             --filters Name=availability-zone,Values=${ZONE} \
+                                       Name=tag:Name,Values=${name} \
+                                       Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                             --query Volumes[].VolumeId`
+  fi
+}
+
+# Gets or creates master persistent volume
+# Sets MASTER_DISK_ID
+function ensure-master-pd {
+  local name=${MASTER_NAME}-pd
+
+  find-master-pd
+
+  if [[ -z "${MASTER_DISK_ID}" ]]; then
+    echo "Creating master disk: size ${MASTER_DISK_SIZE}GB, type ${MASTER_DISK_TYPE}"
+    MASTER_DISK_ID=`$AWS_CMD create-volume --availability-zone ${ZONE} --volume-type ${MASTER_DISK_TYPE} --size ${MASTER_DISK_SIZE} --query VolumeId --output text`
+    add-tag ${MASTER_DISK_ID} Name ${name}
+    add-tag ${MASTER_DISK_ID} KubernetesCluster ${CLUSTER_ID}
   fi
 }
 
@@ -724,8 +755,8 @@ function kube-up {
   # HTTPS to the master is allowed (for API access)
   authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
 
-  master_volume_mapping="{\"DeviceName\": \"/dev/sdb\",\"Ebs\":{\"DeleteOnTermination\":false,\"VolumeSize\":${MASTER_DISK_SIZE},\"VolumeType\":\"${MASTER_DISK_TYPE}\"}}"
-  master_block_device_mappings="[${master_volume_mapping},${BLOCK_DEVICE_MAPPINGS}]"
+  # Get or create master persistent volume
+  ensure-master-pd
 
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
@@ -759,8 +790,8 @@ function kube-up {
     echo "readonly KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN}'"
     echo "readonly DOCKER_STORAGE='${DOCKER_STORAGE:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/setup-master-pd.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/setup-master-pd.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
@@ -776,17 +807,16 @@ function kube-up {
     --key-name ${AWS_SSH_KEY_NAME} \
     --security-group-ids ${MASTER_SG_ID} \
     --associate-public-ip-address \
-    --block-device-mappings "${master_block_device_mappings}" \
+    --block-device-mappings "${BLOCK_DEVICE_MAPPINGS}" \
     --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
   add-tag $master_id KubernetesCluster ${CLUSTER_ID}
 
   echo "Waiting for master to be ready"
-
   local attempt=0
 
-   while true; do
+  while true; do
     echo -n Attempt "$(($attempt+1))" to check for master node
     local ip=$(get_instance_public_ip ${master_id})
     if [[ -z "${ip}" ]]; then
@@ -802,8 +832,14 @@ function kube-up {
       KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
       echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
 
-      # We are not able to add a route to the instance until that instance is in "running" state.
+      # We are not able to add a route or volume to the instance until that instance is in "running" state.
       wait-for-instance-running $master_id
+
+      # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
+      # TODO: Wait for volume to be ready in setup-master-pd.sh
+      echo "Attaching peristent data volume (${MASTER_DISK_ID}) to master"
+      $AWS_CMD attach-volume --volume-id ${MASTER_DISK_ID} --device /dev/sdb --instance-id ${master_id}
+
       sleep 10
       $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MASTER_IP_RANGE} --instance-id $master_id > $LOG
 
@@ -813,16 +849,6 @@ function kube-up {
     attempt=$(($attempt+1))
     sleep 10
   done
-
-  # Master is ready, find the id of the root ebs device
-  # This assumes that the root device will be the first device listed in the response"
-  master_volume_id=$($AWS_CMD describe-instance-attribute \
-    --instance-id $master_id \
-    --attribute blockDeviceMapping | \
-    json_val '["BlockDeviceMappings"][0]["Ebs"]["VolumeId"]')
-
-  add-tag $master_volume_id Name ${MASTER_NAME}-pd
-  add-tag $master_volume_id KubernetesCluster ${CLUSTER_ID}
 
   # Check for SSH connectivity
   attempt=0
@@ -892,7 +918,7 @@ function kube-up {
       --key-name ${AWS_SSH_KEY_NAME} \
       --security-groups ${MINION_SG_ID} \
       ${public_ip_option} \
-      --block-device-mappings "[${BLOCK_DEVICE_MAPPINGS}]" \
+      --block-device-mappings "${BLOCK_DEVICE_MAPPINGS}" \
       --user-data "file://${KUBE_TEMP}/minion-user-data"
 
   echo "Creating autoscaling group"
