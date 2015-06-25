@@ -51,9 +51,9 @@ var _ = Describe("Networking", func() {
 	})
 
 	It("should provide Internet connection for containers", func() {
-		By("Running container which pings google.com")
-		podName := "ping-test"
-		contName := "ping-test-container"
+		By("Running container which tries to wget google.com")
+		podName := "wget-test"
+		contName := "wget-test-container"
 		pod := &api.Pod{
 			TypeMeta: api.TypeMeta{
 				Kind: "Pod",
@@ -66,7 +66,7 @@ var _ = Describe("Networking", func() {
 					{
 						Name:    contName,
 						Image:   "gcr.io/google_containers/busybox",
-						Command: []string{"ping", "-c", "3", "-w", "10", "google.com"},
+						Command: []string{"wget", "-s", "google.com"},
 					},
 				},
 				RestartPolicy: api.RestartPolicyNever,
