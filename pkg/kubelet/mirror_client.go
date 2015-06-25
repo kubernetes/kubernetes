@@ -49,7 +49,7 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *api.Pod) error {
 	}
 	pod.Annotations[ConfigMirrorAnnotationKey] = MirrorType
 
-	_, err := mc.apiserverClient.Pods(NamespaceDefault).Create(pod)
+	_, err := mc.apiserverClient.Pods(pod.Namespace).Create(pod)
 	return err
 }
 
