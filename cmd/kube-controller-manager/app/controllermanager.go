@@ -250,7 +250,7 @@ func (s *CMServer) Run(_ []string) error {
 	var rootCA []byte
 
 	if s.RootCAFile != "" {
-		rootCA, err := ioutil.ReadFile(s.RootCAFile)
+		rootCA, err = ioutil.ReadFile(s.RootCAFile)
 		if err != nil {
 			return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
 		}
