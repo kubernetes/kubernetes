@@ -35,11 +35,6 @@ spec:
         args:
         # command = "/kube2sky"
         - -domain={{ pillar['dns_domain'] }}
-        - -kubecfg_file=/etc/dns_token/kubeconfig
-        volumeMounts:
-        - mountPath: /etc/dns_token
-          name: dns-token
-          readOnly: true
       - name: skydns
         image: gcr.io/google_containers/skydns:2015-03-11-001
         args:
@@ -63,7 +58,3 @@ spec:
           initialDelaySeconds: 30
           timeoutSeconds: 5
       dnsPolicy: Default  # Don't use cluster DNS.
-      volumes:
-      - name: dns-token
-        secret:
-          secretName: token-system-dns
