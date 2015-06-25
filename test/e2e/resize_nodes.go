@@ -294,11 +294,11 @@ func verifyPods(c *client.Client, ns, name string, wantName bool, replicas int) 
 	}
 	e := podsRunning(c, pods)
 	if len(e) > 0 {
-		return fmt.Errorf("Failed to wait for pods running: %v", e)
+		return fmt.Errorf("failed to wait for pods running: %v", e)
 	}
 	err = podsResponding(c, ns, name, wantName, pods)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to wait for pods responding: %v", err)
 	}
 	return nil
 }
