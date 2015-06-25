@@ -475,8 +475,8 @@
 		},
 		{
 			"ImportPath": "github.com/skynetservices/skydns/msg",
-			"Comment": "2.0.1d-2-g245a121",
-			"Rev": "245a1216be2a7f5377ea56e957fdfa0de6ecd067"
+			"Comment": "2.5.1a",
+			"Rev": "1be70b5b8aa07acccd972146d84011b670af88b4"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
