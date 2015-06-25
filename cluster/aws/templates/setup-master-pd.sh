@@ -22,6 +22,7 @@ echo "Mounting master-pd"
 mkdir -p /mnt/master-pd
 mkfs -t ext4 /dev/xvdb
 echo "/dev/xvdb  /mnt/master-pd  ext4  noatime  0 0" >> /etc/fstab
+mount /mnt/master-pd
 
 # Contains all the data stored in etcd
 mkdir -m 700 -p /mnt/master-pd/var/etcd

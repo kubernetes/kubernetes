@@ -66,6 +66,7 @@ else
 
   # Remove any existing mounts
   for block_device in ${block_devices}; do
+    echo "Unmounting ${block_device}"
     /bin/umount ${block_device}
     sed -i -e "\|^${block_device}|d" /etc/fstab
   done
@@ -80,26 +81,28 @@ else
       echo "Found multiple ephemeral block devices, formatting with btrfs as RAID-0"
       mkfs.btrfs -f --data raid0 ${block_devices[@]}
     fi
-    echo "${block_devices[0]}  /mnt  btrfs  noatime  0 0" >> /etc/fstab
-    mount /mnt
+    echo "${block_devices[0]}  /mnt/ephemeral  btrfs  noatime  0 0" >> /etc/fstab
+    mkdir -p /mnt/ephemeral
+    mount /mnt/ephemeral
 
-    mkdir -p /mnt/kubernetes
+    mkdir -p /mnt/ephemeral/kubernetes
 
-    move_docker="/mnt"
-    move_kubelet="/mnt/kubernetes"
+    move_docker="/mnt/ephemeral"
+    move_kubelet="/mnt/ephemeral/kubernetes"
   elif [[ ${docker_storage} == "aufs-nolvm" ]]; then
     if [[ ${#block_devices[@]} != 1 ]]; then
       echo "aufs-nolvm selected, but multiple ephemeral devices were found; only the first will be available"
     fi
 
     mkfs -t ext4 ${block_devices[0]}
-    echo "${block_devices[0]}  /mnt  ext4     noatime  0 0" >> /etc/fstab
-    mount /mnt
+    echo "${block_devices[0]}  /mnt/ephemeral  ext4     noatime  0 0" >> /etc/fstab
+    mkdir -p /mnt/ephemeral
+    mount /mnt/ephemeral
 
-    mkdir -p /mnt/kubernetes
+    mkdir -p /mnt/ephemeral/kubernetes
 
-    move_docker="/mnt"
-    move_kubelet="/mnt/kubernetes"
+    move_docker="/mnt/ephemeral"
+    move_kubelet="/mnt/ephemeral/kubernetes"
   elif [[ ${docker_storage} == "devicemapper" || ${docker_storage} == "aufs" ]]; then
     # We always use LVM, even with one device
     # In devicemapper mode, Docker can use LVM directly
@@ -144,21 +147,21 @@ else
       fi
 
       mkfs -t ext4 /dev/vg-ephemeral/docker
-      mkdir -p /mnt/docker
-      echo "/dev/vg-ephemeral/docker  /mnt/docker  ext4  noatime  0 0" >> /etc/fstab
-      mount /mnt/docker
-      move_docker="/mnt"
+      mkdir -p /mnt/ephemeral/docker
+      echo "/dev/vg-ephemeral/docker  /mnt/ephemeral/docker  ext4  noatime  0 0" >> /etc/fstab
+      mount /mnt/ephemeral/docker
+      move_docker="/mnt/ephemeral"
     fi
 
     # Remaining 5% is for kubernetes data
     # TODO: Should this be a thin pool?  e.g. would we ever want to snapshot this data?
     lvcreate -l 100%FREE -n kubernetes vg-ephemeral
     mkfs -t ext4 /dev/vg-ephemeral/kubernetes
-    mkdir -p /mnt/kubernetes
-    echo "/dev/vg-ephemeral/kubernetes  /mnt/kubernetes  ext4  noatime  0 0" >> /etc/fstab
-    mount /mnt/kubernetes
+    mkdir -p /mnt/ephemeral/kubernetes
+    echo "/dev/vg-ephemeral/kubernetes  /mnt/ephemeral/kubernetes  ext4  noatime  0 0" >> /etc/fstab
+    mount /mnt/ephemeral/kubernetes
 
-    move_kubelet="/mnt/kubernetes"
+    move_kubelet="/mnt/ephemeral/kubernetes"
   else
     echo "Ignoring unknown DOCKER_STORAGE: ${docker_storage}"
   fi
