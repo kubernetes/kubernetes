@@ -20,11 +20,6 @@ Vagrant.configure(2) do |config|
       node.vm.hostname = "node-#{i}.vms.local"
       node.vm.network "private_network", ip: "192.168.1.1#{i}"
       node.vm.provision :ansible do |ansible|
-        ansible.groups = {
-          "masters" => ["master"],
-          "nodes" => ["node-1", "node-2"],
-          "etcd" => ["master"]
-        }
         ansible.host_key_checking = false
         ansible.extra_vars = {
           ansible_ssh_user: 'vagrant',

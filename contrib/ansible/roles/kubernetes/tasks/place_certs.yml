@@ -1,12 +1,16 @@
 ---
-- name: place ssh public key so apiserver can push certs
+- name: place ssh public key on other nodes so apiserver can push certs
   authorized_key: user=root key="{{ item }}" state=present
   with_file:
     - '/tmp/id_rsa.pub'
   changed_when: false
 
 - name: Copy certificates directly from the apiserver to nodes
-  synchronize: src={{ kube_cert_dir }}/{{ item }} dest={{ kube_cert_dir }}/{{ item }}
+  synchronize:
+    src={{ kube_cert_dir }}/{{ item }}
+    dest={{ kube_cert_dir }}/{{ item }}
+    rsync_timeout=30
+    set_remote_user=no
   delegate_to: "{{ groups['masters'][0] }}"
   with_items:
     - "ca.crt"
