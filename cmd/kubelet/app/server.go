@@ -115,6 +115,7 @@ type KubeletServer struct {
 	DockerDaemonContainer          string
 	SystemContainer                string
 	ConfigureCBR0                  bool
+	PodCIDR                        string
 	MaxPods                        int
 	DockerExecHandlerName          string
 
@@ -241,7 +242,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ConfigureCBR0, "configure-cbr0", s.ConfigureCBR0, "If true, kubelet will configure cbr0 based on Node.Spec.PodCIDR.")
 	fs.IntVar(&s.MaxPods, "max-pods", 100, "Number of Pods that can run on this Kubelet.")
 	fs.StringVar(&s.DockerExecHandlerName, "docker-exec-handler", s.DockerExecHandlerName, "Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.")
-
+	fs.StringVar(&s.PodCIDR, "pod-cidr", "", "The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.")
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
@@ -361,6 +362,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		DockerDaemonContainer:     s.DockerDaemonContainer,
 		SystemContainer:           s.SystemContainer,
 		ConfigureCBR0:             s.ConfigureCBR0,
+		PodCIDR:                   s.PodCIDR,
 		MaxPods:                   s.MaxPods,
 		DockerExecHandler:         dockerExecHandler,
 	}
@@ -714,6 +716,7 @@ type KubeletConfig struct {
 	DockerDaemonContainer          string
 	SystemContainer                string
 	ConfigureCBR0                  bool
+	PodCIDR                        string
 	MaxPods                        int
 	DockerExecHandler              dockertools.ExecHandler
 }
@@ -771,6 +774,7 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,
 		kc.ConfigureCBR0,
+		kc.PodCIDR,
 		kc.MaxPods,
 		kc.DockerExecHandler)
 

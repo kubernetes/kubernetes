@@ -354,6 +354,7 @@ func (ks *KubeletExecutorServer) createAndInitKubelet(
 		kc.DockerDaemonContainer,
 		kc.SystemContainer,
 		kc.ConfigureCBR0,
+		kc.PodCIDR,
 		kc.MaxPods,
 		kc.DockerExecHandler,
 	)
