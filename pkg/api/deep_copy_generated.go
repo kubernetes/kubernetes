@@ -207,78 +207,6 @@ func deepCopy_api_Container(in Container, out *Container, c *conversion.Cloner) 
 	return nil
 }
 
-func deepCopy_api_ContainerManifest(in ContainerManifest, out *ContainerManifest, c *conversion.Cloner) error {
-	out.Version = in.Version
-	out.ID = in.ID
-	out.UUID = in.UUID
-	if in.Volumes != nil {
-		out.Volumes = make([]Volume, len(in.Volumes))
-		for i := range in.Volumes {
-			if err := deepCopy_api_Volume(in.Volumes[i], &out.Volumes[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Volumes = nil
-	}
-	if in.Containers != nil {
-		out.Containers = make([]Container, len(in.Containers))
-		for i := range in.Containers {
-			if err := deepCopy_api_Container(in.Containers[i], &out.Containers[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Containers = nil
-	}
-	out.RestartPolicy = in.RestartPolicy
-	if in.TerminationGracePeriodSeconds != nil {
-		out.TerminationGracePeriodSeconds = new(int64)
-		*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
-	} else {
-		out.TerminationGracePeriodSeconds = nil
-	}
-	if in.ActiveDeadlineSeconds != nil {
-		out.ActiveDeadlineSeconds = new(int64)
-		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
-	} else {
-		out.ActiveDeadlineSeconds = nil
-	}
-	out.DNSPolicy = in.DNSPolicy
-	out.HostNetwork = in.HostNetwork
-	if in.ImagePullSecrets != nil {
-		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
-		for i := range in.ImagePullSecrets {
-			if err := deepCopy_api_LocalObjectReference(in.ImagePullSecrets[i], &out.ImagePullSecrets[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ImagePullSecrets = nil
-	}
-	return nil
-}
-
-func deepCopy_api_ContainerManifestList(in ContainerManifestList, out *ContainerManifestList, c *conversion.Cloner) error {
-	if err := deepCopy_api_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
-		return err
-	}
-	if err := deepCopy_api_ListMeta(in.ListMeta, &out.ListMeta, c); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]ContainerManifest, len(in.Items))
-		for i := range in.Items {
-			if err := deepCopy_api_ContainerManifest(in.Items[i], &out.Items[i], c); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
 func deepCopy_api_ContainerPort(in ContainerPort, out *ContainerPort, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.HostPort = in.HostPort
@@ -2152,8 +2080,6 @@ func init() {
 		deepCopy_api_ComponentStatus,
 		deepCopy_api_ComponentStatusList,
 		deepCopy_api_Container,
-		deepCopy_api_ContainerManifest,
-		deepCopy_api_ContainerManifestList,
 		deepCopy_api_ContainerPort,
 		deepCopy_api_ContainerState,
 		deepCopy_api_ContainerStateRunning,

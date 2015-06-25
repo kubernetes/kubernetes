@@ -152,38 +152,6 @@ const (
 	NamespaceAll string = ""
 )
 
-//
-//// ContainerManifest corresponds to the Container Manifest format, documented at:
-//// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
-//// This is used as the representation of Kubernetes workloads.
-//// DEPRECATED: Exists to allow backwards compatible storage for clients accessing etcd
-//// directly.
-//type ContainerManifest struct {
-//	// Required: This must be a supported version string, such as "v1beta1".
-//	Version string `json:"version"`
-//	// Required: This must be a DNS_SUBDOMAIN.
-//	// TODO: ID on Manifest is deprecated and will be removed in the future.
-//	ID string `json:"id"`
-//	// TODO: UUID on Manifest is deprecated in the future once we are done
-//	// with the API refactoring. It is required for now to determine the instance
-//	// of a Pod.
-//	UUID          types.UID      `json:"uuid,omitempty"`
-//	Volumes       []Volume      `json:"volumes"`
-//	Containers    []Container   `json:"containers"`
-//	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
-//}
-//
-//// ContainerManifestList is used to communicate container manifests to kubelet.
-//// DEPRECATED: Exists to allow backwards compatible storage for clients accessing etcd
-//// directly.
-//type ContainerManifestList struct {
-//	TypeMeta `json:",inline"`
-//	// ID is the legacy field representing Name
-//	ID string `json:"id,omitempty"`
-//
-//	Items []ContainerManifest `json:"items,omitempty"`
-//}
-
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have

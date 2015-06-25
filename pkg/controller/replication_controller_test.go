@@ -322,11 +322,6 @@ func TestCreateReplica(t *testing.T) {
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
 	podControl.createReplica(ns, controllerSpec)
 
-	manifest := api.ContainerManifest{}
-	if err := api.Scheme.Convert(&controllerSpec.Spec.Template.Spec, &manifest); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Labels:       controllerSpec.Spec.Template.Labels,

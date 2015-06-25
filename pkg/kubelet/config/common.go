@@ -52,11 +52,6 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) er
 		glog.V(5).Infof("Generated UID %q pod %q from %s", pod.UID, pod.Name, source)
 	}
 
-	// This is required for backward compatibility, and should be removed once we
-	// completely deprecate ContainerManifest.
-	if len(pod.Name) == 0 {
-		pod.Name = string(pod.UID)
-	}
 	pod.Name = generatePodName(pod.Name, nodeName)
 	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
 
