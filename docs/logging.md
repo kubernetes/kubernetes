@@ -3,47 +3,69 @@
 ## Logging by Kubernetes Components
 Kubernetes components, such as kubelet and apiserver, use the [glog](https://godoc.org/github.com/golang/glog) logging library.  Developer conventions for logging severity are described in [devel/logging.md](devel/logging.md).
 
-## Logging in Containers
-There are no Kubernetes-specific requirements for logging from within containers. [search](https://www.google.com/?q=docker+container+logging) will turn up any number of articles about logging and
-Docker containers.  However, we do provide an example of how to collect, index, and view pod logs [using Fluentd, Elasticsearch, and Kibana](./getting-started-guides/logging.md)
-
-
-## Logging to Elasticsearch on the GCE platform
-Currently the collection of container logs using the [Fluentd](http://www.fluentd.org/) log collector is 
-enabled by default for clusters created for the GCE platform. Each node uses Fluentd to collect
-the container logs which are submitted in [Logstash](http://logstash.net/docs/1.4.2/tutorials/getting-started-with-logstash)
-format (in JSON) to an [Elasticsearch](http://www.elasticsearch.org/) cluster which runs as a Kubernetes service.
-As of Kubernetes 0.11, when you create a cluster the console output reports the URL of both the Elasticsearch cluster as well as
-a URL for a [Kibana](http://www.elasticsearch.org/overview/kibana/) dashboard viewer for the logs that have been ingested
-into Elasticsearch.
+## Examining the logs of running containers
+The logs of a running container may be fetched using the command `kubectl logs`. For example, given
+this pod specification which has a container which writes out some text to standard
+output every second [counter-pod.yaml](/examples/blog-logging/counter-pod.yaml):
 ```
-Elasticsearch is running at https://104.197.10.10/api/v1/proxy/namespaces/default/services/elasticsearch-logging
-Kibana is running at https://104.197.10.10/api/v1/proxy/namespaces/default/services/kibana-logging
+ apiVersion: v1
+ kind: Pod
+ metadata:
+   name: counter
+ spec:
+   containers:
+   - name: count
+     image: ubuntu:14.04
+     args: [bash, -c, 
+            'for ((i = 0; ; i++)); do echo "$i: $(date)"; sleep 1; done']
 ```
-Visiting the Kibana dashboard URL in a browser should give a display like this:
-![Kibana](kibana.png)
-
-To learn how to query, filter etc. using Kibana you might like to look at this [tutorial](http://www.elasticsearch.org/guide/en/kibana/current/working-with-queries-and-filters.html).
-
-You can check to see if any logs are being ingested into Elasticsearch by curling against its URL. You will need to provide the username and password that was generated when your cluster was created. This can be found in the `kubernetes_auth` file for your cluster.
+we can run the pod:
 ```
-$ curl -k -u admin:Drt3KdRGnoQL6TQM https://130.211.152.93/api/v1/proxy/namespaces/default/services/elasticsearch-logging/_search?size=10
+ $ kubectl create -f counter-pod.yaml
+ pods/counter
 ```
-A [demonstration](../examples/logging-demo/README.md) of two synthetic logging sources can be used
-to check that logging is working correctly.
+and then fetch the logs:
+```
+$ kubectl logs counter
+0: Tue Jun  2 21:37:31 UTC 2015
+1: Tue Jun  2 21:37:32 UTC 2015
+2: Tue Jun  2 21:37:33 UTC 2015
+3: Tue Jun  2 21:37:34 UTC 2015
+4: Tue Jun  2 21:37:35 UTC 2015
+5: Tue Jun  2 21:37:36 UTC 2015
+...
+```
+If a pod has more than one container then you need to specify which container's log files should
+be fetched e.g.
+```
+$ kubectl logs kube-dns-v3-7r1l9 etcd
+2015/06/23 00:43:10 etcdserver: start to snapshot (applied: 30003, lastsnap: 20002)
+2015/06/23 00:43:10 etcdserver: compacted log at index 30003
+2015/06/23 00:43:10 etcdserver: saved snapshot at index 30003
+2015/06/23 02:05:42 etcdserver: start to snapshot (applied: 40004, lastsnap: 30003)
+2015/06/23 02:05:42 etcdserver: compacted log at index 40004
+2015/06/23 02:05:42 etcdserver: saved snapshot at index 40004
+2015/06/23 03:28:31 etcdserver: start to snapshot (applied: 50005, lastsnap: 40004)
+2015/06/23 03:28:31 etcdserver: compacted log at index 50005
+2015/06/23 03:28:31 etcdserver: saved snapshot at index 50005
+2015/06/23 03:28:56 filePurge: successfully removed file default.etcd/member/wal/0000000000000000-0000000000000000.wal
+2015/06/23 04:51:03 etcdserver: start to snapshot (applied: 60006, lastsnap: 50005)
+2015/06/23 04:51:03 etcdserver: compacted log at index 60006
+2015/06/23 04:51:03 etcdserver: saved snapshot at index 60006
+...
+```
 
-Cluster logging can be turned on or off using the environment variable `ENABLE_NODE_LOGGING` which is defined in the
-`config-default.sh` file for each provider. For the GCE provider this is set by default to `true`. Set this
-to `false` to disable cluster logging.
+## Cluster level logging to Google Cloud Logging
+The getting started guide [Cluster Level Logging to Google Cloud Logging](getting-started-guides/logging.md)
+explains how container logs are ingested into [Google Cloud Logging](https://cloud.google.com/logging/docs/)
+and shows how to query the ingested logs.
 
-The type of logging is used is specified by the environment variable `LOGGING_DESTINATION` which for the
-GCE provider has the default value `elasticsearch`. If this is set to `gcp` for the GCE provider then
-logs will be sent to the Google Cloud Logging system instead.
+## Cluster level logging with Elasticsearch and Kibana
+The getting started guide [Cluster Level Logging with Elasticsearch and Kibana](getting-started-guides/logging-elasticsearch.md)
+describes how to ingest cluster level logs into Elasticsearch and view them using Kibana.
 
-When using Elasticsearch the number of Elasticsearch instances can be controlled by setting the
-variable `ELASTICSEARCH_LOGGING_REPLICAS` which has the default value of `1`. For large clusters
-or clusters that are generating log information at a high rate you may wish to use more
-Elasticsearch instances.
-
+## Ingesting Application Log Files
+Cluster level logging only collects the standard output and standard error output of the applications
+running in containers. The guide [Collecting log files within containers with Fluentd](/contrib/logging/fluentd-sidecar-gcp/README.md) explains how the log files of applications can also be ingested into Google Cloud logging.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/logging.md?pixel)]()
