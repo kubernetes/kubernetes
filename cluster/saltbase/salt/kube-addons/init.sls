@@ -11,6 +11,13 @@ addon-dir-create:
     - require:
         - file: addon-dir-delete
 
+/etc/kubernetes/addons/namespace.yaml:
+  file.managed:
+    - source: salt://kube-addons/namespace.yaml
+    - user: root
+    - group: root
+    - file_mode: 644
+
 {% if pillar.get('enable_cluster_monitoring', '').lower() == 'influxdb' %}
 /etc/kubernetes/addons/cluster-monitoring/influxdb:
   file.recurse:

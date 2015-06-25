@@ -71,7 +71,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 
 	// Check for the existence of the Elasticsearch service.
 	By("Checking the Elasticsearch service exists.")
-	s := f.Client.Services(api.NamespaceDefault)
+	s := f.Client.Services(api.NamespaceSystem)
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
@@ -86,10 +86,10 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	// Wait for the Elasticsearch pods to enter the running state.
 	By("Checking to make sure the Elasticsearch pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{esKey: esValue}))
-	pods, err := f.Client.Pods(api.NamespaceDefault).List(label, fields.Everything())
+	pods, err := f.Client.Pods(api.NamespaceSystem).List(label, fields.Everything())
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
-		err = waitForPodRunning(f.Client, pod.Name)
+		err = waitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -101,7 +101,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		// Query against the root URL for Elasticsearch.
 		body, err := f.Client.Get().
-			Namespace(api.NamespaceDefault).
+			Namespace(api.NamespaceSystem).
 			Prefix("proxy").
 			Resource("services").
 			Name("elasticsearch-logging").
@@ -147,7 +147,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 	var body []byte
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		body, err = f.Client.Get().
-			Namespace(api.NamespaceDefault).
+			Namespace(api.NamespaceSystem).
 			Prefix("proxy").
 			Resource("services").
 			Name("elasticsearch-logging").
@@ -273,7 +273,7 @@ func ClusterLevelLoggingWithElasticsearch(f *Framework) {
 		// verison of the name. Ask for twice as many log lines as we expect to check for
 		// duplication bugs.
 		body, err = f.Client.Get().
-			Namespace(api.NamespaceDefault).
+			Namespace(api.NamespaceSystem).
 			Prefix("proxy").
 			Resource("services").
 			Name("elasticsearch-logging").

@@ -137,7 +137,7 @@ func TestE2E(t *testing.T) {
 	// cluster infrastructure pods that are being pulled or started can block
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
-	if err := waitForPodsRunningReady(api.NamespaceDefault, testContext.MinStartupPods, podStartupTimeout); err != nil {
+	if err := waitForPodsRunningReady(api.NamespaceSystem, testContext.MinStartupPods, podStartupTimeout); err != nil {
 		glog.Fatalf("Error waiting for all pods to be running and ready: %v", err)
 	}
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
