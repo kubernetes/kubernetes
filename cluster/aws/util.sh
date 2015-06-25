@@ -55,7 +55,7 @@ MINION_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 # Be sure to map all the ephemeral drives.  We can specify more than we actually have.
 # TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
 #  only affects the big storage instance types, which aren't a typical use case right now.
-BLOCK_DEVICE_MAPPINGS="{\"DeviceName\": \"/dev/sdb\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral3\"}"
+BLOCK_DEVICE_MAPPINGS="{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sdf\",\"VirtualName\":\"ephemeral3\"}"
 
 function json_val {
     python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
@@ -724,7 +724,7 @@ function kube-up {
   # HTTPS to the master is allowed (for API access)
   authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
 
-  master_volume_mapping="{\"DeviceName\": \"/dev/sdh\",\"Ebs\":{\"DeleteOnTermination\":false,\"VolumeSize\":${MASTER_DISK_SIZE},\"VolumeType\":\"${MASTER_DISK_TYPE}\"}}"
+  master_volume_mapping="{\"DeviceName\": \"/dev/sdb\",\"Ebs\":{\"DeleteOnTermination\":false,\"VolumeSize\":${MASTER_DISK_SIZE},\"VolumeType\":\"${MASTER_DISK_TYPE}\"}}"
   master_block_device_mappings="[${master_volume_mapping},${BLOCK_DEVICE_MAPPINGS}]"
 
   (

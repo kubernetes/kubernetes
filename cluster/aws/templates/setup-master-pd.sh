@@ -13,14 +13,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 # Format and mount the disk, create directories on it for all of the master's
 # persistent data, and link them to where they're used.
 
 # Mount Master Persistent Disk
 echo "Mounting master-pd"
 mkdir -p /mnt/master-pd
-mkfs -t ext4 /dev/xvdh
-echo "/dev/xvdh  /mnt/master-pd  ext4  noatime  0 0" >> /etc/fstab
+mkfs -t ext4 /dev/xvdb
+echo "/dev/xvdb  /mnt/master-pd  ext4  noatime  0 0" >> /etc/fstab
 
 # Contains all the data stored in etcd
 mkdir -m 700 -p /mnt/master-pd/var/etcd
