@@ -30,7 +30,7 @@ A request has 4 attributes that can be considered for authorization:
   - whether the request is readonly (GETs are readonly)
   - what resource is being accessed 
     - applies only to the API endpoints, such as 
-        `/api/v1beta1/pods`.  For miscelaneous endpoints, like `/version`, the
+        `/api/v1/namespaces/default/pods`.  For miscellaneous endpoints, like `/version`, the
         resource is the empty string.
   - the namespace of the object being access, or the empty string if the
         endpoint does not support namespaced objects.
@@ -46,11 +46,11 @@ The file format is [one JSON object per line](http://jsonlines.org/).  There sho
 one map per line.
 
 Each line is a "policy object".  A policy object is a map with the following properties:
-    - `user`, type string; the user-string from `--token_auth_file`
-    - `readonly`, type boolean, when true, means that the policy only applies to GET
+  - `user`, type string; the user-string from `--token_auth_file`
+  - `readonly`, type boolean, when true, means that the policy only applies to GET
       operations.
-    - `resource`, type string; a resource from an URL, such as `pods`.
-    - `namespace`, type string; a namespace string.
+  - `resource`, type string; a resource from an URL, such as `pods`.
+  - `namespace`, type string; a namespace string.
 
 An unset property is the same as a property set to the zero value for its type (e.g. empty string, 0, false).
 However, unset should be preferred for readability.
@@ -82,7 +82,7 @@ To permit an action Policy with an unset namespace applies regardless of namespa
 
 [Complete file example](../pkg/auth/authorizer/abac/example_policy_file.jsonl)
 
-## Plugin Developement
+## Plugin Development
 
 Other implementations can be developed fairly easily.
 The APIserver calls the Authorizer interface:

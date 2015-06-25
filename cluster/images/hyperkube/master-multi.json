@@ -7,7 +7,7 @@
   "containers":[
     {
       "name": "controller-manager",
-      "image": "gcr.io/google_containers/hyperkube:v0.17.0",
+      "image": "gcr.io/google_containers/hyperkube:VERSION",
       "command": [
               "/hyperkube",
               "controller-manager",
@@ -19,11 +19,11 @@
     },
     {
       "name": "apiserver",
-      "image": "gcr.io/google_containers/hyperkube:v0.17.0",
+      "image": "gcr.io/google_containers/hyperkube:VERSION",
       "command": [
               "/hyperkube",
               "apiserver",
-              "--portal_net=10.0.0.1/24",
+              "--portal-net=10.0.0.1/24",
               "--address=0.0.0.0",
               "--etcd_servers=http://127.0.0.1:4001",
               "--cluster_name=kubernetes",
@@ -32,7 +32,7 @@
     },
     {
       "name": "scheduler",
-      "image": "gcr.io/google_containers/hyperkube:v0.17.0",
+      "image": "gcr.io/google_containers/hyperkube:VERSION",
       "command": [
               "/hyperkube",
               "scheduler",

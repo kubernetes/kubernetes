@@ -48,7 +48,7 @@ func newTestRuntimeCache(getter podsGetter) *testRuntimeCache {
 func TestGetPods(t *testing.T) {
 	runtime := &FakeRuntime{}
 	expected := []*Pod{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
-	runtime.Podlist = expected
+	runtime.PodList = expected
 	cache := newTestRuntimeCache(runtime)
 	actual, err := cache.GetPods()
 	if err != nil {
@@ -65,12 +65,12 @@ func TestForceUpdateIfOlder(t *testing.T) {
 
 	// Cache old pods.
 	oldpods := []*Pod{{ID: "1111"}}
-	runtime.Podlist = oldpods
+	runtime.PodList = oldpods
 	cache.updateCacheWithLock()
 
 	// Update the runtime to new pods.
 	newpods := []*Pod{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
-	runtime.Podlist = newpods
+	runtime.PodList = newpods
 
 	// An older timestamp should not force an update.
 	cache.ForceUpdateIfOlder(time.Now().Add(-20 * time.Minute))
@@ -100,7 +100,7 @@ func TestUpdatePodsOnlyIfNewer(t *testing.T) {
 
 	// Instruct runime to return a list of old pods.
 	oldpods := []*Pod{{ID: "1111"}}
-	runtime.Podlist = oldpods
+	runtime.PodList = oldpods
 
 	// Try to update the cache; the attempt should not succeed because the
 	// cache timestamp is newer than the current time.

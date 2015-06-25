@@ -2,7 +2,9 @@
 
 Use the [master.yaml](cloud-configs/master.yaml) and [node.yaml](cloud-configs/node.yaml) cloud-configs to provision a multi-node Kubernetes cluster.
 
-> **Attention**: This requires at least CoreOS version **653.0.0**.
+> **Attention**: This requires at least CoreOS version **[653.0.0][coreos653]**, as this was the first release to include etcd2.
+
+[coreos653]: https://coreos.com/releases/#653.0.0
 
 ## Overview
 

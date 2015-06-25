@@ -35,6 +35,7 @@ func makeValidService() api.Service {
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"key": "val"},
 			SessionAffinity: "None",
+			Type:            api.ServiceTypeClusterIP,
 			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675}},
 		},
 	}
@@ -76,10 +77,10 @@ func TestBeforeUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "change portal IP",
+			name: "change ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Spec.PortalIP = "1.2.3.4"
-				newSvc.Spec.PortalIP = "4.3.2.1"
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "4.3.2.1"
 			},
 			expectErr: true,
 		},

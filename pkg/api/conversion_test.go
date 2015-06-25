@@ -22,9 +22,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 )
 
 func BenchmarkPodConversion(b *testing.B) {

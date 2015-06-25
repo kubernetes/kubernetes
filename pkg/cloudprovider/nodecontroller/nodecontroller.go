@@ -20,14 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -44,8 +39,12 @@ var (
 	ErrCloudInstance  = errors.New("cloud provider doesn't support instances.")
 )
 
-// nodeStatusUpdateRetry controls the number of retries of writing NodeStatus update.
-const nodeStatusUpdateRetry = 5
+const (
+	// nodeStatusUpdateRetry controls the number of retries of writing NodeStatus update.
+	nodeStatusUpdateRetry = 5
+	// controls how often NodeController will try to evict Pods from non-responsive Nodes.
+	nodeEvictionPeriod = 100 * time.Millisecond
+)
 
 type nodeStatusData struct {
 	probeTimestamp           util.Time
@@ -55,14 +54,14 @@ type nodeStatusData struct {
 
 type NodeController struct {
 	cloud                   cloudprovider.Interface
-	matchRE                 string
-	staticResources         *api.NodeResources
-	nodes                   []string
 	kubeClient              client.Interface
 	recorder                record.EventRecorder
 	registerRetryCount      int
 	podEvictionTimeout      time.Duration
 	deletingPodsRateLimiter util.RateLimiter
+	// worker that evicts pods from unresponsive nodes.
+	podEvictor *PodEvictor
+
 	// per Node map storing last observed Status together with a local time when it was observed.
 	// This timestamp is to be used instead of LastProbeTime stored in Condition. We do this
 	// to aviod the problem with time skew across the cluster.
@@ -99,13 +98,10 @@ type NodeController struct {
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
 func NewNodeController(
 	cloud cloudprovider.Interface,
-	matchRE string,
-	nodes []string,
-	staticResources *api.NodeResources,
 	kubeClient client.Interface,
 	registerRetryCount int,
 	podEvictionTimeout time.Duration,
-	deletingPodsRateLimiter util.RateLimiter,
+	podEvictor *PodEvictor,
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
@@ -113,6 +109,7 @@ func NewNodeController(
 	allocateNodeCIDRs bool) *NodeController {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
+	eventBroadcaster.StartLogging(glog.Infof)
 	if kubeClient != nil {
 		glog.Infof("Sending events to api server.")
 		eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
@@ -123,30 +120,27 @@ func NewNodeController(
 		glog.Fatal("NodeController: Must specify clusterCIDR if allocateNodeCIDRs == true.")
 	}
 	return &NodeController{
-		cloud:                   cloud,
-		matchRE:                 matchRE,
-		nodes:                   nodes,
-		staticResources:         staticResources,
-		kubeClient:              kubeClient,
-		recorder:                recorder,
-		registerRetryCount:      registerRetryCount,
-		podEvictionTimeout:      podEvictionTimeout,
-		deletingPodsRateLimiter: deletingPodsRateLimiter,
-		nodeStatusMap:           make(map[string]nodeStatusData),
-		nodeMonitorGracePeriod:  nodeMonitorGracePeriod,
-		nodeMonitorPeriod:       nodeMonitorPeriod,
-		nodeStartupGracePeriod:  nodeStartupGracePeriod,
-		lookupIP:                net.LookupIP,
-		now:                     util.Now,
-		clusterCIDR:             clusterCIDR,
-		allocateNodeCIDRs:       allocateNodeCIDRs,
+		cloud:                  cloud,
+		kubeClient:             kubeClient,
+		recorder:               recorder,
+		registerRetryCount:     registerRetryCount,
+		podEvictionTimeout:     podEvictionTimeout,
+		podEvictor:             podEvictor,
+		nodeStatusMap:          make(map[string]nodeStatusData),
+		nodeMonitorGracePeriod: nodeMonitorGracePeriod,
+		nodeMonitorPeriod:      nodeMonitorPeriod,
+		nodeStartupGracePeriod: nodeStartupGracePeriod,
+		lookupIP:               net.LookupIP,
+		now:                    util.Now,
+		clusterCIDR:            clusterCIDR,
+		allocateNodeCIDRs:      allocateNodeCIDRs,
 	}
 }
 
 // Generates num pod CIDRs that could be assigned to nodes.
-func (nc *NodeController) generateCIDRs(num int) util.StringSet {
+func generateCIDRs(clusterCIDR *net.IPNet, num int) util.StringSet {
 	res := util.NewStringSet()
-	cidrIP := nc.clusterCIDR.IP.To4()
+	cidrIP := clusterCIDR.IP.To4()
 	for i := 0; i < num; i++ {
 		// TODO: Make the CIDRs configurable.
 		b1 := byte(i >> 8)
@@ -156,262 +150,47 @@ func (nc *NodeController) generateCIDRs(num int) util.StringSet {
 	return res
 }
 
-// For each node from newNodes, finds its current spec in registeredNodes.
-// If it is not there, it gets a new valid CIDR assigned.
-func (nc *NodeController) reconcilePodCIDRs(newNodes, registeredNodes *api.NodeList) *api.NodeList {
-	registeredCIDRs := make(map[string]string)
-	availableCIDRs := nc.generateCIDRs(len(newNodes.Items) + len(registeredNodes.Items))
-	for _, node := range registeredNodes.Items {
-		registeredCIDRs[node.Name] = node.Spec.PodCIDR
-		availableCIDRs.Delete(node.Spec.PodCIDR)
-	}
-	for i, node := range newNodes.Items {
-		podCIDR, registered := registeredCIDRs[node.Name]
-		if !registered {
-			podCIDR, _ = availableCIDRs.PopAny()
+// reconcileNodeCIDRs looks at each node and assigns it a valid CIDR
+// if it doesn't currently have one.
+func (nc *NodeController) reconcileNodeCIDRs(nodes *api.NodeList) {
+	glog.V(4).Infof("Reconciling cidrs for %d nodes", len(nodes.Items))
+	// TODO(roberthbailey): This seems inefficient. Why re-calculate CIDRs
+	// on each sync period?
+	availableCIDRs := generateCIDRs(nc.clusterCIDR, len(nodes.Items))
+	for _, node := range nodes.Items {
+		if node.Spec.PodCIDR != "" {
+			glog.V(4).Infof("CIDR %s is already being used by node %s", node.Spec.PodCIDR, node.Name)
+			availableCIDRs.Delete(node.Spec.PodCIDR)
 		}
-		newNodes.Items[i].Spec.PodCIDR = podCIDR
 	}
-	return newNodes
-}
-
-func (nc *NodeController) configureNodeCIDR(node *api.Node) {
-	instances, ok := nc.cloud.Instances()
-	if !ok {
-		glog.Errorf("Error configuring node %s: CloudProvider does not support Instances()", node.Name)
-		return
-	}
-	err := instances.Configure(node.Name, &node.Spec)
-	if err != nil {
-		glog.Errorf("Error configuring node %s: %s", node.Name, err)
-		// The newly assigned CIDR was not properly configured, so don't save it in the API server.
-		node.Spec.PodCIDR = ""
-	}
-}
-
-func (nc *NodeController) unassignNodeCIDR(nodeName string) {
-	instances, ok := nc.cloud.Instances()
-	if !ok {
-		glog.Errorf("Error deconfiguring node %s: CloudProvider does not support Instances()", nodeName)
-		return
-	}
-	err := instances.Release(nodeName)
-	if err != nil {
-		glog.Errorf("Error deconfiguring node %s: %s", nodeName, err)
-	}
-}
-
-// Run creates initial node list and start syncing instances from cloudprovider, if any.
-// It also starts syncing or monitoring cluster node status.
-// 1. registerNodes() is called only once to register all initial nodes (from cloudprovider
-//    or from command line flag). To make cluster bootstrap faster, node controller populates
-//    node addresses.
-// 2. syncCloudNodes() is called periodically (if enabled) to sync instances from cloudprovider.
-//    Node created here will only have specs.
-// 3. monitorNodeStatus() is called periodically to incorporate the results of node status
-//    pushed from kubelet to master.
-func (nc *NodeController) Run(period time.Duration, syncNodeList bool) {
-	// Register intial set of nodes with their status set.
-	var nodes *api.NodeList
-	var err error
-	if nc.isRunningCloudProvider() {
-		if syncNodeList {
-			if nodes, err = nc.getCloudNodesWithSpec(); err != nil {
-				glog.Errorf("Error loading initial node from cloudprovider: %v", err)
+	for _, node := range nodes.Items {
+		if node.Spec.PodCIDR == "" {
+			podCIDR, found := availableCIDRs.PopAny()
+			if !found {
+				nc.recordNodeEvent(&node, "No available CIDR")
+				continue
 			}
-		} else {
-			nodes = &api.NodeList{}
-		}
-	} else {
-		if nodes, err = nc.getStaticNodesWithSpec(); err != nil {
-			glog.Errorf("Error loading initial static nodes: %v", err)
-		}
-	}
-
-	if nodes, err = nc.populateAddresses(nodes); err != nil {
-		glog.Errorf("Error getting nodes ips: %v", err)
-	}
-	if nc.isRunningCloudProvider() && nc.allocateNodeCIDRs {
-		nc.reconcilePodCIDRs(nodes, &api.NodeList{})
-	}
-	if err := nc.registerNodes(nodes, nc.registerRetryCount, period); err != nil {
-		glog.Errorf("Error registering node list %+v: %v", nodes, err)
-	}
-
-	// Start syncing node list from cloudprovider.
-	if syncNodeList && nc.isRunningCloudProvider() {
-		go util.Forever(func() {
-			if err := nc.syncCloudNodes(); err != nil {
-				glog.Errorf("Error syncing cloud: %v", err)
+			glog.V(4).Infof("Assigning node %s CIDR %s", node.Name, podCIDR)
+			node.Spec.PodCIDR = podCIDR
+			if _, err := nc.kubeClient.Nodes().Update(&node); err != nil {
+				nc.recordNodeEvent(&node, "CIDR assignment failed")
 			}
-		}, period)
+		}
 	}
+}
 
-	// Start monitoring node status.
+// Run starts an asynchronous loop that monitors the status of cluster nodes.
+func (nc *NodeController) Run(period time.Duration) {
+	// Incorporate the results of node status pushed from kubelet to master.
 	go util.Forever(func() {
 		if err := nc.monitorNodeStatus(); err != nil {
 			glog.Errorf("Error monitoring node status: %v", err)
 		}
 	}, nc.nodeMonitorPeriod)
-}
 
-// registerNodes registers the given list of nodes, it keeps retrying for `retryCount` times.
-func (nc *NodeController) registerNodes(nodes *api.NodeList, retryCount int, retryInterval time.Duration) error {
-	if len(nodes.Items) == 0 {
-		return nil
-	}
-	nodes = nc.canonicalizeName(nodes)
-	toRegister := util.NewStringSet()
-	var wg sync.WaitGroup
-	var successfullyRegistered int32 = 0
-	for i := range nodes.Items {
-		node := &nodes.Items[i]
-		if !toRegister.Has(node.Name) {
-			wg.Add(1)
-			toRegister.Insert(node.Name)
-			go func(n *api.Node) {
-				defer wg.Done()
-				for i := 0; i < retryCount; i++ {
-					if nc.isRunningCloudProvider() && nc.allocateNodeCIDRs {
-						nc.configureNodeCIDR(n)
-					}
-					_, err := nc.kubeClient.Nodes().Create(n)
-					if err == nil || apierrors.IsAlreadyExists(err) {
-						glog.Infof("Registered node in registry: %v", n.Name)
-						atomic.AddInt32(&successfullyRegistered, 1)
-						return
-					} else {
-						glog.Errorf("Error registering node %v (retries left: %v): %v", n.Name, retryCount-i-1, err)
-					}
-					time.Sleep(retryInterval)
-				}
-				glog.Errorf("Unable to register node %v", n.Name)
-			}(node)
-		}
-	}
-	wg.Wait()
-	if int32(toRegister.Len()) != atomic.LoadInt32(&successfullyRegistered) {
-		return ErrRegistration
-	} else {
-		return nil
-	}
-}
-
-// syncCloudNodes synchronizes the list of instances from cloudprovider to master server.
-func (nc *NodeController) syncCloudNodes() error {
-	matches, err := nc.getCloudNodesWithSpec()
-	if err != nil {
-		return err
-	}
-	nodes, err := nc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return err
-	}
-	nodeMap := make(map[string]*api.Node)
-	nodeMapLock := sync.Mutex{}
-	for i := range nodes.Items {
-		node := nodes.Items[i]
-		nodeMapLock.Lock()
-		nodeMap[node.Name] = &node
-		nodeMapLock.Unlock()
-	}
-	if nc.allocateNodeCIDRs {
-		nc.reconcilePodCIDRs(matches, nodes)
-	}
-	var wg sync.WaitGroup
-	wg.Add(len(matches.Items))
-	// Create nodes which have been created in cloud, but not in kubernetes cluster
-	// Skip nodes if we hit an error while trying to get their addresses.
-	for i := range matches.Items {
-		go func(node *api.Node) {
-			defer wg.Done()
-			nodeMapLock.Lock()
-			_, ok := nodeMap[node.Name]
-			nodeMapLock.Unlock()
-			if !ok {
-				glog.V(3).Infof("Querying addresses for new node: %s", node.Name)
-				nodeList := &api.NodeList{}
-				nodeList.Items = []api.Node{*node}
-				_, err = nc.populateAddresses(nodeList)
-				if err != nil {
-					glog.Errorf("Error fetching addresses for new node %s: %v", node.Name, err)
-					return
-				}
-				node.Status.Addresses = nodeList.Items[0].Status.Addresses
-				if nc.allocateNodeCIDRs {
-					nc.configureNodeCIDR(node)
-				}
-				glog.Infof("Create node in registry: %s", node.Name)
-				_, err = nc.kubeClient.Nodes().Create(node)
-				if err != nil {
-					glog.Errorf("Create node %s error: %v", node.Name, err)
-				}
-			}
-			nodeMapLock.Lock()
-			delete(nodeMap, node.Name)
-			nodeMapLock.Unlock()
-		}(&matches.Items[i])
-	}
-	wg.Wait()
-
-	wg.Add(len(nodeMap))
-	// Delete nodes which have been deleted from cloud, but not from kubernetes cluster.
-	for nodeID := range nodeMap {
-		go func(nodeID string) {
-			defer wg.Done()
-			if nc.allocateNodeCIDRs {
-				nc.unassignNodeCIDR(nodeID)
-			}
-			glog.Infof("Delete node from registry: %s", nodeID)
-			err = nc.kubeClient.Nodes().Delete(nodeID)
-			if err != nil {
-				glog.Errorf("Delete node %s error: %v", nodeID, err)
-			}
-			nc.deletePods(nodeID)
-		}(nodeID)
-	}
-	wg.Wait()
-
-	return nil
-}
-
-// populateAddresses queries Address for given list of nodes.
-func (nc *NodeController) populateAddresses(nodes *api.NodeList) (*api.NodeList, error) {
-	if nc.isRunningCloudProvider() {
-		instances, ok := nc.cloud.Instances()
-		if !ok {
-			return nodes, ErrCloudInstance
-		}
-		for i := range nodes.Items {
-			node := &nodes.Items[i]
-			nodeAddresses, err := instances.NodeAddresses(node.Name)
-			if err != nil {
-				glog.Errorf("error getting instance addresses for %s: %v", node.Name, err)
-			} else {
-				node.Status.Addresses = nodeAddresses
-			}
-		}
-	} else {
-		for i := range nodes.Items {
-			node := &nodes.Items[i]
-			addr := net.ParseIP(node.Name)
-			if addr != nil {
-				address := api.NodeAddress{Type: api.NodeLegacyHostIP, Address: addr.String()}
-				node.Status.Addresses = []api.NodeAddress{address}
-			} else {
-				addrs, err := nc.lookupIP(node.Name)
-				if err != nil {
-					glog.Errorf("Can't get ip address of node %s: %v", node.Name, err)
-				} else if len(addrs) == 0 {
-					glog.Errorf("No ip address for node %v", node.Name)
-				} else {
-					address := api.NodeAddress{Type: api.NodeLegacyHostIP, Address: addrs[0].String()}
-					node.Status.Addresses = []api.NodeAddress{address}
-				}
-			}
-		}
-	}
-	return nodes, nil
+	go util.Forever(func() {
+		nc.podEvictor.TryEvict(func(nodeName string) { nc.deletePods(nodeName) })
+	}, nodeEvictionPeriod)
 }
 
 func (nc *NodeController) recordNodeEvent(node *api.Node, event string) {
@@ -424,7 +203,7 @@ func (nc *NodeController) recordNodeEvent(node *api.Node, event string) {
 	glog.V(2).Infof("Recording %s event message for node %s", event, node.Name)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	nc.recorder.Eventf(ref, event, "Node %s is now %s", node.Name, event)
+	nc.recorder.Eventf(ref, event, "Node %s status is now: %s", node.Name, event)
 }
 
 // For a given node checks its conditions and tries to update it. Returns grace period to which given node
@@ -567,6 +346,11 @@ func (nc *NodeController) monitorNodeStatus() error {
 	if err != nil {
 		return err
 	}
+	if nc.allocateNodeCIDRs {
+		// TODO (cjcullen): Use pkg/controller/framework to watch nodes and
+		// reduce lists/decouple this from monitoring status.
+		nc.reconcileNodeCIDRs(nodes)
+	}
 	for i := range nodes.Items {
 		var gracePeriod time.Duration
 		var lastReadyCondition api.NodeCondition
@@ -594,96 +378,48 @@ func (nc *NodeController) monitorNodeStatus() error {
 			// Check eviction timeout.
 			if lastReadyCondition.Status == api.ConditionFalse &&
 				nc.now().After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
-				// Node stays in not ready for at least 'podEvictionTimeout' - evict all pods on the unhealthy node.
-				// Makes sure we are not removing pods from to many nodes in the same time.
-				glog.Infof("Evicting pods: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout)
-				if nc.deletingPodsRateLimiter.CanAccept() {
-					nc.deletePods(node.Name)
+				if nc.podEvictor.AddNodeToEvict(node.Name) {
+					glog.Infof("Adding pods to evict: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout)
 				}
 			}
 			if lastReadyCondition.Status == api.ConditionUnknown &&
 				nc.now().After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout-gracePeriod)) {
-				// Same as above. Note however, since condition unknown is posted by node controller, which means we
-				// need to substract monitoring grace period in order to get the real 'podEvictionTimeout'.
-				glog.Infof("Evicting pods2: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
-				if nc.deletingPodsRateLimiter.CanAccept() {
-					nc.deletePods(node.Name)
+				if nc.podEvictor.AddNodeToEvict(node.Name) {
+					glog.Infof("Adding pods to evict2: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
+				}
+			}
+			if lastReadyCondition.Status == api.ConditionTrue {
+				if nc.podEvictor.RemoveNodeToEvict(node.Name) {
+					glog.Infof("Pods on %v won't be evicted", node.Name)
 				}
 			}
 
-			// Report node events.
-			if readyCondition.Status == api.ConditionTrue && lastReadyCondition.Status != api.ConditionTrue {
-				nc.recordNodeEvent(node, "ready")
+			// Report node event.
+			if readyCondition.Status != api.ConditionTrue && lastReadyCondition.Status == api.ConditionTrue {
+				nc.recordNodeEvent(node, "NodeNotReady")
 			}
-			if readyCondition.Status == api.ConditionFalse && lastReadyCondition.Status != api.ConditionFalse {
-				nc.recordNodeEvent(node, "not_ready")
-			}
-			if readyCondition.Status == api.ConditionUnknown && lastReadyCondition.Status != api.ConditionUnknown {
-				nc.recordNodeEvent(node, "unknown")
+
+			// Check with the cloud provider to see if the node still exists. If it
+			// doesn't, delete the node and all pods scheduled on the node.
+			if readyCondition.Status != api.ConditionTrue && nc.cloud != nil {
+				instances, ok := nc.cloud.Instances()
+				if !ok {
+					glog.Errorf("%v", ErrCloudInstance)
+					continue
+				}
+				if _, err := instances.ExternalID(node.Name); err != nil && err == cloudprovider.InstanceNotFound {
+					if err := nc.kubeClient.Nodes().Delete(node.Name); err != nil {
+						glog.Errorf("Unable to delete node %s: %v", node.Name, err)
+						continue
+					}
+					if err := nc.deletePods(node.Name); err != nil {
+						glog.Errorf("Unable to delete pods from node %s: %v", node.Name, err)
+					}
+				}
 			}
 		}
 	}
 	return nil
-}
-
-// getStaticNodesWithSpec constructs and returns api.NodeList for static nodes. If error
-// occurs, an empty NodeList will be returned with a non-nil error info. The method only
-// constructs spec fields for nodes.
-func (nc *NodeController) getStaticNodesWithSpec() (*api.NodeList, error) {
-	result := &api.NodeList{}
-	for _, nodeID := range nc.nodes {
-		node := api.Node{
-			ObjectMeta: api.ObjectMeta{Name: nodeID},
-			Spec: api.NodeSpec{
-				ExternalID: nodeID,
-			},
-			Status: api.NodeStatus{
-				Capacity: nc.staticResources.Capacity,
-			},
-		}
-		result.Items = append(result.Items, node)
-	}
-	return result, nil
-}
-
-// getCloudNodesWithSpec constructs and returns api.NodeList from cloudprovider. If error
-// occurs, an empty NodeList will be returned with a non-nil error info. The method only
-// constructs spec fields for nodes.
-func (nc *NodeController) getCloudNodesWithSpec() (*api.NodeList, error) {
-	result := &api.NodeList{}
-	instances, ok := nc.cloud.Instances()
-	if !ok {
-		return result, ErrCloudInstance
-	}
-	matches, err := instances.List(nc.matchRE)
-	if err != nil {
-		return result, err
-	}
-	for i := range matches {
-		node := api.Node{}
-		node.Name = matches[i]
-		resources, err := instances.GetNodeResources(matches[i])
-		if err != nil {
-			return nil, err
-		}
-		if resources == nil {
-			resources = nc.staticResources
-		}
-		if resources != nil {
-			node.Status.Capacity = resources.Capacity
-			if node.Status.Capacity != nil {
-				node.Status.Capacity[api.ResourcePods] = *resource.NewQuantity(0, resource.DecimalSI)
-			}
-		}
-		instanceID, err := instances.ExternalID(node.Name)
-		if err != nil {
-			glog.Errorf("Error getting instance id for %s: %v", node.Name, err)
-		} else {
-			node.Spec.ExternalID = instanceID
-		}
-		result.Items = append(result.Items, node)
-	}
-	return result, nil
 }
 
 // deletePods will delete all pods from master running on given node.
@@ -696,7 +432,7 @@ func (nc *NodeController) deletePods(nodeID string) error {
 	}
 	for _, pod := range pods.Items {
 		// Defensive check, also needed for tests.
-		if pod.Spec.Host != nodeID {
+		if pod.Spec.NodeName != nodeID {
 			continue
 		}
 		glog.V(2).Infof("Delete pod %v", pod.Name)
@@ -706,19 +442,6 @@ func (nc *NodeController) deletePods(nodeID string) error {
 	}
 
 	return nil
-}
-
-// isRunningCloudProvider checks if cluster is running with cloud provider.
-func (nc *NodeController) isRunningCloudProvider() bool {
-	return nc.cloud != nil && len(nc.matchRE) > 0
-}
-
-// canonicalizeName takes a node list and lowercases all nodes' name.
-func (nc *NodeController) canonicalizeName(nodes *api.NodeList) *api.NodeList {
-	for i := range nodes.Items {
-		nodes.Items[i].Name = strings.ToLower(nodes.Items[i].Name)
-	}
-	return nodes
 }
 
 // getCondition returns a condition object for the specific condition

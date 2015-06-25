@@ -4,11 +4,12 @@ import (
 	"time"
 )
 
+// GetMounts retrieves a list of mounts for the current running process.
 func GetMounts() ([]*MountInfo, error) {
 	return parseMountTable()
 }
 
-// Looks at /proc/self/mountinfo to determine of the specified
+// Mounted looks at /proc/self/mountinfo to determine of the specified
 // mountpoint has been mounted
 func Mounted(mountpoint string) (bool, error) {
 	entries, err := parseMountTable()
@@ -25,9 +26,10 @@ func Mounted(mountpoint string) (bool, error) {
 	return false, nil
 }
 
-// Mount the specified options at the target path only if
-// the target is not mounted
-// Options must be specified as fstab style
+// Mount will mount filesystem according to the specified configuration, on the
+// condition that the target path is *not* already mounted. Options must be
+// specified like the mount or fstab unix commands: "opt1=val1,opt2=val2". See
+// flags.go for supported option flags.
 func Mount(device, target, mType, options string) error {
 	flag, _ := parseOptions(options)
 	if flag&REMOUNT != REMOUNT {
@@ -38,9 +40,10 @@ func Mount(device, target, mType, options string) error {
 	return ForceMount(device, target, mType, options)
 }
 
-// Mount the specified options at the target path
-// reguardless if the target is mounted or not
-// Options must be specified as fstab style
+// ForceMount will mount a filesystem according to the specified configuration,
+// *regardless* if the target path is not already mounted. Options must be
+// specified like the mount or fstab unix commands: "opt1=val1,opt2=val2". See
+// flags.go for supported option flags.
 func ForceMount(device, target, mType, options string) error {
 	flag, data := parseOptions(options)
 	if err := mount(device, target, mType, uintptr(flag), data); err != nil {
@@ -49,7 +52,7 @@ func ForceMount(device, target, mType, options string) error {
 	return nil
 }
 
-// Unmount the target only if it is mounted
+// Unmount will unmount the target filesystem, so long as it is mounted.
 func Unmount(target string) error {
 	if mounted, err := Mounted(target); err != nil || !mounted {
 		return err
@@ -57,7 +60,8 @@ func Unmount(target string) error {
 	return ForceUnmount(target)
 }
 
-// Unmount the target reguardless if it is mounted or not
+// ForceUnmount will force an unmount of the target filesystem, regardless if
+// it is mounted or not.
 func ForceUnmount(target string) (err error) {
 	// Simple retry logic for unmount
 	for i := 0; i < 10; i++ {

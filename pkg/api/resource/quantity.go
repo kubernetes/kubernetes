@@ -190,7 +190,9 @@ func ParseQuantity(str string) (*Quantity, error) {
 	// of an amount.
 	// Arguably, this should be inf.RoundHalfUp (normal rounding), but
 	// that would have the side effect of rounding values < .5m to zero.
-	amount.Round(amount, 3, inf.RoundUp)
+	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
+		amount.Round(amount, 3, inf.RoundUp)
+	}
 
 	// The max is just a simple cap.
 	if amount.Cmp(maxAllowed) > 0 {
@@ -234,6 +236,11 @@ func removeFactors(d, factor *big.Int) (result *big.Int, times int) {
 //   rounded up. (1.1i becomes 2i.)
 func (q *Quantity) Canonicalize() (string, suffix) {
 	if q.Amount == nil {
+		return "0", ""
+	}
+
+	// zero is zero always
+	if q.Amount.Cmp(&inf.Dec{}) == 0 {
 		return "0", ""
 	}
 

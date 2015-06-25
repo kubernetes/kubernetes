@@ -160,7 +160,20 @@ func TestSetDefaultService(t *testing.T) {
 	obj2 := roundTrip(t, runtime.Object(svc))
 	svc2 := obj2.(*versioned.Service)
 	if svc2.Spec.SessionAffinity != versioned.ServiceAffinityNone {
-		t.Errorf("Expected default sesseion affinity type:%s, got: %s", versioned.ServiceAffinityNone, svc2.Spec.SessionAffinity)
+		t.Errorf("Expected default session affinity type:%s, got: %s", versioned.ServiceAffinityNone, svc2.Spec.SessionAffinity)
+	}
+	if svc2.Spec.Type != versioned.ServiceTypeClusterIP {
+		t.Errorf("Expected default type:%s, got: %s", versioned.ServiceTypeClusterIP, svc2.Spec.Type)
+	}
+}
+
+func TestSetDefaultServiceWithLoadbalancer(t *testing.T) {
+	svc := &versioned.Service{}
+	svc.Spec.CreateExternalLoadBalancer = true
+	obj2 := roundTrip(t, runtime.Object(svc))
+	svc2 := obj2.(*versioned.Service)
+	if svc2.Spec.Type != versioned.ServiceTypeLoadBalancer {
+		t.Errorf("Expected default type:%s, got: %s", versioned.ServiceTypeLoadBalancer, svc2.Spec.Type)
 	}
 }
 
@@ -181,6 +194,9 @@ func TestSetDefaultPersistentVolume(t *testing.T) {
 
 	if pv2.Status.Phase != versioned.VolumePending {
 		t.Errorf("Expected volume phase %v, got %v", versioned.VolumePending, pv2.Status.Phase)
+	}
+	if pv2.Spec.PersistentVolumeReclaimPolicy != versioned.PersistentVolumeReclaimRetain {
+		t.Errorf("Expected pv reclaim policy %v, got %v", versioned.PersistentVolumeReclaimRetain, pv2.Spec.PersistentVolumeReclaimPolicy)
 	}
 }
 
@@ -320,6 +336,9 @@ func TestSetDefaultNodeExternalID(t *testing.T) {
 	n2 := obj2.(*versioned.Node)
 	if n2.Spec.ExternalID != name {
 		t.Errorf("Expected default External ID: %s, got: %s", name, n2.Spec.ExternalID)
+	}
+	if n2.Spec.ProviderID != "" {
+		t.Errorf("Expected empty default Cloud Provider ID, got: %s", n2.Spec.ProviderID)
 	}
 }
 

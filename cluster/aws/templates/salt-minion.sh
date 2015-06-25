@@ -26,7 +26,7 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-pool
-  cbr-cidr: $MINION_IP_RANGE
+  cbr-cidr: 10.123.45.0/30
   cloud: aws
 EOF
 
@@ -52,6 +52,12 @@ fi
 if [[ -n "${DOCKER_ROOT}" ]]; then
   cat <<EOF >>/etc/salt/minion.d/grains.conf
   docker_root: '$(echo "$DOCKER_ROOT" | sed -e "s/'/''/g")'
+EOF
+fi
+
+if [[ -n "${KUBELET_ROOT}" ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  kubelet_root: '$(echo "$KUBELET_ROOT" | sed -e "s/'/''/g")'
 EOF
 fi
 

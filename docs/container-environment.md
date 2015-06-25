@@ -5,7 +5,7 @@
 This document describes the environment for Kubelet managed containers on a Kubernetes node (kNode).  In contrast to the Kubernetes cluster API, which provides an API for creating and managing containers, the Kubernetes container environment provides the container access to information about what else is going on in the cluster. 
 
 This cluster information makes it possible to build applications that are *cluster aware*.  
-Additionally, the Kubernetes container environment defines a series of hooks that are surfaced to optional hook handlers defined as part of individual containers.  Container hooks are somewhat analagous to operating system signals in a traditional process model.   However these hooks are designed to make it easier to build reliable, scalable cloud applications in the Kubernetes cluster.  Containers that participate in this cluster lifecycle become *cluster native*. 
+Additionally, the Kubernetes container environment defines a series of hooks that are surfaced to optional hook handlers defined as part of individual containers.  Container hooks are somewhat analogous to operating system signals in a traditional process model.   However these hooks are designed to make it easier to build reliable, scalable cloud applications in the Kubernetes cluster.  Containers that participate in this cluster lifecycle become *cluster native*. 
 
 Another important part of the container environment is the file system that is available to the container.  In Kubernetes, the filesystem is a combination of an [image](./images.md) and one or more [volumes](./volumes.md).
 
@@ -30,7 +30,7 @@ FOO_SERVICE_HOST=<the host the service is running on>
 FOO_SERVICE_PORT=<the port the service is running on>
 ```
 
-Going forward, we expect that Services will have a dedicated IP address.  In that context, we will also surface services to the container via DNS.  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.
+Services have dedicated IP address, and are also surfaced to the container via DNS (If [DNS addon](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/addons/dns) is enabled).  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.
 
 ## Container Hooks
 *NB*: Container hooks are under active development, we anticipate adding additional hooks as the Kubernetes container management system evolves.*
@@ -57,9 +57,10 @@ This hook is called before the PostStart handler, when a container has been rest
 This hook is called immediately before a container is terminated.  This event handler is blocking, and must complete before the call to delete the container is sent to the Docker daemon.  The SIGTERM notification sent by Docker is also still sent.
 
 A single parameter named reason is passed to the handler which contains the reason for termination.  Currently the valid values for reason are:
-* ●	```Delete``` - indicating an API call to delete the pod containing this container.
-* ●	```Health``` - indicating that a health check of the container failed.
-* ●	```Dependency``` - indicating that a dependency for the container or the pod is missing, and thus, the container needs to be restarted.  Examples include, the pod infra container crashing, or persistent disk failing for a container that mounts PD.
+
+* ```Delete``` - indicating an API call to delete the pod containing this container.
+* ```Health``` - indicating that a health check of the container failed.
+* ```Dependency``` - indicating that a dependency for the container or the pod is missing, and thus, the container needs to be restarted.  Examples include, the pod infra container crashing, or persistent disk failing for a container that mounts PD.
 
 Eventually, user specified reasons may be [added to the API](https://github.com/GoogleCloudPlatform/kubernetes/issues/137).
 
@@ -67,7 +68,7 @@ Eventually, user specified reasons may be [added to the API](https://github.com/
 ### Hook Handler Execution
 When a management hook occurs, the management system calls into any registered hook handlers in the container for that hook.  These hook handler calls are synchronous in the context of the pod containing the container. Note:this means that hook handler execution blocks any further management of the pod.  If your hook handler blocks, no other management (including health checks) will occur until the hook handler completes.  Blocking hook handlers do *not* affect management of other Pods.  Typically we expect that users will make their hook handlers as lightweight as possible, but there are cases where long running commands make sense (e.g. saving state prior to container stop)
 
-For hooks which have parameters, these parameters are passed to the event handler as a set of key/value pairs.  The details of this parameter passing is handler implementation dependent (see below)
+For hooks which have parameters, these parameters are passed to the event handler as a set of key/value pairs.  The details of this parameter passing is handler implementation dependent (see below).
 
 ### Hook delivery guarantees
 Hook delivery is "at least one", which means that a hook may be called multiple times for any given event (e.g. "start" or "stop") and it is up to the hook implementer to be able to handle this

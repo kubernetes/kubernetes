@@ -37,6 +37,31 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/iscsi" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
+	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{}}) {
+		t.Errorf("Expected false")
+	}
+}
+
+func TestGetAccessModes(t *testing.T) {
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+
+	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/iscsi")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	if !contains(plug.GetAccessModes(), api.ReadWriteOnce) || !contains(plug.GetAccessModes(), api.ReadOnlyMany) {
+		t.Errorf("Expected two AccessModeTypes:  %s and %s", api.ReadWriteOnce, api.ReadOnlyMany)
+	}
+}
+
+func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
 }
 
 type fakeDiskManager struct {
@@ -71,7 +96,7 @@ func (fake *fakeDiskManager) DetachDisk(disk iscsiDisk, mntPath string) error {
 	return nil
 }
 
-func TestPlugin(t *testing.T) {
+func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
@@ -79,20 +104,9 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &api.Volume{
-		Name: "vol1",
-		VolumeSource: api.VolumeSource{
-			ISCSI: &api.ISCSIVolumeSource{
-				TargetPortal: "127.0.0.1:3260",
-				IQN:          "iqn.2014-12.server:storage.target01",
-				FSType:       "ext4",
-				Lun:          0,
-			},
-		},
-	}
 	fakeManager := &fakeDiskManager{}
 	fakeMounter := &mount.FakeMounter{}
-	builder, err := plug.(*ISCSIPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
+	builder, err := plug.(*ISCSIPlugin).newBuilderInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -146,4 +160,38 @@ func TestPlugin(t *testing.T) {
 	if !fakeManager.detachCalled {
 		t.Errorf("Detach was not called")
 	}
+}
+
+func TestPluginVolume(t *testing.T) {
+	vol := &api.Volume{
+		Name: "vol1",
+		VolumeSource: api.VolumeSource{
+			ISCSI: &api.ISCSIVolumeSource{
+				TargetPortal: "127.0.0.1:3260",
+				IQN:          "iqn.2014-12.server:storage.target01",
+				FSType:       "ext4",
+				Lun:          0,
+			},
+		},
+	}
+	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+}
+
+func TestPluginPersistentVolume(t *testing.T) {
+	vol := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "vol1",
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				ISCSI: &api.ISCSIVolumeSource{
+					TargetPortal: "127.0.0.1:3260",
+					IQN:          "iqn.2014-12.server:storage.target01",
+					FSType:       "ext4",
+					Lun:          0,
+				},
+			},
+		},
+	}
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol))
 }

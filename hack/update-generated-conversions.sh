@@ -14,9 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script to fetch latest swagger spec.
-# Puts the updated spec at swagger-spec/
-
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -42,7 +39,7 @@ import (
 // AUTO-GENERATED FUNCTIONS START HERE
 EOF
 
-	go run cmd/kube-conversion/conversion.go -v ${version} -f - >>  $TMPFILE
+	GOPATH=$(godep path):$GOPATH go run cmd/genconversion/conversion.go -v ${version} -f - >>  $TMPFILE
 
 	cat >> $TMPFILE <<EOF
 // AUTO-GENERATED FUNCTIONS END HERE

@@ -30,11 +30,23 @@ function verify-prereqs() {
     gather_installation_reqs
 }
 
+function build-local() {
+    # Make a clean environment to avoid compiler errors.
+    make clean
+    # Build the binaries locally that are used in the charms.
+    make all WHAT="cmd/kube-apiserver cmd/kubectl cmd/kube-controller-manager plugin/cmd/kube-scheduler cmd/kubelet cmd/kube-proxy"
+    OUTPUT_DIR=_output/local/bin/linux/amd64
+    mkdir -p cluster/juju/charms/trusty/kubernetes-master/files/output
+    # Copy the binary output to the charm directory.
+    cp -v $OUTPUT_DIR/* cluster/juju/charms/trusty/kubernetes-master/files/output
+}
+
 function get-password() {
     echo "TODO: Assign username/password security"
 }
 
 function kube-up() {
+    build-local
     if [[ -d "~/.juju/current-env" ]]; then
         juju quickstart -i --no-browser
     else
@@ -47,9 +59,14 @@ function kube-up() {
     sleep-status
     detect-master
     detect-minions
+
+    export KUBE_MASTER_IP="${KUBE_MASTER_IP}:8080"
+    export CONTEXT="juju"
 }
 
 function kube-down() {
+    # Remove the binary files from the charm directory.
+    rm -rf cluster/juju/charms/trusty/kubernetes-master/files/output/
     local jujuenv
     jujuenv=$(cat ~/.juju/current-environment)
     juju destroy-environment $jujuenv

@@ -24,11 +24,25 @@ import (
 // Attributes is an interface used by AdmissionController to get information about a request
 // that is used to make an admission decision.
 type Attributes interface {
+	// GetName returns the name of the object as presented in the request.  On a CREATE operation, the client
+	// may omit name and rely on the server to generate the name.  If that is the case, this method will return
+	// the empty string
+	GetName() string
+	// GetNamespace is the namespace associated with the request (if any)
 	GetNamespace() string
+	// GetResource is the name of the resource being requested.  This is not the kind.  For example: pods
 	GetResource() string
-	GetOperation() string
+	// GetSubresource is the name of the subresource being requested.  This is a different resource, scoped to the parent resource, but it may have a different kind.
+	// For instance, /pods has the resource "pods" and the kind "Pod", while /pods/foo/status has the resource "pods", the sub resource "status", and the kind "Pod"
+	// (because status operates on pods). The binding resource for a pod though may be /pods/foo/binding, which has resource "pods", subresource "binding", and kind "Binding".
+	GetSubresource() string
+	// GetOperation is the operation being performed
+	GetOperation() Operation
+	// GetObject is the object from the incoming request prior to default values being applied
 	GetObject() runtime.Object
+	// GetKind is the type of object being manipulated.  For example: Pod
 	GetKind() string
+	// GetUserInfo is information about the requesting user
 	GetUserInfo() user.Info
 }
 
@@ -36,4 +50,19 @@ type Attributes interface {
 type Interface interface {
 	// Admit makes an admission decision based on the request attributes
 	Admit(a Attributes) (err error)
+
+	// Handles returns true if this admission controller can handle the given operation
+	// where operation can be one of CREATE, UPDATE, DELETE, or CONNECT
+	Handles(operation Operation) bool
 }
+
+// Operation is the type of resource operation being checked for admission control
+type Operation string
+
+// Operation constants
+const (
+	Create  Operation = "CREATE"
+	Update  Operation = "UPDATE"
+	Delete  Operation = "DELETE"
+	Connect Operation = "CONNECT"
+)

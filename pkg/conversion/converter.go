@@ -390,7 +390,7 @@ const (
 	// Loop through destination fields, search for matching source
 	// field to copy it from. Source fields with no corresponding
 	// destination field will be ignored. If SourceToDest is
-	// specified, this flag is ignored. If niether is specified,
+	// specified, this flag is ignored. If neither is specified,
 	// or no flags are passed, this flag is the default.
 	DestFromSource FieldMatchingFlags = 0
 	// Loop through source fields, search for matching dest field

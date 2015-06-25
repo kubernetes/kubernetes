@@ -11,7 +11,7 @@ https://github.com/GoogleCloudPlatform/kubernetes/issues/1755
 apiVersion: v1
 clusters:
 - cluster:
-    api-version: v1beta3
+    api-version: v1
     server: http://cow.org:8080
   name: cow-cluster
 - cluster:
@@ -138,7 +138,7 @@ users:
 #### Commands for the example file
 ```
 $kubectl config set preferences.colors true
-$kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1beta3
+$kubectl config set-cluster cow-cluster --server=http://cow.org:8080 --api-version=v1
 $kubectl config set-cluster horse-cluster --server=https://horse.org:4443 --certificate-authority=path/to/my/cafile
 $kubectl config set-cluster pig-cluster --server=https://pig.org:443 --insecure-skip-tls-verify=true
 $kubectl config set-credentials blue-user --token=blue-token

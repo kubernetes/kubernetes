@@ -58,7 +58,7 @@ passing `ginkgo watch` the `-r` flag will recursively detect all test suites und
 `watch` does not detect *new* packages. Moreover, changes in package X only rerun the tests for package X, tests for packages
 that depend on X are not rerun.
 
-[OSX only] To receive (desktop) notifications when a test run completes:
+[OSX & Linux only] To receive (desktop) notifications when a test run completes:
 
 	ginkgo -notify
 

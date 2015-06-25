@@ -2,6 +2,24 @@
 
 Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/develop on your local machine (Linux, Mac OS X).
 
+**Table of Contents**
+
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Interacting with your Kubernetes cluster with Vagrant.](#interacting-with-your-kubernetes-cluster-with-vagrant)
+- [Authenticating with your master](#authenticating-with-your-master)
+- [Running containers](#running-containers)
+- [Troubleshooting](#troubleshooting)
+    - [I keep downloading the same (large) box all the time!](#i-keep-downloading-the-same-large-box-all-the-time)
+    - [I just created the cluster, but I am getting authorization errors!](#i-just-created-the-cluster-but-i-am-getting-authorization-errors)
+    - [I just created the cluster, but I do not see my container running!](#i-just-created-the-cluster-but-i-do-not-see-my-container-running)
+    - [I want to make changes to Kubernetes code!](#i-want-to-make-changes-to-kubernetes-code)
+    - [I have brought Vagrant up but the nodes cannot validate!](#i-have-brought-vagrant-up-but-the-nodes-cannot-validate)
+    - [I want to change the number of nodes!](#i-want-to-change-the-number-of-nodes)
+    - [I want my VMs to have more memory!](#i-want-my-vms-to-have-more-memory)
+    - [I ran vagrant suspend and nothing works!](#i-ran-vagrant-suspend-and-nothing-works)
+
+
 ### Prerequisites
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install one of:
@@ -104,7 +122,7 @@ Once your Vagrant machines are up and provisioned, the first thing to do is to c
 You may need to build the binaries first, you can do this with ```make```
 
 ```sh
-$ ./cluster/kubectl.sh get minions
+$ ./cluster/kubectl.sh get nodes
 
 NAME                LABELS
 10.245.1.4          <none>
@@ -126,18 +144,18 @@ cat ~/.kubernetes_vagrant_auth
 }
 ```
 
-You should now be set to use the `cluster/kubectl.sh` script. For example try to list the minions that you have started with:
+You should now be set to use the `cluster/kubectl.sh` script. For example try to list the nodes that you have started with:
 
 ```sh
-./cluster/kubectl.sh get minions
+./cluster/kubectl.sh get nodes
 ```
 
 ### Running containers
 
-Your cluster is running, you can list the minions in your cluster:
+Your cluster is running, you can list the nodes in your cluster:
 
 ```sh
-$ ./cluster/kubectl.sh get minions
+$ ./cluster/kubectl.sh get nodes
 
 NAME                 LABELS
 10.245.2.4           <none>
@@ -157,14 +175,14 @@ NAME   IMAGE(S)   HOST   LABELS   STATUS
 $ ./cluster/kubectl.sh get services
 NAME   LABELS   SELECTOR   IP   PORT
 
-$ ./cluster/kubectl.sh get replicationControllers
+$ ./cluster/kubectl.sh get replicationcontrollers
 NAME   IMAGE(S   SELECTOR   REPLICAS
 ```
 
 Start a container running nginx with a replication controller and three replicas
 
 ```sh
-$ ./cluster/kubectl.sh run-container my-nginx --image=nginx --replicas=3 --port=80
+$ ./cluster/kubectl.sh run my-nginx --image=nginx --replicas=3 --port=80
 ```
 
 When listing the pods, you will see that three containers have been started and are in Waiting state:
@@ -177,10 +195,10 @@ NAME                                   IMAGE(S)            HOST                 
 78140853-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.3/10.245.2.3   name=myNginx   Waiting
 ```
 
-You need to wait for the provisioning to complete, you can monitor the minions by doing:
+You need to wait for the provisioning to complete, you can monitor the nodes by doing:
 
 ```sh
-$ sudo salt '*minion-1' cmd.run 'docker images'
+$ vagrant ssh minion-1 -c 'sudo docker images'
 kubernetes-minion-1:
     REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
     <none>              <none>              96864a7d2df3        26 hours ago        204.4 MB
@@ -191,16 +209,16 @@ kubernetes-minion-1:
 Once the docker image for nginx has been downloaded, the container will start and you can list it:
 
 ```sh
-$ sudo salt '*minion-1' cmd.run 'docker ps'
+$ vagrant ssh minion-1 -c 'sudo docker ps'
 kubernetes-minion-1:
     CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
     dbe79bf6e25b        nginx:latest              "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f
     fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b
-    aa2ee3ed844a        google/cadvisor:latest    "/usr/bin/cadvisor -   38 minutes ago      Up 38 minutes                                k8s--cadvisor.9e90d182--cadvisor_-_agent.file--4626b3a2
+    aa2ee3ed844a        google/cadvisor:latest    "/usr/bin/cadvisor"    38 minutes ago      Up 38 minutes                                k8s--cadvisor.9e90d182--cadvisor_-_agent.file--4626b3a2
     65a3a926f357        kubernetes/pause:latest   "/pause"               39 minutes ago      Up 39 minutes       0.0.0.0:4194->8080/tcp   k8s--net.c5ba7f0e--cadvisor_-_agent.file--342fd561
 ```
 
-Going back to listing the pods, services and replicationControllers, you now have:
+Going back to listing the pods, services and replicationcontrollers, you now have:
 
 ```sh
 $ ./cluster/kubectl.sh get pods
@@ -212,17 +230,17 @@ NAME                                   IMAGE(S)            HOST                 
 $ ./cluster/kubectl.sh get services
 NAME   LABELS   SELECTOR   IP   PORT
 
-$ ./cluster/kubectl.sh get replicationControllers
+$ ./cluster/kubectl.sh get replicationcontrollers
 NAME      IMAGE(S            SELECTOR       REPLICAS
 myNginx   nginx              name=my-nginx   3
 ```
 
 We did not start any services, hence there are none listed. But we see three replicas displayed properly.
 Check the [guestbook](../../examples/guestbook/README.md) application to learn how to create a service.
-You can already play with resizing the replicas with:
+You can already play with scaling the replicas with:
 
 ```sh
-$ ./cluster/kubectl.sh resize rc my-nginx --replicas=2
+$ ./cluster/kubectl.sh scale rc my-nginx --replicas=2
 $ ./cluster/kubectl.sh get pods
 NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
 7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Running
@@ -270,13 +288,13 @@ If this is your first time creating the cluster, the kubelet on each minion sche
 
 To set up a vagrant cluster for hacking, follow the [vagrant developer guide](../devel/developer-guides/vagrant.md).
 
-#### I have brought Vagrant up but the minions won't validate!
+#### I have brought Vagrant up but the nodes cannot validate!
 
-Log on to one of the minions (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
+Log on to one of the nodes (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
 
-#### I want to change the number of minions!
+#### I want to change the number of nodes!
 
-You can control the number of minions that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough minions to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `NUM_MINIONS` to 1 like so:
+You can control the number of nodes that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough nodes to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `NUM_MINIONS` to 1 like so:
 
 ```sh
 export NUM_MINIONS=1
@@ -291,7 +309,7 @@ Just set it to the number of megabytes you would like the machines to have. For 
 export KUBERNETES_MEMORY=2048
 ```
 
-If you need more granular control, you can set the amount of memory for the master and minions independently. For example:
+If you need more granular control, you can set the amount of memory for the master and nodes independently. For example:
 
 ```sh
 export KUBERNETES_MASTER_MEMORY=1536
@@ -299,7 +317,7 @@ export KUBERNETES_MINION_MEMORY=2048
 ```
 
 #### I ran vagrant suspend and nothing works!
-```vagrant suspend``` seems to mess up the network.  It's not supported at this time.
+```vagrant suspend``` seems to mess up the network.  This is not supported at this time.
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/vagrant.md?pixel)]()

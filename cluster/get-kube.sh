@@ -49,7 +49,9 @@ function create_cluster {
     cd kubernetes
     ./cluster/kube-up.sh
     echo "Kubernetes binaries at ${PWD}/cluster/"
-    echo "You may want to add this directory to your PATH in \$HOME/.profile"
+    if [[ ":$PATH:" != *":${PWD}/cluster:"* ]]; then
+      echo "You may want to add this directory to your PATH in \$HOME/.profile"
+    fi
 
     echo "Installation successful!"
   )
@@ -66,6 +68,9 @@ function get_latest_version_number {
     wget -qO- ${latest_url}
   elif [[ $(which curl) ]]; then
     curl -Ss ${latest_url}
+  else
+    echo "Couldn't find curl or wget.  Bailing out."
+    exit 4
   fi
 }
 
@@ -99,7 +104,6 @@ else
 fi
 
 file=kubernetes.tar.gz
-
 
 echo "Downloading kubernetes release ${release} to ${PWD}/kubernetes.tar.gz"
 if [[ -n "${KUBERNETES_SKIP_CONFIRM-}" ]]; then

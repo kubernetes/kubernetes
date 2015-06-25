@@ -25,6 +25,10 @@ given resource.
 \fB\-h\fP, \fB\-\-help\fP=false
     help for describe
 
+.PP
+\fB\-l\fP, \fB\-\-selector\fP=""
+    Selector (label query) to filter on
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
@@ -64,15 +68,15 @@ given resource.
     Path to the kubeconfig file to use for CLI requests.
 
 .PP
-\fB\-\-log\_backtrace\_at\fP=:0
+\fB\-\-log\-backtrace\-at\fP=:0
     when logging hits line file:N, emit a stack trace
 
 .PP
-\fB\-\-log\_dir\fP=""
+\fB\-\-log\-dir\fP=""
     If non\-empty, write log files in this directory
 
 .PP
-\fB\-\-log\_flush\_frequency\fP=5s
+\fB\-\-log\-flush\-frequency\fP=5s
     Maximum number of seconds between log flushes
 
 .PP
@@ -134,6 +138,9 @@ $ kubectl describe nodes kubernetes\-minion\-emt8.c.myproject.internal
 
 // Describe a pod
 $ kubectl describe pods/nginx
+
+// Describe pods by label name=myLabel
+$ kubectl describe po \-l name=myLabel
 
 .fi
 .RE

@@ -26,6 +26,8 @@ MASTER=""
 MASTER_IP=""
 MINION_IPS=""
 
+KUBECTL_PATH=${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl
+
 # Assumed Vars:
 #   KUBE_ROOT
 function test-build-release {
@@ -75,7 +77,24 @@ function setClusterInfo() {
 
 # Verify ssh prereqs
 function verify-prereqs {
-   # Expect at least one identity to be available.
+  local rc
+
+  rc=0
+  ssh-add -L 1> /dev/null 2> /dev/null || rc="$?"
+  # "Could not open a connection to your authentication agent."
+  if [[ "${rc}" -eq 2 ]]; then
+    eval "$(ssh-agent)" > /dev/null
+    trap-add "kill ${SSH_AGENT_PID}" EXIT
+  fi
+
+  rc=0
+  ssh-add -L 1> /dev/null 2> /dev/null || rc="$?"
+  # "The agent has no identities."
+  if [[ "${rc}" -eq 1 ]]; then
+    # Try adding one of the default identities, with or without passphrase.
+    ssh-add || true
+  fi 
+  # Expect at least one identity to be available.
   if ! ssh-add -L 1> /dev/null 2> /dev/null; then
     echo "Could not find or add an SSH identity."
     echo "Please start ssh-agent, add your identity, and retry."
@@ -83,30 +102,18 @@ function verify-prereqs {
   fi
 }
 
-# Check prereqs on every k8s node
-function check-prereqs {
-  PATH=$PATH:/opt/bin/
-  # use ubuntu
-  if ! $(grep Ubuntu /etc/lsb-release > /dev/null 2>&1)
-  then
-      echo "warning: not detecting a ubuntu system"
-      exit 1
+# Install handler for signal trap
+function trap-add {
+  local handler="$1"
+  local signal="${2-EXIT}"
+  local cur
+
+  cur="$(eval "sh -c 'echo \$3' -- $(trap -p ${signal})")"
+  if [[ -n "${cur}" ]]; then
+    handler="${cur}; ${handler}"
   fi
 
-  # check etcd
-  if ! $(which etcd > /dev/null)
-  then
-      echo "warning: etcd binary is not found in the PATH: $PATH"
-      exit 1
-  fi
-
-  # detect the etcd version, we support only etcd 2.0.
-  etcdVersion=$(/opt/bin/etcd --version | awk '{print $3}')
-
-  if [ "$etcdVersion" != "2.0.0" ]; then
-    echo "We only support 2.0.0 version of etcd"
-    exit 1
-  fi
+  trap "${handler}" ${signal}
 }
 
 function verify-cluster {
@@ -191,14 +198,13 @@ KUBE_APISERVER_OPTS="--address=0.0.0.0 \
 --port=8080 \
 --etcd_servers=http://127.0.0.1:4001 \
 --logtostderr=true \
---portal_net=${1}"
+--service-cluster-ip-range=${1}"
 EOF
 }
 
 function create-kube-controller-manager-opts(){
   cat <<EOF > ~/kube/default/kube-controller-manager
 KUBE_CONTROLLER_MANAGER_OPTS="--master=127.0.0.1:8080 \
---machines=$1 \
 --logtostderr=true"
 EOF
 
@@ -246,23 +252,11 @@ EOF
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-  local file="$HOME/.kubernetes_auth"
-  if [[ -r "$file" ]]; then
-    KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-    KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
-    return
+  get-kubeconfig-basicauth
+  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
+    KUBE_USER=admin
+    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
   fi
-  KUBE_USER=admin
-  KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-
-  # Store password for reuse.
-  cat << EOF > "$file"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD"
-}
-EOF
-  chmod 0600 "$file"
 }
 
 # Detect the IP for the master
@@ -340,11 +334,20 @@ function kube-up {
   }
 
     ((ii=ii+1))
-        
   done
   wait
 
   verify-cluster
+  detect-master
+  export CONTEXT="ubuntu"
+  export KUBE_SERVER="http://${KUBE_MASTER_IP}:8080"
+
+  source "${KUBE_ROOT}/cluster/common.sh"
+
+  # set kubernetes user and password
+  get-password
+
+  create-kubeconfig
 }
 
 function provision-master() {
@@ -358,7 +361,7 @@ function provision-master() {
   ssh $SSH_OPTS -t $MASTER "source ~/kube/util.sh; \
                             setClusterInfo; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
-                            create-kube-apiserver-opts "${PORTAL_NET}"; \
+                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             sudo -p '[sudo] password to copy files and start master: ' cp ~/kube/default/* /etc/default/ && sudo cp ~/kube/init_conf/* /etc/init/ && sudo cp ~/kube/init_scripts/* /etc/init.d/ \
@@ -397,7 +400,7 @@ function provision-masterandminion() {
   ssh $SSH_OPTS -t $MASTER "source ~/kube/util.sh; \
                             setClusterInfo; \
                             create-etcd-opts "${mm[${MASTER_IP}]}" "${MASTER_IP}" "${CLUSTER}"; \
-                            create-kube-apiserver-opts "${PORTAL_NET}"; \
+                            create-kube-apiserver-opts "${SERVICE_CLUSTER_IP_RANGE}"; \
                             create-kube-controller-manager-opts "${MINION_IPS}"; \
                             create-kube-scheduler-opts; \
                             create-kubelet-opts "${MASTER_IP}" "${MASTER_IP}" "${DNS_SERVER_IP}" "${DNS_DOMAIN}";                     

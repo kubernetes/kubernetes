@@ -289,6 +289,9 @@ func (pd *awsElasticBlockStore) TearDownAt(dir string) error {
 		glog.V(2).Info("Error getting mountrefs for ", dir, ": ", err)
 		return err
 	}
+	if len(refs) == 0 {
+		glog.Warning("Did not find pod-mount for ", dir, " during tear-down")
+	}
 	// Unmount the bind-mount inside this pod
 	if err := pd.mounter.Unmount(dir); err != nil {
 		glog.V(2).Info("Error unmounting dir ", dir, ": ", err)
@@ -307,6 +310,8 @@ func (pd *awsElasticBlockStore) TearDownAt(dir string) error {
 			glog.V(2).Info("Error detaching disk ", pd.volumeID, ": ", err)
 			return err
 		}
+	} else {
+		glog.V(2).Infof("Found multiple refs; won't detach EBS volume: %v", refs)
 	}
 	mountpoint, mntErr := pd.mounter.IsMountPoint(dir)
 	if mntErr != nil {

@@ -142,15 +142,18 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachin
 	if err != nil {
 		return nil, err
 	}
-	err = r.store.Helper.GuaranteedUpdate(podKey, &api.Pod{}, false, func(obj runtime.Object) (runtime.Object, uint64, error) {
+	err = r.store.Helper.GuaranteedUpdate(podKey, &api.Pod{}, false, tools.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
-			return nil, 0, fmt.Errorf("unexpected object: %#v", obj)
+			return nil, fmt.Errorf("unexpected object: %#v", obj)
 		}
-		if pod.Spec.Host != oldMachine {
-			return nil, 0, fmt.Errorf("pod %v is already assigned to host %q", pod.Name, pod.Spec.Host)
+		if pod.DeletionTimestamp != nil {
+			return nil, fmt.Errorf("pod %s is being deleted, cannot be assigned to a host", pod.Name)
 		}
-		pod.Spec.Host = machine
+		if pod.Spec.NodeName != oldMachine {
+			return nil, fmt.Errorf("pod %v is already assigned to node %q", pod.Name, pod.Spec.NodeName)
+		}
+		pod.Spec.NodeName = machine
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
@@ -158,8 +161,8 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachin
 			pod.Annotations[k] = v
 		}
 		finalPod = pod
-		return pod, 0, nil
-	})
+		return pod, nil
+	}))
 	return finalPod, err
 }
 

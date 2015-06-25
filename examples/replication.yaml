@@ -1,8 +1,7 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: nginx
-  namespace: default
 spec:
   replicas: 3
   selector:
@@ -14,10 +13,7 @@ spec:
         app: nginx
     spec:
       containers:
-      - image: nginx
-        imagePullPolicy: IfNotPresent
-        name: nginx
+      - name: nginx
+        image: nginx
         ports:
         - containerPort: 80
-          protocol: TCP
-      restartPolicy: Always

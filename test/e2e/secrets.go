@@ -20,33 +20,13 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 )
 
 var _ = Describe("Secrets", func() {
-	var c *client.Client
-	var ns string
-
-	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
-		ns_, err := createTestingNS("secrets", c)
-		ns = ns_.Name
-		expectNoError(err)
-	})
-
-	AfterEach(func() {
-		// Clean up the namespace if a non-default one was used
-		if ns != api.NamespaceDefault {
-			By("Cleaning up the namespace")
-			err := c.Namespaces().Delete(ns)
-			expectNoError(err)
-		}
-	})
+	f := NewFramework("secrets")
 
 	It("should be consumable from pods", func() {
 		name := "secret-test-" + string(util.NewUUID())
@@ -55,7 +35,7 @@ var _ = Describe("Secrets", func() {
 
 		secret := &api.Secret{
 			ObjectMeta: api.ObjectMeta{
-				Namespace: ns,
+				Namespace: f.Namespace.Name,
 				Name:      name,
 			},
 			Data: map[string][]byte{
@@ -68,12 +48,12 @@ var _ = Describe("Secrets", func() {
 		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 		defer func() {
 			By("Cleaning up the secret")
-			if err := c.Secrets(ns).Delete(secret.Name); err != nil {
+			if err := f.Client.Secrets(f.Namespace.Name).Delete(secret.Name); err != nil {
 				Failf("unable to delete secret %v: %v", secret.Name, err)
 			}
 		}()
 		var err error
-		if secret, err = c.Secrets(ns).Create(secret); err != nil {
+		if secret, err = f.Client.Secrets(f.Namespace.Name).Create(secret); err != nil {
 			Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -95,7 +75,7 @@ var _ = Describe("Secrets", func() {
 				Containers: []api.Container{
 					{
 						Name:  "secret-test",
-						Image: "kubernetes/mounttest:0.1",
+						Image: "gcr.io/google_containers/mounttest:0.2",
 						Args: []string{
 							"--file_content=/etc/secret-volume/data-1",
 							"--file_mode=/etc/secret-volume/data-1"},
@@ -112,9 +92,9 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 
-		testContainerOutputInNamespace("consume secrets", c, pod, []string{
+		testContainerOutputInNamespace("consume secrets", f.Client, pod, []string{
 			"content of file \"/etc/secret-volume/data-1\": value-1",
 			"mode of file \"/etc/secret-volume/data-1\": -r--r--r--",
-		}, ns)
+		}, f.Namespace.Name)
 	})
 })

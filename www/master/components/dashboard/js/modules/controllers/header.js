@@ -18,7 +18,7 @@ angular.module('kubernetesApp.components.dashboard', [])
         $scope.subPages = [
           {category: 'dashboard', name: 'Explore', value: '/dashboard/groups/type/selector/'},
           {category: 'dashboard', name: 'Pods', value: '/dashboard/pods'},
-          {category: 'dashboard', name: 'Minions', value: '/dashboard/minions'},
+          {category: 'dashboard', name: 'Nodes', value: '/dashboard/nodes'},
           {category: 'dashboard', name: 'Replication Controllers', value: '/dashboard/replicationcontrollers'},
           {category: 'dashboard', name: 'Services', value: '/dashboard/services'},
           {category: 'dashboard', name: 'Events', value: '/dashboard/events'}

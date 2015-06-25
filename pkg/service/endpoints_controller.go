@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// CAUTION: If you update code in this file, you may need to also update code
+//          in contrib/mesos/pkg/service/endpoints_controller.go
 package service
 
 import (
@@ -24,8 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/endpoints"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
@@ -302,12 +302,6 @@ func (e *EndpointController) syncService(key string) {
 		for i := range service.Spec.Ports {
 			servicePort := &service.Spec.Ports[i]
 
-			// TODO: Once v1beta1 and v1beta2 are EOL'ed,
-			// this can safely assume that TargetPort is
-			// populated, and findPort() can be removed.
-			_ = v1beta1.Dependency
-			_ = v1beta2.Dependency
-
 			portName := servicePort.Name
 			portProto := servicePort.Protocol
 			portNum, err := findPort(pod, servicePort)
@@ -398,32 +392,14 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 	}
 }
 
-func findDefaultPort(pod *api.Pod, servicePort int, proto api.Protocol) int {
-	for _, container := range pod.Spec.Containers {
-		for _, port := range container.Ports {
-			if port.Protocol == proto {
-				return port.ContainerPort
-			}
-		}
-	}
-	return servicePort
-}
-
-// findPort locates the container port for the given manifest and portName.
-// If the targetPort is a non-zero number, use that.  If the targetPort is 0 or
-// not specified, use the first defined port with the same protocol.  If no port
-// is defined, use the service's port.  If the targetPort is an empty string use
-// the first defined port with the same protocol.  If no port is defined, use
-// the service's port.  If the targetPort is a non-empty string, look that
+// findPort locates the container port for the given pod and portName.  If the
+// targetPort is a number, use that.  If the targetPort is a string, look that
 // string up in all named ports in all containers in the target pod.  If no
 // match is found, fail.
 func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
 	portName := svcPort.TargetPort
 	switch portName.Kind {
 	case util.IntstrString:
-		if len(portName.StrVal) == 0 {
-			return findDefaultPort(pod, svcPort.Port, svcPort.Protocol), nil
-		}
 		name := portName.StrVal
 		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
@@ -433,9 +409,6 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
 			}
 		}
 	case util.IntstrInt:
-		if portName.IntVal == 0 {
-			return findDefaultPort(pod, svcPort.Port, svcPort.Protocol), nil
-		}
 		return portName.IntVal, nil
 	}
 

@@ -52,6 +52,7 @@ function verify-prereqs {
       vmrun vmware_workstation vagrant-vmware-workstation
       prlctl parallels vagrant-parallels
       VBoxManage virtualbox ''
+      virsh libvirt vagrant-libvirt
   )
   local provider_found=''
   local provider_bin
@@ -127,7 +128,7 @@ function create-provision-scripts {
     echo "CONTAINER_ADDR='${MASTER_CONTAINER_ADDR}'"
     echo "MINION_CONTAINER_NETMASKS='${MINION_CONTAINER_NETMASKS[@]}'"
     echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
-    echo "PORTAL_NET='${PORTAL_NET}'"
+    echo "SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
     echo "MASTER_USER='${MASTER_USER}'"
     echo "MASTER_PASSWD='${MASTER_PASSWD}'"
     echo "ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
@@ -139,9 +140,12 @@ function create-provision-scripts {
     echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
     echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
+    echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
     echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
-    grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+    echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
+    echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
+    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+    awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
@@ -150,6 +154,7 @@ function create-provision-scripts {
       echo "MASTER_NAME='${MASTER_NAME}'"
       echo "MASTER_IP='${MASTER_IP}'"
       echo "MINION_NAMES=(${MINION_NAMES[@]})"
+      echo "MINION_NAME=(${MINION_NAMES[$i]})"
       echo "MINION_IPS=(${MINION_IPS[@]})"
       echo "MINION_IP='${MINION_IPS[$i]}'"
       echo "MINION_ID='$i'"
@@ -162,8 +167,10 @@ function create-provision-scripts {
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
       echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
-      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
-      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+      echo "KUBELET_TOKEN='${KUBELET_TOKEN:-}'"
+      echo "KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN:-}'"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
   done
 }
@@ -250,6 +257,7 @@ function verify-cluster {
 # Instantiate a kubernetes cluster
 function kube-up {
   get-password
+  get-tokens
   create-provision-scripts
 
   vagrant up
@@ -366,4 +374,9 @@ function restart-apiserver {
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   echo "Vagrant doesn't need special preparations for e2e tests" 1>&2
+}
+
+function get-tokens() {
+  KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 }

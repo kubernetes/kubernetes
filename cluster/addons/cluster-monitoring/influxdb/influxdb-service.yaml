@@ -1,9 +1,11 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
-metadata: 
-  labels: 
-    name: influxGrafana
+metadata:
   name: monitoring-influxdb
+  namespace: default 
+  labels: 
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "InfluxDB"
 spec: 
   ports: 
     - name: http
@@ -13,5 +15,5 @@ spec:
       port: 8086
       targetPort: 8086
   selector: 
-    name: influxGrafana
+    k8s-app: influxGrafana
 

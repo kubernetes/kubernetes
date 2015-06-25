@@ -19,6 +19,7 @@ package container
 import (
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -56,7 +57,8 @@ type Runtime interface {
 	// KillPod kills all the containers of a pod.
 	KillPod(pod Pod) error
 	// GetPodStatus retrieves the status of the pod, including the information of
-	// all containers in the pod.
+	// all containers in the pod. Clients of this interface assume the containers
+	// statuses in a pod always have a deterministic ordering (eg: sorted by name).
 	GetPodStatus(*api.Pod) (*api.PodStatus, error)
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary.
@@ -280,6 +282,11 @@ func (p *Pod) FindContainerByName(containerName string) *Container {
 		}
 	}
 	return nil
+}
+
+// IsEmpty returns true if the pod is empty.
+func (p *Pod) IsEmpty() bool {
+	return reflect.DeepEqual(p, &Pod{})
 }
 
 // GetPodFullName returns a name that uniquely identifies a pod.

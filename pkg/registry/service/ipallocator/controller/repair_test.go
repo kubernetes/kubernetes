@@ -27,7 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
 )
 
-type mockIPRegistry struct {
+type mockRangeRegistry struct {
 	getCalled bool
 	item      *api.RangeAllocation
 	err       error
@@ -37,12 +37,12 @@ type mockIPRegistry struct {
 	updateErr    error
 }
 
-func (r *mockIPRegistry) Get() (*api.RangeAllocation, error) {
+func (r *mockRangeRegistry) Get() (*api.RangeAllocation, error) {
 	r.getCalled = true
 	return r.item, r.err
 }
 
-func (r *mockIPRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
+func (r *mockRangeRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 	r.updateCalled = true
 	r.updated = alloc
 	return r.updateErr
@@ -51,7 +51,7 @@ func (r *mockIPRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 func TestRepair(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	ipregistry := &mockIPRegistry{
+	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{},
 	}
 	r := NewRepair(0, registry, cidr, ipregistry)
@@ -63,7 +63,7 @@ func TestRepair(t *testing.T) {
 		t.Errorf("unexpected ipregistry: %#v", ipregistry)
 	}
 
-	ipregistry = &mockIPRegistry{
+	ipregistry = &mockRangeRegistry{
 		item:      &api.RangeAllocation{},
 		updateErr: fmt.Errorf("test error"),
 	}
@@ -77,16 +77,21 @@ func TestRepairEmpty(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
 	previous := ipallocator.NewCIDRRange(cidr)
 	previous.Allocate(net.ParseIP("192.168.1.10"))
-	network, data := previous.Snapshot()
+
+	var dst api.RangeAllocation
+	err := previous.Snapshot(&dst)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	registry := registrytest.NewServiceRegistry()
-	ipregistry := &mockIPRegistry{
+	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
 			ObjectMeta: api.ObjectMeta{
 				ResourceVersion: "1",
 			},
-			Range: network.String(),
-			Data:  data,
+			Range: dst.Range,
+			Data:  dst.Data,
 		},
 	}
 	r := NewRepair(0, registry, cidr, ipregistry)
@@ -105,38 +110,44 @@ func TestRepairEmpty(t *testing.T) {
 func TestRepairWithExisting(t *testing.T) {
 	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
 	previous := ipallocator.NewCIDRRange(cidr)
-	network, data := previous.Snapshot()
+
+	var dst api.RangeAllocation
+	err := previous.Snapshot(&dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	registry := registrytest.NewServiceRegistry()
 	registry.List = api.ServiceList{
 		Items: []api.Service{
 			{
-				Spec: api.ServiceSpec{PortalIP: "192.168.1.1"},
+				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			{
-				Spec: api.ServiceSpec{PortalIP: "192.168.1.100"},
+				Spec: api.ServiceSpec{ClusterIP: "192.168.1.100"},
 			},
 			{ // outside CIDR, will be dropped
-				Spec: api.ServiceSpec{PortalIP: "192.168.0.1"},
+				Spec: api.ServiceSpec{ClusterIP: "192.168.0.1"},
 			},
 			{ // empty, ignored
-				Spec: api.ServiceSpec{PortalIP: ""},
+				Spec: api.ServiceSpec{ClusterIP: ""},
 			},
 			{ // duplicate, dropped
-				Spec: api.ServiceSpec{PortalIP: "192.168.1.1"},
+				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			{ // headless
-				Spec: api.ServiceSpec{PortalIP: "None"},
+				Spec: api.ServiceSpec{ClusterIP: "None"},
 			},
 		},
 	}
 
-	ipregistry := &mockIPRegistry{
+	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
 			ObjectMeta: api.ObjectMeta{
 				ResourceVersion: "1",
 			},
-			Range: network.String(),
-			Data:  data,
+			Range: dst.Range,
+			Data:  dst.Data,
 		},
 	}
 	r := NewRepair(0, registry, cidr, ipregistry)

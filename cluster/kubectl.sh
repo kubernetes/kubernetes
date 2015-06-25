@@ -18,6 +18,18 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Stop the bleeding, turn off the warning until we fix token gen.
+# echo "-=-=-=-=-=-=-=-=-=-="
+# echo "NOTE:"
+# echo "kubectl.sh is deprecated and will be removed soon."
+# echo "please replace all usage with calls to the kubectl"
+# echo "binary and ensure that it is in your PATH." 
+# echo ""
+# echo "Please see 'kubectl help config' for more details"
+# echo "about configuring kubectl for your cluster."
+# echo "-=-=-=-=-=-=-=-=-=-="
+
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 UTILS=${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh
@@ -59,7 +71,7 @@ case "$(uname -m)" in
     host_arch=arm
     ;;
   i?86*)
-    host_arch=x86
+    host_arch=386
     ;;
   *)
     echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
@@ -102,9 +114,6 @@ kubectl="${KUBECTL_PATH:-${kubectl}}"
 
 if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
-  config=(
-    "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
-  )
 elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" || "$KUBERNETES_PROVIDER" == "juju" ]]; then
   detect-master > /dev/null
   config=(

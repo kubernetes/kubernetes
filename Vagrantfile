@@ -59,8 +59,8 @@ $kube_provider_boxes = {
   },
   :virtualbox => {
     'fedora' => {
-      :box_name => 'kube-fedora20',
-      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-20_chef-provisionerless.box'
+      :box_name => 'kube-fedora21',
+      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-21_chef-provisionerless.box'
     }
   },
   :libvirt => {
@@ -89,7 +89,7 @@ elsif host =~ /linux/
   #This should work on most processors, however it will fail on ones without the core id field.
   #So far i have only seen this on a raspberry pi. which you probably don't want to run vagrant on anyhow...
   #But just in case we'll default to the result of nproc if we get 0 just to be safe.
-  $vm_cpus = `cat /proc/cpuinfo | grep 'core id' | uniq | wc -l`.to_i
+  $vm_cpus = `cat /proc/cpuinfo | grep 'core id' | sort -u | wc -l`.to_i
   if $vm_cpus < 1
       $vm_cpus = `nproc`.to_i
   end
@@ -211,7 +211,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       c.vm.provision "shell", run: "always", path: script
     end
     c.vm.network "private_network", ip: "#{$master_ip}"
-    c.vm.hostname = ENV['MASTER_NAME']
   end
 
   # Kubernetes minion
@@ -229,7 +228,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         minion.vm.provision "shell", run: "always", path: script
       end
       minion.vm.network "private_network", ip: "#{minion_ip}"
-      minion.vm.hostname = minion_hostname
     end
   end
 end

@@ -143,6 +143,9 @@ func TestTokenCreation(t *testing.T) {
 	testcases := map[string]struct {
 		ClientObjects []runtime.Object
 
+		SecretsSyncPending         bool
+		ServiceAccountsSyncPending bool
+
 		ExistingServiceAccount *api.ServiceAccount
 		ExistingSecrets        []*api.Secret
 
@@ -165,6 +168,18 @@ func TestTokenCreation(t *testing.T) {
 				{Action: "update-serviceaccount", Value: serviceAccount(addTokenSecretReference(emptySecretReferences()))},
 			},
 		},
+		"new serviceaccount with no secrets with unsynced secret store": {
+			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences()), createdTokenSecret()},
+
+			SecretsSyncPending: true,
+
+			AddedServiceAccount: serviceAccount(emptySecretReferences()),
+			ExpectedActions: []testclient.FakeAction{
+				{Action: "create-secret", Value: createdTokenSecret()},
+				{Action: "get-serviceaccount", Value: "default"},
+				{Action: "update-serviceaccount", Value: serviceAccount(addTokenSecretReference(emptySecretReferences()))},
+			},
+		},
 		"new serviceaccount with missing secrets": {
 			ClientObjects: []runtime.Object{serviceAccount(missingSecretReferences()), createdTokenSecret()},
 
@@ -174,6 +189,14 @@ func TestTokenCreation(t *testing.T) {
 				{Action: "get-serviceaccount", Value: "default"},
 				{Action: "update-serviceaccount", Value: serviceAccount(addTokenSecretReference(missingSecretReferences()))},
 			},
+		},
+		"new serviceaccount with missing secrets with unsynced secret store": {
+			ClientObjects: []runtime.Object{serviceAccount(missingSecretReferences()), createdTokenSecret()},
+
+			SecretsSyncPending: true,
+
+			AddedServiceAccount: serviceAccount(missingSecretReferences()),
+			ExpectedActions:     []testclient.FakeAction{},
 		},
 		"new serviceaccount with non-token secrets": {
 			ClientObjects: []runtime.Object{serviceAccount(regularSecretReferences()), createdTokenSecret(), opaqueSecret()},
@@ -203,6 +226,18 @@ func TestTokenCreation(t *testing.T) {
 				{Action: "update-serviceaccount", Value: serviceAccount(addTokenSecretReference(emptySecretReferences()))},
 			},
 		},
+		"updated serviceaccount with no secrets with unsynced secret store": {
+			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences()), createdTokenSecret()},
+
+			SecretsSyncPending: true,
+
+			UpdatedServiceAccount: serviceAccount(emptySecretReferences()),
+			ExpectedActions: []testclient.FakeAction{
+				{Action: "create-secret", Value: createdTokenSecret()},
+				{Action: "get-serviceaccount", Value: "default"},
+				{Action: "update-serviceaccount", Value: serviceAccount(addTokenSecretReference(emptySecretReferences()))},
+			},
+		},
 		"updated serviceaccount with missing secrets": {
 			ClientObjects: []runtime.Object{serviceAccount(missingSecretReferences()), createdTokenSecret()},
 
@@ -212,6 +247,14 @@ func TestTokenCreation(t *testing.T) {
 				{Action: "get-serviceaccount", Value: "default"},
 				{Action: "update-serviceaccount", Value: serviceAccount(addTokenSecretReference(missingSecretReferences()))},
 			},
+		},
+		"updated serviceaccount with missing secrets with unsynced secret store": {
+			ClientObjects: []runtime.Object{serviceAccount(missingSecretReferences()), createdTokenSecret()},
+
+			SecretsSyncPending: true,
+
+			UpdatedServiceAccount: serviceAccount(missingSecretReferences()),
+			ExpectedActions:       []testclient.FakeAction{},
 		},
 		"updated serviceaccount with non-token secrets": {
 			ClientObjects: []runtime.Object{serviceAccount(regularSecretReferences()), createdTokenSecret(), opaqueSecret()},
@@ -259,6 +302,7 @@ func TestTokenCreation(t *testing.T) {
 
 			AddedSecret: serviceAccountTokenSecret(),
 			ExpectedActions: []testclient.FakeAction{
+				{Action: "get-serviceaccount", Value: "default"},
 				{Action: "delete-secret", Value: "token-secret-1"},
 			},
 		},
@@ -283,6 +327,7 @@ func TestTokenCreation(t *testing.T) {
 
 			UpdatedSecret: serviceAccountTokenSecret(),
 			ExpectedActions: []testclient.FakeAction{
+				{Action: "get-serviceaccount", Value: "default"},
 				{Action: "delete-secret", Value: "token-secret-1"},
 			},
 		},
@@ -334,6 +379,10 @@ func TestTokenCreation(t *testing.T) {
 		client := testclient.NewSimpleFake(tc.ClientObjects...)
 
 		controller := NewTokensController(client, DefaultTokenControllerOptions(generator))
+
+		// Tell the token controller whether its stores have been synced
+		controller.serviceAccountsSynced = func() bool { return !tc.ServiceAccountsSyncPending }
+		controller.secretsSynced = func() bool { return !tc.SecretsSyncPending }
 
 		if tc.ExistingServiceAccount != nil {
 			controller.serviceAccounts.Add(tc.ExistingServiceAccount)

@@ -59,9 +59,12 @@ func validNewPersistentVolume(name string) *api.PersistentVolume {
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 			},
+			PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRetain,
 		},
 		Status: api.PersistentVolumeStatus{
-			Phase: api.VolumePending,
+			Phase:   api.VolumePending,
+			Message: "bar",
+			Reason:  "foo",
 		},
 	}
 	return pv
@@ -75,9 +78,9 @@ func validChangedPersistentVolume() *api.PersistentVolume {
 
 func TestCreate(t *testing.T) {
 	storage, _, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
 	pv := validNewPersistentVolume("foo")
-	pv.ObjectMeta = api.ObjectMeta{}
+	pv.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		// valid
 		pv,
@@ -89,9 +92,9 @@ func TestCreate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, _, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
 
 	pv := validChangedPersistentVolume()
 	key, _ := storage.KeyFunc(ctx, pv.Name)
@@ -117,7 +120,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestEtcdListPersistentVolumes(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, _, fakeClient, _ := newStorage(t)
 	key := storage.KeyRootFunc(ctx)
 	key = etcdtest.AddPrefix(key)
@@ -149,7 +152,7 @@ func TestEtcdListPersistentVolumes(t *testing.T) {
 }
 
 func TestEtcdGetPersistentVolumes(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, _, fakeClient, _ := newStorage(t)
 	persistentVolume := validNewPersistentVolume("foo")
 	name := persistentVolume.Name
@@ -180,7 +183,7 @@ func TestEtcdGetPersistentVolumes(t *testing.T) {
 }
 
 func TestListEmptyPersistentVolumesList(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, _, fakeClient, _ := newStorage(t)
 	fakeClient.ChangeIndex = 1
 	key := storage.KeyRootFunc(ctx)
@@ -204,7 +207,7 @@ func TestListEmptyPersistentVolumesList(t *testing.T) {
 }
 
 func TestListPersistentVolumesList(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, _, fakeClient, _ := newStorage(t)
 	fakeClient.ChangeIndex = 1
 	key := storage.KeyRootFunc(ctx)
@@ -264,7 +267,7 @@ func TestPersistentVolumesDecode(t *testing.T) {
 }
 
 func TestEtcdUpdatePersistentVolumes(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, _, fakeClient, _ := newStorage(t)
 	persistentVolume := validChangedPersistentVolume()
 
@@ -294,7 +297,7 @@ func TestEtcdUpdatePersistentVolumes(t *testing.T) {
 }
 
 func TestDeletePersistentVolumes(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, _, fakeClient, _ := newStorage(t)
 	persistentVolume := validNewPersistentVolume("foo")
 	name := persistentVolume.Name
@@ -318,7 +321,7 @@ func TestDeletePersistentVolumes(t *testing.T) {
 
 func TestEtcdUpdateStatus(t *testing.T) {
 	storage, statusStorage, fakeClient, helper := newStorage(t)
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	fakeClient.TestIndex = true
 
 	key, _ := storage.KeyFunc(ctx, "foo")

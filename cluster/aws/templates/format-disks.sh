@@ -42,38 +42,161 @@ for ephemeral_device in $ephemeral_devices; do
   fi
 done
 
+# These are set if we should move where docker/kubelet store data
+# Note this gets set to the parent directory
+move_docker=""
+move_kubelet=""
+
+apt-get update
+
+docker_storage=${DOCKER_STORAGE:-aufs}
+
 # Format the ephemeral disks
 if [[ ${#block_devices[@]} == 0 ]]; then
-  echo "No ephemeral block devices found"
+  echo "No ephemeral block devices found; will use aufs on root"
+  docker_storage="aufs"
+
+  # Install aufs kernel module (for ubuntu)
+  apt-get install --yes linux-image-extra-$(uname -r)
+
+  # Install aufs tools (for debian)
+  apt-get install --yes aufs-tools
 else
-  echo "Block devices: ${block_devices}"
+  echo "Block devices: ${block_devices[@]}"
 
-  apt-get install --yes btrfs-tools
+  # Remove any existing mounts
+  for block_device in ${block_devices}; do
+    /bin/umount ${block_device}
+    sed -i -e "\|^${block_device}|d" /etc/fstab
+  done
 
-  if [[ ${#block_devices[@]} == 1 ]]; then
-    echo "One ephemeral block device found; formatting with btrfs"
-    mkfs.btrfs -f ${block_devices[0]}
+  if [[ ${docker_storage} == "btrfs" ]]; then
+    apt-get install --yes btrfs-tools
+
+    if [[ ${#block_devices[@]} == 1 ]]; then
+      echo "One ephemeral block device found; formatting with btrfs"
+      mkfs.btrfs -f ${block_devices[0]}
+    else
+      echo "Found multiple ephemeral block devices, formatting with btrfs as RAID-0"
+      mkfs.btrfs -f --data raid0 ${block_devices[@]}
+    fi
+    echo "${block_devices[0]}  /mnt  btrfs  noatime  0 0" >> /etc/fstab
+    mount /mnt
+
+    mkdir -p /mnt/kubernetes
+
+    move_docker="/mnt"
+    move_kubelet="/mnt/kubernetes"
+  elif [[ ${docker_storage} == "aufs-nolvm" ]]; then
+    if [[ ${#block_devices[@]} != 1 ]]; then
+      echo "aufs-nolvm selected, but multiple ephemeral devices were found; only the first will be available"
+    fi
+
+    mkfs -t ext4 ${block_devices[0]}
+    echo "${block_devices[0]}  /mnt  ext4     noatime  0 0" >> /etc/fstab
+    mount /mnt
+
+    mkdir -p /mnt/kubernetes
+
+    move_docker="/mnt"
+    move_kubelet="/mnt/kubernetes"
+  elif [[ ${docker_storage} == "devicemapper" || ${docker_storage} == "aufs" ]]; then
+    # We always use LVM, even with one device
+    # In devicemapper mode, Docker can use LVM directly
+    # Also, fewer code paths are good
+    echo "Using LVM2 and ext4"
+    apt-get install --yes lvm2
+
+    # Don't output spurious "File descriptor X leaked on vgcreate invocation."
+    # Known bug: e.g. Ubuntu #591823
+    export LVM_SUPPRESS_FD_WARNINGS=1
+
+    for block_device in ${block_devices}; do
+      pvcreate ${block_device}
+    done
+    vgcreate vg-ephemeral ${block_devices[@]}
+
+    if [[ ${docker_storage} == "devicemapper" ]]; then
+      # devicemapper thin provisioning, managed by docker
+      # This is the best option, but it is sadly broken on most distros
+      # Bug: https://github.com/docker/docker/issues/4036
+
+      # 95% goes to the docker thin-pool
+      lvcreate -l 95%VG --thinpool docker-thinpool vg-ephemeral
+
+      DOCKER_OPTS="${DOCKER_OPTS} --storage-opt dm.thinpooldev=/dev/mapper/vg--ephemeral-docker--thinpool"
+      # Note that we don't move docker; docker goes direct to the thinpool
+    else
+      # aufs
+
+      # Create a docker lv, use docker on it
+      # 95% goes to the docker thin-pool
+      release=`lsb_release -c -s`
+      if [[ "${release}" != "wheezy" ]] ; then
+        lvcreate -l 95%VG --thinpool docker-thinpool vg-ephemeral
+
+        THINPOOL_SIZE=$(lvs vg-ephemeral/docker-thinpool -o LV_SIZE --noheadings --units M --nosuffix)
+        lvcreate -V${THINPOOL_SIZE}M -T vg-ephemeral/docker-thinpool -n docker
+      else
+        # Thin provisioning not supported by Wheezy
+        echo "Detected wheezy; won't use LVM thin provisioning"
+        lvcreate -l 95%VG -n docker vg-ephemeral
+      fi
+
+      mkfs -t ext4 /dev/vg-ephemeral/docker
+      mkdir -p /mnt/docker
+      echo "/dev/vg-ephemeral/docker  /mnt/docker  ext4  noatime  0 0" >> /etc/fstab
+      mount /mnt/docker
+      move_docker="/mnt"
+    fi
+
+    # Remaining 5% is for kubernetes data
+    # TODO: Should this be a thin pool?  e.g. would we ever want to snapshot this data?
+    lvcreate -l 100%FREE -n kubernetes vg-ephemeral
+    mkfs -t ext4 /dev/vg-ephemeral/kubernetes
+    mkdir -p /mnt/kubernetes
+    echo "/dev/vg-ephemeral/kubernetes  /mnt/kubernetes  ext4  noatime  0 0" >> /etc/fstab
+    mount /mnt/kubernetes
+
+    move_kubelet="/mnt/kubernetes"
   else
-    echo "Found multiple ephemeral block devices, formatting with btrfs as RAID-0"
-    mkfs.btrfs -f --data raid0 ${block_devices[@]}
+    echo "Ignoring unknown DOCKER_STORAGE: ${docker_storage}"
   fi
-  mount -t btrfs ${block_devices[0]} /mnt
+fi
 
-  # Move docker to /mnt if we have it
+
+if [[ ${docker_storage} == "btrfs" ]]; then
+  DOCKER_OPTS="${DOCKER_OPTS} -s btrfs"
+elif [[ ${docker_storage} == "aufs-nolvm" || ${docker_storage} == "aufs" ]]; then
+  # Install aufs kernel module
+  apt-get install --yes linux-image-extra-$(uname -r)
+
+  DOCKER_OPTS="${DOCKER_OPTS} -s aufs"
+elif [[ ${docker_storage} == "devicemapper" ]]; then
+  DOCKER_OPTS="${DOCKER_OPTS} -s devicemapper"
+else
+  echo "Ignoring unknown DOCKER_STORAGE: ${docker_storage}"
+fi
+
+if [[ -n "${move_docker}" ]]; then
+  # Move docker to e.g. /mnt
   if [[ -d /var/lib/docker ]]; then
-    mv /var/lib/docker /mnt/
+    mv /var/lib/docker ${move_docker}/
   fi
-  mkdir -p /mnt/docker
-  ln -s /mnt/docker /var/lib/docker
-  DOCKER_ROOT="/mnt/docker"
-  DOCKER_OPTS="${DOCKER_OPTS} -g /mnt/docker"
+  mkdir -p ${move_docker}/docker
+  ln -s ${move_docker}/docker /var/lib/docker
+  DOCKER_ROOT="${move_docker}/docker"
+  DOCKER_OPTS="${DOCKER_OPTS} -g ${DOCKER_ROOT}"
+fi
 
-  # Move /var/lib/kubelet to /mnt if we have it
+if [[ -n "${move_kubelet}" ]]; then
+  # Move /var/lib/kubelet to e.g. /mnt
   # (the backing for empty-dir volumes can use a lot of space!)
   if [[ -d /var/lib/kubelet ]]; then
-    mv /var/lib/kubelet /mnt/
+    mv /var/lib/kubelet ${move_kubelet}/
   fi
-  mkdir -p /mnt/kubelet
-  ln -s /mnt/kubelet /var/lib/kubelet
+  mkdir -p ${move_kubelet}/kubelet
+  ln -s ${move_kubelet}/kubelet /var/lib/kubelet
+  KUBELET_ROOT="${move_kubelet}/kubelet"
 fi
 

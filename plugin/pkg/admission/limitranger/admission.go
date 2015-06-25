@@ -40,6 +40,7 @@ func init() {
 
 // limitRanger enforces usage limits on a per resource basis in the namespace
 type limitRanger struct {
+	*admission.Handler
 	client    client.Interface
 	limitFunc LimitFunc
 	indexer   cache.Indexer
@@ -47,8 +48,9 @@ type limitRanger struct {
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
 func (l *limitRanger) Admit(a admission.Attributes) (err error) {
-	// ignore deletes
-	if a.GetOperation() == "DELETE" {
+
+	// Ignore all calls to subresources
+	if a.GetSubresource() != "" {
 		return nil
 	}
 
@@ -99,9 +101,15 @@ func NewLimitRanger(client client.Interface, limitFunc LimitFunc) admission.Inte
 	}
 	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.LimitRange{}, 0)
 	reflector.Run()
-	return &limitRanger{client: client, limitFunc: limitFunc, indexer: indexer}
+	return &limitRanger{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		client:    client,
+		limitFunc: limitFunc,
+		indexer:   indexer,
+	}
 }
 
+// Min returns the lesser of its 2 arguments
 func Min(a int64, b int64) int64 {
 	if a < b {
 		return a
@@ -109,6 +117,7 @@ func Min(a int64, b int64) int64 {
 	return b
 }
 
+// Max returns the greater of its 2 arguments
 func Max(a int64, b int64) int64 {
 	if a > b {
 		return a
@@ -141,10 +150,6 @@ func defaultContainerResourceRequirements(limitRange *api.LimitRange) api.Resour
 			for k, v := range limit.Default {
 				value := v.Copy()
 				requirements.Limits[k] = *value
-			}
-			for k, v := range limit.Min {
-				value := v.Copy()
-				requirements.Requests[k] = *value
 			}
 		}
 	}

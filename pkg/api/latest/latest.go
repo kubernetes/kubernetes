@@ -24,8 +24,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -36,7 +34,7 @@ var Version string
 
 // OldestVersion is the string that represents the oldest server version supported,
 // for client code that wants to hardcode the lowest common denominator.
-const OldestVersion = "v1beta1"
+const OldestVersion = "v1beta3"
 
 // Versions is the list of versions that are recognized in code. The order provided
 // may be assumed to be least feature rich to most feature rich, and clients may
@@ -88,20 +86,6 @@ func init() {
 		},
 	)
 
-	// versions that used mixed case URL formats
-	versionMixedCase := map[string]bool{
-		"v1beta1": true,
-		"v1beta2": true,
-	}
-
-	// backwards compatibility, prior to v1beta3, we identified the namespace as a query parameter
-	versionToNamespaceScope := map[string]meta.RESTScope{
-		"v1beta1": meta.RESTScopeNamespaceLegacy,
-		"v1beta2": meta.RESTScopeNamespaceLegacy,
-		"v1beta3": meta.RESTScopeNamespace,
-		"v1":      meta.RESTScopeNamespace,
-	}
-
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
 	kindToRootScope := map[string]bool{
@@ -130,16 +114,11 @@ func init() {
 			if ignoredKinds.Has(kind) {
 				continue
 			}
-			mixedCase, found := versionMixedCase[version]
-			if !found {
-				mixedCase = false
-			}
-			scope := versionToNamespaceScope[version]
-			_, found = kindToRootScope[kind]
-			if found {
+			scope := meta.RESTScopeNamespace
+			if kindToRootScope[kind] {
 				scope = meta.RESTScopeRoot
 			}
-			mapper.Add(scope, kind, version, mixedCase)
+			mapper.Add(scope, kind, version, false)
 		}
 	}
 	RESTMapper = mapper
@@ -149,18 +128,6 @@ func init() {
 // string, or an error if the version is not known.
 func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
-	case "v1beta1":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta1.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case "v1beta2":
-		return &meta.VersionInterfaces{
-			Codec:            v1beta2.Codec,
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
 	case "v1beta3":
 		return &meta.VersionInterfaces{
 			Codec:            v1beta3.Codec,

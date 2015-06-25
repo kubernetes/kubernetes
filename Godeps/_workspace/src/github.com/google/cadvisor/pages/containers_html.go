@@ -64,6 +64,36 @@ const containersHtmlTemplate = `
 	</div>
       </div>
       {{end}}
+     {{if .DockerStatus}}
+      <div class="col-sm-12">
+	<div class="page-header">
+	  <h3>Driver Status</h3>
+	</div>
+	<ul class="list-group">
+	  {{range $dockerstatus := .DockerStatus}}
+	  <li class ="list-group-item"><span class="stat-label">{{$dockerstatus.Key}}</span> {{$dockerstatus.Value}}</li>
+	  {{end}}
+	  {{if .DockerDriverStatus}}
+		<li class ="list-group-item"><span class="stat-label">Storage<br></span>
+		<ul class="list-group">
+		{{range $driverstatus := .DockerDriverStatus}}
+		<li class="list-group-item"><span class="stat-label">{{$driverstatus.Key}}</span> {{$driverstatus.Value}}</li>
+		{{end}}
+		</ul>
+		</li>
+	  </ul>
+	  {{end}}
+	</div>
+      {{end}}
+      {{if .DockerImages}}
+      <div class="col-sm-12">
+          <div class="page-header">
+            <h3>Images</h3>
+          </div>
+       <div id="docker-images"></div>
+       <br><br>
+       </div>
+      {{end}}
       {{if .ResourcesAvailable}}
       <div class="col-sm-12">
 	<div class="page-header">
@@ -162,6 +192,16 @@ const containersHtmlTemplate = `
 	  <div class="panel-heading">
             <h3 class="panel-title">Network</h3>
 	  </div>
+          <div class="panel-body">
+	    <div class="dropdown">
+              <button class="btn btn-default dropdown-toggle" type="button" id="network-selection-dropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <span id="network-selection-text"></span>
+                <span class="caret"></span>
+	      </button>
+              <ul id="network-selection" class="dropdown-menu" role="menu" aria-labelledby="network-selection-dropdown">
+              </ul>
+	    </div>
+          </div>
 	  <div class="panel-body">
             <h4>Throughput</h4>
             <div id="network-bytes-chart"></div>
@@ -185,7 +225,8 @@ const containersHtmlTemplate = `
       {{end}}
     </div>
     <script type="text/javascript">
-      startPage({{.ContainerName}}, {{.CpuAvailable}}, {{.MemoryAvailable}}, {{.Root}});
+      startPage({{.ContainerName}}, {{.CpuAvailable}}, {{.MemoryAvailable}}, {{.Root}}, {{.IsRoot}});
+      drawImages({{.DockerImages}});
     </script>
   </body>
 </html>

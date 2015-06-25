@@ -15,13 +15,13 @@ import (
 
 type SwaggerService struct {
 	config            Config
-	apiDeclarationMap map[string]ApiDeclaration
+	apiDeclarationMap *ApiDeclarationList
 }
 
 func newSwaggerService(config Config) *SwaggerService {
 	return &SwaggerService{
 		config:            config,
-		apiDeclarationMap: map[string]ApiDeclaration{}}
+		apiDeclarationMap: new(ApiDeclarationList)}
 }
 
 // LogInfo is the function that is called when this package needs to log. It defaults to log.Printf
@@ -66,13 +66,13 @@ func RegisterSwaggerService(config Config, wsContainer *restful.Container) {
 				// use routes
 				for _, route := range each.Routes() {
 					entry := staticPathFromRoute(route)
-					_, exists := sws.apiDeclarationMap[entry]
+					_, exists := sws.apiDeclarationMap.At(entry)
 					if !exists {
-						sws.apiDeclarationMap[entry] = sws.composeDeclaration(each, entry)
+						sws.apiDeclarationMap.Put(entry, sws.composeDeclaration(each, entry))
 					}
 				}
 			} else { // use root path
-				sws.apiDeclarationMap[each.RootPath()] = sws.composeDeclaration(each, each.RootPath())
+				sws.apiDeclarationMap.Put(each.RootPath(), sws.composeDeclaration(each, each.RootPath()))
 			}
 		}
 	}
@@ -139,19 +139,22 @@ func enableCORS(req *restful.Request, resp *restful.Response, chain *restful.Fil
 
 func (sws SwaggerService) getListing(req *restful.Request, resp *restful.Response) {
 	listing := ResourceListing{SwaggerVersion: swaggerVersion, ApiVersion: sws.config.ApiVersion}
-	for k, v := range sws.apiDeclarationMap {
+	sws.apiDeclarationMap.Do(func(k string, v ApiDeclaration) {
 		ref := Resource{Path: k}
 		if len(v.Apis) > 0 { // use description of first (could still be empty)
 			ref.Description = v.Apis[0].Description
 		}
 		listing.Apis = append(listing.Apis, ref)
-	}
-	sort.Sort(ResourceSorter(listing.Apis))
+	})
 	resp.WriteAsJson(listing)
 }
 
 func (sws SwaggerService) getDeclarations(req *restful.Request, resp *restful.Response) {
-	decl := sws.apiDeclarationMap[composeRootPath(req)]
+	decl, ok := sws.apiDeclarationMap.At(composeRootPath(req))
+	if !ok {
+		resp.WriteErrorString(http.StatusNotFound, "ApiDeclaration not found")
+		return
+	}
 	// unless WebServicesUrl is given
 	if len(sws.config.WebServicesUrl) == 0 {
 		// update base path from the actual request
@@ -180,7 +183,7 @@ func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix 
 		SwaggerVersion: swaggerVersion,
 		BasePath:       sws.config.WebServicesUrl,
 		ResourcePath:   ws.RootPath(),
-		Models:         map[string]Model{},
+		Models:         ModelList{},
 		ApiVersion:     ws.Version()}
 
 	// collect any path parameters
@@ -218,8 +221,6 @@ func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix 
 			for _, param := range route.ParameterDocs {
 				operation.Parameters = append(operation.Parameters, asSwaggerParameter(param.Data()))
 			}
-			// sort parameters
-			sort.Sort(ParameterSorter(operation.Parameters))
 
 			sws.addModelsFromRouteTo(&operation, route, &decl)
 			api.Operations = append(api.Operations, operation)
@@ -253,7 +254,7 @@ func composeResponseMessages(route restful.Route, decl *ApiDeclaration) (message
 			if isCollection {
 				modelName = "array[" + modelName + "]"
 			}
-			modelBuilder{decl.Models}.addModel(st, "")
+			modelBuilder{&decl.Models}.addModel(st, "")
 			// reference the model
 			message.ResponseModel = modelName
 		}
@@ -265,10 +266,10 @@ func composeResponseMessages(route restful.Route, decl *ApiDeclaration) (message
 // addModelsFromRoute takes any read or write sample from the Route and creates a Swagger model from it.
 func (sws SwaggerService) addModelsFromRouteTo(operation *Operation, route restful.Route, decl *ApiDeclaration) {
 	if route.ReadSample != nil {
-		sws.addModelFromSampleTo(operation, false, route.ReadSample, decl.Models)
+		sws.addModelFromSampleTo(operation, false, route.ReadSample, &decl.Models)
 	}
 	if route.WriteSample != nil {
-		sws.addModelFromSampleTo(operation, true, route.WriteSample, decl.Models)
+		sws.addModelFromSampleTo(operation, true, route.WriteSample, &decl.Models)
 	}
 }
 
@@ -289,7 +290,7 @@ func detectCollectionType(st reflect.Type) (bool, reflect.Type) {
 }
 
 // addModelFromSample creates and adds (or overwrites) a Model from a sample resource
-func (sws SwaggerService) addModelFromSampleTo(operation *Operation, isResponse bool, sample interface{}, models map[string]Model) {
+func (sws SwaggerService) addModelFromSampleTo(operation *Operation, isResponse bool, sample interface{}, models *ModelList) {
 	st := reflect.TypeOf(sample)
 	isCollection, st := detectCollectionType(st)
 	modelName := modelBuilder{}.keyFrom(st)
@@ -305,8 +306,9 @@ func (sws SwaggerService) addModelFromSampleTo(operation *Operation, isResponse 
 func asSwaggerParameter(param restful.ParameterData) Parameter {
 	return Parameter{
 		DataTypeFields: DataTypeFields{
-			Type:   &param.DataType,
-			Format: asFormat(param.DataType),
+			Type:         &param.DataType,
+			Format:       asFormat(param.DataType),
+			DefaultValue: Special(param.DefaultValue),
 		},
 		Name:        param.Name,
 		Description: param.Description,

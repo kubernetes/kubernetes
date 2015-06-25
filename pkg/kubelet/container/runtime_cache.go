@@ -32,8 +32,6 @@ type RuntimeCache interface {
 	ForceUpdateIfOlder(time.Time) error
 }
 
-// TODO(yifan): This interface can be removed once docker manager has implemented
-// all the runtime interfaces, (thus we can pass the runtime directly).
 type podsGetter interface {
 	GetPods(bool) ([]*Pod, error)
 }

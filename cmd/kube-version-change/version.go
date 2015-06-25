@@ -28,9 +28,7 @@ import (
 	"runtime"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/ghodss/yaml"
@@ -41,7 +39,7 @@ var (
 	inputSource   = flag.StringP("input", "i", "-", "Input source; '-' means stdin")
 	outputDest    = flag.StringP("output", "o", "-", "Output destination; '-' means stdout")
 	rewrite       = flag.StringP("rewrite", "r", "", "If nonempty, use this as both input and output.")
-	outputVersion = flag.StringP("out-version", "v", "v1beta3", "Version to convert input to")
+	outputVersion = flag.StringP("out-version", "v", latest.Version, "Version to convert input to")
 )
 
 // isYAML determines whether data is JSON or YAML formatted by seeing

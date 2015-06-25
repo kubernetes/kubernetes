@@ -34,14 +34,14 @@ import (
 
 type sourceFile struct {
 	path     string
-	hostname string
+	nodeName string
 	updates  chan<- interface{}
 }
 
-func NewSourceFile(path string, hostname string, period time.Duration, updates chan<- interface{}) {
+func NewSourceFile(path string, nodeName string, period time.Duration, updates chan<- interface{}) {
 	config := &sourceFile{
 		path:     path,
-		hostname: hostname,
+		nodeName: nodeName,
 		updates:  updates,
 	}
 	glog.V(1).Infof("Watching path %q", path)
@@ -55,7 +55,7 @@ func (s *sourceFile) run() {
 }
 
 func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
-	return applyDefaults(pod, source, true, s.hostname)
+	return applyDefaults(pod, source, true, s.nodeName)
 }
 
 func (s *sourceFile) extractFromPath() error {
@@ -148,15 +148,6 @@ func (s *sourceFile) extractFromFile(filename string) (pod *api.Pod, err error) 
 		return s.applyDefaults(pod, filename)
 	}
 
-	parsed, _, pod, manifestErr := tryDecodeSingleManifest(data, defaultFn)
-	if parsed {
-		if manifestErr != nil {
-			// It parsed but could not be used.
-			return pod, manifestErr
-		}
-		return pod, nil
-	}
-
 	parsed, pod, podErr := tryDecodeSinglePod(data, defaultFn)
 	if parsed {
 		if podErr != nil {
@@ -165,7 +156,6 @@ func (s *sourceFile) extractFromFile(filename string) (pod *api.Pod, err error) 
 		return pod, nil
 	}
 
-	return pod, fmt.Errorf("%v: read '%v', but couldn't parse as neither "+
-		"manifest (%v) nor pod (%v).\n",
-		filename, string(data), manifestErr, podErr)
+	return pod, fmt.Errorf("%v: read '%v', but couldn't parse as pod(%v).\n",
+		filename, string(data), podErr)
 }

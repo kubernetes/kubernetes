@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"path"
 	"strconv"
@@ -34,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -46,46 +48,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	// TODO(a-robinson): Add unit tests for the handling of these metrics once
-	// the upstream library supports it.
-	requestCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "apiserver_request_count",
-			Help: "Counter of apiserver requests broken out for each verb, API resource, client, and HTTP response code.",
-		},
-		[]string{"verb", "resource", "client", "code"},
-	)
-	requestLatencies = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name: "apiserver_request_latencies",
-			Help: "Response latency distribution in microseconds for each verb, resource and client.",
-			// Use buckets ranging from 125 ms to 8 seconds.
-			Buckets: prometheus.ExponentialBuckets(125000, 2.0, 7),
-		},
-		[]string{"verb", "resource", "client"},
-	)
-	requestLatenciesSummary = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Name: "apiserver_request_latencies_summary",
-			Help: "Response latency summary in microseconds for each verb and resource.",
-		},
-		[]string{"verb", "resource"},
-	)
-)
-
 func init() {
-	prometheus.MustRegister(requestCounter)
-	prometheus.MustRegister(requestLatencies)
-	prometheus.MustRegister(requestLatenciesSummary)
-}
-
-// monitor is a helper function for each HTTP request handler to use for
-// instrumenting basic request counter and latency metrics.
-func monitor(verb, resource *string, client string, httpCode *int, reqStart time.Time) {
-	requestCounter.WithLabelValues(*verb, *resource, client, strconv.Itoa(*httpCode)).Inc()
-	requestLatencies.WithLabelValues(*verb, *resource, client).Observe(float64((time.Since(reqStart)) / time.Microsecond))
-	requestLatenciesSummary.WithLabelValues(*verb, *resource).Observe(float64((time.Since(reqStart)) / time.Microsecond))
+	metrics.Register()
 }
 
 // monitorFilter creates a filter that reports the metrics for a given resource and action.
@@ -94,7 +58,7 @@ func monitorFilter(action, resource string) restful.FilterFunction {
 		reqStart := time.Now()
 		chain.ProcessFilter(req, res)
 		httpCode := res.StatusCode()
-		monitor(&action, &resource, util.GetClient(req.Request), &httpCode, reqStart)
+		metrics.Monitor(&action, &resource, util.GetClient(req.Request), &httpCode, reqStart)
 	}
 }
 
@@ -108,6 +72,7 @@ type Mux interface {
 // It handles URLs of the form:
 // /${storage_key}[/${object_name}]
 // Where 'storage_key' points to a rest.Storage object stored in storage.
+// This object should contain all parameterization necessary for running a particular API version
 type APIGroupVersion struct {
 	Storage map[string]rest.Storage
 
@@ -130,7 +95,20 @@ type APIGroupVersion struct {
 
 	Admit   admission.Interface
 	Context api.RequestContextMapper
+
+	ProxyDialerFn     ProxyDialerFunc
+	MinRequestTimeout time.Duration
 }
+
+type ProxyDialerFunc func(network, addr string) (net.Conn, error)
+
+// TODO: Pipe these in through the apiserver cmd line
+const (
+	// Minimum duration before timing out read/write requests
+	MinTimeoutSecs = 300
+	// Maximum duration before timing out read/write requests
+	MaxTimeoutSecs = 600
+)
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
@@ -140,27 +118,26 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 
 	prefix := path.Join(g.Root, g.Version)
 	installer := &APIInstaller{
-		group:  g,
-		info:   info,
-		prefix: prefix,
+		group:             g,
+		info:              info,
+		prefix:            prefix,
+		minRequestTimeout: g.MinRequestTimeout,
+		proxyDialerFn:     g.ProxyDialerFn,
 	}
 	ws, registrationErrors := installer.Install()
 	container.Add(ws)
 	return errors.NewAggregate(registrationErrors)
 }
 
-// TODO: This endpoint is deprecated and should be removed at some point.
-// Use "componentstatus" API instead.
-func InstallValidator(mux Mux, servers func() map[string]Server) {
-	mux.Handle("/validate", NewValidator(servers))
-}
-
 // TODO: document all handlers
 // InstallSupport registers the APIServer support functions
-func InstallSupport(mux Mux, ws *restful.WebService) {
+func InstallSupport(mux Mux, ws *restful.WebService, enableResettingMetrics bool) {
 	// TODO: convert healthz and metrics to restful and remove container arg
 	healthz.InstallHandler(mux)
 	mux.Handle("/metrics", prometheus.Handler())
+	if enableResettingMetrics {
+		mux.HandleFunc("/resetMetrics", metrics.Reset)
+	}
 
 	// Set up a service to return the git code version.
 	ws.Path("/version")
@@ -263,32 +240,49 @@ func write(statusCode int, apiVersion string, codec runtime.Codec, object runtim
 		io.Copy(writer, out)
 		return
 	}
-	writeJSON(statusCode, codec, object, w)
+	writeJSON(statusCode, codec, object, w, isPrettyPrint(req))
+}
+
+func isPrettyPrint(req *http.Request) bool {
+	pp := req.URL.Query().Get("pretty")
+	if len(pp) > 0 {
+		pretty, _ := strconv.ParseBool(pp)
+		return pretty
+	}
+	userAgent := req.UserAgent()
+	// This covers basic all browers and cli http tools
+	if strings.HasPrefix(userAgent, "curl") || strings.HasPrefix(userAgent, "Wget") || strings.HasPrefix(userAgent, "Mozilla/5.0") {
+		return true
+	}
+	return false
 }
 
 // writeJSON renders an object as JSON to the response.
-func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w http.ResponseWriter) {
+func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, pretty bool) {
 	output, err := codec.Encode(object)
 	if err != nil {
 		errorJSONFatal(err, codec, w)
 		return
 	}
-	// PR #2243: Pretty-print JSON by default.
-	formatted := &bytes.Buffer{}
-	err = json.Indent(formatted, output, "", "  ")
-	if err != nil {
-		errorJSONFatal(err, codec, w)
-		return
+	if pretty {
+		// PR #2243: Pretty-print JSON by default.
+		formatted := &bytes.Buffer{}
+		err = json.Indent(formatted, output, "", "  ")
+		if err != nil {
+			errorJSONFatal(err, codec, w)
+			return
+		}
+		output = formatted.Bytes()
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	w.Write(formatted.Bytes())
+	w.Write(output)
 }
 
 // errorJSON renders an error to the response. Returns the HTTP status code of the error.
 func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) int {
 	status := errToAPIStatus(err)
-	writeJSON(status.Code, codec, status, w)
+	writeJSON(status.Code, codec, status, w, true)
 	return status.Code
 }
 

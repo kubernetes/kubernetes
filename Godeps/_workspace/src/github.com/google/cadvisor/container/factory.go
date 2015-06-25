@@ -30,6 +30,9 @@ type ContainerHandlerFactory interface {
 
 	// Name of the factory.
 	String() string
+
+	// Returns debugging information. Map of lines per category.
+	DebugInfo() map[string][]string
 }
 
 // TODO(vmarmol): Consider not making this global.
@@ -89,4 +92,18 @@ func ClearContainerHandlerFactories() {
 	defer factoriesLock.Unlock()
 
 	factories = make([]ContainerHandlerFactory, 0, 4)
+}
+
+func DebugInfo() map[string][]string {
+	factoriesLock.RLock()
+	defer factoriesLock.RUnlock()
+
+	// Get debug information for all factories.
+	out := make(map[string][]string)
+	for _, factory := range factories {
+		for k, v := range factory.DebugInfo() {
+			out[k] = v
+		}
+	}
+	return out
 }

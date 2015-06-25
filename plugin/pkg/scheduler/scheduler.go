@@ -16,6 +16,9 @@ limitations under the License.
 
 package scheduler
 
+// Note: if you change code in this file, you might need to change code in
+// contrib/mesos/pkg/scheduler/.
+
 import (
 	"time"
 
@@ -73,6 +76,9 @@ type Config struct {
 	Algorithm    algorithm.ScheduleAlgorithm
 	Binder       Binder
 
+	// Rate at which we can create pods
+	BindPodsRateLimiter util.RateLimiter
+
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
@@ -106,6 +112,10 @@ func (s *Scheduler) Run() {
 
 func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
+	if s.config.BindPodsRateLimiter != nil {
+		s.config.BindPodsRateLimiter.Accept()
+	}
+
 	glog.V(3).Infof("Attempting to schedule: %v", pod)
 	start := time.Now()
 	defer func() {
@@ -142,7 +152,7 @@ func (s *Scheduler) scheduleOne() {
 		s.config.Recorder.Eventf(pod, "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
 		// tell the model to assume that this binding took effect.
 		assumed := *pod
-		assumed.Spec.Host = dest
+		assumed.Spec.NodeName = dest
 		s.config.Modeler.AssumePod(&assumed)
 	})
 }

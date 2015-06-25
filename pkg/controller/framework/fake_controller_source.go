@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -130,7 +129,7 @@ func (f *FakeControllerSource) List() (runtime.Object, error) {
 		// Otherwise, if they make a change and write it back, they
 		// will inadvertently change the our canonical copy (in
 		// addition to racing with other clients).
-		objCopy, err := conversion.DeepCopy(obj)
+		objCopy, err := api.Scheme.DeepCopy(obj)
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +166,7 @@ func (f *FakeControllerSource) Watch(resourceVersion string) (watch.Interface, e
 			// it back, they will inadvertently change the our
 			// canonical copy (in addition to racing with other
 			// clients).
-			objCopy, err := conversion.DeepCopy(c.Object)
+			objCopy, err := api.Scheme.DeepCopy(c.Object)
 			if err != nil {
 				return nil, err
 			}

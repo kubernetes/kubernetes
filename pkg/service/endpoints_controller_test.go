@@ -63,7 +63,6 @@ func addPods(store cache.Store, namespace string, nPods int, nPorts int) {
 }
 
 func TestFindPort(t *testing.T) {
-	servicePort := 999
 	testCases := []struct {
 		name       string
 		containers []api.Container
@@ -89,74 +88,6 @@ func TestFindPort(t *testing.T) {
 		}}}},
 		port:     util.NewIntOrStringFromInt(93),
 		expected: 93,
-		pass:     true,
-	}, {
-		name:       "zero int, no ports",
-		containers: []api.Container{{}},
-		port:       util.NewIntOrStringFromInt(0),
-		expected:   servicePort,
-		pass:       true,
-	}, {
-		name: "zero int, one ctr with ports",
-		containers: []api.Container{{Ports: []api.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}}}},
-		port:     util.NewIntOrStringFromInt(0),
-		expected: 22,
-		pass:     true,
-	}, {
-		name: "zero int, two ctr with ports",
-		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}}}},
-		port:     util.NewIntOrStringFromInt(0),
-		expected: 22,
-		pass:     true,
-	}, {
-		name:       "empty str, no ports",
-		containers: []api.Container{{}},
-		port:       util.NewIntOrStringFromString(""),
-		expected:   servicePort,
-		pass:       true,
-	}, {
-		name: "empty str, one ctr with ports",
-		containers: []api.Container{{Ports: []api.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}}}},
-		port:     util.NewIntOrStringFromString(""),
-		expected: 22,
-		pass:     true,
-	}, {
-		name: "empty str, two ctr with ports",
-		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}}}},
-		port:     util.NewIntOrStringFromString(""),
-		expected: 22,
 		pass:     true,
 	}, {
 		name:       "valid str, no ports",
@@ -204,7 +135,7 @@ func TestFindPort(t *testing.T) {
 
 	for _, tc := range testCases {
 		port, err := findPort(&api.Pod{Spec: api.PodSpec{Containers: tc.containers}},
-			&api.ServicePort{Protocol: "TCP", Port: servicePort, TargetPort: tc.port})
+			&api.ServicePort{Protocol: "TCP", TargetPort: tc.port})
 		if err != nil && tc.pass {
 			t.Errorf("unexpected error for %s: %v", tc.name, err)
 		}
@@ -387,7 +318,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", ns, "foo"), "PUT", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexisting(t *testing.T) {
@@ -427,7 +358,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", ns, "foo"), "PUT", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
@@ -456,7 +387,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", api.NamespaceDefault, "foo"), "GET", nil)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", api.NamespaceDefault, "foo"), "GET", nil)
 }
 
 func TestSyncEndpointsItems(t *testing.T) {
@@ -498,7 +429,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	})
 	// endpointsHandler should get 2 requests - one for "GET" and the next for "POST".
 	endpointsHandler.ValidateRequestCount(t, 2)
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", ns, ""), "POST", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, ""), "POST", &data)
 }
 
 func TestSyncEndpointsItemsWithLabels(t *testing.T) {
@@ -545,7 +476,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	})
 	// endpointsHandler should get 2 requests - one for "GET" and the next for "POST".
 	endpointsHandler.ValidateRequestCount(t, 2)
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", ns, ""), "POST", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, ""), "POST", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
@@ -594,5 +525,5 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithNamespaceQuery("endpoints", ns, "foo"), "PUT", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }

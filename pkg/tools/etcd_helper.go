@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -181,6 +182,8 @@ func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 
 // decodeNodeList walks the tree of each node in the list and decodes into the specified object
 func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) error {
+	trace := util.NewTrace("decodeNodeList " + getTypeName(slicePtr))
+	defer trace.LogIfLong(500 * time.Millisecond)
 	v, err := conversion.EnforcePtr(slicePtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		// This should not happen at runtime.
@@ -188,9 +191,11 @@ func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 	}
 	for _, node := range nodes {
 		if node.Dir {
+			trace.Step("Decoding dir " + node.Key + " START")
 			if err := h.decodeNodeList(node.Nodes, slicePtr); err != nil {
 				return err
 			}
+			trace.Step("Decoding dir " + node.Key + " END")
 			continue
 		}
 		if obj, found := h.getFromCache(node.ModifiedIndex); found {
@@ -210,6 +215,7 @@ func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 			}
 		}
 	}
+	trace.Step(fmt.Sprintf("Decoded %v nodes", len(nodes)))
 	return nil
 }
 
@@ -230,7 +236,7 @@ func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
 	if found {
 		// We should not return the object itself to avoid poluting the cache if someone
 		// modifies returned values.
-		objCopy, err := conversion.DeepCopy(obj)
+		objCopy, err := api.Scheme.DeepCopy(obj)
 		if err != nil {
 			glog.Errorf("Error during DeepCopy of cached object: %q", err)
 			return nil, false
@@ -247,7 +253,7 @@ func (h *EtcdHelper) addToCache(index uint64, obj runtime.Object) {
 	defer func() {
 		cacheAddLatency.Observe(float64(time.Since(startTime) / time.Microsecond))
 	}()
-	objCopy, err := conversion.DeepCopy(obj)
+	objCopy, err := api.Scheme.DeepCopy(obj)
 	if err != nil {
 		glog.Errorf("Error during DeepCopy of cached object: %q", err)
 		return
@@ -261,20 +267,25 @@ func (h *EtcdHelper) addToCache(index uint64, obj runtime.Object) {
 // ExtractToList works on a *List api object (an object that satisfies the runtime.IsList
 // definition) and extracts a go object per etcd node into a slice with the resource version.
 func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
+	trace := util.NewTrace("ExtractToList " + getTypeName(listObj))
+	defer trace.LogIfLong(time.Second)
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {
 		return err
 	}
 	key = h.PrefixEtcdKey(key)
 	startTime := time.Now()
+	trace.Step("About to list etcd node")
 	nodes, index, err := h.listEtcdNode(key)
 	recordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
+	trace.Step("Etcd node listed")
 	if err != nil {
 		return err
 	}
 	if err := h.decodeNodeList(nodes, listPtr); err != nil {
 		return err
 	}
+	trace.Step("Node list decoded")
 	if h.Versioner != nil {
 		if err := h.Versioner.UpdateList(listObj, index); err != nil {
 			return err
@@ -286,14 +297,17 @@ func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
 // ExtractObjToList unmarshals json found at key and opaques it into a *List api object
 // (an object that satisfies the runtime.IsList definition).
 func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error {
+	trace := util.NewTrace("ExtractObjToList " + getTypeName(listObj))
 	listPtr, err := runtime.GetItemsPtr(listObj)
 	if err != nil {
 		return err
 	}
 	key = h.PrefixEtcdKey(key)
 	startTime := time.Now()
+	trace.Step("About to read etcd node")
 	response, err := h.Client.Get(key, false, false)
 	recordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
+	trace.Step("Etcd node read")
 	if err != nil {
 		if IsEtcdNotFound(err) {
 			return nil
@@ -307,6 +321,7 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 	if err := h.decodeNodeList(nodes, listPtr); err != nil {
 		return err
 	}
+	trace.Step("Object decoded")
 	if h.Versioner != nil {
 		if err := h.Versioner.UpdateList(listObj, response.EtcdIndex); err != nil {
 			return err
@@ -320,23 +335,25 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 // empty responses and nil response nodes exactly like a not found error.
 func (h *EtcdHelper) ExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) error {
 	key = h.PrefixEtcdKey(key)
-	_, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
+	_, _, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
 	return err
 }
 
-func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) (body string, modifiedIndex uint64, err error) {
+// bodyAndExtractObj performs the normal Get path to etcd, returning the parsed node and response for additional information
+// about the response, like the current etcd index and the ttl.
+func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) (body string, node *etcd.Node, res *etcd.Response, err error) {
 	startTime := time.Now()
 	response, err := h.Client.Get(key, false, false)
 	recordEtcdRequestLatency("get", getTypeName(objPtr), startTime)
 
 	if err != nil && !IsEtcdNotFound(err) {
-		return "", 0, err
+		return "", nil, nil, err
 	}
-	return h.extractObj(response, err, objPtr, ignoreNotFound, false)
+	body, node, err = h.extractObj(response, err, objPtr, ignoreNotFound, false)
+	return body, node, response, err
 }
 
-func (h *EtcdHelper) extractObj(response *etcd.Response, inErr error, objPtr runtime.Object, ignoreNotFound, prevNode bool) (body string, modifiedIndex uint64, err error) {
-	var node *etcd.Node
+func (h *EtcdHelper) extractObj(response *etcd.Response, inErr error, objPtr runtime.Object, ignoreNotFound, prevNode bool) (body string, node *etcd.Node, err error) {
 	if response != nil {
 		if prevNode {
 			node = response.PrevNode
@@ -348,14 +365,14 @@ func (h *EtcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 		if ignoreNotFound {
 			v, err := conversion.EnforcePtr(objPtr)
 			if err != nil {
-				return "", 0, err
+				return "", nil, err
 			}
 			v.Set(reflect.Zero(v.Type()))
-			return "", 0, nil
+			return "", nil, nil
 		} else if inErr != nil {
-			return "", 0, inErr
+			return "", nil, inErr
 		}
-		return "", 0, fmt.Errorf("unable to locate a value on the response: %#v", response)
+		return "", nil, fmt.Errorf("unable to locate a value on the response: %#v", response)
 	}
 	body = node.Value
 	err = h.Codec.DecodeInto([]byte(body), objPtr)
@@ -363,7 +380,7 @@ func (h *EtcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 		_ = h.Versioner.UpdateObject(objPtr, node)
 		// being unable to set the version does not prevent the object from being extracted
 	}
-	return body, node.ModifiedIndex, err
+	return body, node, err
 }
 
 // CreateObj adds a new object at a key unless it already exists. 'ttl' is time-to-live in seconds,
@@ -467,9 +484,28 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 	return err
 }
 
+// ResponseMeta contains information about the etcd metadata that is associated with
+// an object. It abstracts the actual underlying objects to prevent coupling with etcd
+// and to improve testability.
+type ResponseMeta struct {
+	// TTL is the time to live of the node that contained the returned object. It may be
+	// zero or negative in some cases (objects may be expired after the requested
+	// expiration time due to server lag).
+	TTL int64
+}
+
 // Pass an EtcdUpdateFunc to EtcdHelper.GuaranteedUpdate to make an etcd update that is guaranteed to succeed.
 // See the comment for GuaranteedUpdate for more detail.
-type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, ttl uint64, err error)
+type EtcdUpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
+type SimpleEtcdUpdateFunc func(runtime.Object) (runtime.Object, error)
+
+// SimpleUpdateFunc converts SimpleEtcdUpdateFunc into EtcdUpdateFunc
+func SimpleUpdate(fn SimpleEtcdUpdateFunc) EtcdUpdateFunc {
+	return func(input runtime.Object, _ ResponseMeta) (runtime.Object, *uint64, error) {
+		out, err := fn(input)
+		return out, nil, err
+	}
+}
 
 // GuaranteedUpdate calls "tryUpdate()" to update key "key" that is of type "ptrToType". It keeps
 // calling tryUpdate() and retrying the update until success if there is etcd index conflict. Note that object
@@ -480,7 +516,7 @@ type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, ttl uint6
 // Example:
 //
 // h := &util.EtcdHelper{client, encoding, versioning}
-// err := h.GuaranteedUpdate("myKey", &MyType{}, true, func(input runtime.Object) (runtime.Object, uint64, error) {
+// err := h.GuaranteedUpdate("myKey", &MyType{}, true, func(input runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
 //	// Before each invocation of the user-defined function, "input" is reset to etcd's current contents for "myKey".
 //
 //	cur := input.(*MyType) // Guaranteed to succeed.
@@ -488,9 +524,9 @@ type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, ttl uint6
 //	// Make a *modification*.
 //	cur.Counter++
 //
-//	// Return the modified object. Return an error to stop iterating. Return a non-zero uint64 to set
-//      // the TTL on the object.
-//	return cur, 0, nil
+//	// Return the modified object. Return an error to stop iterating. Return a uint64 to alter
+//  // the TTL on the object, or nil to keep it the same value.
+//	return cur, nil, nil
 // })
 //
 func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate EtcdUpdateFunc) error {
@@ -502,14 +538,33 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 	key = h.PrefixEtcdKey(key)
 	for {
 		obj := reflect.New(v.Type()).Interface().(runtime.Object)
-		origBody, index, err := h.bodyAndExtractObj(key, obj, ignoreNotFound)
+		origBody, node, res, err := h.bodyAndExtractObj(key, obj, ignoreNotFound)
+		if err != nil {
+			return err
+		}
+		meta := ResponseMeta{}
+		if node != nil {
+			meta.TTL = node.TTL
+		}
+
+		ret, newTTL, err := tryUpdate(obj, meta)
 		if err != nil {
 			return err
 		}
 
-		ret, ttl, err := tryUpdate(obj)
-		if err != nil {
-			return err
+		index := uint64(0)
+		ttl := uint64(0)
+		if node != nil {
+			index = node.ModifiedIndex
+			if node.TTL > 0 {
+				ttl = uint64(node.TTL)
+			}
+		} else if res != nil {
+			index = res.EtcdIndex
+		}
+
+		if newTTL != nil {
+			ttl = *newTTL
 		}
 
 		data, err := h.Codec.Encode(ret)

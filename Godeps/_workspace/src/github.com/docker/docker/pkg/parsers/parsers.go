@@ -2,6 +2,7 @@ package parsers
 
 import (
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -10,7 +11,12 @@ import (
 func ParseHost(defaultTCPAddr, defaultUnixAddr, addr string) (string, error) {
 	addr = strings.TrimSpace(addr)
 	if addr == "" {
-		addr = fmt.Sprintf("unix://%s", defaultUnixAddr)
+		if runtime.GOOS != "windows" {
+			addr = fmt.Sprintf("unix://%s", defaultUnixAddr)
+		} else {
+			// Note - defaultTCPAddr already includes tcp:// prefix
+			addr = fmt.Sprintf("%s", defaultTCPAddr)
+		}
 	}
 	addrParts := strings.Split(addr, "://")
 	if len(addrParts) == 1 {
@@ -134,4 +140,18 @@ func ParsePortRange(ports string) (uint64, uint64, error) {
 		return 0, 0, fmt.Errorf("Invalid range specified for the Port: %s", ports)
 	}
 	return start, end, nil
+}
+
+func ParseLink(val string) (string, string, error) {
+	if val == "" {
+		return "", "", fmt.Errorf("empty string specified for links")
+	}
+	arr := strings.Split(val, ":")
+	if len(arr) > 2 {
+		return "", "", fmt.Errorf("bad format for links: %s", val)
+	}
+	if len(arr) == 1 {
+		return val, val, nil
+	}
+	return arr[0], arr[1], nil
 }

@@ -12,44 +12,96 @@
    */
   function ServiceDataService($q) {
     var services = {
-      "kind": "ServiceList",
-      "creationTimestamp": null,
-      "selfLink": "/api/v1beta1/services",
-      "resourceVersion": 166552,
-      "apiVersion": "v1beta1",
-      "items": [
+    "kind": "List",
+    "apiVersion": "v1",
+    "metadata": {},
+    "items": [
         {
-          "id": "kubernetes",
-          "uid": "626dd08d-ab51-11e4-8ae8-061695c59fcf",
-          "creationTimestamp": "2015-02-03T03:04:36Z",
-          "selfLink": "/api/v1beta1/services/kubernetes?namespace=default",
-          "resourceVersion": 11,
-          "namespace": "default",
-          "port": 443,
-          "protocol": "TCP",
-          "labels": {"component": "apiserver", "provider": "kubernetes"},
-          "selector": null,
-          "containerPort": 0,
-          "portalIP": "10.244.66.215",
-          "sessionAffinity": "None"
+            "kind": "Service",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "kubernetes",
+                "namespace": "default",
+                "selfLink": "/api/v1/namespaces/default/services/kubernetes",
+                "resourceVersion": "6",
+                "creationTimestamp": null,
+                "labels": {
+                    "component": "apiserver",
+                    "provider": "kubernetes"
+                }
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "protocol": "TCP",
+                        "port": 443,
+                        "targetPort": 443
+                    }
+                ],
+                "portalIP": "10.0.0.2",
+                "sessionAffinity": "None"
+            },
+            "status": {}
         },
         {
-          "id": "kubernetes-ro",
-          "uid": "626f9584-ab51-11e4-8ae8-061695c59fcf",
-          "creationTimestamp": "2015-02-03T03:04:36Z",
-          "selfLink": "/api/v1beta1/services/kubernetes-ro?namespace=default",
-          "resourceVersion": 12,
-          "namespace": "default",
-          "port": 80,
-          "protocol": "TCP",
-          "labels": {"component": "apiserver", "provider": "kubernetes"},
-          "selector": null,
-          "containerPort": 0,
-          "portalIP": "10.244.182.142",
-          "sessionAffinity": "None"
+            "kind": "Service",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "kubernetes-ro",
+                "namespace": "default",
+                "selfLink": "/api/v1/namespaces/default/services/kubernetes-ro",
+                "resourceVersion": "8",
+                "creationTimestamp": null,
+                "labels": {
+                    "component": "apiserver",
+                    "provider": "kubernetes"
+                }
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "protocol": "TCP",
+                        "port": 80,
+                        "targetPort": 80
+                    }
+                ],
+                "portalIP": "10.0.0.1",
+                "sessionAffinity": "None"
+            },
+            "status": {}
+        },
+        {
+            "kind": "Service",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "redis-master",
+                "namespace": "default",
+                "selfLink": "/api/v1/namespaces/default/services/redis-master",
+                "uid": "a6fde246-ff78-11e4-8f2d-080027213276",
+                "resourceVersion": "72",
+                "creationTimestamp": "2015-05-21T05:17:19Z",
+                "labels": {
+                    "name": "redis-master"
+                }
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "protocol": "TCP",
+                        "port": 6379,
+                        "targetPort": 6379
+                    }
+                ],
+                "selector": {
+                    "name": "redis-master"
+                },
+                "portalIP": "10.0.0.124",
+                "sessionAffinity": "None"
+            },
+            "status": {}
         }
-      ]
-    };
+    ]
+};
 
     // Uses promises
     return {

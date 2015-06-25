@@ -42,9 +42,12 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		return nil, fmt.Errorf("unable to parse %q: %v", source, err)
 	}
 	data = json
-	version, kind, err := m.DataVersionAndKind(data)
+	version, kind, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from %q: %v", source, err)
+	}
+	if kind == "" {
+		return nil, fmt.Errorf("kind not set in %q", source)
 	}
 	mapping, err := m.RESTMapping(kind, version)
 	if err != nil {

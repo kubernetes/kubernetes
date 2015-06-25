@@ -40,6 +40,13 @@ DAEMON_USER=root
 #
 do_start()
 {
+        # Avoid a potential race at boot time when both monit and init.d start
+        # the same service
+        PIDS=$(pidof $DAEMON)
+        for PID in ${PIDS}; do
+            kill -9 $PID
+	done
+
         # Raise the file descriptor limit - we expect to open a lot of sockets!
         ulimit -n 65536
 

@@ -22,13 +22,13 @@ While Kubernetes today is not primarily a multi-tenant system, the long term evo
 
 We define "user" as a unique identity accessing the Kubernetes API server, which may be a human or an automated process.  Human users fall into the following categories:
 
-1. k8s admin - administers a kubernetes cluster and has access to the undelying components of the system
+1. k8s admin - administers a kubernetes cluster and has access to the underlying components of the system
 2. k8s project administrator - administrates the security of a small subset of the cluster
 3. k8s developer - launches pods on a kubernetes cluster and consumes cluster resources
 
 Automated process users fall into the following categories:
 
-1. k8s container user - a user that processes running inside a container (on the cluster) can use to access other cluster resources indepedent of the human users attached to a project
+1. k8s container user - a user that processes running inside a container (on the cluster) can use to access other cluster resources independent of the human users attached to a project
 2. k8s infrastructure user - the user that kubernetes infrastructure components use to perform cluster functions with clearly defined roles
 
 
@@ -104,7 +104,7 @@ A pod runs in a *security context* under a *service account* that is defined by 
 
 ### TODO: authorization, authentication
 
-### Isolate the data store from the minions and supporting infrastructure
+### Isolate the data store from the nodes and supporting infrastructure
 
 Access to the central data store (etcd) in Kubernetes allows an attacker to run arbitrary containers on hosts, to gain access to any protected information stored in either volumes or in pods (such as access tokens or shared secrets provided as environment variables), to intercept and redirect traffic from running services by inserting middlemen, or to simply delete the entire history of the custer.
 
@@ -114,7 +114,7 @@ Both the Kubelet and Kube Proxy need information related to their specific roles
 
 The controller manager for Replication Controllers and other future controllers act on behalf of a user via delegation to perform automated maintenance on Kubernetes resources. Their ability to access or modify resource state should be strictly limited to their intended duties and they should be prevented from accessing information not pertinent to their role.  For example, a replication controller needs only to create a copy of a known pod configuration, to determine the running state of an existing pod, or to delete an existing pod that it created - it does not need to know the contents or current state of a pod, nor have access to any data in the pods attached volumes.
 
-The Kubernetes pod scheduler is responsible for reading data from the pod to fit it onto a minion in the cluster.  At a minimum, it needs access to view the ID of a pod (to craft the binding), its current state, any resource information necessary to identify placement, and other data relevant to concerns like anti-affinity, zone or region preference, or custom logic.  It does not need the ability to modify pods or see other resources, only to create bindings.  It should not need the ability to delete bindings unless the scheduler takes control of relocating components on failed hosts (which could be implemented by a separate component that can delete bindings but not create them).  The scheduler may need read access to user or project-container information to determine preferential location (underspecified at this time).
+The Kubernetes pod scheduler is responsible for reading data from the pod to fit it onto a node in the cluster.  At a minimum, it needs access to view the ID of a pod (to craft the binding), its current state, any resource information necessary to identify placement, and other data relevant to concerns like anti-affinity, zone or region preference, or custom logic.  It does not need the ability to modify pods or see other resources, only to create bindings.  It should not need the ability to delete bindings unless the scheduler takes control of relocating components on failed hosts (which could be implemented by a separate component that can delete bindings but not create them).  The scheduler may need read access to user or project-container information to determine preferential location (underspecified at this time).
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/security.md?pixel)]()

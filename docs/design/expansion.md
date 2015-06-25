@@ -55,7 +55,7 @@ available to subsequent expansions.
 ### Use Case: Variable expansion in command
 
 Users frequently need to pass the values of environment variables to a container's command.  
-Currently, Kubernetes does not perform any expansion of varibles.  The workaround is to invoke a
+Currently, Kubernetes does not perform any expansion of variables.  The workaround is to invoke a
 shell in the container's command and have the shell perform the substitution, or to write a wrapper
 script that sets up the environment and runs the command.  This has a number of drawbacks:
 
@@ -116,7 +116,7 @@ expanded, then `$(VARIABLE_NAME)` should be present in the output.
 
 Although the `$(var)` syntax does overlap with the `$(command)` form of command substitution
 supported by many shells, because unexpanded variables are present verbatim in the output, we
-expect this will not present a problem to many users.  If there is a collision between a varible
+expect this will not present a problem to many users.  If there is a collision between a variable
 name and command substitution syntax, the syntax can be escaped with the form `$$(VARIABLE_NAME)`,
 which will evaluate to `$(VARIABLE_NAME)` whether `VARIABLE_NAME` can be expanded or not.
 
@@ -207,9 +207,8 @@ The necessary changes to implement this functionality are:
 2.  Introduce `third_party/golang/expansion` package that provides:
     1.  An `Expand(string, func(string) string) string` function
     2.  A `MappingFuncFor(ObjectEventRecorder, ...map[string]string) string` function 
-3.  Add a new EnvVarSource for expansions and associated tests
-4.  Make the kubelet expand environment correctly
-5.  Make the kubelet expand command correctly
+3.  Make the kubelet expand environment correctly
+4.  Make the kubelet expand command correctly
 
 #### Event Recording
 
@@ -277,31 +276,17 @@ func Expand(input string, mapping func(string) string) string {
 }
 ```
 
-#### Expansion `EnvVarSource`
-
-In order to avoid changing the existing behavior of the `EnvVar.Value` field, there should be a new
-`EnvVarSource` that represents a variable expansion that an env var's value should come from:
-
-```go
-// EnvVarSource represents a source for the value of an EnvVar.
-type EnvVarSource struct {
-	// Other fields omitted
-
-	Expansion *EnvVarExpansion
-}
-
-type EnvVarExpansion struct {
-	// The input string to be expanded
-	Expand string
-}
-```
-
 #### Kubelet changes
 
-The Kubelet should change to:
+The Kubelet should be made to correctly expand variables references in a container's environment, 
+command, and args.  Changes will need to be made to:
 
-1.  Correctly expand environment variables with `Expansion` sources
-2.  Correctly expand references in the Command and Args
+1.  The `makeEnvironmentVariables` function in the kubelet; this is used by
+    `GenerateRunContainerOptions`, which is used by both the docker and rkt container runtimes
+2.  The docker manager `setEntrypointAndCommand` func has to be changed to perform variable
+    expansion
+3.  The rkt runtime should be made to support expansion in command and args when support for it is
+    implemented
 
 ### Examples
 
@@ -363,7 +348,7 @@ No other variables are defined.
 Notice the `$(var)` syntax.
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   name: expansion-pod
@@ -374,16 +359,14 @@ spec:
       command: [ "/bin/sh", "-c", "env" ]
       env:
         - name: PUBLIC_URL
-          valueFrom:
-            expansion:
-              expand: "http://$(GITSERVER_SERVICE_HOST):$(GITSERVER_SERVICE_PORT)"
+          value: "http://$(GITSERVER_SERVICE_HOST):$(GITSERVER_SERVICE_PORT)"
   restartPolicy: Never
 ```
 
 #### In a pod: building a URL using downward API
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   name: expansion-pod
@@ -398,9 +381,7 @@ spec:
             fieldRef:
               fieldPath: "metadata.namespace"
         - name: PUBLIC_URL
-          valueFrom:
-            expansion:
-              expand: "http://gitserver.$(POD_NAMESPACE):$(SERVICE_PORT)"
+          value: "http://gitserver.$(POD_NAMESPACE):$(SERVICE_PORT)"
   restartPolicy: Never
 ```
 

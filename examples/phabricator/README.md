@@ -6,7 +6,7 @@ The example combines a web frontend and an external service that provides MySQL 
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have a basic understanding of kubernetes services and that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
+This example assumes that you have a basic understanding of kubernetes [services](../../docs/services.md) and that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides):
 
 ```shell
 $ cd kubernetes
@@ -21,12 +21,12 @@ In the remaining part of this example we will assume that your instance is named
 
 ### Step Two: Turn up the phabricator
 
-To start Phabricator server use the file `examples/phabricator/phabricator-controller.json` which describes a replication controller with a single pod running an Apache server with Phabricator PHP source:
+To start Phabricator server use the file [`examples/phabricator/phabricator-controller.json`](phabricator-controller.json) which describes a [replication controller](../../docs/replication-controller.md) with a single [pod](../../docs/pods.md) running an Apache server with Phabricator PHP source:
 
 ```js
 {
   "kind": "ReplicationController",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "phabricator-controller",
     "labels": {
@@ -66,13 +66,13 @@ To start Phabricator server use the file `examples/phabricator/phabricator-contr
 Create the phabricator pod in your Kubernetes cluster by running:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/phabricator/phabricator-controller.json
+$ kubectl create -f examples/phabricator/phabricator-controller.json
 ```
 
 Once that's up you can list the pods in the cluster, to verify that it is running:
 
 ```shell
-cluster/kubectl.sh get pods
+kubectl get pods
 ```
 
 You'll see a single phabricator pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds):
@@ -99,7 +99,7 @@ CONTAINER ID        IMAGE                             COMMAND     CREATED       
 If you read logs of the phabricator container you will notice the following error message:
 
 ```bash
-$ cluster/kubectl.sh log phabricator-controller-02qp4
+$ kubectl log phabricator-controller-02qp4
 [...]
 Raw MySQL Error: Attempt to connect to root@173.194.252.142 failed with error
 #2013: Lost connection to MySQL server at 'reading initial communication
@@ -113,12 +113,12 @@ This is because the host on which this container is running is not authorized in
 gcloud sql instances patch phabricator-db --authorized-networks 130.211.141.151
 ```
 
-To automate this process and make sure that a proper host is authorized even if pod is rescheduled to a new machine we need a separate pod that periodically lists pods and authorizes hosts. Use the file `examples/phabricator/authenticator-controller.json`:
+To automate this process and make sure that a proper host is authorized even if pod is rescheduled to a new machine we need a separate pod that periodically lists pods and authorizes hosts. Use the file [`examples/phabricator/authenticator-controller.json`](authenticator-controller.json):
 
 ```js
 {
   "kind": "ReplicationController",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "authenticator-controller",
     "labels": {
@@ -152,7 +152,7 @@ To automate this process and make sure that a proper host is authorized even if 
 To create the pod run:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/phabricator/authenticator-controller.json
+$ kubectl create -f examples/phabricator/authenticator-controller.json
 ```
 
 
@@ -169,12 +169,12 @@ NAME         REGION      ADDRESS        STATUS
 phabricator  us-central1 107.178.210.6  RESERVED
 ```
 
-Use the file `examples/phabricator/phabricator-service.json`:
+Use the file [`examples/phabricator/phabricator-service.json`](phabricator-service.json):
 
 ```js
 {
   "kind": "Service",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "phabricator"
   },
@@ -188,10 +188,7 @@ Use the file `examples/phabricator/phabricator-service.json`:
     "selector": {
       "name": "phabricator"
     },
-    "createExternalLoadBalancer": true,
-    "publicIPs": [
-      "107.178.210.6"
-    ]
+    "type": "LoadBalancer"
   }
 }
 ```
@@ -199,11 +196,19 @@ Use the file `examples/phabricator/phabricator-service.json`:
 To create the service run:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/phabricator/phabricator-service.json
+$ kubectl create -f examples/phabricator/phabricator-service.json
 phabricator
 ```
 
-Note that it will also create an external load balancer so that we can access it from outside. You may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+To play with the service itself, find the external IP of the load balancer:
+
+```shell
+$ kubectl get services guestbook -o template --template='{{(index .status.loadBalancer.ingress 0).ip}}'
+```
+
+and then visit port 80 of that IP address.
+
+**Note**: You may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
 ```shell
 $ gcloud compute firewall-rules create phabricator-node-80 --allow=tcp:80 --target-tags kubernetes-minion

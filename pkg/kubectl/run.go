@@ -29,6 +29,7 @@ type BasicReplicationController struct{}
 func (BasicReplicationController) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"labels", false},
+		{"default-name", false},
 		{"name", true},
 		{"replicas", true},
 		{"image", true},
@@ -38,6 +39,13 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 }
 
 func (BasicReplicationController) Generate(params map[string]string) (runtime.Object, error) {
+	name, found := params["name"]
+	if !found || len(name) == 0 {
+		name, found = params["default-name"]
+		if !found || len(name) == 0 {
+			return nil, fmt.Errorf("'name' is a required parameter.")
+		}
+	}
 	// TODO: extract this flag to a central location.
 	labelString, found := params["labels"]
 	var labels map[string]string
@@ -49,7 +57,7 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 		}
 	} else {
 		labels = map[string]string{
-			"run-container": params["name"],
+			"run": name,
 		}
 	}
 	count, err := strconv.Atoi(params["replicas"])
@@ -58,7 +66,7 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 	}
 	controller := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
-			Name:   params["name"],
+			Name:   name,
 			Labels: labels,
 		},
 		Spec: api.ReplicationControllerSpec{
@@ -71,7 +79,7 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:  params["name"],
+							Name:  name,
 							Image: params["image"],
 						},
 					},

@@ -50,8 +50,7 @@ func TestCreate(t *testing.T) {
 	storage := NewStorage(helper)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
 	secret := validNewSecret("foo")
-	secret.Name = ""
-	secret.GenerateName = "foo-"
+	secret.ObjectMeta = api.ObjectMeta{GenerateName: "foo-"}
 	test.TestCreate(
 		// valid
 		secret,
@@ -72,13 +71,18 @@ func TestUpdate(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
 	storage := NewStorage(helper)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
-	key := etcdtest.AddPrefix("secrets/default/foo")
+	key, err := storage.KeyFunc(test.TestContext(), "foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = etcdtest.AddPrefix(key)
 
 	fakeEtcdClient.ExpectNotFoundGet(key)
 	fakeEtcdClient.ChangeIndex = 2
 	secret := validNewSecret("foo")
 	existing := validNewSecret("exists")
-	obj, err := storage.Create(api.NewDefaultContext(), existing)
+	existing.Namespace = test.TestNamespace()
+	obj, err := storage.Create(test.TestContext(), existing)
 	if err != nil {
 		t.Fatalf("unable to create object: %v", err)
 	}

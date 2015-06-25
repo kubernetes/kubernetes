@@ -3,6 +3,10 @@ API Conventions
 
 Updated: 4/16/2015
 
+*This document is oriented at users who want a deeper understanding of the kubernetes
+API structure, and developers wanting to extend the kubernetes API.  An introduction to
+using resources with kubectl can be found in (working_with_resources.md).*
+
 The conventions of the [Kubernetes API](api.md) (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
 
 The general style of the Kubernetes API is RESTful - clients create, update, delete, or retrieve a description of an object via the standard HTTP verbs (POST, PUT, DELETE, and GET) - and those APIs preferentially accept and return JSON. Kubernetes also exposes additional endpoints for non-standard verbs and allows alternative content types. All of the JSON accepted and returned by the server has a schema, identified by the "kind" and "apiVersion" fields. Where relevant HTTP header fields exist, they should mirror the content of JSON fields, but the information should not be represented only in the HTTP header.
@@ -28,9 +32,9 @@ Kinds are grouped into three categories:
 
    Creating an API object is a record of intent - once created, the system will work to ensure that resource exists. All API objects have common metadata.
 
-   An object may have multiple resources that clients can use to perform specific actions than create, update, delete, or get.
+   An object may have multiple resources that clients can use to perform specific actions that create, update, delete, or get.
 
-   Examples: Pods, ReplicationControllers, Services, Namespaces, Nodes
+   Examples: `Pods`, `ReplicationControllers`, `Services`, `Namespaces`, `Nodes`
 
 2. **Lists** are collections of **resources** of one (usually) or more (occasionally) kinds.
 
@@ -189,7 +193,7 @@ These are verbs which change the fundamental type of data returned (watch return
 
 Two additional verbs `redirect` and `proxy` provide access to cluster resources as described in [accessing-the-cluster.md](accessing-the-cluster.md).
 
-When resources wish to expose alternative actions that are closely coupled to a single resource, they should do so using new sub-resources. An example is allowing automated processes to update the "status" field of a Pod. The `/pods` endpoint only allows updates to "metadata" and "spec", since those reflect end-user intent. An automated process should be able to modify status for users to see by sending an updated Pod kind to the server to the "/pods/&lt;name&gt;/status" endpoint - the alternate endpoint allows different rules to be applied to the update, and access to be appropriately restricted. Likewise, some actions like "stop" or "resize" are best represented as REST sub-resources that are POSTed to.  The POST action may require a simple kind to be provided if the action requires parameters, or function without a request body.
+When resources wish to expose alternative actions that are closely coupled to a single resource, they should do so using new sub-resources. An example is allowing automated processes to update the "status" field of a Pod. The `/pods` endpoint only allows updates to "metadata" and "spec", since those reflect end-user intent. An automated process should be able to modify status for users to see by sending an updated Pod kind to the server to the "/pods/&lt;name&gt;/status" endpoint - the alternate endpoint allows different rules to be applied to the update, and access to be appropriately restricted. Likewise, some actions like "stop" or "scale" are best represented as REST sub-resources that are POSTed to.  The POST action may require a simple kind to be provided if the action requires parameters, or function without a request body.
 
 TODO: more documentation of Watch
 
@@ -201,7 +205,7 @@ The API supports three different PATCH operations, determined by their correspon
  * As defined in [RFC6902](https://tools.ietf.org/html/rfc6902), a JSON Patch is a sequence of operations that are executed on the resource, e.g. `{"op": "add", "path": "/a/b/c", "value": [ "foo", "bar" ]}`. For more details on how to use JSON Patch, see the RFC.
 * Merge Patch, `Content-Type: application/merge-json-patch+json`
  * As defined in [RFC7386](https://tools.ietf.org/html/rfc7386), a Merge Patch is essentially a partial representation of the resource. The submitted JSON is "merged" with the current resource to create a new one, then the new one is saved. For more details on how to use Merge Patch, see the RFC.
-* Strategic Merge Patch, `Content-Type: application/strategic-merge-json-patch+json`
+* Strategic Merge Patch, `Content-Type: application/strategic-merge-patch+json`
  * Strategic Merge Patch is a custom implementation of Merge Patch. For a detailed explanation of how it works and why it needed to be introduced, see below.
 
 #### Strategic Merge Patch
@@ -218,7 +222,7 @@ spec:
 ...and we POST that to the server (as JSON). Then let's say we want to *add* a container to this Pod.
 
 ```yaml
-PATCH /api/v1beta3/namespaces/default/pods/pod-name
+PATCH /api/v1/namespaces/default/pods/pod-name
 spec:
   containers:
     - name: log-tailer
@@ -301,13 +305,14 @@ Late Initialization
 Late initialization is when resource fields are set by a system controller
 after an object is created/updated.
 
-For example, the scheduler sets the pod.spec.host field after the pod is created.
+For example, the scheduler sets the `pod.spec.nodeName` field after the pod is created.
 
 Late-initializers should only make the following types of modifications:
-  - Setting previously unset fields
-  - Adding keys to maps
-  - Adding values to arrays which have mergeable semantics (`patchStrategy:"merge"` attribute in
-  go definition of type).
+ - Setting previously unset fields
+ - Adding keys to maps
+ - Adding values to arrays which have mergeable semantics (`patchStrategy:"merge"` attribute in
+  the type definition).
+  
 These conventions:
  1. allow a user (with sufficient privilege) to override any system-default behaviors by setting
     the fields that would otherwise have been defaulted.
@@ -318,7 +323,7 @@ These conventions:
 
 Although the apiserver Admission Control stage acts prior to object creation,
 Admission Control plugins should follow the Late Initialization conventions
-too, to allow their implementation to be later moved to a controller, or to client libraries.
+too, to allow their implementation to be later moved to a 'controller', or to client libraries.
 
 Concurrency Control and Consistency
 -----------------------------------
@@ -461,9 +466,9 @@ The status object is encoded as JSON and provided as the body of the response.  
 
 **Example:**
 ```
-$ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https://10.240.122.184:443/api/v1beta3/namespaces/default/pods/grafana
+$ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https://10.240.122.184:443/api/v1/namespaces/default/pods/grafana
 
-> GET /api/v1beta3/namespaces/default/pods/grafana HTTP/1.1
+> GET /api/v1/namespaces/default/pods/grafana HTTP/1.1
 > User-Agent: curl/7.26.0
 > Host: 10.240.122.184
 > Accept: */*
@@ -477,13 +482,13 @@ $ curl -v -k -H "Authorization: Bearer WhCDvq4VPpYhrcfmF6ei7V9qlbqTubUc" https:/
 < 
 {
   "kind": "Status",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {},
   "status": "Failure",
   "message": "pods \"grafana\" not found",
   "reason": "NotFound",
   "details": {
-    "id": "grafana",
+    "name": "grafana",
     "kind": "pods"
   },
   "code": 404
@@ -511,7 +516,7 @@ Possible values for the ```reason``` and ```details``` fields:
   * Details (optional):
     * `kind string`
       * The kind attribute of the unauthorized resource (on some operations may differ from the requested resource).
-    * `id   string`
+    * `name string`
       * The identifier of the unauthorized resource.
    * HTTP status code: `401 StatusUnauthorized`
 * `Forbidden`
@@ -519,7 +524,7 @@ Possible values for the ```reason``` and ```details``` fields:
   * Details (optional):
     * `kind string`
       * The kind attribute of the forbidden resource (on some operations may differ from the requested resource).
-    * `id   string`
+    * `name string`
       * The identifier of the forbidden resource.
 	 * HTTP status code: `403 StatusForbidden`
 * `NotFound`
@@ -527,7 +532,7 @@ Possible values for the ```reason``` and ```details``` fields:
   * Details (optional):
     * `kind string`
       * The kind attribute of the missing resource (on some operations may differ from the requested resource).
-    * `id   string`
+    * `name string`
       * The identifier of the missing resource.
   * HTTP status code: `404 StatusNotFound`
 * `AlreadyExists`
@@ -535,7 +540,7 @@ Possible values for the ```reason``` and ```details``` fields:
   * Details (optional):
     * `kind string`
       * The kind attribute of the conflicting resource.
-    * `id   string`
+    * `name string`
       * The identifier of the conflicting resource.
   * HTTP status code: `409 StatusConflict`
 * `Conflict`
@@ -546,7 +551,7 @@ Possible values for the ```reason``` and ```details``` fields:
   * Details (optional):
     * `kind string`
       * the kind attribute of the invalid resource
-    * `id   string`
+    * `name string`
       * the identifier of the invalid resource
     * `causes`
       * One or more `StatusCause` entries indicating the data in the provided resource that was invalid. The `reason`, `message`, and `field` attributes will be set.
@@ -560,7 +565,7 @@ Possible values for the ```reason``` and ```details``` fields:
     * Details (optional):
       * `kind string`
         * The kind attribute of the resource being acted on.
-      * `id   string`
+      * `name string`
         * The operation that is being attempted.
   * The server should set the `Retry-After` HTTP header and return `retryAfterSeconds` in the details field of the object. A value of `0` is the default.
   * Http status code: `504 StatusServerTimeout`

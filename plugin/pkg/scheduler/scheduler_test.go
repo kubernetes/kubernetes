@@ -42,7 +42,7 @@ func podWithID(id, desiredHost string) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: id, SelfLink: testapi.SelfLink("pods", id)},
 		Spec: api.PodSpec{
-			Host: desiredHost,
+			NodeName: desiredHost,
 		},
 	}
 }
@@ -294,4 +294,68 @@ func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
 	}
 	<-called
 	events.Stop()
+}
+
+// Fake rate limiter that records the 'accept' tokens from the real rate limiter
+type FakeRateLimiter struct {
+	r            util.RateLimiter
+	acceptValues []bool
+}
+
+func (fr *FakeRateLimiter) CanAccept() bool {
+	return true
+}
+
+func (fr *FakeRateLimiter) Stop() {}
+
+func (fr *FakeRateLimiter) Accept() {
+	fr.acceptValues = append(fr.acceptValues, fr.r.CanAccept())
+}
+
+func TestSchedulerRateLimitsBinding(t *testing.T) {
+	scheduledPodStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	scheduledPodLister := &cache.StoreToPodLister{scheduledPodStore}
+	queuedPodStore := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
+	queuedPodLister := &cache.StoreToPodLister{queuedPodStore}
+	modeler := NewSimpleModeler(queuedPodLister, scheduledPodLister)
+
+	algo := NewGenericScheduler(
+		map[string]algorithm.FitPredicate{},
+		[]algorithm.PriorityConfig{},
+		modeler.PodLister(),
+		rand.New(rand.NewSource(time.Now().UnixNano())))
+
+	// Rate limit to 1 pod
+	fr := FakeRateLimiter{util.NewTokenBucketRateLimiter(0.02, 1), []bool{}}
+	c := &Config{
+		Modeler: modeler,
+		MinionLister: algorithm.FakeMinionLister(
+			api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
+		),
+		Algorithm: algo,
+		Binder: fakeBinder{func(b *api.Binding) error {
+			return nil
+		}},
+		NextPod: func() *api.Pod {
+			return queuedPodStore.Pop().(*api.Pod)
+		},
+		Error: func(p *api.Pod, err error) {
+			t.Errorf("Unexpected error when scheduling pod %+v: %v", p, err)
+		},
+		Recorder:            &record.FakeRecorder{},
+		BindPodsRateLimiter: &fr,
+	}
+
+	s := New(c)
+	firstPod := podWithID("foo", "")
+	secondPod := podWithID("boo", "")
+	queuedPodStore.Add(firstPod)
+	queuedPodStore.Add(secondPod)
+
+	for i, hitRateLimit := range []bool{true, false} {
+		s.scheduleOne()
+		if fr.acceptValues[i] != hitRateLimit {
+			t.Errorf("Unexpected rate limiting, expect rate limit to be: %v but found it was %v", hitRateLimit, fr.acceptValues[i])
+		}
+	}
 }

@@ -32,26 +32,7 @@ import (
 )
 
 var _ = Describe("ServiceAccounts", func() {
-	var c *client.Client
-	var ns string
-
-	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		expectNoError(err)
-		ns_, err := createTestingNS("service-accounts", c)
-		ns = ns_.Name
-		expectNoError(err)
-	})
-
-	AfterEach(func() {
-		// Clean up the namespace if a non-default one was used
-		if ns != api.NamespaceDefault {
-			By("Cleaning up the namespace")
-			err := c.Namespaces().Delete(ns)
-			expectNoError(err)
-		}
-	})
+	f := NewFramework("svcaccounts")
 
 	It("should mount an API token into pods", func() {
 		var tokenName string
@@ -61,7 +42,7 @@ var _ = Describe("ServiceAccounts", func() {
 		expectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
 			By("getting the auto-created API token")
 			tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
-			secrets, err := c.Secrets(ns).List(labels.Everything(), tokenSelector)
+			secrets, err := f.Client.Secrets(f.Namespace.Name).List(labels.Everything(), tokenSelector)
 			if err != nil {
 				return false, err
 			}
@@ -84,7 +65,7 @@ var _ = Describe("ServiceAccounts", func() {
 				Containers: []api.Container{
 					{
 						Name:  "service-account-test",
-						Image: "kubernetes/mounttest:0.1",
+						Image: "gcr.io/google_containers/mounttest:0.2",
 						Args: []string{
 							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountTokenKey),
 						},
@@ -94,8 +75,8 @@ var _ = Describe("ServiceAccounts", func() {
 			},
 		}
 
-		testContainerOutputInNamespace("consume service account token", c, pod, []string{
+		f.TestContainerOutput("consume service account token", pod, []string{
 			fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountTokenKey, tokenContent),
-		}, ns)
+		})
 	})
 })

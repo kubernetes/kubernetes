@@ -20,12 +20,7 @@ import (
 	"testing"
 )
 
-func TestResourcePathWithPrefixForV1Beta3(t *testing.T) {
-	if Version() != "v1beta3" {
-		// Skip the test if we are not testing v1beta3.
-		return
-	}
-
+func TestResourcePathWithPrefix(t *testing.T) {
 	testCases := []struct {
 		prefix    string
 		resource  string
@@ -33,11 +28,11 @@ func TestResourcePathWithPrefixForV1Beta3(t *testing.T) {
 		name      string
 		expected  string
 	}{
-		{"prefix", "resource", "mynamespace", "myresource", "/api/v1beta3/prefix/namespaces/mynamespace/resource/myresource"},
-		{"prefix", "resource", "", "myresource", "/api/v1beta3/prefix/resource/myresource"},
-		{"prefix", "resource", "mynamespace", "", "/api/v1beta3/prefix/namespaces/mynamespace/resource"},
-		{"prefix", "resource", "", "", "/api/v1beta3/prefix/resource"},
-		{"", "resource", "mynamespace", "myresource", "/api/v1beta3/namespaces/mynamespace/resource/myresource"},
+		{"prefix", "resource", "mynamespace", "myresource", "/api/" + Version() + "/prefix/namespaces/mynamespace/resource/myresource"},
+		{"prefix", "resource", "", "myresource", "/api/" + Version() + "/prefix/resource/myresource"},
+		{"prefix", "resource", "mynamespace", "", "/api/" + Version() + "/prefix/namespaces/mynamespace/resource"},
+		{"prefix", "resource", "", "", "/api/" + Version() + "/prefix/resource"},
+		{"", "resource", "mynamespace", "myresource", "/api/" + Version() + "/namespaces/mynamespace/resource/myresource"},
 	}
 	for _, item := range testCases {
 		if actual := ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
@@ -46,123 +41,20 @@ func TestResourcePathWithPrefixForV1Beta3(t *testing.T) {
 	}
 }
 
-func TestResourcePathWithPrefixForV1Beta1(t *testing.T) {
-	if Version() != "v1beta1" {
-		// Skip the test if we are not testing v1beta1.
-		return
-	}
-
-	testCases := []struct {
-		prefix    string
-		resource  string
-		namespace string
-		name      string
-		expected  string
-	}{
-		{"prefix", "resource", "mynamespace", "myresource", "/api/v1beta1/prefix/resource/myresource"},
-		{"prefix", "resource", "", "myresource", "/api/v1beta1/prefix/resource/myresource"},
-		{"prefix", "resource", "mynamespace", "", "/api/v1beta1/prefix/resource"},
-		{"prefix", "resource", "", "", "/api/v1beta1/prefix/resource"},
-		{"", "resource", "mynamespace", "myresource", "/api/v1beta1/resource/myresource"},
-	}
-	for _, item := range testCases {
-		if actual := ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
-		}
-	}
-}
-
-func TestResourcePathForV1Beta3(t *testing.T) {
-	if Version() != "v1beta3" {
-		// Skip the test if we are not testing v1beta3.
-		return
-	}
-
+func TestResourcePath(t *testing.T) {
 	testCases := []struct {
 		resource  string
 		namespace string
 		name      string
 		expected  string
 	}{
-		{"resource", "mynamespace", "myresource", "/api/v1beta3/namespaces/mynamespace/resource/myresource"},
-		{"resource", "", "myresource", "/api/v1beta3/resource/myresource"},
-		{"resource", "mynamespace", "", "/api/v1beta3/namespaces/mynamespace/resource"},
-		{"resource", "", "", "/api/v1beta3/resource"},
+		{"resource", "mynamespace", "myresource", "/api/" + Version() + "/namespaces/mynamespace/resource/myresource"},
+		{"resource", "", "myresource", "/api/" + Version() + "/resource/myresource"},
+		{"resource", "mynamespace", "", "/api/" + Version() + "/namespaces/mynamespace/resource"},
+		{"resource", "", "", "/api/" + Version() + "/resource"},
 	}
 	for _, item := range testCases {
 		if actual := ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
-		}
-	}
-}
-
-func TestResourcePathForV1Beta1(t *testing.T) {
-	if Version() != "v1beta1" {
-		// Skip the test if we are not testing v1beta1.
-		return
-	}
-
-	testCases := []struct {
-		resource  string
-		namespace string
-		name      string
-		expected  string
-	}{
-		{"resource", "mynamespace", "myresource", "/api/v1beta1/resource/myresource"},
-		{"resource", "", "myresource", "/api/v1beta1/resource/myresource"},
-		{"resource", "mynamespace", "", "/api/v1beta1/resource"},
-		{"resource", "", "", "/api/v1beta1/resource"},
-	}
-	for _, item := range testCases {
-		if actual := ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
-		}
-	}
-}
-
-func TestResourcePathWithNamespaceQueryForV1Beta3(t *testing.T) {
-	if Version() != "v1beta3" {
-		// Skip the test if we are not testing v1beta3.
-		return
-	}
-
-	testCases := []struct {
-		resource  string
-		namespace string
-		name      string
-		expected  string
-	}{
-		{"resource", "mynamespace", "myresource", "/api/v1beta3/namespaces/mynamespace/resource/myresource"},
-		{"resource", "", "myresource", "/api/v1beta3/resource/myresource"},
-		{"resource", "mynamespace", "", "/api/v1beta3/namespaces/mynamespace/resource"},
-		{"resource", "", "", "/api/v1beta3/resource"},
-	}
-	for _, item := range testCases {
-		if actual := ResourcePathWithNamespaceQuery(item.resource, item.namespace, item.name); actual != item.expected {
-			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
-		}
-	}
-}
-
-func TestResourcePathWithNamespaceQueryForV1Beta1(t *testing.T) {
-	if Version() != "v1beta1" {
-		// Skip the test if we are not testing v1beta1.
-		return
-	}
-
-	testCases := []struct {
-		resource  string
-		namespace string
-		name      string
-		expected  string
-	}{
-		{"resource", "mynamespace", "myresource", "/api/v1beta1/resource/myresource?namespace=mynamespace"},
-		{"resource", "", "myresource", "/api/v1beta1/resource/myresource"},
-		{"resource", "mynamespace", "", "/api/v1beta1/resource?namespace=mynamespace"},
-		{"resource", "", "", "/api/v1beta1/resource"},
-	}
-	for _, item := range testCases {
-		if actual := ResourcePathWithNamespaceQuery(item.resource, item.namespace, item.name); actual != item.expected {
 			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
 		}
 	}

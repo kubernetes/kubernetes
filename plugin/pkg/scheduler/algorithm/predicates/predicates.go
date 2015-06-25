@@ -52,12 +52,13 @@ func (nodes ClientNodeInfo) GetNodeInfo(nodeID string) (*api.Node, error) {
 
 func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 	if volume.GCEPersistentDisk != nil {
-		pdName := volume.GCEPersistentDisk.PDName
+		disk := volume.GCEPersistentDisk
 
 		manifest := &(pod.Spec)
 		for ix := range manifest.Volumes {
 			if manifest.Volumes[ix].GCEPersistentDisk != nil &&
-				manifest.Volumes[ix].GCEPersistentDisk.PDName == pdName {
+				manifest.Volumes[ix].GCEPersistentDisk.PDName == disk.PDName &&
+				!(manifest.Volumes[ix].GCEPersistentDisk.ReadOnly && disk.ReadOnly) {
 				return true
 			}
 		}
@@ -189,10 +190,10 @@ func (n *NodeSelector) PodSelectorMatches(pod *api.Pod, existingPods []*api.Pod,
 }
 
 func PodFitsHost(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
-	if len(pod.Spec.Host) == 0 {
+	if len(pod.Spec.NodeName) == 0 {
 		return true, nil
 	}
-	return pod.Spec.Host == node, nil
+	return pod.Spec.NodeName == node, nil
 }
 
 type NodeLabelChecker struct {
@@ -300,7 +301,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api
 			}
 			if len(nsServicePods) > 0 {
 				// consider any service pod and fetch the minion its hosted on
-				otherMinion, err := s.nodeInfo.GetNodeInfo(nsServicePods[0].Spec.Host)
+				otherMinion, err := s.nodeInfo.GetNodeInfo(nsServicePods[0].Spec.NodeName)
 				if err != nil {
 					return false, err
 				}
@@ -359,6 +360,20 @@ func getUsedPorts(pods ...*api.Pod) map[int]bool {
 	return ports
 }
 
+func filterNonRunningPods(pods []*api.Pod) []*api.Pod {
+	if len(pods) == 0 {
+		return pods
+	}
+	result := []*api.Pod{}
+	for _, pod := range pods {
+		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+			continue
+		}
+		result = append(result, pod)
+	}
+	return result
+}
+
 // MapPodsToMachines obtains a list of pods and pivots that list into a map where the keys are host names
 // and the values are the list of pods running on that host.
 func MapPodsToMachines(lister algorithm.PodLister) (map[string][]*api.Pod, error) {
@@ -368,8 +383,9 @@ func MapPodsToMachines(lister algorithm.PodLister) (map[string][]*api.Pod, error
 	if err != nil {
 		return map[string][]*api.Pod{}, err
 	}
+	pods = filterNonRunningPods(pods)
 	for _, scheduledPod := range pods {
-		host := scheduledPod.Spec.Host
+		host := scheduledPod.Spec.NodeName
 		machineToPods[host] = append(machineToPods[host], scheduledPod)
 	}
 	return machineToPods, nil

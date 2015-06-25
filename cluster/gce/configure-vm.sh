@@ -50,6 +50,12 @@ function ensure-install-dir() {
   cd ${INSTALL_DIR}
 }
 
+function salt-apiserver-timeout-grain() {
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  minRequestTimeout: '$1'
+EOF
+}
+
 function set-broken-motd() {
   echo -e '\nBroken (or in progress) GCE Kubernetes node setup! Suggested first step:\n  tail /var/log/startupscript.log\n' > /etc/motd
 }
@@ -77,13 +83,6 @@ import pipes,sys,yaml
 for k,v in yaml.load(sys.stdin).iteritems():
   print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
 ''' < "${kube_env_yaml}")
-
-  # Infer master status from hostname
-  if [[ $(hostname) == "${INSTANCE_PREFIX}-master" ]]; then
-    KUBERNETES_MASTER="true"
-  else
-    KUBERNETES_MASTER="false"
-  fi
 }
 
 function remove-docker-artifacts() {
@@ -108,9 +107,21 @@ download-or-bust() {
   local -r url="$1"
   local -r file="${url##*/}"
   rm -f "$file"
-  until curl --ipv4 -Lo "$file" --connect-timeout 20 --retry 6 --retry-delay 10 "$1"; do
-    echo "Failed to download file ($1). Retrying."
+  until curl --ipv4 -Lo "$file" --connect-timeout 20 --retry 6 --retry-delay 10 "${url}"; do
+    echo "Failed to download file (${url}). Retrying."
   done
+}
+
+validate-hash() {
+  local -r file="$1"
+  local -r expected="$2"
+  local actual
+
+  actual=$(sha1sum ${file} | awk '{ print $1 }') || true
+  if [[ "${actual}" != "${expected}" ]]; then
+    echo "== ${file} corrupted, sha1 ${actual} doesn't match expected ${expected} =="
+    return 1
+  fi
 }
 
 # Install salt from GCS.  See README.md for instructions on how to update these
@@ -221,9 +232,12 @@ mount-master-pd() {
   mkdir -p /mnt/master-pd/srv/kubernetes
   # Contains the cluster's initial config parameters and auth tokens
   mkdir -p /mnt/master-pd/srv/salt-overlay
+  # Directory for kube-apiserver to store SSH key (if necessary)
+  mkdir -p /mnt/master-pd/srv/sshproxy
 
   ln -s -f /mnt/master-pd/var/etcd /var/etcd
   ln -s -f /mnt/master-pd/srv/kubernetes /srv/kubernetes
+  ln -s -f /mnt/master-pd/srv/sshproxy /srv/sshproxy
   ln -s -f /mnt/master-pd/srv/salt-overlay /srv/salt-overlay
 
   # This is a bit of a hack to get around the fact that salt has to run after the
@@ -250,7 +264,7 @@ instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 node_instance_prefix: '$(echo "$NODE_INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 allocate_node_cidrs: '$(echo "$ALLOCATE_NODE_CIDRS" | sed -e "s/'/''/g")'
-portal_net: '$(echo "$PORTAL_NET" | sed -e "s/'/''/g")'
+service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 enable_cluster_monitoring: '$(echo "$ENABLE_CLUSTER_MONITORING" | sed -e "s/'/''/g")'
 enable_node_monitoring: '$(echo "$ENABLE_NODE_MONITORING" | sed -e "s/'/''/g")'
 enable_cluster_logging: '$(echo "$ENABLE_CLUSTER_LOGGING" | sed -e "s/'/''/g")'
@@ -428,24 +442,47 @@ EOF
   fi
 }
 
-function download-release() {
-  # TODO(zmerlynn): We should optimize for the reboot case here, but
-  # unlike the .debs, we don't have version information in the
-  # filenames here, nor do the URLs even provide useful information in
-  # the dev environment case (because they're just a project
-  # bucket). We should probably push a hash into the kube-env, and
-  # store it when we download, and then when it's different infer that
-  # a push occurred (otherwise it's a simple reboot).
+function try-download-release() {
+  # TODO(zmerlynn): Now we REALLy have no excuse not to do the reboot
+  # optimization.
 
-  echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
-  download-or-bust "$SERVER_BINARY_TAR_URL"
+  # TODO(zmerlynn): This may not be set yet by everyone (GKE).
+  if [[ -z "${SERVER_BINARY_TAR_HASH:-}" ]]; then
+    echo "Downloading binary release sha1 (not found in env)"
+    download-or-bust "${SERVER_BINARY_TAR_URL}.sha1"
+    SERVER_BINARY_TAR_HASH=$(cat "${SERVER_BINARY_TAR_URL##*/}.sha1")
+  fi
+
+  echo "Downloading binary release tar (${SERVER_BINARY_TAR_URL})"
+  download-or-bust "${SERVER_BINARY_TAR_URL}"
+
+  validate-hash "${SERVER_BINARY_TAR_URL##*/}" "${SERVER_BINARY_TAR_HASH}"
+  echo "Validated ${SERVER_BINARY_TAR_URL} SHA1 = ${SERVER_BINARY_TAR_HASH}"
+
+  # TODO(zmerlynn): This may not be set yet by everyone (GKE).
+  if [[ -z "${SALT_TAR_HASH:-}" ]]; then
+    echo "Downloading Salt tar sha1 (not found in env)"
+    download-or-bust "${SALT_TAR_URL}.sha1"
+    SALT_TAR_HASH=$(cat "${SALT_TAR_URL##*/}.sha1")
+  fi
 
   echo "Downloading Salt tar ($SALT_TAR_URL)"
   download-or-bust "$SALT_TAR_URL"
 
-  echo "Unpacking Salt tree"
+  validate-hash "${SALT_TAR_URL##*/}" "${SALT_TAR_HASH}"
+  echo "Validated ${SALT_TAR_URL} SHA1 = ${SALT_TAR_HASH}"
+
+  echo "Unpacking Salt tree and checking integrity of binary release tar"
   rm -rf kubernetes
-  tar xzf "${SALT_TAR_URL##*/}"
+  tar xzf "${SALT_TAR_URL##*/}" && tar tzf "${SERVER_BINARY_TAR_URL##*/}" > /dev/null
+}
+
+function download-release() {
+  # In case of failure checking integrity of release, retry.
+  until try-download-release; do
+    sleep 15
+    echo "Couldn't download release. Retrying..."
+  done
 
   echo "Running release install script"
   sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
@@ -480,14 +517,18 @@ grains:
   cbr-cidr: ${MASTER_IP_RANGE}
   cloud: gce
 EOF
-  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]]; then
+  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]] && ! [[ -z "${NODE_NETWORK:-}" ]] ; then
     cat <<EOF >/etc/gce.conf
 [global]
 token-url = ${TOKEN_URL}
 project-id = ${PROJECT_ID}
+network-name = ${NODE_NETWORK}
 EOF
+    EXTERNAL_IP=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   cloud_config: /etc/gce.conf
+  advertise_address: '${EXTERNAL_IP}'
+  proxy_ssh_user: '${PROXY_SSH_USER}'
 EOF
   fi
 }
@@ -535,6 +576,9 @@ function configure-salt() {
   salt-run-local
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
     salt-master-role
+    if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}"  ]; then
+        salt-apiserver-timeout-grain $KUBE_APISERVER_REQUEST_TIMEOUT
+    fi
   else
     salt-node-role
     salt-docker-opts

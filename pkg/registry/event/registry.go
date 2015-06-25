@@ -44,7 +44,7 @@ func NewEtcdRegistry(h tools.EtcdHelper, ttl uint64) generic.Registry {
 			KeyFunc: func(ctx api.Context, id string) (string, error) {
 				return etcdgeneric.NamespaceKeyFunc(ctx, prefix, id)
 			},
-			TTLFunc: func(runtime.Object, bool) (uint64, error) {
+			TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
 				return ttl, nil
 			},
 			Helper: h,

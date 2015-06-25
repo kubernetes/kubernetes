@@ -18,6 +18,7 @@ package ovirt_cloud
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,6 +33,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
+
+const ProviderName = "ovirt"
 
 type OVirtInstance struct {
 	UUID      string
@@ -75,7 +78,7 @@ type XmlVmsList struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("ovirt",
+	cloudprovider.RegisterCloudProvider(ProviderName,
 		func(config io.Reader) (cloudprovider.Interface, error) {
 			return newOVirtCloud(config)
 		})
@@ -115,6 +118,11 @@ func (aws *OVirtCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
+// ProviderName returns the cloud provider ID.
+func (v *OVirtCloud) ProviderName() string {
+	return ProviderName
+}
+
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for oVirt cloud
 func (v *OVirtCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return nil, false
@@ -127,6 +135,11 @@ func (v *OVirtCloud) Instances() (cloudprovider.Instances, bool) {
 
 // Zones returns an implementation of Zones for oVirt cloud
 func (v *OVirtCloud) Zones() (cloudprovider.Zones, bool) {
+	return nil, false
+}
+
+// Routes returns an implementation of Routes for oVirt cloud
+func (v *OVirtCloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
@@ -155,13 +168,24 @@ func (v *OVirtCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: address.String()}}, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (v *OVirtCloud) ExternalID(name string) (string, error) {
 	instance, err := v.fetchInstance(name)
 	if err != nil {
 		return "", err
 	}
 	return instance.UUID, nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (v *OVirtCloud) InstanceID(name string) (string, error) {
+	instance, err := v.fetchInstance(name)
+	if err != nil {
+		return "", err
+	}
+	// TODO: define a way to identify the provider instance to complete
+	// the format <provider_instance_id>/<instance_id>.
+	return "/" + instance.UUID, err
 }
 
 func getInstancesFromXml(body io.Reader) (OVirtInstanceMap, error) {
@@ -251,10 +275,11 @@ func (v *OVirtCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	return nil, nil
 }
 
-func (v *OVirtCloud) Configure(name string, spec *api.NodeSpec) error {
-	return nil
+// Implementation of Instances.CurrentNodeName
+func (v *OVirtCloud) CurrentNodeName(hostname string) (string, error) {
+	return hostname, nil
 }
 
-func (v *OVirtCloud) Release(name string) error {
-	return nil
+func (v *OVirtCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
 }

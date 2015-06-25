@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	// Timeout used in benchmarks, to eg: resize an rc
+	// Timeout used in benchmarks, to eg: scale an rc
 	DefaultTimeout = 30 * time.Minute
 
 	// Rc manifest used to create pods for benchmarks.
@@ -184,33 +184,33 @@ func StopRC(rc *api.ReplicationController, restClient *client.Client) error {
 	if err != nil || reaper == nil {
 		return err
 	}
-	_, err = reaper.Stop(rc.Namespace, rc.Name, nil)
+	_, err = reaper.Stop(rc.Namespace, rc.Name, 0, nil)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// ResizeRC resizes the given rc to the given replicas.
-func ResizeRC(name, ns string, replicas int, restClient *client.Client) (*api.ReplicationController, error) {
-	resizer, err := kubectl.ResizerFor("ReplicationController", kubectl.NewResizerClient(restClient))
+// ScaleRC scales the given rc to the given replicas.
+func ScaleRC(name, ns string, replicas int, restClient *client.Client) (*api.ReplicationController, error) {
+	scaler, err := kubectl.ScalerFor("ReplicationController", kubectl.NewScalerClient(restClient))
 	if err != nil {
 		return nil, err
 	}
 	retry := &kubectl.RetryParams{50 * time.Millisecond, DefaultTimeout}
 	waitForReplicas := &kubectl.RetryParams{50 * time.Millisecond, DefaultTimeout}
-	err = resizer.Resize(ns, name, uint(replicas), nil, retry, waitForReplicas)
+	err = scaler.Scale(ns, name, uint(replicas), nil, retry, waitForReplicas)
 	if err != nil {
 		return nil, err
 	}
-	resized, err := restClient.ReplicationControllers(ns).Get(name)
+	scaled, err := restClient.ReplicationControllers(ns).Get(name)
 	if err != nil {
 		return nil, err
 	}
-	return resized, nil
+	return scaled, nil
 }
 
-// StartRC creates given rc if it doesn't already exist, then updates it via kubectl's resizer.
+// StartRC creates given rc if it doesn't already exist, then updates it via kubectl's scaler.
 func StartRC(controller *api.ReplicationController, restClient *client.Client) (*api.ReplicationController, error) {
 	created, err := restClient.ReplicationControllers(controller.Namespace).Get(controller.Name)
 	if err != nil {
@@ -221,11 +221,11 @@ func StartRC(controller *api.ReplicationController, restClient *client.Client) (
 		}
 	}
 	// If we just created an rc, wait till it creates its replicas.
-	return ResizeRC(created.Name, created.Namespace, controller.Spec.Replicas, restClient)
+	return ScaleRC(created.Name, created.Namespace, controller.Spec.Replicas, restClient)
 }
 
 // StartPods check for numPods in TestNS. If they exist, it no-ops, otherwise it starts up
-// a temp rc, resizes it to match numPods, then deletes the rc leaving behind the pods.
+// a temp rc, scales it to match numPods, then deletes the rc leaving behind the pods.
 func StartPods(numPods int, host string, restClient *client.Client) error {
 	start := time.Now()
 	defer func() {
@@ -242,7 +242,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 
 	// Make the rc unique to the given host.
 	controller.Spec.Replicas = numPods
-	controller.Spec.Template.Spec.Host = host
+	controller.Spec.Template.Spec.NodeName = host
 	controller.Name = controller.Name + host
 	controller.Spec.Selector["host"] = host
 	controller.Spec.Template.Labels["host"] = host

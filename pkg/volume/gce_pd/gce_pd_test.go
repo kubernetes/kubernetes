@@ -40,6 +40,9 @@ func TestCanSupport(t *testing.T) {
 	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
+	if !plug.CanSupport(&volume.Spec{Name: "foo", PersistentVolumeSource: api.PersistentVolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}) {
+		t.Errorf("Expected true")
+	}
 }
 
 func TestGetAccessModes(t *testing.T) {

@@ -304,10 +304,9 @@ function kube::build::ensure_golang() {
   }
 }
 
-# Set up the context directory for the kube-build image and build it.
-function kube::build::build_image() {
-  local -r build_context_dir="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
-  local -r source=(
+# The set of source targets to include in the kube-build image
+function kube::build::source_targets() {
+  local targets=(
     api
     build
     cmd
@@ -323,11 +322,22 @@ function kube::build::build_image() {
     test
     third_party
   )
+  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
+    for contrib in "${KUBERNETES_CONTRIB}"; do
+      targets+=($(eval "kube::contrib::${contrib}::source_targets"))
+    done
+  fi
+  echo "${targets[@]}"
+}
+
+# Set up the context directory for the kube-build image and build it.
+function kube::build::build_image() {
+  local -r build_context_dir="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
 
   kube::build::build_image_cross
 
   mkdir -p "${build_context_dir}"
-  tar czf "${build_context_dir}/kube-source.tar.gz" "${source[@]}"
+  tar czf "${build_context_dir}/kube-source.tar.gz" $(kube::build::source_targets)
 
   kube::version::get_version_vars
   kube::version::save_version_vars "${build_context_dir}/kube-version-defs"
@@ -412,8 +422,12 @@ function kube::build::run_build_command() {
 
   local -a docker_run_opts=(
     "--name=${KUBE_BUILD_CONTAINER_NAME}"
-     "${DOCKER_MOUNT_ARGS[@]}"
-    )
+    "${DOCKER_MOUNT_ARGS[@]}"
+  )
+
+  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
+    docker_run_opts+=(-e "KUBERNETES_CONTRIB=${KUBERNETES_CONTRIB}")
+  fi
 
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'
   # to work.  However, if we run this way and don't have stdin, then it ends up
@@ -631,6 +645,12 @@ function kube::release::create_docker_images_for_server() {
         echo $md5_sum > ${1}/${binary_name}.docker_tag
 
         rm -rf ${docker_build_path}
+
+        kube::log::status "Deleting docker image ${docker_image_tag}"
+        "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
+
+        # Now, that we have created docker images we can safely delete raw binary.
+        rm -f $1/${binary_name}
       ) &
     done
 

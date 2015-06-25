@@ -1,8 +1,8 @@
 #
-# This pod imports nfs-server.default.kube.local:/ into /var/www/html
+# This pod imports nfs-server.default.kube.local:/ into /usr/share/nginx/html
 #
 
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   name: nfs-web
@@ -13,15 +13,13 @@ spec:
       ports:
         - name: web
           containerPort: 80
-          protocol: tcp
       volumeMounts:
           # name must match the volume name below
           - name: nfs
-            mountPath: "/var/www/html"
+            mountPath: "/usr/share/nginx/html"
   volumes:
     - name: nfs
       nfs:
         # FIXME: use the right hostname
         server: nfs-server.default.kube.local
         path: "/"
-        readOnly: false

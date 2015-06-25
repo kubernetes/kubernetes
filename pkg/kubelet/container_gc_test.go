@@ -18,11 +18,13 @@ package kubelet
 
 import (
 	"fmt"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,6 +73,20 @@ func makeContainerDetailMap(funcs ...func(map[string]*docker.Container)) map[str
 		f(m)
 	}
 	return m
+}
+
+func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
+	act := make([]string, len(actual))
+	exp := make([]string, len(expected))
+	copy(act, actual)
+	copy(exp, expected)
+
+	sort.StringSlice(act).Sort()
+	sort.StringSlice(exp).Sort()
+
+	if !reflect.DeepEqual(exp, act) {
+		t.Errorf("Expected(sorted): %#v, Actual(sorted): %#v", exp, act)
+	}
 }
 
 func TestGarbageCollectZeroMaxContainers(t *testing.T) {

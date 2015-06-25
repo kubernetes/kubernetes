@@ -42,15 +42,12 @@ func init() {
 // It looks at all incoming requests in a namespace context, and if the namespace does not exist, it creates one.
 // It is useful in deployments that do not want to restrict creation of a namespace prior to its usage.
 type provision struct {
+	*admission.Handler
 	client client.Interface
 	store  cache.Store
 }
 
 func (p *provision) Admit(a admission.Attributes) (err error) {
-	// only handle create requests
-	if a.GetOperation() != "CREATE" {
-		return nil
-	}
 	defaultVersion, kind, err := latest.RESTMapper.VersionAndKindForResource(a.GetResource())
 	if err != nil {
 		return admission.NewForbidden(a, err)
@@ -83,6 +80,7 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 	return nil
 }
 
+// NewProvision creates a new namespace provision admission control handler
 func NewProvision(c client.Interface) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
@@ -99,8 +97,13 @@ func NewProvision(c client.Interface) admission.Interface {
 		0,
 	)
 	reflector.Run()
+	return createProvision(c, store)
+}
+
+func createProvision(c client.Interface, store cache.Store) admission.Interface {
 	return &provision{
-		client: c,
-		store:  store,
+		Handler: admission.NewHandler(admission.Create),
+		client:  c,
+		store:   store,
 	}
 }

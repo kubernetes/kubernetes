@@ -5,42 +5,51 @@
   <div class="detail">
 
       <div class="back">
-        <md-button class="md-default-theme" ng-href="#/dashboard/replicationcontrollers">‹ BACK</md-button>
+        <md-button class="md-default-theme" ng-click="doTheBack()">‹ BACK</md-button>
       </div>
 
       <div class="heading">
         <span class="label">Replication Controller: </span>
-        <span>{{replicationController.id}}</span>
+        <span>{{replicationController.metadata.name}}</span>
       </div>
 
 
-      <table>
+      <table class="align-top">
         <tbody>
           <tr>
             <td class="name">Created</td>
             <td class="value">
-              {{replicationController.creationTimestamp | date:'medium'}}
+              {{replicationController.metadata.creationTimestamp | date:'medium'}}
             </td>
           </tr>
 
           <tr>
             <td class="name">Desired Replicas</td>
             <td class="value">
-              {{replicationController.desiredState.replicas}}
+              {{replicationController.spec.replicas}}
             </td>
           </tr>
 
           <tr>
             <td class="name">Current Replicas</td>
             <td class="value">
-              {{replicationController.currentState.replicas}}
+              {{replicationController.status.replicas}}
+            </td>
+          </tr>
+
+          <tr ng-show="replicationController.spec.selector">
+            <td class="name">Selector</td>
+            <td class="value">
+              <span ng-repeat="(label, value) in replicationController.spec.selector">
+                {{label}}={{value}}{{$last ? '' : ', '}}
+              </span>
             </td>
           </tr>
 
           <tr>
             <td class="name">Labels</td>
             <td class="value">
-              <div ng-repeat="(label, value) in replicationController.labels">
+              <div ng-repeat="(label, value) in replicationController.metadata.labels">
                   {{label}}: {{value}}
               </div>
             </td>
@@ -49,9 +58,13 @@
           <tr>
             <td class="name">Related Pods</td>
             <td class="value">
-              <div ng-repeat="(label, value) in replicationController.desiredState.replicaSelector">
-                  <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=pod">{{label}}: {{value}}</a>
-                </div>
+              <div ng-show="replicationController.spec.selector && Object.keys(replicationController.spec.selector).length > 1">
+                <a ng-href="#/dashboard/groups/type/selector/{{getSelectorUrlFragment(replicationController.spec.selector)}},type=pod">{{getSelectorUrlFragment(replicationController.spec.selector)}}</a>
+              </div>
+
+              <div ng-repeat="(label, value) in replicationController.spec.selector">
+                <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=pod">{{label}}: {{value}}</a>
+              </div>
             </td>
           </tr>
 
@@ -59,8 +72,13 @@
           <tr>
             <td class="name">Related Services</td>
             <td class="value">
-              <div ng-repeat="(label, value) in replicationController.desiredState.replicaSelector">
-                  <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=service">{{label}}: {{value}}</a>
+              <div ng-show="replicationController.spec.selector && Object.keys(replicationController.spec.selector).length > 1">
+
+                <a ng-href="#/dashboard/groups/type/selector/{{getSelectorUrlFragment(replicationController.spec.selector)}},type=pod">{{getSelectorUrlFragment(replicationController.spec.selector)}}</a>
+              </div>
+
+              <div ng-repeat="(label, value) in replicationController.spec.selector">
+                  <a ng-href="#/dashboard/groups/type/selector/{{label}}={{value}},type=service">{{label}}={{value}}</a>
                 </div>
             </td>
           </tr>

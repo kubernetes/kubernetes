@@ -4,7 +4,7 @@
     "metadata": {
         "name": "elasticsearch-logging-controller",
         "namespace": "default",
-        "selfLink": "/api/v1beta1/replicationControllers/elasticsearch-logging-controller?namespace=default",
+        "selfLink": "/api/v1beta3/namespaces/default/replicationcontrollers/elasticsearch-logging-controller",
         "uid": "aa76f162-e8e5-11e4-8fde-42010af09327",
         "resourceVersion": "98",
         "creationTimestamp": "2015-04-22T11:49:43Z",

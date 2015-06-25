@@ -26,13 +26,30 @@ write_files:
       else
         echo "kubernetes release found. Skipping download."
       fi
-  - path: /run/setup-auth.sh
+  - path: /run/config-kubelet.sh
     permissions: 0755
     content: |
       #!/bin/bash -e
       set -x
       /usr/bin/mkdir -p /var/lib/kubelet
-      /bin/echo  "{\"BearerToken\": \"KUBELET_TOKEN\", \"Insecure\": true }" > /var/lib/kubelet/kubernetes_auth
+      cat > /var/lib/kubelet/kubeconfig << EOF
+      apiVersion: v1
+      kind: Config
+      users:
+      - name: kubelet
+        user:
+          token: KUBELET_TOKEN
+      clusters:
+      - name: local
+        cluster:
+          insecure-skip-tls-verify: true
+      contexts:
+      - context:
+          cluster: local
+          user: kubelet
+        name: service-account-context
+      current-context: service-account-context
+      EOF
   - path: /run/config-kube-proxy.sh
     permissions: 0755
     content: |
@@ -66,6 +83,10 @@ coreos:
     peer-addr: $private_ipv4:7001
     peer-bind-addr: $private_ipv4:7001
 
+  flannel:
+    ip_masq: true
+    interface: eth2
+
   fleet:
     public-ip: $private_ipv4
     metadata: kubernetes_role=minion
@@ -79,20 +100,16 @@ coreos:
     - name: fleet.service
       command: start
     - name: flanneld.service
-      command: start
       drop-ins:
-      - name: 50-network-config.conf
-        content: |
-          [Service]
-          ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "KUBE_NETWORK", "Backend": {"Type": "host-gw"}}'
-          ExecStart=
-          ExecStart=/usr/libexec/sdnotify-proxy /run/flannel/sd.sock \
-            /usr/bin/docker run --net=host --privileged=true --rm \
-              --volume=/run/flannel:/run/flannel \
-              --env=NOTIFY_SOCKET=/run/flannel/sd.sock \
-              --env-file=/run/flannel/options.env \
-              --volume=${ETCD_SSL_DIR}:/etc/ssl/etcd:ro \
-              quay.io/coreos/flannel:${FLANNEL_VER} /opt/bin/flanneld -etcd-endpoints http://127.0.0.1:4001 --ip-masq=true --iface=eth2
+        - name: 50-flannel.conf
+          content: |
+            [Unit]
+            Requires=etcd.service
+            After=etcd.service
+
+            [Service]
+            ExecStartPre=-/usr/bin/etcdctl mk /coreos.com/network/config '{"Network":"KUBE_NETWORK", "Backend": {"Type": "host-gw"}}'
+      command: start
     - name: docker.service
       command: start
       drop-ins:
@@ -103,6 +120,7 @@ coreos:
             # won't land in flannel's network...
             Requires=flanneld.service
             After=flanneld.service
+            Restart=Always
     - name: download-release.service
       command: start
       content: |
@@ -128,7 +146,7 @@ coreos:
         Requires=download-release.service
         [Service]
         EnvironmentFile=/run/kubelet/apiservers.env
-        ExecStartPre=/run/setup-auth.sh
+        ExecStartPre=/run/config-kubelet.sh
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kubelet /opt/bin/kubelet
         ExecStart=/opt/bin/kubelet \
         --address=$private_ipv4 \

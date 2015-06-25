@@ -17,11 +17,76 @@
 # exit on any error
 set -e
 
+#setup kubelet config
+mkdir -p "/var/lib/kubelet"
+(umask 077;
+cat > "/var/lib/kubelet/kubeconfig" << EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+user:
+  token: ${KUBELET_TOKEN}
+clusters:
+- name: local
+cluster:
+  insecure-skip-tls-verify: true
+contexts:
+- context:
+  cluster: local
+  user: kubelet
+name: service-account-context
+current-context: service-account-context
+EOF
+)
+
+#setup proxy config
+mkdir -p "/var/lib/kube-proxy/"
+# Make a kubeconfig file with the token.
+# TODO(etune): put apiserver certs into secret too, and reference from authfile,
+# so that "Insecure" is not needed.
+(umask 077;
+cat > "/var/lib/kube-proxy/kubeconfig" << EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kube-proxy
+user:
+  token: ${KUBE_PROXY_TOKEN}
+clusters:
+- name: local
+cluster:
+   insecure-skip-tls-verify: true
+contexts:
+- context:
+  cluster: local
+  user: kube-proxy
+name: service-account-context
+current-context: service-account-context
+EOF
+)
+
+
+
+# Set the host name explicitly
+# See: https://github.com/mitchellh/vagrant/issues/2430
+hostnamectl set-hostname ${MINION_NAME}
+
+# Workaround to vagrant inability to guess interface naming sequence
+# Tell system to abandon the new naming scheme and use eth* instead
+rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
+
+# Disable network interface being managed by Network Manager (needed for Fedora 21+)
+NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
+sed -i 's/^NM_CONTROLLED=no/#NM_CONTROLLED=no/' ${NETWORK_CONF_PATH}ifcfg-eth1
+systemctl restart network
+
 # Setup hosts file to support ping by hostname to master
 if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
   echo "Adding $MASTER_NAME to hosts file"
   echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 fi
+echo "$MINION_IP $MINION_NAME" >> /etc/hosts
 
 # Setup hosts file to support ping by hostname to each minion in the cluster
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
@@ -32,6 +97,12 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "$ip $minion" >> /etc/hosts
   fi
 done
+
+# Configure network
+provision-network
+
+# Placeholder for any other manifests that may be per-node.
+mkdir -p /etc/kubernetes/manifests
 
 # Let the minion know who its master is
 # Recover the salt-minion if the salt-master network changes
@@ -74,6 +145,7 @@ grains:
   cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
   container_subnet: '$(echo "$MINION_CONTAINER_SUBNET" | sed -e "s/'/''/g")'
   hostname_override: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
+  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
 EOF
 
 # we will run provision to update code each time we test, so we do not want to do salt install each time

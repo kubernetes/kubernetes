@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 type instrumentedDockerInterface struct {
@@ -34,130 +34,158 @@ func NewInstrumentedDockerInterface(dockerClient DockerInterface) DockerInterfac
 	}
 }
 
+// Record the duration of the operation.
+func recordOperation(operation string, start time.Time) {
+	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
+}
+
+// Record error for metric if an error occured.
+func recordError(operation string, err error) {
+	if err != nil {
+		metrics.DockerErrors.WithLabelValues(operation).Inc()
+	}
+}
+
 func (in instrumentedDockerInterface) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("list_containers").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.ListContainers(options)
+	const operation = "list_containers"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.ListContainers(options)
+	recordError(operation, err)
+	return out, err
 }
 
 func (in instrumentedDockerInterface) InspectContainer(id string) (*docker.Container, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("inspect_container").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.InspectContainer(id)
+	const operation = "inspect_container"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.InspectContainer(id)
+	recordError(operation, err)
+	return out, err
 }
 
 func (in instrumentedDockerInterface) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("create_container").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.CreateContainer(opts)
+	const operation = "create_container"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.CreateContainer(opts)
+	recordError(operation, err)
+	return out, err
 }
 
 func (in instrumentedDockerInterface) StartContainer(id string, hostConfig *docker.HostConfig) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("start_container").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.StartContainer(id, hostConfig)
+	const operation = "start_container"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.StartContainer(id, hostConfig)
+	recordError(operation, err)
+	return err
 }
 
 func (in instrumentedDockerInterface) StopContainer(id string, timeout uint) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("stop_container").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.StopContainer(id, timeout)
+	const operation = "stop_container"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.StopContainer(id, timeout)
+	recordError(operation, err)
+	return err
 }
 
 func (in instrumentedDockerInterface) RemoveContainer(opts docker.RemoveContainerOptions) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("remove_container").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.RemoveContainer(opts)
+	const operation = "remove_container"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.RemoveContainer(opts)
+	recordError(operation, err)
+	return err
 }
 
 func (in instrumentedDockerInterface) InspectImage(image string) (*docker.Image, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("inspect_image").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.InspectImage(image)
+	const operation = "inspect_image"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.InspectImage(image)
+	recordError(operation, err)
+	return out, err
 }
 
 func (in instrumentedDockerInterface) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("list_images").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.ListImages(opts)
+	const operation = "list_images"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.ListImages(opts)
+	recordError(operation, err)
+	return out, err
 }
 
 func (in instrumentedDockerInterface) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("pull_image").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.PullImage(opts, auth)
+	const operation = "pull_image"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.PullImage(opts, auth)
+	recordError(operation, err)
+	return err
 }
 
 func (in instrumentedDockerInterface) RemoveImage(image string) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("remove_image").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.RemoveImage(image)
+	const operation = "remove_image"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.RemoveImage(image)
+	recordError(operation, err)
+	return err
 }
 
 func (in instrumentedDockerInterface) Logs(opts docker.LogsOptions) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("logs").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.Logs(opts)
+	const operation = "logs"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.Logs(opts)
+	recordError(operation, err)
+	return err
 }
 
 func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("version").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.Version()
+	const operation = "version"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.Version()
+	recordError(operation, err)
+	return out, err
 }
 
 func (in instrumentedDockerInterface) Info() (*docker.Env, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("info").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.Info()
+	const operation = "info"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.Info()
+	recordError(operation, err)
+	return out, err
 }
 
 func (in instrumentedDockerInterface) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("create_exec").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.CreateExec(opts)
+	const operation = "create_exec"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.CreateExec(opts)
+	recordError(operation, err)
+	return out, err
 }
 
 func (in instrumentedDockerInterface) StartExec(startExec string, opts docker.StartExecOptions) error {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("start_exec").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.StartExec(startExec, opts)
+	const operation = "start_exec"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.StartExec(startExec, opts)
+	recordError(operation, err)
+	return err
 }
 
 func (in instrumentedDockerInterface) InspectExec(id string) (*docker.ExecInspect, error) {
-	start := time.Now()
-	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("inspect_exec").Observe(metrics.SinceInMicroseconds(start))
-	}()
-	return in.client.InspectExec(id)
+	const operation = "inspect_exec"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.InspectExec(id)
+	recordError(operation, err)
+	return out, err
 }

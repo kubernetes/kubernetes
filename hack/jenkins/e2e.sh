@@ -38,23 +38,25 @@ else
 fi
 
 # Additional parameters that are passed to ginkgo runner.
-GINKGO_TEST_ARGS=""
+GINKGO_TEST_ARGS=${GINKGO_TEST_ARGS:-""}
 
 if [[ "${PERFORMANCE:-}" == "true" ]]; then
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-      export MASTER_SIZE="m3.xlarge"
+      export MASTER_SIZE=${MASTER_SIZE:-"m3.xlarge"}
     else
-      export MASTER_SIZE="n1-standard-4"
+      export MASTER_SIZE=${MASTER_SIZE:-"n1-standard-4"}
+      export MINION_SIZE=${MINION_SIZE:-"n1-standard-2"}
     fi
-    export NUM_MINIONS="100"
-    GINKGO_TEST_ARGS="--ginkgo.focus=\[Performance suite\] "
+    export NUM_MINIONS=${NUM_MINIONS:-"100"}
+    GINKGO_TEST_ARGS=${GINKGO_TEST_ARGS:-"--ginkgo.focus=\[Performance suite\] "}
 else
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-      export MASTER_SIZE="t2.small"
+      export MASTER_SIZE=${MASTER_SIZE:-"t2.small"}
     else
-      export MASTER_SIZE="g1-small"
+      export MASTER_SIZE=${MASTER_SIZE:-"n1-standard-2"}
+      export MINION_SIZE=${MINION_SIZE:-"n1-standard-2"}
     fi
-    export NUM_MINIONS="2"
+    export NUM_MINIONS=${NUM_MINIONS:-"2"}
 fi
 
 
@@ -114,8 +116,15 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
         export KUBE_SKIP_UPDATE=y
         sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update -q" || true
 
-        # For GKE, we can get the server-specified version.
-        if [[ ${JENKINS_USE_SERVER_VERSION:-} =~ ^[yY]$ ]]; then
+        if [[ ! -z ${JENKINS_EXPLICIT_VERSION:-} ]]; then
+            # Use an explicit pinned version like "ci/v0.10.0-101-g6c814c4" or
+            # "release/v0.19.1"
+            IFS='/' read -a varr <<< "${JENKINS_EXPLICIT_VERSION}"
+            bucket="${varr[0]}"
+            githash="${varr[1]}"
+            echo "$bucket / $githash"
+        elif [[ ${JENKINS_USE_SERVER_VERSION:-} =~ ^[yY]$ ]]; then
+            # For GKE, we can get the server-specified version.
             # We'll pull our TARs for tests from the release bucket.
             bucket="release"
 
@@ -125,8 +134,16 @@ if [[ "${E2E_UP,,}" == "true" ]]; then
             #       code=400,message=cluster.cluster_api_versionmustbeoneof:
             #       0.15.0,0.16.0.
             # The command should error, so we throw an || true on there.
-            msg=$(gcloud alpha container clusters create this-wont-work \
-                --zone=us-central1-f --cluster-api-version=0.0.0 2>&1 \
+            create_args=(
+              "this-wont-work"
+              "--zone=us-central1-f"
+            )
+            if [[ ! -z "${DOGFOOD_GCLOUD:-}" ]]; then
+              create_args+=("--cluster-version=0.0.0")
+            else
+              create_args+=("--cluster-api-version=0.0.0")
+            fi
+            msg=$(gcloud ${CMD_GROUP:-alpha} container clusters create "${create_args[@]}" 2>&1 \
                 | tr -d '[[:space:]]') || true
             # Strip out everything before the final colon, which gives us just
             # the allowed versions; something like "0.15.0,0.16.0." or "0.16.0."
@@ -204,7 +221,9 @@ fi
 cd kubernetes
 
 # Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
-export E2E_REPORT_DIR=${WORKSPACE}
+ARTIFACTS=${WORKSPACE}/_artifacts
+mkdir -p ${ARTIFACTS}
+export E2E_REPORT_DIR=${ARTIFACTS}
 
 ### Set up ###
 if [[ "${E2E_UP,,}" == "true" ]]; then
@@ -217,10 +236,25 @@ fi
 # Jenkins will look at the junit*.xml files for test failures, so don't exit
 # with a nonzero error code if it was only tests that failed.
 if [[ "${E2E_TEST,,}" == "true" ]]; then
-    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}--ginkgo.noColor" || true
+    go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS} --ginkgo.noColor" || true
 fi
+
+# TODO(zml): We have a bunch of legacy Jenkins configs that are
+# expecting junit*.xml to be in ${WORKSPACE} root and it's Friday
+# afternoon, so just put the junit report where it's expected.
+# If link already exists, non-zero return code should not cause build to fail.
+for junit in ${ARTIFACTS}/junit*.xml; do
+  ln -s -f ${junit} ${WORKSPACE} || true
+done
 
 ### Clean up ###
 if [[ "${E2E_DOWN,,}" == "true" ]]; then
+    # Sleep before deleting the cluster to give the controller manager time to
+    # delete any cloudprovider resources still around from the last test.
+    # This is calibrated to allow enough time for 3 attempts to delete the
+    # resources. Each attempt is allocated 5 seconds for requests to the
+    # cloudprovider plus the processingRetryInterval from servicecontroller.go
+    # for the wait between attempts.
+    sleep 30
     go run ./hack/e2e.go ${E2E_OPT} -v --down
 fi

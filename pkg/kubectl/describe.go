@@ -17,6 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -73,6 +75,7 @@ func describerMap(c *client.Client) map[string]Describer {
 		"ResourceQuota":         &ResourceQuotaDescriber{c},
 		"PersistentVolume":      &PersistentVolumeDescriber{c},
 		"PersistentVolumeClaim": &PersistentVolumeClaimDescriber{c},
+		"Namespace":             &NamespaceDescriber{c},
 	}
 	return m
 }
@@ -110,11 +113,143 @@ func init() {
 		describeService,
 		describeReplicationController,
 		describeNode,
+		describeNamespace,
 	)
 	if err != nil {
 		glog.Fatalf("Cannot register describers: %v", err)
 	}
 	DefaultObjectDescriber = d
+}
+
+// NamespaceDescriber generates information about a namespace
+type NamespaceDescriber struct {
+	client.Interface
+}
+
+func (d *NamespaceDescriber) Describe(namespace, name string) (string, error) {
+	ns, err := d.Namespaces().Get(name)
+	if err != nil {
+		return "", err
+	}
+	resourceQuotaList, err := d.ResourceQuotas(name).List(labels.Everything())
+	if err != nil {
+		return "", err
+	}
+	limitRangeList, err := d.LimitRanges(name).List(labels.Everything())
+	if err != nil {
+		return "", err
+	}
+
+	return describeNamespace(ns, resourceQuotaList, limitRangeList)
+}
+
+func describeNamespace(namespace *api.Namespace, resourceQuotaList *api.ResourceQuotaList, limitRangeList *api.LimitRangeList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", namespace.Name)
+		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(namespace.Labels))
+		fmt.Fprintf(out, "Status:\t%s\n", string(namespace.Status.Phase))
+		if resourceQuotaList != nil {
+			fmt.Fprintf(out, "\n")
+			DescribeResourceQuotas(resourceQuotaList, out)
+		}
+		if limitRangeList != nil {
+			fmt.Fprintf(out, "\n")
+			DescribeLimitRanges(limitRangeList, out)
+		}
+		return nil
+	})
+}
+
+// DescribeLimitRanges merges a set of limit range items into a single tabular description
+func DescribeLimitRanges(limitRanges *api.LimitRangeList, w io.Writer) {
+	if len(limitRanges.Items) == 0 {
+		fmt.Fprint(w, "No resource limits.\n")
+		return
+	}
+	fmt.Fprintf(w, "Resource Limits\n Type\tResource\tMin\tMax\tDefault\n")
+	fmt.Fprintf(w, " ----\t--------\t---\t---\t---\n")
+	for _, limitRange := range limitRanges.Items {
+		for i := range limitRange.Spec.Limits {
+			item := limitRange.Spec.Limits[i]
+			maxResources := item.Max
+			minResources := item.Min
+			defaultResources := item.Default
+
+			set := map[api.ResourceName]bool{}
+			for k := range maxResources {
+				set[k] = true
+			}
+			for k := range minResources {
+				set[k] = true
+			}
+			for k := range defaultResources {
+				set[k] = true
+			}
+
+			for k := range set {
+				// if no value is set, we output -
+				maxValue := "-"
+				minValue := "-"
+				defaultValue := "-"
+
+				maxQuantity, maxQuantityFound := maxResources[k]
+				if maxQuantityFound {
+					maxValue = maxQuantity.String()
+				}
+
+				minQuantity, minQuantityFound := minResources[k]
+				if minQuantityFound {
+					minValue = minQuantity.String()
+				}
+
+				defaultQuantity, defaultQuantityFound := defaultResources[k]
+				if defaultQuantityFound {
+					defaultValue = defaultQuantity.String()
+				}
+
+				msg := " %v\t%v\t%v\t%v\t%v\n"
+				fmt.Fprintf(w, msg, item.Type, k, minValue, maxValue, defaultValue)
+			}
+		}
+	}
+}
+
+// DescribeResourceQuotas merges a set of quota items into a single tabular description of all quotas
+func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w io.Writer) {
+	if len(quotas.Items) == 0 {
+		fmt.Fprint(w, "No resource quota.\n")
+		return
+	}
+	resources := []api.ResourceName{}
+	hard := map[api.ResourceName]resource.Quantity{}
+	used := map[api.ResourceName]resource.Quantity{}
+	for _, q := range quotas.Items {
+		for resource := range q.Status.Hard {
+			resources = append(resources, resource)
+			hardQuantity := q.Status.Hard[resource]
+			usedQuantity := q.Status.Used[resource]
+
+			// if for some reason there are multiple quota documents, we take least permissive
+			prevQuantity, ok := hard[resource]
+			if ok {
+				if hardQuantity.Value() < prevQuantity.Value() {
+					hard[resource] = hardQuantity
+				}
+			} else {
+				hard[resource] = hardQuantity
+			}
+			used[resource] = usedQuantity
+		}
+	}
+
+	sort.Sort(SortableResourceNames(resources))
+	fmt.Fprint(w, "Resource Quotas\n Resource\tUsed\tHard\n")
+	fmt.Fprint(w, " ---\t---\t---\n")
+	for _, resource := range resources {
+		hardQuantity := hard[resource]
+		usedQuantity := used[resource]
+		fmt.Fprintf(w, " %s\t%s\t%s\n", string(resource), usedQuantity.String(), hardQuantity.String())
+	}
 }
 
 // LimitRangeDescriber generates information about a limit range
@@ -268,9 +403,10 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&pod.Spec))
-		fmt.Fprintf(out, "Host:\t%s\n", pod.Spec.Host+"/"+pod.Status.HostIP)
+		fmt.Fprintf(out, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
 		fmt.Fprintf(out, "Status:\t%s\n", string(pod.Status.Phase))
+		fmt.Fprintf(out, "IP:\t%s\n", pod.Status.PodIP)
 		fmt.Fprintf(out, "Replication Controllers:\t%s\n", printReplicationControllersByLabels(rcs))
 		fmt.Fprintf(out, "Containers:\n")
 		describeContainers(pod.Status.ContainerStatuses, out)
@@ -304,12 +440,14 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pv.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pv.Labels))
-		fmt.Fprintf(out, "Status:\t%d\n", pv.Status.Phase)
+		fmt.Fprintf(out, "Status:\t%s\n", pv.Status.Phase)
 		if pv.Spec.ClaimRef != nil {
-			fmt.Fprintf(out, "Claim:\t%d\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
+			fmt.Fprintf(out, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
 		} else {
-			fmt.Fprintf(out, "Claim:\t%d\n", "")
+			fmt.Fprintf(out, "Claim:\t%s\n", "")
 		}
+		fmt.Fprintf(out, "Reclaim Policy:\t%d\n", pv.Spec.PersistentVolumeReclaimPolicy)
+		fmt.Fprintf(out, "Message:\t%d\n", pv.Status.Message)
 		return nil
 	})
 }
@@ -348,20 +486,20 @@ func describeContainers(containers []api.ContainerStatus, out io.Writer) {
 			if container.State.Waiting.Reason != "" {
 				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Waiting.Reason)
 			}
-		case container.State.Termination != nil:
+		case container.State.Terminated != nil:
 			fmt.Fprintf(out, "    State:\tTerminated\n")
-			if container.State.Termination.Reason != "" {
-				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Termination.Reason)
+			if container.State.Terminated.Reason != "" {
+				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Terminated.Reason)
 			}
-			if container.State.Termination.Message != "" {
-				fmt.Fprintf(out, "      Message:\t%s\n", container.State.Termination.Message)
+			if container.State.Terminated.Message != "" {
+				fmt.Fprintf(out, "      Message:\t%s\n", container.State.Terminated.Message)
 			}
-			fmt.Fprintf(out, "      Exit Code:\t%d\n", container.State.Termination.ExitCode)
-			if container.State.Termination.Signal > 0 {
-				fmt.Fprintf(out, "      Signal:\t%d\n", container.State.Termination.Signal)
+			fmt.Fprintf(out, "      Exit Code:\t%d\n", container.State.Terminated.ExitCode)
+			if container.State.Terminated.Signal > 0 {
+				fmt.Fprintf(out, "      Signal:\t%d\n", container.State.Terminated.Signal)
 			}
-			fmt.Fprintf(out, "      Started:\t%s\n", container.State.Termination.StartedAt.Time.Format(time.RFC1123Z))
-			fmt.Fprintf(out, "      Finished:\t%s\n", container.State.Termination.FinishedAt.Time.Format(time.RFC1123Z))
+			fmt.Fprintf(out, "      Started:\t%s\n", container.State.Terminated.StartedAt.Time.Format(time.RFC1123Z))
+			fmt.Fprintf(out, "      Finished:\t%s\n", container.State.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
 		default:
 			fmt.Fprintf(out, "    State:\tWaiting\n")
 		}
@@ -480,6 +618,22 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 	return describeService(service, endpoints, events)
 }
 
+func buildIngressString(ingress []api.LoadBalancerIngress) string {
+	var buffer bytes.Buffer
+
+	for i := range ingress {
+		if i != 0 {
+			buffer.WriteString(", ")
+		}
+		if ingress[i].IP != "" {
+			buffer.WriteString(ingress[i].IP)
+		} else {
+			buffer.WriteString(ingress[i].Hostname)
+		}
+	}
+	return buffer.String()
+}
+
 func describeService(service *api.Service, endpoints *api.Endpoints, events *api.EventList) (string, error) {
 	if endpoints == nil {
 		endpoints = &api.Endpoints{}
@@ -488,10 +642,11 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Name:\t%s\n", service.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
-		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.PortalIP)
-		if len(service.Spec.PublicIPs) > 0 {
-			list := strings.Join(service.Spec.PublicIPs, ", ")
-			fmt.Fprintf(out, "Public IPs:\t%s\n", list)
+		fmt.Fprintf(out, "Type:\t%s\n", service.Spec.Type)
+		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.ClusterIP)
+		if len(service.Status.LoadBalancer.Ingress) > 0 {
+			list := buildIngressString(service.Status.LoadBalancer.Ingress)
+			fmt.Fprintf(out, "LoadBalancer Ingress:\t%s\n", list)
 		}
 		for i := range service.Spec.Ports {
 			sp := &service.Spec.Ports[i]
@@ -501,7 +656,10 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 				name = "<unnamed>"
 			}
 			fmt.Fprintf(out, "Port:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
-			fmt.Fprintf(out, "Endpoints:\t%s\t%s\n", name, formatEndpoints(endpoints, util.NewStringSet(sp.Name)))
+			if sp.NodePort != 0 {
+				fmt.Fprintf(out, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
+			}
+			fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints, util.NewStringSet(sp.Name)))
 		}
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {
@@ -591,7 +749,7 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 	}
 	for i := range allPods.Items {
 		pod := &allPods.Items[i]
-		if pod.Spec.Host != name {
+		if pod.Spec.NodeName != name {
 			continue
 		}
 		pods = append(pods, pod)
@@ -652,8 +810,9 @@ func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (strin
 			fmt.Fprintf(out, "ExternalID:\t%s\n", node.Spec.ExternalID)
 		}
 		fmt.Fprintf(out, "Pods:\t(%d in total)\n", len(pods))
+		fmt.Fprint(out, "  Namespace\tName\n")
 		for _, pod := range pods {
-			fmt.Fprintf(out, "  %s\n", pod.Name)
+			fmt.Fprintf(out, "  %s\t%s\n", pod.Namespace, pod.Name)
 		}
 		if events != nil {
 			DescribeEvents(events, out)

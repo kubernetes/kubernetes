@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package pflag_test
+package pflag
 
 import (
 	"bytes"
@@ -14,19 +14,18 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	. "github.com/spf13/pflag"
 )
 
 var (
-	test_bool     = Bool("test_bool", false, "bool value")
-	test_int      = Int("test_int", 0, "int value")
-	test_int64    = Int64("test_int64", 0, "int64 value")
-	test_uint     = Uint("test_uint", 0, "uint value")
-	test_uint64   = Uint64("test_uint64", 0, "uint64 value")
-	test_string   = String("test_string", "0", "string value")
-	test_float64  = Float64("test_float64", 0, "float64 value")
-	test_duration = Duration("test_duration", 0, "time.Duration value")
+	test_bool                    = Bool("test_bool", false, "bool value")
+	test_int                     = Int("test_int", 0, "int value")
+	test_int64                   = Int64("test_int64", 0, "int64 value")
+	test_uint                    = Uint("test_uint", 0, "uint value")
+	test_uint64                  = Uint64("test_uint64", 0, "uint64 value")
+	test_string                  = String("test_string", "0", "string value")
+	test_float64                 = Float64("test_float64", 0, "float64 value")
+	test_duration                = Duration("test_duration", 0, "time.Duration value")
+	normalizeFlagNameInvocations = 0
 )
 
 func boolString(s string) string {
@@ -186,6 +185,7 @@ func TestShorthand(t *testing.T) {
 	boolaFlag := f.BoolP("boola", "a", false, "bool value")
 	boolbFlag := f.BoolP("boolb", "b", false, "bool2 value")
 	boolcFlag := f.BoolP("boolc", "c", false, "bool3 value")
+	booldFlag := f.BoolP("boold", "d", false, "bool4 value")
 	stringaFlag := f.StringP("stringa", "s", "0", "string value")
 	stringzFlag := f.StringP("stringz", "z", "0", "string value")
 	extra := "interspersed-argument"
@@ -196,6 +196,7 @@ func TestShorthand(t *testing.T) {
 		"-cs",
 		"hello",
 		"-z=something",
+		"-d=true",
 		"--",
 		notaflag,
 	}
@@ -214,6 +215,9 @@ func TestShorthand(t *testing.T) {
 	}
 	if *boolcFlag != true {
 		t.Error("boolc flag should be true, is ", *boolcFlag)
+	}
+	if *booldFlag != true {
+		t.Error("boold flag should be true, is ", *booldFlag)
 	}
 	if *stringaFlag != "hello" {
 		t.Error("stringa flag should be `hello`, is ", *stringaFlag)
@@ -251,6 +255,8 @@ func replaceSeparators(name string, from []string, to string) string {
 func wordSepNormalizeFunc(f *FlagSet, name string) NormalizedName {
 	seps := []string{"-", "_"}
 	name = replaceSeparators(name, seps, ".")
+	normalizeFlagNameInvocations++
+
 	return NormalizedName(name)
 }
 
@@ -340,6 +346,31 @@ func TestCustomNormalizedNames(t *testing.T) {
 	}
 	if *someOtherFlag != true {
 		t.Error("someOtherFlag should be true, is ", *someOtherFlag)
+	}
+}
+
+// Every flag we add, the name (displayed also in usage) should normalized
+func TestNormalizationFuncShouldChangeFlagName(t *testing.T) {
+	// Test normalization after addition
+	f := NewFlagSet("normalized", ContinueOnError)
+
+	f.Bool("valid_flag", false, "bool value")
+	if f.Lookup("valid_flag").Name != "valid_flag" {
+		t.Error("The new flag should have the name 'valid_flag' instead of ", f.Lookup("valid_flag").Name)
+	}
+
+	f.SetNormalizeFunc(wordSepNormalizeFunc)
+	if f.Lookup("valid_flag").Name != "valid.flag" {
+		t.Error("The new flag should have the name 'valid.flag' instead of ", f.Lookup("valid_flag").Name)
+	}
+
+	// Test normalization before addition
+	f = NewFlagSet("normalized", ContinueOnError)
+	f.SetNormalizeFunc(wordSepNormalizeFunc)
+
+	f.Bool("valid_flag", false, "bool value")
+	if f.Lookup("valid_flag").Name != "valid.flag" {
+		t.Error("The new flag should have the name 'valid.flag' instead of ", f.Lookup("valid_flag").Name)
 	}
 }
 
@@ -569,5 +600,18 @@ func TestDeprecatedFlagUsageNormalized(t *testing.T) {
 
 	if !strings.Contains(out, usageMsg) {
 		t.Errorf("usageMsg not printed when using a deprecated flag!")
+	}
+}
+
+// Name normalization function should be called only once on flag addition
+func TestMultipleNormalizeFlagNameInvocations(t *testing.T) {
+	normalizeFlagNameInvocations = 0
+
+	f := NewFlagSet("normalized", ContinueOnError)
+	f.SetNormalizeFunc(wordSepNormalizeFunc)
+	f.Bool("with_under_flag", false, "bool value")
+
+	if normalizeFlagNameInvocations != 1 {
+		t.Fatal("Expected normalizeFlagNameInvocations to be 1; got ", normalizeFlagNameInvocations)
 	}
 }

@@ -51,6 +51,7 @@ type MergeItem struct {
 	NonMergingList    []MergeItem
 	MergingIntList    []int `patchStrategy:"merge"`
 	NonMergingIntList []int
+	MergeItemPtr      *MergeItem `patchStrategy:"merge" patchMergeKey:"name"`
 	SimpleMap         map[string]string
 }
 
@@ -232,6 +233,41 @@ strategicMergePatchCases:
         - $patch: replace
     result:
       mergingList: []
+  - description: add new field inside pointers
+    original:
+      mergeItemPtr:
+        - name: 1
+    patch:
+      mergeItemPtr:
+        - name: 2
+    result:
+      mergeItemPtr:
+        - name: 1
+        - name: 2
+  - description: update nested pointers
+    original:
+      mergeItemPtr:
+        - name: 1
+          mergeItemPtr:
+            - name: 1
+            - name: 2
+              value: 2
+        - name: 2
+    patch:
+      mergeItemPtr:
+        - name: 1
+          mergeItemPtr:
+            - name: 1
+              value: 1
+    result:
+      mergeItemPtr:
+        - name: 1
+          mergeItemPtr:
+            - name: 1
+              value: 1
+            - name: 2
+              value: 2
+        - name: 2
 sortMergeListTestCases:
   - description: sort one list of maps
     original:
@@ -351,6 +387,40 @@ sortMergeListTestCases:
             - 1
             - 2
             - 3
+  - description: sort nested pointers of ints
+    original:
+      mergeItemPtr:
+        - name: 2
+          mergingIntList:
+            - 1
+            - 3
+            - 2
+        - name: 1
+          mergingIntList:
+            - 2
+            - 1
+    sorted:
+      mergeItemPtr:
+        - name: 1
+          mergingIntList:
+            - 1
+            - 2
+        - name: 2
+          mergingIntList:
+            - 1
+            - 2
+            - 3
+  - description: sort one pointer of maps
+    original:
+      mergeItemPtr:
+        - name: 1
+        - name: 3
+        - name: 2
+    sorted:
+      mergeItemPtr:
+        - name: 1
+        - name: 2
+        - name: 3
 `)
 
 func TestStrategicMergePatch(t *testing.T) {

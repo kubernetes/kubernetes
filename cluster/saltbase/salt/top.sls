@@ -10,8 +10,6 @@ base:
     - openvpn-client
 {% elif grains.network_mode is defined and grains.network_mode == 'calico' %}
     - calico.node
-{% else %}
-    - sdn
 {% endif %}
     - helpers
     - cadvisor
@@ -41,6 +39,7 @@ base:
     - cadvisor
     - kube-client-tools
     - kube-master-addons
+    - kube-admission-controls
 {% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
     - logrotate
 {% endif %}
@@ -53,8 +52,6 @@ base:
     - kubelet
 {% if grains['network_mode'] is defined and grains['network_mode'] == 'calico' %}
     - calico.master
-{% else %}
-    - sdn
 {% endif %}
 {% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] == 'aws' %}

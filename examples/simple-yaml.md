@@ -1,7 +1,7 @@
 ## Getting started with config files.
 
 In addition to the imperative style commands described [elsewhere](simple-nginx.md), Kubernetes
-supports declarative YAML or JSON configuration files.  Often times config files are prefereable
+supports declarative YAML or JSON configuration files.  Often times config files are preferable
 to imperative commands, since they can be checked into version control and changes to the files
 can be code reviewed, producing a more robust, reliable and archival system.
 
@@ -15,22 +15,18 @@ kubectl create -f pod.yaml
 Where pod.yaml contains something like:
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
+  name: nginx
   labels:
     app: nginx
-  name: nginx
-  namespace: default
 spec:
   containers:
-  - image: nginx
-    imagePullPolicy: IfNotPresent
-    name: nginx
+  - name: nginx
+    image: nginx
     ports:
     - containerPort: 80
-      protocol: TCP
-  restartPolicy: Always
 ```
 
 You can see your cluster's pods:
@@ -58,11 +54,10 @@ kubectl create -f replication.yaml
 Where ```replication.yaml``` contains:
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: nginx
-  namespace: default
 spec:
   replicas: 3
   selector:
@@ -74,13 +69,10 @@ spec:
         app: nginx
     spec:
       containers:
-      - image: nginx
-        imagePullPolicy: IfNotPresent
-        name: nginx
+      - name: nginx
+        image: nginx
         ports:
         - containerPort: 80
-          protocol: TCP
-      restartPolicy: Always
 ```
 
 To delete the replication controller (and the pods it created):

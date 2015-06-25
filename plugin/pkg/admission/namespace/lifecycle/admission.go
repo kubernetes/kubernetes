@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -29,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -41,14 +43,22 @@ func init() {
 // lifecycle is an implementation of admission.Interface.
 // It enforces life-cycle constraints around a Namespace depending on its Phase
 type lifecycle struct {
-	client client.Interface
-	store  cache.Store
+	*admission.Handler
+	client             client.Interface
+	store              cache.Store
+	immortalNamespaces util.StringSet
 }
 
 func (l *lifecycle) Admit(a admission.Attributes) (err error) {
-	if a.GetOperation() != "CREATE" {
+
+	// prevent deletion of immortal namespaces
+	if a.GetOperation() == admission.Delete {
+		if a.GetKind() == "Namespace" && l.immortalNamespaces.Has(a.GetName()) {
+			return errors.NewForbidden(a.GetKind(), a.GetName(), fmt.Errorf("namespace can never be deleted"))
+		}
 		return nil
 	}
+
 	defaultVersion, kind, err := latest.RESTMapper.VersionAndKindForResource(a.GetResource())
 	if err != nil {
 		return admission.NewForbidden(a, err)
@@ -77,9 +87,10 @@ func (l *lifecycle) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
-	return admission.NewForbidden(a, fmt.Errorf("Namespace %s is terminating", a.GetNamespace()))
+	return admission.NewForbidden(a, fmt.Errorf("Unable to create new content in namespace %s because it is being terminated.", a.GetNamespace()))
 }
 
+// NewLifecycle creates a new namespace lifecycle admission control handler
 func NewLifecycle(c client.Interface) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
@@ -97,7 +108,9 @@ func NewLifecycle(c client.Interface) admission.Interface {
 	)
 	reflector.Run()
 	return &lifecycle{
-		client: c,
-		store:  store,
+		Handler:            admission.NewHandler(admission.Create, admission.Delete),
+		client:             c,
+		store:              store,
+		immortalNamespaces: util.NewStringSet(api.NamespaceDefault),
 	}
 }

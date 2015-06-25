@@ -105,7 +105,7 @@ app.controller('GroupCtrl', [
         k8sApi.getPods(query).success(function(data) {
           $scope.addLabel("type", "pod", data.items);
           for (var i = 0; data.items && i < data.items.length; ++i) {
-            data.items[i].labels.host = data.items[i].currentState.host;
+            data.items[i].metadata.labels.host = data.items[i].spec.host;
             list.push(data.items[i]);
           }
           barrier();
@@ -136,10 +136,10 @@ app.controller('GroupCtrl', [
         return;
       }
       for (var i = 0; i < items.length; i++) {
-        if (!items[i].labels) {
-          items[i].labels = [];
+        if (!items[i].metadata.labels) {
+          items[i].metadata.labels = [];
         }
-        items[i].labels[key] = value;
+        items[i].metadata.labels[key] = value;
       }
     };
 
@@ -149,7 +149,7 @@ app.controller('GroupCtrl', [
         "kind": "grouping"
       };
       for (var i = 0; i < items.length; i++) {
-        key = items[i].labels[$scope.groupBy[index]];
+        key = items[i].metadata.labels[$scope.groupBy[index]];
         if (!key) {
           key = "";
         }
@@ -198,7 +198,7 @@ app.controller('GroupCtrl', [
     function buildGroupByOptions() {
       var g = $scope.groups;
       var options = getDefaultGroupByOptions();
-      var newOptions = _.map(g.items, function(vals) { return _.map(vals, function(v) { return _.keys(v.labels); }); });
+      var newOptions = _.map(g.items, function(vals) { return _.map(vals, function(v) { return _.keys(v.metadata.labels); }); });
       newOptions =
           _.reject(_.uniq(_.flattenDeep(newOptions)), function(o) { return o == 'name' || o == 'type' || o == ""; });
       newOptions = _.map(newOptions, function(o) {

@@ -71,15 +71,15 @@ JSON and YAML formats are accepted.
     Path to the kubeconfig file to use for CLI requests.
 
 .PP
-\fB\-\-log\_backtrace\_at\fP=:0
+\fB\-\-log\-backtrace\-at\fP=:0
     when logging hits line file:N, emit a stack trace
 
 .PP
-\fB\-\-log\_dir\fP=""
+\fB\-\-log\-dir\fP=""
     If non\-empty, write log files in this directory
 
 .PP
-\fB\-\-log\_flush\_frequency\fP=5s
+\fB\-\-log\-flush\-frequency\fP=5s
     Maximum number of seconds between log flushes
 
 .PP
@@ -142,8 +142,8 @@ $ kubectl update \-f pod.json
 // Update a pod based on the JSON passed into stdin.
 $ cat pod.json | kubectl update \-f \-
 
-// Update a pod by downloading it, applying the patch, then updating. Requires apiVersion be specified.
-$ kubectl update pods my\-pod \-\-patch='\{ "apiVersion": "v1beta1", "desiredState": \{ "manifest": [\{ "cpu": 100 \}]\}\}'
+// Partially update a node using strategic merge patch
+kubectl \-\-api\-version=v1 update node k8s\-node\-1 \-\-patch='\{"spec":\{"unschedulable":true\}\}'
 
 .fi
 .RE

@@ -31,6 +31,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
+const ProviderName = "vagrant"
+
 // VagrantCloud is an implementation of Interface, TCPLoadBalancer and Instances for developer managed Vagrant cluster.
 type VagrantCloud struct {
 	saltURL  string
@@ -40,7 +42,7 @@ type VagrantCloud struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("vagrant", func(config io.Reader) (cloudprovider.Interface, error) { return newVagrantCloud() })
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newVagrantCloud() })
 }
 
 // SaltToken is an authorization token required by Salt REST API.
@@ -73,7 +75,7 @@ type SaltMinionsResponse struct {
 // newVagrantCloud creates a new instance of VagrantCloud configured to talk to the Salt REST API.
 func newVagrantCloud() (*VagrantCloud, error) {
 	return &VagrantCloud{
-		saltURL:  "http://127.0.0.1:8000",
+		saltURL:  "http://kubernetes-master:8000",
 		saltUser: "vagrant",
 		saltPass: "vagrant",
 		saltAuth: "pam",
@@ -82,6 +84,11 @@ func newVagrantCloud() (*VagrantCloud, error) {
 
 func (v *VagrantCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
+}
+
+// ProviderName returns the cloud provider ID.
+func (v *VagrantCloud) ProviderName() string {
+	return ProviderName
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Vagrant cloud.
@@ -96,6 +103,11 @@ func (v *VagrantCloud) Instances() (cloudprovider.Instances, bool) {
 
 // Zones returns an implementation of Zones for Vagrant cloud.
 func (v *VagrantCloud) Zones() (cloudprovider.Zones, bool) {
+	return nil, false
+}
+
+// Routes returns an implementation of Routes for Vagrant cloud.
+func (v *VagrantCloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
@@ -119,6 +131,15 @@ func (v *VagrantCloud) getInstanceByAddress(address string) (*SaltMinion, error)
 	return nil, fmt.Errorf("unable to find instance for address: %s", address)
 }
 
+func (v *VagrantCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
+}
+
+// Implementation of Instances.CurrentNodeName
+func (v *VagrantCloud) CurrentNodeName(hostname string) (string, error) {
+	return hostname, nil
+}
+
 // NodeAddresses returns the NodeAddresses of a particular machine instance.
 func (v *VagrantCloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
 	// Due to vagrant not running with a dedicated DNS setup, we return the IP address of a minion as its hostname at this time
@@ -130,9 +151,18 @@ func (v *VagrantCloud) NodeAddresses(instance string) ([]api.NodeAddress, error)
 	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance.
+// ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (v *VagrantCloud) ExternalID(instance string) (string, error) {
 	// Due to vagrant not running with a dedicated DNS setup, we return the IP address of a minion as its hostname at this time
+	minion, err := v.getInstanceByAddress(instance)
+	if err != nil {
+		return "", err
+	}
+	return minion.IP, nil
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (v *VagrantCloud) InstanceID(instance string) (string, error) {
 	minion, err := v.getInstanceByAddress(instance)
 	if err != nil {
 		return "", err
@@ -238,12 +268,4 @@ func (v *VagrantCloud) List(filter string) ([]string, error) {
 
 func (v *VagrantCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	return nil, nil
-}
-
-func (v *VagrantCloud) Configure(name string, spec *api.NodeSpec) error {
-	return nil
-}
-
-func (v *VagrantCloud) Release(name string) error {
-	return nil
 }

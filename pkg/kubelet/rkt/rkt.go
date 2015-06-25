@@ -19,7 +19,6 @@ package rkt
 import (
 	"encoding/json"
 	"fmt"
-	"hash/adler32"
 	"io"
 	"io/ioutil"
 	"os"
@@ -38,7 +37,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
 	"github.com/coreos/go-systemd/dbus"
@@ -460,14 +458,6 @@ func newUnitOption(section, name, value string) *unit.UnitOption {
 	return &unit.UnitOption{Section: section, Name: name, Value: value}
 }
 
-// TODO(yifan): Move this duplicated function to container runtime.
-// hashContainer computes the hash of one api.Container.
-func hashContainer(container *api.Container) uint64 {
-	hash := adler32.New()
-	util.DeepHashObject(hash, *container)
-	return uint64(hash.Sum32())
-}
-
 // TODO(yifan): Remove the receiver once we can solve the appName->imageID problem.
 func (r *runtime) apiPodToruntimePod(uuid string, pod *api.Pod) *kubecontainer.Pod {
 	p := &kubecontainer.Pod{
@@ -485,7 +475,7 @@ func (r *runtime) apiPodToruntimePod(uuid string, pod *api.Pod) *kubecontainer.P
 			ID:      types.UID(buildContainerID(&containerID{uuid, c.Name, img.id})),
 			Name:    c.Name,
 			Image:   c.Image,
-			Hash:    hashContainer(c),
+			Hash:    kubecontainer.HashContainer(c),
 			Created: time.Now().Unix(),
 		})
 	}
@@ -847,7 +837,7 @@ func (r *runtime) SyncPod(pod *api.Pod, runningPod kubecontainer.Pod, podStatus 
 
 	restartPod := false
 	for _, container := range pod.Spec.Containers {
-		expectedHash := hashContainer(&container)
+		expectedHash := kubecontainer.HashContainer(&container)
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {
@@ -990,7 +980,7 @@ func (r *runtime) ExecInContainer(containerID string, cmd []string, stdin io.Rea
 	}
 	if stdin != nil {
 		// Use an os.Pipe here as it returns true *os.File objects.
-		// This way, if you run 'kubectl exec -p <pod> -i bash' (no tty) and type 'exit',
+		// This way, if you run 'kubectl exec <pod> -i bash' (no tty) and type 'exit',
 		// the call below to command.Run() can unblock because its Stdin is the read half
 		// of the pipe.
 		r, w, err := os.Pipe()

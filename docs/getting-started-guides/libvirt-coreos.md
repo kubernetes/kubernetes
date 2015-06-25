@@ -1,4 +1,18 @@
-## Getting started with libvirt CoreOS
+Getting started with libvirt CoreOS
+-----------------------------------
+
+**Table of Contents**
+
+- [Highlights](#highlights)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Interacting with your Kubernetes cluster with the `kube-*` scripts.](#interacting-with-your-kubernetes-cluster-with-the-kube--scripts)
+- [Troubleshooting](#troubleshooting)
+    - [!!! Cannot find kubernetes-server-linux-amd64.tar.gz](#-cannot-find-kubernetes-server-linux-amd64targz)
+    - [Can't find virsh in PATH, please fix and retry.](#cant-find-virsh-in-path-please-fix-and-retry)
+    - [error: Failed to connect socket to '/var/run/libvirt/libvirt-sock': No such file or directory](#error-failed-to-connect-socket-to-varrunlibvirtlibvirt-sock-no-such-file-or-directory)
+    - [error: Failed to connect socket to '/var/run/libvirt/libvirt-sock': Permission denied](#error-failed-to-connect-socket-to-varrunlibvirtlibvirt-sock-permission-denied)
+    - [error: Out of memory initializing network (virsh net-create...)](#error-out-of-memory-initializing-network-virsh-net-create)
 
 ### Highlights
 
@@ -116,7 +130,7 @@ virsh -c qemu:///system list
 You can check that the kubernetes cluster is working with:
 
 ```
-$ ./cluster/kubectl.sh get minions
+$ kubectl get nodes
 NAME                LABELS              STATUS
 192.168.10.2        <none>              Ready
 192.168.10.3        <none>              Ready
@@ -173,7 +187,7 @@ KUBE_PUSH=local cluster/kube-push.sh
 Interact with the cluster
 
 ```
-cluster/kubectl.sh
+kubectl ...
 ```
 
 ### Troubleshooting

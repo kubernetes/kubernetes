@@ -88,7 +88,7 @@ coreos:
         - name: 50-opts.conf
           content: |
             [Service]
-            Environment=DOCKER_OPTS='--bridge=cbr0 --iptables=false'
+            Environment='DOCKER_OPTS=--bridge=cbr0 --iptables=false'
     - name: docker-tcp.socket
       command: start
       enable: yes

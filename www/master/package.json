@@ -14,6 +14,7 @@
     "gulp-callback": "^0.0.3",
     "gulp-changed": "^1.1.0",
     "gulp-concat": "^2.4.1",
+    "gulp-debug": "^2.0.1",
     "gulp-expect-file": "0.0.7",
     "gulp-filter": "^1.0.2",
     "gulp-foreach": "^0.1.0",
@@ -48,7 +49,10 @@
   "scripts": {
     "prestart": "bower install",
     "start": "npm install",
-    "poststart": "gulp"
+    "poststart": "gulp",
+    "prebuild": "bower install --allow-root --config.interactive=false",
+    "build": "npm install",
+    "postbuild": "gulp build"
   },
   "dependencies": {
     "lodash": "^3.3.0"

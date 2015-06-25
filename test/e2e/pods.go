@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -34,11 +35,22 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// createNamespaceIfDoesNotExist ensures that the namespace with specified name exists, or returns an error
+func createNamespaceIfDoesNotExist(c *client.Client, name string) (*api.Namespace, error) {
+	namespace, err := c.Namespaces().Get(name)
+	if err != nil {
+		namespace, err = c.Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: name}})
+	}
+	return namespace, err
+}
+
 func runLivenessTest(c *client.Client, podDescr *api.Pod, expectRestart bool) {
 	ns := "e2e-test-" + string(util.NewUUID())
+	_, err := createNamespaceIfDoesNotExist(c, ns)
+	expectNoError(err, fmt.Sprintf("creating namespace %s", ns))
 
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
-	_, err := c.Pods(ns).Create(podDescr)
+	_, err = c.Pods(ns).Create(podDescr)
 	expectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
@@ -85,10 +97,13 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod, expectRestart bool) {
 // testHostIP tests that a pod gets a host IP
 func testHostIP(c *client.Client, pod *api.Pod) {
 	ns := "e2e-test-" + string(util.NewUUID())
+	_, err := createNamespaceIfDoesNotExist(c, ns)
+	expectNoError(err, fmt.Sprintf("creating namespace %s", ns))
+
 	podClient := c.Pods(ns)
 	By("creating pod")
 	defer podClient.Delete(pod.Name, nil)
-	_, err := podClient.Create(pod)
+	_, err = podClient.Create(pod)
 	if err != nil {
 		Fail(fmt.Sprintf("Failed to create pod: %v", err))
 	}
@@ -118,6 +133,7 @@ func testHostIP(c *client.Client, pod *api.Pod) {
 
 var _ = Describe("Pods", func() {
 	var c *client.Client
+	// TODO convert this to use the NewFramework(...)
 
 	BeforeEach(func() {
 		var err error
@@ -140,6 +156,42 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		})
+	})
+	It("should be schedule with cpu and memory limits", func() {
+		podClient := c.Pods(api.NamespaceDefault)
+
+		By("creating the pod")
+		name := "pod-update-" + string(util.NewUUID())
+		value := strconv.Itoa(time.Now().Nanosecond())
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					"name": "foo",
+					"time": value,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "nginx",
+						Image: "gcr.io/google_containers/pause",
+						Resources: api.ResourceRequirements{
+							Limits: api.ResourceList{
+								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+								api.ResourceMemory: *resource.NewQuantity(10*1024*1024, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+		}
+		defer podClient.Delete(pod.Name, nil)
+		_, err := podClient.Create(pod)
+		if err != nil {
+			Fail(fmt.Sprintf("Error creating a pod: %v", err))
+		}
+		expectNoError(waitForPodRunning(c, pod.Name))
 	})
 	It("should be submitted and removed", func() {
 		podClient := c.Pods(api.NamespaceDefault)
@@ -518,7 +570,7 @@ var _ = Describe("Pods", func() {
 					Containers: []api.Container{
 						{
 							Name:  "nginx",
-							Image: "nginx",
+							Image: "gcr.io/google_containers/nginx:1.7.9",
 						},
 					},
 				},
@@ -590,7 +642,7 @@ var _ = Describe("Pods", func() {
 					Containers: []api.Container{
 						{
 							Name:  "nginx",
-							Image: "nginx",
+							Image: "gcr.io/google_containers/nginx:1.7.9",
 							Ports: []api.Port{{ContainerPort: 80}},
 						},
 					},

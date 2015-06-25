@@ -89,6 +89,7 @@ func TestRunOnce(t *testing.T) {
 		os:                  kubecontainer.FakeOS{},
 		volumeManager:       newVolumeManager(),
 	}
+	kb.containerManager, _ = newContainerManager(cadvisor, "", "", "")
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if err := kb.setupDataDirs(); err != nil {
@@ -96,7 +97,7 @@ func TestRunOnce(t *testing.T) {
 	}
 	podContainers := []docker.APIContainers{
 		{
-			Names:  []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo_new_12345678_42"},
+			Names:  []string{"/k8s_bar." + strconv.FormatUint(kubecontainer.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo_new_12345678_42"},
 			ID:     "1234",
 			Status: "running",
 		},

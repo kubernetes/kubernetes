@@ -8,7 +8,7 @@ If you use Fedora 21 on Kubernetes node, then first install iSCSI initiator on t
    
 then edit */etc/iscsi/initiatorname.iscsi* and */etc/iscsi/iscsid.conf* to match your iSCSI target configuration.
 
-I mostly followed these [instructions](http://www.server-world.info/en/note?os=Fedora_21&p=iscsi&f=2) to setup iSCSI initiator and these [instructions](http://www.server-world.info/en/note?os=Fedora_21&p=iscsi) to setup iSCSI target.
+I mostly followed these [instructions](http://www.server-world.info/en/note?os=Fedora_21&p=iscsi) to setup iSCSI target. and these [instructions](http://www.server-world.info/en/note?os=Fedora_21&p=iscsi&f=2) to setup iSCSI initiator.
 
 **Setup B.** On Unbuntu 12.04 and Debian 7 nodes on GCE
 
@@ -17,15 +17,27 @@ GCE does not provide preconfigured Fedora 21 image, so I set up the iSCSI target
 ##Step 2. Creating the pod with iSCSI persistent storage
 Once you have installed iSCSI initiator and new Kubernetes, you can create a pod based on my example *iscsi.json*. In the pod JSON, you need to provide *targetPortal* (the iSCSI target's **IP** address and *port* if not the default port 3260), target's *iqn*, *lun*, and the type of the filesystem that has been created on the lun, and *readOnly* boolean. 
 
+**Note:** If you have followed the instructions in the links above you
+may have partitioned the device, the iSCSI volume plugin does not
+currently support partitions so format the device as one partition.
+Make sure you have the correct device name then run the following as
+root to format it:
+
+```console
+mkfs.ext4 /dev/<name of device>
+```
+
 Once your pod is created, run it on the Kubernetes master:
 
-    #cluster/kubectl.sh create -f your_new_pod.json
+```console
+kubectl create -f your_new_pod.json
+```
 
 Here is my command and output:
 
 ```console
-# cluster/kubectl.sh create -f examples/iscsi/iscsi.json
-# cluster/kubectl.sh get pods
+# kubectl create -f examples/iscsi/iscsi.json
+# kubectl get pods
 POD       IP            CONTAINER(S)   IMAGE(S)           HOST                                    LABELS    STATUS    CREATED         MESSAGE
 iscsipd   10.244.3.14                                     kubernetes-minion-bz1p/104.154.61.231   <none>    Running   About an hour   
                         iscsipd-rw     kubernetes/pause                                                     Running   About an hour   

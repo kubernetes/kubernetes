@@ -32,6 +32,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
+	"github.com/onsi/ginkgo/types"
 	"github.com/onsi/gomega"
 )
 
@@ -40,21 +41,6 @@ const (
 	// running and ready before any e2e tests run. It includes pulling all of
 	// the pods (as of 5/18/15 this is 8 pods).
 	podStartupTimeout = 10 * time.Minute
-
-	// minStartupPods is the minimum number of pods that will allow
-	// wiatForPodsRunningReady(...) to succeed. More verbosely, that function
-	// checks that all pods in the cluster are both in a phase of "running" and
-	// have a condition of "ready": "true". It aims to ensure that the cluster's
-	// pods are fully healthy before beginning e2e tests. However, if there were
-	// only 0 pods, it would technically pass if there wasn't a required minimum
-	// number of pods. We expect every cluster to come up with some number of
-	// pods (which in practice is more than this number), so we have this
-	// minimum here as a sanity check to make sure that there are actually pods
-	// on the cluster (i.e. preventing a possible race with kube-addons). This
-	// does *not* mean that the function will succeed as soon as minStartupPods
-	// are found to be running and ready; it ensures that *all* pods it finds
-	// are running and ready. This is the minimum number it must find.
-	minStartupPods = 1
 )
 
 var (
@@ -62,6 +48,22 @@ var (
 
 	reportDir = flag.String("report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 )
+
+type failReporter struct {
+	failed bool
+}
+
+func (f *failReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
+}
+func (f *failReporter) BeforeSuiteDidRun(setupSummary *types.SetupSummary) {}
+func (f *failReporter) SpecWillRun(specSummary *types.SpecSummary)         {}
+func (f *failReporter) SpecDidComplete(specSummary *types.SpecSummary) {
+	if specSummary.Failed() {
+		f.failed = true
+	}
+}
+func (f *failReporter) AfterSuiteDidRun(setupSummary *types.SetupSummary) {}
+func (f *failReporter) SpecSuiteDidEnd(summary *types.SuiteSummary)       {}
 
 func init() {
 	// Turn on verbose by default to get spec names
@@ -79,11 +81,21 @@ func init() {
 	flag.StringVar(&testContext.Host, "host", "", "The host, or apiserver, to connect to")
 	flag.StringVar(&testContext.RepoRoot, "repo-root", "../../", "Root directory of kubernetes repository, for finding test files.")
 	flag.StringVar(&testContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, vagrant, etc.)")
+	flag.StringVar(&testContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
+	flag.StringVar(&testContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
+	flag.StringVar(&testContext.prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
+	flag.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
+	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce")
+	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", -1, "Number of nodes in the cluster")
+
+	flag.StringVar(&cloudConfig.ClusterTag, "cluster-tag", "", "Tag used to identify resources.  Only required if provider is aws.")
+	flag.IntVar(&testContext.MinStartupPods, "minStartupPods", 0, "The number of pods which we need to see in 'Running' state with a 'Ready' condition of true, before we try running tests. This is useful in any cluster which needs some base pod-based services running before it can be used.")
+
 }
 
 func TestE2E(t *testing.T) {
@@ -103,6 +115,11 @@ func TestE2E(t *testing.T) {
 		}
 		awsConfig += fmt.Sprintf("Zone=%s\n", cloudConfig.Zone)
 
+		if cloudConfig.ClusterTag == "" {
+			glog.Fatal("--cluster-tag must be specified for AWS")
+		}
+		awsConfig += fmt.Sprintf("KubernetesClusterTag=%s\n", cloudConfig.ClusterTag)
+
 		var err error
 		cloudConfig.Provider, err = cloudprovider.GetCloudProvider(testContext.Provider, strings.NewReader(awsConfig))
 		if err != nil {
@@ -114,21 +131,26 @@ func TestE2E(t *testing.T) {
 	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
 		config.GinkgoConfig.SkipString = "Skipped"
 	}
-
 	gomega.RegisterFailHandler(ginkgo.Fail)
 
 	// Ensure all pods are running and ready before starting tests (otherwise,
 	// cluster infrastructure pods that are being pulled or started can block
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
-	if err := waitForPodsRunningReady(api.NamespaceDefault, minStartupPods, podStartupTimeout); err != nil {
+	if err := waitForPodsRunningReady(api.NamespaceDefault, testContext.MinStartupPods, podStartupTimeout); err != nil {
 		glog.Fatalf("Error waiting for all pods to be running and ready: %v", err)
 	}
-
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	var r []ginkgo.Reporter
 	if *reportDir != "" {
 		r = append(r, reporters.NewJUnitReporter(path.Join(*reportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
+		failReport := &failReporter{}
+		r = append(r, failReport)
+		defer func() {
+			if failReport.failed {
+				coreDump(*reportDir)
+			}
+		}()
 	}
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }

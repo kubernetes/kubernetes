@@ -8,6 +8,11 @@
     },
     {
       "Effect": "Allow",
+      "Action": ["elasticloadbalancing:*"],
+      "Resource": ["*"]
+    },
+    {
+      "Effect": "Allow",
       "Action": "s3:*",
       "Resource": [
         "arn:aws:s3:::kubernetes-*"

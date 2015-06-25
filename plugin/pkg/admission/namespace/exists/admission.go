@@ -19,6 +19,7 @@ package exists
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -42,6 +43,7 @@ func init() {
 // It rejects all incoming requests in a namespace context if the namespace does not exist.
 // It is useful in deployments that want to enforce pre-declaration of a Namespace resource.
 type exists struct {
+	*admission.Handler
 	client client.Interface
 	store  cache.Store
 }
@@ -72,9 +74,17 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	if exists {
 		return nil
 	}
-	return admission.NewForbidden(a, fmt.Errorf("Namespace %s does not exist", a.GetNamespace()))
+
+	// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
+	_, err = e.client.Namespaces().Get(a.GetNamespace())
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("Namespace %s does not exist", a.GetNamespace()))
+	}
+
+	return nil
 }
 
+// NewExists creates a new namespace exists admission control handler
 func NewExists(c client.Interface) admission.Interface {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
@@ -88,11 +98,12 @@ func NewExists(c client.Interface) admission.Interface {
 		},
 		&api.Namespace{},
 		store,
-		0,
+		5*time.Minute,
 	)
 	reflector.Run()
 	return &exists{
-		client: c,
-		store:  store,
+		client:  c,
+		store:   store,
+		Handler: admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 	}
 }

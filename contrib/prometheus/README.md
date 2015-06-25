@@ -23,7 +23,7 @@ Now quickly confirm that /mnt/promdash/file.sqlite3 exists, and has a non-zero s
 ```
 Looks open enough :).  
 
-1. Now, you can start this pod, like so `kubectl create -f cluster/add-ons/prometheus/prometheusB3.yaml`.  This pod will start both prometheus, the server, as well as promdash, the visualization tool.  You can then configure promdash, and next time you restart the pod - you're configuration will be remain (since the promdash directory was mounted as a local docker volume).
+1. Now, you can start this pod, like so `kubectl create -f contrib/prometheus/prometheus-all.json`.  This ReplicationController will maintain both prometheus, the server, as well as promdash, the visualization tool.  You can then configure promdash, and next time you restart the pod - you're configuration will be remain (since the promdash directory was mounted as a local docker volume).
 
 1. Finally, you can simply access localhost:3000, which will have promdash running.  Then, add the prometheus server (locahost:9090)to as a promdash server, and create a dashboard according to the promdash directions.
 
@@ -31,15 +31,21 @@ Looks open enough :).
 
 You can launch prometheus easily, by simply running.
 
-`kubectl create -f cluster/addons/prometheus/prometheus.yaml`
+`kubectl create -f contrib/prometheus/prometheus-all.json`
 
-This will bind to port 9090 locally.  You can see the prometheus database at that URL.
+Then (edit the publicIP field in prometheus-service to be a public ip on one of your kubelets), 
 
-# How it works
+and run 
 
-This is a v1beta1 based, containerized prometheus pod, which scrapes endpoints which are readable on the KUBERNETES_RO service (the internal kubernetes service running in the default namespace, which is visible to all pods).
+`kubectl create -f contrib/prometheus/prometheus-service.json`
 
-1. The KUBERNETES_RO service is already running : providing read access to the API metrics.
+Now, you can access the service `wget 10.0.1.89:9090`, and build graphs.
+
+## How it works
+
+This is a v1beta3 based, containerized prometheus ReplicationController, which scrapes endpoints which are readable on the KUBERNETES service (the internal kubernetes service running in the default namespace, which is visible to all pods).
+
+1. Use kubectl to handle auth & proxy the kubernetes API locally, emulating the old KUBERNETES_RO service.
 
 1. The list of services to be monitored is passed as a command line aguments in
 the yaml file.
@@ -68,7 +74,7 @@ at port 9090.
 - We should publish this image into the kube/ namespace.
 - Possibly use postgre or mysql as a promdash database.
 - push gateway (https://github.com/prometheus/pushgateway) setup.
-- Setup high availability via NFS
-
+- stop using kubectl to make a local proxy faking the old RO port and build in
+  real auth capabilities.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/prometheus/README.md?pixel)]()

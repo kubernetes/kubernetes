@@ -77,7 +77,7 @@ You now need to edit the docker configuration to activate new flags.  Again, thi
 
 This may be in ```/etc/default/docker``` or ```/etc/systemd/service/docker.service``` or it may be elsewhere.
 
-Regardless, you need to add the following to the docker comamnd line:
+Regardless, you need to add the following to the docker command line:
 ```sh
 --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}
 ```
@@ -108,20 +108,20 @@ systemctl start docker
 Ok, now that your networking is set up, you can startup Kubernetes, this is the same as the single-node case, we will use the "main" instance of the Docker daemon for the Kubernetes components.
 
 ```sh
-sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.17.0 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
+sudo docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.18.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests-multi
 ```
 
 ### Also run the service proxy
 ```sh
-sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.17.0 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+sudo docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.18.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
 
 ### Test it out
 At this point, you should have a functioning 1-node cluster.  Let's test it out!
 
 Download the kubectl binary
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v0.17.0/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v0.17.0/bin/linux/amd64/kubectl))
+([OS X](http://storage.googleapis.com/kubernetes-release/release/v0.18.2/bin/darwin/amd64/kubectl))
+([linux](http://storage.googleapis.com/kubernetes-release/release/v0.18.2/bin/linux/amd64/kubectl))
 
 List the nodes
 
@@ -131,8 +131,8 @@ kubectl get nodes
 
 This should print:
 ```
-NAME        LABELS    STATUS
-127.0.0.1   <none>    Ready
+NAME        LABELS                             STATUS
+127.0.0.1   kubernetes.io/hostname=127.0.0.1   Ready
 ```
 
 If the status of the node is ```NotReady``` or ```Unknown``` please check that all of the containers you created are successfully running.

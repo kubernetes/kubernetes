@@ -95,7 +95,7 @@ func TestNewInvalid(t *testing.T) {
 			fielderrors.NewFieldDuplicate("field[0].name", "bar"),
 			&api.StatusDetails{
 				Kind: "kind",
-				ID:   "name",
+				Name: "name",
 				Causes: []api.StatusCause{{
 					Type:  api.CauseTypeFieldValueDuplicate,
 					Field: "field[0].name",
@@ -106,7 +106,7 @@ func TestNewInvalid(t *testing.T) {
 			fielderrors.NewFieldInvalid("field[0].name", "bar", "detail"),
 			&api.StatusDetails{
 				Kind: "kind",
-				ID:   "name",
+				Name: "name",
 				Causes: []api.StatusCause{{
 					Type:  api.CauseTypeFieldValueInvalid,
 					Field: "field[0].name",
@@ -117,7 +117,7 @@ func TestNewInvalid(t *testing.T) {
 			fielderrors.NewFieldNotFound("field[0].name", "bar"),
 			&api.StatusDetails{
 				Kind: "kind",
-				ID:   "name",
+				Name: "name",
 				Causes: []api.StatusCause{{
 					Type:  api.CauseTypeFieldValueNotFound,
 					Field: "field[0].name",
@@ -128,7 +128,7 @@ func TestNewInvalid(t *testing.T) {
 			fielderrors.NewFieldNotSupported("field[0].name", "bar"),
 			&api.StatusDetails{
 				Kind: "kind",
-				ID:   "name",
+				Name: "name",
 				Causes: []api.StatusCause{{
 					Type:  api.CauseTypeFieldValueNotSupported,
 					Field: "field[0].name",
@@ -139,7 +139,7 @@ func TestNewInvalid(t *testing.T) {
 			fielderrors.NewFieldRequired("field[0].name"),
 			&api.StatusDetails{
 				Kind: "kind",
-				ID:   "name",
+				Name: "name",
 				Causes: []api.StatusCause{{
 					Type:  api.CauseTypeFieldValueRequired,
 					Field: "field[0].name",

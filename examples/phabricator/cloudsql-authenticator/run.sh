@@ -20,7 +20,7 @@
 while true; do
   hostport="https://kubernetes.default.cluster.local"
   token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-  path="api/v1beta3/pods"
+  path="api/v1/pods"
   query="labels=$SELECTOR"
 
   # TODO: load in the CAS cert when we distributed it on all platforms.

@@ -60,13 +60,6 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
       auth_config=(
       "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
       )
-      if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-        # gcloud doesn't override the current-context, so we explicitly set it
-        detect-project &> /dev/null
-        auth_config+=(
-          "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
-        )
-      fi
     fi
 else
   echo "Conformance Test.  No cloud-provider-specific preparation."
@@ -77,21 +70,39 @@ else
   )
 fi
 
+if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
+  NODE_INSTANCE_GROUP="${NODE_INSTANCE_PREFIX}-group"
+else
+  NODE_INSTANCE_GROUP=""
+fi
+
+if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+  detect-node-instance-group
+fi
+
 ginkgo_args=()
 if [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
   ginkgo_args+=("-p")
 fi
 
+
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
+# Add path for things like running kubectl binary.
+export PATH=$(dirname "${e2e_test}"):"${PATH}"
 "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
   --host="https://${KUBE_MASTER_IP-}" \
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \
   --gce-zone="${ZONE:-}" \
+  --gke-cluster="${CLUSTER_NAME:-}" \
   --kube-master="${KUBE_MASTER:-}" \
+  --cluster-tag="${CLUSTER_ID:-}" \
   --repo-root="${KUBE_VERSION_ROOT}" \
+  --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
+  --num-nodes="${NUM_MINIONS:-}" \
+  --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
   ${E2E_REPORT_DIR+"--report-dir=${E2E_REPORT_DIR}"} \
   "${@:-}"

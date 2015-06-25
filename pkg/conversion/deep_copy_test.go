@@ -40,7 +40,7 @@ func TestDeepCopy(t *testing.T) {
 		}{},
 	}
 	for _, obj := range table {
-		obj2, err := DeepCopy(obj)
+		obj2, err := NewCloner().DeepCopy(obj)
 		if err != nil {
 			t.Errorf("Error: couldn't copy %#v", obj)
 			continue
@@ -51,7 +51,7 @@ func TestDeepCopy(t *testing.T) {
 
 		obj3 := reflect.New(reflect.TypeOf(obj)).Interface()
 		f.Fuzz(obj3)
-		obj4, err := DeepCopy(obj3)
+		obj4, err := NewCloner().DeepCopy(obj3)
 		if err != nil {
 			t.Errorf("Error: couldn't copy %#v", obj)
 			continue
@@ -64,7 +64,7 @@ func TestDeepCopy(t *testing.T) {
 }
 
 func copyOrDie(t *testing.T, in interface{}) interface{} {
-	out, err := DeepCopy(in)
+	out, err := NewCloner().DeepCopy(in)
 	if err != nil {
 		t.Fatalf("DeepCopy failed: %#q: %v", in, err)
 	}
@@ -154,7 +154,7 @@ func BenchmarkDeepCopy(b *testing.B) {
 	var r interface{}
 	for i := 0; i < b.N; i++ {
 		for j := range table {
-			r, _ = DeepCopy(table[j])
+			r, _ = NewCloner().DeepCopy(table[j])
 		}
 	}
 	result = r

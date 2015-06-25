@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -65,7 +66,8 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName("", "Type", &internalType{})
 	scheme.AddKnownTypeWithName("unlikelyversion", "Type", &externalType{})
-	scheme.AddKnownTypeWithName("v1beta1", "Type", &ExternalType2{})
+	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
+	scheme.AddKnownTypeWithName(testapi.Version(), "Type", &ExternalType2{})
 
 	codec := runtime.CodecFor(scheme, "unlikelyversion")
 	validVersion := testapi.Version()
@@ -138,7 +140,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func() (validation.Schema, error) {
@@ -172,8 +174,8 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Validator: validation.NullSchema{},
 	}
 	generators := map[string]kubectl.Generator{
-		"run-container/v1": kubectl.BasicReplicationController{},
-		"service/v1":       kubectl.ServiceGenerator{},
+		"run/v1":     kubectl.BasicReplicationController{},
+		"service/v1": kubectl.ServiceGenerator{},
 	}
 	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
@@ -192,7 +194,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func() (validation.Schema, error) {
@@ -219,32 +221,34 @@ func stringBody(body string) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
 }
 
+// TODO(jlowdermilk): refactor the Factory so we can test client versions properly,
+// with different client/server version skew scenarios.
 // Verify that resource.RESTClients constructed from a factory respect mapping.APIVersion
-func TestClientVersions(t *testing.T) {
-	f := cmdutil.NewFactory(nil)
-
-	version := testapi.Version()
-	mapping := &meta.RESTMapping{
-		APIVersion: version,
-	}
-	c, err := f.RESTClient(mapping)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	client := c.(*client.RESTClient)
-	if client.APIVersion() != version {
-		t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
-	}
-}
+//func TestClientVersions(t *testing.T) {
+//	f := cmdutil.NewFactory(nil)
+//
+//	version := testapi.Version()
+//	mapping := &meta.RESTMapping{
+//		APIVersion: version,
+//	}
+//	c, err := f.RESTClient(mapping)
+//	if err != nil {
+//		t.Errorf("unexpected error: %v", err)
+//	}
+//	client := c.(*client.RESTClient)
+//	if client.APIVersion() != version {
+//		t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
+//	}
+//}
 
 func ExamplePrintReplicationController() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false)
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, []string{})
 	tf.Client = &client.FakeRESTClient{
 		Codec:  codec,
 		Client: nil,
 	}
-	cmd := NewCmdRunContainer(f, os.Stdout)
+	cmd := NewCmdRun(f, os.Stdout)
 	ctrl := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name:   "foo",
@@ -275,4 +279,30 @@ func ExamplePrintReplicationController() {
 	// Output:
 	// CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS
 	// foo          foo            someimage   foo=bar    1
+}
+
+func TestNormalizationFuncGlobalExistance(t *testing.T) {
+	// This test can be safely deleted when we will not support multiple flag formats
+	root := NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
+
+	if root.Parent() != nil {
+		t.Fatal("We expect the root command to be returned")
+	}
+	if root.GlobalNormalizationFunc() == nil {
+		t.Fatal("We expect that root command has a global normalization function")
+	}
+
+	if reflect.ValueOf(root.GlobalNormalizationFunc()).Pointer() != reflect.ValueOf(root.Flags().GetNormalizeFunc()).Pointer() {
+		t.Fatal("root command seems to have a wrong normalization function")
+	}
+
+	sub := root
+	for sub.HasSubCommands() {
+		sub = sub.Commands()[0]
+	}
+
+	// In case of failure of this test check this PR: spf13/cobra#110
+	if reflect.ValueOf(sub.Flags().GetNormalizeFunc()).Pointer() != reflect.ValueOf(root.Flags().GetNormalizeFunc()).Pointer() {
+		t.Fatal("child and root commands should have the same normalization functions")
+	}
 }

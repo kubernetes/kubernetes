@@ -39,6 +39,9 @@ func TestCanSupport(t *testing.T) {
 	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
+	if !plug.CanSupport(&volume.Spec{Name: "foo", PersistentVolumeSource: api.PersistentVolumeSource{NFS: &api.NFSVolumeSource{}}}) {
+		t.Errorf("Expected true")
+	}
 	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{}}) {
 		t.Errorf("Expected false")
 	}
@@ -57,6 +60,47 @@ func TestGetAccessModes(t *testing.T) {
 	}
 }
 
+func TestRecycler(t *testing.T) {
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins([]volume.VolumePlugin{&nfsPlugin{newRecyclerFunc: newMockRecycler}}, volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+
+	spec := &volume.Spec{PersistentVolumeSource: api.PersistentVolumeSource{NFS: &api.NFSVolumeSource{Path: "/foo"}}}
+	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	recycler, err := plug.NewRecycler(spec)
+	if err != nil {
+		t.Error("Failed to make a new Recyler: %v", err)
+	}
+	if recycler.GetPath() != spec.PersistentVolumeSource.NFS.Path {
+		t.Errorf("Expected %s but got %s", spec.PersistentVolumeSource.NFS.Path, recycler.GetPath())
+	}
+	if err := recycler.Recycle(); err != nil {
+		t.Errorf("Mock Recycler expected to return nil but got %s", err)
+	}
+}
+
+func newMockRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
+	return &mockRecycler{
+		path: spec.PersistentVolumeSource.NFS.Path,
+	}, nil
+}
+
+type mockRecycler struct {
+	path string
+	host volume.VolumeHost
+}
+
+func (r *mockRecycler) GetPath() string {
+	return r.path
+}
+
+func (r *mockRecycler) Recycle() error {
+	// return nil means recycle passed
+	return nil
+}
+
 func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
@@ -66,20 +110,16 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 	return false
 }
 
-func TestPlugin(t *testing.T) {
+func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/nfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &api.Volume{
-		Name:         "vol1",
-		VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{"localhost", "/tmp", false}},
-	}
 	fake := &mount.FakeMounter{}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.(*nfsPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), pod, fake)
+	builder, err := plug.(*nfsPlugin).newBuilderInternal(spec, pod, fake)
 	volumePath := builder.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
@@ -137,4 +177,27 @@ func TestPlugin(t *testing.T) {
 	}
 
 	fake.ResetLog()
+}
+
+func TestPluginVolume(t *testing.T) {
+	vol := &api.Volume{
+		Name:         "vol1",
+		VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{"localhost", "/tmp", false}},
+	}
+	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+}
+
+func TestPluginPersistentVolume(t *testing.T) {
+	vol := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "vol1",
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				NFS: &api.NFSVolumeSource{"localhost", "/tmp", false},
+			},
+		},
+	}
+
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol))
 }

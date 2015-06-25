@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -217,6 +218,15 @@ func (b *Builder) NamespaceParam(namespace string) *Builder {
 // to NamespaceParam() if empty.
 func (b *Builder) DefaultNamespace() *Builder {
 	b.defaultNamespace = true
+	return b
+}
+
+// AllNamespaces instructs the builder to use NamespaceAll as a namespace to request resources
+// acroll all namespace. This overrides the namespace set by NamespaceParam().
+func (b *Builder) AllNamespaces(allNamespace bool) *Builder {
+	if allNamespace {
+		b.namespace = api.NamespaceAll
+	}
 	return b
 }
 

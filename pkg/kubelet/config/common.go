@@ -24,27 +24,25 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilyaml "github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
 
-	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 )
 
-// Generate a pod name that is unique among nodes by appending the hostname.
-func generatePodName(name, hostname string) string {
-	return fmt.Sprintf("%s-%s", name, hostname)
+// Generate a pod name that is unique among nodes by appending the nodeName.
+func generatePodName(name, nodeName string) string {
+	return fmt.Sprintf("%s-%s", name, nodeName)
 }
 
-func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) error {
+func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
 		if isFile {
-			fmt.Fprintf(hasher, "host:%s", hostname)
+			fmt.Fprintf(hasher, "host:%s", nodeName)
 			fmt.Fprintf(hasher, "file:%s", source)
 		} else {
 			fmt.Fprintf(hasher, "url:%s", source)
@@ -59,7 +57,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) er
 	if len(pod.Name) == 0 {
 		pod.Name = string(pod.UID)
 	}
-	pod.Name = generatePodName(pod.Name, hostname)
+	pod.Name = generatePodName(pod.Name, nodeName)
 	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
 
 	if pod.Namespace == "" {
@@ -68,7 +66,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) er
 	glog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
 
 	// Set the Host field to indicate this pod is scheduled on the current node.
-	pod.Spec.Host = hostname
+	pod.Spec.NodeName = nodeName
 
 	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
 	return nil
@@ -143,69 +141,4 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api
 		}
 	}
 	return true, *newPods, err
-}
-
-func tryDecodeSingleManifest(data []byte, defaultFn defaultFunc) (parsed bool, manifest v1beta1.ContainerManifest, pod *api.Pod, err error) {
-	// TODO: should be api.Scheme.Decode
-	// This is awful.  DecodeInto() expects to find an APIObject, which
-	// Manifest is not.  We keep reading manifest for now for compat, but
-	// we will eventually change it to read Pod (at which point this all
-	// becomes nicer).  Until then, we assert that the ContainerManifest
-	// structure on disk is always v1beta1.  Read that, convert it to a
-	// "current" ContainerManifest (should be ~identical), then convert
-	// that to a Pod (which is a well-understood conversion).  This
-	// avoids writing a v1beta1.ContainerManifest -> api.Pod
-	// conversion which would be identical to the api.ContainerManifest ->
-	// api.Pod conversion.
-	pod = new(api.Pod)
-	if err = yaml.Unmarshal(data, &manifest); err != nil {
-		return false, manifest, pod, err
-	}
-	newManifest := api.ContainerManifest{}
-	if err = api.Scheme.Convert(&manifest, &newManifest); err != nil {
-		return false, manifest, pod, err
-	}
-	if errs := validation.ValidateManifest(&newManifest); len(errs) > 0 {
-		err = fmt.Errorf("invalid manifest: %v", errs)
-		return false, manifest, pod, err
-	}
-	if err = api.Scheme.Convert(&newManifest, pod); err != nil {
-		return true, manifest, pod, err
-	}
-	if err := defaultFn(pod); err != nil {
-		return true, manifest, pod, err
-	}
-	// Success.
-	return true, manifest, pod, nil
-}
-
-func tryDecodeManifestList(data []byte, defaultFn defaultFunc) (parsed bool, manifests []v1beta1.ContainerManifest, pods api.PodList, err error) {
-	// TODO: should be api.Scheme.Decode
-	// See the comment in tryDecodeSingle().
-	if err = yaml.Unmarshal(data, &manifests); err != nil {
-		return false, manifests, pods, err
-	}
-	newManifests := []api.ContainerManifest{}
-	if err = api.Scheme.Convert(&manifests, &newManifests); err != nil {
-		return false, manifests, pods, err
-	}
-	for i := range newManifests {
-		manifest := &newManifests[i]
-		if errs := validation.ValidateManifest(manifest); len(errs) > 0 {
-			err = fmt.Errorf("invalid manifest: %v", errs)
-			return false, manifests, pods, err
-		}
-	}
-	list := api.ContainerManifestList{Items: newManifests}
-	if err = api.Scheme.Convert(&list, &pods); err != nil {
-		return true, manifests, pods, err
-	}
-	for i := range pods.Items {
-		pod := &pods.Items[i]
-		if err := defaultFn(pod); err != nil {
-			return true, manifests, pods, err
-		}
-	}
-	// Success.
-	return true, manifests, pods, nil
 }

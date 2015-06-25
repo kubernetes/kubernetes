@@ -1,4 +1,22 @@
-## Getting started locally
+Getting started locally
+-----------------------
+
+**Table of Contents**
+
+- [Requirements](#requirements)
+    - [Linux](#linux)
+    - [Docker](#docker)
+    - [etcd](#etcd)
+    - [go](#go)
+- [Starting the cluster](#starting-the-cluster)
+- [Running a container](#running-a-container)
+- [Running a user defined pod](#running-a-user-defined-pod)
+- [Troubleshooting](#troubleshooting)
+    - [I cannot reach service IPs on the network.](#i-cannot-reach-service-ips-on-the-network)
+    - [I cannot create a replication controller with replica size greater than 1!  What gives?](#i-cannot-create-a-replication-controller-with-replica-size-greater-than-1--what-gives)
+    - [I changed Kubernetes code, how do I run it?](#i-changed-kubernetes-code-how-do-i-run-it)
+    - [kubectl claims to start a container but `get pods` and `docker ps` don't show it.](#kubectl-claims-to-start-a-container-but-get-pods-and-docker-ps-dont-show-it)
+    - [The pods fail to connect to the services by host names](#the-pods-fail-to-connect-to-the-services-by-host-names)
 
 ### Requirements
 
@@ -46,8 +64,8 @@ You can now use any of the cluster/kubectl.sh commands to interact with your loc
 ```
 cluster/kubectl.sh get pods
 cluster/kubectl.sh get services
-cluster/kubectl.sh get replicationControllers
-cluster/kubectl.sh run-container my-nginx --image=nginx --replicas=2 --port=80
+cluster/kubectl.sh get replicationcontrollers
+cluster/kubectl.sh run my-nginx --image=nginx --replicas=2 --port=80
 
 
 ## begin wait for provision to complete, you can monitor the docker pull by opening a new terminal
@@ -61,7 +79,7 @@ cluster/kubectl.sh run-container my-nginx --image=nginx --replicas=2 --port=80
 ## introspect kubernetes!
 cluster/kubectl.sh get pods
 cluster/kubectl.sh get services
-cluster/kubectl.sh get replicationControllers
+cluster/kubectl.sh get replicationcontrollers
 ```
 
 
@@ -69,7 +87,7 @@ cluster/kubectl.sh get replicationControllers
 
 Note the difference between a [container](http://docs.k8s.io/containers.md)
 and a [pod](http://docs.k8s.io/pods.md). Since you only asked for the former, kubernetes will create a wrapper pod for you.
-However you can't view the nginx start page on localhost. To verify that nginx is running you need to run `curl` within the docker container (try `docker exec`).
+However you cannot view the nginx start page on localhost. To verify that nginx is running you need to run `curl` within the docker container (try `docker exec`).
 
 You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:
 
@@ -81,16 +99,17 @@ Congratulations!
 
 ### Troubleshooting
 
-#### I can't reach service IPs on the network.
+#### I cannot reach service IPs on the network.
 
 Some firewall software that uses iptables may not interact well with
-kubernetes.  If you're having trouble around networking, try disabling any
-firewall or other iptables-using systems, first.
+kubernetes.  If you have trouble around networking, try disabling any
+firewall or other iptables-using systems, first.  Also, you can check
+if SELinux is blocking anything by running a command such as `journalctl --since yesterday | grep avc`.
 
-By default the IP range for service portals is 10.0.*.* - depending on your
+By default the IP range for service cluster IPs is 10.0.*.* - depending on your
 docker installation, this may conflict with IPs for containers.  If you find
 containers running with IPs in this range, edit hack/local-cluster-up.sh and
-change the portal_net flag to something else.
+change the service-cluster-ip-range flag to something else.
 
 #### I cannot create a replication controller with replica size greater than 1!  What gives?
 

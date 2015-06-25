@@ -1,8 +1,18 @@
-#Configuring kubernetes on [Fedora](http://fedoraproject.org) via [Ansible](http://www.ansible.com/home).
+Configuring kubernetes on [Fedora](http://fedoraproject.org) via [Ansible](http://www.ansible.com/home)
+-------------------------------------------------------------------------------------------------------
 
 Configuring kubernetes on Fedora via Ansible offers a simple way to quickly create a clustered environment with little effort.
 
-Requirements:
+**Table of Contents**
+
+- [Prerequisites](#prerequisites)
+- [Architecture of the cluster](#architecture-of-the-cluster)
+- [Configuring ssh access to the cluster](#configuring-ssh-access-to-the-cluster)
+- [Configuring the internal kubernetes network](#configuring-the-internal-kubernetes-network)
+- [Setting up the cluster](#setting-up-the-cluster)
+- [Testing and using your new cluster](#testing-and-using-your-new-cluster)
+
+##Prerequisites
 
 1. Host able to run ansible and able to clone the following repo: [kubernetes-ansible](https://github.com/eparis/kubernetes-ansible)
 2. A Fedora 20+ or RHEL7 host to act as cluster master
@@ -14,7 +24,7 @@ Ansible will take care of the rest of the configuration for you - configuring ne
 
 ## Architecture of the cluster
 
-A Kubernetes cluster reqiures etcd, a master, and n minions, so we will create a cluster with three hosts, for example:
+A Kubernetes cluster requires etcd, a master, and n minions, so we will create a cluster with three hosts, for example:
 
 ```
     fed1 (master,etcd) = 192.168.121.205
@@ -174,25 +184,27 @@ iptables -nvL
 ```
 cat << EOF > apache.json
 {
-  "id": "fedoraapache",
   "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "fedoraapache",
-      "containers": [{
-        "name": "fedoraapache",
-        "image": "fedora/apache",
-        "ports": [{
-          "containerPort": 80,
-          "hostPort": 80
-        }]
-      }]
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "fedoraapache",
+    "labels": {
+      "name": "fedoraapache"
     }
   },
-  "labels": {
-    "name": "fedoraapache"
+  "spec": {
+    "containers": [
+      {
+        "name": "fedoraapache",
+        "image": "fedora/apache",
+        "ports": [
+          {
+            "hostPort": 80,
+            "containerPort": 80
+          }
+        ]
+      }
+    ]
   }
 }
 EOF 

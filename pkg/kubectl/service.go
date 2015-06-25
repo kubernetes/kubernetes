@@ -29,12 +29,14 @@ type ServiceGenerator struct{}
 
 func (ServiceGenerator) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
-		{"name", true},
+		{"default-name", true},
+		{"name", false},
 		{"selector", true},
 		{"port", true},
 		{"labels", false},
 		{"public-ip", false},
 		{"create-external-load-balancer", false},
+		{"type", false},
 		{"protocol", false},
 		{"container-port", false}, // alias of target-port
 		{"target-port", false},
@@ -61,8 +63,11 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 	}
 
 	name, found := params["name"]
-	if !found {
-		return nil, fmt.Errorf("'name' is a required parameter.")
+	if !found || len(name) == 0 {
+		name, found = params["default-name"]
+		if !found || len(name) == 0 {
+			return nil, fmt.Errorf("'name' is a required parameter.")
+		}
 	}
 	portString, found := params["port"]
 	if !found {
@@ -102,10 +107,13 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 		service.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(port)
 	}
 	if params["create-external-load-balancer"] == "true" {
-		service.Spec.CreateExternalLoadBalancer = true
+		service.Spec.Type = api.ServiceTypeLoadBalancer
 	}
 	if len(params["public-ip"]) != 0 {
-		service.Spec.PublicIPs = []string{params["public-ip"]}
+		service.Spec.DeprecatedPublicIPs = []string{params["public-ip"]}
+	}
+	if len(params["type"]) != 0 {
+		service.Spec.Type = api.ServiceType(params["type"])
 	}
 	return &service, nil
 }

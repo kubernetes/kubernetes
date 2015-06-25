@@ -1,7 +1,19 @@
-# Rackspace
+Getting started on Rackspace
+----------------------------
 
-* Supported Version: v0.16.2
- * `git checkout v0.16.2`
+**Table of Contents**
+
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [Provider: Rackspace](#provider-rackspace)
+- [Build](#build)
+- [Cluster](#cluster)
+- [Some notes:](#some-notes)
+- [Network Design](#network-design)
+
+## Introduction
+
+* Supported Version: v0.18.1
 
 In general, the dev-build-and-up.sh workflow for Rackspace is the similar to GCE. The specific implementation is different due to the use of CoreOS, Rackspace Cloud Files and the overall network design.
 
@@ -20,8 +32,9 @@ The current cluster design is inspired by:
 
 ##Provider: Rackspace
 
-- To install the latest released version of kubernetes use `export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash`
 - To build your own released version from source use `export KUBERNETES_PROVIDER=rackspace` and run the `bash hack/dev-build-and-up.sh`
+- Note: The get.k8s.io install method is not working yet for our scripts.
+  * To install the latest released version of kubernetes use `export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash`
 
 ## Build
 1. The kubernetes binaries will be built via the common build scripts in `build/`.
@@ -33,9 +46,9 @@ The current cluster design is inspired by:
 There is a specific `cluster/rackspace` directory with the scripts for the following steps:
 1. A cloud network will be created and all instances will be attached to this network.
   - flanneld uses this network for next hop routing. These routes allow the containers running on each node to communicate with one another on this private network.
-2. A SSH key will be created and uploaded if needed. This key must be used to ssh into the machines since we won't capture the password.
+2. A SSH key will be created and uploaded if needed. This key must be used to ssh into the machines (we do not capture the password).
 3. The master server and additional nodes will be created via the `nova` CLI. A `cloud-config.yaml` is generated and provided as user-data with the entire configuration for the systems.
-4. We then boot as many nodes as defined via `$RAX_NUM_MINIONS`.
+4. We then boot as many nodes as defined via `$NUM_MINIONS`.
 
 ## Some notes:
 - The scripts expect `eth2` to be the cloud network that the containers will communicate across.

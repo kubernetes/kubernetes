@@ -32,16 +32,16 @@ func FromServices(services *api.ServiceList) []api.EnvVar {
 	for i := range services.Items {
 		service := &services.Items[i]
 
-		// ignore services where PortalIP is "None" or empty
+		// ignore services where ClusterIP is "None" or empty
 		// the services passed to this method should be pre-filtered
-		// only services that have the portal IP set should be included here
+		// only services that have the cluster IP set should be included here
 		if !api.IsServiceIPSet(service) {
 			continue
 		}
 
 		// Host
 		name := makeEnvVariableName(service.Name) + "_SERVICE_HOST"
-		result = append(result, api.EnvVar{Name: name, Value: service.Spec.PortalIP})
+		result = append(result, api.EnvVar{Name: name, Value: service.Spec.ClusterIP})
 		// First port - give it the backwards-compatible name
 		name = makeEnvVariableName(service.Name) + "_SERVICE_PORT"
 		result = append(result, api.EnvVar{Name: name, Value: strconv.Itoa(service.Spec.Ports[0].Port)})
@@ -81,14 +81,14 @@ func makeLinkVariables(service *api.Service) []api.EnvVar {
 			// Docker special-cases the first port.
 			all = append(all, api.EnvVar{
 				Name:  prefix + "_PORT",
-				Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), service.Spec.PortalIP, sp.Port),
+				Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), service.Spec.ClusterIP, sp.Port),
 			})
 		}
 		portPrefix := fmt.Sprintf("%s_PORT_%d_%s", prefix, sp.Port, strings.ToUpper(protocol))
 		all = append(all, []api.EnvVar{
 			{
 				Name:  portPrefix,
-				Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), service.Spec.PortalIP, sp.Port),
+				Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), service.Spec.ClusterIP, sp.Port),
 			},
 			{
 				Name:  portPrefix + "_PROTO",
@@ -100,7 +100,7 @@ func makeLinkVariables(service *api.Service) []api.EnvVar {
 			},
 			{
 				Name:  portPrefix + "_ADDR",
-				Value: service.Spec.PortalIP,
+				Value: service.Spec.ClusterIP,
 			},
 		}...)
 	}

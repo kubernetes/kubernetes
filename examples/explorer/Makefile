@@ -10,7 +10,7 @@ container: explorer
 	docker build -t gcr.io/google_containers/explorer:$(TAG) .
 
 push: container
-	gcloud preview docker push gcr.io/google_containers/explorer:$(TAG)
+	gcloud docker push gcr.io/google_containers/explorer:$(TAG)
 
 clean:
 	rm -f explorer

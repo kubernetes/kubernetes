@@ -38,6 +38,11 @@ func (alwaysDeny) Admit(a admission.Attributes) (err error) {
 	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
 }
 
+func (alwaysDeny) Handles(operation admission.Operation) bool {
+	return true
+}
+
+// NewAlwaysDeny creates an always deny admission handler
 func NewAlwaysDeny() admission.Interface {
 	return new(alwaysDeny)
 }

@@ -114,15 +114,15 @@ type TokenEndpoint struct {
 
 // 5.2 API Declaration
 type ApiDeclaration struct {
-	SwaggerVersion string           `json:"swaggerVersion"`
-	ApiVersion     string           `json:"apiVersion"`
-	BasePath       string           `json:"basePath"`
-	ResourcePath   string           `json:"resourcePath"` // must start with /
-	Apis           []Api            `json:"apis,omitempty"`
-	Models         map[string]Model `json:"models,omitempty"`
-	Produces       []string         `json:"produces,omitempty"`
-	Consumes       []string         `json:"consumes,omitempty"`
-	Authorizations []Authorization  `json:"authorizations,omitempty"`
+	SwaggerVersion string          `json:"swaggerVersion"`
+	ApiVersion     string          `json:"apiVersion"`
+	BasePath       string          `json:"basePath"`
+	ResourcePath   string          `json:"resourcePath"` // must start with /
+	Apis           []Api           `json:"apis,omitempty"`
+	Models         ModelList       `json:"models,omitempty"`
+	Produces       []string        `json:"produces,omitempty"`
+	Consumes       []string        `json:"consumes,omitempty"`
+	Authorizations []Authorization `json:"authorizations,omitempty"`
 }
 
 // 5.2.2 API Object
@@ -166,12 +166,12 @@ type ResponseMessage struct {
 
 // 5.2.6, 5.2.7 Models Object
 type Model struct {
-	Id            string                   `json:"id"`
-	Description   string                   `json:"description,omitempty"`
-	Required      []string                 `json:"required,omitempty"`
-	Properties    map[string]ModelProperty `json:"properties"`
-	SubTypes      []string                 `json:"subTypes,omitempty"`
-	Discriminator string                   `json:"discriminator,omitempty"`
+	Id            string            `json:"id"`
+	Description   string            `json:"description,omitempty"`
+	Required      []string          `json:"required,omitempty"`
+	Properties    ModelPropertyList `json:"properties"`
+	SubTypes      []string          `json:"subTypes,omitempty"`
+	Discriminator string            `json:"discriminator,omitempty"`
 }
 
 // 5.2.8 Properties Object

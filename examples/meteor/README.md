@@ -4,6 +4,40 @@ Meteor on Kuberenetes
 This example shows you how to package and run a
 [Meteor](https://www.meteor.com/) app on Kubernetes.
 
+Get started on Google Compute Engine
+------------------------------------
+
+Meteor uses MongoDB, and we will use the `GCEPersistentDisk` type of
+volume for persistent storage. Therefore, this example is only
+applicable to [Google Compute
+Engine](https://cloud.google.com/compute/). Take a look at the
+[volumes documentation](/docs/volumes.md) for other options.
+
+First, if you have not already done so:
+
+1. [Create](https://cloud.google.com/compute/docs/quickstart) a
+[Google Cloud Platform](https://cloud.google.com/) project.
+2. [Enable
+billing](https://developers.google.com/console/help/new/#billing).
+3. Install the [gcloud SDK](https://cloud.google.com/sdk/).
+
+Authenticate with gcloud and set the gcloud default project name to
+point to the project you want to use for your Kubernetes cluster:
+
+```shell
+gcloud auth login
+gcloud config set project <project-name>
+```
+
+Next, start up a Kubernetes cluster:
+```shell
+wget -q -O - https://get.k8s.io | bash
+```
+
+Please see the [GCE getting started
+guide](http://docs.k8s.io/getting-started-guides/gce.md) for full
+details and other options for starting a cluster.
+
 Build a container for your Meteor app
 -------------------------------------
 
@@ -58,20 +92,20 @@ your app image with your project ID, and push to GCR. Replace
 `<project>` with your project ID.
 ```
 docker tag my-meteor gcr.io/<project>/my-meteor
-gcloud preview docker push gcr.io/<project>/my-meteor
+gcloud docker push gcr.io/<project>/my-meteor
 ```
 
 Running
 -------
 
 Now that you have containerized your Meteor app it's time to set up
-your cluster. Edit `meteor-controller.json` and make sure the `image`
-points to the container you just pushed to the Docker Hub or GCR.
+your cluster. Edit [`meteor-controller.json`](meteor-controller.json)
+and make sure the `image:` points to the container you just pushed to
+the Docker Hub or GCR.
 
-As you may know, Meteor uses MongoDB, and we'll need to provide it a
-persistant Kuberetes volume to store its data. See the [volumes
-documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md)
-for options. We're going to use Google Compute Engine persistant
+We will need to provide MongoDB a persistent Kuberetes volume to
+store its data. See the [volumes documentation](/docs/volumes.md) for
+options. We're going to use Google Compute Engine persistent
 disks. Create the MongoDB disk by running:
 ```
 gcloud compute disks create --size=200GB mongo-disk
@@ -96,12 +130,12 @@ kubectl create -f meteor-controller.json
 kubectl create -f meteor-service.json
 ```
 
-Note that `meteor-service.json` creates an external load balancer, so
+Note that [`meteor-service.json`](meteor-service.json) creates a load balancer, so
 your app should be available through the IP of that load balancer once
 the Meteor pods are started. You can find the IP of your load balancer
 by running:
 ```
-kubectl get services/meteor -o template -t "{{.spec.publicIPs}}"
+kubectl get services/meteor --template="{{range .status.loadBalancer.ingress}} {{.ip}} {{end}}"
 ```
 
 You will have to open up port 80 if it's not open yet in your
@@ -127,20 +161,20 @@ ENTRYPOINT MONGO_URL=mongodb://$MONGO_SERVICE_HOST:$MONGO_SERVICE_PORT /usr/loca
 Here we can see the MongoDB host and port information being passed
 into the Meteor app. The `MONGO_SERVICE...` environment variables are
 set by Kubernetes, and point to the service named `mongo` specified in
-`mongo-service.json`. See the [environment
-docuementation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md)
-for more details.
+[`mongo-service.json`](mongo-service.json). See the [environment
+documentation](/docs/container-environment.md) for more details.
 
 As you may know, Meteor uses long lasting connections, and requires
 _sticky sessions_. With Kubernetes you can scale out your app easily
-with session affinity. The `meteor-service.json` file contains
+with session affinity. The
+[`meteor-service.json`](meteor-service.json) file contains
 `"sessionAffinity": "ClientIP"`, which provides this for us. See the
 [service
-documentation](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#portals-and-service-proxies)
-for more information.
+documentation](/docs/services.md#virtual-ips-and-service-proxies) for
+more information.
 
 As mentioned above, the mongo container uses a volume which is mapped
-to a persistant disk by Kubernetes. In `mongo-pod.json` the container
+to a persistent disk by Kubernetes. In [`mongo-pod.json`](mongo-pod.json) the container
 section specifies the volume:
 ```
         "volumeMounts": [

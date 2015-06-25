@@ -37,6 +37,11 @@ func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
 	return nil
 }
 
+func (alwaysAdmit) Handles(operation admission.Operation) bool {
+	return true
+}
+
+// NewAlwaysAdmit creates a new always admit admission handler
 func NewAlwaysAdmit() admission.Interface {
 	return new(alwaysAdmit)
 }

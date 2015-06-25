@@ -20,7 +20,7 @@ echo ok > /tmp/health; sleep 10; rm -rf /tmp/health; sleep 600
 so when Kubelet executes the health check 15 seconds (defined by initialDelaySeconds) after the container started, the check would fail.
 
 
-The [http-liveness.yaml](./http-liveness.yaml) demonstrates the HTTP check.
+The [http-liveness.yaml](http-liveness.yaml) demonstrates the HTTP check.
 ```
     livenessProbe:
       httpGet:
@@ -36,34 +36,34 @@ This [guide](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examp
 ## Get your hands dirty
 To show the health check is actually working, first create the pods:
 ```
-# cluster/kubectl.sh create -f exec-liveness.yaml
-# cluster/kbuectl.sh create -f http-liveness.yaml
+# kubectl create -f exec-liveness.yaml
+# kubectl create -f http-liveness.yaml
 ```
 
 Check the status of the pods once they are created:
 ```
-# cluster/kubectl.sh get pods
+# kubectl get pods
 POD             IP           CONTAINER(S)   IMAGE(S)                            HOST                                     LABELS          STATUS    CREATED     MESSAGE
-liveness-exec   10.244.3.7                                                      kubernetes-minion-f08h/130.211.122.180   test=liveness   Running   3 seconds   
-                             liveness       gcr.io/google_containers/busybox                                                             Running   2 seconds   
-liveness-http   10.244.0.8                                                      kubernetes-minion-0bks/104.197.10.10     test=liveness   Running   3 seconds   
-                             liveness       gcr.io/google_containers/liveness                                                            Running   2 seconds   
+liveness-exec   10.244.3.7                                                      kubernetes-minion-f08h/130.211.122.180   test=liveness   Running   3 seconds
+                             liveness       gcr.io/google_containers/busybox                                                             Running   2 seconds
+liveness-http   10.244.0.8                                                      kubernetes-minion-0bks/104.197.10.10     test=liveness   Running   3 seconds
+                             liveness       gcr.io/google_containers/liveness                                                            Running   2 seconds
 ```
 
 Check the status half a minute later, you will see the termination messages:
 ```
-# cluster/kubectl.sh get pods
+# kubectl get pods
 POD             IP           CONTAINER(S)   IMAGE(S)                            HOST                                     LABELS          STATUS    CREATED      MESSAGE
-liveness-exec   10.244.3.7                                                      kubernetes-minion-f08h/130.211.122.180   test=liveness   Running   34 seconds   
+liveness-exec   10.244.3.7                                                      kubernetes-minion-f08h/130.211.122.180   test=liveness   Running   34 seconds
                              liveness       gcr.io/google_containers/busybox                                                             Running   3 seconds    last termination: exit code 137
-liveness-http   10.244.0.8                                                      kubernetes-minion-0bks/104.197.10.10     test=liveness   Running   34 seconds   
+liveness-http   10.244.0.8                                                      kubernetes-minion-0bks/104.197.10.10     test=liveness   Running   34 seconds
                              liveness       gcr.io/google_containers/liveness                                                            Running   13 seconds   last termination: exit code 2
 ```
 The termination messages indicate that the liveness probes have failed, and the containers have been killed and recreated.
 
 You can also see the container restart count being incremented by running `kubectl describe`.
 ```
-# cluster/kubectl.sh describe pods liveness-exec | grep "Restart Count"
+# kubectl describe pods liveness-exec | grep "Restart Count"
 Restart Count:      8
 ```
 

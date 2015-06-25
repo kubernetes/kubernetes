@@ -7709,7 +7709,10 @@ function SelectProvider($$interimElementProvider) {
       var focusedNode = centeredNode || optionNodes[0];
       if (focusedNode) {
         opts.focusedNode = focusedNode;
-        focusedNode.focus();
+        // This is commented out to fix an issue where the first option remains in focus
+        // even after you mouseover to a different option.
+        // It is fixed in the compiled source and is here for reference.
+        // focusedNode.focus();
       }
 
       if (isScrollable) {

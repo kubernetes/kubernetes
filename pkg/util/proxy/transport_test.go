@@ -17,7 +17,6 @@ limitations under the License.
 package proxy
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -25,8 +24,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-
-	"golang.org/x/net/html"
 )
 
 func parseURLOrDie(inURL string) *url.URL {
@@ -35,19 +32,6 @@ func parseURLOrDie(inURL string) *url.URL {
 		panic(err)
 	}
 	return parsed
-}
-
-// fmtHTML parses and re-emits 'in', effectively canonicalizing it.
-func fmtHTML(in string) string {
-	doc, err := html.Parse(strings.NewReader(in))
-	if err != nil {
-		panic(err)
-	}
-	out := &bytes.Buffer{}
-	if err := html.Render(out, doc); err != nil {
-		panic(err)
-	}
-	return string(out.Bytes())
 }
 
 func TestProxyTransport(t *testing.T) {
@@ -77,7 +61,15 @@ func TestProxyTransport(t *testing.T) {
 			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
 			sourceURL:    "http://myminion.com/logs/log.log",
 			transport:    testTransport,
-			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
+			output:       `<pre><a href="kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
+			contentType:  "text/html",
+			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
+		},
+		"full document": {
+			input:        `<html><header></header><body><pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre></body></html>`,
+			sourceURL:    "http://myminion.com/logs/log.log",
+			transport:    testTransport,
+			output:       `<html><header></header><body><pre><a href="kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre></body></html>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
@@ -85,7 +77,7 @@ func TestProxyTransport(t *testing.T) {
 			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log/">google.log</a></pre>`,
 			sourceURL:    "http://myminion.com/logs/log.log",
 			transport:    testTransport,
-			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log/">google.log</a></pre>`,
+			output:       `<pre><a href="kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log/">google.log</a></pre>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
@@ -93,7 +85,7 @@ func TestProxyTransport(t *testing.T) {
 			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
 			sourceURL:    "http://myminion.com/logs/log.log",
 			transport:    testTransport,
-			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
+			output:       `<pre><a href="kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
 			contentType:  "text/html; charset=utf-8",
 			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
@@ -109,15 +101,15 @@ func TestProxyTransport(t *testing.T) {
 			input:        `<a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a>`,
 			sourceURL:    "http://myminion.com/whatever/apt/somelog.log",
 			transport:    testTransport2,
-			output:       `<a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/kubelet.log">kubelet.log</a><a href="https://foo.com/proxy/minion/minion1:8080/google.log">google.log</a>`,
+			output:       `<a href="kubelet.log">kubelet.log</a><a href="https://foo.com/proxy/minion/minion1:8080/google.log">google.log</a>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:8080/whatever/apt/somelog.log",
 		},
 		"image": {
-			input:        `<pre><img src="kubernetes.jpg"/></pre>`,
+			input:        `<pre><img src="kubernetes.jpg"/><img src="/kubernetes_abs.jpg"/></pre>`,
 			sourceURL:    "http://myminion.com/",
 			transport:    testTransport,
-			output:       `<pre><img src="http://foo.com/proxy/minion/minion1:10250/kubernetes.jpg"/></pre>`,
+			output:       `<pre><img src="kubernetes.jpg"/><img src="http://foo.com/proxy/minion/minion1:10250/kubernetes_abs.jpg"/></pre>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:10250/",
 		},
@@ -161,10 +153,6 @@ func TestProxyTransport(t *testing.T) {
 	}
 
 	testItem := func(name string, item *Item) {
-		// Canonicalize the html so we can diff.
-		item.input = fmtHTML(item.input)
-		item.output = fmtHTML(item.output)
-
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Check request headers.
 			if got, want := r.Header.Get("X-Forwarded-Uri"), item.forwardedURI; got != want {

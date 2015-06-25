@@ -37,8 +37,6 @@ import (
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -55,25 +53,18 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 	return obj, nil
 }
 
-// This creates a fake API version, similar to api/latest.go for a v1beta1 equivalent api. It is distinct
-// from the Kubernetes API versions to allow clients to properly distinguish the two.
+// This creates fake API versions, similar to api/latest.go.
 const testVersion = "version"
+const newVersion = "version2"
 
-// The equivalent of the Kubernetes v1beta3 API.
-const testVersion2 = "version2"
-
-var versions = []string{testVersion, testVersion2}
-var legacyCodec = runtime.CodecFor(api.Scheme, testVersion)
-var codec = runtime.CodecFor(api.Scheme, testVersion2)
-
-// these codecs reflect ListOptions/DeleteOptions coming from the serverAPIversion
-var versionServerCodec = runtime.CodecFor(api.Scheme, "v1beta1")
-var version2ServerCodec = runtime.CodecFor(api.Scheme, "v1beta3")
+var versions = []string{testVersion, newVersion}
+var codec = runtime.CodecFor(api.Scheme, testVersion)
+var newCodec = runtime.CodecFor(api.Scheme, newVersion)
 
 var accessor = meta.NewAccessor()
 var versioner runtime.ResourceVersioner = accessor
 var selfLinker runtime.SelfLinker = accessor
-var mapper, namespaceMapper, legacyNamespaceMapper meta.RESTMapper // The mappers with namespace and with legacy namespace scopes.
+var mapper, namespaceMapper meta.RESTMapper // The mappers with namespace and with legacy namespace scopes.
 var admissionControl admission.Interface
 var requestContextMapper api.RequestContextMapper
 
@@ -81,13 +72,13 @@ func interfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
 	case testVersion:
 		return &meta.VersionInterfaces{
-			Codec:            legacyCodec,
+			Codec:            codec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
-	case testVersion2:
+	case newVersion:
 		return &meta.VersionInterfaces{
-			Codec:            codec,
+			Codec:            newCodec,
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
@@ -109,53 +100,65 @@ func newMapper() *meta.DefaultRESTMapper {
 	)
 }
 
+func addTestTypes() {
+	type ListOptions struct {
+		runtime.Object
+		api.TypeMeta    `json:",inline"`
+		LabelSelector   string `json:"labels,omitempty"`
+		FieldSelector   string `json:"fields,omitempty"`
+		Watch           bool   `json:"watch,omitempty"`
+		ResourceVersion string `json:"resourceVersion,omitempty"`
+	}
+	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &api.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+}
+
+func addNewTestTypes() {
+	type ListOptions struct {
+		runtime.Object
+		api.TypeMeta    `json:",inline"`
+		LabelSelector   string `json:"labelSelector,omitempty"`
+		FieldSelector   string `json:"fieldSelector,omitempty"`
+		Watch           bool   `json:"watch,omitempty"`
+		ResourceVersion string `json:"resourceVersion,omitempty"`
+	}
+	api.Scheme.AddKnownTypes(newVersion, &Simple{}, &SimpleList{}, &api.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+}
+
 func init() {
 	// Certain API objects are returned regardless of the contents of storage:
 	// api.Status is returned in errors
 
 	// "internal" version
 	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{}, &api.Status{}, &api.ListOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
-	// "version" version
-	// TODO: Use versioned api objects?
-	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &v1beta1.Status{}, &SimpleGetOptions{}, &SimpleRoot{})
-	// "version2" version
-	// TODO: Use versioned api objects?
-	api.Scheme.AddKnownTypes(testVersion2, &Simple{}, &SimpleList{}, &v1beta3.Status{}, &SimpleGetOptions{}, &SimpleRoot{})
-
-	// Register SimpleGetOptions with the server versions to convert query params to it
-	api.Scheme.AddKnownTypes("v1beta1", &SimpleGetOptions{})
-	api.Scheme.AddKnownTypes("v1beta3", &SimpleGetOptions{})
+	addTestTypes()
+	addNewTestTypes()
 
 	nsMapper := newMapper()
-	legacyNsMapper := newMapper()
-	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources
+
+	// enumerate all supported versions, get the kinds, and register with
+	// the mapper how to address our resources
 	for _, version := range versions {
 		for kind := range api.Scheme.KnownTypes(version) {
-			mixedCase := true
 			root := kind == "SimpleRoot"
 			if root {
-				legacyNsMapper.Add(meta.RESTScopeRoot, kind, version, mixedCase)
-				nsMapper.Add(meta.RESTScopeRoot, kind, version, mixedCase)
+				nsMapper.Add(meta.RESTScopeRoot, kind, version, false)
 			} else {
-				legacyNsMapper.Add(meta.RESTScopeNamespaceLegacy, kind, version, mixedCase)
-				nsMapper.Add(meta.RESTScopeNamespace, kind, version, mixedCase)
+				nsMapper.Add(meta.RESTScopeNamespace, kind, version, false)
 			}
 		}
 	}
 
-	mapper = legacyNsMapper
-	legacyNamespaceMapper = legacyNsMapper
+	mapper = nsMapper
 	namespaceMapper = nsMapper
 	admissionControl = admit.NewAlwaysAdmit()
 	requestContextMapper = api.NewRequestContextMapper()
 
-	//mapper.(*meta.DefaultRESTMapper).Add(meta.RESTScopeNamespaceLegacy, "Simple", testVersion, false)
 	api.Scheme.AddFieldLabelConversionFunc(testVersion, "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	api.Scheme.AddFieldLabelConversionFunc(testVersion2, "Simple",
+	api.Scheme.AddFieldLabelConversionFunc(newVersion, "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
@@ -210,13 +213,13 @@ func handleInternal(legacy bool, storage map[string]rest.Storage, admissionContr
 	}
 	if legacy {
 		group.Version = testVersion
-		group.ServerVersion = "v1beta1"
-		group.Codec = legacyCodec
-		group.Mapper = legacyNamespaceMapper
-	} else {
-		group.Version = testVersion2
-		group.ServerVersion = "v1beta3"
+		group.ServerVersion = testVersion
 		group.Codec = codec
+		group.Mapper = namespaceMapper
+	} else {
+		group.Version = newVersion
+		group.ServerVersion = newVersion
+		group.Codec = newCodec
 		group.Mapper = namespaceMapper
 	}
 
@@ -227,7 +230,7 @@ func handleInternal(legacy bool, storage map[string]rest.Storage, admissionContr
 		panic(fmt.Sprintf("unable to install container %s: %v", group.Version, err))
 	}
 	ws := new(restful.WebService)
-	InstallSupport(mux, ws)
+	InstallSupport(mux, ws, false)
 	container.Add(ws)
 	return &defaultAPIServer{mux, group, container}
 }
@@ -604,20 +607,40 @@ func TestNotFound(t *testing.T) {
 		Status int
 	}
 	cases := map[string]T{
-		"PATCH method":                 {"PATCH", "/api/version/foo", http.StatusMethodNotAllowed},
-		"GET long prefix":              {"GET", "/api/", http.StatusNotFound},
-		"GET missing storage":          {"GET", "/api/version/blah", http.StatusNotFound},
-		"GET with extra segment":       {"GET", "/api/version/foo/bar/baz", http.StatusNotFound},
-		"POST with extra segment":      {"POST", "/api/version/foo/bar", http.StatusMethodNotAllowed},
-		"DELETE without extra segment": {"DELETE", "/api/version/foo", http.StatusMethodNotAllowed},
-		"DELETE with extra segment":    {"DELETE", "/api/version/foo/bar/baz", http.StatusNotFound},
-		"PUT without extra segment":    {"PUT", "/api/version/foo", http.StatusMethodNotAllowed},
-		"PUT with extra segment":       {"PUT", "/api/version/foo/bar/baz", http.StatusNotFound},
-		"watch missing storage":        {"GET", "/api/version/watch/", http.StatusNotFound},
-		"watch with bad method":        {"POST", "/api/version/watch/foo/bar", http.StatusMethodNotAllowed},
+		// Positive checks to make sure everything is wired correctly
+		"GET root": {"GET", "/api/version/simpleroots", http.StatusOK},
+		// TODO: JTL: "GET root item":       {"GET", "/api/version/simpleroots/bar", http.StatusOK},
+		"GET namespaced": {"GET", "/api/version/namespaces/ns/simples", http.StatusOK},
+		// TODO: JTL: "GET namespaced item": {"GET", "/api/version/namespaces/ns/simples/bar", http.StatusOK},
+
+		"GET long prefix": {"GET", "/api/", http.StatusNotFound},
+
+		"root PATCH method":           {"PATCH", "/api/version/simpleroots", http.StatusMethodNotAllowed},
+		"root GET missing storage":    {"GET", "/api/version/blah", http.StatusNotFound},
+		"root GET with extra segment": {"GET", "/api/version/simpleroots/bar/baz", http.StatusNotFound},
+		// TODO: JTL: "root POST with extra segment":      {"POST", "/api/version/simpleroots/bar", http.StatusMethodNotAllowed},
+		"root DELETE without extra segment": {"DELETE", "/api/version/simpleroots", http.StatusMethodNotAllowed},
+		"root DELETE with extra segment":    {"DELETE", "/api/version/simpleroots/bar/baz", http.StatusNotFound},
+		"root PUT without extra segment":    {"PUT", "/api/version/simpleroots", http.StatusMethodNotAllowed},
+		"root PUT with extra segment":       {"PUT", "/api/version/simpleroots/bar/baz", http.StatusNotFound},
+		"root watch missing storage":        {"GET", "/api/version/watch/", http.StatusNotFound},
+		// TODO: JTL: "root watch with bad method":        {"POST", "/api/version/watch/simpleroot/bar", http.StatusMethodNotAllowed},
+
+		"namespaced PATCH method":                 {"PATCH", "/api/version/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"namespaced GET long prefix":              {"GET", "/api/", http.StatusNotFound},
+		"namespaced GET missing storage":          {"GET", "/api/version/blah", http.StatusNotFound},
+		"namespaced GET with extra segment":       {"GET", "/api/version/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"namespaced POST with extra segment":      {"POST", "/api/version/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"namespaced DELETE without extra segment": {"DELETE", "/api/version/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"namespaced DELETE with extra segment":    {"DELETE", "/api/version/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"namespaced PUT without extra segment":    {"PUT", "/api/version/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"namespaced PUT with extra segment":       {"PUT", "/api/version/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"namespaced watch missing storage":        {"GET", "/api/version/watch/", http.StatusNotFound},
+		"namespaced watch with bad method":        {"POST", "/api/version/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
 	}
 	handler := handle(map[string]rest.Storage{
-		"foo": &SimpleRESTStorage{},
+		"simples":     &SimpleRESTStorage{},
+		"simpleroots": &SimpleRESTStorage{},
 	})
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -730,34 +753,56 @@ func TestList(t *testing.T) {
 		label     string
 		field     string
 	}{
+		// legacy namespace param is ignored
 		{
-			url:       "/api/version/simple",
+			url:       "/api/version/simple?namespace=",
 			namespace: "",
-			selfLink:  "/api/version/simple?namespace=",
+			selfLink:  "/api/version/simple",
 			legacy:    true,
 		},
 		{
 			url:       "/api/version/simple?namespace=other",
-			namespace: "other",
-			selfLink:  "/api/version/simple?namespace=other",
+			namespace: "",
+			selfLink:  "/api/version/simple",
 			legacy:    true,
 		},
 		{
 			url:       "/api/version/simple?namespace=other&labels=a%3Db&fields=c%3Dd",
+			namespace: "",
+			selfLink:  "/api/version/simple",
+			legacy:    true,
+			label:     "a=b",
+			field:     "c=d",
+		},
+		// legacy api version is honored
+		{
+			url:       "/api/version/simple",
+			namespace: "",
+			selfLink:  "/api/version/simple",
+			legacy:    true,
+		},
+		{
+			url:       "/api/version/namespaces/other/simple",
 			namespace: "other",
-			selfLink:  "/api/version/simple?namespace=other",
+			selfLink:  "/api/version/namespaces/other/simple",
+			legacy:    true,
+		},
+		{
+			url:       "/api/version/namespaces/other/simple?labels=a%3Db&fields=c%3Dd",
+			namespace: "other",
+			selfLink:  "/api/version/namespaces/other/simple",
 			legacy:    true,
 			label:     "a=b",
 			field:     "c=d",
 		},
 		// list items across all namespaces
 		{
-			url:       "/api/version/simple?namespace=",
+			url:       "/api/version/simple",
 			namespace: "",
-			selfLink:  "/api/version/simple?namespace=",
+			selfLink:  "/api/version/simple",
 			legacy:    true,
 		},
-		// list items in a namespace, v1beta3+
+		// list items in a namespace in the path
 		{
 			url:       "/api/version2/namespaces/default/simple",
 			namespace: "default",
@@ -888,10 +933,10 @@ func TestNonEmptyList(t *testing.T) {
 	if listOut.Items[0].Other != simpleStorage.list[0].Other {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
 	}
-	if listOut.SelfLink != "/api/version/simple?namespace=" {
+	if listOut.SelfLink != "/api/version/simple" {
 		t.Errorf("unexpected list self link: %#v", listOut)
 	}
-	expectedSelfLink := "/api/version/simple/something?namespace=other"
+	expectedSelfLink := "/api/version/namespaces/other/simple/something"
 	if listOut.Items[0].ObjectMeta.SelfLink != expectedSelfLink {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0].ObjectMeta.SelfLink, expectedSelfLink)
 	}
@@ -935,7 +980,7 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	if listOut.Items[0].Other != simpleStorage.list[0].Other {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
 	}
-	if listOut.SelfLink != "/api/version/simple?namespace=" {
+	if listOut.SelfLink != "/api/version/simple" {
 		t.Errorf("unexpected list self link: %#v", listOut)
 	}
 	expectedSelfLink := ""
@@ -973,7 +1018,7 @@ func TestGet(t *testing.T) {
 	}
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		expectedSet: "/api/version/simple/id?namespace=default",
+		expectedSet: "/api/version/namespaces/default/simple/id",
 		name:        "id",
 		namespace:   "default",
 	}
@@ -982,7 +1027,7 @@ func TestGet(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/simple/id")
+	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/id")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1014,7 +1059,7 @@ func TestGetBinary(t *testing.T) {
 	server := httptest.NewServer(handle(map[string]rest.Storage{"simple": &simpleStorage}))
 	defer server.Close()
 
-	req, _ := http.NewRequest("GET", server.URL+"/api/version/simple/binary", nil)
+	req, _ := http.NewRequest("GET", server.URL+"/api/version/namespaces/default/simple/binary", nil)
 	req.Header.Add("Accept", "text/other, */*")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -1047,7 +1092,7 @@ func TestGetWithOptions(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/simple/id?param1=test1&param2=test2")
+	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/id?param1=test1&param2=test2")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1089,7 +1134,7 @@ func TestGetWithOptionsAndPath(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/simple/id/a/different/path?param1=test1&param2=test2&atAPath=not")
+	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/id/a/different/path?param1=test1&param2=test2&atAPath=not")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1124,7 +1169,7 @@ func TestGetAlternateSelfLink(t *testing.T) {
 	}
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		expectedSet: "/api/version/simple/id?namespace=test",
+		expectedSet: "/api/version/namespaces/test/simple/id",
 		name:        "id",
 		namespace:   "test",
 	}
@@ -1133,7 +1178,7 @@ func TestGetAlternateSelfLink(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/simple/id?namespace=test")
+	resp, err := http.Get(server.URL + "/api/version/namespaces/test/simple/id")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1226,7 +1271,7 @@ func TestConnect(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/simple/" + itemID + "/connect")
+	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/" + itemID + "/connect")
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1264,7 +1309,7 @@ func TestConnectWithOptions(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/simple/" + itemID + "/connect?param1=value1&param2=value2")
+	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/" + itemID + "/connect?param1=value1&param2=value2")
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1311,7 +1356,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/api/version/simple/" + itemID + "/connect/" + testPath + "?param1=value1&param2=value2")
+	resp, err := http.Get(server.URL + "/api/version/namespaces/default/simple/" + itemID + "/connect/" + testPath + "?param1=value1&param2=value2")
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1352,7 +1397,7 @@ func TestDelete(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/simple/"+ID, nil)
+	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, nil)
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1378,13 +1423,13 @@ func TestDeleteWithOptions(t *testing.T) {
 	item := &api.DeleteOptions{
 		GracePeriodSeconds: &grace,
 	}
-	body, err := versionServerCodec.Encode(item)
+	body, err := codec.Encode(item)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1413,7 +1458,7 @@ func TestLegacyDelete(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/simple/"+ID, nil)
+	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, nil)
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1439,13 +1484,13 @@ func TestLegacyDeleteIgnoresOptions(t *testing.T) {
 	defer server.Close()
 
 	item := api.NewDeleteOptions(300)
-	body, err := versionServerCodec.Encode(item)
+	body, err := codec.Encode(item)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1471,7 +1516,7 @@ func TestDeleteInvokesAdmissionControl(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/simple/"+ID, nil)
+	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, nil)
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1493,7 +1538,7 @@ func TestDeleteMissing(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/api/version/simple/"+ID, nil)
+	request, err := http.NewRequest("DELETE", server.URL+"/api/version/namespaces/default/simple/"+ID, nil)
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1518,7 +1563,7 @@ func TestPatch(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		expectedSet: "/api/version/simple/" + ID + "?namespace=default",
+		expectedSet: "/api/version/namespaces/default/simple/" + ID,
 		name:        ID,
 		namespace:   api.NamespaceDefault,
 	}
@@ -1527,7 +1572,7 @@ func TestPatch(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("PATCH", server.URL+"/api/version/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	request, err := http.NewRequest("PATCH", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 	request.Header.Set("Content-Type", "application/merge-patch+json")
 	_, err = client.Do(request)
 	if err != nil {
@@ -1559,7 +1604,7 @@ func TestPatchRequiresMatchingName(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("PATCH", server.URL+"/api/version/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
+	request, err := http.NewRequest("PATCH", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
 	request.Header.Set("Content-Type", "application/merge-patch+json")
 	response, err := client.Do(request)
 	if err != nil {
@@ -1577,7 +1622,7 @@ func TestUpdate(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		expectedSet: "/api/version/simple/" + ID + "?namespace=default",
+		expectedSet: "/api/version/namespaces/default/simple/" + ID,
 		name:        ID,
 		namespace:   api.NamespaceDefault,
 	}
@@ -1599,7 +1644,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	_, err = client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1636,7 +1681,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1665,7 +1710,7 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1697,7 +1742,7 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1735,7 +1780,7 @@ func TestUpdateAllowsMismatchedNamespaceOnError(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	_, err = client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1772,7 +1817,7 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1806,7 +1851,7 @@ func TestUpdateMissing(t *testing.T) {
 	}
 
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/simple/"+ID, bytes.NewReader(body))
+	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/"+ID, bytes.NewReader(body))
 	response, err := client.Do(request)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1830,7 +1875,7 @@ func TestCreateNotFound(t *testing.T) {
 
 	simple := &Simple{Other: "foo"}
 	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/api/version/simple", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1853,7 +1898,7 @@ func TestCreateChecksDecode(t *testing.T) {
 
 	simple := &api.Pod{}
 	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/api/version/simple", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1888,9 +1933,9 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Context: requestContextMapper,
 		Mapper:  namespaceMapper,
 
-		Version:       testVersion2,
-		ServerVersion: "v1beta3",
-		Codec:         codec,
+		Version:       newVersion,
+		ServerVersion: newVersion,
+		Codec:         newCodec,
 	}
 	container := restful.NewContainer()
 	if err := group.InstallREST(container); err == nil {
@@ -1916,9 +1961,9 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Context: requestContextMapper,
 		Mapper:  namespaceMapper,
 
-		Version:       testVersion2,
-		ServerVersion: "v1beta3",
-		Codec:         codec,
+		Version:       newVersion,
+		ServerVersion: newVersion,
+		Codec:         newCodec,
 	}
 	container = restful.NewContainer()
 	if err := group.InstallREST(container); err != nil {
@@ -1956,7 +2001,7 @@ func TestCreateWithName(t *testing.T) {
 
 	simple := &Simple{Other: "foo"}
 	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/api/version/simple/"+pathName+"/sub", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/simple/"+pathName+"/sub", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1980,7 +2025,7 @@ func TestUpdateChecksDecode(t *testing.T) {
 
 	simple := &api.Pod{}
 	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("PUT", server.URL+"/api/version/simple/bar", bytes.NewBuffer(data))
+	request, err := http.NewRequest("PUT", server.URL+"/api/version/namespaces/default/simple/bar", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2039,7 +2084,7 @@ func TestCreate(t *testing.T) {
 		t:           t,
 		name:        "bar",
 		namespace:   "default",
-		expectedSet: "/api/version/foo/bar?namespace=default",
+		expectedSet: "/api/version/namespaces/default/foo/bar",
 	}
 	handler := handleLinker(map[string]rest.Storage{"foo": &storage}, selfLinker)
 	server := httptest.NewServer(handler)
@@ -2050,7 +2095,7 @@ func TestCreate(t *testing.T) {
 		Other: "bar",
 	}
 	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/api/version/foo", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/default/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2095,7 +2140,7 @@ func TestCreateInNamespace(t *testing.T) {
 		t:           t,
 		name:        "bar",
 		namespace:   "other",
-		expectedSet: "/api/version/foo/bar?namespace=other",
+		expectedSet: "/api/version/namespaces/other/foo/bar",
 	}
 	handler := handleLinker(map[string]rest.Storage{"foo": &storage}, selfLinker)
 	server := httptest.NewServer(handler)
@@ -2106,7 +2151,7 @@ func TestCreateInNamespace(t *testing.T) {
 		Other: "bar",
 	}
 	data, _ := codec.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/api/version/foo?namespace=other", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/api/version/namespaces/other/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2217,7 +2262,7 @@ func TestDelayReturnsError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/api/version/foo/bar", server.URL), nil, http.StatusConflict)
+	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/api/version/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
 	if status.Status != api.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != api.StatusReasonAlreadyExists {
 		t.Errorf("Unexpected status %#v", status)
 	}
@@ -2231,7 +2276,7 @@ func (*UnregisteredAPIObject) IsAnAPIObject() {}
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(http.StatusOK, codec, &UnregisteredAPIObject{"Undecodable"}, w)
+		writeJSON(http.StatusOK, codec, &UnregisteredAPIObject{"Undecodable"}, w, false)
 	}))
 	defer server.Close()
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)

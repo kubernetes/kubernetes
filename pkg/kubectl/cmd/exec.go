@@ -32,17 +32,20 @@ import (
 )
 
 const (
-	exec_example = `// get output from running 'date' in ruby-container from pod 123456-7890
-$ kubectl exec -p 123456-7890 -c ruby-container date
+	exec_example = `// get output from running 'date' from pod 123456-7890, using the first container by default
+$ kubectl exec 123456-7890 date
+	
+// get output from running 'date' in ruby-container from pod 123456-7890
+$ kubectl exec 123456-7890 -c ruby-container date
 
 //switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-780 and sends stdout/stderr from 'bash' back to the client
-$ kubectl exec -p 123456-7890 -c ruby-container -i -t -- bash -il`
+$ kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il`
 )
 
 func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	params := &execParams{}
 	cmd := &cobra.Command{
-		Use:     "exec -p POD -c CONTAINER -- COMMAND [args...]",
+		Use:     "exec POD -c CONTAINER -- COMMAND [args...]",
 		Short:   "Execute a command in a container.",
 		Long:    "Execute a command in a container.",
 		Example: exec_example,
@@ -52,10 +55,8 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 		},
 	}
 	cmd.Flags().StringVarP(&params.podName, "pod", "p", "", "Pod name")
-	cmd.MarkFlagRequired("pod")
 	// TODO support UID
 	cmd.Flags().StringVarP(&params.containerName, "container", "c", "", "Container name")
-	cmd.MarkFlagRequired("container")
 	cmd.Flags().BoolVarP(&params.stdin, "stdin", "i", false, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&params.tty, "tty", "t", false, "Stdin is a TTY")
 	return cmd
@@ -79,14 +80,29 @@ type execParams struct {
 	tty           bool
 }
 
-func RunExec(f *cmdutil.Factory, cmd *cobra.Command, cmdIn io.Reader, cmdOut, cmdErr io.Writer, p *execParams, args []string, re remoteExecutor) error {
-	if len(p.podName) == 0 {
-		return cmdutil.UsageError(cmd, "POD is required for exec")
+func extractPodAndContainer(cmd *cobra.Command, argsIn []string, p *execParams) (podName string, containerName string, args []string, err error) {
+	if len(p.podName) == 0 && len(argsIn) == 0 {
+		return "", "", nil, cmdutil.UsageError(cmd, "POD is required for exec")
 	}
+	if len(p.podName) != 0 {
+		printDeprecationWarning("exec POD", "-p POD")
+		podName = p.podName
+		if len(argsIn) < 1 {
+			return "", "", nil, cmdutil.UsageError(cmd, "COMMAND is required for exec")
+		}
+		args = argsIn
+	} else {
+		podName = argsIn[0]
+		args = argsIn[1:]
+		if len(args) < 1 {
+			return "", "", nil, cmdutil.UsageError(cmd, "COMMAND is required for exec")
+		}
+	}
+	return podName, p.containerName, args, nil
+}
 
-	if len(args) < 1 {
-		return cmdutil.UsageError(cmd, "COMMAND is required for exec")
-	}
+func RunExec(f *cmdutil.Factory, cmd *cobra.Command, cmdIn io.Reader, cmdOut, cmdErr io.Writer, p *execParams, argsIn []string, re remoteExecutor) error {
+	podName, containerName, args, err := extractPodAndContainer(cmd, argsIn, p)
 	namespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -97,17 +113,17 @@ func RunExec(f *cmdutil.Factory, cmd *cobra.Command, cmdIn io.Reader, cmdOut, cm
 		return err
 	}
 
-	pod, err := client.Pods(namespace).Get(p.podName)
+	pod, err := client.Pods(namespace).Get(podName)
 	if err != nil {
 		return err
 	}
 
 	if pod.Status.Phase != api.PodRunning {
-		glog.Fatalf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
+		glog.Fatalf("Unable to execute command because pod %s is not running. Current status=%v", podName, pod.Status.Phase)
 	}
 
-	containerName := p.containerName
 	if len(containerName) == 0 {
+		glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
 		containerName = pod.Spec.Containers[0].Name
 	}
 

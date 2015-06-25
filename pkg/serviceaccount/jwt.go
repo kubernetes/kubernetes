@@ -24,15 +24,16 @@ import (
 	"io/ioutil"
 	"strings"
 
-	jwt "github.com/dgrijalva/jwt-go"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang/glog"
 )
 
 const (
-	ServiceAccountUsernamePrefix    = "serviceaccount"
+	ServiceAccountUsernamePrefix    = "system:serviceaccount"
 	ServiceAccountUsernameSeparator = ":"
 
 	Issuer = "kubernetes/serviceaccount"
@@ -84,11 +85,15 @@ func MakeUsername(namespace, name string) string {
 // SplitUsername returns the namespace and ServiceAccount name embedded in the given username,
 // or an error if the username is not a valid name produced by MakeUsername
 func SplitUsername(username string) (string, string, error) {
-	parts := strings.Split(username, ServiceAccountUsernameSeparator)
-	if len(parts) != 3 || parts[0] != ServiceAccountUsernamePrefix || len(parts[1]) == 0 || len(parts[2]) == 0 {
+	if !strings.HasPrefix(username, ServiceAccountUsernamePrefix+ServiceAccountUsernameSeparator) {
 		return "", "", fmt.Errorf("Username must be in the form %s", MakeUsername("namespace", "name"))
 	}
-	return parts[1], parts[2], nil
+	username = strings.TrimPrefix(username, ServiceAccountUsernamePrefix+ServiceAccountUsernameSeparator)
+	parts := strings.Split(username, ServiceAccountUsernameSeparator)
+	if len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+		return "", "", fmt.Errorf("Username must be in the form %s", MakeUsername("namespace", "name"))
+	}
+	return parts[0], parts[1], nil
 }
 
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.
@@ -137,7 +142,7 @@ type jwtTokenAuthenticator struct {
 func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
 	var validationError error
 
-	for _, key := range j.keys {
+	for i, key := range j.keys {
 		// Attempt to verify with each key until we find one that works
 		parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
@@ -157,6 +162,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 				if (err.Errors & jwt.ValidationErrorSignatureInvalid) != 0 {
 					// Signature error, perhaps one of the other keys will verify the signature
 					// If not, we want to return this error
+					glog.V(4).Infof("Signature error (key %d): %v", i, err)
 					validationError = err
 					continue
 				}
@@ -200,18 +206,22 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 			// Make sure token hasn't been invalidated by deletion of the secret
 			secret, err := j.getter.GetSecret(namespace, secretName)
 			if err != nil {
+				glog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
 				return nil, false, errors.New("Token has been invalidated")
 			}
 			if bytes.Compare(secret.Data[api.ServiceAccountTokenKey], []byte(token)) != 0 {
+				glog.V(4).Infof("Token contents no longer matches %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
 				return nil, false, errors.New("Token does not match server's copy")
 			}
 
 			// Make sure service account still exists (name and UID)
 			serviceAccount, err := j.getter.GetServiceAccount(namespace, serviceAccountName)
 			if err != nil {
+				glog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, serviceAccountName, err)
 				return nil, false, err
 			}
 			if string(serviceAccount.UID) != serviceAccountUID {
+				glog.V(4).Infof("Service account UID no longer matches %s/%s: %q != %q", namespace, serviceAccountName, string(serviceAccount.UID), serviceAccountUID)
 				return nil, false, fmt.Errorf("ServiceAccount UID (%s) does not match claim (%s)", serviceAccount.UID, serviceAccountUID)
 			}
 		}

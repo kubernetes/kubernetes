@@ -17,6 +17,19 @@
 # exit on any error
 set -e
 
+# Set the host name explicitly
+# See: https://github.com/mitchellh/vagrant/issues/2430
+hostnamectl set-hostname ${MASTER_NAME}
+
+# Workaround to vagrant inability to guess interface naming sequence
+# Tell system to abandon the new naming scheme and use eth* instead
+rm -f /etc/sysconfig/network-scripts/ifcfg-enp0s3
+
+# Disable network interface being managed by Network Manager (needed for Fedora 21+)
+NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
+sed -i 's/^NM_CONTROLLED=no/#NM_CONTROLLED=no/' ${NETWORK_CONF_PATH}ifcfg-eth1
+systemctl restart network
+
 function release_not_found() {
   echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
   echo "are running from a clone of the git repo, please run ./build/release.sh." >&2
@@ -56,11 +69,14 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
   fi
 done
 echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
+echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
+
+# Configure the openvswitch network
+provision-network
 
 # Update salt configuration
 mkdir -p /etc/salt/minion.d
 cat <<EOF >/etc/salt/minion.d/master.conf
-master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
 master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
 auth_timeout: 10
 auth_tries: 2
@@ -82,11 +98,12 @@ grains:
   roles:
     - kubernetes-master
   runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
+  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
 EOF
 
 mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
-  portal_net: '$(echo "$PORTAL_NET" | sed -e "s/'/''/g")'
+  service_cluster_ip_range: '$(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
   cert_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   enable_cluster_monitoring: '$(echo "$ENABLE_CLUSTER_MONITORING" | sed -e "s/'/''/g")'
   enable_node_monitoring: '$(echo "$ENABLE_NODE_MONITORING" | sed -e "s/'/''/g")'
@@ -99,7 +116,7 @@ cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
   dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
   instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
-  admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'  
+  admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 EOF
 
 # Configure the salt-master
@@ -136,18 +153,40 @@ EOF
 # apiserver to send events.
 known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
 if [[ ! -f "${known_tokens_file}" ]]; then
-  kubelet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
-  kube_proxy_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
 
   mkdir -p /srv/salt-overlay/salt/kube-apiserver
   known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
   (umask u=rw,go= ;
-   echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file;
-   echo "$kube_proxy_token,kube_proxy,kube_proxy" >> $known_tokens_file)
+   echo "$KUBELET_TOKEN,kubelet,kubelet" > $known_tokens_file;
+   echo "$KUBE_PROXY_TOKEN,kube_proxy,kube_proxy" >> $known_tokens_file)
 
   mkdir -p /srv/salt-overlay/salt/kubelet
   kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
-  (umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
+  (umask u=rw,go= ; echo "{\"BearerToken\": \"$KUBELET_TOKEN\", \"Insecure\": true }" > $kubelet_auth_file)
+  kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+
+  mkdir -p /srv/salt-overlay/salt/kubelet
+  (umask 077;
+  cat > "${kubelet_kubeconfig_file}" << EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+  user:
+    token: ${KUBELET_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+contexts:
+  - context:
+    cluster: local
+    user: kubelet
+  name: service-account-context
+current-context: service-account-context
+EOF
+)
+
 
   mkdir -p /srv/salt-overlay/salt/kube-proxy
   kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
@@ -155,13 +194,13 @@ if [[ ! -f "${known_tokens_file}" ]]; then
   # TODO(etune): put apiserver certs into secret too, and reference from authfile,
   # so that "Insecure" is not needed.
   (umask 077;
-  cat > "${kube_proxy_kubeconfig_file}" <<EOF
+  cat > "${kube_proxy_kubeconfig_file}" << EOF
 apiVersion: v1
 kind: Config
 users:
 - name: kube-proxy
   user:
-    token: ${kube_proxy_token}
+    token: ${KUBE_PROXY_TOKEN}
 clusters:
 - name: local
   cluster:
@@ -216,7 +255,7 @@ external_auth:
       - .*
 rest_cherrypy:
   port: 8000
-  host: 127.0.0.1
+  host: ${MASTER_IP}
   disable_ssl: True
   webhook_disable_auth: True
 EOF
@@ -249,5 +288,5 @@ else
   # set up to run highstate as new minions join for the first time.
   echo "Executing configuration"
   salt '*' mine.update
-  salt --show-timeout --force-color '*' state.highstate
+  salt --force-color '*' state.highstate
 fi

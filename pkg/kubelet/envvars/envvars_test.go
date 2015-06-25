@@ -30,8 +30,8 @@ func TestFromServices(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo-bar"},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{"bar": "baz"},
-					PortalIP: "1.2.3.4",
+					Selector:  map[string]string{"bar": "baz"},
+					ClusterIP: "1.2.3.4",
 					Ports: []api.ServicePort{
 						{Port: 8080, Protocol: "TCP"},
 					},
@@ -40,8 +40,8 @@ func TestFromServices(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "abc-123"},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{"bar": "baz"},
-					PortalIP: "5.6.7.8",
+					Selector:  map[string]string{"bar": "baz"},
+					ClusterIP: "5.6.7.8",
 					Ports: []api.ServicePort{
 						{Name: "u-d-p", Port: 8081, Protocol: "UDP"},
 						{Name: "t-c-p", Port: 8081, Protocol: "TCP"},
@@ -51,8 +51,8 @@ func TestFromServices(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "q-u-u-x"},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{"bar": "baz"},
-					PortalIP: "9.8.7.6",
+					Selector:  map[string]string{"bar": "baz"},
+					ClusterIP: "9.8.7.6",
 					Ports: []api.ServicePort{
 						{Port: 8082, Protocol: "TCP"},
 						{Name: "8083", Port: 8083, Protocol: "TCP"},
@@ -60,20 +60,20 @@ func TestFromServices(t *testing.T) {
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "svrc-portalip-none"},
+				ObjectMeta: api.ObjectMeta{Name: "svrc-clusterip-none"},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{"bar": "baz"},
-					PortalIP: "None",
+					Selector:  map[string]string{"bar": "baz"},
+					ClusterIP: "None",
 					Ports: []api.ServicePort{
 						{Port: 8082, Protocol: "TCP"},
 					},
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "svrc-portalip-empty"},
+				ObjectMeta: api.ObjectMeta{Name: "svrc-clusterip-empty"},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{"bar": "baz"},
-					PortalIP: "",
+					Selector:  map[string]string{"bar": "baz"},
+					ClusterIP: "",
 					Ports: []api.ServicePort{
 						{Port: 8082, Protocol: "TCP"},
 					},

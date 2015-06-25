@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ReplicationController
+metadata: 
+  labels: 
+    name: influxGrafana
+    kubernetes.io/cluster-service: "true"
+  name: monitoring-influx-grafana-controller
+spec: 
+  replicas: 1
+  selector: 
+    name: influxGrafana
+  template: 
+    metadata: 
+      labels: 
+        name: influxGrafana
+        kubernetes.io/cluster-service: "true"
+    spec: 
+      containers: 
+        - image: gcr.io/google_containers/heapster_influxdb:v0.3
+          name: influxdb
+          ports: 
+            - containerPort: 8083
+              hostPort: 8083
+            - containerPort: 8086
+              hostPort: 8086
+        - image: gcr.io/google_containers/heapster_grafana:v0.7
+          name: grafana
+          env: 
+            - name: INFLUXDB_EXTERNAL_URL
+              value: /api/v1/proxy/namespaces/default/services/monitoring-grafana/db/
+            - name: INFLUXDB_HOST
+              value: monitoring-influxdb
+            - name: INFLUXDB_PORT
+              value: "8086"
+

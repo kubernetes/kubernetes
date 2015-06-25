@@ -1,4 +1,3 @@
-# Secret Distribution
 
 ## Abstract
 
@@ -123,7 +122,7 @@ We should consider what the best way to allow this is; there are a few different
 
 3.  Give secrets attributes that allow the user to express that the secret should be presented to
     the container as an environment variable.  The container's environment would contain the
-    desired values and the software in the container could use them without accomodation the
+    desired values and the software in the container could use them without accommodation the
     command or setup script.
 
 For our initial work, we will treat all secrets as files to narrow the problem space.  There will
@@ -148,7 +147,8 @@ have different preferences for the central store of secret data.  Some possibili
 
 1.  An etcd collection alongside the storage for other API resources
 2.  A collocated [HSM](http://en.wikipedia.org/wiki/Hardware_security_module)
-3.  An external datastore such as an external etcd, RDBMS, etc.
+3.  A secrets server like [Vault](https://www.vaultproject.io/) or [Keywhiz](https://square.github.io/keywhiz/)
+4.  An external datastore such as an external etcd, RDBMS, etc.
 
 #### Size limit for secrets
 
@@ -183,6 +183,11 @@ involved:
 For now, we will not implement validations around these limits.  Cluster operators will decide how
 much node storage is allocated to secrets. It will be the operator's responsibility to ensure that
 the allocated storage is sufficient for the workload scheduled onto a node.
+
+For now, kubelets will only attach secrets to api-sourced pods, and not file- or http-sourced
+ones.  Doing so would:
+  - confuse the secrets admission controller in the case of mirror pods.
+  - create an apiserver-liveness dependency -- avoiding this dependency is a main reason to use non-api-source pods.
 
 ### Use-Case: Kubelet read of secrets for node
 
@@ -389,12 +394,14 @@ To create a pod that uses an ssh key stored as a secret, we first need to create
 
 ```json
 {
-  "apiVersion": "v1beta2",
   "kind": "Secret",
-  "id": "ssh-key-secret",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "ssh-key-secret"
+  },
   "data": {
-    "id-rsa.pub": "dmFsdWUtMQ0K",
-    "id-rsa": "dmFsdWUtMg0KDQo="
+    "id-rsa": "dmFsdWUtMg0KDQo=",
+    "id-rsa.pub": "dmFsdWUtMQ0K"
   }
 }
 ```
@@ -407,38 +414,36 @@ Now we can create a pod which references the secret with the ssh key and consume
 
 ```json
 {
-  "id": "secret-test-pod",
   "kind": "Pod",
-  "apiVersion":"v1beta2",
-  "labels": {
-    "name": "secret-test"
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "secret-test-pod",
+    "labels": {
+      "name": "secret-test"
+    }
   },
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "secret-test-pod",
-      "containers": [{
+  "spec": {
+    "volumes": [
+      {
+        "name": "secret-volume",
+        "secret": {
+          "secretName": "ssh-key-secret"
+        }
+      }
+    ],
+    "containers": [
+      {
         "name": "ssh-test-container",
         "image": "mySshImage",
-        "volumeMounts": [{
-          "name": "secret-volume",
-          "mountPath": "/etc/secret-volume",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
-        "name": "secret-volume",
-        "source": {
-          "secret": {
-            "target": {
-              "kind": "Secret",
-              "namespace": "example",
-              "name": "ssh-key-secret"
-            }
+        "volumeMounts": [
+          {
+            "name": "secret-volume",
+            "readOnly": true,
+            "mountPath": "/etc/secret-volume"
           }
-        }
-      }]
-    }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -452,105 +457,116 @@ The container is then free to use the secret data to establish an ssh connection
 
 ### Use-Case: Pods with pod / test credentials
 
-Let's compare examples where a pod consumes a secret containing prod credentials and another pod
-consumes a secret with test environment credentials.
+This example illustrates a pod which consumes a secret containing prod
+credentials and another pod which consumes a secret with test environment
+credentials.
 
 The secrets:
 
 ```json
-[{
-  "apiVersion": "v1beta2",
-  "kind": "Secret",
-  "id": "prod-db-secret",
-  "data": {
-    "username": "dmFsdWUtMQ0K",
-    "password": "dmFsdWUtMg0KDQo="
-  }
-},
 {
-  "apiVersion": "v1beta2",
-  "kind": "Secret",
-  "id": "test-db-secret",
-  "data": {
-    "username": "dmFsdWUtMQ0K",
-    "password": "dmFsdWUtMg0KDQo="
-  }
-}]
+  "apiVersion": "v1",
+  "kind": "List",
+  "items":
+  [{
+    "kind": "Secret",
+    "apiVersion": "v1",
+    "metadata": {
+      "name": "prod-db-secret"
+    },
+    "data": {
+      "password": "dmFsdWUtMg0KDQo=",
+      "username": "dmFsdWUtMQ0K"
+    }
+  },
+  {
+    "kind": "Secret",
+    "apiVersion": "v1",
+    "metadata": {
+      "name": "test-db-secret"
+    },
+    "data": {
+      "password": "dmFsdWUtMg0KDQo=",
+      "username": "dmFsdWUtMQ0K"
+    }
+  }]
+}
 ```
 
 The pods:
 
 ```json
-[{
-  "id": "prod-db-client-pod",
-  "kind": "Pod",
-  "apiVersion":"v1beta2",
-  "labels": {
-    "name": "prod-db-client"
-  },
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "prod-db-pod",
-      "containers": [{
-        "name": "db-client-container",
-        "image": "myClientImage",
-        "volumeMounts": [{
-          "name": "secret-volume",
-          "mountPath": "/etc/secret-volume",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
-        "name": "secret-volume",
-        "source": {
-          "secret": {
-            "target": {
-              "kind": "Secret",
-              "namespace": "example",
-              "name": "prod-db-secret"
-            }
-          }
-        }
-      }]
-    }
-  }
-},
 {
-  "id": "test-db-client-pod",
-  "kind": "Pod",
-  "apiVersion":"v1beta2",
-  "labels": {
-    "name": "test-db-client"
-  },
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "test-db-pod",
-      "containers": [{
-        "name": "db-client-container",
-        "image": "myClientImage",
-        "volumeMounts": [{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items":
+  [{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+      "name": "prod-db-client-pod",
+      "labels": {
+        "name": "prod-db-client"
+      }
+    },
+    "spec": {
+      "volumes": [
+        {
           "name": "secret-volume",
-          "mountPath": "/etc/secret-volume",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
-        "name": "secret-volume",
-        "source": {
           "secret": {
-            "target": {
-              "kind": "Secret",
-              "namespace": "example",
-              "name": "test-db-secret"
-            }
+            "secretName": "prod-db-secret"
           }
         }
-      }]
+      ],
+      "containers": [
+        {
+          "name": "db-client-container",
+          "image": "myClientImage",
+          "volumeMounts": [
+            {
+              "name": "secret-volume",
+              "readOnly": true,
+              "mountPath": "/etc/secret-volume"
+            }
+          ]
+        }
+      ]
     }
-  }
-}]
+  },
+  {
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+      "name": "test-db-client-pod",
+      "labels": {
+        "name": "test-db-client"
+      }
+    },
+    "spec": {
+      "volumes": [
+        {
+          "name": "secret-volume",
+          "secret": {
+            "secretName": "test-db-secret"
+          }
+        }
+      ],
+      "containers": [
+        {
+          "name": "db-client-container",
+          "image": "myClientImage",
+          "volumeMounts": [
+            {
+              "name": "secret-volume",
+              "readOnly": true,
+              "mountPath": "/etc/secret-volume"
+            }
+          ]
+        }
+      ]
+    }
+  }]
+}
 ```
 
 The specs for the two pods differ only in the value of the object referred to by the secret volume

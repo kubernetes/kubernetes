@@ -18,6 +18,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -88,7 +89,12 @@ type ShortcutExpander struct {
 // mapper.
 func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
 	resource = expandResourceShortcut(resource)
-	return e.RESTMapper.VersionAndKindForResource(resource)
+	defaultVersion, kind, err = e.RESTMapper.VersionAndKindForResource(resource)
+	// TODO: remove this once v1beta1 and v1beta2 are deprecated
+	if err == nil && kind == "Minion" {
+		err = fmt.Errorf("Alias minion(s) is deprecated. Use node(s) instead")
+	}
+	return defaultVersion, kind, err
 }
 
 // expandResourceShortcut will return the expanded version of resource
@@ -100,7 +106,7 @@ func expandResourceShortcut(resource string) string {
 		"cs":     "componentstatuses",
 		"ev":     "events",
 		"limits": "limitRanges",
-		"mi":     "minions",
+		"no":     "nodes",
 		"po":     "pods",
 		"pv":     "persistentVolumes",
 		"pvc":    "persistentVolumeClaims",

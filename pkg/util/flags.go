@@ -19,14 +19,24 @@ package util
 import "strings"
 
 import "github.com/spf13/pflag"
+import "github.com/golang/glog"
 
+// WordSepNormalizeFunc changes all flags that contain "_" separators
 func WordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
-	from := []string{"-", "_"}
-	to := "."
-	for _, sep := range from {
-		name = strings.Replace(name, sep, to, -1)
+	if strings.Contains(name, "_") {
+		return pflag.NormalizedName(strings.Replace(name, "_", "-", -1))
 	}
-	// Type convert to indicate normalization has been done.
+	return pflag.NormalizedName(name)
+}
+
+// WarnWordSepNormalizeFunc changes and warns for flags that contain "_" separators
+func WarnWordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
+	if strings.Contains(name, "_") {
+		nname := strings.Replace(name, "_", "-", -1)
+		glog.Warningf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", name, nname)
+
+		return pflag.NormalizedName(nname)
+	}
 	return pflag.NormalizedName(name)
 }
 

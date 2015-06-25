@@ -13,6 +13,48 @@ crashes or scheduling changes).  This maps well to DNS, which has a long
 history of clients that, on purpose or on accident, do not respect DNS TTLs
 (see previous remark about Pod IPs changing).
 
+## Where does resolution work?
+Kubernetes Service DNS names can be resolved using standard methods (e.g. [`gethostbyname`](
+http://linux.die.net/man/3/gethostbyname)) inside any pod, except pods which
+have the `hostNet` field set to `true`.
+
+## Supported DNS schema
+The following sections detail the supported record types and layout that is
+supported.  Any other layout or names or queries that happen to work are
+considered implementation details and are subject to change without warning.
+
+### A records
+"Normal" (not headless) Services are assigned a DNS A record for a name of the
+form `my-svc.my-namespace.svc.cluster.local`.  This resolves to the cluster IP
+of the Service.
+
+"Headless" (without a cluster IP) Services are also assigned a DNS A record for
+a name of the form `my-svc.my-namespace.svc.cluster.local`.  Unlike normal
+Services, this resolves to the set of IPs of the pods selected by the Service.
+Clients are expected to consume the set or else use standard round-robin
+selection from the set.
+
+### SRV records
+SRV Records are created for named ports that are part of normal or Headless
+Services.
+For each named port, the SRV record would have the form
+`_my-port-name._my-port-protocol.my-svc.my-namespace.svc.cluster.local`.
+For a regular service, this resolves to the port number and the CNAME:
+`my-svc.my-namespace.svc.cluster.local`.
+For a headless service, this resolves to multiple answers, one for each pod
+that is backing the service, and contains the port number and a CNAME of the pod
+with the format `auto-generated-name.my-svc.my-namespace.svc.cluster.local`
+SRV records always contain the 'svc' segment in them and are not supported for
+old-style CNAMEs where the 'svc' segment was omitted.
+
+
+### Backwards compatibility
+Previous versions of kube-dns made names of the for
+`my-svc.my-namespace.cluster.local` (the 'svc' level was added later).  For
+compatibility, kube-dns supports both names for the time being.  Users should
+avoid creating a namespace named 'svc', to avoid conflicts.  The old name
+format is deprecated and will be removed in a future release.
+
 ## How do I find the DNS server?
 The DNS server itself runs as a Kubernetes Service.  This gives it a stable IP
 address.  When you run the SkyDNS service, you want to assign a static IP to use for
@@ -35,12 +77,12 @@ example, see `cluster/gce/config-default.sh`.
 ```shell
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 ```
 
 This enables DNS with a DNS Service IP of `10.0.0.10` and a local domain of
-`kubernetes.local`, served by a single copy of SkyDNS.
+`cluster.local`, served by a single copy of SkyDNS.
 
 If you are not using a supported cluster setup, you will have to replicate some
 of this yourself.  First, each kubelet needs to run with the following flags
@@ -58,20 +100,97 @@ Salt.  You will need to replace the `{{ <param> }}` blocks with your own values
 for the config variables mentioned above.  Other than the templating, these are
 normal kubernetes objects, and can be instantiated with `kubectl create`.
 
+## How do I test if it is working?
+First deploy DNS as described above.
+
+### 1 Create a simple Pod to use as a test environment.
+
+Create a file named busybox.yaml with the
+following contents:
+
+```yaml
+apiVersion: v1beta3
+kind: Pod
+metadata:
+  name: busybox
+  namespace: default
+spec:
+  containers:
+  - image: busybox
+    command:
+      - sleep
+      - "3600"
+    imagePullPolicy: IfNotPresent
+    name: busybox
+  restartPolicy: Always
+```
+
+Then create a pod using this file:
+
+```
+kubectl create -f busybox.yaml
+```
+
+### 2 Wait for this pod to go into the running state. 
+
+You can get its status with:
+```
+kubectl get pods busybox
+```
+
+You should see:
+```
+NAME      READY     REASON    RESTARTS   AGE
+busybox   1/1       Running   0          <some-time>
+```
+
+### 3 Validate DNS works
+Once that pod is running, you can exec nslookup in that environment:
+```
+kubectl exec busybox -- nslookup kubernetes
+```
+
+You should see something like:
+```
+Server:    10.0.0.10
+Address 1: 10.0.0.10
+
+Name:      kubernetes
+Address 1: 10.0.0.1
+```
+
+If you see that, DNS is working correctly.
+
+
 ## How does it work?
 SkyDNS depends on etcd for what to serve, but it doesn't really need all of
 what etcd offers (at least not in the way we use it).  For simplicty, we run
 etcd and SkyDNS together in a pod, and we do not try to link etcd instances
 across replicas.  A helper container called [kube2sky](kube2sky/) also runs in
 the pod and acts a bridge between Kubernetes and SkyDNS.  It finds the
-Kubernetes master through the `kubernetes-ro` service (via environment
+Kubernetes master through the `kubernetes` service (via environment
 variables), pulls service info from the master, and writes that to etcd for
 SkyDNS to find.
+
+## Inheriting DNS from the node
+When running a pod, kubelet will prepend the cluster DNS server and search
+paths to the node's own DNS settings.  If the node is able to resolve DNS names
+specific to the larger environment, pods should be able to, also.  See "Known
+issues" below for a caveat.
 
 ## Known issues
 Kubernetes installs do not configure the nodes' resolv.conf files to use the
 cluster DNS by default, because that process is inherently distro-specific.
 This should probably be implemented eventually.
+
+Linux's libc is impossibly stuck ([see this bug from
+2005](https://bugzilla.redhat.com/show_bug.cgi?id=168253)) with limits of just
+3 DNS `nameserver` records and 6 DNS `search` records.  Kubernetes needs to
+consume 1 `nameserver` record and 3 `search` records.  This means that if a
+local installation already uses 3 `nameserver`s or uses more than 3 `search`es,
+some of those settings will be lost.  As a partial workaround, the node can run
+`dnsmasq` which will provide more `nameserver` entries, but not more `search`
+entries.
 
 ## Making changes
 Please observe the release process for making changes to the `kube2sky`

@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
@@ -26,6 +27,7 @@ import (
 type RESTClient interface {
 	Get() *client.Request
 	Post() *client.Request
+	Patch(api.PatchType) *client.Request
 	Delete() *client.Request
 	Put() *client.Request
 }

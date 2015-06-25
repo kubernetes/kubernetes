@@ -23,8 +23,10 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestDeleteObjectByTuple(t *testing.T) {
@@ -110,13 +112,41 @@ func TestDeleteObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
 	if buf.String() != "replicationcontrollers/redis-master\n" {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestDeleteObjectNotFound(t *testing.T) {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdDelete(f, buf)
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("cascade", "false")
+	filenames := cmd.Flags().Lookup("filename").Value.(*util.StringList)
+	err := RunDelete(f, buf, cmd, []string{}, *filenames)
+	if err == nil || !errors.IsNotFound(err) {
+		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
 }
 
@@ -139,8 +169,9 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("cascade", "false")
+	cmd.Flags().Set("ignore-not-found", "true")
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "" {
@@ -171,8 +202,8 @@ func TestDeleteMultipleObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
@@ -181,7 +212,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 	}
 }
 
-func TestDeleteMultipleObjectIgnoreMissing(t *testing.T) {
+func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	_, svc, _ := testData()
 
 	f, tf, codec := NewAPIFactory()
@@ -204,10 +235,15 @@ func TestDeleteMultipleObjectIgnoreMissing(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("cascade", "false")
-	cmd.Run(cmd, []string{})
+	filenames := cmd.Flags().Lookup("filename").Value.(*util.StringList)
+	t.Logf("filenames: %v\n", filenames)
+	err := RunDelete(f, buf, cmd, []string{}, *filenames)
+	if err == nil || !errors.IsNotFound(err) {
+		t.Errorf("unexpected error: expected NotFound, got %v", err)
+	}
 
 	if buf.String() != "services/frontend\n" {
 		t.Errorf("unexpected output: %s", buf.String())

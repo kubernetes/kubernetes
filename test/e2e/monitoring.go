@@ -41,7 +41,7 @@ var _ = Describe("Monitoring", func() {
 		expectNoError(err)
 	})
 
-	It("verify monitoring pods and all cluster nodes are available on influxdb using heapster.", func() {
+	It("should verify monitoring pods and all cluster nodes are available on influxdb using heapster.", func() {
 		if !providerIs("gce") {
 			By(fmt.Sprintf("Skipping Monitoring test, which is only supported for provider gce (not %s)",
 				testContext.Provider))
@@ -56,17 +56,14 @@ const (
 	influxdbDatabaseName = "k8s"
 	influxdbUser         = "root"
 	influxdbPW           = "root"
-	podlistQuery         = "select distinct(pod_id) from /cpu.*/"
-	nodelistQuery        = "select distinct(hostname) from /cpu.*/"
+	podlistQuery         = "select distinct(pod_id) from \"cpu/usage_ns_cumulative\""
+	nodelistQuery        = "select distinct(hostname) from \"cpu/usage_ns_cumulative\""
 	sleepBetweenAttempts = 5 * time.Second
 	testTimeout          = 5 * time.Minute
 )
 
 var (
-	expectedRcs = map[string]bool{
-		"monitoring-heapster-controller":       false,
-		"monitoring-influx-grafana-controller": false,
-	}
+	rcLabels         = []string{"heapster", "influxGrafana"}
 	expectedServices = map[string]bool{
 		influxdbService:      false,
 		"monitoring-grafana": false,
@@ -74,17 +71,25 @@ var (
 )
 
 func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error) {
-	rcList, err := c.ReplicationControllers(api.NamespaceDefault).List(labels.Everything())
-	if err != nil {
-		return nil, err
-	}
 	expectedPods := []string{}
-	for _, rc := range rcList.Items {
-		if _, ok := expectedRcs[rc.Name]; ok {
-			if rc.Status.Replicas != 1 {
-				return nil, fmt.Errorf("expected to find only one replica for rc %q, found %d", rc.Name, rc.Status.Replicas)
-			}
-			expectedRcs[rc.Name] = true
+	// Iterate over the labels that identify the replication controllers that we
+	// want to check. The rcLabels contains the value values for the k8s-app key
+	// that identify the replication controllers that we want to check. Using a label
+	// rather than an explicit name is preferred because the names will typically have
+	// a version suffix e.g. heapster-monitoring-v1 and this will change after a rolling
+	// update e.g. to heapster-monitoring-v2. By using a label query we can check for the
+	// situaiton when a heapster-monitoring-v1 and heapster-monitoring-v2 replication controller
+	// is running (which would be an error except during a rolling update).
+	for _, rcLabel := range rcLabels {
+		rcList, err := c.ReplicationControllers(api.NamespaceDefault).List(labels.Set{"k8s-app": rcLabel}.AsSelector())
+		if err != nil {
+			return nil, err
+		}
+		if len(rcList.Items) != 1 {
+			return nil, fmt.Errorf("expected to find one replica for RC with label %s but got %d",
+				rcLabel, len(rcList.Items))
+		}
+		for _, rc := range rcList.Items {
 			podList, err := c.Pods(api.NamespaceDefault).List(labels.Set(rc.Spec.Selector).AsSelector(), fields.Everything())
 			if err != nil {
 				return nil, err
@@ -92,11 +97,6 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 			for _, pod := range podList.Items {
 				expectedPods = append(expectedPods, string(pod.UID))
 			}
-		}
-	}
-	for rc, found := range expectedRcs {
-		if !found {
-			return nil, fmt.Errorf("Replication Controller %q not found.", rc)
 		}
 	}
 	return expectedPods, nil
@@ -208,7 +208,7 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 	if !ok {
 		Failf("failed to get master http client")
 	}
-	proxyUrl := fmt.Sprintf("%s/api/v1beta3/proxy/namespaces/default/services/%s:api/", getMasterHost(), influxdbService)
+	proxyUrl := fmt.Sprintf("%s/api/v1/proxy/namespaces/default/services/%s:api/", getMasterHost(), influxdbService)
 	config := &influxdb.ClientConfig{
 		Host: proxyUrl,
 		// TODO(vishh): Infer username and pw from the Pod spec.

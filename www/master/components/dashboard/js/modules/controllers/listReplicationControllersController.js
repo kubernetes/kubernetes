@@ -36,12 +36,7 @@ app.controller('ListReplicationControllersCtrl', [
     $scope.thumbs = 'thumb';
     $scope.count = 10;
 
-    $scope.go = function(d) { $location.path('/dashboard/pods/' + d.id); };
-
-    $scope.moreClick = function(d, e) {
-      $location.path('/dashboard/pods/' + d.id);
-      e.stopPropagation();
-    };
+    $scope.go = function(data) { $location.path('/dashboard/replicationcontrollers/' + data.controller); };
 
     function handleError(data, status, headers, config) {
       console.log("Error (" + status + "): " + data);
@@ -50,7 +45,7 @@ app.controller('ListReplicationControllersCtrl', [
 
     $scope.content = [];
 
-    function getData(dataId) {
+    function getData() {
       $scope.loading = true;
       k8sApi.getReplicationControllers().success(function(data) {
         $scope.loading = false;
@@ -67,27 +62,26 @@ app.controller('ListReplicationControllersCtrl', [
 
           var _name = '', _image = '';
 
-          if (replicationController.desiredState.podTemplate.desiredState.manifest.containers) {
-            Object.keys(replicationController.desiredState.podTemplate.desiredState.manifest.containers)
+          if (replicationController.spec.template.spec.containers) {
+            Object.keys(replicationController.spec.template.spec.containers)
                 .forEach(function(key) {
-                  _name += replicationController.desiredState.podTemplate.desiredState.manifest.containers[key].name;
-                  _image += replicationController.desiredState.podTemplate.desiredState.manifest.containers[key].image;
+                  _name += replicationController.spec.template.spec.containers[key].name;
+                  _image += replicationController.spec.template.spec.containers[key].image;
                 });
           }
 
-          var _name_selector = '';
+          var _selectors = '';
 
-          if (replicationController.desiredState.replicaSelector) {
-            Object.keys(replicationController.desiredState.replicaSelector)
-                .forEach(function(key) { _name_selector += replicationController.desiredState.replicaSelector[key]; });
+          if (replicationController.spec.selector) {
+            _selectors = _.map(replicationController.spec.selector, function(v, k) { return k + '=' + v }).join(', ');
           }
 
           $scope.content.push({
-            controller: replicationController.id,
+            controller: replicationController.metadata.name,
             containers: _name,
             images: _image,
-            selector: _name_selector,
-            replicas: replicationController.currentState.replicas
+            selector: _selectors,
+            replicas: replicationController.status.replicas
           });
 
         });
@@ -95,7 +89,7 @@ app.controller('ListReplicationControllersCtrl', [
       }).error($scope.handleError);
     }
 
-    getData($routeParams.serviceId);
+    getData();
 
   }
 ]);

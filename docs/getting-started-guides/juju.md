@@ -1,17 +1,32 @@
-## Getting started with Juju
+Getting started with Juju
+-------------------------
 
 Juju handles provisioning machines and deploying complex systems to a
 wide number of clouds, supporting service orchestration once the bundle of
 services has been deployed.
 
+**Table of Contents**
 
-### Prerequisites
+- [Prerequisites](#prerequisites)
+   - [On Ubuntu](#on-ubuntu)
+   - [With Docker](#with-docker)
+- [Launch Kubernetes cluster](#launch-kubernetes-cluster)
+- [Exploring the cluster](#exploring-the-cluster)
+- [Run some containers!](#run-some-containers)
+- [Scale out cluster](#scale-out-cluster)
+- [Launch the "k8petstore" example app](#launch-the-k8petstore-example-app)
+- [Tear down cluster](#tear-down-cluster)
+- [More Info](#more-info)
+    - [Cloud compatibility](#cloud-compatibility)
+
+
+## Prerequisites
 
 > Note: If you're running kube-up, on ubuntu - all of the dependencies
 > will be handled for you. You may safely skip to the section:
 > [Launch Kubernetes Cluster](#launch-kubernetes-cluster)
 
-#### On Ubuntu
+### On Ubuntu
 
 [Install the Juju client](https://juju.ubuntu.com/install) on your
 local ubuntu system:
@@ -21,7 +36,7 @@ local ubuntu system:
     sudo apt-get install juju-core juju-quickstart
 
 
-#### With Docker
+### With Docker
 
 If you are not using ubuntu or prefer the isolation of docker, you may
 run the following:
@@ -89,33 +104,31 @@ No pods will be available before starting a container:
     kubectl get pods
     POD  CONTAINER(S)   IMAGE(S)   HOST  LABELS  STATUS
 
-    kubectl get replicationControllers
+    kubectl get replicationcontrollers
     CONTROLLER  CONTAINER(S)  IMAGE(S)  SELECTOR  REPLICAS
 
 We'll follow the aws-coreos example. Create a pod manifest: `pod.json`
 
 ```
 {
-  "id": "hello",
+  "apiVersion": "v1",
   "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "hello",
-      "containers": [{
-        "name": "hello",
-        "image": "quay.io/kelseyhightower/hello",
-        "ports": [{
-          "containerPort": 80,
-          "hostPort": 80
-        }]
-      }]
+  "metadata": {
+    "name": "hello",
+    "labels": {
+      "name": "hello",
+      "environment": "testing"
     }
   },
-  "labels": {
-    "name": "hello",
-    "environment": "testing"
+  "spec": {
+    "containers": [{
+      "name": "hello",
+      "image": "quay.io/kelseyhightower/hello",
+      "ports": [{
+        "containerPort": 80,
+        "hostPort": 80
+      }]
+    }]
   }
 }
 ```
@@ -130,9 +143,9 @@ Get info on the pod:
     kubectl get pods
 
 
-To test the hello app, we'll need to locate which minion is hosting
+To test the hello app, we need to locate which minion is hosting
 the container. Better tooling for using juju to introspect container
-is in the works but for let'suse `juju run` and `juju status` to find
+is in the works but we can use `juju run` and `juju status` to find
 our hello app.
 
 Exit out of our ssh session and run:
@@ -163,17 +176,14 @@ We can add minion units like so:
 
     juju add-unit docker # creates unit docker/2, kubernetes/2, docker-flannel/2
 
+## Launch the "k8petstore" example app
 
-## Launch the "petstore" example app
-
-The petstore example is available as a
+The [k8petstore example](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/k8petstore) is available as a
 [juju action](https://jujucharms.com/docs/devel/actions).
 
     juju action do kubernetes-master/0
 
-
-Note: this example includes curl statements to exercise the app.
-
+Note: this example includes curl statements to exercise the app, which automatically generates "petstore" transactions written to redis, and allows you to visualize the throughput in your browswer.
 
 ## Tear down cluster
 
@@ -182,7 +192,6 @@ Note: this example includes curl statements to exercise the app.
 or
 
     juju destroy-environment --force `juju env`
-
 
 ## More Info
 

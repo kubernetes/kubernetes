@@ -5,7 +5,7 @@
 Processes in Pods may need to call the Kubernetes API.  For example:
   - scheduler
   - replication controller
-  - minion controller
+  - node controller
   - a map-reduce type framework which has a controller that then tries to make a dynamically determined number of workers and watch them
   - continuous build and push system
   - monitoring system
@@ -13,7 +13,7 @@ Processes in Pods may need to call the Kubernetes API.  For example:
 They also may interact with services other than the Kubernetes API, such as:
   - an image repository, such as docker -- both when the images are pulled to start the containers, and for writing
     images in the case of pods that generate images.
-  - accessing other cloud services, such as blob storage, in the context of a larged, integrated, cloud offering (hosted
+  - accessing other cloud services, such as blob storage, in the context of a large, integrated, cloud offering (hosted
     or private).
   - accessing files in an NFS volume attached to the pod
 
@@ -149,7 +149,7 @@ First, if it finds pods which have a `Pod.Spec.ServiceAccountUsername` but no `P
 then it copies in the referenced securityContext and secrets references for the corresponding `serviceAccount`.
 
 Second, if ServiceAccount definitions change, it may take some actions.
-**TODO**: decide what actions it takes when a serviceAccount defintion changes.  Does it stop pods, or just
+**TODO**: decide what actions it takes when a serviceAccount definition changes.  Does it stop pods, or just
 allow someone to list ones that out out of spec?  In general, people may want to customize this?
 
 Third, if a new namespace is created, it may create a new serviceAccount for that namespace.  This may include

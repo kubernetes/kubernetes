@@ -18,19 +18,21 @@ package dockertools
 
 import (
 	"fmt"
-	"hash/adler32"
 	"math/rand"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/parsers"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -113,6 +115,22 @@ func parseImageName(image string) (string, string) {
 	return parsers.ParseRepositoryTag(image)
 }
 
+func filterHTTPError(err error, image string) error {
+	// docker/docker/pull/11314 prints detailed error info for docker pull.
+	// When it hits 502, it returns a verbose html output including an inline svg,
+	// which makes the output of kubectl get pods much harder to parse.
+	// Here converts such verbose output to a concise one.
+	jerr, ok := err.(*jsonmessage.JSONError)
+	if ok && (jerr.Code == http.StatusBadGateway ||
+		jerr.Code == http.StatusServiceUnavailable ||
+		jerr.Code == http.StatusGatewayTimeout) {
+		glog.V(2).Infof("Pulling image %q failed: %v", image, err)
+		return fmt.Errorf("image pull failed for %s because the registry is temporarily unavailbe.", image)
+	} else {
+		return err
+	}
+}
+
 func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 	repoToPull, tag := parseImageName(image)
 
@@ -149,7 +167,7 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 			return fmt.Errorf("image pull failed for %s, this may be because there are no credentials on this request.  details: (%v)", image, err)
 		}
 
-		return err
+		return filterHTTPError(err, image)
 	}
 
 	var pullErrs []error
@@ -160,7 +178,7 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 			return nil
 		}
 
-		pullErrs = append(pullErrs, err)
+		pullErrs = append(pullErrs, filterHTTPError(err, image))
 	}
 
 	return utilerrors.NewAggregate(pullErrs)
@@ -212,15 +230,9 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 
 const containerNamePrefix = "k8s"
 
-func HashContainer(container *api.Container) uint64 {
-	hash := adler32.New()
-	util.DeepHashObject(hash, *container)
-	return uint64(hash.Sum32())
-}
-
 // Creates a name which can be reversed to identify both full pod name and container name.
 func BuildDockerName(dockerName KubeletContainerName, container *api.Container) string {
-	containerName := dockerName.ContainerName + "." + strconv.FormatUint(HashContainer(container), 16)
+	containerName := dockerName.ContainerName + "." + strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	return fmt.Sprintf("%s_%s_%s_%s_%08x",
 		containerNamePrefix,
 		containerName,

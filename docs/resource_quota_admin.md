@@ -1,6 +1,6 @@
 # Administering Resource Quotas
 
-Kubernetes can limit the both number of objects created in a namespace, and the
+Kubernetes can limit both the number of objects created in a namespace, and the
 total amount of resources requested by pods in a namespace.  This facilitates
 sharing of a single Kubernetes cluster by several teams or tenants, each in
 a namespace.
@@ -9,7 +9,7 @@ a namespace.
 
 Resource Quota support is enabled by default for many kubernetes distributions.  It is
 enabled when the apiserver `--admission_control=` flag has `ResourceQuota` as
-one of its arguments.  
+one of its arguments.
 
 Resource Quota is enforced in a particular namespace when there is a
 `ResourceQuota` object in that namespace.  There should be at most one
@@ -54,7 +54,7 @@ Kubectl supports creating, updating, and viewing quotas
 $ kubectl namespace myspace
 $ cat <<EOF > quota.json
 {
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "kind": "ResourceQuota",
   "metadata": {
     "name": "quota",
@@ -89,7 +89,7 @@ services                3       5
 
 ## Quota and Cluster Capacity
 Resource Quota objects are independent of the Cluster Capacity.  They are
-expressed in absolute units.  
+expressed in absolute units.
 
 Sometimes more complex policies may be desired, such as:
   - proportionally divide total cluster resources among several teams.
@@ -97,7 +97,7 @@ Sometimes more complex policies may be desired, such as:
     limit to prevent accidental resource exhaustion.
 
 Such policies could be implemented using ResourceQuota as a building-block, by
-writing a controller which watches the quota usage and adjusts the quota
+writing a 'controller' which watches the quota usage and adjusts the quota
 hard limits of each namespace.
 
 

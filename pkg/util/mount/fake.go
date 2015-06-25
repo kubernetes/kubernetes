@@ -22,6 +22,8 @@ type FakeMounter struct {
 	Log         []FakeAction
 }
 
+var _ Interface = &FakeMounter{}
+
 // Values for FakeAction.Action
 const FakeActionMount = "mount"
 const FakeActionUnmount = "unmount"

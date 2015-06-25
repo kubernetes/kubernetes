@@ -72,13 +72,6 @@ type Request struct {
 	baseURL *url.URL
 	codec   runtime.Codec
 
-	// If true, add "?namespace=<namespace>" as a query parameter, if false put namespaces/<namespace> in path
-	// Query parameter is considered legacy behavior
-	namespaceInQuery bool
-	// If true, lowercase resource prior to inserting into a path, if false, leave it as is. Preserving
-	// case is considered legacy behavior.
-	preserveResourceCase bool
-
 	// generic components accessible via method setters
 	path    string
 	subpath string
@@ -107,7 +100,7 @@ type Request struct {
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
 func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion string,
-	codec runtime.Codec, namespaceInQuery bool, preserveResourceCase bool) *Request {
+	codec runtime.Codec) *Request {
 	metrics.Register()
 	return &Request{
 		client:     client,
@@ -115,10 +108,7 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion str
 		baseURL:    baseURL,
 		path:       baseURL.Path,
 		apiVersion: apiVersion,
-
-		codec:                codec,
-		namespaceInQuery:     namespaceInQuery,
-		preserveResourceCase: preserveResourceCase,
+		codec:      codec,
 	}
 }
 
@@ -210,6 +200,23 @@ func (r *Request) NamespaceIfScoped(namespace string, scoped bool) *Request {
 	return r
 }
 
+// UnversionedPath strips the apiVersion from the baseURL before appending segments.
+func (r *Request) UnversionedPath(segments ...string) *Request {
+	if r.err != nil {
+		return r
+	}
+	upath := path.Clean(r.baseURL.Path)
+	//TODO(jdef) this is a pretty hackish version test
+	if strings.HasPrefix(path.Base(upath), "v") {
+		upath = path.Dir(upath)
+		if upath == "." {
+			upath = "/"
+		}
+	}
+	r.path = path.Join(append([]string{upath}, segments...)...)
+	return r
+}
+
 // AbsPath overwrites an existing path with the segments provided. Trailing slashes are preserved
 // when a single segment is passed.
 func (r *Request) AbsPath(segments ...string) *Request {
@@ -253,8 +260,18 @@ const (
 	// Will be automatically emitted as the correct name for the API version.
 	NodeUnschedulable = "spec.unschedulable"
 	ObjectNameField   = "metadata.name"
-	PodHost           = "spec.host"
+	PodHost           = "spec.nodeName"
 	SecretType        = "type"
+
+	EventReason                  = "reason"
+	EventSource                  = "source"
+	EventInvolvedKind            = "involvedObject.kind"
+	EventInvolvedNamespace       = "involvedObject.namespace"
+	EventInvolvedName            = "involvedObject.name"
+	EventInvolvedUID             = "involvedObject.uid"
+	EventInvolvedAPIVersion      = "involvedObject.apiVersion"
+	EventInvolvedResourceVersion = "involvedObject.resourceVersion"
+	EventInvolvedFieldPath       = "involvedObject.fieldPath"
 )
 
 type clientFieldNameToAPIVersionFieldName map[string]string
@@ -295,44 +312,6 @@ func (v versionToResourceToFieldMapping) filterField(apiVersion, resourceType, f
 }
 
 var fieldMappings = versionToResourceToFieldMapping{
-	"v1beta1": resourceTypeToFieldMapping{
-		"nodes": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   "name",
-			NodeUnschedulable: "unschedulable",
-		},
-		"minions": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   "name",
-			NodeUnschedulable: "unschedulable",
-		},
-		"pods": clientFieldNameToAPIVersionFieldName{
-			PodHost: "DesiredState.Host",
-		},
-		"secrets": clientFieldNameToAPIVersionFieldName{
-			SecretType: "type",
-		},
-		"serviceAccounts": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "name",
-		},
-	},
-	"v1beta2": resourceTypeToFieldMapping{
-		"nodes": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   "name",
-			NodeUnschedulable: "unschedulable",
-		},
-		"minions": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField:   "name",
-			NodeUnschedulable: "unschedulable",
-		},
-		"pods": clientFieldNameToAPIVersionFieldName{
-			PodHost: "DesiredState.Host",
-		},
-		"secrets": clientFieldNameToAPIVersionFieldName{
-			SecretType: "type",
-		},
-		"serviceAccounts": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "name",
-		},
-	},
 	"v1beta3": resourceTypeToFieldMapping{
 		"nodes": clientFieldNameToAPIVersionFieldName{
 			ObjectNameField:   "metadata.name",
@@ -351,12 +330,60 @@ var fieldMappings = versionToResourceToFieldMapping{
 		"serviceAccounts": clientFieldNameToAPIVersionFieldName{
 			ObjectNameField: "metadata.name",
 		},
+		"endpoints": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "metadata.name",
+		},
+		"events": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:              "metadata.name",
+			EventReason:                  "reason",
+			EventSource:                  "source",
+			EventInvolvedKind:            "involvedObject.kind",
+			EventInvolvedNamespace:       "involvedObject.namespace",
+			EventInvolvedName:            "involvedObject.name",
+			EventInvolvedUID:             "involvedObject.uid",
+			EventInvolvedAPIVersion:      "involvedObject.apiVersion",
+			EventInvolvedResourceVersion: "involvedObject.resourceVersion",
+			EventInvolvedFieldPath:       "involvedObject.fieldPath",
+		},
+	},
+	"v1": resourceTypeToFieldMapping{
+		"nodes": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:   "metadata.name",
+			NodeUnschedulable: "spec.unschedulable",
+		},
+		"pods": clientFieldNameToAPIVersionFieldName{
+			PodHost: "spec.nodeName",
+		},
+		"secrets": clientFieldNameToAPIVersionFieldName{
+			SecretType: "type",
+		},
+		"serviceAccounts": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "metadata.name",
+		},
+		"endpoints": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "metadata.name",
+		},
+		"events": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField:              "metadata.name",
+			EventReason:                  "reason",
+			EventSource:                  "source",
+			EventInvolvedKind:            "involvedObject.kind",
+			EventInvolvedNamespace:       "involvedObject.namespace",
+			EventInvolvedName:            "involvedObject.name",
+			EventInvolvedUID:             "involvedObject.uid",
+			EventInvolvedAPIVersion:      "involvedObject.apiVersion",
+			EventInvolvedResourceVersion: "involvedObject.resourceVersion",
+			EventInvolvedFieldPath:       "involvedObject.fieldPath",
+		},
 	},
 }
 
 // FieldsSelectorParam adds the given selector as a query parameter with the name paramName.
 func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 	if r.err != nil {
+		return r
+	}
+	if s == nil {
 		return r
 	}
 	if s.Empty() {
@@ -375,6 +402,9 @@ func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 // LabelsSelectorParam adds the given selector as a query parameter
 func (r *Request) LabelsSelectorParam(s labels.Selector) *Request {
 	if r.err != nil {
+		return r
+	}
+	if s == nil {
 		return r
 	}
 	if s.Empty() {
@@ -446,8 +476,10 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
+		glog.V(8).Infof("Request Body: %s", string(data))
 		r.body = bytes.NewBuffer(data)
 	case []byte:
+		glog.V(8).Infof("Request Body: %s", string(t))
 		r.body = bytes.NewBuffer(t)
 	case io.Reader:
 		r.body = t
@@ -457,6 +489,7 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
+		glog.V(8).Infof("Request Body: %s", string(data))
 		r.body = bytes.NewBuffer(data)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
@@ -467,15 +500,11 @@ func (r *Request) Body(obj interface{}) *Request {
 // URL returns the current working URL.
 func (r *Request) URL() *url.URL {
 	p := r.path
-	if r.namespaceSet && !r.namespaceInQuery && len(r.namespace) > 0 {
+	if r.namespaceSet && len(r.namespace) > 0 {
 		p = path.Join(p, "namespaces", r.namespace)
 	}
 	if len(r.resource) != 0 {
-		resource := r.resource
-		if !r.preserveResourceCase {
-			resource = strings.ToLower(resource)
-		}
-		p = path.Join(p, resource)
+		p = path.Join(p, strings.ToLower(r.resource))
 	}
 	// Join trims trailing slashes, so preserve r.path's trailing slash for backwards compat if nothing was changed
 	if len(r.resourceName) != 0 || len(r.subpath) != 0 || len(r.subresource) != 0 {
@@ -495,10 +524,6 @@ func (r *Request) URL() *url.URL {
 		}
 	}
 
-	if r.namespaceSet && r.namespaceInQuery {
-		query.Set("namespace", r.namespace)
-	}
-
 	// timeout is handled specially here.
 	if r.timeout != 0 {
 		query.Set("timeout", r.timeout.String())
@@ -507,12 +532,25 @@ func (r *Request) URL() *url.URL {
 	return finalURL
 }
 
-// finalURLTemplate is similar to URL(), but if the request contains name of an object
-// (e.g. GET for a specific Pod) it will be substited with "<name>".
-func (r *Request) finalURLTemplate() string {
+// finalURLTemplate is similar to URL(), but will make all specific parameter values equal
+// - instead of name or namespace, "{name}" and "{namespace}" will be used, and all query
+// parameters will be reset. This creates a copy of the request so as not to change the
+// underyling object.  This means some useful request info (like the types of field
+// selectors in use) will be lost.
+// TODO: preserve field selector keys
+func (r Request) finalURLTemplate() string {
 	if len(r.resourceName) != 0 {
-		r.resourceName = "<name>"
+		r.resourceName = "{name}"
 	}
+	if r.namespaceSet && len(r.namespace) != 0 {
+		r.namespace = "{namespace}"
+	}
+	newParams := url.Values{}
+	v := []string{"{value}"}
+	for k := range r.params {
+		newParams[k] = v
+	}
+	r.params = newParams
 	return r.URL().String()
 }
 
@@ -738,6 +776,8 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			body = data
 		}
 	}
+	glog.V(8).Infof("Response Body: %s", string(body))
+
 	// Did the server give us a status response?
 	isStatusResponse := false
 	var status api.Status
@@ -793,6 +833,8 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 			body = data
 		}
 	}
+	glog.V(8).Infof("Response Body: %s", string(body))
+
 	message := "unknown"
 	if isTextResponse(resp) {
 		message = strings.TrimSpace(string(body))

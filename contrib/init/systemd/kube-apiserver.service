@@ -18,6 +18,7 @@ ExecStart=/usr/bin/kube-apiserver \
 	    $KUBE_ADMISSION_CONTROL \
 	    $KUBE_API_ARGS
 Restart=on-failure
+Type=notify
 LimitNOFILE=65536
 
 [Install]

@@ -210,7 +210,7 @@ __custom_func() {
 	    __kubectl_get_resource
             return
             ;;
-	kubectl_log)
+	kubectl_logs)
 	    __kubectl_require_pod_and_container
 	    return
 	    ;;
@@ -229,8 +229,11 @@ _kubectl_get()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--all-namespaces")
     flags+=("--help")
     flags+=("-h")
+    flags+=("--label-columns=")
+    two_word_flags+=("-L")
     flags+=("--no-headers")
     flags+=("--output=")
     two_word_flags+=("-o")
@@ -274,11 +277,14 @@ _kubectl_describe()
 
     flags+=("--help")
     flags+=("-h")
+    flags+=("--selector=")
+    two_word_flags+=("-l")
 
     must_have_one_flag=()
     must_have_one_noun=()
     must_have_one_noun+=("limitrange")
     must_have_one_noun+=("minion")
+    must_have_one_noun+=("namespace")
     must_have_one_noun+=("node")
     must_have_one_noun+=("persistentvolume")
     must_have_one_noun+=("persistentvolumeclaim")
@@ -363,8 +369,10 @@ _kubectl_delete()
     flags+=("--grace-period=")
     flags+=("--help")
     flags+=("-h")
+    flags+=("--ignore-not-found")
     flags+=("--selector=")
     two_word_flags+=("-l")
+    flags+=("--timeout=")
 
     must_have_one_flag=()
     must_have_one_noun=()
@@ -387,9 +395,9 @@ _kubectl_namespace()
     must_have_one_noun=()
 }
 
-_kubectl_log()
+_kubectl_logs()
 {
-    last_command="kubectl_log"
+    last_command="kubectl_logs"
     commands=()
 
     flags=()
@@ -441,9 +449,9 @@ _kubectl_rolling-update()
     must_have_one_noun=()
 }
 
-_kubectl_resize()
+_kubectl_scale()
 {
-    last_command="kubectl_resize"
+    last_command="kubectl_scale"
     commands=()
 
     flags=()
@@ -484,10 +492,6 @@ _kubectl_exec()
     flags+=("-t")
 
     must_have_one_flag=()
-    must_have_one_flag+=("--container=")
-    must_have_one_flag+=("-c")
-    must_have_one_flag+=("--pod=")
-    must_have_one_flag+=("-p")
     must_have_one_noun=()
 }
 
@@ -522,11 +526,16 @@ _kubectl_proxy()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--accept-hosts=")
+    flags+=("--accept-paths=")
     flags+=("--api-prefix=")
+    flags+=("--disable-filter")
     flags+=("--help")
     flags+=("-h")
     flags+=("--port=")
     two_word_flags+=("-p")
+    flags+=("--reject-methods=")
+    flags+=("--reject-paths=")
     flags+=("--www=")
     two_word_flags+=("-w")
     flags+=("--www-prefix=")
@@ -536,9 +545,9 @@ _kubectl_proxy()
     must_have_one_noun=()
 }
 
-_kubectl_run-container()
+_kubectl_run()
 {
-    last_command="kubectl_run-container"
+    last_command="kubectl_run"
     commands=()
 
     flags=()
@@ -590,8 +599,10 @@ _kubectl_stop()
     flags+=("--grace-period=")
     flags+=("--help")
     flags+=("-h")
+    flags+=("--ignore-not-found")
     flags+=("--selector=")
     two_word_flags+=("-l")
+    flags+=("--timeout=")
 
     must_have_one_flag=()
     must_have_one_noun=()
@@ -615,6 +626,7 @@ _kubectl_expose()
     flags+=("-h")
     flags+=("--labels=")
     two_word_flags+=("-l")
+    flags+=("--name=")
     flags+=("--no-headers")
     flags+=("--output=")
     two_word_flags+=("-o")
@@ -624,10 +636,10 @@ _kubectl_expose()
     flags+=("--protocol=")
     flags+=("--public-ip=")
     flags+=("--selector=")
-    flags+=("--service-name=")
     flags+=("--target-port=")
     flags+=("--template=")
     two_word_flags+=("-t")
+    flags+=("--type=")
 
     must_have_one_flag=()
     must_have_one_flag+=("--port=")
@@ -893,13 +905,13 @@ _kubectl()
     commands+=("update")
     commands+=("delete")
     commands+=("namespace")
-    commands+=("log")
+    commands+=("logs")
     commands+=("rolling-update")
-    commands+=("resize")
+    commands+=("scale")
     commands+=("exec")
     commands+=("port-forward")
     commands+=("proxy")
-    commands+=("run-container")
+    commands+=("run")
     commands+=("stop")
     commands+=("expose")
     commands+=("label")
@@ -924,9 +936,9 @@ _kubectl()
     flags+=("-h")
     flags+=("--insecure-skip-tls-verify")
     flags+=("--kubeconfig=")
-    flags+=("--log_backtrace_at=")
-    flags+=("--log_dir=")
-    flags+=("--log_flush_frequency=")
+    flags+=("--log-backtrace-at=")
+    flags+=("--log-dir=")
+    flags+=("--log-flush-frequency=")
     flags+=("--logtostderr")
     flags+=("--match-server-version")
     flags+=("--namespace=")

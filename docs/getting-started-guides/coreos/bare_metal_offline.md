@@ -1,6 +1,28 @@
-# Bare Metal CoreOS with Kubernetes (OFFLINE)
+Bare Metal CoreOS with Kubernetes (OFFLINE)
+------------------------------------------
 Deploy a CoreOS running Kubernetes environment. This particular guild is made to help those in an OFFLINE system, wither for testing a POC before the real deal, or you are restricted to be totally offline for your applications.
 
+**Table of Contents**
+
+- [Prerequisites](#prerequisites)
+- [High Level Design](#high-level-design)
+- [This Guides variables](#this-guides-variables)
+- [Setup PXELINUX CentOS](#setup-pxelinux-centos)
+- [Adding CoreOS to PXE](#adding-coreos-to-pxe)
+- [DHCP configuration](#dhcp-configuration)
+- [Kubernetes](#kubernetes)
+- [Cloud Configs](#cloud-configs)
+    - [master.yml](#masteryml)
+    - [node.yml](#nodeyml)
+- [New pxelinux.cfg file](#new-pxelinuxcfg-file)
+- [Specify the pxelinux targets](#specify-the-pxelinux-targets)
+- [Creating test pod](#creating-test-pod)
+- [Helping commands for debugging](#helping-commands-for-debugging)
+
+
+## Prerequisites
+1. Installed *CentOS 6* for PXE server
+2. At least two bare metal nodes to work with
 
 ## High Level Design
 1. Manage the tftp directory 
@@ -11,10 +33,6 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 4. Setup nodes to deploy CoreOS creating a etcd cluster. 
 5. Have no access to the public [etcd discovery tool](https://discovery.etcd.io/). 
 6. Installing the CoreOS slaves to become Kubernetes minions.
-
-## Pre-requisites
-1. Installed *CentOS 6* for PXE server
-2. At least two bare metal nodes to work with
 
 ## This Guides variables
 | Node Description              | MAC               | IP          |
@@ -159,7 +177,7 @@ This section covers configuring the DHCP server to hand out our new images. In t
 
 We will be specifying the node configuration later in the guide.
 
-# Kubernetes
+## Kubernetes
 To deploy our configuration we need to create an ```etcd``` master. To do so we want to pxe CoreOS with a specific cloud-config.yml. There are two options we have here. 
 1. Is to template the cloud config file and programmatically create new static configs for different cluster setups.
 2. Have a service discovery protocol running in our stack to do auto discovery.
@@ -363,7 +381,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             ExecStart=/opt/bin/kube-apiserver \
             --address=0.0.0.0 \
             --port=8080 \
-            --portal_net=10.100.0.0/16 \
+            --service-cluster-ip-range=10.100.0.0/16 \
             --etcd_servers=http://127.0.0.1:4001 \
             --logtostderr=true
             Restart=always
@@ -602,46 +620,9 @@ Reboot these servers to get the images PXEd and ready for running containers!
 ## Creating test pod
 Now that the CoreOS with Kubernetes installed is up and running lets spin up some Kubernetes pods to demonstrate the system.
 
-Here is a fork where you can do a full walk through by using [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough), or use the following example for a quick test.
+See [a simple nginx example](../../../examples/simple-nginx.md) to try out your new cluster.
 
-
-On the Kubernetes Master node lets create a '''nginx.yml'''
-    
-    apiVersion: v1beta1
-    kind: Pod
-    id: www
-    desiredState:
-      manifest:
-        version: v1beta1
-        id: www
-        containers:
-          - name: nginx
-            image: nginx
-    
-
-Now for the service: ```nginx-service.yml```
-    
-    kind: Service
-    apiVersion: v1beta1
-    # must be a DNS compatible name
-    id: nginx-example
-    # the port that this service should serve on
-    port: 80
-    # just like the selector in the replication controller,
-    # but this time it identifies the set of pods to load balance
-    # traffic to.
-    selector:
-      name: www
-    # the container on each pod to connect to, can be a name
-    # (e.g. 'www') or a number (e.g. 80)
-    containerPort: 80
-
-Now add the pod to Kubernetes:
-
-     kubectl create -f nginx.yml
-
-This might take a while to download depending on the environment.
-    
+For more complete applications, please look in the [examples directory](../../../examples).
 
 ## Helping commands for debugging
 

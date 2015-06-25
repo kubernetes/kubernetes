@@ -17,7 +17,9 @@ Display one or many resources.
 
 .PP
 Possible resources include pods (po), replication controllers (rc), services
-(svc), minions (mi), events (ev), or component statuses (cs).
+(svc), nodes, events (ev), component statuses (cs), limit ranges (limits),
+nodes (no), persistent volumes (pv), persistent volume claims (pvc)
+or resource quotas (quota).
 
 .PP
 By specifying the output as 'template' and providing a Go template as the value
@@ -26,8 +28,16 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
 
 .SH OPTIONS
 .PP
+\fB\-\-all\-namespaces\fP=false
+    If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with \-\-namespace.
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for get
+
+.PP
+\fB\-L\fP, \fB\-\-label\-columns\fP=[]
+    Accepts a comma separated list of labels that are going to be presented as columns. Names are case\-sensitive. You can also use multiple flag statements like \-L label1 \-L label2...
 
 .PP
 \fB\-\-no\-headers\fP=false
@@ -97,15 +107,15 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
     Path to the kubeconfig file to use for CLI requests.
 
 .PP
-\fB\-\-log\_backtrace\_at\fP=:0
+\fB\-\-log\-backtrace\-at\fP=:0
     when logging hits line file:N, emit a stack trace
 
 .PP
-\fB\-\-log\_dir\fP=""
+\fB\-\-log\-dir\fP=""
     If non\-empty, write log files in this directory
 
 .PP
-\fB\-\-log\_flush\_frequency\fP=5s
+\fB\-\-log\-flush\-frequency\fP=5s
     Maximum number of seconds between log flushes
 
 .PP
@@ -166,13 +176,13 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
 $ kubectl get pods
 
 // List a single replication controller with specified NAME in ps output format.
-$ kubectl get replicationController web
+$ kubectl get replicationcontroller web
 
 // List a single pod in JSON output format.
 $ kubectl get \-o json pod web\-pod\-13je7
 
 // Return only the phase value of the specified pod.
-$ kubectl get \-o template web\-pod\-13je7 \-\-template=\{\{.status.phase\}\} \-\-api\-version=v1beta3
+$ kubectl get \-o template web\-pod\-13je7 \-\-template=\{\{.status.phase\}\} \-\-api\-version=v1
 
 // List all replication controllers and services together in ps output format.
 $ kubectl get rc,services

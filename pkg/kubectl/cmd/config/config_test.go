@@ -108,6 +108,35 @@ func TestSetIntoExistingStruct(t *testing.T) {
 	test.run(t)
 }
 
+func TestSetWithPathPrefixIntoExistingStruct(t *testing.T) {
+	expectedConfig := newRedFederalCowHammerConfig()
+	cc := expectedConfig.Clusters["cow-clusters"]
+	cinfo := &cc
+	cinfo.Server = "http://cow.org:8080/foo/baz"
+	expectedConfig.Clusters["cow-cluster"] = *cinfo
+	test := configCommandTest{
+		args:           []string{"set", "clusters.cow-cluster.server", "http://cow.org:8080/foo/baz"},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+
+	dc := clientcmd.NewDefaultClientConfig(expectedConfig, &clientcmd.ConfigOverrides{})
+	dcc, err := dc.ClientConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedHost := "http://cow.org:8080"
+	if expectedHost != dcc.Host {
+		t.Fatalf("expected client.Config.Host = %q instead of %q", expectedHost, dcc.Host)
+	}
+	expectedPrefix := "/foo/baz"
+	if expectedPrefix != dcc.Prefix {
+		t.Fatalf("expected client.Config.Prefix = %q instead of %q", expectedPrefix, dcc.Prefix)
+	}
+}
+
 func TestUnsetStruct(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	delete(expectedConfig.AuthInfos, "red-user")

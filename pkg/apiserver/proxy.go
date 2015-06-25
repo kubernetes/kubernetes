@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -49,6 +50,8 @@ type ProxyHandler struct {
 	codec                  runtime.Codec
 	context                api.RequestContextMapper
 	apiRequestInfoResolver *APIRequestInfoResolver
+
+	dial func(network, addr string) (net.Conn, error)
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -56,7 +59,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var apiResource string
 	var httpCode int
 	reqStart := time.Now()
-	defer monitor(&verb, &apiResource, util.GetClient(req), &httpCode, reqStart)
+	defer metrics.Monitor(&verb, &apiResource, util.GetClient(req), &httpCode, reqStart)
 
 	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {
@@ -109,7 +112,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w)
+		writeJSON(status.Code, r.codec, status, w, true)
 		httpCode = status.Code
 		return
 	}
@@ -118,6 +121,10 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		notFound(w, req)
 		httpCode = http.StatusNotFound
 		return
+	}
+	// If we have a custom dialer, and no pre-existing transport, initialize it to use the dialer.
+	if transport == nil && r.dial != nil {
+		transport = &http.Transport{Dial: r.dial}
 	}
 
 	// Default to http
@@ -140,7 +147,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	newReq, err := http.NewRequest(req.Method, location.String(), req.Body)
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w)
+		writeJSON(status.Code, r.codec, status, w, true)
 		notFound(w, req)
 		httpCode = status.Code
 		return
@@ -190,11 +197,10 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	if !httpstream.IsUpgradeRequest(req) {
 		return false
 	}
-
 	backendConn, err := dialURL(location, transport)
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w)
+		writeJSON(status.Code, r.codec, status, w, true)
 		return true
 	}
 	defer backendConn.Close()
@@ -205,14 +211,14 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w)
+		writeJSON(status.Code, r.codec, status, w, true)
 		return true
 	}
 	defer requestHijackedConn.Close()
 
 	if err = newReq.Write(backendConn); err != nil {
 		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w)
+		writeJSON(status.Code, r.codec, status, w, true)
 		return true
 	}
 

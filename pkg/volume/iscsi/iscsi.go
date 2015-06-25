@@ -53,9 +53,11 @@ func (plugin *ISCSIPlugin) Name() string {
 }
 
 func (plugin *ISCSIPlugin) CanSupport(spec *volume.Spec) bool {
-	if spec.VolumeSource.ISCSI == nil {
+	if spec.VolumeSource.ISCSI == nil && spec.PersistentVolumeSource.ISCSI == nil {
 		return false
 	}
+	// TODO:  turn this into a func so CanSupport can be unit tested without
+	// having to make system calls
 	// see if iscsiadm is there
 	_, err := plugin.execCommand("iscsiadm", []string{"-h"})
 	if err == nil {
@@ -78,7 +80,13 @@ func (plugin *ISCSIPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.
 }
 
 func (plugin *ISCSIPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
-	iscsi := spec.VolumeSource.ISCSI
+	var iscsi *api.ISCSIVolumeSource
+	if spec.VolumeSource.ISCSI != nil {
+		iscsi = spec.VolumeSource.ISCSI
+	} else {
+		iscsi = spec.PersistentVolumeSource.ISCSI
+	}
+
 	lun := strconv.Itoa(iscsi.Lun)
 
 	return &iscsiDisk{

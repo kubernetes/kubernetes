@@ -99,15 +99,15 @@ func NewDeleteOptions(grace int64) *DeleteOptions {
 	return &DeleteOptions{GracePeriodSeconds: &grace}
 }
 
-// this function aims to check if the service portal IP is set or not
+// this function aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *Service) bool {
-	return service.Spec.PortalIP != PortalIPNone && service.Spec.PortalIP != ""
+	return service.Spec.ClusterIP != ClusterIPNone && service.Spec.ClusterIP != ""
 }
 
-// this function aims to check if the service portal IP is requested or not
+// this function aims to check if the service's cluster IP is requested or not
 func IsServiceIPRequested(service *Service) bool {
-	return service.Spec.PortalIP == ""
+	return service.Spec.ClusterIP == ""
 }
 
 var standardFinalizers = util.NewStringSet(
@@ -140,4 +140,41 @@ func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%x", md5.Sum(data)), nil
+}
+
+// TODO: make method on LoadBalancerStatus?
+func LoadBalancerStatusEqual(l, r *LoadBalancerStatus) bool {
+	return ingressSliceEqual(l.Ingress, r.Ingress)
+}
+
+func ingressSliceEqual(lhs, rhs []LoadBalancerIngress) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	for i := range lhs {
+		if !ingressEqual(&lhs[i], &rhs[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func ingressEqual(lhs, rhs *LoadBalancerIngress) bool {
+	if lhs.IP != rhs.IP {
+		return false
+	}
+	if lhs.Hostname != rhs.Hostname {
+		return false
+	}
+	return true
+}
+
+// TODO: make method on LoadBalancerStatus?
+func LoadBalancerStatusDeepCopy(lb *LoadBalancerStatus) *LoadBalancerStatus {
+	c := &LoadBalancerStatus{}
+	c.Ingress = make([]LoadBalancerIngress, len(lb.Ingress))
+	for i := range lb.Ingress {
+		c.Ingress[i] = lb.Ingress[i]
+	}
+	return c
 }

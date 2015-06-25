@@ -1,0 +1,1 @@
+DAEMON_ARGS="$DAEMON_ARGS   --cloud_provider=gce --config=/etc/kubernetes/manifests --allow_privileged=False --v=2 --cluster_dns=10.0.0.10 --cluster_domain=cluster.local  --configure-cbr0=true --cgroup_root=/ --system-container=/system"

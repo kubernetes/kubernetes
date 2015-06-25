@@ -1,4 +1,17 @@
-# Getting started on AWS EC2
+Getting started on AWS EC2
+--------------------------
+
+**Table of Contents**
+
+- [Prerequisites](#prerequisites)
+- [Cluster turnup](#cluster-turnup)
+    - [Supported procedure: `get-kube`](#supported-procedure-get-kube)
+    - [Alternatives](#alternatives)
+- [Getting started with your cluster](#getting-started-with-your-cluster)
+    - [Command line administration tool: `kubectl`](#command-line-administration-tool-kubectl)
+    - [Examples](#examples)
+- [Tearing down the cluster](#tearing-down-the-cluster)
+- [Further reading](#further-reading)
 
 ## Prerequisites
 
@@ -39,6 +52,8 @@ export INSTANCE_PREFIX=k8s
 
 It will also try to create or reuse a keypair called "kubernetes", and IAM profiles called "kubernetes-master" and "kubernetes-minion".
 If these already exist, make sure you want them to be used here.
+
+NOTE: If using an existing keypair named "kubernetes" then you must set the `AWS_SSH_KEY` key to point to your private key.
 
 ### Alternatives
 A contributed [example](aws-coreos.md) allows you to setup a Kubernetes cluster based on [CoreOS](http://www.coreos.com), either using

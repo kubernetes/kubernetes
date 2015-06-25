@@ -1,4 +1,15 @@
-##Getting started on [Fedora](http://fedoraproject.org)
+Getting started on [Fedora](http://fedoraproject.org)
+-----------------------------------------------------
+
+**Table of Contents**
+
+- [Prerequisites](#prerequisites)
+- [Instructions](#instructions)
+
+## Prerequisites
+1. You need 2 or more machines with Fedora installed.
+
+## Instructions
 
 This is a getting started guide for Fedora.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...
 
@@ -61,7 +72,7 @@ systemctl stop iptables-services firewalld
 
 **Configure the kubernetes services on the master.**
 
-* Edit /etc/kubernetes/apiserver to appear as such.  The portal_net IP addresses must be an unused block of addresses, not used anywhere else.  They do not need to be routed or assigned to anything.
+* Edit /etc/kubernetes/apiserver to appear as such.  The service_cluster_ip_range IP addresses must be an unused block of addresses, not used anywhere else.  They do not need to be routed or assigned to anything.
 
 ```
 # The address on the local server to listen to.
@@ -71,22 +82,13 @@ KUBE_API_ADDRESS="--address=0.0.0.0"
 KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
 
 # Address range to use for services
-KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
+KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
 
 # Add your own!
 KUBE_API_ARGS=""
 ```
 
-* *Optional* Edit /etc/kubernetes/controller-manager and remove --machines=127.0.0.1 from the KUBELET_ADDRESSES. Leaving this in won't hurt anything but it will cause the output to note that the 127.0.0.1 node is NotReady because we will not be configuring one in this guide.
-
-```
-KUBELET_ADDRESSES=""
-
-KUBE_CONTROLLER_MANAGER_ARGS=""
-```
-
-
-* Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1,if not ,you will get the error like "connection refused"
+* Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1, if not, you will get the error like "connection refused"
 ```
 ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
 ```
@@ -107,7 +109,7 @@ done
 
 ```json
 {
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "kind": "Node",
     "metadata": {
         "name": "fed-node",

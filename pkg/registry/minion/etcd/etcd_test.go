@@ -88,9 +88,9 @@ func validChangedNode() *api.Node {
 
 func TestCreate(t *testing.T) {
 	storage, fakeEtcdClient := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
 	node := validNewNode()
-	node.ObjectMeta = api.ObjectMeta{}
+	node.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		// valid
 		node,
@@ -102,9 +102,9 @@ func TestCreate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, fakeEtcdClient := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
 
 	node := validChangedNode()
 	key, _ := storage.KeyFunc(ctx, node.Name)

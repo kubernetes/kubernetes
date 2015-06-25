@@ -27,17 +27,17 @@ instructions for your platform.
 
 ## Step One: Start your ZooKeeper service
 
-ZooKeeper is a distributed coordination service that Storm uses as a
+ZooKeeper is a distributed coordination [service](../../docs/services.md) that Storm uses as a
 bootstrap and for state storage.
 
-Use the `examples/storm/zookeeper.json` file to create a pod running
+Use the [`examples/storm/zookeeper.json`](zookeeper.json) file to create a [pod](../../docs/pods.md) running
 the ZooKeeper service.
 
 ```shell
 $ kubectl create -f examples/storm/zookeeper.json
 ```
 
-Then, use the `examples/storm/zookeeper-service.json` file to create a
+Then, use the [`examples/storm/zookeeper-service.json`](zookeeper-service.json) file to create a
 logical service endpoint that Storm can use to access the ZooKeeper
 pod.
 
@@ -62,7 +62,6 @@ zookeeper           192.168.86.4        zookeeper           mattf/zookeeper     
 $ kubectl get services
 NAME                LABELS                                    SELECTOR            IP                  PORT
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
-kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
 zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
 
 $ echo ruok | nc 10.254.139.141 2181; echo
@@ -74,14 +73,14 @@ imok
 The Nimbus service is the master (or head) service for a Storm
 cluster. It depends on a functional ZooKeeper service.
 
-Use the `examples/storm/storm-nimbus.json` file to create a pod running
+Use the [`examples/storm/storm-nimbus.json`](storm-nimbus.json) file to create a pod running
 the Nimbus service.
 
 ```shell
 $ kubectl create -f examples/storm/storm-nimbus.json
 ```
 
-Then, use the `examples/storm/storm-nimbus-service.json` file to
+Then, use the [`examples/storm/storm-nimbus-service.json`](storm-nimbus-service.json) file to
 create a logical service endpoint that Storm workers can use to access
 the Nimbus pod.
 
@@ -97,7 +96,6 @@ Ensure that the Nimbus service is running and functional.
 $ kubectl get services
 NAME                LABELS                                    SELECTOR            IP                  PORT
 kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
-kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
 zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
 nimbus              name=nimbus                               name=nimbus         10.254.115.208      6627
 
@@ -115,8 +113,8 @@ the Nimbus service.
 The Storm workers need both the ZooKeeper and Nimbus services to be
 running.
 
-Use the `examples/storm/storm-worker-controller.json` file to create a
-ReplicationController that manages the worker pods.
+Use the [`examples/storm/storm-worker-controller.json`](storm-worker-controller.json) file to create a
+[replication controller](../../docs/replication-controller.md) that manages the worker pods.
 
 ```shell
 $ kubectl create -f examples/storm/storm-worker-controller.json
@@ -149,7 +147,7 @@ Node count: 13
 
 There should be one client from the Nimbus service and one per
 worker. Ideally, you should get ```stat``` output from ZooKeeper
-before and after creating the ReplicationController.
+before and after creating the replication controller.
 
 (Pull requests welcome for alternative ways to validate the workers)
 

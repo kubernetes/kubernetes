@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 
 	"github.com/onsi/ginkgo/ginkgo/testsuite"
 )
@@ -20,9 +21,15 @@ func NewNotifier(commandFlags *RunWatchAndBuildCommandFlags) *Notifier {
 
 func (n *Notifier) VerifyNotificationsAreAvailable() {
 	if n.commandFlags.Notify {
-		_, err := exec.LookPath("terminal-notifier")
-		if err != nil {
-			fmt.Printf(`--notify requires terminal-notifier, which you don't seem to have installed.
+		onLinux := (runtime.GOOS == "linux")
+		onOSX := (runtime.GOOS == "darwin")
+		if onOSX {
+
+			_, err := exec.LookPath("terminal-notifier")
+			if err != nil {
+				fmt.Printf(`--notify requires terminal-notifier, which you don't seem to have installed.
+
+OSX:
 
 To remedy this:
 
@@ -32,7 +39,22 @@ To learn more about terminal-notifier:
 
     https://github.com/alloy/terminal-notifier
 `)
-			os.Exit(1)
+				os.Exit(1)
+			}
+
+		} else if onLinux {
+
+			_, err := exec.LookPath("notify-send")
+			if err != nil {
+				fmt.Printf(`--notify requires terminal-notifier or notify-send, which you don't seem to have installed.
+
+Linux:
+
+Download and install notify-send for your distribution
+`)
+				os.Exit(1)
+			}
+
 		}
 	}
 }
@@ -46,16 +68,34 @@ func (n *Notifier) SendSuiteCompletionNotification(suite testsuite.TestSuite, su
 }
 
 func (n *Notifier) SendNotification(title string, subtitle string) {
-	args := []string{"-title", title, "-subtitle", subtitle, "-group", "com.onsi.ginkgo"}
-
-	terminal := os.Getenv("TERM_PROGRAM")
-	if terminal == "iTerm.app" {
-		args = append(args, "-activate", "com.googlecode.iterm2")
-	} else if terminal == "Apple_Terminal" {
-		args = append(args, "-activate", "com.apple.Terminal")
-	}
 
 	if n.commandFlags.Notify {
-		exec.Command("terminal-notifier", args...).Run()
+		onLinux := (runtime.GOOS == "linux")
+		onOSX := (runtime.GOOS == "darwin")
+
+		if onOSX {
+
+			_, err := exec.LookPath("terminal-notifier")
+			if err == nil {
+				args := []string{"-title", title, "-subtitle", subtitle, "-group", "com.onsi.ginkgo"}
+				terminal := os.Getenv("TERM_PROGRAM")
+				if terminal == "iTerm.app" {
+					args = append(args, "-activate", "com.googlecode.iterm2")
+				} else if terminal == "Apple_Terminal" {
+					args = append(args, "-activate", "com.apple.Terminal")
+				}
+
+				exec.Command("terminal-notifier", args...).Run()
+			}
+
+		} else if onLinux {
+
+			_, err := exec.LookPath("notify-send")
+			if err == nil {
+				args := []string{"-a", "ginkgo", title, subtitle}
+				exec.Command("notify-send", args...).Run()
+			}
+
+		}
 	}
 }

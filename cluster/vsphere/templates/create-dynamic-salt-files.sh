@@ -22,7 +22,7 @@ mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
 instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 node_instance_prefix: $NODE_INSTANCE_PREFIX
-portal_net: $PORTAL_NET
+service_cluster_ip_range: $SERVICE_CLUSTER_IP_RANGE
 enable_cluster_monitoring: $ENABLE_CLUSTER_MONITORING
 enable_node_monitoring: $ENABLE_NODE_MONITORING
 enable_cluster_logging: $ENABLE_CLUSTER_LOGGING

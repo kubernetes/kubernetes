@@ -1,10 +1,11 @@
 package integration_test
 
 import (
+	"strings"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
-	"strings"
 )
 
 var _ = Describe("SuiteSetup", func() {
@@ -171,7 +172,7 @@ var _ = Describe("SuiteSetup", func() {
 			output := string(session.Out.Contents())
 
 			Ω(output).Should(ContainSubstring("Node 1 disappeared before completing BeforeSuite"))
-			Ω(output).Should(ContainSubstring("Ginkgo timed out waiting for all parallel nodes to end"))
+			Ω(output).Should(ContainSubstring("Ginkgo timed out waiting for all parallel nodes to report back!"))
 		})
 	})
 })

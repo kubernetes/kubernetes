@@ -17,19 +17,24 @@ limitations under the License.
 package fake_cloud
 
 import (
+	"errors"
+	"fmt"
 	"net"
 	"regexp"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
+
+const ProviderName = "fake"
 
 // FakeBalancer is a fake storage of balancer information
 type FakeBalancer struct {
 	Name       string
 	Region     string
 	ExternalIP net.IP
-	Ports      []int
+	Ports      []*api.ServicePort
 	Hosts      []string
 }
 
@@ -39,7 +44,7 @@ type FakeUpdateBalancerCall struct {
 	Hosts  []string
 }
 
-// FakeCloud is a test-double implementation of Interface, TCPLoadBalancer and Instances. It is useful for testing.
+// FakeCloud is a test-double implementation of Interface, TCPLoadBalancer, Instances, and Routes. It is useful for testing.
 type FakeCloud struct {
 	Exists        bool
 	Err           error
@@ -53,7 +58,14 @@ type FakeCloud struct {
 	ExternalIP    net.IP
 	Balancers     []FakeBalancer
 	UpdateCalls   []FakeUpdateBalancerCall
+	RouteMap      map[string]*FakeRoute
+	Lock          sync.Mutex
 	cloudprovider.Zone
+}
+
+type FakeRoute struct {
+	ClusterName string
+	Route       cloudprovider.Route
 }
 
 func (f *FakeCloud) addCall(desc string) {
@@ -77,6 +89,11 @@ func (f *FakeCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return f, true
 }
 
+// ProviderName returns the cloud provider ID.
+func (f *FakeCloud) ProviderName() string {
+	return ProviderName
+}
+
 // TCPLoadBalancer returns a fake implementation of TCPLoadBalancer.
 // Actually it just returns f itself.
 func (f *FakeCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
@@ -94,17 +111,28 @@ func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
 	return f, true
 }
 
+func (f *FakeCloud) Routes() (cloudprovider.Routes, bool) {
+	return f, true
+}
+
 // GetTCPLoadBalancer is a stub implementation of TCPLoadBalancer.GetTCPLoadBalancer.
-func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error) {
-	return f.ExternalIP.String(), f.Exists, f.Err
+func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
+	status := &api.LoadBalancerStatus{}
+	status.Ingress = []api.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
+
+	return status, f.Exists, f.Err
 }
 
 // CreateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.ServiceAffinity) (string, error) {
+func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
 	f.addCall("create")
 	f.Balancers = append(f.Balancers, FakeBalancer{name, region, externalIP, ports, hosts})
-	return f.ExternalIP.String(), f.Err
+
+	status := &api.LoadBalancerStatus{}
+	status.Ingress = []api.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
+
+	return status, f.Err
 }
 
 // UpdateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
@@ -115,11 +143,20 @@ func (f *FakeCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) e
 	return f.Err
 }
 
-// DeleteTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.DeleteTCPLoadBalancer.
+// EnsureTCPLoadBalancerDeleted is a test-spy implementation of TCPLoadBalancer.EnsureTCPLoadBalancerDeleted.
 // It adds an entry "delete" into the internal method call record.
-func (f *FakeCloud) DeleteTCPLoadBalancer(name, region string) error {
+func (f *FakeCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	f.addCall("delete")
 	return f.Err
+}
+
+func (f *FakeCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+	return errors.New("unimplemented")
+}
+
+// Implementation of Instances.CurrentNodeName
+func (f *FakeCloud) CurrentNodeName(hostname string) (string, error) {
+	return hostname, nil
 }
 
 // NodeAddresses is a test-spy implementation of Instances.NodeAddresses.
@@ -135,6 +172,12 @@ func (f *FakeCloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
 func (f *FakeCloud) ExternalID(instance string) (string, error) {
 	f.addCall("external-id")
 	return f.ExtID[instance], f.Err
+}
+
+// InstanceID returns the cloud provider ID of the specified instance.
+func (f *FakeCloud) InstanceID(instance string) (string, error) {
+	f.addCall("instance-id")
+	return f.ExtID[instance], nil
 }
 
 // List is a test-spy implementation of Instances.List.
@@ -160,12 +203,46 @@ func (f *FakeCloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	return f.NodeResources, f.Err
 }
 
-func (f *FakeCloud) Configure(name string, spec *api.NodeSpec) error {
-	f.addCall("configure")
-	return f.Err
+func (f *FakeCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	f.addCall("list-routes")
+	var routes []*cloudprovider.Route
+	for _, fakeRoute := range f.RouteMap {
+		if clusterName == fakeRoute.ClusterName {
+			routeCopy := fakeRoute.Route
+			routes = append(routes, &routeCopy)
+		}
+	}
+	return routes, f.Err
 }
 
-func (f *FakeCloud) Release(name string) error {
-	f.addCall("release")
-	return f.Err
+func (f *FakeCloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	f.addCall("create-route")
+	name := clusterName + "-" + nameHint
+	if _, exists := f.RouteMap[name]; exists {
+		f.Err = fmt.Errorf("route %q already exists", name)
+		return f.Err
+	}
+	fakeRoute := FakeRoute{}
+	fakeRoute.Route = *route
+	fakeRoute.Route.Name = name
+	fakeRoute.ClusterName = clusterName
+	f.RouteMap[name] = &fakeRoute
+	return nil
+}
+
+func (f *FakeCloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	f.addCall("delete-route")
+	name := route.Name
+	if _, exists := f.RouteMap[name]; !exists {
+		f.Err = fmt.Errorf("no route found with name %q", name)
+		return f.Err
+	}
+	delete(f.RouteMap, name)
+	return nil
 }

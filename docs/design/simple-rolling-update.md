@@ -8,21 +8,21 @@ Assume that we have a current replication controller named ```foo``` and it is r
 
 ```kubectl rolling-update rc foo [foo-v2] --image=myimage:v2```
 
-If the user doesn't specify a name for the 'next' controller, then the 'next' controller is renamed to
-the name of the original controller.
+If the user doesn't specify a name for the 'next' replication controller, then the 'next' replication controller is renamed to
+the name of the original replication controller.
 
 Obviously there is a race here, where if you kill the client between delete foo, and creating the new version of 'foo' you might be surprised about what is there, but I think that's ok.
 See [Recovery](#recovery) below
 
-If the user does specify a name for the 'next' controller, then the 'next' controller is retained with its existing name,
-and the old 'foo' controller is deleted.  For the purposes of the rollout, we add a unique-ifying label ```kubernetes.io/deployment``` to both the ```foo``` and ```foo-next``` controllers.
-The value of that label is the hash of the complete JSON representation of the```foo-next``` or```foo``` controller.  The name of this label can be overridden by the user with the ```--deployment-label-key``` flag.
+If the user does specify a name for the 'next' replication controller, then the 'next' replication controller is retained with its existing name,
+and the old 'foo' replication controller is deleted.  For the purposes of the rollout, we add a unique-ifying label ```kubernetes.io/deployment``` to both the ```foo``` and ```foo-next``` replication controllers.
+The value of that label is the hash of the complete JSON representation of the```foo-next``` or```foo``` replication controller.  The name of this label can be overridden by the user with the ```--deployment-label-key``` flag.
 
 #### Recovery
 If a rollout fails or is terminated in the middle, it is important that the user be able to resume the roll out.
-To facilitate recovery in the case of a crash of the updating process itself, we add the following annotations to each replicaController in the ```kubernetes.io/``` annotation namespace:
-   * ```desired-replicas``` The desired number of replicas for this controller (either N or zero)
-   * ```update-partner``` A pointer to the replicaiton controller resource that is the other half of this update (syntax ```<name>``` the namespace is assumed to be identical to the namespace of this replication controller.)
+To facilitate recovery in the case of a crash of the updating process itself, we add the following annotations to each replication controller in the ```kubernetes.io/``` annotation namespace:
+   * ```desired-replicas``` The desired number of replicas for this replication controller (either N or zero)
+   * ```update-partner``` A pointer to the replication controller resource that is the other half of this update (syntax ```<name>``` the namespace is assumed to be identical to the namespace of this replication controller.)
 
 Recovery is achieved by issuing the same command again:
 

@@ -28,14 +28,14 @@ import (
 func TestScopeNamingGenerateLink(t *testing.T) {
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		expectedSet: "/api/v1beta3/namespaces/other/services/foo",
+		expectedSet: "/api/v1/namespaces/other/services/foo",
 		name:        "foo",
 		namespace:   "other",
 	}
 	s := scopeNaming{
 		meta.RESTScopeNamespace,
 		selfLinker,
-		"/api/v1beta3/namespaces/{namespace}/services/{name}",
+		"/api/v1/namespaces/{namespace}/services/{name}",
 		true,
 	}
 	service := &api.Service{

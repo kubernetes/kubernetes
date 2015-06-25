@@ -40,6 +40,10 @@ type Scheme struct {
 	// default coverting behavior.
 	converter *Converter
 
+	// cloner stores all registered copy functions. It also has default
+	// deep copy behavior.
+	cloner *Cloner
+
 	// Indent will cause the JSON output from Encode to be indented, iff it is true.
 	Indent bool
 
@@ -60,6 +64,7 @@ func NewScheme() *Scheme {
 		typeToVersion:   map[reflect.Type]string{},
 		typeToKind:      map[reflect.Type][]string{},
 		converter:       NewConverter(),
+		cloner:          NewCloner(),
 		InternalVersion: "",
 		MetaFactory:     DefaultMetaFactory,
 	}
@@ -212,6 +217,29 @@ func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) err
 	return nil
 }
 
+// AddDeepCopyFuncs adds functions to the list of deep copy functions.
+// Note that to copy sub-objects, you can use the conversion.Cloner object that
+// will be passed to your deep-copy function.
+func (s *Scheme) AddDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
+	for _, f := range deepCopyFuncs {
+		if err := s.cloner.RegisterDeepCopyFunc(f); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Similar to AddDeepCopyFuncs, but registers deep copy functions that were
+// automatically generated.
+func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
+	for _, f := range deepCopyFuncs {
+		if err := s.cloner.RegisterGeneratedDeepCopyFunc(f); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // AddStructFieldConversion allows you to specify a mechanical copy for a moved
 // or renamed struct field without writing an entire conversion function. See
 // the comment in Converter.SetStructFieldCopy for parameter details.
@@ -260,6 +288,11 @@ func (s *Scheme) Recognizes(version, kind string) bool {
 // a specific input type in conversion, such as a map[string]string to structs.
 func (s *Scheme) RegisterInputDefaults(in interface{}, fn FieldMappingFunc, defaultFlags FieldMatchingFlags) error {
 	return s.converter.RegisterInputDefaults(in, fn, defaultFlags)
+}
+
+// Performs a deep copy of the given object.
+func (s *Scheme) DeepCopy(in interface{}) (interface{}, error) {
+	return s.cloner.DeepCopy(in)
 }
 
 // Convert will attempt to convert in into out. Both must be pointers. For easy

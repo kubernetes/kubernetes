@@ -197,7 +197,7 @@ func TestPodFitsHost(t *testing.T) {
 		{
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					Host: "foo",
+					NodeName: "foo",
 				},
 			},
 			node: "foo",
@@ -207,7 +207,7 @@ func TestPodFitsHost(t *testing.T) {
 		{
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					Host: "bar",
+					NodeName: "bar",
 				},
 			},
 			node: "foo",
@@ -234,7 +234,7 @@ func newPod(host string, hostPorts ...int) *api.Pod {
 	}
 	return &api.Pod{
 		Spec: api.PodSpec{
-			Host: host,
+			NodeName: host,
 			Containers: []api.Container{
 				{
 					Ports: networkPorts,
@@ -632,7 +632,7 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
-			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
@@ -641,7 +641,7 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
-			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
@@ -650,7 +650,7 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
-			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     false,
@@ -659,7 +659,7 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns2"}}},
 			fits:     true,
@@ -668,7 +668,7 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
 			fits:     true,
@@ -677,7 +677,7 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
 			fits:     false,
@@ -686,7 +686,7 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
-			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     false,
@@ -695,7 +695,7 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
-			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine5"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine5"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     "machine4",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,

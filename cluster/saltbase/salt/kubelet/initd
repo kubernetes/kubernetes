@@ -39,6 +39,13 @@ DAEMON_USER=root
 #
 do_start()
 {
+        # Avoid a potential race at boot time when both monit and init.d start
+        # the same service
+        PIDS=$(pidof $DAEMON)
+        for PID in ${PIDS}; do
+            kill -9 $PID
+	done
+
         # Return
         #   0 if daemon has been started
         #   1 if daemon was already running

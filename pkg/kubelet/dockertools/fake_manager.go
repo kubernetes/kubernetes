@@ -40,8 +40,8 @@ func NewFakeDockerManager(
 	runtimeHooks kubecontainer.RuntimeHooks) *DockerManager {
 
 	dm := NewDockerManager(client, recorder, readinessManager, containerRefManager, podInfraContainerImage, qps,
-		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, runtimeHooks)
-	dm.Puller = &FakeDockerPuller{}
+		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, runtimeHooks, &NativeExecHandler{})
+	dm.puller = &FakeDockerPuller{}
 	dm.prober = prober.New(nil, readinessManager, containerRefManager, recorder)
 	return dm
 }

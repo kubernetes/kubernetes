@@ -130,6 +130,7 @@ type Done chan<- interface{}
 //	IsMeasurement: true if the current test is a measurement
 //	FileName: the name of the file containing the current test
 //	LineNumber: the line number for the current test
+//	Failed: if the current test has failed, this will be true (useful in an AfterEach)
 type GinkgoTestDescription struct {
 	FullTestText   string
 	ComponentTexts []string
@@ -139,6 +140,8 @@ type GinkgoTestDescription struct {
 
 	FileName   string
 	LineNumber int
+
+	Failed bool
 }
 
 //CurrentGinkgoTestDescripton returns information about the current running test.
@@ -157,6 +160,7 @@ func CurrentGinkgoTestDescription() GinkgoTestDescription {
 		IsMeasurement:  summary.IsMeasurement,
 		FileName:       subjectCodeLocation.FileName,
 		LineNumber:     subjectCodeLocation.LineNumber,
+		Failed:         summary.HasFailureState(),
 	}
 }
 

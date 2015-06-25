@@ -36,17 +36,13 @@ func errToAPIStatus(err error) *api.Status {
 	case statusError:
 		status := t.Status()
 		if len(status.Status) == 0 {
-		}
-		switch status.Status {
-		case api.StatusSuccess:
-			if status.Code == 0 {
-				status.Code = http.StatusOK
-			}
-		case "":
 			status.Status = api.StatusFailure
-			fallthrough
-		case api.StatusFailure:
-			if status.Code == 0 {
+		}
+		if status.Code == 0 {
+			switch status.Status {
+			case api.StatusSuccess:
+				status.Code = http.StatusOK
+			case api.StatusFailure:
 				status.Code = http.StatusInternalServerError
 			}
 		}

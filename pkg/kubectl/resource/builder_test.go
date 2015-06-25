@@ -177,7 +177,7 @@ func (v *testVisitor) Objects() []runtime.Object {
 
 func TestPathBuilder(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		FilenameParam("../../../examples/guestbook/redis-master-controller.json")
+		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml")
 
 	test := &testVisitor{}
 	singular := false
@@ -227,8 +227,8 @@ func TestNodeBuilder(t *testing.T) {
 
 func TestPathBuilderWithMultiple(t *testing.T) {
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
-		FilenameParam("../../../examples/guestbook/redis-master-controller.json").
-		FilenameParam("../../../examples/guestbook/redis-master-controller.json").
+		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml").
+		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml").
 		NamespaceParam("test").DefaultNamespace()
 
 	test := &testVisitor{}
@@ -640,7 +640,7 @@ func TestContinueOnErrorVisitor(t *testing.T) {
 func TestSingularObject(t *testing.T) {
 	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master-controller.json").
+		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml").
 		Flatten().
 		Do().Object()
 
@@ -751,7 +751,7 @@ func TestWatch(t *testing.T) {
 		}),
 	})).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master-service.json").Flatten().
+		FilenameParam("../../../examples/guestbook/redis-master-service.yaml").Flatten().
 		Do().Watch("12")
 
 	if err != nil {
@@ -778,8 +778,8 @@ func TestWatch(t *testing.T) {
 func TestWatchMultipleError(t *testing.T) {
 	_, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
 		NamespaceParam("test").DefaultNamespace().
-		FilenameParam("../../../examples/guestbook/redis-master-controller.json").Flatten().
-		FilenameParam("../../../examples/guestbook/redis-master-controller.json").Flatten().
+		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml").Flatten().
+		FilenameParam("../../../examples/guestbook/redis-master-controller.yaml").Flatten().
 		Do().Watch("")
 
 	if err == nil {

@@ -18,13 +18,14 @@ package cobra
 import (
 	"bytes"
 	"fmt"
-	"github.com/inconshreveable/mousetrap"
-	flag "github.com/spf13/pflag"
 	"io"
 	"os"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/inconshreveable/mousetrap"
+	flag "github.com/spf13/pflag"
 )
 
 // Command is just that, a command for your application.
@@ -93,6 +94,8 @@ type Command struct {
 	helpFunc      func(*Command, []string) // Help can be defined by application
 	helpCommand   *Command                 // The help command
 	helpFlagVal   bool
+	// The global normalization function that we can use on every pFlag set and children commands
+	globNormFunc func(f *flag.FlagSet, name string) flag.NormalizedName
 }
 
 // os.Args[1:] by default, if desired, can be overridden
@@ -149,6 +152,19 @@ func (c *Command) SetHelpCommand(cmd *Command) {
 // Can be defined by Application
 func (c *Command) SetHelpTemplate(s string) {
 	c.helpTemplate = s
+}
+
+// SetGlobalNormalizationFunc sets a normalization function to all flag sets and also to child commands.
+// The user should not have a cyclic dependency on commands.
+func (c *Command) SetGlobalNormalizationFunc(n func(f *flag.FlagSet, name string) flag.NormalizedName) {
+	c.Flags().SetNormalizeFunc(n)
+	c.PersistentFlags().SetNormalizeFunc(n)
+	c.LocalFlags().SetNormalizeFunc(n)
+	c.globNormFunc = n
+
+	for _, command := range c.commands {
+		command.SetGlobalNormalizationFunc(n)
+	}
 }
 
 func (c *Command) UsageFunc() (f func(*Command) error) {
@@ -360,25 +376,28 @@ func argsMinusFirstX(args []string, x string) []string {
 
 // find the target command given the args and command tree
 // Meant to be run on the highest node. Only searches down.
-func (c *Command) Find(arrs []string) (*Command, []string, error) {
+func (c *Command) Find(args []string) (*Command, []string, error) {
 	if c == nil {
 		return nil, nil, fmt.Errorf("Called find() on a nil Command")
 	}
 
-	if len(arrs) == 0 {
-		return c.Root(), arrs, nil
+	// If there are no arguments, return the root command. If the root has no
+	// subcommands, args reflects arguments that should actually be passed to
+	// the root command, so also return the root command.
+	if len(args) == 0 || !c.Root().HasSubCommands() {
+		return c.Root(), args, nil
 	}
 
 	var innerfind func(*Command, []string) (*Command, []string)
 
-	innerfind = func(c *Command, args []string) (*Command, []string) {
-		if len(args) > 0 && c.HasSubCommands() {
-			argsWOflags := stripFlags(args, c)
+	innerfind = func(c *Command, innerArgs []string) (*Command, []string) {
+		if len(innerArgs) > 0 && c.HasSubCommands() {
+			argsWOflags := stripFlags(innerArgs, c)
 			if len(argsWOflags) > 0 {
 				matches := make([]*Command, 0)
 				for _, cmd := range c.commands {
 					if cmd.Name() == argsWOflags[0] || cmd.HasAlias(argsWOflags[0]) { // exact name or alias match
-						return innerfind(cmd, argsMinusFirstX(args, argsWOflags[0]))
+						return innerfind(cmd, argsMinusFirstX(innerArgs, argsWOflags[0]))
 					} else if EnablePrefixMatching {
 						if strings.HasPrefix(cmd.Name(), argsWOflags[0]) { // prefix match
 							matches = append(matches, cmd)
@@ -393,18 +412,18 @@ func (c *Command) Find(arrs []string) (*Command, []string, error) {
 
 				// only accept a single prefix match - multiple matches would be ambiguous
 				if len(matches) == 1 {
-					return innerfind(matches[0], argsMinusFirstX(args, argsWOflags[0]))
+					return innerfind(matches[0], argsMinusFirstX(innerArgs, argsWOflags[0]))
 				}
 			}
 		}
 
-		return c, args
+		return c, innerArgs
 	}
 
-	commandFound, a := innerfind(c, arrs)
+	commandFound, a := innerfind(c, args)
 
 	// If we matched on the root, but we asked for a subcommand, return an error
-	if commandFound.Name() == c.Name() && len(stripFlags(arrs, c)) > 0 && commandFound.Name() != arrs[0] {
+	if commandFound.Name() == c.Name() && len(stripFlags(args, c)) > 0 && commandFound.Name() != args[0] {
 		return nil, a, fmt.Errorf("unknown command %q", a[0])
 	}
 
@@ -605,6 +624,10 @@ func (c *Command) AddCommand(cmds ...*Command) {
 		nameLen := len(x.Name())
 		if nameLen > c.commandsMaxNameLen {
 			c.commandsMaxNameLen = nameLen
+		}
+		// If glabal normalization function exists, update all children
+		if c.globNormFunc != nil {
+			x.SetGlobalNormalizationFunc(c.globNormFunc)
 		}
 		c.commands = append(c.commands, x)
 	}
@@ -828,6 +851,11 @@ func (c *Command) HasRunnableSubCommands() bool {
 // Determine if the command is a child command
 func (c *Command) HasParent() bool {
 	return c.parent != nil
+}
+
+// GlobalNormalizationFunc returns the global normalization function or nil if doesn't exists
+func (c *Command) GlobalNormalizationFunc() func(f *flag.FlagSet, name string) flag.NormalizedName {
+	return c.globNormFunc
 }
 
 // Get the complete FlagSet that applies to this command (local and persistent declared here and by all parents)

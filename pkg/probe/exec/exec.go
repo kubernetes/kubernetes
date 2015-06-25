@@ -28,24 +28,24 @@ func New() ExecProber {
 }
 
 type ExecProber interface {
-	Probe(e exec.Cmd) (probe.Result, error)
+	Probe(e exec.Cmd) (probe.Result, string, error)
 }
 
 type execProber struct{}
 
-func (pr execProber) Probe(e exec.Cmd) (probe.Result, error) {
+func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 	data, err := e.CombinedOutput()
-	glog.V(4).Infof("health check response: %s", string(data))
+	glog.V(4).Infof("Exec probe response: %q", string(data))
 	if err != nil {
 		exit, ok := err.(exec.ExitError)
 		if ok {
 			if exit.ExitStatus() == 0 {
-				return probe.Success, nil
+				return probe.Success, string(data), nil
 			} else {
-				return probe.Failure, nil
+				return probe.Failure, string(data), nil
 			}
 		}
-		return probe.Unknown, err
+		return probe.Unknown, "", err
 	}
-	return probe.Success, nil
+	return probe.Success, string(data), nil
 }

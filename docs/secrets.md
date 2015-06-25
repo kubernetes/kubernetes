@@ -5,62 +5,113 @@ passwords, OAuth tokens, and ssh keys.  Putting this information in a `secret`
 is safer and more flexible than putting it verbatim in a `pod` definition or in
 a docker image.
 
-### Creating and Using Secrets
-To make use of secrets requires at least two steps:
-  1. create a `secret` resource with secret data
-  1. create a pod that has a volume of type `secret` and a container
-     which mounts that volume.
+## Overview of Secrets
 
-This is an example of a simple secret, in json format:
+
+Creation of secrets can be manual (done by the user) or automatic (done by
+automation built into the cluster).
+
+A secret can be used with a pod in two ways: either as files in a volume mounted on one or more of
+its containers, or used by kubelet when pulling images for the pod.
+
+To use a secret, a pod needs to reference the secret.  This reference
+can likewise be added manually or automatically.
+
+A single Pod may use various combination of the above options.
+
+### Service Accounts Automatically Create and Use Secrets with API Credentials
+
+Kubernetes automatically creates secrets which contain credentials for
+accessing the API and it automatically modifies your pods to use this type of
+secret.
+
+The automatic creation and use of API credentials can be disabled or overridden
+if desired.  However, if all you need to do is securely access the apiserver,
+this is the recommended workflow.
+
+See the [Service Account](service_accounts.md) documentation for more
+information on how Service Accounts work.
+
+### Creating a Secret Manually
+
+This is an example of a simple secret, in yaml format:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysecret
+type: Opaque
+data:
+  password: dmFsdWUtMg0K
+  username: dmFsdWUtMQ0K
+```
+
+The data field is a map.  Its keys must match
+[DNS_SUBDOMAIN](design/identifiers.md), except that leading dots are also
+allowed.  The values are arbitrary data, encoded using base64. The values of
+username and password in the example above, before base64 encoding,
+are `value-1` and `value-2`, respectively, with carriage return and newline characters at the end.
+
+Create the secret using [`kubectl create`](kubectl-create.md).
+
+Once the secret is created, you can:
+  - create pods that automatically use it via a [Service Account](service_accounts.md).
+  - modify your pod specification to use the secret
+
+### Manually specifying a Secret to be Mounted on a Pod
+
+This is an example of a pod that mounts a secret in a volume:
 ```json
 {
-  "apiVersion": "v1beta3",
-  "kind": "Secret",
-  "metadata" : {
-    "name": "mysecret",
-    "namespace": "myns",
-  },  
-  "data": {
-    "username": "dmFsdWUtMQ0K",
-    "password": "dmFsdWUtMg0KDQo="
+ "apiVersion": "v1",
+ "kind": "Pod",
+  "metadata": {
+    "name": "mypod",
+    "namespace": "myns"
+  },
+  "spec": {
+    "containers": [{
+      "name": "mypod",
+      "image": "redis",
+      "volumeMounts": [{
+        "name": "foo",
+        "mountPath": "/etc/foo",
+        "readOnly": true
+      }]
+    }],
+    "volumes": [{
+      "name": "foo",
+      "secret": {
+        "secretName": "mysecret"
+      }
+    }]
   }
 }
 ```
 
-The data field is a map.
-Its keys must match [DNS_SUBDOMAIN](design/identifiers.md).
-The values are arbitrary data, encoded using base64.
+Each secret you want to use needs its own `spec.volumes`.
 
-This is an example of a pod that uses a secret, in json format:
-```json
-{
-  "kind": "Pod",
-  "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "mypod"
-  },
-  "spec": {
-    "manifest": {
-      "containers": [{
-        "name": "c",
-        "image": "example/image",
-        "volumeMounts": [{
-          "name": "foo",
-          "mountPath": "/etc/foo",
-          "readOnly": true
-        }]
-      }],
-      "volumes": [{
-        "name": "foo",
-        "secret": {
-          "secretName": "mysecret"
-        }
-      }]
-    }
-  }
-}]
-```
+If there are multiple containers in the pod, then each container needs its
+own `volumeMounts` block, but only one `spec.volumes` is needed per secret.
 
+You can package many files into one secret, or use many secrets,
+whichever is convenient.
+
+### Manually specifying an imagePullSecret
+Use of imagePullSecrets is desribed in the [images documentation](
+images.md#specifying-imagepullsecrets-on-a-pod)
+### Automatic use of Manually Created Secrets
+
+*This feature is planned but not implemented.  See [issue
+9902](https://github.com/GoogleCloudPlatform/kubernetes/issues/9902).*
+
+You can reference manually created secrets from a [service account](
+service_accounts.md).
+Then, pods which use that service account will have
+`volumeMounts` and/or `imagePullSecrets` added to them.
+The secrets will be mounted at **TBD**.
+
+## Details
 ### Restrictions
 Secret volume sources are validated to ensure that the specified object
 reference actually points to an object of type `Secret`.  Therefore, a secret
@@ -74,7 +125,28 @@ of very large secrets which would exhaust apiserver and kubelet memory.
 However, creation of many smaller secrets could also exhaust memory.  More
 comprehensive limits on memory usage due to secrets is a planned feature.
 
+Kubelet only supports use of secrets for Pods it gets from the API server.
+This includes any pods created using kubectl, or indirectly via a replication
+controller.  It does not include pods created via the kubelets
+`--manifest-url` flag, its `--config` flag, or its REST API (these are
+not common ways to create pods.)
+
 ### Consuming Secret Values
+
+Inside the container that mounts a secret volume, the secret keys appear as
+files and the secret values are base-64 decoded and stored inside these files.
+This is the result of commands
+executed inside the container from the example above:
+
+```
+$ ls /etc/foo/
+username
+password
+$ cat /etc/foo/username
+value-1
+$ cat /etc/foo/password
+value-2
+```
 
 The program in a container is responsible for reading the secret(s) from the
 files.  Currently, if a program expects a secret to be stored in an environment
@@ -84,22 +156,32 @@ versions of Kubernetes are expected to provide more automation for populating
 environment variables from files.
 
 
-## Changes to Secrets
+### Secret and Pod Lifetime interaction
 
-Once a pod is created, its secret volumes will not change, even if the secret
-resource is modified.  To change the secret used, the original pod must be
-deleted, and a new pod (perhaps with an identical PodSpec) must be created.
-Therefore, updating a secret follows the same workflow as deploying a new
-container image.  The `kubectl rollingupdate` command can be used ([man
-page](kubectl-rollingupdate.md)).
+When a pod is created via the API, there is no check whether a referenced
+secret exists.  Once a pod is scheduled, the kubelet will try to fetch the
+secret value.  If the secret cannot be fetched because it does not exist or
+because of a temporary lack of connection to the API server, kubelet will
+periodically retry.  It will report an event about the pod explaining the
+reason it is not started yet.  Once the a secret is fetched, the kubelet will
+create and mount a volume containing it.  None of the pod's containers will
+start until all the pod's volumes are mounted.
 
-The resourceVersion of the secret is not specified when it is referenced.
+Once the kubelet has started a pod's containers, its secret volumes will not
+change, even if the secret resource is modified.  To change the secret used,
+the original pod must be deleted, and a new pod (perhaps with an identical
+`PodSpec`) must be created.  Therefore, updating a secret follows the same
+workflow as deploying a new container image.  The `kubectl rolling-update`
+command can be used ([man page](kubectl_rolling-update.md)).
+
+The [`resourceVersion`](api-conventions.md#concurrency-control-and-consistency)
+of the secret is not specified when it is referenced.
 Therefore, if a secret is updated at about the same time as pods are starting,
 then it is not defined which version of the secret will be used for the pod. It
 is not possible currently to check what resource version of a secret object was
 used when a pod was created.  It is planned that pods will report this
-information, so that a controller could restart ones using a old
-resourceVersion.  In the interim, if this is a concern, it is recommended to not
+information, so that a replication controller restarts ones using an old
+`resourceVersion`.  In the interim, if this is a concern, it is recommended to not
 update the data of existing secrets, but to create new ones with distinct names.
 
 ## Use cases
@@ -111,7 +193,7 @@ To create a pod that uses an ssh key stored as a secret, we first need to create
 ```json
 {
   "kind": "Secret",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "ssh-key-secret"
   },
@@ -132,7 +214,7 @@ consumes it in a volume:
 ```json
 {
   "kind": "Pod",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "secret-test-pod",
     "labels": {
@@ -182,12 +264,12 @@ The secrets:
 
 ```json
 {
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "kind": "List",
   "items":
   [{
     "kind": "Secret",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
       "name": "prod-db-secret"
     },
@@ -198,7 +280,7 @@ The secrets:
   },
   {
     "kind": "Secret",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
       "name": "test-db-secret"
     },
@@ -214,12 +296,12 @@ The pods:
 
 ```json
 {
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "kind": "List",
   "items":
   [{
     "kind": "Pod",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
       "name": "prod-db-client-pod",
       "labels": {
@@ -252,7 +334,7 @@ The pods:
   },
   {
     "kind": "Pod",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
       "name": "test-db-client-pod",
       "labels": {
@@ -295,6 +377,30 @@ Both containers will have the following files present on their filesystems:
 Note how the specs for the two pods differ only in one field;  this facilitates
 creating pods with different capabilities from a common pod config template.
 
+You could further simplify the base pod specification by using two service accounts:
+one called, say, `prod-user` with the `prod-db-secret`, and one called, say,
+`test-user` with the `test-db-secret`.  Then, the pod spec can be shortened to, for example:
+```json
+{
+"kind": "Pod",
+"apiVersion": "v1",
+"metadata": {
+  "name": "prod-db-client-pod",
+  "labels": {
+    "name": "prod-db-client"
+  }
+},
+"spec": {
+  "serviceAccount": "prod-db-client",
+  "containers": [
+    {
+      "name": "db-client-container",
+      "image": "myClientImage",
+    }
+  ]
+}
+```
+
 ### Use-case: Secret visible to one container in a pod
 <a name="use-case-two-containers"></a>
 
@@ -311,6 +417,8 @@ to simple signing requests from the frontend (e.g. over localhost networking).
 With this partitioned approach, an attacker now has to trick the application
 server into doing something rather arbitrary, which may be harder than getting
 it to read a file.
+
+<!-- TODO: explain how to do this while still using automation. -->
 
 ## Security Properties
 

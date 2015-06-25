@@ -46,9 +46,6 @@ You can use --output=template --template=TEMPLATE to extract specific values.`
 	view_example = `// Show Merged kubeconfig settings.
 $ kubectl config view
 
-// Show only local kubeconfig settings
-$ kubectl config view --local
-
 // Get the password for the e2e user
 $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2e" }}{{ index .user.password }}{{end}}{{end}}'`
 )
@@ -119,7 +116,6 @@ func (o ViewOptions) Run(out io.Writer, printer kubectl.ResourcePrinter) error {
 }
 
 func (o *ViewOptions) Complete() bool {
-	// if --kubeconfig, --global, or --local is specified, then merging doesn't make sense since you're declaring precise intent
 	if o.ConfigAccess.IsExplicitFile() {
 		if !o.Merge.Provided() {
 			o.Merge.Set("false")

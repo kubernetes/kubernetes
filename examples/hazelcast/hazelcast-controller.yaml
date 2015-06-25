@@ -1,4 +1,4 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: ReplicationController
 metadata: 
   labels: 
@@ -16,9 +16,12 @@ spec:
       containers: 
         - resources:
             limits:
-              cpu: 1
-          image: pires/hazelcast-k8s:0.2
+              cpu: 0.5
+          image: quay.io/pires/hazelcast-kubernetes:0.3.1
           name: hazelcast
+          env:
+          - name: "DNS_DOMAIN"
+            value: "cluster.local"
           ports: 
             - containerPort: 5701
               name: hazelcast

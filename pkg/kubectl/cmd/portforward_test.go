@@ -41,34 +41,38 @@ func TestPortForward(t *testing.T) {
 
 	tests := []struct {
 		name, version, podPath, pfPath, container string
-		nsInQuery                                 bool
 		pod                                       *api.Pod
 		pfErr                                     bool
 	}{
 		{
-			name:      "v1beta1 - pod portforward",
-			version:   "v1beta1",
-			podPath:   "/api/v1beta1/pods/foo",
-			pfPath:    "/api/v1beta1/pods/foo/portforward",
-			nsInQuery: true,
-			pod:       execPod(),
+			name:    "v1beta3 - pod portforward",
+			version: "v1beta3",
+			podPath: "/api/v1beta3/namespaces/test/pods/foo",
+			pfPath:  "/api/v1beta3/namespaces/test/pods/foo/portforward",
+			pod:     execPod(),
 		},
 		{
-			name:      "v1beta3 - pod portforward",
-			version:   "v1beta3",
-			podPath:   "/api/v1beta3/namespaces/test/pods/foo",
-			pfPath:    "/api/v1beta3/namespaces/test/pods/foo/portforward",
-			nsInQuery: false,
-			pod:       execPod(),
+			name:    "v1beta3 - pod portforward error",
+			version: "v1beta3",
+			podPath: "/api/v1beta3/namespaces/test/pods/foo",
+			pfPath:  "/api/v1beta3/namespaces/test/pods/foo/portforward",
+			pod:     execPod(),
+			pfErr:   true,
 		},
 		{
-			name:      "v1beta3 - pod portforward error",
-			version:   "v1beta3",
-			podPath:   "/api/v1beta3/namespaces/test/pods/foo",
-			pfPath:    "/api/v1beta3/namespaces/test/pods/foo/portforward",
-			nsInQuery: false,
-			pod:       execPod(),
-			pfErr:     true,
+			name:    "v1 - pod portforward",
+			version: "v1",
+			podPath: "/api/v1/namespaces/test/pods/foo",
+			pfPath:  "/api/v1/namespaces/test/pods/foo/portforward",
+			pod:     execPod(),
+		},
+		{
+			name:    "v1 - pod portforward error",
+			version: "v1",
+			podPath: "/api/v1/namespaces/test/pods/foo",
+			pfPath:  "/api/v1/namespaces/test/pods/foo/portforward",
+			pod:     execPod(),
+			pfErr:   true,
 		},
 	}
 	for _, test := range tests {
@@ -78,11 +82,6 @@ func TestPortForward(t *testing.T) {
 			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
-					if test.nsInQuery {
-						if ns := req.URL.Query().Get("namespace"); ns != "test" {
-							t.Errorf("%s: did not get expected namespace: %s\n", test.name, ns)
-						}
-					}
 					body := objBody(codec, test.pod)
 					return &http.Response{StatusCode: 200, Body: body}, nil
 				default:

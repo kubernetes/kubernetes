@@ -24,7 +24,7 @@ import (
 
 func TestAdmission(t *testing.T) {
 	handler := NewAlwaysDeny()
-	err := handler.Admit(admission.NewAttributesRecord(nil, "Pod", "foo", "Pod", "ignored", nil))
+	err := handler.Admit(admission.NewAttributesRecord(nil, "kind", "namespace", "name", "resource", "subresource", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected error returned from admission handler")
 	}

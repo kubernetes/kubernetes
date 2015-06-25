@@ -2,7 +2,9 @@
 
 Use the [standalone.yaml](cloud-configs/standalone.yaml) cloud-config to provision a single node Kubernetes cluster.
 
-> **Attention**: This requires at least CoreOS version **653.0.0**.
+> **Attention**: This requires at least CoreOS version **[653.0.0][coreos653]**, as this was the first release to include etcd2.
+
+[coreos653]: https://coreos.com/releases/#653.0.0
 
 ### CoreOS image versions
 

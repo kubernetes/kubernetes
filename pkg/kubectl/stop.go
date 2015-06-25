@@ -26,14 +26,15 @@ import (
 )
 
 const (
-	shortInterval = time.Millisecond * 100
-	interval      = time.Second * 3
-	timeout       = time.Minute * 5
+	Interval = time.Second * 1
+	Timeout  = time.Minute * 5
 )
 
 // A Reaper handles terminating an object as gracefully as possible.
+// timeout is how long we'll wait for the termination to be successful
+// gracePeriod is time given to an API object for it to delete itself cleanly (e.g. pod shutdown)
 type Reaper interface {
-	Stop(namespace, name string, gracePeriod *api.DeleteOptions) (string, error)
+	Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error)
 }
 
 type NoSuchReaperError struct {
@@ -52,13 +53,17 @@ func IsNoSuchReaperError(err error) bool {
 func ReaperFor(kind string, c client.Interface) (Reaper, error) {
 	switch kind {
 	case "ReplicationController":
-		return &ReplicationControllerReaper{c, interval, timeout}, nil
+		return &ReplicationControllerReaper{c, Interval, Timeout}, nil
 	case "Pod":
 		return &PodReaper{c}, nil
 	case "Service":
 		return &ServiceReaper{c}, nil
 	}
 	return nil, &NoSuchReaperError{kind}
+}
+
+func ReaperForReplicationController(c client.Interface, timeout time.Duration) (Reaper, error) {
+	return &ReplicationControllerReaper{c, Interval, timeout}, nil
 }
 
 type ReplicationControllerReaper struct {
@@ -77,15 +82,22 @@ type objInterface interface {
 	Get(name string) (meta.Interface, error)
 }
 
-func (reaper *ReplicationControllerReaper) Stop(namespace, name string, gracePeriod *api.DeleteOptions) (string, error) {
+func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
 	rc := reaper.ReplicationControllers(namespace)
-	resizer, err := ResizerFor("ReplicationController", NewResizerClient(*reaper))
+	scaler, err := ScalerFor("ReplicationController", NewScalerClient(*reaper))
 	if err != nil {
 		return "", err
 	}
-	retry := &RetryParams{shortInterval, reaper.timeout}
-	waitForReplicas := &RetryParams{reaper.pollInterval, reaper.timeout}
-	if err = resizer.Resize(namespace, name, 0, nil, retry, waitForReplicas); err != nil {
+	if timeout == 0 {
+		rc, err := rc.Get(name)
+		if err != nil {
+			return "", err
+		}
+		timeout = Timeout + time.Duration(10*rc.Spec.Replicas)*time.Second
+	}
+	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
+	waitForReplicas := NewRetryParams(reaper.pollInterval, timeout)
+	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil {
 		return "", err
 	}
 	if err := rc.Delete(name); err != nil {
@@ -94,7 +106,7 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, gracePer
 	return fmt.Sprintf("%s stopped", name), nil
 }
 
-func (reaper *PodReaper) Stop(namespace, name string, gracePeriod *api.DeleteOptions) (string, error) {
+func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
 	pods := reaper.Pods(namespace)
 	_, err := pods.Get(name)
 	if err != nil {
@@ -107,7 +119,7 @@ func (reaper *PodReaper) Stop(namespace, name string, gracePeriod *api.DeleteOpt
 	return fmt.Sprintf("%s stopped", name), nil
 }
 
-func (reaper *ServiceReaper) Stop(namespace, name string, gracePeriod *api.DeleteOptions) (string, error) {
+func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
 	services := reaper.Services(namespace)
 	_, err := services.Get(name)
 	if err != nil {

@@ -25,7 +25,9 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 func TestMerge(t *testing.T) {
@@ -43,7 +45,7 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fragment: `{ "apiVersion": "v1beta1" }`,
+			fragment: `{ "apiVersion": "v1beta3" }`,
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
@@ -54,25 +56,46 @@ func TestMerge(t *testing.T) {
 				},
 			},
 		},
+		/* TODO: uncomment this test once Merge is updated to use
+		strategic-merge-patch. See #8449.
 		{
 			kind: "Pod",
 			obj: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						api.Container{
+							Name:  "c1",
+							Image: "red-image",
+						},
+						api.Container{
+							Name:  "c2",
+							Image: "blue-image",
+						},
+					},
+				},
 			},
-			fragment: `{ "apiVersion": "v1beta1", "id": "baz", "desiredState": { "host": "bar" } }`,
+			fragment: `{ "apiVersion": "v1beta3", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`,
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
-					Name: "baz",
+					Name: "foo",
 				},
 				Spec: api.PodSpec{
-					Host:          "bar",
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					Containers: []api.Container{
+						api.Container{
+							Name:  "c1",
+							Image: "green-image",
+						},
+						api.Container{
+							Name:  "c2",
+							Image: "blue-image",
+						},
+					},
 				},
 			},
-		},
+		}, */
 		{
 			kind: "Pod",
 			obj: &api.Pod{
@@ -109,24 +132,6 @@ func TestMerge(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			kind: "Pod",
-			obj: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-				},
-			},
-			fragment: `{ "apiVersion": "v1beta1", "id": null}`,
-			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-			},
-		},
-		{
 			kind:      "Service",
 			obj:       &api.Service{},
 			fragment:  `{ "apiVersion": "badVersion" }`,
@@ -137,10 +142,17 @@ func TestMerge(t *testing.T) {
 			obj: &api.Service{
 				Spec: api.ServiceSpec{},
 			},
-			fragment: `{ "apiVersion": "v1beta1", "port": 0 }`,
+			fragment: `{ "apiVersion": "v1beta3", "spec": { "ports": [ { "port": 0 } ] } }`,
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
+					Type:            api.ServiceTypeClusterIP,
+					Ports: []api.ServicePort{
+						{
+							Protocol: api.ProtocolTCP,
+							Port:     0,
+						},
+					},
 				},
 			},
 		},
@@ -153,10 +165,149 @@ func TestMerge(t *testing.T) {
 					},
 				},
 			},
-			fragment: `{ "apiVersion": "v1beta1", "selector": { "version": "v2" } }`,
+			fragment: `{ "apiVersion": "v1beta3", "spec": { "selector": { "version": "v2" } } }`,
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
+					Type:            api.ServiceTypeClusterIP,
+					Selector: map[string]string{
+						"version": "v2",
+					},
+				},
+			},
+		},
+		{
+			kind: "Pod",
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			fragment: `{ "apiVersion": "v1" }`,
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+		},
+		/* TODO: uncomment this test once Merge is updated to use
+		strategic-merge-patch. See #8449.
+		{
+			kind: "Pod",
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						api.Container{
+							Name:  "c1",
+							Image: "red-image",
+						},
+						api.Container{
+							Name:  "c2",
+							Image: "blue-image",
+						},
+					},
+				},
+			},
+			fragment: `{ "apiVersion": "v1", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`,
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						api.Container{
+							Name:  "c1",
+							Image: "green-image",
+						},
+						api.Container{
+							Name:  "c2",
+							Image: "blue-image",
+						},
+					},
+				},
+			},
+		}, */
+		{
+			kind: "Pod",
+			obj: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			fragment: `{ "apiVersion": "v1", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`,
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Volumes: []api.Volume{
+						{
+							Name:         "v1",
+							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+						},
+						{
+							Name:         "v2",
+							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+						},
+					},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+		},
+		{
+			kind:      "Pod",
+			obj:       &api.Pod{},
+			fragment:  "invalid json",
+			expected:  &api.Pod{},
+			expectErr: true,
+		},
+		{
+			kind:      "Service",
+			obj:       &api.Service{},
+			fragment:  `{ "apiVersion": "badVersion" }`,
+			expectErr: true,
+		},
+		{
+			kind: "Service",
+			obj: &api.Service{
+				Spec: api.ServiceSpec{},
+			},
+			fragment: `{ "apiVersion": "v1", "spec": { "ports": [ { "port": 0 } ] } }`,
+			expected: &api.Service{
+				Spec: api.ServiceSpec{
+					SessionAffinity: "None",
+					Type:            api.ServiceTypeClusterIP,
+					Ports: []api.ServicePort{
+						{
+							Protocol: api.ProtocolTCP,
+							Port:     0,
+						},
+					},
+				},
+			},
+		},
+		{
+			kind: "Service",
+			obj: &api.Service{
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"version": "v1",
+					},
+				},
+			},
+			fragment: `{ "apiVersion": "v1", "spec": { "selector": { "version": "v2" } } }`,
+			expected: &api.Service{
+				Spec: api.ServiceSpec{
+					SessionAffinity: "None",
+					Type:            api.ServiceTypeClusterIP,
 					Selector: map[string]string{
 						"version": "v2",
 					},
@@ -247,6 +398,39 @@ func TestReadConfigData(t *testing.T) {
 		}
 		if !test.expectErr && !reflect.DeepEqual(test.data, dataOut) {
 			t.Errorf("unexpected data: %v, expected %v", dataOut, test.data)
+		}
+	}
+}
+
+func TestCheckInvalidErr(t *testing.T) {
+	tests := []struct {
+		err      error
+		expected string
+	}{
+		{
+			errors.NewInvalid("Invalid1", "invalidation", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("Cause", "single", "details")}),
+			`Error from server: Invalid1 "invalidation" is invalid: Cause: invalid value 'single': details`,
+		},
+		{
+			errors.NewInvalid("Invalid2", "invalidation", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("Cause", "multi1", "details"), fielderrors.NewFieldInvalid("Cause", "multi2", "details")}),
+			`Error from server: Invalid2 "invalidation" is invalid: [Cause: invalid value 'multi1': details, Cause: invalid value 'multi2': details]`,
+		},
+		{
+			errors.NewInvalid("Invalid3", "invalidation", fielderrors.ValidationErrorList{}),
+			`Error from server: Invalid3 "invalidation" is invalid: <nil>`,
+		},
+	}
+
+	var errReturned string
+	errHandle := func(err string) {
+		errReturned = err
+	}
+
+	for _, test := range tests {
+		checkErr(test.err, errHandle)
+
+		if errReturned != test.expected {
+			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
 		}
 	}
 }

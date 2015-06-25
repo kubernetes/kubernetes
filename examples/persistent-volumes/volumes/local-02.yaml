@@ -1,13 +1,14 @@
 kind: PersistentVolume
-apiVersion: v1beta3
+apiVersion: v1
 metadata:
   name: pv0002
   labels:
     type: local
 spec:
   capacity:
-    storage: 5Gi
+    storage: 8Gi
   accessModes:
     - ReadWriteOnce
   hostPath:
     path: "/tmp/data02"
+  persistentVolumeReclaimPolicy: Recycle

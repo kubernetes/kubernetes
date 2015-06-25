@@ -21,6 +21,7 @@ import (
 
 	cmdconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/config"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 
 	"github.com/spf13/cobra"
@@ -81,7 +82,7 @@ __custom_func() {
 	    __kubectl_get_resource
             return
             ;;
-	kubectl_log)
+	kubectl_logs)
 	    __kubectl_require_pod_and_container
 	    return
 	    ;;
@@ -107,6 +108,9 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 
 	f.BindFlags(cmds.PersistentFlags())
 
+	// From this point and forward we get warnings on flags that contain "_" separators
+	cmds.SetGlobalNormalizationFunc(util.WarnWordSepNormalizeFunc)
+
 	cmds.AddCommand(NewCmdGet(f, out))
 	cmds.AddCommand(NewCmdDescribe(f, out))
 	cmds.AddCommand(NewCmdCreate(f, out))
@@ -116,13 +120,13 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdNamespace(out))
 	cmds.AddCommand(NewCmdLog(f, out))
 	cmds.AddCommand(NewCmdRollingUpdate(f, out))
-	cmds.AddCommand(NewCmdResize(f, out))
+	cmds.AddCommand(NewCmdScale(f, out))
 
 	cmds.AddCommand(NewCmdExec(f, in, out, err))
 	cmds.AddCommand(NewCmdPortForward(f))
 	cmds.AddCommand(NewCmdProxy(f, out))
 
-	cmds.AddCommand(NewCmdRunContainer(f, out))
+	cmds.AddCommand(NewCmdRun(f, out))
 	cmds.AddCommand(NewCmdStop(f, out))
 	cmds.AddCommand(NewCmdExposeService(f, out))
 

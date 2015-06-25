@@ -20,8 +20,11 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 )
 
 func getResourceList(cpu, memory string) api.ResourceList {
@@ -45,7 +48,8 @@ func getResourceRequirements(limits, requests api.ResourceList) api.ResourceRequ
 func validLimitRange() api.LimitRange {
 	return api.LimitRange{
 		ObjectMeta: api.ObjectMeta{
-			Name: "abc",
+			Name:      "abc",
+			Namespace: "test",
 		},
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{
@@ -65,9 +69,32 @@ func validLimitRange() api.LimitRange {
 	}
 }
 
+func validLimitRangeNoDefaults() api.LimitRange {
+	return api.LimitRange{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "abc",
+			Namespace: "test",
+		},
+		Spec: api.LimitRangeSpec{
+			Limits: []api.LimitRangeItem{
+				{
+					Type: api.LimitTypePod,
+					Max:  getResourceList("200m", "4Gi"),
+					Min:  getResourceList("50m", "2Mi"),
+				},
+				{
+					Type: api.LimitTypeContainer,
+					Max:  getResourceList("100m", "2Gi"),
+					Min:  getResourceList("25m", "1Mi"),
+				},
+			},
+		},
+	}
+}
+
 func validPod(name string, numContainers int, resources api.ResourceRequirements) api.Pod {
 	pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: name},
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test"},
 		Spec:       api.PodSpec{},
 	}
 	pod.Spec.Containers = make([]api.Container, 0, numContainers)
@@ -84,7 +111,7 @@ func TestDefaultContainerResourceRequirements(t *testing.T) {
 	limitRange := validLimitRange()
 	expected := api.ResourceRequirements{
 		Limits:   getResourceList("50m", "5Mi"),
-		Requests: getResourceList("25m", "1Mi"),
+		Requests: api.ResourceList{},
 	}
 
 	actual := defaultContainerResourceRequirements(&limitRange)
@@ -118,10 +145,7 @@ func TestMergePodResourceRequirements(t *testing.T) {
 			api.ResourceCPU:    defaultRequirements.Limits[api.ResourceCPU],
 			api.ResourceMemory: resource.MustParse("512Mi"),
 		},
-		Requests: api.ResourceList{
-			api.ResourceCPU:    defaultRequirements.Requests[api.ResourceCPU],
-			api.ResourceMemory: defaultRequirements.Requests[api.ResourceMemory],
-		},
+		Requests: api.ResourceList{},
 	}
 	mergePodResourceRequirements(&pod, &defaultRequirements)
 	for i := range pod.Spec.Containers {
@@ -194,4 +218,30 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestLimitRangerIgnoresSubresource(t *testing.T) {
+	client := testclient.NewSimpleFake()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	handler := &limitRanger{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		client:    client,
+		limitFunc: Limit,
+		indexer:   indexer,
+	}
+
+	limitRange := validLimitRangeNoDefaults()
+	testPod := validPod("testPod", 1, api.ResourceRequirements{})
+
+	indexer.Add(&limitRange)
+	err := handler.Admit(admission.NewAttributesRecord(&testPod, "Pod", limitRange.Namespace, "testPod", "pods", "", admission.Update, nil))
+	if err == nil {
+		t.Errorf("Expected an error since the pod did not specify resource limits in its update call")
+	}
+
+	err = handler.Admit(admission.NewAttributesRecord(&testPod, "Pod", limitRange.Namespace, "testPod", "pods", "status", admission.Update, nil))
+	if err != nil {
+		t.Errorf("Should have ignored calls to any subresource of pod %v", err)
+	}
+
 }

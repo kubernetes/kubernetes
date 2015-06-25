@@ -53,6 +53,8 @@ func init() {
 var _ = admission.Interface(&serviceAccount{})
 
 type serviceAccount struct {
+	*admission.Handler
+
 	// LimitSecretReferences rejects pods that reference secrets their service accounts do not reference
 	LimitSecretReferences bool
 	// MountServiceAccountToken creates Volume and VolumeMounts for the first referenced ServiceAccountToken for the pod's service account
@@ -72,7 +74,8 @@ type serviceAccount struct {
 // 1. If the pod does not specify a ServiceAccount, it sets the pod's ServiceAccount to "default"
 // 2. It ensures the ServiceAccount referenced by the pod exists
 // 3. If LimitSecretReferences is true, it rejects the pod if the pod references Secret objects which the pod's ServiceAccount does not reference
-// 4. If MountServiceAccountToken is true, it adds a VolumeMount with the pod's ServiceAccount's api token secret to containers
+// 4. If the pod does not contain any ImagePullSecrets, the ImagePullSecrets of the service account are added.
+// 5. If MountServiceAccountToken is true, it adds a VolumeMount with the pod's ServiceAccount's api token secret to containers
 func NewServiceAccount(cl client.Interface) *serviceAccount {
 	serviceAccountsIndexer, serviceAccountsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
@@ -102,6 +105,7 @@ func NewServiceAccount(cl client.Interface) *serviceAccount {
 	)
 
 	return &serviceAccount{
+		Handler: admission.NewHandler(admission.Create),
 		// TODO: enable this once we've swept secret usage to account for adding secret references to service accounts
 		LimitSecretReferences: false,
 		// Auto mount service account API token secrets
@@ -130,10 +134,6 @@ func (s *serviceAccount) Stop() {
 }
 
 func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
-	// We only care about Pod CREATE operations
-	if a.GetOperation() != "CREATE" {
-		return nil
-	}
 	if a.GetResource() != string(api.ResourcePods) {
 		return nil
 	}
@@ -150,7 +150,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
 	if _, isMirrorPod := pod.Annotations[kubelet.ConfigMirrorAnnotationKey]; isMirrorPod {
-		if len(pod.Spec.ServiceAccount) != 0 {
+		if len(pod.Spec.ServiceAccountName) != 0 {
 			return admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference service accounts"))
 		}
 		for _, volume := range pod.Spec.Volumes {
@@ -162,17 +162,17 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	}
 
 	// Set the default service account if needed
-	if len(pod.Spec.ServiceAccount) == 0 {
-		pod.Spec.ServiceAccount = DefaultServiceAccountName
+	if len(pod.Spec.ServiceAccountName) == 0 {
+		pod.Spec.ServiceAccountName = DefaultServiceAccountName
 	}
 
 	// Ensure the referenced service account exists
-	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccount)
+	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccount, err))
+		return admission.NewForbidden(a, fmt.Errorf("Error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
 	}
 	if serviceAccount == nil {
-		return admission.NewForbidden(a, fmt.Errorf("Missing service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccount, err))
+		return admission.NewForbidden(a, fmt.Errorf("Missing service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
 	}
 
 	if s.LimitSecretReferences {
@@ -185,6 +185,11 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		if err := s.mountServiceAccountToken(serviceAccount, pod); err != nil {
 			return admission.NewForbidden(a, err)
 		}
+	}
+
+	if len(pod.Spec.ImagePullSecrets) == 0 {
+		pod.Spec.ImagePullSecrets = make([]api.LocalObjectReference, len(serviceAccount.ImagePullSecrets))
+		copy(pod.Spec.ImagePullSecrets, serviceAccount.ImagePullSecrets)
 	}
 
 	return nil
@@ -283,9 +288,9 @@ func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAcco
 
 func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccount, pod *api.Pod) error {
 	// Ensure all secrets the pod references are allowed by the service account
-	referencedSecrets := util.NewStringSet()
+	mountableSecrets := util.NewStringSet()
 	for _, s := range serviceAccount.Secrets {
-		referencedSecrets.Insert(s.Name)
+		mountableSecrets.Insert(s.Name)
 	}
 	for _, volume := range pod.Spec.Volumes {
 		source := volume.VolumeSource
@@ -293,8 +298,19 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccoun
 			continue
 		}
 		secretName := source.Secret.SecretName
-		if !referencedSecrets.Has(secretName) {
+		if !mountableSecrets.Has(secretName) {
 			return fmt.Errorf("Volume with secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", secretName, serviceAccount.Name)
+		}
+	}
+
+	// limit pull secret references as well
+	pullSecrets := util.NewStringSet()
+	for _, s := range serviceAccount.ImagePullSecrets {
+		pullSecrets.Insert(s.Name)
+	}
+	for i, pullSecretRef := range pod.Spec.ImagePullSecrets {
+		if !pullSecrets.Has(pullSecretRef.Name) {
+			return fmt.Errorf(`imagePullSecrets[%d].name="%s" is not allowed because service account %s does not reference that imagePullSecret`, i, pullSecretRef.Name, serviceAccount.Name)
 		}
 	}
 	return nil

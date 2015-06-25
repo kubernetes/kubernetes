@@ -8,7 +8,7 @@ It assumes some familiarity with concepts in the [User Guide](user-guide.md).
 There are many different examples of how to setup a kubernetes cluster.  Many of them are listed in this
 [matrix](getting-started-guides/README.md).  We call each of the combinations in this matrix a *distro*.
 
-Before chosing a particular guide, here are some things to consider:
+Before choosing a particular guide, here are some things to consider:
  - Are you just looking to try out Kubernetes on your laptop, or build a high-availability many-node cluster? Both
    models are supported, but some distros are better for one case or the other.
  - Will you be using a hosted Kubernetes cluster, such as [GKE](https://cloud.google.com/container-engine), or setting
@@ -69,6 +69,8 @@ project.](salt.md).
 * **Authentication**  [authentication]( authentication.md)
 
 * **Authorization** [authorization]( authorization.md)
+
+* **Admission Controllers** [admission_controllers]( admission_controllers.md)
 
 
 

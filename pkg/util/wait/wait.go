@@ -45,6 +45,8 @@ type ConditionFunc func() (done bool, err error)
 // may be missed if the condition takes too long or the time window is too short.
 // If you pass maxTimes = 0, Poll will loop until condition returns true or an
 // error.
+// Poll always waits the interval before the first check of the condition.
+// TODO: create a separate PollImmediate function that does not wait.
 func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
 	return WaitFor(poller(interval, timeout), condition)
 }
@@ -57,7 +59,7 @@ type WaitFunc func() <-chan struct{}
 // placed on the channel and once more when the channel is closed.  If c
 // returns an error the loop ends and that error is returned, and if c returns
 // true the loop ends and nil is returned. ErrWaitTimeout will be returned if
-// the channel is closed without c every returning true.
+// the channel is closed without c ever returning true.
 func WaitFor(wait WaitFunc, c ConditionFunc) error {
 	w := wait()
 	for {

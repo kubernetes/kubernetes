@@ -57,6 +57,26 @@ func TestDec(t *testing.T) {
 	}
 }
 
+// TestQuantityParseZero ensures that when a 0 quantity is passed, its string value is 0
+func TestQuantityParseZero(t *testing.T) {
+	zero := MustParse("0")
+	if expected, actual := "0", zero.String(); expected != actual {
+		t.Errorf("Expected %v, actual %v", expected, actual)
+	}
+}
+
+// Verifies that you get 0 as canonical value if internal value is 0, and not 0<suffix>
+func TestQuantityCanocicalizeZero(t *testing.T) {
+	val := MustParse("1000m")
+	x := val.Amount
+	y := dec(1, 0)
+	z := val.Amount.Sub(x, y)
+	zero := Quantity{z, DecimalSI}
+	if expected, actual := "0", zero.String(); expected != actual {
+		t.Errorf("Expected %v, actual %v", expected, actual)
+	}
+}
+
 func TestQuantityParse(t *testing.T) {
 	table := []struct {
 		input  string

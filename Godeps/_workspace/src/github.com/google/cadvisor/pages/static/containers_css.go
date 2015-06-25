@@ -39,6 +39,17 @@ const containersCss = `
 .isolation-title {
 	color:#FFFFFF;
 }
+.table-row {
+    font-family: "courier", "monospace";
+    font-size: 15px;
+    text-align: right;
+    vertical-align: top;
+    border: 5px;
+    margin-left: 3px;
+    margin-right: 3px;
+    margin-top: 3px;
+    margin-bottom: 3px;
+}
 #logo {
     height: 200px;
     margin-top: 20px;

@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// AddPrinterFlags adds printing related flags to a command (e.g. output format, no headers, template path)
 func AddPrinterFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|template|templatefile.")
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")

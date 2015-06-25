@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -69,12 +70,14 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(err)
 		},
 	}
-	usage := "Filename, directory, or URL to a file containing the resource to delete"
+	usage := "Filename, directory, or URL to a file containing the resource to delete."
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
-	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
+	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
+	cmd.Flags().Bool("ignore-not-found", false, "Treat \"resource not found\" as a successful delete.")
 	cmd.Flags().Bool("cascade", true, "If true, cascade the delete resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
 	cmd.Flags().Int("grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
+	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
 	return cmd
 }
 
@@ -98,20 +101,24 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return err
 	}
 
+	ignoreNotFound := cmdutil.GetFlagBool(cmd, "ignore-not-found")
 	// By default use a reaper to delete all related resources.
 	if cmdutil.GetFlagBool(cmd, "cascade") {
-		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), cmdutil.GetFlagInt(cmd, "grace-period"))
+		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"))
 	}
-	return DeleteResult(r, out)
+	return DeleteResult(r, out, ignoreNotFound)
 }
 
-func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefaultDelete bool, gracePeriod int) error {
+func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int) error {
 	found := 0
-	err := r.IgnoreErrors(errors.IsNotFound).Visit(func(info *resource.Info) error {
+	if ignoreNotFound {
+		r = r.IgnoreErrors(errors.IsNotFound)
+	}
+	err := r.Visit(func(info *resource.Info) error {
 		found++
 		reaper, err := f.Reaper(info.Mapping)
 		if err != nil {
-			// If the error is "not found" and the user didn't explicitly ask for stop.
+			// If there is no reaper for this resources and the user didn't explicitly ask for stop.
 			if kubectl.IsNoSuchReaperError(err) && isDefaultDelete {
 				return deleteResource(info, out)
 			}
@@ -121,7 +128,7 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 		if gracePeriod >= 0 {
 			options = api.NewDeleteOptions(int64(gracePeriod))
 		}
-		if _, err := reaper.Stop(info.Namespace, info.Name, options); err != nil {
+		if _, err := reaper.Stop(info.Namespace, info.Name, timeout, options); err != nil {
 			return err
 		}
 		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
@@ -136,9 +143,12 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 	return nil
 }
 
-func DeleteResult(r *resource.Result, out io.Writer) error {
+func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool) error {
 	found := 0
-	err := r.IgnoreErrors(errors.IsNotFound).Visit(func(info *resource.Info) error {
+	if ignoreNotFound {
+		r = r.IgnoreErrors(errors.IsNotFound)
+	}
+	err := r.Visit(func(info *resource.Info) error {
 		found++
 		return deleteResource(info, out)
 	})

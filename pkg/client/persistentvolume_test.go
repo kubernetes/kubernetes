@@ -28,9 +28,6 @@ import (
 )
 
 func getPersistentVolumesResoureName() string {
-	if api.PreV1Beta3(testapi.Version()) {
-		return "persistentVolumes"
-	}
 	return "persistentvolumes"
 }
 
@@ -151,7 +148,8 @@ func TestPersistentVolumeStatusUpdate(t *testing.T) {
 			},
 		},
 		Status: api.PersistentVolumeStatus{
-			Phase: api.VolumeBound,
+			Phase:   api.VolumeBound,
+			Message: "foo",
 		},
 	}
 	c := &testClient{

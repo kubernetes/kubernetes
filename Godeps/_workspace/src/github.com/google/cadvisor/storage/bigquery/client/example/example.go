@@ -84,25 +84,4 @@ func main() {
 			panic(err)
 		}
 	}
-
-	// Query
-	tableName, err := c.GetTableName()
-	if err != nil {
-		fmt.Printf("table not set")
-		panic(err)
-	}
-
-	query := "SELECT * FROM " + tableName + " ORDER BY Timestamp LIMIT 100"
-	header, rows, err := c.Query(query)
-	if err != nil {
-		fmt.Printf("Failed query")
-		panic(err)
-	}
-	fmt.Printf("Headers: %v", header)
-	for _, row := range rows {
-		for i, val := range row {
-			fmt.Printf("%s:%v ", header[i], val)
-		}
-		fmt.Printf("\n")
-	}
 }

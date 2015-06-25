@@ -115,7 +115,7 @@ func (spec *Spec) Run(writer io.Writer) {
 	}()
 
 	for sample := 0; sample < spec.subject.Samples(); sample++ {
-		spec.state, spec.failure = spec.runSample(sample, writer)
+		spec.runSample(sample, writer)
 
 		if spec.state != types.SpecStatePassed {
 			return
@@ -123,9 +123,9 @@ func (spec *Spec) Run(writer io.Writer) {
 	}
 }
 
-func (spec *Spec) runSample(sample int, writer io.Writer) (specState types.SpecState, specFailure types.SpecFailure) {
-	specState = types.SpecStatePassed
-	specFailure = types.SpecFailure{}
+func (spec *Spec) runSample(sample int, writer io.Writer) {
+	spec.state = types.SpecStatePassed
+	spec.failure = types.SpecFailure{}
 	innerMostContainerIndexToUnwind := -1
 
 	defer func() {
@@ -134,9 +134,9 @@ func (spec *Spec) runSample(sample int, writer io.Writer) (specState types.SpecS
 			for _, afterEach := range container.SetupNodesOfType(types.SpecComponentTypeAfterEach) {
 				spec.announceSetupNode(writer, "AfterEach", container, afterEach)
 				afterEachState, afterEachFailure := afterEach.Run()
-				if afterEachState != types.SpecStatePassed && specState == types.SpecStatePassed {
-					specState = afterEachState
-					specFailure = afterEachFailure
+				if afterEachState != types.SpecStatePassed && spec.state == types.SpecStatePassed {
+					spec.state = afterEachState
+					spec.failure = afterEachFailure
 				}
 			}
 		}
@@ -146,8 +146,8 @@ func (spec *Spec) runSample(sample int, writer io.Writer) (specState types.SpecS
 		innerMostContainerIndexToUnwind = i
 		for _, beforeEach := range container.SetupNodesOfType(types.SpecComponentTypeBeforeEach) {
 			spec.announceSetupNode(writer, "BeforeEach", container, beforeEach)
-			specState, specFailure = beforeEach.Run()
-			if specState != types.SpecStatePassed {
+			spec.state, spec.failure = beforeEach.Run()
+			if spec.state != types.SpecStatePassed {
 				return
 			}
 		}
@@ -156,17 +156,15 @@ func (spec *Spec) runSample(sample int, writer io.Writer) (specState types.SpecS
 	for _, container := range spec.containers {
 		for _, justBeforeEach := range container.SetupNodesOfType(types.SpecComponentTypeJustBeforeEach) {
 			spec.announceSetupNode(writer, "JustBeforeEach", container, justBeforeEach)
-			specState, specFailure = justBeforeEach.Run()
-			if specState != types.SpecStatePassed {
+			spec.state, spec.failure = justBeforeEach.Run()
+			if spec.state != types.SpecStatePassed {
 				return
 			}
 		}
 	}
 
 	spec.announceSubject(writer, spec.subject)
-	specState, specFailure = spec.subject.Run()
-
-	return
+	spec.state, spec.failure = spec.subject.Run()
 }
 
 func (spec *Spec) announceSetupNode(writer io.Writer, nodeType string, container *containernode.ContainerNode, setupNode leafnodes.BasicNode) {

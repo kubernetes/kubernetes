@@ -4,13 +4,14 @@ In Kubernetes, rather than individual application containers, _pods_ are the sma
 
 ## What is a _pod_?
 
-A _pod_ (as in a pod of whales or pea pod) corresponds to a colocated group of applications running with a shared context. Within that context, the applications may also have individual cgroup isolations applied. A pod models an application-specific "logical host" in a containerized environment. It may contain one or more applications which are relatively tightly coupled -- in a pre-container world, they would have executed on the same physical or virtual host.
+A _pod_ (as in a pod of whales or pea pod) corresponds to a colocated group of applications running with a shared context. Within that context, the applications may also have individual cgroup isolations applied. A pod models an application-specific "logical host" in a containerized environment. It may contain one or more applications which are relatively tightly coupled &mdash; in a pre-container world, they would have executed on the same physical or virtual host.
 
 The context of the pod can be defined as the conjunction of several Linux namespaces:
-- PID namespace (applications within the pod can see each other's processes)
-- network namespace (applications within the pod have access to the same IP and port space)
-- IPC namespace (applications within the pod can use SystemV IPC or POSIX message queues to communicate)
-- UTS namespace (applications within the pod share a hostname)
+
+* PID namespace (applications within the pod can see each other's processes)
+* network namespace (applications within the pod have access to the same IP and port space)
+* IPC namespace (applications within the pod can use SystemV IPC or POSIX message queues to communicate)
+* UTS namespace (applications within the pod share a hostname)
 
 Applications within a pod also have access to shared volumes, which are defined at the pod level and made available in each application's filesystem. Additionally, a pod may define top-level cgroup isolations which form an outer bound to any individual isolation applied to constituent applications.
 
@@ -35,11 +36,12 @@ Pods also simplify application deployment and management by providing a higher-l
 ## Uses of pods
 
 Pods can be used to host vertically integrated application stacks, but their primary motivation is to support co-located, co-managed helper programs, such as:
-- content management systems, file and data loaders, local cache managers, etc.
-- log and checkpoint backup, compression, rotation, snapshotting, etc.
-- data change watchers, log tailers, logging and monitoring adapters, event publishers, etc.
-- proxies, bridges, and adapters
-- controllers, managers, configurators, and updaters
+
+* content management systems, file and data loaders, local cache managers, etc.
+* log and checkpoint backup, compression, rotation, snapshotting, etc.
+* data change watchers, log tailers, logging and monitoring adapters, event publishers, etc.
+* proxies, bridges, and adapters
+* controllers, managers, configurators, and updaters
 
 Individual pods are not intended to run multiple instances of the same application, in general.
 
@@ -62,14 +64,15 @@ Pods aren't intended to be treated as durable [pets](https://blog.engineyard.com
 
 In general, users shouldn't need to create pods directly. They should almost always use controllers (e.g., [replication controller](replication-controller.md)), even for singletons.  Controllers provide self-healing with a cluster scope, as well as replication and rollout management. 
 
-The use of collective APIs as the primary user-facing primitive is relatively common among cluster scheduling systems, including [Borg](https://research.google.com/pubs/pub43438.html), [Marathon](https://mesosphere.github.io/marathon/docs/rest-api.html, https://github.com/gambol99/go-marathon/blob/master/application.go), [Aurora](http://aurora.apache.org/documentation/latest/configuration-reference/#job-schema), and [Tupperware](http://www.slideshare.net/Docker/aravindnarayanan-facebook140613153626phpapp02-37588997).
+The use of collective APIs as the primary user-facing primitive is relatively common among cluster scheduling systems, including [Borg](https://research.google.com/pubs/pub43438.html), [Marathon](https://mesosphere.github.io/marathon/docs/rest-api.html), [Aurora](http://aurora.apache.org/documentation/latest/configuration-reference/#job-schema), and [Tupperware](http://www.slideshare.net/Docker/aravindnarayanan-facebook140613153626phpapp02-37588997).
 
 Pod is exposed as a primitive in order to facilitate:
+
 * scheduler and controller pluggability
 * support for pod-level operations without the need to "proxy" them via controller APIs  
 * decoupling of pod lifetime from controller lifetime, such as for bootstrapping
-* decoupling of controllers and services -- the endpoint controller just watches pods
-* clean composition of Kubelet-level functionality with cluster-level functionality -- Kubelet is effectively the "pod controller"
+* decoupling of controllers and services &mdash; the endpoint controller just watches pods
+* clean composition of Kubelet-level functionality with cluster-level functionality &mdash; Kubelet is effectively the "pod controller"
 * high-availability applications, which will expect pods to be replaced in advance of their termination and certainly in advance of deletion, such as in the case of planned evictions, image prefetching, or live pod migration [#3949](https://github.com/GoogleCloudPlatform/kubernetes/issues/3949)
 
 The current best practice for pets is to create a replication controller with `replicas` equal to `1` and a corresponding service. If you find this cumbersome, please comment on [issue #260](https://github.com/GoogleCloudPlatform/kubernetes/issues/260). 

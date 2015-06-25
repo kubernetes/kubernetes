@@ -428,7 +428,7 @@ func chooseHostInterfaceNativeGo() (net.IP, error) {
 	if ip == nil {
 		return nil, fmt.Errorf("no acceptable interface from host")
 	}
-	glog.V(4).Infof("Choosing interface %s for from-host portals", intfs[i].Name)
+	glog.V(4).Infof("Choosing interface %s (IP %v) as default", intfs[i].Name, ip)
 	return ip, nil
 }
 
@@ -507,4 +507,21 @@ func GetClient(req *http.Request) string {
 		}
 	}
 	return "unknown"
+}
+
+func ShortenString(str string, n int) string {
+	if len(str) <= n {
+		return str
+	} else {
+		return str[:n]
+	}
+}
+
+func FileExists(filename string) (bool, error) {
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
 }

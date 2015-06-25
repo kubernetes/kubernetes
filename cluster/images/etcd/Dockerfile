@@ -1,4 +1,4 @@
-FROM scratch
+FROM busybox
 MAINTAINER  Dawn Chen <dawnchen@google.com>
 
 ADD ./etcd /usr/local/bin/etcd

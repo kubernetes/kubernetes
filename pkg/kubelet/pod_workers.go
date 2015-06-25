@@ -34,7 +34,7 @@ type PodWorkers interface {
 	ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty)
 }
 
-type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod) error
+type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod, SyncPodType) error
 
 type podWorkers struct {
 	// Protects all per worker fields.
@@ -71,6 +71,9 @@ type workUpdate struct {
 
 	// Function to call when the update is complete.
 	updateCompleteFn func()
+
+	// A string describing the type of this update, eg: create
+	updateType SyncPodType
 }
 
 func newPodWorkers(runtimeCache kubecontainer.RuntimeCache, syncPodFn syncPodFnType,
@@ -103,7 +106,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 			}
 
 			err = p.syncPodFn(newWork.pod, newWork.mirrorPod,
-				kubecontainer.Pods(pods).FindPodByID(newWork.pod.UID))
+				kubecontainer.Pods(pods).FindPodByID(newWork.pod.UID), newWork.updateType)
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
 				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)
@@ -122,6 +125,14 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete 
 	var podUpdates chan workUpdate
 	var exists bool
 
+	// TODO: Pipe this through from the kubelet. Currently kubelets operating with
+	// snapshot updates (PodConfigNotificationSnapshot) will send updates, creates
+	// and deletes as SET operations, which makes updates indistinguishable from
+	// creates. The intent here is to communicate to the pod worker that it can take
+	// certain liberties, like skipping status generation, when it receives a create
+	// event for a pod.
+	updateType := SyncPodUpdate
+
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	if podUpdates, exists = p.podUpdates[uid]; !exists {
@@ -131,6 +142,12 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete 
 		// the channel is empty, so buffer of size 1 is enough.
 		podUpdates = make(chan workUpdate, 1)
 		p.podUpdates[uid] = podUpdates
+
+		// Creating a new pod worker either means this is a new pod, or that the
+		// kubelet just restarted. In either case the kubelet is willing to believe
+		// the status of the pod for the first pod worker sync. See corresponding
+		// comment in syncPod.
+		updateType = SyncPodCreate
 		go func() {
 			defer util.HandleCrash()
 			p.managePodLoop(podUpdates)
@@ -142,12 +159,14 @@ func (p *podWorkers) UpdatePod(pod *api.Pod, mirrorPod *api.Pod, updateComplete 
 			pod:              pod,
 			mirrorPod:        mirrorPod,
 			updateCompleteFn: updateComplete,
+			updateType:       updateType,
 		}
 	} else {
 		p.lastUndeliveredWorkUpdate[pod.UID] = workUpdate{
 			pod:              pod,
 			mirrorPod:        mirrorPod,
 			updateCompleteFn: updateComplete,
+			updateType:       updateType,
 		}
 	}
 }

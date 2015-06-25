@@ -33,15 +33,15 @@ import (
 
 type sourceURL struct {
 	url      string
-	hostname string
+	nodeName string
 	updates  chan<- interface{}
 	data     []byte
 }
 
-func NewSourceURL(url, hostname string, period time.Duration, updates chan<- interface{}) {
+func NewSourceURL(url, nodeName string, period time.Duration, updates chan<- interface{}) {
 	config := &sourceURL{
 		url:      url,
-		hostname: hostname,
+		nodeName: nodeName,
 		updates:  updates,
 		data:     nil,
 	}
@@ -56,7 +56,7 @@ func (s *sourceURL) run() {
 }
 
 func (s *sourceURL) applyDefaults(pod *api.Pod) error {
-	return applyDefaults(pod, s.url, false, s.hostname)
+	return applyDefaults(pod, s.url, false, s.nodeName)
 }
 
 func (s *sourceURL) extractFromURL() error {
@@ -77,49 +77,11 @@ func (s *sourceURL) extractFromURL() error {
 		s.updates <- kubelet.PodUpdate{[]*api.Pod{}, kubelet.SET, kubelet.HTTPSource}
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
-	// Short circuit if the manifest has not changed since the last time it was read.
+	// Short circuit if the data has not changed since the last time it was read.
 	if bytes.Compare(data, s.data) == 0 {
 		return nil
 	}
 	s.data = data
-
-	// First try as if it's a single manifest
-	parsed, manifest, pod, singleErr := tryDecodeSingleManifest(data, s.applyDefaults)
-	if parsed {
-		if singleErr != nil {
-			// It parsed but could not be used.
-			return singleErr
-		}
-		// It parsed!
-		s.updates <- kubelet.PodUpdate{[]*api.Pod{pod}, kubelet.SET, kubelet.HTTPSource}
-		return nil
-	}
-
-	// That didn't work, so try an array of manifests.
-	parsed, manifests, podList, multiErr := tryDecodeManifestList(data, s.applyDefaults)
-	if parsed {
-		if multiErr != nil {
-			// It parsed but could not be used.
-			return multiErr
-		}
-		// A single manifest that did not pass semantic validation will yield an empty
-		// array of manifests (and no error) when unmarshaled as such.  In that case,
-		// if the single manifest at least had a Version, we return the single-manifest
-		// error (if any).
-		if len(manifests) == 0 && len(manifest.Version) != 0 {
-			return singleErr
-		}
-		// It parsed!
-		pods := make([]*api.Pod, 0)
-		for i := range podList.Items {
-			pods = append(pods, &podList.Items[i])
-		}
-		s.updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.HTTPSource}
-		return nil
-	}
-
-	// Parsing it as ContainerManifest(s) failed.
-	// Try to parse it as Pod(s).
 
 	// First try as it is a single pod.
 	parsed, pod, singlePodErr := tryDecodeSinglePod(data, s.applyDefaults)
@@ -147,9 +109,7 @@ func (s *sourceURL) extractFromURL() error {
 		return nil
 	}
 
-	return fmt.Errorf("%v: received '%v', but couldn't parse as neither "+
-		"single (%v: %+v) or multiple manifests (%v: %+v) nor "+
+	return fmt.Errorf("%v: received '%v', but couldn't parse as "+
 		"single (%v) or multiple pods (%v).\n",
-		s.url, string(data), singleErr, manifest, multiErr, manifests,
-		singlePodErr, multiPodErr)
+		s.url, string(data), singlePodErr, multiPodErr)
 }

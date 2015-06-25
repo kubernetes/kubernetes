@@ -38,6 +38,9 @@ func TestCanSupport(t *testing.T) {
 	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
+	if !plug.CanSupport(&volume.Spec{Name: "foo", PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{}}}) {
+		t.Errorf("Expected true")
+	}
 	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{}}) {
 		t.Errorf("Expected false")
 	}
@@ -54,6 +57,47 @@ func TestGetAccessModes(t *testing.T) {
 	if len(plug.GetAccessModes()) != 1 || plug.GetAccessModes()[0] != api.ReadWriteOnce {
 		t.Errorf("Expected %s PersistentVolumeAccessMode", api.ReadWriteOnce)
 	}
+}
+
+func TestRecycler(t *testing.T) {
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, newMockRecycler}}, volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
+
+	spec := &volume.Spec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}
+	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	recycler, err := plug.NewRecycler(spec)
+	if err != nil {
+		t.Error("Failed to make a new Recyler: %v", err)
+	}
+	if recycler.GetPath() != spec.PersistentVolumeSource.HostPath.Path {
+		t.Errorf("Expected %s but got %s", spec.PersistentVolumeSource.HostPath.Path, recycler.GetPath())
+	}
+	if err := recycler.Recycle(); err != nil {
+		t.Errorf("Mock Recycler expected to return nil but got %s", err)
+	}
+}
+
+func newMockRecycler(spec *volume.Spec, host volume.VolumeHost) (volume.Recycler, error) {
+	return &mockRecycler{
+		path: spec.PersistentVolumeSource.HostPath.Path,
+	}, nil
+}
+
+type mockRecycler struct {
+	path string
+	host volume.VolumeHost
+}
+
+func (r *mockRecycler) GetPath() string {
+	return r.path
+}
+
+func (r *mockRecycler) Recycle() error {
+	// return nil means recycle passed
+	return nil
 }
 
 func TestPlugin(t *testing.T) {

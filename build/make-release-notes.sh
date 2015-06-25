@@ -24,19 +24,18 @@ function pop_dir {
 }
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
 if [[ -z "${1:-}" ]]; then
-  echo "Usage: ${0} <pr-number>"
+  echo "Usage: ${0} <pr-number> [opts]"
   exit 1
 fi
 
 pushd . > /dev/null
 trap 'pop_dir' INT TERM EXIT
 
-cd ${KUBE_ROOT}/contrib/release-notes
-# TODO: vendor these dependencies, but using godep again will be annoying...
-GOPATH=$PWD go get github.com/google/go-github/github
-GOPATH=$PWD go get github.com/google/go-querystring/query
-GOPATH=$PWD go build release-notes.go
-./release-notes --last-release-pr=${1}
+kube::golang::build_binaries contrib/release-notes
+kube::golang::place_bins
+releasenotes=$(kube::util::find-binary "release-notes")
+"${releasenotes}" --last-release-pr=${1} ${@}
 

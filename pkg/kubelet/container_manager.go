@@ -16,9 +16,18 @@ limitations under the License.
 
 package kubelet
 
+import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+)
+
 // Manages the containers running on a machine.
 type containerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
+	// - Creates the system container where all non-containerized processes run.
 	Start() error
+
+	// Returns resources allocated to system containers in the machine.
+	// These containers include the system and Kubernetes services.
+	SystemContainersLimit() api.ResourceList
 }

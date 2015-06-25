@@ -65,7 +65,8 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode
 }
 
 func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	ep_name := spec.VolumeSource.Glusterfs.EndpointsName
+	source := plugin.getGlusterVolumeSource(spec)
+	ep_name := source.EndpointsName
 	ns := pod.Namespace
 	ep, err := plugin.host.GetKubeClient().Endpoints(ns).Get(ep_name)
 	if err != nil {
@@ -76,12 +77,21 @@ func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ vol
 	return plugin.newBuilderInternal(spec, ep, pod, mounter, exec.New())
 }
 
+func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) *api.GlusterfsVolumeSource {
+	if spec.VolumeSource.Glusterfs != nil {
+		return spec.VolumeSource.Glusterfs
+	} else {
+		return spec.PersistentVolumeSource.Glusterfs
+	}
+}
+
 func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.Endpoints, pod *api.Pod, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
+	source := plugin.getGlusterVolumeSource(spec)
 	return &glusterfs{
 		volName:  spec.Name,
 		hosts:    ep,
-		path:     spec.VolumeSource.Glusterfs.Path,
-		readonly: spec.VolumeSource.Glusterfs.ReadOnly,
+		path:     source.Path,
+		readonly: source.ReadOnly,
 		mounter:  mounter,
 		exe:      exe,
 		pod:      pod,

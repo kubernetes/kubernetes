@@ -85,23 +85,25 @@ func addFlagToPFlagSet(f *flag.Flag, fs *pflag.FlagSet) {
 	}
 }
 
-// Adds all of the flags in a 'flag.FlagSet' package flags to a 'pflag.FlagSet'.
+// AddFlagSetToPFlagSet adds all of the flags in a 'flag.FlagSet' package flags to a 'pflag.FlagSet'.
 func AddFlagSetToPFlagSet(fsIn *flag.FlagSet, fsOut *pflag.FlagSet) {
 	fsIn.VisitAll(func(f *flag.Flag) {
 		addFlagToPFlagSet(f, fsOut)
 	})
 }
 
-// Add all of the top level 'flag' package flags to the top level 'pflag' flags.
+// AddAllFlagsToPFlags adds all of the top level 'flag' package flags to the top level 'pflag' flags.
 func AddAllFlagsToPFlags() {
 	AddFlagSetToPFlagSet(flag.CommandLine, pflag.CommandLine)
 }
 
-// Merge all of the flags from fsFrom into fsTo.
+// AddPFlagSetToPFlagSet merges the flags of fsFrom into fsTo.
 func AddPFlagSetToPFlagSet(fsFrom *pflag.FlagSet, fsTo *pflag.FlagSet) {
-	fsFrom.VisitAll(func(f *pflag.Flag) {
-		if fsTo.Lookup(f.Name) == nil {
-			fsTo.AddFlag(f)
-		}
-	})
+	if fsFrom != nil && fsTo != nil {
+		fsFrom.VisitAll(func(f *pflag.Flag) {
+			if fsTo.Lookup(f.Name) == nil {
+				fsTo.AddFlag(f)
+			}
+		})
+	}
 }

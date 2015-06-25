@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+apt-get update
+apt-get install --yes curl
+
 # Retry a download until we get it.
 #
 # $1 is the URL to download

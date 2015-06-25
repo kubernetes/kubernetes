@@ -19,13 +19,17 @@ package master
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"net/url"
+	"os"
 	rt "runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
@@ -33,8 +37,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
@@ -63,13 +65,15 @@ import (
 	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
 	secretetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
+	etcdallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/etcd"
 	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
-	etcdipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator/etcd"
 	serviceaccountetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/portallocator"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
@@ -85,21 +89,16 @@ type Config struct {
 	EventTTL      time.Duration
 	MinionRegexp  string
 	KubeletClient client.KubeletClient
-	PortalNet     *net.IPNet
 	// allow downstream consumers to disable the core controller loops
 	EnableCoreControllers bool
 	EnableLogsSupport     bool
 	EnableUISupport       bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
-	// allow v1beta1 to be conditionally disabled
-	DisableV1Beta1 bool
-	// allow v1beta2 to be conditionally disabled
-	DisableV1Beta2 bool
 	// allow v1beta3 to be conditionally disabled
 	DisableV1Beta3 bool
-	// allow v1 to be conditionally enabled
-	EnableV1 bool
+	// allow v1 to be conditionally disabled
+	DisableV1 bool
 	// allow downstream consumers to disable the index route
 	EnableIndex           bool
 	EnableProfiling       bool
@@ -118,13 +117,14 @@ type Config struct {
 	// If specified, all web services will be registered into this container
 	RestfulContainer *restful.Container
 
+	// If specified, requests will be allocated a random timeout between this value, and twice this value.
+	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
+	MinRequestTimeout int
+
 	// Number of masters running; all masters must be started with the
 	// same value for this field. (Numbers > 1 currently untested.)
 	MasterCount int
 
-	// The port on PublicAddress where a read-only server will be installed.
-	// Defaults to 7080 if not set.
-	ReadOnlyPort int
 	// The port on PublicAddress where a read-write server will be installed.
 	// Defaults to 6443 if not set.
 	ReadWritePort int
@@ -132,7 +132,9 @@ type Config struct {
 	// ExternalHost is the host name to use for external (public internet) facing URLs (e.g. Swagger)
 	ExternalHost string
 
-	// If nil, the first result from net.InterfaceAddrs will be used.
+	// PublicAddress is the IP address where members of the cluster (kubelet,
+	// kube-proxy, services, etc.) can reach the master.
+	// If nil or 0.0.0.0, the host's default interface will be used.
 	PublicAddress net.IP
 
 	// Control the interval that pod, node IP, and node heath status caches
@@ -141,13 +143,28 @@ type Config struct {
 
 	// The name of the cluster.
 	ClusterName string
+
+	// The range of IPs to be assigned to services with type=ClusterIP or greater
+	ServiceClusterIPRange *net.IPNet
+
+	// The range of ports to be assigned to services with type=NodePort or greater
+	ServiceNodePortRange util.PortRange
+
+	// Used for secure proxy.  If empty, don't use secure proxy.
+	SSHUser       string
+	SSHKeyfile    string
+	InstallSSHKey InstallSSHKey
 }
+
+type InstallSSHKey func(user string, data []byte) error
 
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
 	// "Inputs", Copied from Config
-	portalNet    *net.IPNet
-	cacheTimeout time.Duration
+	serviceClusterIPRange *net.IPNet
+	serviceNodePortRange  util.PortRange
+	cacheTimeout          time.Duration
+	minRequestTimeout     time.Duration
 
 	mux                   apiserver.Mux
 	muxHelper             *apiserver.MuxHelper
@@ -164,8 +181,6 @@ type Master struct {
 	authorizer            authorizer.Authorizer
 	admissionControl      admission.Interface
 	masterCount           int
-	v1beta1               bool
-	v1beta2               bool
 	v1beta3               bool
 	v1                    bool
 	requestContextMapper  api.RequestContextMapper
@@ -174,10 +189,7 @@ type Master struct {
 	externalHost string
 	// clusterIP is the IP address of the master within the cluster.
 	clusterIP            net.IP
-	publicReadOnlyPort   int
 	publicReadWritePort  int
-	serviceReadOnlyIP    net.IP
-	serviceReadOnlyPort  int
 	serviceReadWriteIP   net.IP
 	serviceReadWritePort int
 	masterServices       *util.Runner
@@ -188,15 +200,22 @@ type Master struct {
 	// registries are internal client APIs for accessing the storage layer
 	// TODO: define the internal typed interface in a way that clients can
 	// also be replaced
-	nodeRegistry      minion.Registry
-	namespaceRegistry namespace.Registry
-	serviceRegistry   service.Registry
-	endpointRegistry  endpoint.Registry
-	portalAllocator   service.IPRegistry
+	nodeRegistry              minion.Registry
+	namespaceRegistry         namespace.Registry
+	serviceRegistry           service.Registry
+	endpointRegistry          endpoint.Registry
+	serviceClusterIPAllocator service.RangeRegistry
+	serviceNodePortAllocator  service.RangeRegistry
 
 	// "Outputs"
 	Handler         http.Handler
 	InsecureHandler http.Handler
+
+	// Used for secure proxy
+	dialer        apiserver.ProxyDialerFunc
+	tunnels       *util.SSHTunnelList
+	tunnelsLock   sync.Mutex
+	installSSHKey InstallSSHKey
 }
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
@@ -214,24 +233,30 @@ func NewEtcdHelper(client tools.EtcdGetSet, version string, prefix string) (help
 
 // setDefaults fills in any fields not set that are required to have valid data.
 func setDefaults(c *Config) {
-	if c.PortalNet == nil {
+	if c.ServiceClusterIPRange == nil {
 		defaultNet := "10.0.0.0/24"
-		glog.Warningf("Portal net unspecified. Defaulting to %v.", defaultNet)
-		_, portalNet, err := net.ParseCIDR(defaultNet)
+		glog.Warningf("Network range for service cluster IPs is unspecified. Defaulting to %v.", defaultNet)
+		_, serviceClusterIPRange, err := net.ParseCIDR(defaultNet)
 		if err != nil {
 			glog.Fatalf("Unable to parse CIDR: %v", err)
 		}
-		if size := ipallocator.RangeSize(portalNet); size < 8 {
-			glog.Fatalf("The portal net range must be at least %d IP addresses", 8)
+		if size := ipallocator.RangeSize(serviceClusterIPRange); size < 8 {
+			glog.Fatalf("The service cluster IP range must be at least %d IP addresses", 8)
 		}
-		c.PortalNet = portalNet
+		c.ServiceClusterIPRange = serviceClusterIPRange
+	}
+	if c.ServiceNodePortRange.Size == 0 {
+		// TODO: Currently no way to specify an empty range (do we need to allow this?)
+		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
+		// but then that breaks the strict nestedness of ServiceType.
+		// Review post-v1
+		defaultServiceNodePortRange := util.PortRange{Base: 30000, Size: 2768}
+		c.ServiceNodePortRange = defaultServiceNodePortRange
+		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ServiceNodePortRange)
 	}
 	if c.MasterCount == 0 {
 		// Clearly, there will be at least one master.
 		c.MasterCount = 1
-	}
-	if c.ReadOnlyPort == 0 {
-		c.ReadOnlyPort = 7080
 	}
 	if c.ReadWritePort == 0 {
 		c.ReadWritePort = 6443
@@ -259,9 +284,9 @@ func setDefaults(c *Config) {
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset,
 // including:
-//   PortalNet
+//   ServiceClusterIPRange
+//   ServiceNodePortRange
 //   MasterCount
-//   ReadOnlyPort
 //   ReadWritePort
 //   PublicAddress
 // Certain config fields must be specified, including:
@@ -286,19 +311,16 @@ func New(c *Config) *Master {
 		glog.Fatalf("master.New() called with config.KubeletClient == nil")
 	}
 
-	// Select the first two valid IPs from portalNet to use as the master service portalIPs
-	serviceReadOnlyIP, err := ipallocator.GetIndexedIP(c.PortalNet, 1)
-	if err != nil {
-		glog.Fatalf("Failed to generate service read-only IP for master service: %v", err)
-	}
-	serviceReadWriteIP, err := ipallocator.GetIndexedIP(c.PortalNet, 2)
+	// Select the first valid IP from serviceClusterIPRange to use as the master service IP.
+	serviceReadWriteIP, err := ipallocator.GetIndexedIP(c.ServiceClusterIPRange, 1)
 	if err != nil {
 		glog.Fatalf("Failed to generate service read-write IP for master service: %v", err)
 	}
-	glog.V(4).Infof("Setting master service IPs based on PortalNet subnet to %q (read-only) and %q (read-write).", serviceReadOnlyIP, serviceReadWriteIP)
+	glog.V(4).Infof("Setting master service IP to %q (read-write).", serviceReadWriteIP)
 
 	m := &Master{
-		portalNet:             c.PortalNet,
+		serviceClusterIPRange: c.ServiceClusterIPRange,
+		serviceNodePortRange:  c.ServiceNodePortRange,
 		rootWebService:        new(restful.WebService),
 		enableCoreControllers: c.EnableCoreControllers,
 		enableLogsSupport:     c.EnableLogsSupport,
@@ -310,40 +332,40 @@ func New(c *Config) *Master {
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
 		admissionControl:      c.AdmissionControl,
-		v1beta1:               !c.DisableV1Beta1,
-		v1beta2:               !c.DisableV1Beta2,
 		v1beta3:               !c.DisableV1Beta3,
-		v1:                    c.EnableV1,
+		v1:                    !c.DisableV1,
 		requestContextMapper:  c.RequestContextMapper,
 
-		cacheTimeout: c.CacheTimeout,
+		cacheTimeout:      c.CacheTimeout,
+		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 
 		masterCount:         c.MasterCount,
 		externalHost:        c.ExternalHost,
 		clusterIP:           c.PublicAddress,
-		publicReadOnlyPort:  c.ReadOnlyPort,
 		publicReadWritePort: c.ReadWritePort,
-		serviceReadOnlyIP:   serviceReadOnlyIP,
-		// TODO: serviceReadOnlyPort should be passed in as an argument, it may not always be 80
-		serviceReadOnlyPort: 80,
 		serviceReadWriteIP:  serviceReadWriteIP,
 		// TODO: serviceReadWritePort should be passed in as an argument, it may not always be 443
 		serviceReadWritePort: 443,
+
+		installSSHKey: c.InstallSSHKey,
 	}
 
+	var handlerContainer *restful.Container
 	if c.RestfulContainer != nil {
 		m.mux = c.RestfulContainer.ServeMux
-		m.handlerContainer = c.RestfulContainer
+		handlerContainer = c.RestfulContainer
 	} else {
 		mux := http.NewServeMux()
 		m.mux = mux
-		m.handlerContainer = NewHandlerContainer(mux)
+		handlerContainer = NewHandlerContainer(mux)
 	}
+	m.handlerContainer = handlerContainer
 	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
 	m.handlerContainer.Router(restful.CurlyRouter{})
 	m.muxHelper = &apiserver.MuxHelper{m.mux, []string{}}
 
 	m.init(c)
+
 	return m
 }
 
@@ -390,17 +412,10 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 
 // init initializes master.
 func (m *Master) init(c *Config) {
-	// TODO: make initialization of the helper part of the Master, and allow some storage
-	// objects to have a newer storage version than the user's default.
-	newerHelper, err := NewEtcdHelper(c.EtcdHelper.Client, "v1beta3", DefaultEtcdPathPrefix)
-	if err != nil {
-		glog.Fatalf("Unable to setup storage for v1beta3: %v", err)
-	}
-
 	podStorage := podetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
 	podRegistry := pod.NewRegistry(podStorage.Pod)
 
-	podTemplateStorage := podtemplateetcd.NewREST(newerHelper)
+	podTemplateStorage := podtemplateetcd.NewREST(c.EtcdHelper)
 
 	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
 	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
@@ -424,9 +439,23 @@ func (m *Master) init(c *Config) {
 	registry := etcd.NewRegistry(c.EtcdHelper, podRegistry, m.endpointRegistry)
 	m.serviceRegistry = registry
 
-	ipAllocator := ipallocator.NewCIDRRange(m.portalNet)
-	portalAllocator := etcdipallocator.NewEtcd(ipAllocator, c.EtcdHelper)
-	m.portalAllocator = portalAllocator
+	var serviceClusterIPRegistry service.RangeRegistry
+	serviceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(m.serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {
+		mem := allocator.NewAllocationMap(max, rangeSpec)
+		etcd := etcdallocator.NewEtcd(mem, "/ranges/serviceips", "serviceipallocation", c.EtcdHelper)
+		serviceClusterIPRegistry = etcd
+		return etcd
+	})
+	m.serviceClusterIPAllocator = serviceClusterIPRegistry
+
+	var serviceNodePortRegistry service.RangeRegistry
+	serviceNodePortAllocator := portallocator.NewPortAllocatorCustom(m.serviceNodePortRange, func(max int, rangeSpec string) allocator.Interface {
+		mem := allocator.NewAllocationMap(max, rangeSpec)
+		etcd := etcdallocator.NewEtcd(mem, "/ranges/servicenodeports", "servicenodeportallocation", c.EtcdHelper)
+		serviceNodePortRegistry = etcd
+		return etcd
+	})
+	m.serviceNodePortAllocator = serviceNodePortRegistry
 
 	controllerStorage := controlleretcd.NewREST(c.EtcdHelper)
 
@@ -444,7 +473,7 @@ func (m *Master) init(c *Config) {
 		"podTemplates": podTemplateStorage,
 
 		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, portalAllocator, c.ClusterName),
+		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, serviceClusterIPAllocator, serviceNodePortAllocator, c.ClusterName),
 		"endpoints":              endpointsStorage,
 		"minions":                nodeStorage,
 		"minions/status":         nodeStatusStorage,
@@ -465,22 +494,51 @@ func (m *Master) init(c *Config) {
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,
 		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
 
-		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c, false) }),
+		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
+	}
+
+	// establish the node proxy dialer
+	if len(c.SSHUser) > 0 {
+		// Usernames are capped @ 32
+		if len(c.SSHUser) > 32 {
+			glog.Warning("SSH User is too long, truncating to 32 chars")
+			c.SSHUser = c.SSHUser[0:32]
+		}
+		glog.Infof("Setting up proxy: %s %s", c.SSHUser, c.SSHKeyfile)
+
+		// public keyfile is written last, so check for that.
+		publicKeyFile := c.SSHKeyfile + ".pub"
+		exists, err := util.FileExists(publicKeyFile)
+		if err != nil {
+			glog.Errorf("Error detecting if key exists: %v", err)
+		} else if !exists {
+			glog.Infof("Key doesn't exist, attempting to create")
+			err := m.generateSSHKey(c.SSHUser, c.SSHKeyfile, publicKeyFile)
+			if err != nil {
+				glog.Errorf("Failed to create key pair: %v", err)
+			}
+		}
+		m.tunnels = &util.SSHTunnelList{}
+		m.dialer = m.Dial
+		m.setupSecureProxy(c.SSHUser, c.SSHKeyfile, publicKeyFile)
+
+		// This is pretty ugly.  A better solution would be to pull this all the way up into the
+		// server.go file.
+		httpKubeletClient, ok := c.KubeletClient.(*client.HTTPKubeletClient)
+		if ok {
+			httpKubeletClient.Config.Dial = m.dialer
+			transport, err := client.MakeTransport(httpKubeletClient.Config)
+			if err != nil {
+				glog.Errorf("Error setting up transport over SSH: %v", err)
+			} else {
+				httpKubeletClient.Client.Transport = transport
+			}
+		} else {
+			glog.Errorf("Failed to cast %v to HTTPKubeletClient, skipping SSH tunnel.")
+		}
 	}
 
 	apiVersions := []string{}
-	if m.v1beta1 {
-		if err := m.api_v1beta1().InstallREST(m.handlerContainer); err != nil {
-			glog.Fatalf("Unable to setup API v1beta1: %v", err)
-		}
-		apiVersions = append(apiVersions, "v1beta1")
-	}
-	if m.v1beta2 {
-		if err := m.api_v1beta2().InstallREST(m.handlerContainer); err != nil {
-			glog.Fatalf("Unable to setup API v1beta2: %v", err)
-		}
-		apiVersions = append(apiVersions, "v1beta2")
-	}
 	if m.v1beta3 {
 		if err := m.api_v1beta3().InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup API v1beta3: %v", err)
@@ -494,7 +552,7 @@ func (m *Master) init(c *Config) {
 		apiVersions = append(apiVersions, "v1")
 	}
 
-	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
+	apiserver.InstallSupport(m.muxHelper, m.rootWebService, c.EnableProfiling)
 	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
 	defaultVersion := m.defaultAPIGroupVersion()
 	requestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), defaultVersion.Mapper}
@@ -507,8 +565,6 @@ func (m *Master) init(c *Config) {
 		m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
 	}
 
-	// TODO: This is now deprecated. Should be removed once client dependencies are gone.
-	apiserver.InstallValidator(m.muxHelper, func() map[string]apiserver.Server { return m.getServersToValidate(c, true) })
 	if c.EnableLogsSupport {
 		apiserver.InstallLogsSupport(m.muxHelper)
 	}
@@ -584,23 +640,24 @@ func (m *Master) NewBootstrapController() *Controller {
 	return &Controller{
 		NamespaceRegistry: m.namespaceRegistry,
 		ServiceRegistry:   m.serviceRegistry,
-		ServiceIPRegistry: m.portalAllocator,
-		EndpointRegistry:  m.endpointRegistry,
-		PortalNet:         m.portalNet,
 		MasterCount:       m.masterCount,
 
-		PortalIPInterval: 3 * time.Minute,
+		EndpointRegistry: m.endpointRegistry,
 		EndpointInterval: 10 * time.Second,
+
+		ServiceClusterIPRegistry: m.serviceClusterIPAllocator,
+		ServiceClusterIPRange:    m.serviceClusterIPRange,
+		ServiceClusterIPInterval: 3 * time.Minute,
+
+		ServiceNodePortRegistry: m.serviceNodePortAllocator,
+		ServiceNodePortRange:    m.serviceNodePortRange,
+		ServiceNodePortInterval: 3 * time.Minute,
 
 		PublicIP: m.clusterIP,
 
 		ServiceIP:         m.serviceReadWriteIP,
 		ServicePort:       m.serviceReadWritePort,
 		PublicServicePort: m.publicReadWritePort,
-
-		ReadOnlyServiceIP:         m.serviceReadOnlyIP,
-		ReadOnlyServicePort:       m.serviceReadOnlyPort,
-		PublicReadOnlyServicePort: m.publicReadOnlyPort,
 	}
 }
 
@@ -618,10 +675,6 @@ func (m *Master) InstallSwaggerAPI() {
 		host := m.clusterIP.String()
 		if m.publicReadWritePort != 0 {
 			hostAndPort = net.JoinHostPort(host, strconv.Itoa(m.publicReadWritePort))
-		} else {
-			// Use the read only port.
-			hostAndPort = net.JoinHostPort(host, strconv.Itoa(m.publicReadOnlyPort))
-			protocol = "http://"
 		}
 	}
 	webServicesUrl := protocol + hostAndPort
@@ -637,7 +690,7 @@ func (m *Master) InstallSwaggerAPI() {
 	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
 }
 
-func (m *Master) getServersToValidate(c *Config, includeNodes bool) map[string]apiserver.Server {
+func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 	serversToValidate := map[string]apiserver.Server{
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
 		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
@@ -664,15 +717,6 @@ func (m *Master) getServersToValidate(c *Config, includeNodes bool) map[string]a
 		}
 		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/v2/keys/"}
 	}
-	if includeNodes && m.nodeRegistry != nil {
-		nodes, err := m.nodeRegistry.ListMinions(api.NewDefaultContext(), labels.Everything(), fields.Everything())
-		if err != nil {
-			glog.Errorf("Failed to list minions: %v", err)
-		}
-		for ix, node := range nodes.Items {
-			serversToValidate[fmt.Sprintf("node-%d", ix)] = apiserver.Server{Addr: node.Name, Port: ports.KubeletPort, Path: "/healthz", EnableHTTPS: true}
-		}
-	}
 	return serversToValidate
 }
 
@@ -689,39 +733,10 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
-	}
-}
 
-// api_v1beta1 returns the resources and codec for API version v1beta1.
-func (m *Master) api_v1beta1() *apiserver.APIGroupVersion {
-	storage := make(map[string]rest.Storage)
-	for k, v := range m.storage {
-		if k == "podTemplates" {
-			continue
-		}
-		storage[k] = v
+		ProxyDialerFn:     m.dialer,
+		MinRequestTimeout: m.minRequestTimeout,
 	}
-	version := m.defaultAPIGroupVersion()
-	version.Storage = storage
-	version.Version = "v1beta1"
-	version.Codec = v1beta1.Codec
-	return version
-}
-
-// api_v1beta2 returns the resources and codec for API version v1beta2.
-func (m *Master) api_v1beta2() *apiserver.APIGroupVersion {
-	storage := make(map[string]rest.Storage)
-	for k, v := range m.storage {
-		if k == "podTemplates" {
-			continue
-		}
-		storage[k] = v
-	}
-	version := m.defaultAPIGroupVersion()
-	version.Storage = storage
-	version.Version = "v1beta2"
-	version.Codec = v1beta2.Codec
-	return version
 }
 
 // api_v1beta3 returns the resources and codec for API version v1beta3.
@@ -754,4 +769,175 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	version.Version = "v1"
 	version.Codec = v1.Codec
 	return version
+}
+
+func findExternalAddress(node *api.Node) (string, error) {
+	for ix := range node.Status.Addresses {
+		addr := &node.Status.Addresses[ix]
+		if addr.Type == api.NodeExternalIP {
+			return addr.Address, nil
+		}
+	}
+	return "", fmt.Errorf("Couldn't find external address: %v", node)
+}
+
+func (m *Master) Dial(net, addr string) (net.Conn, error) {
+	// Only lock while picking a tunnel.
+	tunnel, err := func() (util.SSHTunnelEntry, error) {
+		m.tunnelsLock.Lock()
+		defer m.tunnelsLock.Unlock()
+		return m.tunnels.PickRandomTunnel()
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	start := time.Now()
+	id := rand.Int63() // So you can match begins/ends in the log.
+	glog.V(3).Infof("[%x: %v] Dialing...", id, tunnel.Address)
+	defer func() {
+		glog.V(3).Infof("[%x: %v] Dialed in %v.", id, tunnel.Address, time.Now().Sub(start))
+	}()
+	return tunnel.Tunnel.Dial(net, addr)
+}
+
+func (m *Master) needToReplaceTunnels(addrs []string) bool {
+	if m.tunnels == nil || m.tunnels.Len() != len(addrs) {
+		return true
+	}
+	// TODO (cjcullen): This doesn't need to be n^2
+	for ix := range addrs {
+		if !m.tunnels.Has(addrs[ix]) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Master) getNodeAddresses() ([]string, error) {
+	nodes, err := m.nodeRegistry.ListMinions(api.NewDefaultContext(), labels.Everything(), fields.Everything())
+	if err != nil {
+		return nil, err
+	}
+	addrs := []string{}
+	for ix := range nodes.Items {
+		node := &nodes.Items[ix]
+		addr, err := findExternalAddress(node)
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, addr)
+	}
+	return addrs, nil
+}
+
+func (m *Master) replaceTunnels(user, keyfile string, newAddrs []string) error {
+	glog.Infof("replacing tunnels. New addrs: %v", newAddrs)
+	tunnels := util.MakeSSHTunnels(user, keyfile, newAddrs)
+	if err := tunnels.Open(); err != nil {
+		return err
+	}
+	if m.tunnels != nil {
+		m.tunnels.Close()
+	}
+	m.tunnels = tunnels
+	return nil
+}
+
+func (m *Master) loadTunnels(user, keyfile string) error {
+	m.tunnelsLock.Lock()
+	defer m.tunnelsLock.Unlock()
+	addrs, err := m.getNodeAddresses()
+	if err != nil {
+		return err
+	}
+	if !m.needToReplaceTunnels(addrs) {
+		return nil
+	}
+	// TODO: This is going to unnecessarily close connections to unchanged nodes.
+	// See comment about using Watch above.
+	glog.Info("found different nodes. Need to replace tunnels")
+	return m.replaceTunnels(user, keyfile, addrs)
+}
+
+func (m *Master) refreshTunnels(user, keyfile string) error {
+	m.tunnelsLock.Lock()
+	defer m.tunnelsLock.Unlock()
+	addrs, err := m.getNodeAddresses()
+	if err != nil {
+		return err
+	}
+	return m.replaceTunnels(user, keyfile, addrs)
+}
+
+func (m *Master) setupSecureProxy(user, privateKeyfile, publicKeyfile string) {
+	// Sync loop to ensure that the SSH key has been installed.
+	go util.Until(func() {
+		if m.installSSHKey == nil {
+			glog.Error("Won't attempt to install ssh key: installSSHKey function is nil")
+			return
+		}
+		key, err := util.ParsePublicKeyFromFile(publicKeyfile)
+		if err != nil {
+			glog.Errorf("Failed to load public key: %v", err)
+			return
+		}
+		keyData, err := util.EncodeSSHKey(key)
+		if err != nil {
+			glog.Errorf("Failed to encode public key: %v", err)
+			return
+		}
+		if err := m.installSSHKey(user, keyData); err != nil {
+			glog.Errorf("Failed to install ssh key: %v", err)
+		}
+	}, 5*time.Minute, util.NeverStop)
+	// Sync loop for tunnels
+	// TODO: switch this to watch.
+	go util.Until(func() {
+		if err := m.loadTunnels(user, privateKeyfile); err != nil {
+			glog.Errorf("Failed to load SSH Tunnels: %v", err)
+		}
+		if m.tunnels != nil && m.tunnels.Len() != 0 {
+			// Sleep for 10 seconds if we have some tunnels.
+			// TODO (cjcullen): tunnels can lag behind actually existing nodes.
+			time.Sleep(9 * time.Second)
+		}
+	}, 1*time.Second, util.NeverStop)
+	// Refresh loop for tunnels
+	// TODO: could make this more controller-ish
+	go util.Until(func() {
+		time.Sleep(5 * time.Minute)
+		if err := m.refreshTunnels(user, privateKeyfile); err != nil {
+			glog.Errorf("Failed to refresh SSH Tunnels: %v", err)
+		}
+	}, 0*time.Second, util.NeverStop)
+}
+
+func (m *Master) generateSSHKey(user, privateKeyfile, publicKeyfile string) error {
+	private, public, err := util.GenerateKey(2048)
+	if err != nil {
+		return err
+	}
+	// If private keyfile already exists, we must have only made it halfway
+	// through last time, so delete it.
+	exists, err := util.FileExists(privateKeyfile)
+	if err != nil {
+		glog.Errorf("Error detecting if private key exists: %v", err)
+	} else if exists {
+		glog.Infof("Private key exists, but public key does not")
+		if err := os.Remove(privateKeyfile); err != nil {
+			glog.Errorf("Failed to remove stale private key: %v", err)
+		}
+	}
+	if err := ioutil.WriteFile(privateKeyfile, util.EncodePrivateKey(private), 0600); err != nil {
+		return err
+	}
+	publicKeyBytes, err := util.EncodePublicKey(public)
+	if err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(publicKeyfile+".tmp", publicKeyBytes, 0600); err != nil {
+		return err
+	}
+	return os.Rename(publicKeyfile+".tmp", publicKeyfile)
 }

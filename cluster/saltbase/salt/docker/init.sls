@@ -8,13 +8,26 @@ bridge-utils:
   pkg.installed
 
 {% if grains.os_family == 'RedHat' %}
+
 docker-io:
   pkg:
     - installed
 
+{{ environment_file }}:
+  file.managed:
+    - source: salt://docker/default
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: true
+
 docker:
   service.running:
     - enable: True
+    - watch:
+      - file: {{ environment_file }}
+      - pkg: docker-io
     - require:
       - pkg: docker-io
 {% if grains.network_mode == "calico" and 'kubernetes-pool' in grains.roles %}
@@ -25,15 +38,6 @@ cbr0:
   container_bridge.ensure:
     - cidr: {{ grains.container_subnet }}
     - mtu: 1460
-
-{{ environment_file }}:
-  file.managed:
-    - source: salt://docker/docker-defaults
-    - template: jinja
-    - user: root
-    - group: root
-    - mode: 644
-    - makedirs: true
 
 {% endif %}
 

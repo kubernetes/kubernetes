@@ -25,9 +25,6 @@ import (
 )
 
 func getRCResourceName() string {
-	if api.PreV1Beta3(testapi.Version()) {
-		return "replicationControllers"
-	}
 	return "replicationcontrollers"
 }
 

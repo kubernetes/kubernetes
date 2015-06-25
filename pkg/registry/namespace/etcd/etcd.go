@@ -102,7 +102,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	// prior to final deletion, we must ensure that finalizers is empty
 	if len(namespace.Spec.Finalizers) != 0 {
-		err = apierrors.NewConflict("Namespace", namespace.Name, fmt.Errorf("Termination is in progress, waiting for %v", namespace.Spec.Finalizers))
+		err = apierrors.NewConflict("Namespace", namespace.Name, fmt.Errorf("The system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system."))
 		return nil, err
 	}
 	return r.Etcd.Delete(ctx, name, nil)

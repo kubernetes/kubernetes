@@ -32,15 +32,30 @@ const (
 $ kubectl proxy --port=8011 --www=./local/www/
 
 // Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
-// This makes e.g. the pods api available at localhost:8011/k8s-api/v1beta1/pods/
-$ kubectl proxy --api-prefix=k8s-api`
+// This makes e.g. the pods api available at localhost:8011/k8s-api/v1/pods/
+$ kubectl proxy --api-prefix=/k8s-api`
 )
 
 func NewCmdProxy(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
-		Short:   "Run a proxy to the Kubernetes API server",
-		Long:    `Run a proxy to the Kubernetes API server. `,
+		Use:   "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
+		Short: "Run a proxy to the Kubernetes API server",
+		Long: `To proxy all of the kubernetes api and nothing else, use:
+
+kubectl proxy --api-prefix=/
+
+To proxy only part of the kubernetes api and also some static files:
+
+kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
+
+The above lets you 'curl localhost:8001/api/v1/pods'.
+
+To proxy the entire kubernetes api at a different root, use:
+
+kubectl proxy --api-prefix=/custom/
+
+The above lets you 'curl localhost:8001/custom/api/v1/pods'
+`,
 		Example: proxy_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunProxy(f, out, cmd)
@@ -50,7 +65,12 @@ func NewCmdProxy(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix.")
 	cmd.Flags().StringP("www-prefix", "P", "/static/", "Prefix to serve static files under, if static file directory is specified.")
 	cmd.Flags().StringP("api-prefix", "", "/api/", "Prefix to serve the proxied API under.")
+	cmd.Flags().String("accept-paths", kubectl.DefaultPathAcceptRE, "Regular expression for paths that the proxy should accept.")
+	cmd.Flags().String("reject-paths", kubectl.DefaultPathRejectRE, "Regular expression for paths that the proxy should reject.")
+	cmd.Flags().String("accept-hosts", kubectl.DefaultHostAcceptRE, "Regular expression for hosts that the proxy should accept.")
+	cmd.Flags().String("reject-methods", kubectl.DefaultMethodRejectRE, "Regular expression for HTTP methods that the proxy should reject.")
 	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy.")
+	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks.  Use with caution.")
 	return cmd
 }
 
@@ -72,7 +92,17 @@ func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	if !strings.HasSuffix(apiProxyPrefix, "/") {
 		apiProxyPrefix += "/"
 	}
-	server, err := kubectl.NewProxyServer(cmdutil.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, clientConfig)
+	filter := &kubectl.FilterServer{
+		AcceptPaths: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-paths")),
+		RejectPaths: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "reject-paths")),
+		AcceptHosts: kubectl.MakeRegexpArrayOrDie(cmdutil.GetFlagString(cmd, "accept-hosts")),
+	}
+	if cmdutil.GetFlagBool(cmd, "disable-filter") {
+		glog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
+		filter = nil
+	}
+
+	server, err := kubectl.NewProxyServer(cmdutil.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, filter, clientConfig)
 	if err != nil {
 		return err
 	}

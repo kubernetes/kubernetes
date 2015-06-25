@@ -62,7 +62,7 @@ func calculateOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.
 
 	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
 	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)
-	glog.V(4).Infof(
+	glog.V(10).Infof(
 		"%v -> %v: Least Requested Priority, Absolute/Requested: (%d, %d) / (%d, %d) Score: (%d, %d)",
 		pod.Name, node.Name,
 		totalMilliCPU, totalMemory,
@@ -190,7 +190,7 @@ func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*ap
 		diff := math.Abs(cpuFraction - memoryFraction)
 		score = int(10 - diff*10)
 	}
-	glog.V(4).Infof(
+	glog.V(10).Infof(
 		"%v -> %v: Balanced Resource Allocation, Absolute/Requested: (%d, %d) / (%d, %d) Score: (%d)",
 		pod.Name, node.Name,
 		totalMilliCPU, totalMemory,

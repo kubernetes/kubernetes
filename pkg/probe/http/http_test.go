@@ -22,6 +22,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,19 +48,23 @@ func TestFormatURL(t *testing.T) {
 }
 
 func TestHTTPProbeChecker(t *testing.T) {
-	handleReq := func(s int) func(w http.ResponseWriter) {
-		return func(w http.ResponseWriter) { w.WriteHeader(s) }
+	handleReq := func(s int, body string) func(w http.ResponseWriter) {
+		return func(w http.ResponseWriter) {
+			w.WriteHeader(s)
+			w.Write([]byte(body))
+		}
 	}
 
 	prober := New()
 	testCases := []struct {
 		handler func(w http.ResponseWriter)
 		health  probe.Result
+		body    string
 	}{
 		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
-		{handleReq(http.StatusOK), probe.Success},
-		{handleReq(-1), probe.Failure},
-		{func(w http.ResponseWriter) { time.Sleep(3 * time.Second) }, probe.Failure},
+		{handleReq(http.StatusOK, "ok body"), probe.Success, "ok body"},
+		{handleReq(-1, "fail body"), probe.Failure, "fail body"},
+		{func(w http.ResponseWriter) { time.Sleep(3 * time.Second) }, probe.Failure, "use of closed network connection"},
 	}
 	for _, test := range testCases {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +82,7 @@ func TestHTTPProbeChecker(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		health, err := prober.Probe(host, p, "", 1*time.Second)
+		health, output, err := prober.Probe(host, p, "", 1*time.Second)
 		if test.health == probe.Unknown && err == nil {
 			t.Errorf("Expected error")
 		}
@@ -86,6 +91,9 @@ func TestHTTPProbeChecker(t *testing.T) {
 		}
 		if health != test.health {
 			t.Errorf("Expected %v, got %v", test.health, health)
+		}
+		if !strings.Contains(output, test.body) {
+			t.Errorf("Expected %v, got %v", test.body, output)
 		}
 	}
 }

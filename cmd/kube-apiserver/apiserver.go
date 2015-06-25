@@ -20,8 +20,10 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/cmd/kube-apiserver/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -32,6 +34,8 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	s := app.NewAPIServer()
 	s.AddFlags(pflag.CommandLine)
 

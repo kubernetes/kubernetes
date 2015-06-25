@@ -1,6 +1,6 @@
 {
     "kind": "PersistentVolumeClaim",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
         "name": "myclaim-3"
     }, "spec": {

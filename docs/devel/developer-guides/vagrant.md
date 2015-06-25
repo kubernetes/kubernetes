@@ -9,7 +9,7 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
    2. [VMWare Fusion](https://www.vmware.com/products/fusion/) version 5 or greater as well as the appropriate [Vagrant VMWare Fusion provider](https://www.vagrantup.com/vmware)
    3. [VMWare Workstation](https://www.vmware.com/products/workstation/) version 9 or greater as well as the [Vagrant VMWare Workstation provider](https://www.vagrantup.com/vmware)
    4. [Parallels Desktop](https://www.parallels.com/products/desktop/) version 9 or greater as well as the [Vagrant Parallels provider](https://parallels.github.io/vagrant-parallels/)
-3. Get or build a [binary release](../../getting-started-guides/binary_release.md)
+3. Get or build a [binary release](/docs/getting-started-guides/binary_release.md)
 
 ### Setup
 
@@ -184,14 +184,14 @@ NAME   IMAGE(S)   HOST   LABELS   STATUS
 $ cluster/kubectl.sh get services
 NAME   LABELS   SELECTOR   IP   PORT
 
-$ cluster/kubectl.sh get replicationControllers
+$ cluster/kubectl.sh get replicationcontrollers
 NAME   IMAGE(S   SELECTOR   REPLICAS
 ```
 
 Start a container running nginx with a replication controller and three replicas
 
 ```
-$ cluster/kubectl.sh run-container my-nginx --image=nginx --replicas=3 --port=80
+$ cluster/kubectl.sh run my-nginx --image=nginx --replicas=3 --port=80
 ```
 
 When listing the pods, you will see that three containers have been started and are in Waiting state:
@@ -224,7 +224,7 @@ kubernetes-minion-1:
     fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b
 ```
 
-Going back to listing the pods, services and replicationControllers, you now have:
+Going back to listing the pods, services and replicationcontrollers, you now have:
 
 ```
 $ cluster/kubectl.sh get pods
@@ -236,17 +236,17 @@ NAME                                   IMAGE(S)            HOST                 
 $ cluster/kubectl.sh get services
 NAME   LABELS   SELECTOR   IP   PORT
 
-$ cluster/kubectl.sh get replicationControllers
+$ cluster/kubectl.sh get replicationcontrollers
 NAME      IMAGE(S            SELECTOR       REPLICAS
 myNginx   nginx              name=my-nginx   3
 ```
 
 We did not start any services, hence there are none listed. But we see three replicas displayed properly.
-Check the [guestbook](../../examples/guestbook/README.md) application to learn how to create a service.
-You can already play with resizing the replicas with:
+Check the [guestbook](/examples/guestbook/README.md) application to learn how to create a service.
+You can already play with scaling the replicas with:
 
 ```sh
-$ ./cluster/kubectl.sh resize rc my-nginx --replicas=2
+$ ./cluster/kubectl.sh scale rc my-nginx --replicas=2
 $ ./cluster/kubectl.sh get pods
 NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
 7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Running

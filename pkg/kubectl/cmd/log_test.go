@@ -153,24 +153,21 @@ func TestLog(t *testing.T) {
 
 	tests := []struct {
 		name, version, podPath, logPath, container string
-		nsInQuery                                  bool
 		pod                                        *api.Pod
 	}{
 		{
-			name:      "v1beta1 - pod log",
-			version:   "v1beta1",
-			podPath:   "/api/v1beta1/pods/foo",
-			logPath:   "/api/v1beta1/pods/foo/log",
-			nsInQuery: true,
-			pod:       testPod(),
+			name:    "v1beta3 - pod log",
+			version: "v1beta3",
+			podPath: "/api/v1beta3/namespaces/test/pods/foo",
+			logPath: "/api/v1beta3/namespaces/test/pods/foo/log",
+			pod:     testPod(),
 		},
 		{
-			name:      "v1beta3 - pod log",
-			version:   "v1beta3",
-			podPath:   "/api/v1beta3/namespaces/test/pods/foo",
-			logPath:   "/api/v1beta3/namespaces/test/pods/foo/log",
-			nsInQuery: false,
-			pod:       testPod(),
+			name:    "v1 - pod log",
+			version: "v1",
+			podPath: "/api/v1/namespaces/test/pods/foo",
+			logPath: "/api/v1/namespaces/test/pods/foo/log",
+			pod:     testPod(),
 		},
 	}
 	for _, test := range tests {
@@ -181,19 +178,9 @@ func TestLog(t *testing.T) {
 			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
-					if test.nsInQuery {
-						if ns := req.URL.Query().Get("namespace"); ns != "test" {
-							t.Errorf("%s: did not get expected namespace: %s\n", test.name, ns)
-						}
-					}
 					body := objBody(codec, test.pod)
 					return &http.Response{StatusCode: 200, Body: body}, nil
 				case p == test.logPath && m == "GET":
-					if test.nsInQuery {
-						if ns := req.URL.Query().Get("namespace"); ns != "test" {
-							t.Errorf("%s: did not get expected namespace: %s\n", test.name, ns)
-						}
-					}
 					body := ioutil.NopCloser(bytes.NewBufferString(logContent))
 					return &http.Response{StatusCode: 200, Body: body}, nil
 				default:

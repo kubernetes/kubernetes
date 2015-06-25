@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
@@ -143,7 +142,9 @@ func TestUpdate(t *testing.T) {
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 3 gets for each resize
+				// 4 gets for each scale
+				{newRc(1, 1), nil},
+				{newRc(1, 1), nil},
 				{newRc(1, 1), nil},
 				{newRc(1, 1), nil},
 				{newRc(1, 1), nil},
@@ -165,7 +166,10 @@ Update succeeded. Deleting foo-v1
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 3 gets for each resize
+				// 4 gets for each scale
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
@@ -196,7 +200,10 @@ Update succeeded. Deleting foo-v1
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 3 gets for each resize
+				// 4 gets for each scale
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
@@ -211,7 +218,8 @@ Update succeeded. Deleting foo-v1
 				{oldRc(0), nil},
 				{oldRc(0), nil},
 				{oldRc(0), nil},
-				// final resize on newRc
+				// final scale on newRc
+				{newRc(7, 7), nil},
 				{newRc(7, 7), nil},
 				{newRc(7, 7), nil},
 				{newRc(7, 7), nil},
@@ -222,7 +230,7 @@ Update succeeded. Deleting foo-v1
 			`Creating foo-v2
 Updating foo-v1 replicas: 1, foo-v2 replicas: 1
 Updating foo-v1 replicas: 0, foo-v2 replicas: 2
-Resizing foo-v2 replicas: 2 -> 7
+Scaling foo-v2 replicas: 2 -> 7
 Update succeeded. Deleting foo-v1
 `,
 		}, {
@@ -230,7 +238,10 @@ Update succeeded. Deleting foo-v1
 			[]fakeResponse{
 				// no existing newRc
 				{nil, fmt.Errorf("not found")},
-				// 3 gets for each update
+				// 4 gets for each update
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
+				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
 				{newRc(1, 2), nil},
@@ -246,6 +257,8 @@ Update succeeded. Deleting foo-v1
 				{oldRc(5), nil},
 				{oldRc(5), nil},
 				// stop oldRc
+				{oldRc(0), nil},
+				{oldRc(0), nil},
 				{oldRc(0), nil},
 				{oldRc(0), nil},
 				// cleanup annotations
@@ -298,7 +311,7 @@ Update succeeded. Deleting foo-v1
 	responses := []fakeResponse{
 		// Existing newRc
 		{rcExisting, nil},
-		// 3 gets for each resize
+		// 3 gets for each scale
 		{newRc(2, 2), nil},
 		{newRc(2, 2), nil},
 		{newRc(2, 2), nil},
@@ -672,7 +685,7 @@ func TestUpdateWithRetries(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/api/v1beta3/namespaces/default/replicationcontrollers/rc" && m == "PUT":
+			case p == testapi.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
 				update := updates[0]
 				updates = updates[1:]
 				// We should always get an update with a valid rc even when the get fails. The rc should always
@@ -685,7 +698,7 @@ func TestUpdateWithRetries(t *testing.T) {
 					delete(c.Spec.Selector, "baz")
 				}
 				return update, nil
-			case p == "/api/v1beta3/namespaces/default/replicationcontrollers/rc" && m == "GET":
+			case p == testapi.ResourcePath("replicationcontrollers", "default", "rc") && m == "GET":
 				get := gets[0]
 				gets = gets[1:]
 				return get, nil
@@ -695,7 +708,7 @@ func TestUpdateWithRetries(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &client.Config{Version: latest.Version}
+	clientConfig := &client.Config{Version: testapi.Version()}
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 
@@ -763,27 +776,27 @@ func TestAddDeploymentHash(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/api/v1beta3/namespaces/default/pods" && m == "GET":
+			case p == testapi.ResourcePath("pods", "default", "") && m == "GET":
 				if req.URL.RawQuery != "labelSelector=foo%3Dbar" {
 					t.Errorf("Unexpected query string: %s", req.URL.RawQuery)
 				}
 				return &http.Response{StatusCode: 200, Body: objBody(codec, podList)}, nil
-			case p == "/api/v1beta3/namespaces/default/pods/foo" && m == "PUT":
+			case p == testapi.ResourcePath("pods", "default", "foo") && m == "PUT":
 				seen.Insert("foo")
 				obj := readOrDie(t, req, codec)
 				podList.Items[0] = *(obj.(*api.Pod))
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &podList.Items[0])}, nil
-			case p == "/api/v1beta3/namespaces/default/pods/bar" && m == "PUT":
+			case p == testapi.ResourcePath("pods", "default", "bar") && m == "PUT":
 				seen.Insert("bar")
 				obj := readOrDie(t, req, codec)
 				podList.Items[1] = *(obj.(*api.Pod))
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &podList.Items[1])}, nil
-			case p == "/api/v1beta3/namespaces/default/pods/baz" && m == "PUT":
+			case p == testapi.ResourcePath("pods", "default", "baz") && m == "PUT":
 				seen.Insert("baz")
 				obj := readOrDie(t, req, codec)
 				podList.Items[2] = *(obj.(*api.Pod))
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &podList.Items[2])}, nil
-			case p == "/api/v1beta3/namespaces/default/replicationcontrollers/rc" && m == "PUT":
+			case p == testapi.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
 				updatedRc = true
 				return &http.Response{StatusCode: 200, Body: objBody(codec, rc)}, nil
 			default:
@@ -792,7 +805,7 @@ func TestAddDeploymentHash(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &client.Config{Version: latest.Version}
+	clientConfig := &client.Config{Version: testapi.Version()}
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 

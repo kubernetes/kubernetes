@@ -39,6 +39,10 @@ func addDefaultingFuncs() {
 					obj.Labels = labels
 				}
 			}
+			if obj.Spec.Replicas == nil {
+				obj.Spec.Replicas = new(int)
+				*obj.Spec.Replicas = 1
+			}
 		},
 		func(obj *Volume) {
 			if util.AllPtrFieldsNil(&obj.VolumeSource) {
@@ -70,6 +74,9 @@ func addDefaultingFuncs() {
 		func(obj *ServiceSpec) {
 			if obj.SessionAffinity == "" {
 				obj.SessionAffinity = ServiceAffinityNone
+			}
+			if obj.Type == "" {
+				obj.Type = ServiceTypeClusterIP
 			}
 			for i := range obj.Ports {
 				sp := &obj.Ports[i]
@@ -105,6 +112,9 @@ func addDefaultingFuncs() {
 		func(obj *PersistentVolume) {
 			if obj.Status.Phase == "" {
 				obj.Status.Phase = VolumePending
+			}
+			if obj.Spec.PersistentVolumeReclaimPolicy == "" {
+				obj.Spec.PersistentVolumeReclaimPolicy = PersistentVolumeReclaimRetain
 			}
 		},
 		func(obj *PersistentVolumeClaim) {

@@ -48,6 +48,15 @@ func main() {
 		errs = []error{}
 	)
 
+	// NOTE: the ordering of execution of the various command line
+	// flags is intentional and allows a single command to:
+	//
+	// 1.  Check the fstype of a path
+	// 2.  Write a new file within that path
+	// 3.  Check that the file's content can be read
+	//
+	// Changing the ordering of the following code will break tests.
+
 	err = fsType(fsTypePath)
 	if err != nil {
 		errs = append(errs, err)

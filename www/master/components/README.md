@@ -1,9 +1,10 @@
 Components
 ==========
 
-A tab in the Kubernetes UI with its set of visualizations is referred to as a *component*. Components are separated from the UI chrome and base data providers to simplify the development of new visualizations. This document provides reference for creation and modification of components.
+A tab in the Kubernetes UI with its set of visualizations is referred to as a *component*. Components are separated from the chrome and services to simplify the development of new visualizations. This document describes how to create and modify components.
 
-Each component has its own directory, which contains a manifest file, HTML views, Angular providers, CSS, Less and other assets. Below is the recommended directory structure for a component.
+Each component has its own directory in `www/master/components`. The component directory contains a manifest file and the files comprising the component, such as HTML  pages and views, Angular providers, CSS and Less files, and other assets. Here is the recommended structure for a component directory:
+
 ```
 foo_component
 ├── config
@@ -16,6 +17,8 @@ foo_component
 │       └── services
 ├── less
 ├── pages
+├── protractor
+├── test
 ├── views
 │   └── partials
 └── manifest.json
@@ -23,9 +26,10 @@ foo_component
 
 ###Manifest file
 
-The JSON-formatted manifest file, named ```manifest.json```, is located at the root of a component. Based on the component directory name and the contents of the manifest, the Kubernetes UI automatically adds a tab to the chrome, a dependency on the component's AngularJS module to main AngularJS app and Angular routes for the component.
+The JSON-formatted manifest file, named `manifest.json`, resides at the root of the directory. Using the component directory name and the contents of the manifest, the Kubernetes UI automatically adds a tab to the chrome, a dependency on the component's AngularJS module in the main AngularJS app, and Angular routes for the component.
 
-For example, consider a manifest file at ```master/components/foo_component/manifest.json```:
+For example, consider the following manifest file at `master/components/foo_component/manifest.json`:
+
 ```
 {
   "routes": [
@@ -42,26 +46,28 @@ For example, consider a manifest file at ```master/components/foo_component/mani
 }
 ```
 
-From the name of the component directory, the Kubernetes UI
-* creates a tab called "Foo Component",
-* adds Angular module ```kubernetesApp.components.fooComponent``` to the dependencies of ```kubernetesApp```, and
-* defines Angular routes ```/foo_component/``` and ```/foo_component/kittens```.
+From the name of the component directory, the Kubernetes UI:
 
-Every tab links to ```/``` relative to its component, so it is important to always define a ```/``` route.
+* creates a tab called "Foo Component",
+* adds Angular module `kubernetesApp.components.fooComponent` to the dependencies of `kubernetesApp`, and
+* defines Angular routes `/foo_component/` and `/foo_component/kittens`.
+
+Every tab links to `/` relative to its component, so it is important to always define a `/` route.
 
 ###Source files
-In general, all files located in ```master/components/<component>``` are copied to ```app/components/<component>/``` on each gulp build. This includes (but is not limited to) HTML views, CSS and images. Exceptions to this copy are the ```config``` and ```less``` directories as well as all ```.js``` files.
+Many of the files located in `master/components/<component>` are copied to `app/components/<component>/` on each gulp build. This includes (but is not limited to) HTML pages and views, CSS files and images.
 
-The sections below describe how the exceptions are built into the UI.
+Exceptions include the `config` and `less` directories, and all of the `.js` files. The following sections explain how the exceptions are built into the UI.
 
 ####JavaScript
-All JavaScript files located in the ```master/components/<component>/js``` are uglified and concatenated together with the rest of the UI's JavaScript. Once aggregated, the JavaScript file is minified and written to ```app/assets/js/app.js```.
+All JavaScript files located in the `master/components/<component>/js` are concatenated together with the rest of the UI's JavaScript and written to `app/assets/js/app.js`. In the production build, they are also uglified.
 
 ####Configuration
 
-Similar to the [UI-wide configuration](../../README.md#configuration), components can define different configuration for each environment. The gulp task creates the constant ```ENV``` under the ```kubernetesApp.config``` module for configuration, which is an object with a property for the root UI and each component.
+Similar to the [application wide configuration](../../README.md#configuration), components can define environment specific configuration. The gulp task creates the constant `ENV` under the `kubernetesApp.config` module, which is an object with a property for the root UI and each component.
 
-For example, a configuration for the ```development``` environment specific to ```foo_component``` would be located at ```master/components/foo_component/config/development.json```. Such a component would access its ```development.json``` configuration verbatim at ```ENV.foo_component```:
+For example, a configuration for the `development` environment specific to `foo_component` would be located at `master/components/foo_component/config/development.json`. Such a component would access its `development.json` configuration verbatim at `ENV.foo_component`:
+
 ```
 angular.module('kubernetesApp.components.fooComponent', ['kubernetesApp.config'])
     .provider('foo', ...)
@@ -72,7 +78,7 @@ angular.module('kubernetesApp.components.fooComponent', ['kubernetesApp.config']
 
 ####Less
 
-Like JavaScript, the component's Less files are built into one monolithic CSS file. All top-level Less files located at ```master/components/<component>/less/*.less``` are imported into the main UI's Less file. The result is then minified and copied to ```app/assets/css/app.css```.
+Like JavaScript, the component's Less files are built into one monolithic CSS file. All top-level Less files located at `master/components/<component>/less/*.less` are imported into the main UI's Less file. The result is then copied to `app/assets/css/app.css`. In the production build, it is also minified.
 
 Sub-directories of this path are watched for changes, but not directly imported. This is useful for defining common colors, mixins and other functions or variables used by the top-level Less files.
 
@@ -120,9 +126,5 @@ Sub-directories of this path are watched for changes, but not directly imported.
   "required": ["routes"]
 }
 ```
-
-Content available under the [CC-By 3.0
-license](http://creativecommons.org/licenses/by/3.0/)
-
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/www/master/components/README.md?pixel)]()

@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -26,7 +25,11 @@ import (
 
 // Config holds the information needed to build connect to remote kubernetes clusters as a given user
 type Config struct {
-	v1beta3.TypeMeta `json:",inline"`
+	// Legacy field from pkg/api/types.go TypeMeta.
+	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
+	Kind string `json:"kind,omitempty"`
+	// Version of the schema for this config object.
+	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
 	Preferences Preferences `json:"preferences"`
 	// Clusters is a map of referencable names to cluster configs

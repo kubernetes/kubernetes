@@ -7,7 +7,7 @@ container: skydns
 	sudo docker build -t gcr.io/google_containers/skydns .
 
 push:
-	sudo gcloud preview docker push gcr.io/google_containers/skydns
+	sudo gcloud docker push gcr.io/google_containers/skydns
 
 clean:
 	rm -f skydns

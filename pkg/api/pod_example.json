@@ -4,7 +4,7 @@
     "metadata": {
         "name": "etcd-server-e2e-test-wojtekt-master",
         "namespace": "default",
-        "selfLink": "/api/v1beta1/pods/etcd-server-e2e-test-wojtekt-master?namespace=default",
+        "selfLink": "/api/v1beta3/namespaces/default/pods/etcd-server-e2e-test-wojtekt-master",
         "uid": "a671734a-e8e5-11e4-8fde-42010af09327",
         "resourceVersion": "22",
         "creationTimestamp": "2015-04-22T11:49:36Z",

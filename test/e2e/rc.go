@@ -103,7 +103,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 		if err != nil {
 			Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
-		if _, err = rcReaper.Stop(ns, controller.Name, nil); err != nil {
+		if _, err = rcReaper.Stop(ns, controller.Name, 0, nil); err != nil {
 			Logf("Failed to stop replication controller %v: %v.", controller.Name, err)
 		}
 	}()
@@ -141,7 +141,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	By("Trying to dial each unique pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
-	err = wait.Poll(retryInterval, retryTimeout, responseChecker{c, ns, label, name, pods}.checkAllResponses)
+	err = wait.Poll(retryInterval, retryTimeout, podResponseChecker{c, ns, label, name, true, pods}.checkAllResponses)
 	if err != nil {
 		Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}
@@ -154,46 +154,4 @@ func isElementOf(podUID types.UID, pods *api.PodList) bool {
 		}
 	}
 	return false
-}
-
-type responseChecker struct {
-	c              *client.Client
-	ns             string
-	label          labels.Selector
-	controllerName string
-	pods           *api.PodList
-}
-
-func (r responseChecker) checkAllResponses() (done bool, err error) {
-	successes := 0
-	currentPods, err := r.c.Pods(r.ns).List(r.label, fields.Everything())
-	Expect(err).NotTo(HaveOccurred())
-	for i, pod := range r.pods.Items {
-		// Check that the replica list remains unchanged, otherwise we have problems.
-		if !isElementOf(pod.UID, currentPods) {
-			return false, fmt.Errorf("Pod with UID %s is no longer a member of the replica set.  Must have been restarted for some reason.  Current replica set: %v", pod.UID, currentPods)
-		}
-		body, err := r.c.Get().
-			Prefix("proxy").
-			Namespace(api.NamespaceDefault).
-			Resource("pods").
-			Name(string(pod.Name)).
-			Do().
-			Raw()
-		if err != nil {
-			Logf("Controller %s: Failed to GET from replica %d (%s): %v:", r.controllerName, i+1, pod.Name, err)
-			continue
-		}
-		// The body should be the pod name.
-		if string(body) != pod.Name {
-			Logf("Controller %s: Replica %d expected response %s but got %s", r.controllerName, i+1, pod.Name, string(body))
-			continue
-		}
-		successes++
-		Logf("Controller %s: Got expected result from replica %d: %s, %d of %d required successes so far", r.controllerName, i+1, string(body), successes, len(r.pods.Items))
-	}
-	if successes < len(r.pods.Items) {
-		return false, nil
-	}
-	return true, nil
 }

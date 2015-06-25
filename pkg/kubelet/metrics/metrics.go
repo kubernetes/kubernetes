@@ -25,36 +25,83 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const kubeletSubsystem = "kubelet"
+const (
+	KubeletSubsystem              = "kubelet"
+	PodWorkerLatencyKey           = "pod_worker_latency_microseconds"
+	SyncPodsLatencyKey            = "sync_pods_latency_microseconds"
+	PodStartLatencyKey            = "pod_start_latency_microseconds"
+	PodStatusLatencyKey           = "generate_pod_status_latency_microseconds"
+	ContainerManagerOperationsKey = "container_manager_latency_microseconds"
+	DockerOperationsKey           = "docker_operations_latency_microseconds"
+	DockerErrorsKey               = "docker_errors"
+	PodWorkerStartLatencyKey      = "pod_worker_start_latency_microseconds"
+)
 
 var (
 	ContainersPerPodCount = prometheus.NewSummary(
 		prometheus.SummaryOpts{
-			Subsystem: kubeletSubsystem,
+			Subsystem: KubeletSubsystem,
 			Name:      "containers_per_pod_count",
 			Help:      "The number of containers per pod.",
 		},
 	)
-	SyncPodLatency = prometheus.NewSummaryVec(
+	PodWorkerLatency = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
-			Subsystem: kubeletSubsystem,
-			Name:      "sync_pod_latency_microseconds",
+			Subsystem: KubeletSubsystem,
+			Name:      PodWorkerLatencyKey,
 			Help:      "Latency in microseconds to sync a single pod. Broken down by operation type: create, update, or sync",
 		},
 		[]string{"operation_type"},
 	)
 	SyncPodsLatency = prometheus.NewSummary(
 		prometheus.SummaryOpts{
-			Subsystem: kubeletSubsystem,
-			Name:      "sync_pods_latency_microseconds",
+			Subsystem: KubeletSubsystem,
+			Name:      SyncPodsLatencyKey,
 			Help:      "Latency in microseconds to sync all pods.",
+		},
+	)
+	PodStartLatency = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      PodStartLatencyKey,
+			Help:      "Latency in microseconds for a single pod to go from pending to running. Broken down by podname.",
+		},
+	)
+	PodStatusLatency = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      PodStatusLatencyKey,
+			Help:      "Latency in microseconds to generate status for a single pod.",
+		},
+	)
+	ContainerManagerLatency = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      ContainerManagerOperationsKey,
+			Help:      "Latency in microseconds for container manager operations. Broken down by method.",
+		},
+		[]string{"operation_type"},
+	)
+	PodWorkerStartLatency = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      PodWorkerStartLatencyKey,
+			Help:      "Latency in microseconds from seeing a pod to starting a worker.",
 		},
 	)
 	DockerOperationsLatency = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
-			Subsystem: kubeletSubsystem,
-			Name:      "docker_operations_latency_microseconds",
+			Subsystem: KubeletSubsystem,
+			Name:      DockerOperationsKey,
 			Help:      "Latency in microseconds of Docker operations. Broken down by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+	DockerErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      DockerErrorsKey,
+			Help:      "Cumulative number of Docker errors by operation type.",
 		},
 		[]string{"operation_type"},
 	)
@@ -66,33 +113,17 @@ var registerMetrics sync.Once
 func Register(containerCache kubecontainer.RuntimeCache) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(SyncPodLatency)
+		prometheus.MustRegister(PodWorkerLatency)
+		prometheus.MustRegister(PodStartLatency)
+		prometheus.MustRegister(PodStatusLatency)
 		prometheus.MustRegister(DockerOperationsLatency)
+		prometheus.MustRegister(ContainerManagerLatency)
 		prometheus.MustRegister(SyncPodsLatency)
+		prometheus.MustRegister(PodWorkerStartLatency)
 		prometheus.MustRegister(ContainersPerPodCount)
+		prometheus.MustRegister(DockerErrors)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
 	})
-}
-
-type SyncPodType int
-
-const (
-	SyncPodSync SyncPodType = iota
-	SyncPodUpdate
-	SyncPodCreate
-)
-
-func (sp SyncPodType) String() string {
-	switch sp {
-	case SyncPodCreate:
-		return "create"
-	case SyncPodUpdate:
-		return "update"
-	case SyncPodSync:
-		return "sync"
-	default:
-		return "unknown"
-	}
 }
 
 // Gets the time since the specified start in microseconds.
@@ -115,11 +146,11 @@ type podAndContainerCollector struct {
 // TODO(vmarmol): Split by source?
 var (
 	runningPodCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", kubeletSubsystem, "running_pod_count"),
+		prometheus.BuildFQName("", KubeletSubsystem, "running_pod_count"),
 		"Number of pods currently running",
 		nil, nil)
 	runningContainerCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", kubeletSubsystem, "running_container_count"),
+		prometheus.BuildFQName("", KubeletSubsystem, "running_container_count"),
 		"Number of containers currently running",
 		nil, nil)
 )

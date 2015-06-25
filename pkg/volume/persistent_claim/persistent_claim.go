@@ -48,13 +48,13 @@ func (plugin *persistentClaimPlugin) Name() string {
 }
 
 func (plugin *persistentClaimPlugin) CanSupport(spec *volume.Spec) bool {
-	return spec.VolumeSource.PersistentVolumeClaimVolumeSource != nil
+	return spec.VolumeSource.PersistentVolumeClaim != nil
 }
 
 func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	claim, err := plugin.host.GetKubeClient().PersistentVolumeClaims(pod.Namespace).Get(spec.VolumeSource.PersistentVolumeClaimVolumeSource.ClaimName)
+	claim, err := plugin.host.GetKubeClient().PersistentVolumeClaims(pod.Namespace).Get(spec.VolumeSource.PersistentVolumeClaim.ClaimName)
 	if err != nil {
-		glog.Errorf("Error finding claim: %+v\n", spec.VolumeSource.PersistentVolumeClaimVolumeSource.ClaimName)
+		glog.Errorf("Error finding claim: %+v\n", spec.VolumeSource.PersistentVolumeClaim.ClaimName)
 		return nil, err
 	}
 
@@ -74,7 +74,7 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod,
 	}
 
 	if pv.Spec.ClaimRef.UID != claim.UID {
-		glog.Errorf("Excepted volume.Spec.ClaimRef.UID %+v but have %+v", pv.Spec.ClaimRef.UID, claim.UID)
+		glog.Errorf("Expected volume.Spec.ClaimRef.UID %+v but have %+v", pv.Spec.ClaimRef.UID, claim.UID)
 		return nil, err
 	}
 

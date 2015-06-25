@@ -65,7 +65,7 @@ function create-kubeconfig() {
     user_args+=(
      "--token=${KUBE_BEARER_TOKEN}"
     )
-  else
+  elif [[ ! -z "${KUBE_USER:-}" && ! -z "${KUBE_PASSWORD:-}" ]]; then
     user_args+=(
      "--username=${KUBE_USER}"
      "--password=${KUBE_PASSWORD}"
@@ -87,7 +87,7 @@ function create-kubeconfig() {
   # If we have a bearer token, also create a credential entry with basic auth
   # so that it is easy to discover the basic auth password for your cluster
   # to use in a web browser.
-  if [[ ! -z "${KUBE_BEARER_TOKEN:-}" ]]; then
+  if [[ ! -z "${KUBE_BEARER_TOKEN:-}" && ! -z "${KUBE_USER:-}" && ! -z "${KUBE_PASSWORD:-}" ]]; then
     "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
   fi
 
@@ -166,5 +166,69 @@ function get-kubeconfig-bearertoken() {
   # Handle empty/missing token
   if [[ "${KUBE_BEARER_TOKEN}" == '<no value>' ]]; then
     KUBE_BEARER_TOKEN=''
+  fi
+}
+
+# Sets KUBE_VERSION variable to the version passed in as an argument, or if argument is
+# latest_stable, latest_release, or latest_ci fetches and sets the correponding version number
+#
+# Args:
+#   $1 version string from command line
+# Vars set:
+#   KUBE_VERSION
+function set_binary_version() {
+  if [[ "${1}" == "latest_stable" ]]; then
+    KUBE_VERSION=$(gsutil cat gs://kubernetes-release/release/stable.txt)
+    echo "Using latest stable version: ${KUBE_VERSION}" >&2
+  elif [[ "${1}" == "latest_release" ]]; then
+    KUBE_VERSION=$(gsutil cat gs://kubernetes-release/release/latest.txt)
+    echo "Using latest release version: ${KUBE_VERSION}" >&2
+  elif [[ "${1}" == "latest_ci" ]]; then
+    KUBE_VERSION=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
+    echo "Using latest ci version: ${KUBE_VERSION}" >&2
+  else
+    KUBE_VERSION=${1}
+  fi
+}
+
+# Figure out which binary use on the server and assure it is available.
+# If KUBE_VERSION is specified use binaries specified by it, otherwise
+# use local dev binaries.
+#
+# Assumed vars:
+#   PROJECT
+# Vars set:
+#   SERVER_BINARY_TAR_URL
+#   SERVER_BINARY_TAR_HASH
+#   SALT_TAR_URL
+#   SALT_TAR_HASH
+function tars_from_version() {
+  if [[ -z "${KUBE_VERSION-}" ]]; then
+    find-release-tars
+    upload-server-tars
+  elif [[ ${KUBE_VERSION} =~ ${KUBE_VERSION_REGEX} ]]; then
+    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+  elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
+    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+  else
+    echo "Version doesn't match regexp" >&2
+    exit 1
+  fi
+  until SERVER_BINARY_TAR_HASH=$(curl --fail --silent "${SERVER_BINARY_TAR_URL}.sha1"); do
+    echo "Failure trying to curl release .sha1"
+  done
+  until SALT_TAR_HASH=$(curl --fail --silent "${SALT_TAR_URL}.sha1"); do
+    echo "Failure trying to curl Salt tar .sha1"
+  done
+
+  if ! curl -Ss --range 0-1 "${SERVER_BINARY_TAR_URL}" >&/dev/null; then
+    echo "Can't find release at ${SERVER_BINARY_TAR_URL}" >&2
+    exit 1
+  fi
+  if ! curl -Ss --range 0-1 "${SALT_TAR_URL}" >&/dev/null; then
+    echo "Can't find Salt tar at ${SALT_TAR_URL}" >&2
+    exit 1
   fi
 }

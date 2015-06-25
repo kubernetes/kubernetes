@@ -29,6 +29,18 @@ func addConversionFuncs() {
 	err := api.Scheme.AddConversionFuncs(
 		convert_v1beta3_Container_To_api_Container,
 		convert_api_Container_To_v1beta3_Container,
+		convert_v1beta3_ServiceSpec_To_api_ServiceSpec,
+		convert_api_ServiceSpec_To_v1beta3_ServiceSpec,
+		convert_v1beta3_PodSpec_To_api_PodSpec,
+		convert_api_PodSpec_To_v1beta3_PodSpec,
+		convert_v1beta3_ContainerState_To_api_ContainerState,
+		convert_api_ContainerState_To_v1beta3_ContainerState,
+		convert_api_ContainerStateTerminated_To_v1beta3_ContainerStateTerminated,
+		convert_v1beta3_ContainerStateTerminated_To_api_ContainerStateTerminated,
+		convert_v1beta3_StatusDetails_To_api_StatusDetails,
+		convert_api_StatusDetails_To_v1beta3_StatusDetails,
+		convert_v1beta3_StatusCause_To_api_StatusCause,
+		convert_api_StatusCause_To_v1beta3_StatusCause,
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
@@ -41,9 +53,10 @@ func addConversionFuncs() {
 			switch label {
 			case "metadata.name",
 				"metadata.namespace",
-				"status.phase",
-				"spec.host":
+				"status.phase":
 				return label, value, nil
+			case "spec.host":
+				return "spec.nodeName", value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
@@ -129,6 +142,19 @@ func addConversionFuncs() {
 		panic(err)
 	}
 	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "ServiceAccount",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
+	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Endpoints",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name":
@@ -327,5 +353,376 @@ func convert_api_Container_To_v1beta3_Container(in *api.Container, out *Containe
 	if out.SecurityContext != nil && out.SecurityContext.Capabilities != nil {
 		out.Capabilities = *out.SecurityContext.Capabilities
 	}
+	return nil
+}
+
+func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ServiceSpec))(in)
+	}
+	if in.Ports != nil {
+		out.Ports = make([]api.ServicePort, len(in.Ports))
+		for i := range in.Ports {
+			if err := convert_v1beta3_ServicePort_To_api_ServicePort(&in.Ports[i], &out.Ports[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ports = nil
+	}
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	out.ClusterIP = in.PortalIP
+
+	typeIn := in.Type
+	if typeIn == "" {
+		if in.CreateExternalLoadBalancer {
+			typeIn = ServiceTypeLoadBalancer
+		} else {
+			typeIn = ServiceTypeClusterIP
+		}
+	}
+	if err := s.Convert(&typeIn, &out.Type, 0); err != nil {
+		return err
+	}
+
+	if in.PublicIPs != nil {
+		out.DeprecatedPublicIPs = make([]string, len(in.PublicIPs))
+		for i := range in.PublicIPs {
+			out.DeprecatedPublicIPs[i] = in.PublicIPs[i]
+		}
+	} else {
+		out.DeprecatedPublicIPs = nil
+	}
+	out.SessionAffinity = api.ServiceAffinity(in.SessionAffinity)
+	return nil
+}
+
+func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ServiceSpec))(in)
+	}
+	if in.Ports != nil {
+		out.Ports = make([]ServicePort, len(in.Ports))
+		for i := range in.Ports {
+			if err := convert_api_ServicePort_To_v1beta3_ServicePort(&in.Ports[i], &out.Ports[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ports = nil
+	}
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	} else {
+		out.Selector = nil
+	}
+	out.PortalIP = in.ClusterIP
+
+	if err := s.Convert(&in.Type, &out.Type, 0); err != nil {
+		return err
+	}
+	out.CreateExternalLoadBalancer = in.Type == api.ServiceTypeLoadBalancer
+
+	if in.DeprecatedPublicIPs != nil {
+		out.PublicIPs = make([]string, len(in.DeprecatedPublicIPs))
+		for i := range in.DeprecatedPublicIPs {
+			out.PublicIPs[i] = in.DeprecatedPublicIPs[i]
+		}
+	} else {
+		out.PublicIPs = nil
+	}
+	out.SessionAffinity = ServiceAffinity(in.SessionAffinity)
+	return nil
+}
+
+func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*PodSpec))(in)
+	}
+	if in.Volumes != nil {
+		out.Volumes = make([]api.Volume, len(in.Volumes))
+		for i := range in.Volumes {
+			if err := convert_v1beta3_Volume_To_api_Volume(&in.Volumes[i], &out.Volumes[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Volumes = nil
+	}
+	if in.Containers != nil {
+		out.Containers = make([]api.Container, len(in.Containers))
+		for i := range in.Containers {
+			if err := convert_v1beta3_Container_To_api_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Containers = nil
+	}
+	out.RestartPolicy = api.RestartPolicy(in.RestartPolicy)
+	if in.TerminationGracePeriodSeconds != nil {
+		out.TerminationGracePeriodSeconds = new(int64)
+		*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
+	} else {
+		out.TerminationGracePeriodSeconds = nil
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		out.ActiveDeadlineSeconds = new(int64)
+		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
+	out.DNSPolicy = api.DNSPolicy(in.DNSPolicy)
+	if in.NodeSelector != nil {
+		out.NodeSelector = make(map[string]string)
+		for key, val := range in.NodeSelector {
+			out.NodeSelector[key] = val
+		}
+	} else {
+		out.NodeSelector = nil
+	}
+	out.ServiceAccountName = in.ServiceAccount
+	out.NodeName = in.Host
+	out.HostNetwork = in.HostNetwork
+	if in.ImagePullSecrets != nil {
+		out.ImagePullSecrets = make([]api.LocalObjectReference, len(in.ImagePullSecrets))
+		for i := range in.ImagePullSecrets {
+			if err := convert_v1beta3_LocalObjectReference_To_api_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ImagePullSecrets = nil
+	}
+	return nil
+}
+
+func convert_api_PodSpec_To_v1beta3_PodSpec(in *api.PodSpec, out *PodSpec, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.PodSpec))(in)
+	}
+	if in.Volumes != nil {
+		out.Volumes = make([]Volume, len(in.Volumes))
+		for i := range in.Volumes {
+			if err := convert_api_Volume_To_v1beta3_Volume(&in.Volumes[i], &out.Volumes[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Volumes = nil
+	}
+	if in.Containers != nil {
+		out.Containers = make([]Container, len(in.Containers))
+		for i := range in.Containers {
+			if err := convert_api_Container_To_v1beta3_Container(&in.Containers[i], &out.Containers[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Containers = nil
+	}
+	out.RestartPolicy = RestartPolicy(in.RestartPolicy)
+	if in.TerminationGracePeriodSeconds != nil {
+		out.TerminationGracePeriodSeconds = new(int64)
+		*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
+	} else {
+		out.TerminationGracePeriodSeconds = nil
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		out.ActiveDeadlineSeconds = new(int64)
+		*out.ActiveDeadlineSeconds = *in.ActiveDeadlineSeconds
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
+	out.DNSPolicy = DNSPolicy(in.DNSPolicy)
+	if in.NodeSelector != nil {
+		out.NodeSelector = make(map[string]string)
+		for key, val := range in.NodeSelector {
+			out.NodeSelector[key] = val
+		}
+	} else {
+		out.NodeSelector = nil
+	}
+	out.ServiceAccount = in.ServiceAccountName
+	out.Host = in.NodeName
+	out.HostNetwork = in.HostNetwork
+	if in.ImagePullSecrets != nil {
+		out.ImagePullSecrets = make([]LocalObjectReference, len(in.ImagePullSecrets))
+		for i := range in.ImagePullSecrets {
+			if err := convert_api_LocalObjectReference_To_v1beta3_LocalObjectReference(&in.ImagePullSecrets[i], &out.ImagePullSecrets[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ImagePullSecrets = nil
+	}
+	return nil
+}
+
+func convert_api_ContainerState_To_v1beta3_ContainerState(in *api.ContainerState, out *ContainerState, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ContainerState))(in)
+	}
+	if in.Waiting != nil {
+		out.Waiting = new(ContainerStateWaiting)
+		if err := convert_api_ContainerStateWaiting_To_v1beta3_ContainerStateWaiting(in.Waiting, out.Waiting, s); err != nil {
+			return err
+		}
+	} else {
+		out.Waiting = nil
+	}
+	if in.Running != nil {
+		out.Running = new(ContainerStateRunning)
+		if err := convert_api_ContainerStateRunning_To_v1beta3_ContainerStateRunning(in.Running, out.Running, s); err != nil {
+			return err
+		}
+	} else {
+		out.Running = nil
+	}
+	if in.Terminated != nil {
+		out.Termination = new(ContainerStateTerminated)
+		if err := convert_api_ContainerStateTerminated_To_v1beta3_ContainerStateTerminated(in.Terminated, out.Termination, s); err != nil {
+			return err
+		}
+	} else {
+		out.Termination = nil
+	}
+	return nil
+}
+
+func convert_v1beta3_ContainerState_To_api_ContainerState(in *ContainerState, out *api.ContainerState, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ContainerState))(in)
+	}
+	if in.Waiting != nil {
+		out.Waiting = new(api.ContainerStateWaiting)
+		if err := convert_v1beta3_ContainerStateWaiting_To_api_ContainerStateWaiting(in.Waiting, out.Waiting, s); err != nil {
+			return err
+		}
+	} else {
+		out.Waiting = nil
+	}
+	if in.Running != nil {
+		out.Running = new(api.ContainerStateRunning)
+		if err := convert_v1beta3_ContainerStateRunning_To_api_ContainerStateRunning(in.Running, out.Running, s); err != nil {
+			return err
+		}
+	} else {
+		out.Running = nil
+	}
+	if in.Termination != nil {
+		out.Terminated = new(api.ContainerStateTerminated)
+		if err := convert_v1beta3_ContainerStateTerminated_To_api_ContainerStateTerminated(in.Termination, out.Terminated, s); err != nil {
+			return err
+		}
+	} else {
+		out.Terminated = nil
+	}
+	return nil
+}
+
+func convert_api_ContainerStateTerminated_To_v1beta3_ContainerStateTerminated(in *api.ContainerStateTerminated, out *ContainerStateTerminated, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.ContainerStateTerminated))(in)
+	}
+	out.ExitCode = in.ExitCode
+	out.Signal = in.Signal
+	out.Reason = in.Reason
+	out.Message = in.Message
+	if err := s.Convert(&in.StartedAt, &out.StartedAt, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.FinishedAt, &out.FinishedAt, 0); err != nil {
+		return err
+	}
+	out.ContainerID = in.ContainerID
+	return nil
+}
+
+func convert_v1beta3_ContainerStateTerminated_To_api_ContainerStateTerminated(in *ContainerStateTerminated, out *api.ContainerStateTerminated, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*ContainerStateTerminated))(in)
+	}
+	out.ExitCode = in.ExitCode
+	out.Signal = in.Signal
+	out.Reason = in.Reason
+	out.Message = in.Message
+	if err := s.Convert(&in.StartedAt, &out.StartedAt, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.FinishedAt, &out.FinishedAt, 0); err != nil {
+		return err
+	}
+	out.ContainerID = in.ContainerID
+	return nil
+}
+
+func convert_v1beta3_StatusDetails_To_api_StatusDetails(in *StatusDetails, out *api.StatusDetails, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*StatusDetails))(in)
+	}
+	out.Name = in.ID
+	out.Kind = in.Kind
+	if in.Causes != nil {
+		out.Causes = make([]api.StatusCause, len(in.Causes))
+		for i := range in.Causes {
+			if err := convert_v1beta3_StatusCause_To_api_StatusCause(&in.Causes[i], &out.Causes[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Causes = nil
+	}
+	out.RetryAfterSeconds = in.RetryAfterSeconds
+	return nil
+}
+
+func convert_api_StatusDetails_To_v1beta3_StatusDetails(in *api.StatusDetails, out *StatusDetails, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.StatusDetails))(in)
+	}
+	out.ID = in.Name
+	out.Kind = in.Kind
+	if in.Causes != nil {
+		out.Causes = make([]StatusCause, len(in.Causes))
+		for i := range in.Causes {
+			if err := convert_api_StatusCause_To_v1beta3_StatusCause(&in.Causes[i], &out.Causes[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Causes = nil
+	}
+	out.RetryAfterSeconds = in.RetryAfterSeconds
+	return nil
+}
+
+func convert_v1beta3_StatusCause_To_api_StatusCause(in *StatusCause, out *api.StatusCause, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*StatusCause))(in)
+	}
+	out.Type = api.CauseType(in.Type)
+	out.Message = in.Message
+	out.Field = in.Field
+	return nil
+}
+
+func convert_api_StatusCause_To_v1beta3_StatusCause(in *api.StatusCause, out *StatusCause, s conversion.Scope) error {
+	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
+		defaulting.(func(*api.StatusCause))(in)
+	}
+	out.Type = CauseType(in.Type)
+	out.Message = in.Message
+	out.Field = in.Field
 	return nil
 }

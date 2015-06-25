@@ -104,7 +104,7 @@ func podScheduled(c *client.Client, podNamespace, podName string) wait.Condition
 			// This could be a connection error so we want to retry.
 			return false, nil
 		}
-		if pod.Spec.Host == "" {
+		if pod.Spec.NodeName == "" {
 			return false, nil
 		}
 		return true, nil

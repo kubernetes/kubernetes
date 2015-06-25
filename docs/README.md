@@ -1,6 +1,14 @@
 # Kubernetes Documentation
 
-* The [User's guide](user-guide.md) is for anyone who wants to run programs and services on an exisiting Kubernetes cluster.
+**Note**
+This documentation is current for HEAD.
+
+Documentation for previous releases is available in their respective branches:
+   * [v0.19.0](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/release-0.19.0/docs)
+   * [v0.18.1](https://github.com/GoogleCloudPlatform/kubernetes/tree/release-0.18/docs)
+   * [v0.17.1](https://github.com/GoogleCloudPlatform/kubernetes/tree/release-0.17/docs)
+
+* The [User's guide](user-guide.md) is for anyone who wants to run programs and services on an existing Kubernetes cluster.
 
 * The [Cluster Admin's guide](cluster-admin-guide.md) is for anyone setting up a Kubernetes cluster or administering it.
 

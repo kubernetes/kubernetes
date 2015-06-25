@@ -17,7 +17,9 @@ limitations under the License.
 package clientcmd
 
 import (
+	"fmt"
 	"io"
+	"net/url"
 	"os"
 
 	"github.com/imdario/mergo"
@@ -35,6 +37,8 @@ var (
 
 	// EnvVarCluster allows overriding the DefaultCluster using an envvar for the server name
 	EnvVarCluster = clientcmdapi.Cluster{Server: os.Getenv("KUBERNETES_MASTER")}
+
+	DefaultClientConfig = DirectClientConfig{*clientcmdapi.NewConfig(), "", &ConfigOverrides{}, nil}
 )
 
 // ClientConfig is used to make it easy to get an api server client
@@ -85,6 +89,13 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 
 	clientConfig := &client.Config{}
 	clientConfig.Host = configClusterInfo.Server
+	if u, err := url.ParseRequestURI(clientConfig.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
+		clientConfig.Prefix = u.Path
+		u.Path = ""
+		u.RawQuery = ""
+		u.Fragment = ""
+		clientConfig.Host = u.String()
+	}
 	clientConfig.Version = configClusterInfo.APIVersion
 
 	// only try to read the auth information if we are secure
@@ -283,4 +294,33 @@ func (config DirectClientConfig) getCluster() clientcmdapi.Cluster {
 	mergo.Merge(&mergedClusterInfo, config.overrides.ClusterInfo)
 
 	return mergedClusterInfo
+}
+
+// inClusterClientConfig makes a config that will work from within a kubernetes cluster container environment.
+type inClusterClientConfig struct{}
+
+func (inClusterClientConfig) RawConfig() (clientcmdapi.Config, error) {
+	return clientcmdapi.Config{}, fmt.Errorf("inCluster environment config doesn't support multiple clusters")
+}
+
+func (inClusterClientConfig) ClientConfig() (*client.Config, error) {
+	return client.InClusterConfig()
+}
+
+func (inClusterClientConfig) Namespace() (string, error) {
+	// TODO: generic way to figure out what namespace you are running in?
+	// This way assumes you've set the POD_NAMESPACE environment variable
+	// using the downward API.
+	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
+		return ns, nil
+	}
+	return "default", nil
+}
+
+// Possible returns true if loading an inside-kubernetes-cluster is possible.
+func (inClusterClientConfig) Possible() bool {
+	fi, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount/token")
+	return os.Getenv("KUBERNETES_SERVICE_HOST") != "" &&
+		os.Getenv("KUBERNETES_SERVICE_PORT") != "" &&
+		err == nil && !fi.IsDir()
 }

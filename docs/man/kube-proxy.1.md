@@ -17,34 +17,40 @@ The kube-proxy takes several options.
 **--alsologtostderr**=false
 	log to standard error as well as files
 
-**--api_version=**""
-	The API version to use when talking to the server
+**--bind-address**=0.0.0.0
+	The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)
 
-**--bindaddress**="0.0.0.0"
-	The address for the proxy server to serve on (set to 0.0.0.0 or "" for all interfaces)
+**--healthz-bind-address**=127.0.0.1
+	The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
 
-**--etcd_servers**=[]
-	List of etcd servers to watch (http://ip:port), comma separated (optional)
+**--healthz-port**=10249
+	The port to bind the health check server. Use 0 to disable.
 
-**--insecure_skip_tls_verify**=false
-	If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
+**--kubeconfig**=""
+	Path to kubeconfig file with authorization information (the master location is set by the master flag).
 
 **--log_backtrace_at**=:0
 	when logging hits line file:N, emit a stack trace
 
-**--log_dir**=""
+**--log_dir**=
 	If non-empty, write log files in this directory
 
 **--log_flush_frequency**=5s
 	Maximum number of seconds between log flushes
 
-**--logtostderr**=false
+**--logtostderr**=true
 	log to standard error instead of files
 
 **--master**=""
-	The address of the Kubernetes API server
+	The address of the Kubernetes API server (overrides any value in kubeconfig)
 
-**--stderrthreshold**=0
+**--oom-score-adj**=-899
+	The oom_score_adj value for kube-proxy process. Values must be within the range [-1000, 1000]
+
+**--resource-container**="/kube-proxy"
+	Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).
+
+**--stderrthreshold**=2
 	logs at or above this threshold go to stderr
 
 **--v**=0
@@ -56,11 +62,11 @@ The kube-proxy takes several options.
 **--vmodule**=
 	comma-separated list of pattern=N settings for file-filtered logging
 
-
 # EXAMPLES
 ```
-/usr/bin/kube-proxy --logtostderr=true --v=0 --etcd_servers=http://127.0.0.1:4001
+/usr/bin/kube-proxy --logtostderr=true --v=0 --master=http://127.0.0.1:8080
 ```
+
 # HISTORY
 October 2014, Originally compiled by Scott Collier (scollier at redhat dot com) based
  on the kubernetes source material and internal work.

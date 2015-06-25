@@ -1,8 +1,24 @@
-#**Kubernetes multiple nodes cluster with flannel on Fedora**
+Kubernetes multiple nodes cluster with flannel on Fedora
+--------------------------------------------------------
+
+**Table of Contents**
+
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [Master Setup](#master-setup)
+- [Node Setup](#node-setup)
+- [**Test the cluster and flannel configuration**](#test-the-cluster-and-flannel-configuration)
+
+## Introduction
 
 This document describes how to deploy kubernetes on multiple hosts to set up a multi-node cluster and networking with flannel. Follow fedora [getting started guide](fedora_manual_config.md) to setup 1 master (fed-master) and 2 or more nodes (minions). Make sure that all nodes (minions) have different names (fed-node1, fed-node2 and so on) and labels (fed-node1-label, fed-node2-label, and so on) to avoid any conflict. Also make sure that the kubernetes master host is running etcd, kube-controller-manager, kube-scheduler, and kube-apiserver services, and the nodes (minions) are running docker, kube-proxy and kubelet services. Now install flannel on kubernetes nodes (minions). flannel on each node configures an overlay network that docker uses. flannel runs on each node to setup a unique class-C container network.
 
-##**Perform following commands on the kubernetes master**
+## Prerequisites
+1. You need 2 or more machines with Fedora installed.
+
+## Master Setup
+
+**Perform following commands on the kubernetes master**
 
 * Configure flannel by creating a `flannel-config.json` in your current directory on fed-master. flannel provides udp and vxlan among other overlay networking backend options. In this guide, we choose kernel based vxlan backend. The contents of the json are:
 
@@ -30,7 +46,9 @@ This document describes how to deploy kubernetes on multiple hosts to set up a m
 # etcdctl get /coreos.com/network/config
 ```
 
-##**Perform following commands on all kubernetes nodes**
+## Node Setup
+
+**Perform following commands on all kubernetes nodes**
 
 * Edit the flannel configuration file /etc/sysconfig/flanneld as follows:
 

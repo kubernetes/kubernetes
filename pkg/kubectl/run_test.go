@@ -39,14 +39,14 @@ func TestGenerate(t *testing.T) {
 			expected: &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
 					Name:   "foo",
-					Labels: map[string]string{"run-container": "foo"},
+					Labels: map[string]string{"run": "foo"},
 				},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
-					Selector: map[string]string{"run-container": "foo"},
+					Selector: map[string]string{"run": "foo"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
-							Labels: map[string]string{"run-container": "foo"},
+							Labels: map[string]string{"run": "foo"},
 						},
 						Spec: api.PodSpec{
 							Containers: []api.Container{
@@ -70,14 +70,14 @@ func TestGenerate(t *testing.T) {
 			expected: &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
 					Name:   "foo",
-					Labels: map[string]string{"run-container": "foo"},
+					Labels: map[string]string{"run": "foo"},
 				},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
-					Selector: map[string]string{"run-container": "foo"},
+					Selector: map[string]string{"run": "foo"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
-							Labels: map[string]string{"run-container": "foo"},
+							Labels: map[string]string{"run": "foo"},
 						},
 						Spec: api.PodSpec{
 							Containers: []api.Container{
@@ -107,14 +107,14 @@ func TestGenerate(t *testing.T) {
 			expected: &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
 					Name:   "foo",
-					Labels: map[string]string{"run-container": "foo"},
+					Labels: map[string]string{"run": "foo"},
 				},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
-					Selector: map[string]string{"run-container": "foo"},
+					Selector: map[string]string{"run": "foo"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
-							Labels: map[string]string{"run-container": "foo"},
+							Labels: map[string]string{"run": "foo"},
 						},
 						Spec: api.PodSpec{
 							Containers: []api.Container{

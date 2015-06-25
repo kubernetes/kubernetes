@@ -67,9 +67,10 @@ type RequestScope struct {
 	Creater   runtime.ObjectCreater
 	Convertor runtime.ObjectConvertor
 
-	Resource   string
-	Kind       string
-	APIVersion string
+	Resource    string
+	Subresource string
+	Kind        string
+	APIVersion  string
 
 	// The version of apiserver resources to use
 	ServerAPIVersion string
@@ -142,7 +143,7 @@ func getRequestOptions(req *restful.Request, scope RequestScope, kind string, su
 }
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
-func ConnectResource(connecter rest.Connecter, scope RequestScope, connectOptionsKind string, subpath bool, subpathKey string) restful.RouteFunction {
+func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, connectOptionsKind, restPath string, subpath bool, subpathKey string) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 		namespace, name, err := scope.Namer.Name(req)
@@ -156,6 +157,20 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, connectOption
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
+		}
+		if admit.Handles(admission.Connect) {
+			connectRequest := &rest.ConnectRequest{
+				Name:         name,
+				Options:      opts,
+				ResourcePath: restPath,
+			}
+			userInfo, _ := api.UserFrom(ctx)
+
+			err = admit.Admit(admission.NewAttributesRecord(connectRequest, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 		handler, err := connecter.Connect(ctx, name, opts)
 		if err != nil {
@@ -172,7 +187,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, connectOption
 }
 
 // ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.
-func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool) restful.RouteFunction {
+func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -239,7 +254,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				errorJSON(err, scope.Codec, w)
 				return
 			}
-			serveWatch(watcher, scope, w, req)
+			serveWatch(watcher, scope, w, req, minRequestTimeout)
 			return
 		}
 
@@ -293,11 +308,14 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			return
 		}
 
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "CREATE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Create) {
+			userInfo, _ := api.UserFrom(ctx)
+
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
@@ -361,11 +379,14 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		ctx = api.WithNamespace(ctx, namespace)
 
 		// PATCH requires same permission as UPDATE
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Update) {
+			userInfo, _ := api.UserFrom(ctx)
+
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		versionedObj, err := converter.ConvertToVersion(obj, scope.APIVersion)
@@ -459,11 +480,14 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Update) {
+			userInfo, _ := api.UserFrom(ctx)
+
+			err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		wasCreated := false
@@ -486,7 +510,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if wasCreated {
 			status = http.StatusCreated
 		}
-		writeJSON(status, scope.Codec, result, w)
+		writeJSON(status, scope.Codec, result, w, isPrettyPrint(req.Request))
 	}
 }
 
@@ -521,11 +545,14 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			}
 		}
 
-		userInfo, _ := api.UserFrom(ctx)
-		err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, scope.Resource, "DELETE", userInfo))
-		if err != nil {
-			errorJSON(err, scope.Codec, w)
-			return
+		if admit.Handles(admission.Delete) {
+			userInfo, _ := api.UserFrom(ctx)
+
+			err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
@@ -543,7 +570,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 				Status: api.StatusSuccess,
 				Code:   http.StatusOK,
 				Details: &api.StatusDetails{
-					ID:   name,
+					Name: name,
 					Kind: scope.Kind,
 				},
 			}

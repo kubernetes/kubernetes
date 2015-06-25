@@ -20,10 +20,20 @@ monit:
     - group: root
     - mode: 644
 
+{% if "kubernetes-pool" in grains.get('roles', []) %}
 /etc/monit/conf.d/kube-proxy:
   file:
     - managed
     - source: salt://monit/kube-proxy
+    - user: root
+    - group: root
+    - mode: 644
+{% endif %}
+
+/etc/monit/conf.d/kube-addons:
+  file:
+    - managed
+    - source: salt://monit/kube-addons
     - user: root
     - group: root
     - mode: 644

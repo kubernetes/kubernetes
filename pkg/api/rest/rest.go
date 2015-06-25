@@ -246,3 +246,18 @@ type StorageMetadata interface {
 	// PATCH) can respond with.
 	ProducesMIMETypes(verb string) []string
 }
+
+// ConnectRequest is an object passed to admission control for Connect operations
+type ConnectRequest struct {
+	// Name is the name of the object on which the connect request was made
+	Name string
+
+	// Options is the options object passed to the connect request. See the NewConnectOptions method on Connecter
+	Options runtime.Object
+
+	// ResourcePath is the path for the resource in the REST server (ie. "pods/proxy")
+	ResourcePath string
+}
+
+// IsAnAPIObject makes ConnectRequest a runtime.Object
+func (*ConnectRequest) IsAnAPIObject() {}

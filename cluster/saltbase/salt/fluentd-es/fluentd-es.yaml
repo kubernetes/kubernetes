@@ -6,6 +6,9 @@ spec:
   containers:
   - name: fluentd-elasticsearch
     image: gcr.io/google_containers/fluentd-elasticsearch:1.5
+    resources:
+      limits:
+        cpu: 100m
     env:
     - name: "FLUENTD_ARGS"
       value: "-qq"

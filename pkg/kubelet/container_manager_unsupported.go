@@ -20,6 +20,9 @@ package kubelet
 
 import (
 	"fmt"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 )
 
 type unsupportedContainerManager struct {
@@ -31,6 +34,10 @@ func (unsupportedContainerManager) Start() error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
-func newContainerManager(dockerDaemonContainer string) (containerManager, error) {
+func (unsupportedContainerManager) SystemContainersLimit() api.ResourceList {
+	return api.ResourceList{}
+}
+
+func newContainerManager(cadvisorInterface cadvisor.Interface, dockerDaemonContainer, systemContainer, kubeletContainer string) (containerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

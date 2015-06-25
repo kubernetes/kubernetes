@@ -20,8 +20,40 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	versioned "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 )
+
+func TestResourceQuotaStatusConversion(t *testing.T) {
+	// should serialize as "0"
+	expected := resource.NewQuantity(int64(0), resource.DecimalSI)
+	if "0" != expected.String() {
+		t.Errorf("Expected: 0, Actual: %v, do not require units", expected.String())
+	}
+
+	parsed := resource.MustParse("0")
+	if "0" != parsed.String() {
+		t.Errorf("Expected: 0, Actual: %v, do not require units", parsed.String())
+	}
+
+	quota := &api.ResourceQuota{}
+	quota.Status = api.ResourceQuotaStatus{}
+	quota.Status.Hard = api.ResourceList{}
+	quota.Status.Used = api.ResourceList{}
+	quota.Status.Hard[api.ResourcePods] = *expected
+
+	// round-trip the object
+	data, _ := versioned.Codec.Encode(quota)
+	object, _ := versioned.Codec.Decode(data)
+	after := object.(*api.ResourceQuota)
+	actualQuantity := after.Status.Hard[api.ResourcePods]
+	actual := &actualQuantity
+
+	// should be "0", but was "0m"
+	if expected.String() != actual.String() {
+		t.Errorf("Expected %v, Actual %v", expected.String(), actual.String())
+	}
+}
 
 func TestNodeConversion(t *testing.T) {
 	obj, err := versioned.Codec.Decode([]byte(`{"kind":"Minion","apiVersion":"v1beta3"}`))

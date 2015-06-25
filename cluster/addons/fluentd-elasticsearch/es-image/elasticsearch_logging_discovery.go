@@ -24,12 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/golang/glog"
-)
-
-var (
-	kubeconfig = flag.String("kubeconfig", "/etc/token-system-logging/kubeconfig", "kubeconfig file for access")
 )
 
 func flattenSubsets(subsets []api.EndpointSubset) []string {
@@ -46,17 +41,7 @@ func main() {
 	flag.Parse()
 	glog.Info("Kubernetes Elasticsearch logging discovery")
 
-	settings, err := clientcmd.LoadFromFile(*kubeconfig)
-	if err != nil {
-		glog.Fatalf("Error loading configuration from %s: %v", *kubeconfig, err.Error())
-	}
-
-	config, err := clientcmd.NewDefaultClientConfig(*settings, &clientcmd.ConfigOverrides{}).ClientConfig()
-	if err != nil {
-		glog.Fatalf("Failed to construct config: %v", err)
-	}
-
-	c, err := client.New(config)
+	c, err := client.NewInCluster()
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}

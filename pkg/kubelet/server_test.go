@@ -55,6 +55,16 @@ type fakeKubelet struct {
 	containerLogsFunc                  func(podFullName, containerName, tail string, follow, pervious bool, stdout, stderr io.Writer) error
 	streamingConnectionIdleTimeoutFunc func() time.Duration
 	hostnameFunc                       func() string
+	resyncInterval                     time.Duration
+	loopEntryTime                      time.Time
+}
+
+func (fk *fakeKubelet) ResyncInterval() time.Duration {
+	return fk.resyncInterval
+}
+
+func (fk *fakeKubelet) LatestLoopEntryTime() time.Time {
+	return fk.loopEntryTime
 }
 
 func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
@@ -453,51 +463,71 @@ func TestHealthCheck(t *testing.T) {
 	}
 
 	// Test with correct hostname, Docker version
-	resp, err := http.Get(fw.testHTTPServer.URL + "/healthz")
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		// copying the response body did not work
-		t.Fatalf("Cannot copy resp: %#v", err)
-	}
-	result := string(body)
-	if !strings.Contains(result, "ok") {
-		t.Errorf("expected body contains ok, got %s", result)
-	}
+	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
 
 	//Test with incorrect hostname
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "fake"
 	}
-	resp, err = http.Get(fw.testHTTPServer.URL + "/healthz")
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
-	}
+	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
 
 	//Test with old container runtime version
 	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
 		return dockertools.NewVersion("1.1")
 	}
 
-	resp, err = http.Get(fw.testHTTPServer.URL + "/healthz")
+	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
+}
+
+func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
+	resp, err := http.Get(httpURL)
 	if err != nil {
 		t.Fatalf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("expected status code %d, got %d", http.StatusInternalServerError, resp.StatusCode)
+	if resp.StatusCode != expectedErrorCode {
+		t.Errorf("expected status code %d, got %d", expectedErrorCode, resp.StatusCode)
+	}
+}
+
+func TestSyncLoopCheck(t *testing.T) {
+	fw := newServerTest()
+	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
+		return dockertools.NewVersion("1.15")
+	}
+	fw.fakeKubelet.hostnameFunc = func() string {
+		return "127.0.0.1"
 	}
 
+	fw.fakeKubelet.resyncInterval = time.Minute
+	fw.fakeKubelet.loopEntryTime = time.Now()
+
+	// Test with correct hostname, Docker version
+	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
+
+	fw.fakeKubelet.loopEntryTime = time.Now().Add(time.Minute * -10)
+	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
+}
+
+// returns http response status code from the HTTP GET
+func assertHealthIsOk(t *testing.T, httpURL string) {
+	resp, err := http.Get(httpURL)
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+	body, readErr := ioutil.ReadAll(resp.Body)
+	if readErr != nil {
+		// copying the response body did not work
+		t.Fatalf("Cannot copy resp: %#v", readErr)
+	}
+	result := string(body)
+	if !strings.Contains(result, "ok") {
+		t.Errorf("expected body contains ok, got %s", result)
+	}
 }
 
 func setPodByNameFunc(fw *serverTestFramework, namespace, pod, container string) {

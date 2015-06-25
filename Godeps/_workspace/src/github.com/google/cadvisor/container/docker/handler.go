@@ -261,17 +261,10 @@ func (self *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
 	}
 
 	// TODO(rjnagal): Remove the conversion when network stats are read from libcontainer.
-	net := stats.Network
-	// Ingress for host veth is from the container.
-	// Hence tx_bytes stat on the host veth is actually number of bytes received by the container.
-	stats.Network.RxBytes = net.TxBytes
-	stats.Network.RxPackets = net.TxPackets
-	stats.Network.RxErrors = net.TxErrors
-	stats.Network.RxDropped = net.TxDropped
-	stats.Network.TxBytes = net.RxBytes
-	stats.Network.TxPackets = net.RxPackets
-	stats.Network.TxErrors = net.RxErrors
-	stats.Network.TxDropped = net.RxDropped
+	convertInterfaceStats(&stats.Network.InterfaceStats)
+	for i := range stats.Network.Interfaces {
+		convertInterfaceStats(&stats.Network.Interfaces[i])
+	}
 
 	// Get filesystem stats.
 	err = self.getFsStats(stats)
@@ -280,6 +273,21 @@ func (self *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
 	}
 
 	return stats, nil
+}
+
+func convertInterfaceStats(stats *info.InterfaceStats) {
+	net := stats
+
+	// Ingress for host veth is from the container.
+	// Hence tx_bytes stat on the host veth is actually number of bytes received by the container.
+	stats.RxBytes = net.TxBytes
+	stats.RxPackets = net.TxPackets
+	stats.RxErrors = net.TxErrors
+	stats.RxDropped = net.TxDropped
+	stats.TxBytes = net.RxBytes
+	stats.TxPackets = net.RxPackets
+	stats.TxErrors = net.RxErrors
+	stats.TxDropped = net.RxDropped
 }
 
 func (self *dockerContainerHandler) ListContainers(listType container.ListType) ([]info.ContainerReference, error) {

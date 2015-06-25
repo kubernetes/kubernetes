@@ -15,15 +15,15 @@ limitations under the License.
 
 -->
 # Live update example
-This example demonstrates the usage of Kubernetes to perform a live update on a running group of pods.
+This example demonstrates the usage of Kubernetes to perform a live update on a running group of [pods](../../docs/pods.md).
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes-new#contents):
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides):
 
 ```bash
 $ cd kubernetes
-$ hack/dev-build-and-up.sh
+$ ./cluster/kube-up.sh
 ```
 
 ### Step One: Turn up the UX for the demo
@@ -31,28 +31,28 @@ $ hack/dev-build-and-up.sh
 You can use bash job control to run this in the background (note that you must use the default port -- 8001 -- for the following demonstration to work properly).  This can sometimes spew to the output so you could also run it in a different terminal.
 
 ```
-$ ./cluster/kubectl.sh proxy --www=examples/update-demo/local/ &
-+ ./cluster/kubectl.sh proxy --www=examples/update-demo/local/
+$ ./kubectl proxy --www=examples/update-demo/local/ &
++ ./kubectl proxy --www=examples/update-demo/local/
 I0218 15:18:31.623279   67480 proxy.go:36] Starting to serve on localhost:8001
 ```
 
 Now visit the the [demo website](http://localhost:8001/static).  You won't see anything much quite yet.
 
-### Step Two: Run the controller
+### Step Two: Run the replication controller
 Now we will turn up two replicas of an image.  They all serve on internal port 80.
 
 ```bash
-$ ./cluster/kubectl.sh create -f examples/update-demo/nautilus-rc.yaml
+$ ./kubectl create -f examples/update-demo/nautilus-rc.yaml
 ```
 
 After pulling the image from the Docker Hub to your worker nodes (which may take a minute or so) you'll see a couple of squares in the UI detailing the pods that are running along with the image that they are serving up.  A cute little nautilus.
 
-### Step Three: Try resizing the controller
+### Step Three: Try scaling the replication controller
 
 Now we will increase the number of replicas from two to four:
 
 ```bash
-$ ./cluster/kubectl.sh resize rc update-demo-nautilus --replicas=4
+$ ./kubectl scale rc update-demo-nautilus --replicas=4
 ```
 
 If you go back to the [demo website](http://localhost:8001/static/index.html) you should eventually see four boxes, one for each pod.
@@ -61,30 +61,29 @@ If you go back to the [demo website](http://localhost:8001/static/index.html) yo
 We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
 ```bash
-$ ./cluster/kubectl.sh rolling-update update-demo-nautilus --update-period=10s -f examples/update-demo/kitten-rc.yaml
+$ ./kubectl rolling-update update-demo-nautilus --update-period=10s -f examples/update-demo/kitten-rc.yaml
 ```
 The rolling-update command in kubectl will do 2 things:
 
-1. Create a new replication controller with a pod template that uses the new image (`gcr.io/google_containers/update-demo:kitten`)
-2. Resize the old and new replication controllers until the new controller replaces the old. This will kill the current pods one at a time, spinnning up new ones to replace them.
+1. Create a new [replication controller](../../docs/replication-controller.md) with a pod template that uses the new image (`gcr.io/google_containers/update-demo:kitten`)
+2. Scale the old and new replication controllers until the new controller replaces the old. This will kill the current pods one at a time, spinnning up new ones to replace them.
 
 Watch the [demo website](http://localhost:8001/static/index.html), it will update one pod every 10 seconds until all of the pods have the new image.
 
 ### Step Five: Bring down the pods
 
 ```bash
-$ ./cluster/kubectl.sh stop rc update-demo-kitten
+$ ./kubectl stop rc update-demo-kitten
 ```
 
-This will first 'stop' the replication controller by turning the target number of replicas to 0.  It'll then delete that controller.
+This first stops the replication controller by turning the target number of replicas to 0 and then deletes the controller.
 
 ### Step Six: Cleanup
 
 To turn down a Kubernetes cluster:
 
 ```bash
-$ cd ../..  # Up to kubernetes.
-$ cluster/kube-down.sh
+$ ./cluster/kube-down.sh
 ```
 
 Kill the proxy running in the background:
@@ -92,9 +91,9 @@ After you are done running this demo make sure to kill it:
 
 ```bash
 $ jobs
-[1]+  Running                 ./cluster/kubectl.sh proxy --www=local/ &
+[1]+  Running                 ./kubectl proxy --www=local/ &
 $ kill %1
-[1]+  Terminated: 15          ./cluster/kubectl.sh proxy --www=local/
+[1]+  Terminated: 15          ./kubectl proxy --www=local/
 ```
 
 ### Updating the Docker images

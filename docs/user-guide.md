@@ -3,7 +3,7 @@
 The user guide is intended for anyone who wants to run programs and services
 on an existing Kubernetes cluster.  Setup and administration of a
 Kubernetes cluster is described in the [Cluster Admin Guide](cluster-admin-guide.md).
-The developer guide describes is for anyone wanting to either write code which directly accesses the
+The [Developer Guide](developer-guide.md) is for anyone wanting to either write code which directly accesses the
 kubernetes API, or to contribute directly to the kubernetes project.
 
 ## Primary concepts
@@ -38,11 +38,10 @@ kubernetes API, or to contribute directly to the kubernetes project.
   (e.g. ssh keys, passwords) separately from the Pods that use them, protecting
   the sensitive data from proliferation by tools that process pods.
 
+* **Accessing the API and other cluster services via a Proxy** [accessing-the-cluster.md](../docs/accessing-the-cluster.md)
+
 * **API Overview** ([api.md](api.md)): Pointers to API documentation on various topics
   and explanation of Kubernetes's approaches to API changes and API versioning.
-
-* **Accessing the API** ([accessing_the_api.md](accessing_the_api.md)):
-  Ports, IPs, proxies, and firewall rules.
 
 * **Kubernetes Web Interface** ([ui.md](ui.md)): Accessing the Kubernetes
   web user interface.
@@ -59,14 +58,22 @@ kubernetes API, or to contribute directly to the kubernetes project.
 * **Glossary** ([glossary.md](glossary.md)): Terms and concepts.
 
 ## Further reading
-
+<!--- make sure all documents from the docs directory are linked somewhere.
+This one-liner (execute in docs/ dir) prints unlinked documents (only from this
+dir - no recursion):
+for i in *.md; do grep -r $i . | grep -v "^\./$i" > /dev/null; rv=$?; if [[ $rv -ne 0 ]]; then echo $i; fi; done
+-->
 
 * **Annotations** ([annotations.md](annotations.md)): Attaching
   arbitrary non-identifying metadata.
 
+* **Downward API** ([downward_api.md](downward_api.md)): Accessing system
+  configuration from a pod without accessing Kubernetes API (see also
+  [container-environment.md](container-environment.md)).
+
 * **Kubernetes Container Environment** ([container-environment.md](container-environment.md)):
   Describes the environment for Kubelet managed containers on a Kubernetes
-  node.
+  node (see also [downward_api.md](downward_api.md)).
 
 * **DNS Integration with SkyDNS** ([dns.md](dns.md)):
   Resolving a DNS name directly to a Kubernetes service.
@@ -84,11 +91,12 @@ kubernetes API, or to contribute directly to the kubernetes project.
 
 * **Networking** ([networking.md](networking.md)): Pod networking overview.
 
+* **Services and firewalls** ([services-firewalls.md](services-firewalls.md)): How
+  to use firewalls.
+
 * **The Kubernetes Resource Model** ([resources.md](resources.md)):
   Provides resource information such as size, type, and quantity to assist in
   assigning Kubernetes resources appropriately.
-
-* **Accessing cluster services via a Proxy** [accessing-the-cluster.md](../docs/accessing-the-cluster.md)
 
 * The [API object documentation](http://kubernetes.io/third_party/swagger-ui/).
 

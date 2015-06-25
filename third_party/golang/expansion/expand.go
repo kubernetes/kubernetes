@@ -1,5 +1,9 @@
 package expansion
 
+import (
+	"bytes"
+)
+
 const (
 	operator        = '$'
 	referenceOpener = '('
@@ -32,13 +36,13 @@ func MappingFuncFor(context ...map[string]string) func(string) string {
 // the expansion spec using the given mapping function to resolve the
 // values of variables.
 func Expand(input string, mapping func(string) string) string {
-	buf := make([]byte, 0, 2*len(input))
+	var buf bytes.Buffer
 	checkpoint := 0
 	for cursor := 0; cursor < len(input); cursor++ {
 		if input[cursor] == operator && cursor+1 < len(input) {
 			// Copy the portion of the input string since the last
 			// checkpoint into the buffer
-			buf = append(buf, input[checkpoint:cursor]...)
+			buf.WriteString(input[checkpoint:cursor])
 
 			// Attempt to read the variable name as defined by the
 			// syntax from the input string
@@ -48,10 +52,10 @@ func Expand(input string, mapping func(string) string) string {
 				// We were able to read a variable name correctly;
 				// apply the mapping to the variable name and copy the
 				// bytes into the buffer
-				buf = append(buf, mapping(read)...)
+				buf.WriteString(mapping(read))
 			} else {
 				// Not a variable name; copy the read bytes into the buffer
-				buf = append(buf, read...)
+				buf.WriteString(read)
 			}
 
 			// Advance the cursor in the input string to account for
@@ -65,7 +69,7 @@ func Expand(input string, mapping func(string) string) string {
 
 	// Return the buffer and any remaining unwritten bytes in the
 	// input string.
-	return string(buf) + input[checkpoint:]
+	return buf.String() + input[checkpoint:]
 }
 
 // tryReadVariableName attempts to read a variable name from the input

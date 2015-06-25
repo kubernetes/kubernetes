@@ -44,7 +44,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s\n", d.Output) {
+	if buf.String() != fmt.Sprintf("%s\n\n", d.Output) {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

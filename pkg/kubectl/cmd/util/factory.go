@@ -64,9 +64,9 @@ type Factory struct {
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer func(mapping *meta.RESTMapping) (kubectl.Describer, error)
 	// Returns a Printer for formatting objects of the given type or an error.
-	Printer func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
-	// Returns a Resizer for changing the size of the specified RESTMapping type or an error
-	Resizer func(mapping *meta.RESTMapping) (kubectl.Resizer, error)
+	Printer func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, columnLabels []string) (kubectl.ResourcePrinter, error)
+	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
+	Scaler func(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 	// Returns a Reaper for gracefully shutting down resources.
 	Reaper func(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 	// PodSelectorForObject returns the pod selector associated with the provided object
@@ -90,11 +90,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	mapper := kubectl.ShortcutExpander{latest.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	generators := map[string]kubectl.Generator{
-		"run-container/v1": kubectl.BasicReplicationController{},
-		"service/v1":       kubectl.ServiceGenerator{},
+		"run/v1":     kubectl.BasicReplicationController{},
+		"service/v1": kubectl.ServiceGenerator{},
 	}
 
 	clientConfig := optionalClientConfig
@@ -102,10 +102,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		clientConfig = DefaultClientConfig(flags)
 	}
 
-	clients := &clientCache{
-		clients: make(map[string]*client.Client),
-		loader:  clientConfig,
-	}
+	clients := NewClientCache(clientConfig)
 
 	return &Factory{
 		clients:    clients,
@@ -143,8 +140,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return describer, nil
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
-			return kubectl.NewHumanReadablePrinter(noHeaders), nil
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace, columnLabels), nil
 		},
 		PodSelectorForObject: func(object runtime.Object) (string, error) {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
@@ -187,12 +184,12 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		LabelsForObject: func(object runtime.Object) (map[string]string, error) {
 			return meta.NewAccessor().Labels(object)
 		},
-		Resizer: func(mapping *meta.RESTMapping) (kubectl.Resizer, error) {
+		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ResizerFor(mapping.Kind, kubectl.NewResizerClient(client))
+			return kubectl.ScalerFor(mapping.Kind, kubectl.NewScalerClient(client))
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)
@@ -236,17 +233,18 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 		f.flags.Bool("validate", false, "If true, use a schema to validate the input before sending it")
 	}
 
-	if f.flags != nil {
-		f.flags.VisitAll(func(flag *pflag.Flag) {
-			flags.AddFlag(flag)
-		})
-	}
+	// Merge factory's flags
+	util.AddPFlagSetToPFlagSet(f.flags, flags)
 
 	// Globally persistent flags across all subcommands.
 	// TODO Change flag names to consts to allow safer lookup from subcommands.
 	// TODO Add a verbose flag that turns on glog logging. Probably need a way
 	// to do that automatically for every subcommand.
 	flags.BoolVar(&f.clients.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
+
+	// Normalize all flags that are comming from other packages or pre-configurations
+	// a.k.a. change all "_" to "-". e.g. glog package
+	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
 }
 
 func getPorts(spec api.PodSpec) []string {
@@ -265,7 +263,7 @@ type clientSwaggerSchema struct {
 }
 
 func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
-	version, _, err := c.t.DataVersionAndKind(data)
+	version, _, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
 	if err != nil {
 		return err
 	}
@@ -289,7 +287,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 //           1.  CommandLineLocation - this parsed from the command line, so it must be late bound.  If you specify this,
 //               then no other kubeconfig files are merged.  This file must exist.
 //           2.  If $KUBECONFIG is set, then it is treated as a list of files that should be merged.
-//			 3.  HomeDirectoryLocation
+//	     3.  HomeDirectoryLocation
 //           Empty filenames are ignored.  Files with non-deserializable content produced errors.
 //           The first file to set a particular value or map key wins and the value or map key is never changed.
 //           This means that the first file to set CurrentContext will have its context preserved.  It also means
@@ -315,6 +313,13 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 //           2.  If the command line does not specify one, and the auth info has conflicting techniques, fail.
 //           3.  If the command line specifies one and the auth info specifies another, honor the command line technique.
 //   2.  Use default values and potentially prompt for auth information
+//
+//   However, if it appears that we're running in a kubernetes cluster
+//   container environment, then run with the auth info kubernetes mounted for
+//   us. Specifically:
+//     The env vars KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT are
+//     set, and the file /var/run/secrets/kubernetes.io/serviceaccount/token
+//     exists and is not a directory.
 func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	flags.StringVar(&loadingRules.ExplicitPath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
@@ -343,7 +348,7 @@ func (f *Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Wri
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(cmd, mapping)
+	printer, err := f.PrinterForMapping(cmd, mapping, false)
 	if err != nil {
 		return err
 	}
@@ -352,7 +357,7 @@ func (f *Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Wri
 
 // PrinterForMapping returns a printer suitable for displaying the provided resource type.
 // Requires that printer flags have been added to cmd (see AddPrinterFlags).
-func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.ResourcePrinter, error) {
+func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
 	printer, ok, err := PrinterForCommand(cmd)
 	if err != nil {
 		return nil, err
@@ -373,7 +378,7 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		}
 		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.APIVersion)
 	} else {
-		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"))
+		printer, err = f.Printer(mapping, GetFlagBool(cmd, "no-headers"), withNamespace, GetFlagStringList(cmd, "label-columns"))
 		if err != nil {
 			return nil, err
 		}

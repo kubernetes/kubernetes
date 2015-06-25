@@ -70,14 +70,14 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 }
 
 func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
-	r := &Request{baseURL: &url.URL{}, path: "/path/", namespaceInQuery: true}
+	r := &Request{baseURL: &url.URL{}, path: "/path/"}
 	if s := r.URL().String(); s != "/path/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}, namespaceInQuery: true}).AbsPath("/foo/")
+	r := (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
@@ -89,7 +89,7 @@ func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
 }
 
 func TestRequestAbsPathJoins(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}, namespaceInQuery: true}).AbsPath("foo/bar", "baz")
+	r := (&Request{baseURL: &url.URL{}}).AbsPath("foo/bar", "baz")
 	if s := r.URL().String(); s != "foo/bar/baz" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
@@ -100,20 +100,11 @@ func TestRequestSetsNamespace(t *testing.T) {
 		baseURL: &url.URL{
 			Path: "/",
 		},
-		namespaceInQuery: true,
 	}).Namespace("foo")
 	if r.namespace == "" {
 		t.Errorf("namespace should be set: %#v", r)
 	}
-	if s := r.URL().String(); s != "?namespace=foo" {
-		t.Errorf("namespace should be in params: %s", s)
-	}
 
-	r = (&Request{
-		baseURL: &url.URL{
-			Path: "/",
-		},
-	}).Namespace("foo")
 	if s := r.URL().String(); s != "namespaces/foo" {
 		t.Errorf("namespace should be in path: %s", s)
 	}
@@ -215,6 +206,24 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 	}
 }
 
+func TestURLTemplate(t *testing.T) {
+	uri, _ := url.Parse("http://localhost")
+	r := NewRequest(nil, "POST", uri, "test", nil)
+	r.Prefix("pre1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0")
+	full := r.URL()
+	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
+		t.Errorf("unexpected initial URL: %s", full)
+	}
+	actual := r.finalURLTemplate()
+	expected := "http://localhost/pre1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D?p0=%7Bvalue%7D"
+	if actual != expected {
+		t.Errorf("unexpected URL template: %s %s", actual, expected)
+	}
+	if r.URL().String() != full.String() {
+		t.Errorf("creating URL template changed request: %s -> %s", full.String(), r.URL().String())
+	}
+}
+
 func TestTransformResponse(t *testing.T) {
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")
@@ -260,7 +269,7 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
-		r := NewRequest(nil, "", uri, testapi.Version(), testapi.Codec(), true, true)
+		r := NewRequest(nil, "", uri, testapi.Version(), testapi.Codec())
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -620,7 +629,7 @@ func TestRequestUpgrade(t *testing.T) {
 			Err: true,
 		},
 		{
-			Request: NewRequest(nil, "", uri, testapi.Version(), testapi.Codec(), true, true),
+			Request: NewRequest(nil, "", uri, testapi.Version(), testapi.Codec()),
 			Config: &Config{
 				Username: "u",
 				Password: "p",
@@ -629,7 +638,7 @@ func TestRequestUpgrade(t *testing.T) {
 			Err:             false,
 		},
 		{
-			Request: NewRequest(nil, "", uri, testapi.Version(), testapi.Codec(), true, true),
+			Request: NewRequest(nil, "", uri, testapi.Version(), testapi.Codec()),
 			Config: &Config{
 				BearerToken: "b",
 			},
@@ -1002,6 +1011,50 @@ func TestVerbs(t *testing.T) {
 	}
 	if r := c.Delete(); r.verb != "DELETE" {
 		t.Errorf("Delete verb is wrong")
+	}
+}
+
+func TestUnversionedPath(t *testing.T) {
+	tt := []struct {
+		host         string
+		prefix       string
+		unversioned  string
+		expectedPath string
+	}{
+		{"", "", "", "/api"},
+		{"", "", "versions", "/api/versions"},
+		{"", "/", "", "/"},
+		{"", "/versions", "", "/versions"},
+		{"", "/api", "", "/api"},
+		{"", "/api/vfake", "", "/api/vfake"},
+		{"", "/api/vfake", "v1beta100", "/api/vfake/v1beta100"},
+		{"", "/api", "/versions", "/api/versions"},
+		{"", "/api", "versions", "/api/versions"},
+		{"", "/a/api", "", "/a/api"},
+		{"", "/a/api", "/versions", "/a/api/versions"},
+		{"", "/a/api", "/versions/d/e", "/a/api/versions/d/e"},
+		{"", "/a/api/vfake", "/versions/d/e", "/a/api/vfake/versions/d/e"},
+	}
+	for i, tc := range tt {
+		c := NewOrDie(&Config{Host: tc.host, Prefix: tc.prefix})
+		r := c.Post().Prefix("/alpha").UnversionedPath(tc.unversioned)
+		if r.path != tc.expectedPath {
+			t.Errorf("test case %d failed: unexpected path: %s, expected %s", i+1, r.path, tc.expectedPath)
+		}
+	}
+	for i, tc := range tt {
+		c := NewOrDie(&Config{Host: tc.host, Prefix: tc.prefix, Version: "v1"})
+		r := c.Post().Prefix("/alpha").UnversionedPath(tc.unversioned)
+		if r.path != tc.expectedPath {
+			t.Errorf("test case %d failed: unexpected path: %s, expected %s", i+1, r.path, tc.expectedPath)
+		}
+	}
+	for i, tc := range tt {
+		c := NewOrDie(&Config{Host: tc.host, Prefix: tc.prefix, Version: "v1beta3"})
+		r := c.Post().Prefix("/alpha").UnversionedPath(tc.unversioned)
+		if r.path != tc.expectedPath {
+			t.Errorf("test case %d failed: unexpected path: %s, expected %s", i+1, r.path, tc.expectedPath)
+		}
 	}
 }
 

@@ -66,12 +66,14 @@ func main() {
 	if _, err := exec.LookPath("git"); err != nil {
 		log.Fatalf("required git executable not found: %v", err)
 	}
-	if err := syncRepo(*flRepo, *flDest, *flBranch, *flRev); err != nil {
-		log.Fatalf("error syncing repo: %v", err)
+	for {
+		if err := syncRepo(*flRepo, *flDest, *flBranch, *flRev); err != nil {
+			log.Fatalf("error syncing repo: %v", err)
+		}
+		log.Printf("wait %d seconds", *flWait)
+		time.Sleep(time.Duration(*flWait) * time.Second)
+		log.Println("done")
 	}
-	log.Printf("wait %d seconds", *flWait)
-	time.Sleep(time.Duration(*flWait) * time.Second)
-	log.Println("done")
 }
 
 // syncRepo syncs the branch of a given repository to the destination at the given rev.

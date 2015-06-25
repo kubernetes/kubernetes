@@ -14,12 +14,12 @@ func (b Boat) PostBuildModel(m *Model) *Model {
 
 	// add model property (just to test is can be added; is this a real usecase?)
 	extraType := "string"
-	m.Properties["extra"] = ModelProperty{
+	m.Properties.Put("extra", ModelProperty{
 		Description: "extra description",
 		DataTypeFields: DataTypeFields{
 			Type: &extraType,
 		},
-	}
+	})
 	return m
 }
 

@@ -16,9 +16,9 @@ kubectl rolling\-update \- Perform a rolling update of the given ReplicationCont
 Perform a rolling update of the given ReplicationController.
 
 .PP
-Replaces the specified controller with new controller, updating one pod at a time to use the
+Replaces the specified replication controller with a new replication controller by updating one pod at a time to use the
 new PodTemplate. The new\-controller.json must specify the same namespace as the
-existing controller and overwrite at least one (common) label in its replicaSelector.
+existing replication controller and overwrite at least one (common) label in its replicaSelector.
 
 
 .SH OPTIONS
@@ -32,7 +32,7 @@ existing controller and overwrite at least one (common) label in its replicaSele
 
 .PP
 \fB\-f\fP, \fB\-\-filename\fP=""
-    Filename or URL to file to use to create the new controller.
+    Filename or URL to file to use to create the new replication controller.
 
 .PP
 \fB\-h\fP, \fB\-\-help\fP=false
@@ -40,7 +40,7 @@ existing controller and overwrite at least one (common) label in its replicaSele
 
 .PP
 \fB\-\-image\fP=""
-    Image to upgrade the controller to.  Can not be used with \-\-filename/\-f
+    Image to use for upgrading the replication controller.  Can not be used with \-\-filename/\-f
 
 .PP
 \fB\-\-no\-headers\fP=false
@@ -56,7 +56,7 @@ existing controller and overwrite at least one (common) label in its replicaSele
 
 .PP
 \fB\-\-poll\-interval\fP="3s"
-    Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+    Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 
 .PP
 \fB\-\-rollback\fP=false
@@ -69,7 +69,7 @@ existing controller and overwrite at least one (common) label in its replicaSele
 
 .PP
 \fB\-\-timeout\fP="5m0s"
-    Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+    Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 
 .PP
 \fB\-\-update\-period\fP="1m0s"
@@ -114,15 +114,15 @@ existing controller and overwrite at least one (common) label in its replicaSele
     Path to the kubeconfig file to use for CLI requests.
 
 .PP
-\fB\-\-log\_backtrace\_at\fP=:0
+\fB\-\-log\-backtrace\-at\fP=:0
     when logging hits line file:N, emit a stack trace
 
 .PP
-\fB\-\-log\_dir\fP=""
+\fB\-\-log\-dir\fP=""
     If non\-empty, write log files in this directory
 
 .PP
-\fB\-\-log\_flush\_frequency\fP=5s
+\fB\-\-log\-flush\-frequency\fP=5s
     Maximum number of seconds between log flushes
 
 .PP
@@ -179,7 +179,7 @@ existing controller and overwrite at least one (common) label in its replicaSele
 .RS
 
 .nf
-// Update pods of frontend\-v1 using new controller data in frontend\-v2.json.
+// Update pods of frontend\-v1 using new replication controller data in frontend\-v2.json.
 $ kubectl rolling\-update frontend\-v1 \-f frontend\-v2.json
 
 // Update pods of frontend\-v1 using JSON data passed into stdin.

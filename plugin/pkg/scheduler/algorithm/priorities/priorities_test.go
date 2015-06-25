@@ -48,16 +48,16 @@ func TestLeastRequested(t *testing.T) {
 		"baz": "blah",
 	}
 	machine1Spec := api.PodSpec{
-		Host: "machine1",
+		NodeName: "machine1",
 	}
 	machine2Spec := api.PodSpec{
-		Host: "machine2",
+		NodeName: "machine2",
 	}
 	noResources := api.PodSpec{
 		Containers: []api.Container{},
 	}
 	cpuOnly := api.PodSpec{
-		Host: "machine1",
+		NodeName: "machine1",
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
@@ -76,9 +76,9 @@ func TestLeastRequested(t *testing.T) {
 		},
 	}
 	cpuOnly2 := cpuOnly
-	cpuOnly2.Host = "machine2"
+	cpuOnly2.NodeName = "machine2"
 	cpuAndMemory := api.PodSpec{
-		Host: "machine2",
+		NodeName: "machine2",
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
@@ -378,16 +378,16 @@ func TestBalancedResourceAllocation(t *testing.T) {
 		"baz": "blah",
 	}
 	machine1Spec := api.PodSpec{
-		Host: "machine1",
+		NodeName: "machine1",
 	}
 	machine2Spec := api.PodSpec{
-		Host: "machine2",
+		NodeName: "machine2",
 	}
 	noResources := api.PodSpec{
 		Containers: []api.Container{},
 	}
 	cpuOnly := api.PodSpec{
-		Host: "machine1",
+		NodeName: "machine1",
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
@@ -406,9 +406,9 @@ func TestBalancedResourceAllocation(t *testing.T) {
 		},
 	}
 	cpuOnly2 := cpuOnly
-	cpuOnly2.Host = "machine2"
+	cpuOnly2.NodeName = "machine2"
 	cpuAndMemory := api.PodSpec{
-		Host: "machine2",
+		NodeName: "machine2",
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{

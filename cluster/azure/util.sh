@@ -322,7 +322,7 @@ function kube-up {
         echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
         echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
         echo "readonly MASTER_HTPASSWD='${htpasswd}'"
-        echo "readonly PORTAL_NET='${PORTAL_NET}'"
+        echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
         echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"        
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/create-dynamic-salt-files.sh"

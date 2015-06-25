@@ -22,12 +22,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# VERSION_REGEX matches things like "v0.13.1"
-readonly VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
-
-# CI_VERSION_REGEX matches things like "v0.14.1-341-ge0c9d9e"
-readonly CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(.*)$"
-
 if [[ "${KUBERNETES_PROVIDER:-gce}" != "gce" ]]; then
   echo "!!! ${1} only works on GCE" >&2
   exit 1
@@ -40,15 +34,17 @@ source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 function usage() {
   echo "!!! EXPERIMENTAL !!!"
   echo ""
-  echo "${0} [-M|-N] -l | <release or continuous integration version>"
+  echo "${0} [-M|-N|-P] -l | <release or continuous integration version> | [latest_stable|latest_release|latest_ci]"
   echo "  Upgrades master and nodes by default"
   echo "  -M:  Upgrade master only"
   echo "  -N:  Upgrade nodes only"
+  echo "  -P:  Node upgrade prerequisites only (create a new instance template)"
   echo "  -l:  Use local(dev) binaries"
   echo ""
   echo "(... Fetching current release versions ...)"
   echo ""
 
+  # NOTE: IF YOU CHANGE THE FOLLOWING LIST, ALSO UPDATE test/e2e/cluster_upgrade.go
   local latest_release
   local latest_stable
   local latest_ci
@@ -58,7 +54,7 @@ function usage() {
   latest_ci=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
 
   echo "To upgrade to:"
-  echo "  latest stable: ${0} ${latest_stable}"
+  echo "  latest stable:  ${0} ${latest_stable}"
   echo "  latest release: ${0} ${latest_release}"
   echo "  latest ci:      ${0} ${latest_ci}"
 }
@@ -66,9 +62,10 @@ function usage() {
 function upgrade-master() {
   echo "== Upgrading master to '${SERVER_BINARY_TAR_URL}'. Do not interrupt, deleting master instance. =="
 
+  get-kubeconfig-basicauth
+  get-kubeconfig-bearertoken
+
   detect-master
-  get-password
-  set-master-htpasswd
 
   # Delete the master instance. Note that the master-pd is created
   # with auto-delete=no, so it should not be deleted.
@@ -85,7 +82,17 @@ function upgrade-master() {
 function wait-for-master() {
   echo "== Waiting for new master to respond to API requests =="
 
-  until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
+  local curl_auth_arg
+  if [[ -n ${KUBE_BEARER_TOKEN:-} ]]; then
+    curl_auth_arg=(-H "Authorization: Bearer ${KUBE_BEARER_TOKEN}")
+  elif [[ -n ${KUBE_PASSWORD:-} ]]; then
+    curl_auth_arg=(--user "${KUBE_USER}:${KUBE_PASSWORD}")
+  else
+    echo "can't get auth credentials for the current master"
+    exit 1
+  fi
+
+  until curl --insecure "${curl_auth_arg[@]}" --max-time 5 \
     --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/healthz"; do
     printf "."
     sleep 2
@@ -97,63 +104,146 @@ function wait-for-master() {
 # Perform common upgrade setup tasks
 #
 # Assumed vars
-#   local_binaries
-#   binary_version
+#   KUBE_VERSION
 function prepare-upgrade() {
   ensure-temp-dir
   detect-project
-
-  if [[ "${local_binaries}" == "true" ]]; then
-    find-release-tars
-    upload-server-tars
-  else
-    tars_from_version ${binary_version}
-  fi
+  tars_from_version
 }
 
+
+# Reads kube-env metadata from first node in MINION_NAMES.
+#
+# Assumed vars:
+#   MINION_NAMES
+#   PROJECT
+#   ZONE
+function get-node-env() {
+  # TODO(mbforbes): Make this more reliable with retries.
+  gcloud compute --project ${PROJECT} ssh --zone ${ZONE} ${MINION_NAMES[0]} --command \
+    "curl --fail --silent -H 'Metadata-Flavor: Google' \
+      'http://metadata/computeMetadata/v1/instance/attributes/kube-env'" 2>/dev/null
+}
+
+# Using provided node env, extracts value from provided key.
+#
+# Args:
+# $1 node env (kube-env of node; result of calling get-node-env)
+# $2 env key to use
+function get-env-val() {
+  echo "${1}" | grep ${2} | cut -d : -f 2 | cut -d \' -f 2
+}
+
+# Assumed vars:
+#   KUBE_VERSION
+#   MINION_SCOPES
+#   NODE_INSTANCE_PREFIX
+#   PROJECT
+#   ZONE
+#
+# Vars set:
+#   KUBELET_TOKEN
+#   KUBE_PROXY_TOKEN
+#   CA_CERT_BASE64
+#   EXTRA_DOCKER_OPTS
+#   KUBELET_CERT_BASE64
+#   KUBELET_KEY_BASE64
 function upgrade-nodes() {
-  echo "== Upgrading nodes to ${SERVER_BINARY_TAR_URL}. =="
+  prepare-node-upgrade
+  do-node-upgrade
+}
+
+# prepare-node-upgrade creates a new instance template suitable for upgrading
+# to KUBE_VERSION and echos a single line with the name of the new template.
+#
+# Assumed vars:
+#   KUBE_VERSION
+#   MINION_SCOPES
+#   NODE_INSTANCE_PREFIX
+#   PROJECT
+#   ZONE
+#
+# Vars set:
+#   SANITIZED_VERSION
+#   KUBELET_TOKEN
+#   KUBE_PROXY_TOKEN
+#   CA_CERT_BASE64
+#   EXTRA_DOCKER_OPTS
+#   KUBELET_CERT_BASE64
+#   KUBELET_KEY_BASE64
+function prepare-node-upgrade() {
+  echo "== Preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
+  SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed s/"\."/-/g)
 
   detect-minion-names
-  get-password
-  set-master-htpasswd
-  kube-update-nodes upgrade
-  echo "== Done =="
+
+  # TODO(mbforbes): Refactor setting scope flags.
+  local -a scope_flags=()
+  if (( "${#MINION_SCOPES[@]}" > 0 )); then
+    scope_flags=("--scopes" "$(join_csv ${MINION_SCOPES[@]})")
+  else
+    scope_flags=("--no-scopes")
+  fi
+
+  # Get required node env vars from exiting template.
+  local node_env=$(get-node-env)
+  KUBELET_TOKEN=$(get-env-val "${node_env}" "KUBELET_TOKEN")
+  KUBE_PROXY_TOKEN=$(get-env-val "${node_env}" "KUBE_PROXY_TOKEN")
+  CA_CERT_BASE64=$(get-env-val "${node_env}" "CA_CERT")
+  EXTRA_DOCKER_OPTS=$(get-env-val "${node_env}" "EXTRA_DOCKER_OPTS")
+  KUBELET_CERT_BASE64=$(get-env-val "${node_env}" "KUBELET_CERT")
+  KUBELET_KEY_BASE64=$(get-env-val "${node_env}" "KUBELET_KEY")
+
+  # TODO(mbforbes): How do we ensure kube-env is written in a ${version}-
+  #                 compatible way?
+  write-node-env
+
+  # TODO(mbforbes): Get configure-vm script from ${version}. (Must plumb this
+  #                 through all create-node-instance-template implementations).
+  create-node-instance-template ${SANITIZED_VERSION}
+  # The following is echo'd so that callers can get the template name.
+  echo "${NODE_INSTANCE_PREFIX}-template-${SANITIZED_VERSION}"
+  echo "== Finished preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
 }
 
-function tars_from_version() {
-  version=${1-}
+# Prereqs:
+# - prepare-node-upgrade should have been called successfully
+function do-node-upgrade() {
+  echo "== Upgrading nodes to ${KUBE_VERSION}. ==" >&2
+  # Do the actual upgrade.
+  # NOTE(mbforbes): If you are changing this gcloud command, update
+  #                 test/e2e/restart.go to match this EXACTLY.
+  gcloud preview rolling-updates \
+      --project="${PROJECT}" \
+      --zone="${ZONE}" \
+      start \
+      --group="${NODE_INSTANCE_PREFIX}-group" \
+      --template="${NODE_INSTANCE_PREFIX}-template-${SANITIZED_VERSION}" \
+      --instance-startup-timeout=300s \
+      --max-num-concurrent-instances=1 \
+      --max-num-failed-instances=0 \
+      --min-instance-update-time=0s
 
-  if [[ ${version} =~ ${VERSION_REGEX} ]]; then
-    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-server-linux-amd64.tar.gz"
-    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-salt.tar.gz"
-  elif [[ ${version} =~ ${CI_VERSION_REGEX} ]]; then
-    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${version}/kubernetes-server-linux-amd64.tar.gz"
-    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${version}/kubernetes-salt.tar.gz"
-  else
-    echo "!!! Version not provided or version doesn't match regexp" >&2
-    exit 1
-  fi
+  # TODO(mbforbes): Wait for the rolling-update to finish.
 
-  if ! curl -Ss --range 0-1 ${SERVER_BINARY_TAR_URL} >&/dev/null; then
-    echo "!!! Can't find release at ${SERVER_BINARY_TAR_URL}" >&2
-    exit 1
-  fi
-
-  echo "== Release ${version} validated =="
+  echo "== Finished upgrading nodes to ${KUBE_VERSION}. ==" >&2
 }
 
 master_upgrade=true
 node_upgrade=true
+node_prereqs=false
 local_binaries=false
 
-while getopts ":MNlh" opt; do
+while getopts ":MNPlh" opt; do
   case ${opt} in
     M)
       node_upgrade=false
       ;;
     N)
       master_upgrade=false
+      ;;
+    P)
+      node_prereqs=true
       ;;
     l)
       local_binaries=true
@@ -182,17 +272,28 @@ if [[ "${master_upgrade}" == "false" ]] && [[ "${node_upgrade}" == "false" ]]; t
 fi
 
 if [[ "${local_binaries}" == "false" ]]; then
-  binary_version=${1}
+  set_binary_version ${1}
 fi
 
 prepare-upgrade
+
+if [[ "${node_prereqs}" == "true" ]]; then
+  prepare-node-upgrade
+  exit 0
+fi
 
 if [[ "${master_upgrade}" == "true" ]]; then
   upgrade-master
 fi
 
 if [[ "${node_upgrade}" == "true" ]]; then
-  upgrade-nodes
+  if [[ "${local_binaries}" == "true" ]]; then
+    echo "Upgrading nodes to local binaries is not yet supported." >&2
+    exit 1
+  else
+    upgrade-nodes
+  fi
 fi
 
+echo "== Validating cluster post-upgrade =="
 "${KUBE_ROOT}/cluster/validate-cluster.sh"

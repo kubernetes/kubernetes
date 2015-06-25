@@ -7,10 +7,9 @@ kubernetes-local:
         "gui-y": "0"
       expose: true
       options:
-        version: "v0.15.0"
+        version: "local"
     docker:
-      charm: docker
-      branch: https://github.com/chuckbutler/docker-charm.git
+      charm: cs:trusty/docker
       num_units: 2
       options:
         latest: true
@@ -18,8 +17,7 @@ kubernetes-local:
         "gui-x": "0"
         "gui-y": "0"
     flannel-docker:
-      charm: flannel-docker
-      branch: https://github.com/chuckbutler/flannel-docker-charm.git
+      charm: cs:~kubernetes/trusty/flannel-docker
       annotations:
         "gui-x": "0"
         "gui-y": "300"

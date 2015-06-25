@@ -18,17 +18,12 @@ package apiserver
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
-	"net/http/httptest"
-	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type fakeRoundTripper struct {
@@ -82,68 +77,5 @@ func TestValidate(t *testing.T) {
 		if status != test.expectedStatus {
 			t.Errorf("expected %s, got %s", test.expectedStatus.String(), status.String())
 		}
-	}
-}
-
-func makeTestValidator(servers map[string]string, rt http.RoundTripper) (http.Handler, error) {
-	result := map[string]Server{}
-	for name, value := range servers {
-		host, port, err := net.SplitHostPort(value)
-		if err != nil {
-			return nil, fmt.Errorf("invalid server spec: %s (%v)", value, err)
-		}
-		val, err := strconv.Atoi(port)
-		if err != nil {
-			return nil, fmt.Errorf("invalid server spec: %s (%v)", port, err)
-		}
-		result[name] = Server{Addr: host, Port: val, Path: "/healthz"}
-	}
-
-	return &validator{servers: func() map[string]Server { return result }, rt: rt}, nil
-}
-
-func TestValidator(t *testing.T) {
-	fake := &fakeRoundTripper{
-		resp: &http.Response{
-			Body:       ioutil.NopCloser(bytes.NewBufferString("foo")),
-			StatusCode: 200,
-		},
-	}
-	validator, err := makeTestValidator(map[string]string{
-		"foo": "foo.com:80",
-		"bar": "bar.com:8080",
-	}, fake)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	testServer := httptest.NewServer(validator)
-	defer testServer.Close()
-
-	resp, err := http.Get(testServer.URL + "/validatez")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %v", resp.StatusCode)
-	}
-	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	var status []ServerStatus
-	if err := json.Unmarshal(data, &status); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	components := util.StringSet{}
-	for _, s := range status {
-		if s.Err != "nil" {
-			t.Errorf("Component %v is unhealthy: %v", s.Component, s.Err)
-		}
-		components.Insert(s.Component)
-	}
-	if len(status) != 2 || !components.Has("foo") || !components.Has("bar") {
-		t.Errorf("unexpected status: %#v", status)
 	}
 }

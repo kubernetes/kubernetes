@@ -57,7 +57,7 @@ var _ = Describe("hostDir", func() {
 		}
 	})
 
-	It("MOD volume on tmpfs should have the correct mode", func() {
+	It("should give a volume the correct mode", func() {
 		volumePath := "/test-volume"
 		source := &api.HostPathVolumeSource{
 			Path: "/tmp",
@@ -126,7 +126,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 			Containers: []api.Container{
 				{
 					Name:  containerName,
-					Image: "kubernetes/mounttest:0.1",
+					Image: "gcr.io/google_containers/mounttest:0.2",
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      volumeName,
@@ -135,7 +135,8 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 					},
 				},
 			},
-			Volumes: mount(source),
+			RestartPolicy: api.RestartPolicyNever,
+			Volumes:       mount(source),
 		},
 	}
 }

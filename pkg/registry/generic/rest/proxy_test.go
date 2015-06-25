@@ -26,6 +26,8 @@ import (
 	"testing"
 
 	"golang.org/x/net/websocket"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/proxy"
 )
 
 type SimpleBackendHandler struct {
@@ -49,8 +51,10 @@ func (s *SimpleBackendHandler) ServeHTTP(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	for k, v := range s.responseHeader {
-		w.Header().Add(k, v)
+	if s.responseHeader != nil {
+		for k, v := range s.responseHeader {
+			w.Header().Add(k, v)
+		}
 	}
 	w.Write([]byte(s.responseBody))
 }
@@ -69,7 +73,7 @@ func validateParameters(t *testing.T, name string, actual url.Values, expected m
 	}
 }
 
-func validateHeaders(t *testing.T, name string, actual http.Header, expected map[string]string) {
+func validateHeaders(t *testing.T, name string, actual http.Header, expected map[string]string, notExpected []string) {
 	for k, v := range expected {
 		actualValue, ok := actual[k]
 		if !ok {
@@ -81,31 +85,46 @@ func validateHeaders(t *testing.T, name string, actual http.Header, expected map
 				name, k, actualValue, v)
 		}
 	}
+	if notExpected == nil {
+		return
+	}
+	for _, h := range notExpected {
+		if _, present := actual[h]; present {
+			t.Errorf("%s: unexpected header: %s", name, h)
+		}
+	}
 }
 
 func TestServeHTTP(t *testing.T) {
 	tests := []struct {
-		name          string
-		method        string
-		requestPath   string
-		requestBody   string
-		requestParams map[string]string
-		requestHeader map[string]string
+		name                  string
+		method                string
+		requestPath           string
+		expectedPath          string
+		requestBody           string
+		requestParams         map[string]string
+		requestHeader         map[string]string
+		responseHeader        map[string]string
+		expectedRespHeader    map[string]string
+		notExpectedRespHeader []string
 	}{
 		{
-			name:        "root path, simple get",
-			method:      "GET",
-			requestPath: "/",
+			name:         "root path, simple get",
+			method:       "GET",
+			requestPath:  "/",
+			expectedPath: "/",
 		},
 		{
-			name:        "simple path, get",
-			method:      "GET",
-			requestPath: "/path/to/test",
+			name:         "simple path, get",
+			method:       "GET",
+			requestPath:  "/path/to/test",
+			expectedPath: "/path/to/test",
 		},
 		{
 			name:          "request params",
 			method:        "POST",
-			requestPath:   "/some/path",
+			requestPath:   "/some/path/",
+			expectedPath:  "/some/path/",
 			requestParams: map[string]string{"param1": "value/1", "param2": "value%2"},
 			requestBody:   "test request body",
 		},
@@ -113,16 +132,46 @@ func TestServeHTTP(t *testing.T) {
 			name:          "request headers",
 			method:        "PUT",
 			requestPath:   "/some/path",
+			expectedPath:  "/some/path",
 			requestHeader: map[string]string{"Header1": "value1", "Header2": "value2"},
+		},
+		{
+			name:         "empty path - slash should be added",
+			method:       "GET",
+			requestPath:  "",
+			expectedPath: "/",
+		},
+		{
+			name:         "remove CORS headers",
+			method:       "GET",
+			requestPath:  "/some/path",
+			expectedPath: "/some/path",
+			responseHeader: map[string]string{
+				"Header1":                      "value1",
+				"Access-Control-Allow-Origin":  "some.server",
+				"Access-Control-Allow-Methods": "GET"},
+			expectedRespHeader: map[string]string{
+				"Header1": "value1",
+			},
+			notExpectedRespHeader: []string{
+				"Access-Control-Allow-Origin",
+				"Access-Control-Allow-Methods",
+			},
 		},
 	}
 
 	for _, test := range tests {
 		func() {
 			backendResponse := "<html><head></head><body><a href=\"/test/path\">Hello</a></body></html>"
+			backendResponseHeader := test.responseHeader
+			// Test a simple header if not specified in the test
+			if backendResponseHeader == nil && test.expectedRespHeader == nil {
+				backendResponseHeader = map[string]string{"Content-Type": "text/html"}
+				test.expectedRespHeader = map[string]string{"Content-Type": "text/html"}
+			}
 			backendHandler := &SimpleBackendHandler{
 				responseBody:   backendResponse,
-				responseHeader: map[string]string{"Content-Type": "text/html"},
+				responseHeader: backendResponseHeader,
 			}
 			backendServer := httptest.NewServer(backendHandler)
 			defer backendServer.Close()
@@ -176,7 +225,7 @@ func TestServeHTTP(t *testing.T) {
 			}
 
 			// Path
-			if backendHandler.requestURL.Path != test.requestPath {
+			if backendHandler.requestURL.Path != test.expectedPath {
 				t.Errorf("Unexpected request path: %s", backendHandler.requestURL.Path)
 			}
 			// Parameters
@@ -184,9 +233,13 @@ func TestServeHTTP(t *testing.T) {
 
 			// Headers
 			validateHeaders(t, test.name+" backend request", backendHandler.requestHeader,
-				test.requestHeader)
+				test.requestHeader, nil)
 
 			// Validate proxy response
+
+			// Response Headers
+			validateHeaders(t, test.name+" backend headers", res.Header, test.expectedRespHeader, test.notExpectedRespHeader)
+
 			// Validate Body
 			responseBody, err := ioutil.ReadAll(res.Body)
 			if err != nil {
@@ -238,5 +291,61 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 	if e, a := "hello world", string(response[0:n]); e != a {
 		t.Fatalf("expected '%#v', got '%#v'", e, a)
+	}
+}
+
+func TestDefaultProxyTransport(t *testing.T) {
+	tests := []struct {
+		name,
+		url,
+		location,
+		expectedScheme,
+		expectedHost,
+		expectedPathPrepend string
+	}{
+
+		{
+			name:                "simple path",
+			url:                 "http://test.server:8080/a/test/location",
+			location:            "http://localhost/location",
+			expectedScheme:      "http",
+			expectedHost:        "test.server:8080",
+			expectedPathPrepend: "/a/test",
+		},
+		{
+			name:                "empty path",
+			url:                 "http://test.server:8080/a/test/",
+			location:            "http://localhost",
+			expectedScheme:      "http",
+			expectedHost:        "test.server:8080",
+			expectedPathPrepend: "/a/test",
+		},
+		{
+			name:                "location ending in slash",
+			url:                 "http://test.server:8080/a/test/",
+			location:            "http://localhost/",
+			expectedScheme:      "http",
+			expectedHost:        "test.server:8080",
+			expectedPathPrepend: "/a/test",
+		},
+	}
+
+	for _, test := range tests {
+		locURL, _ := url.Parse(test.location)
+		URL, _ := url.Parse(test.url)
+		h := UpgradeAwareProxyHandler{
+			Location: locURL,
+		}
+		result := h.defaultProxyTransport(URL)
+		transport := result.(*corsRemovingTransport).RoundTripper.(*proxy.Transport)
+		if transport.Scheme != test.expectedScheme {
+			t.Errorf("%s: unexpected scheme. Actual: %s, Expected: %s", test.name, transport.Scheme, test.expectedScheme)
+		}
+		if transport.Host != test.expectedHost {
+			t.Errorf("%s: unexpected host. Actual: %s, Expected: %s", test.name, transport.Host, test.expectedHost)
+		}
+		if transport.PathPrepend != test.expectedPathPrepend {
+			t.Errorf("%s: unexpected path prepend. Actual: %s, Expected: %s", test.name, transport.PathPrepend, test.expectedPathPrepend)
+		}
 	}
 }
