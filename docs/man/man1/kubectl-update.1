@@ -21,8 +21,20 @@ JSON and YAML formats are accepted.
 
 .SH OPTIONS
 .PP
+\fB\-\-cascade\fP=false
+    Only relevant during a force update. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.
+
+.PP
 \fB\-f\fP, \fB\-\-filename\fP=[]
     Filename, directory, or URL to file to use to update the resource.
+
+.PP
+\fB\-\-force\fP=false
+    Delete and re\-create the specified resource
+
+.PP
+\fB\-\-grace\-period\fP=\-1
+    Only relevant during a force update. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.
 
 .PP
 \fB\-h\fP, \fB\-\-help\fP=false
@@ -31,6 +43,10 @@ JSON and YAML formats are accepted.
 .PP
 \fB\-\-patch\fP=""
     A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.
+
+.PP
+\fB\-\-timeout\fP=0
+    Only relevant during a force update. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -144,6 +160,9 @@ $ cat pod.json | kubectl update \-f \-
 
 // Partially update a node using strategic merge patch
 kubectl \-\-api\-version=v1 update node k8s\-node\-1 \-\-patch='\{"spec":\{"unschedulable":true\}\}'
+
+// Force update, delete and then re\-create the resource
+kubectl update \-\-force \-f pod.json
 
 .fi
 .RE

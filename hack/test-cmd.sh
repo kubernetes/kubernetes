@@ -315,6 +315,13 @@ for version in "${kube_api_versions[@]}"; do
   # Post-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
 
+  ## --force update pod can change other field, e.g., spec.container.name
+  # Command
+  kubectl get "${kube_flags[@]}" pod valid-pod -o json | sed 's/"kubernetes-serve-hostname"/"update-k8s-serve-hostname"/g' > tmp-valid-pod.json
+  kubectl update "${kube_flags[@]}" --force -f tmp-valid-pod.json
+  # Post-condition: spec.container.name = "update-k8s-serve-hostname"
+  kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'update-k8s-serve-hostname'
+
   ### Overwriting an existing label is not permitted
   # Pre-condition: name is valid-pod
   kube::test::get_object_assert 'pod valid-pod' "{{${labels_field}.name}}" 'valid-pod'

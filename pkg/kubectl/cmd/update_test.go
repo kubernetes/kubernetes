@@ -34,10 +34,10 @@ func TestUpdateObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && (m == "GET" || m == "PUT" || m == "DELETE"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "PUT":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
+				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -55,6 +55,15 @@ func TestUpdateObject(t *testing.T) {
 	if buf.String() != "replicationcontrollers/rc1\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
+
+	buf.Reset()
+	cmd.Flags().Set("force", "true")
+	cmd.Flags().Set("cascade", "false")
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != "replicationcontrollers/redis-master\nreplicationcontrollers/rc1\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
 }
 
 func TestUpdateMultipleObject(t *testing.T) {
@@ -66,14 +75,14 @@ func TestUpdateMultipleObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && (m == "GET" || m == "PUT" || m == "DELETE"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "PUT":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/services/frontend" && m == "GET":
+			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
+				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
+			case p == "/namespaces/test/services/frontend" && (m == "GET" || m == "PUT" || m == "DELETE"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
-			case p == "/namespaces/test/services/frontend" && m == "PUT":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+			case p == "/namespaces/test/services" && m == "POST":
+				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -91,6 +100,15 @@ func TestUpdateMultipleObject(t *testing.T) {
 	if buf.String() != "replicationcontrollers/rc1\nservices/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
+
+	buf.Reset()
+	cmd.Flags().Set("force", "true")
+	cmd.Flags().Set("cascade", "false")
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != "replicationcontrollers/redis-master\nservices/frontend\nreplicationcontrollers/rc1\nservices/baz\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
 }
 
 func TestUpdateDirectory(t *testing.T) {
@@ -102,10 +120,14 @@ func TestUpdateDirectory(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, "/namespaces/test/services/") && (m == "GET" || m == "PUT"):
+			case strings.HasPrefix(p, "/namespaces/test/services/") && (m == "GET" || m == "PUT" || m == "DELETE"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
-			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && (m == "GET" || m == "PUT"):
+			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && (m == "GET" || m == "PUT" || m == "DELETE"):
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+			case strings.HasPrefix(p, "/namespaces/test/services") && m == "POST":
+				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
+			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers") && m == "POST":
+				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -121,6 +143,49 @@ func TestUpdateDirectory(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "replicationcontrollers/rc1\nservices/baz\nreplicationcontrollers/rc1\nservices/baz\nreplicationcontrollers/rc1\nservices/baz\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+
+	buf.Reset()
+	cmd.Flags().Set("force", "true")
+	cmd.Flags().Set("cascade", "false")
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != "replicationcontrollers/frontend\nservices/frontend\nreplicationcontrollers/redis-master\nservices/redis-master\nreplicationcontrollers/redis-slave\nservices/redis-slave\n"+
+		"replicationcontrollers/rc1\nservices/baz\nreplicationcontrollers/rc1\nservices/baz\nreplicationcontrollers/rc1\nservices/baz\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestForceUpdateObjectNotFound(t *testing.T) {
+	_, _, rc := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+				return &http.Response{StatusCode: 404, Body: stringBody("")}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
+				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdUpdate(f, buf)
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("force", "true")
+	cmd.Flags().Set("cascade", "false")
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != "replicationcontrollers/rc1\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
