@@ -22,5 +22,13 @@ Docs in this directory relate to developing Kubernetes.
 
 * **Profiling Kubernetes** ([profiling.md](profiling.md)): How to plug in go pprof profiler to Kubernetes.
 
+* **Instrumenting Kubernetes with a new metric**
+  ([instrumentation.md](instrumentation.md)): How to add a new metrics to the
+  Kubernetes code base.
+
+* **Coding Conventions** ([coding-conventions.md](coding-conventions.md)):
+  Coding style advice for contributors.
+
+* **Faster PR reviews** ([faster_reviews.md](faster_reviews.md)): How to get faster PR reviews.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/README.md?pixel)]()
