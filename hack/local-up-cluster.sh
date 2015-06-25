@@ -228,7 +228,6 @@ function start_controller_manager {
     CTLRMGR_LOG=/tmp/kube-controller-manager.log
     sudo -E "${GO_OUT}/kube-controller-manager" \
       --v=${LOG_LEVEL} \
-      --machines="127.0.0.1" \
       --service_account_private_key_file="${SERVICE_ACCOUNT_KEY}" \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!

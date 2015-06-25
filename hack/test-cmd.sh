@@ -103,7 +103,6 @@ kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
 # Start controller manager
 kube::log::status "Starting controller-manager"
 "${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
-  --machines="127.0.0.1" \
   --port="${CTLRMGR_PORT}" \
   --master="127.0.0.1:${API_PORT}" 1>&2 &
 CTLRMGR_PID=$!

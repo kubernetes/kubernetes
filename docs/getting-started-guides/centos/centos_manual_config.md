@@ -111,12 +111,6 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
 KUBE_API_ARGS=""
 ```
 
-* Edit /etc/kubernetes/controller-manager to appear as such:
-```
-# Comma separated list of minions
-KUBELET_ADDRESSES="--machines=centos-minion"
-```
-
 * Start the appropriate services on master:
 
 ```
