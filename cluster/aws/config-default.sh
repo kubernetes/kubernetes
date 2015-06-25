@@ -94,3 +94,6 @@ COREOS_CHANNEL="${COREOS_CHANNEL:-alpha}"
 CONTAINER_RUNTIME="${KUBE_CONTAINER_RUNTIME:-docker}"
 RKT_VERSION="${KUBE_RKT_VERSION:-0.5.5}"
 
+# Extra shell code to be appended to the end of the aws user-data
+# passed to minions on creation.
+EXTRA_MINION_USER_DATA=''

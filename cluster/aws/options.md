@@ -70,6 +70,16 @@ will run on this storage if available, as typically the root disk is comparative
 
 If your machines don't have any ephemeral disks, this will default to the aufs driver on your root disk (with no LVM).
 
+## EXTRA_MINION_USER_DATA
+
+If set to non-empty the contents of this variable will be appended to the end of the "minon-user-data" before it's
+passed to AWS. minion-user-data is a script that gets run on a new AWS instance on instance creation.
+
+Value defaults to empty string.
+
+Setting this variable to a string containing bash code allows the user to do some additional system configuration of
+every minion.
+
 **KUBE_OS_DISTRIBUTION**
 
 The distribution to use.  Valid options: `wheezy`, `ubuntu`, `coreos`.

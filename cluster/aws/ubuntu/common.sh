@@ -33,6 +33,9 @@ function generate-minion-user-data {
   grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
   grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
   grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"
+  if [[ -n "${EXTRA_MINION_USER_DATA}" ]]; then
+    echo "${EXTRA_MINION_USER_DATA}"
+  fi
 }
 
 function check-minion() {
