@@ -41,7 +41,7 @@ This pod runs a binary that displays the content of one of the pieces of secret 
 volume: 
 
 ```shell
-$ kubectl log secret-test-pod
+$ kubectl logs secret-test-pod
 2015-04-29T21:17:24.712206409Z content of file "/etc/secret-volume/data-1": value-1
 ```
 
