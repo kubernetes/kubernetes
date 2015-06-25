@@ -761,7 +761,7 @@ function kube-up {
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
     if [[ -n "${EXTRA_MASTER_USER_DATA}" ]]; then
-      echo "${EXTRA_MASTER_USR_DATA}"
+      echo "${EXTRA_MASTER_USER_DATA}"
     fi
   ) > "${KUBE_TEMP}/master-start.sh"
 

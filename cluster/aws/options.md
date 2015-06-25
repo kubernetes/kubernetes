@@ -70,19 +70,17 @@ will run on this storage if available, as typically the root disk is comparative
 
 If your machines don't have any ephemeral disks, this will default to the aufs driver on your root disk (with no LVM).
 
-## EXTRA_MINION_USER_DATA
+## KUGE_EXTRA_MINION_USER_DATA and KUGE_EXTRA_MASTER_USER_DATA
+Note: Not currently supported by CoreOS
 
-If set to non-empty the contents of this variable will be appended to the end of the "minon-user-data" before it's
-passed to AWS. minion-user-data is a script that gets run on a new AWS instance on instance creation.
+If set to non-empty the contents of this variable will be appended to the end of the  the miinion or master user-data 
+respectively, before each is passed to AWS. The user-data is a script that gets run on a new AWS instance upon instance
+creation.
 
 Value defaults to empty string.
 
-Setting this variable to a string containing bash code allows the user to do some additional system configuration of
-every minion.
-
-## EXTRA_MASTER_USER_DATA
-
-This is the same thing as `EXTRA_MINION_USER_DATA` but for the master instead.
+Setting these variables to strings containing bash code allows the user to do some additional system configuration of
+every minion, or the master.
 
 **KUBE_OS_DISTRIBUTION**
 
