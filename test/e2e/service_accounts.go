@@ -75,7 +75,7 @@ var _ = Describe("ServiceAccounts", func() {
 			},
 		}
 
-		f.TestContainerOutput("consume service account token", pod, []string{
+		f.TestContainerOutput("consume service account token", pod, 0, []string{
 			fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, api.ServiceAccountTokenKey, tokenContent),
 		})
 	})
