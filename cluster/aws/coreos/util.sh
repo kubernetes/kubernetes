@@ -51,9 +51,6 @@ function generate-minion-user-data() {
       KUBERNETES_CONTAINER_RUNTIME=$(yaml-quote ${CONTAINER_RUNTIME})
       RKT_VERSION=$(yaml-quote ${RKT_VERSION})
 EOF
-  if [[ -n "${EXTRA_MINION_USER_DATA}" ]]; then
-     echo "${EXTRA_MINION_USER_DATA}"
-  fi
 }
 
 function check-minion() {
