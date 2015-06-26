@@ -43,6 +43,9 @@ flannel_prefix: 12
 # room for 4096 nodes with 254 pods per node.
 flannel_host_prefix: 24
 
+# Set to false to disable logging with elasticsearch
+cluster_logging: true
+
 # Turn to false to disable cluster monitoring with heapster and influxdb
 cluster_monitoring: true
 

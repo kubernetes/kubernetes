@@ -17,6 +17,9 @@
 - include: cluster-monitoring.yml
   when: cluster_monitoring
 
+- include: cluster-logging.yml
+  when: cluster_logging
+
 #- name: Get kube-addons script from Kubernetes
 #  get_url:
 #    url=https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/cluster/saltbase/salt/kube-addons/kube-addons.sh
@@ -42,6 +45,7 @@
   with_items:
     - "system:dns"
     - "system:monitoring"
+    - "system:logging"
   register: gentoken
   changed_when: "'Added' in gentoken.stdout"
   notify:

@@ -14,6 +14,16 @@
 - include: centos.yml
   when: not is_atomic and ansible_distribution == "CentOS"
 
+- name: Make sure manifest directory exists
+  file: path={{ kube_manifest_dir }} state=directory
+
+- name: Install fluentd pod into each node
+  get_url:
+    url=https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/cluster/saltbase/salt/fluentd-es/fluentd-es.yaml
+    dest="{{ kube_manifest_dir }}"
+    force=yes
+  when: cluster_logging
+
 - name: Get the node token values
   slurp:
     src: "{{ kube_token_dir }}/{{ item }}-{{ inventory_hostname }}.token"
