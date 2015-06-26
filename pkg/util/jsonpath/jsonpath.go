@@ -97,6 +97,8 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 		return j.evalWildcard(value, node)
 	case *RecursiveNode:
 		return j.evalRecursive(value, node)
+	case *UnionNode:
+		return j.evalUnion(value, node)
 	default:
 		return value, fmt.Errorf("unexpect Node %v", node)
 	}
@@ -152,6 +154,20 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 			value = value.Slice3(node.Params[0].Value, node.Params[1].Value, node.Params[2].Value)
 		}
 		for i := 0; i < value.Len(); i++ {
+			result = append(result, value.Index(i))
+		}
+	}
+	return result, nil
+}
+
+// evalUnion evaluates UnionNode
+func (j *JSONPath) evalUnion(input []reflect.Value, node *UnionNode) ([]reflect.Value, error) {
+	result := []reflect.Value{}
+	for _, value := range input {
+		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
+			return input, fmt.Errorf("%v is not array or slice", value)
+		}
+		for _, i := range node.Value {
 			result = append(result, value.Index(i))
 		}
 	}

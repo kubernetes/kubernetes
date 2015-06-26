@@ -217,6 +217,23 @@ Loop:
 	if text == "*" {
 		text = ":"
 	}
+
+	//union operator
+	strs := strings.Split(text, ",")
+	if len(strs) > 1 {
+		value := make([]int, len(strs))
+		var err error
+		for i, str := range strs {
+			value[i], err = strconv.Atoi(str)
+			if err != nil {
+				return fmt.Errorf("union of non-intergers")
+			}
+		}
+		cur.append(newUnion(value))
+		return p.parseInsideAction(cur)
+	}
+
+	//slice operator
 	reg := regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:[\d]*)?$`)
 	value := reg.FindStringSubmatch(text)
 	if value == nil {

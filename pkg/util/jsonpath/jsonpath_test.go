@@ -70,6 +70,7 @@ var jsonpathTests = []jsonpathTest{
 	{"recurfileds", "${..Price}", storeData, "8.95 12.99 8.99 19.95"},
 	{"recurarray", "${..Book[2]}", storeData,
 		"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
+	{"union", "${[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4"},
 }
 
 func TestJSONPath(t *testing.T) {

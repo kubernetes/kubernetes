@@ -40,6 +40,7 @@ const (
 	NodeFloat
 	NodeWildcard
 	NodeRecursive
+	NodeUnion
 )
 
 var NodeTypeName = map[NodeType]string{
@@ -52,6 +53,7 @@ var NodeTypeName = map[NodeType]string{
 	NodeFloat:     "NodeFloat",
 	NodeWildcard:  "NodeWildcard",
 	NodeRecursive: "NodeRecursive",
+	NodeUnion:     "NodeUnion",
 }
 
 type Node interface {
@@ -201,4 +203,18 @@ func newRecursive() *RecursiveNode {
 
 func (r *RecursiveNode) String() string {
 	return fmt.Sprintf("%s", r.Type())
+}
+
+// UnionNode is union of array indexes
+type UnionNode struct {
+	NodeType
+	Value []int
+}
+
+func newUnion(value []int) *UnionNode {
+	return &UnionNode{NodeType: NodeUnion, Value: value}
+}
+
+func (u *UnionNode) String() string {
+	return fmt.Sprintf("%s: %v", u.Type(), u.Value)
 }

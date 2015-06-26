@@ -44,6 +44,7 @@ var parserTests = []parserTest{
 	{"recursive", `${..}`, []Node{newList(), newRecursive()}},
 	{"recurField", `${..price}`,
 		[]Node{newList(), newRecursive(), newField("price")}},
+	{"union", `${[1,3,5]}`, []Node{newList(), newUnion([]int{1, 3, 5})}},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {
