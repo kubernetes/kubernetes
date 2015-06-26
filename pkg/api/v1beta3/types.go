@@ -975,8 +975,8 @@ type PodTemplateList struct {
 
 // ReplicationControllerSpec is the specification of a replication controller.
 type ReplicationControllerSpec struct {
-	// Replicas is the number of desired replicas.
-	Replicas int `json:"replicas,omitempty" description:"number of replicas desired"`
+	// Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified.
+	Replicas *int `json:"replicas,omitempty" description:"number of replicas desired"`
 
 	// Selector is a label query over pods that should match the Replicas count.
 	// If Selector is empty, it is defaulted to the labels present on the Pod template.

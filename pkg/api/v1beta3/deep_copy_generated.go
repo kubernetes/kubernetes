@@ -1514,7 +1514,12 @@ func deepCopy_v1beta3_ReplicationControllerList(in ReplicationControllerList, ou
 }
 
 func deepCopy_v1beta3_ReplicationControllerSpec(in ReplicationControllerSpec, out *ReplicationControllerSpec, c *conversion.Cloner) error {
-	out.Replicas = in.Replicas
+	if in.Replicas != nil {
+		out.Replicas = new(int)
+		*out.Replicas = *in.Replicas
+	} else {
+		out.Replicas = nil
+	}
 	if in.Selector != nil {
 		out.Selector = make(map[string]string)
 		for key, val := range in.Selector {
