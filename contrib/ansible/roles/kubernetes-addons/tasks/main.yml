@@ -13,7 +13,9 @@
 
 - include: dns.yml
   when: dns_setup
-  tags: dns
+
+- include: cluster-monitoring.yml
+  when: cluster_monitoring
 
 #- name: Get kube-addons script from Kubernetes
 #  get_url:
@@ -39,6 +41,7 @@
     TOKEN_DIR: "{{ kube_token_dir }}"
   with_items:
     - "system:dns"
+    - "system:monitoring"
   register: gentoken
   changed_when: "'Added' in gentoken.stdout"
   notify:

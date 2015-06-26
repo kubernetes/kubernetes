@@ -43,6 +43,9 @@ flannel_prefix: 12
 # room for 4096 nodes with 254 pods per node.
 flannel_host_prefix: 24
 
+# Turn to false to disable cluster monitoring with heapster and influxdb
+cluster_monitoring: true
+
 # Turn this varable to 'false' to disable whole DNS configuration.
 dns_setup: true
 # How many replicas in the Replication Controller
