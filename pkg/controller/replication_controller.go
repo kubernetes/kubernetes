@@ -17,8 +17,10 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -209,6 +211,14 @@ func (rm *ReplicationManager) getPodControllers(pod *api.Pod) *api.ReplicationCo
 		glog.V(4).Infof("No controllers found for pod %v, replication manager will avoid syncing", pod.Name)
 		return nil
 	}
+	if len(controllers) > 1 {
+		rcNames := []string{}
+		for _, controller := range controllers {
+			rcNames = append(rcNames, fmt.Sprintf("%s/%s", controller.Namespace, controller.Name))
+		}
+		util.HandleError(fmt.Errorf("Multiple controllers matched for pod %s/%s.  Choosing the first of: %s.", pod.Namespace, pod.Name, strings.Join(rcNames, ", ")))
+	}
+
 	return &controllers[0]
 }
 
