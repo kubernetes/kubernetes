@@ -409,7 +409,14 @@ func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
 			}
 		}
 	case util.IntstrInt:
-		return portName.IntVal, nil
+		p := portName.IntVal
+		for _, container := range pod.Spec.Containers {
+			for _, port := range container.Ports {
+				if port.ContainerPort == p && port.Protocol == svcPort.Protocol {
+					return portName.IntVal, nil
+				}
+			}
+		}
 	}
 
 	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
