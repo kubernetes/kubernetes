@@ -385,7 +385,7 @@ This makes some kinds of firewalling impossible.
 LoadBalancers only support TCP, not UDP.
 
 The `Type` field is designed as nested functionality - each level adds to the
-previous.  This is not strictly required on all cloud providers (e.g. GCE does
+previous.  This is not strictly required on all cloud providers (e.g. Google Compute Engine does
 not need to allocate a `NodePort` to make `LoadBalancer` work, but AWS does)
 but the current API requires it.
 

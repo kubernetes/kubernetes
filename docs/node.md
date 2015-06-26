@@ -69,7 +69,7 @@ Kubernetes from the node.
 ## Node Management
 
 Unlike [Pods](pods.md) and [Services](services.md), a Node is not inherently
-created by Kubernetes: it is either created from cloud providers like GCE,
+created by Kubernetes: it is either created from cloud providers like Google Compute Engine,
 or from your physical or virtual machines. What this means is that when
 Kubernetes creates a node, it only creates a representation for the node.
 After creation, Kubernetes will check whether the node is valid or not.

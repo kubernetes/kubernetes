@@ -19,7 +19,7 @@ Here is the same information in a picture which shows how the pods might be plac
 
 ![Cluster](/examples/blog-logging/diagrams/cloud-logging.png)
 
-This diagram shows four nodes created on a GCE cluster with the name of each VM node on a purple background. The internal and public IPs of each node are shown on gray boxes and the pods running in each node are shown in green boxes. Each pod box shows the name of the pod and the namespace it runs in, the IP address of the pod and the images which are run as part of the pod’s execution. Here we see that every node is running a fluentd-cloud-logging pod which is collecting the log output of the containers running on the same node and sending them to Google Cloud Logging. A pod which provides the
+This diagram shows four nodes created on a Google Compute Engine cluster with the name of each VM node on a purple background. The internal and public IPs of each node are shown on gray boxes and the pods running in each node are shown in green boxes. Each pod box shows the name of the pod and the namespace it runs in, the IP address of the pod and the images which are run as part of the pod’s execution. Here we see that every node is running a fluentd-cloud-logging pod which is collecting the log output of the containers running on the same node and sending them to Google Cloud Logging. A pod which provides the
 [cluster DNS service](/docs/dns.md) runs on one of the nodes and a pod which provides monitoring support runs on another node.
 
 To help explain how cluster level logging works let’s start off with a synthetic log generator pod specification [counter-pod.yaml](/examples/blog-logging/counter-pod.yaml):
@@ -167,7 +167,7 @@ Here is some sample output:
 
 ![BigQuery](bigquery-logging.png)
 
-We could also fetch the logs from Google Cloud Storage buckets to our desktop or laptop and then search them locally. The following command fetches logs for the counter pod running in a cluster which is itself in a GCE project called `myproject`. Only logs for the date 2015-06-11 are fetched.
+We could also fetch the logs from Google Cloud Storage buckets to our desktop or laptop and then search them locally. The following command fetches logs for the counter pod running in a cluster which is itself in a Compute Engine project called `myproject`. Only logs for the date 2015-06-11 are fetched.
 
 
 ```
