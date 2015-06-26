@@ -52,15 +52,30 @@ func TestMergeContext(t *testing.T) {
 	const namespace = "overriden-namespace"
 
 	config := createValidTestConfig()
-	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{})
+
+	_, overridden, err := clientBuilder.Namespace()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if overridden {
+		t.Error("Expected namespace to not be overridden")
+	}
+
+	clientBuilder = NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
 		Context: clientcmdapi.Context{
 			Namespace: namespace,
 		},
 	})
 
-	actual, err := clientBuilder.Namespace()
+	actual, overridden, err := clientBuilder.Namespace()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if !overridden {
+		t.Error("Expected namespace to be overridden")
 	}
 
 	matchStringArg(namespace, actual, t)

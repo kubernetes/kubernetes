@@ -75,7 +75,7 @@ func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList) err
 		return err
 	}
 
-	cmdNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -84,8 +84,8 @@ func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList) err
 	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		Schema(schema).
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).RequireNamespace().
-		FilenameParam(filenames...).
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, filenames...).
 		Flatten().
 		Do()
 	err = r.Err()

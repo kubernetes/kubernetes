@@ -74,7 +74,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	namespace, err := f.DefaultNamespace()
+	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}

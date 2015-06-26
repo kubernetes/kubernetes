@@ -78,8 +78,10 @@ type Factory struct {
 	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func() (validation.Schema, error)
-	// Returns the default namespace to use in cases where no other namespace is specified
-	DefaultNamespace func() (string, error)
+	// Returns the default namespace to use in cases where no
+	// other namespace is specified and whether the namespace was
+	// overriden.
+	DefaultNamespace func() (string, bool, error)
 	// Returns the generator for the provided generator name
 	Generator func(name string) (kubectl.Generator, bool)
 }
@@ -209,7 +211,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return validation.NullSchema{}, nil
 		},
-		DefaultNamespace: func() (string, error) {
+		DefaultNamespace: func() (string, bool, error) {
 			return clientConfig.Namespace()
 		},
 		Generator: func(name string) (kubectl.Generator, bool) {

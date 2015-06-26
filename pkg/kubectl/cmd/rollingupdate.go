@@ -117,7 +117,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
 	dryrun := cmdutil.GetFlagBool(cmd, "dry-run")
 
-	cmdNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -154,10 +154,11 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		if err != nil {
 			return err
 		}
+
 		request := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 			Schema(schema).
-			NamespaceParam(cmdNamespace).RequireNamespace().
-			FilenameParam(filename).
+			NamespaceParam(cmdNamespace).DefaultNamespace().
+			FilenameParam(enforceNamespace, filename).
 			Do()
 		obj, err := request.Object()
 		if err != nil {

@@ -57,7 +57,7 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 	printService(out, "Kubernetes master", client.Host)
 
 	mapper, typer := factory.Object()
-	cmdNamespace, err := factory.DefaultNamespace()
+	cmdNamespace, _, err := factory.DefaultNamespace()
 	if err != nil {
 		return err
 	}
