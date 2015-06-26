@@ -5,7 +5,7 @@
   "resourcePath": "/api/v1beta3",
   "apis": [
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/bindings",
+    "path": "/api/v1beta3/namespaces/{namespace}/bindings",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -14,6 +14,14 @@
       "summary": "create a Binding",
       "nickname": "createBinding",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Binding",
         "paramType": "body",
@@ -25,7 +33,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -58,6 +66,14 @@
       "nickname": "createBinding",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Binding",
         "paramType": "body",
         "name": "body",
@@ -83,7 +99,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/componentstatuses",
+    "path": "/api/v1beta3/namespaces/{namespace}/componentstatuses",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -92,6 +108,14 @@
       "summary": "list objects of kind ComponentStatus",
       "nickname": "listComponentStatus",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -127,7 +151,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -150,7 +174,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/componentstatuses/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/componentstatuses/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -161,8 +185,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -205,6 +237,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -252,7 +292,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/endpoints",
+    "path": "/api/v1beta3/namespaces/{namespace}/endpoints",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -261,6 +301,14 @@
       "summary": "list or watch objects of kind Endpoints",
       "nickname": "listEndpoints",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -296,7 +344,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -323,6 +371,14 @@
       "nickname": "createEndpoints",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Endpoints",
         "paramType": "body",
         "name": "body",
@@ -333,7 +389,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -356,15 +412,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/endpoints",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/endpoints",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Endpoints",
-      "nickname": "watchEndpointslist",
+      "nickname": "watchEndpointsList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -400,7 +464,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -423,7 +487,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/endpoints/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/endpoints/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -434,8 +498,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -470,6 +542,14 @@
       "nickname": "replaceEndpoints",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Endpoints",
         "paramType": "body",
         "name": "body",
@@ -480,7 +560,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -516,6 +596,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -525,7 +613,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -543,7 +631,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Endpoints"
        }
       ],
       "produces": [
@@ -562,6 +650,14 @@
       "nickname": "deleteEndpoints",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
         "name": "body",
@@ -572,7 +668,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -603,7 +699,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/endpoints/{name}",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/endpoints/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -612,6 +708,14 @@
       "summary": "watch changes to an object of kind Endpoints",
       "nickname": "watchEndpoints",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -647,7 +751,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -690,6 +794,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -741,6 +853,14 @@
       "nickname": "createEndpoints",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Endpoints",
         "paramType": "body",
         "name": "body",
@@ -773,8 +893,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Endpoints",
-      "nickname": "watchEndpointslist",
+      "nickname": "watchEndpointsList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -825,7 +953,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/events",
+    "path": "/api/v1beta3/namespaces/{namespace}/events",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -834,6 +962,14 @@
       "summary": "list or watch objects of kind Event",
       "nickname": "listEvent",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -869,7 +1005,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -896,6 +1032,14 @@
       "nickname": "createEvent",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Event",
         "paramType": "body",
         "name": "body",
@@ -906,7 +1050,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -929,15 +1073,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/events",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/events",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
-      "nickname": "watchEventlist",
+      "nickname": "watchEventList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -973,7 +1125,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -996,7 +1148,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/events/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/events/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -1007,8 +1159,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1043,6 +1203,14 @@
       "nickname": "replaceEvent",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Event",
         "paramType": "body",
         "name": "body",
@@ -1053,7 +1221,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1089,6 +1257,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1098,7 +1274,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1116,7 +1292,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Event"
        }
       ],
       "produces": [
@@ -1136,8 +1312,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1168,7 +1352,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/events/{name}",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/events/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -1177,6 +1361,14 @@
       "summary": "watch changes to an object of kind Event",
       "nickname": "watchEvent",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1212,7 +1404,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1255,6 +1447,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -1306,6 +1506,14 @@
       "nickname": "createEvent",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Event",
         "paramType": "body",
         "name": "body",
@@ -1338,8 +1546,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
-      "nickname": "watchEventlist",
+      "nickname": "watchEventList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1390,7 +1606,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/limitranges",
+    "path": "/api/v1beta3/namespaces/{namespace}/limitranges",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -1399,6 +1615,14 @@
       "summary": "list or watch objects of kind LimitRange",
       "nickname": "listLimitRange",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1434,7 +1658,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1461,6 +1685,14 @@
       "nickname": "createLimitRange",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.LimitRange",
         "paramType": "body",
         "name": "body",
@@ -1471,7 +1703,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1494,15 +1726,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/limitranges",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/limitranges",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of LimitRange",
-      "nickname": "watchLimitRangelist",
+      "nickname": "watchLimitRangeList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1538,7 +1778,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1561,7 +1801,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/limitranges/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/limitranges/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -1572,8 +1812,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1608,6 +1856,14 @@
       "nickname": "replaceLimitRange",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.LimitRange",
         "paramType": "body",
         "name": "body",
@@ -1618,7 +1874,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1654,6 +1910,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1663,7 +1927,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1681,7 +1945,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.LimitRange"
        }
       ],
       "produces": [
@@ -1701,8 +1965,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1733,7 +2005,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/limitranges/{name}",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/limitranges/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -1742,6 +2014,14 @@
       "summary": "watch changes to an object of kind LimitRange",
       "nickname": "watchLimitRange",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1777,7 +2057,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -1820,6 +2100,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -1871,6 +2159,14 @@
       "nickname": "createLimitRange",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.LimitRange",
         "paramType": "body",
         "name": "body",
@@ -1903,8 +2199,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of LimitRange",
-      "nickname": "watchLimitRangelist",
+      "nickname": "watchLimitRangeList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -1967,6 +2271,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -2018,6 +2330,14 @@
       "nickname": "createNamespace",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Namespace",
         "paramType": "body",
         "name": "body",
@@ -2050,8 +2370,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Namespace",
-      "nickname": "watchNamespacelist",
+      "nickname": "watchNamespaceList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -2113,6 +2441,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "name",
         "description": "name of the Namespace",
@@ -2140,6 +2476,14 @@
       "summary": "replace the specified Namespace",
       "nickname": "replaceNamespace",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Namespace",
         "paramType": "body",
@@ -2179,6 +2523,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2198,7 +2550,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Namespace"
        }
       ],
       "produces": [
@@ -2216,6 +2568,14 @@
       "summary": "delete a Namespace",
       "nickname": "deleteNamespace",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -2259,6 +2619,14 @@
       "summary": "watch changes to an object of kind Namespace",
       "nickname": "watchNamespace",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -2323,9 +2691,17 @@
      {
       "type": "v1beta3.Namespace",
       "method": "PUT",
-      "summary": "replace the specified Namespace",
-      "nickname": "replaceNamespace",
+      "summary": "replace finalize of the specified Namespace",
+      "nickname": "replaceNamespaceFinalize",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Namespace",
         "paramType": "body",
@@ -2366,9 +2742,17 @@
      {
       "type": "v1beta3.Namespace",
       "method": "PUT",
-      "summary": "replace the specified Namespace",
-      "nickname": "replaceNamespace",
+      "summary": "replace status of the specified Namespace",
+      "nickname": "replaceNamespaceStatus",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Namespace",
         "paramType": "body",
@@ -2412,6 +2796,14 @@
       "summary": "list or watch objects of kind Node",
       "nickname": "listNode",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -2466,6 +2858,14 @@
       "nickname": "createNode",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Node",
         "paramType": "body",
         "name": "body",
@@ -2498,8 +2898,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Node",
-      "nickname": "watchNodelist",
+      "nickname": "watchNodeList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -2561,6 +2969,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "name",
         "description": "name of the Node",
@@ -2588,6 +3004,14 @@
       "summary": "replace the specified Node",
       "nickname": "replaceNode",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Node",
         "paramType": "body",
@@ -2627,6 +3051,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2646,7 +3078,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Node"
        }
       ],
       "produces": [
@@ -2664,6 +3096,14 @@
       "summary": "delete a Node",
       "nickname": "deleteNode",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -2707,6 +3147,14 @@
       "summary": "watch changes to an object of kind Node",
       "nickname": "watchNode",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -2757,34 +3205,6 @@
       ],
       "produces": [
        "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta3/redirect/nodes/{name}",
-    "description": "API at /api/v1beta3 version v1beta3",
-    "operations": [
-     {
-      "type": "string",
-      "method": "GET",
-      "summary": "redirect GET request to Node",
-      "nickname": "redirectNode",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Node",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
       ],
       "consumes": [
        "*/*"
@@ -2948,9 +3368,9 @@
      },
      {
       "type": "string",
-      "method": "TRACE",
-      "summary": "proxy TRACE requests to Node",
-      "nickname": "proxyTRACENode",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Node",
+      "nickname": "proxyOPTIONSNode",
       "parameters": [
        {
         "type": "string",
@@ -3094,9 +3514,9 @@
      },
      {
       "type": "string",
-      "method": "TRACE",
-      "summary": "proxy TRACE requests to Node",
-      "nickname": "proxyTRACENode",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Node",
+      "nickname": "proxyOPTIONSNode",
       "parameters": [
        {
         "type": "string",
@@ -3123,9 +3543,17 @@
      {
       "type": "v1beta3.Node",
       "method": "PUT",
-      "summary": "replace the specified Node",
-      "nickname": "replaceNode",
+      "summary": "replace status of the specified Node",
+      "nickname": "replaceNodeStatus",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Node",
         "paramType": "body",
@@ -3160,7 +3588,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/persistentvolumeclaims",
+    "path": "/api/v1beta3/namespaces/{namespace}/persistentvolumeclaims",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -3169,6 +3597,14 @@
       "summary": "list or watch objects of kind PersistentVolumeClaim",
       "nickname": "listPersistentVolumeClaim",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3204,7 +3640,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -3231,6 +3667,14 @@
       "nickname": "createPersistentVolumeClaim",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PersistentVolumeClaim",
         "paramType": "body",
         "name": "body",
@@ -3241,7 +3685,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -3264,15 +3708,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/persistentvolumeclaims",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/persistentvolumeclaims",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
-      "nickname": "watchPersistentVolumeClaimlist",
+      "nickname": "watchPersistentVolumeClaimList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3308,7 +3760,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -3331,7 +3783,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/persistentvolumeclaims/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/persistentvolumeclaims/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -3342,8 +3794,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -3378,6 +3838,14 @@
       "nickname": "replacePersistentVolumeClaim",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PersistentVolumeClaim",
         "paramType": "body",
         "name": "body",
@@ -3388,7 +3856,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -3424,6 +3892,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3433,7 +3909,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -3451,7 +3927,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.PersistentVolumeClaim"
        }
       ],
       "produces": [
@@ -3470,6 +3946,14 @@
       "nickname": "deletePersistentVolumeClaim",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
         "name": "body",
@@ -3480,7 +3964,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -3511,7 +3995,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/persistentvolumeclaims/{name}",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/persistentvolumeclaims/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -3520,6 +4004,14 @@
       "summary": "watch changes to an object of kind PersistentVolumeClaim",
       "nickname": "watchPersistentVolumeClaim",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3555,7 +4047,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -3598,6 +4090,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -3649,6 +4149,14 @@
       "nickname": "createPersistentVolumeClaim",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PersistentVolumeClaim",
         "paramType": "body",
         "name": "body",
@@ -3681,8 +4189,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
-      "nickname": "watchPersistentVolumeClaimlist",
+      "nickname": "watchPersistentVolumeClaimList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3733,15 +4249,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/persistentvolumeclaims/{name}/status",
+    "path": "/api/v1beta3/namespaces/{namespace}/persistentvolumeclaims/{name}/status",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "v1beta3.PersistentVolumeClaim",
       "method": "PUT",
-      "summary": "replace the specified PersistentVolumeClaim",
-      "nickname": "replacePersistentVolumeClaim",
+      "summary": "replace status of the specified PersistentVolumeClaim",
+      "nickname": "replacePersistentVolumeClaimStatus",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.PersistentVolumeClaim",
         "paramType": "body",
@@ -3753,7 +4277,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -3793,6 +4317,14 @@
       "summary": "list or watch objects of kind PersistentVolume",
       "nickname": "listPersistentVolume",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3847,6 +4379,14 @@
       "nickname": "createPersistentVolume",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PersistentVolume",
         "paramType": "body",
         "name": "body",
@@ -3879,8 +4419,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolume",
-      "nickname": "watchPersistentVolumelist",
+      "nickname": "watchPersistentVolumeList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -3942,6 +4490,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "name",
         "description": "name of the PersistentVolume",
@@ -3969,6 +4525,14 @@
       "summary": "replace the specified PersistentVolume",
       "nickname": "replacePersistentVolume",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.PersistentVolume",
         "paramType": "body",
@@ -4008,6 +4572,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4027,7 +4599,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.PersistentVolume"
        }
       ],
       "produces": [
@@ -4045,6 +4617,14 @@
       "summary": "delete a PersistentVolume",
       "nickname": "deletePersistentVolume",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
@@ -4088,6 +4668,14 @@
       "summary": "watch changes to an object of kind PersistentVolume",
       "nickname": "watchPersistentVolume",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -4152,9 +4740,17 @@
      {
       "type": "v1beta3.PersistentVolume",
       "method": "PUT",
-      "summary": "replace the specified PersistentVolume",
-      "nickname": "replacePersistentVolume",
+      "summary": "replace status of the specified PersistentVolume",
+      "nickname": "replacePersistentVolumeStatus",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.PersistentVolume",
         "paramType": "body",
@@ -4189,7 +4785,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/pods",
+    "path": "/api/v1beta3/namespaces/{namespace}/pods",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -4198,6 +4794,14 @@
       "summary": "list or watch objects of kind Pod",
       "nickname": "listPod",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -4233,7 +4837,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4260,6 +4864,14 @@
       "nickname": "createPod",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Pod",
         "paramType": "body",
         "name": "body",
@@ -4270,7 +4882,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4293,15 +4905,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/pods",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/pods",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Pod",
-      "nickname": "watchPodlist",
+      "nickname": "watchPodList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -4337,7 +4957,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4360,7 +4980,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/pods/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/pods/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -4371,8 +4991,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4407,6 +5035,14 @@
       "nickname": "replacePod",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Pod",
         "paramType": "body",
         "name": "body",
@@ -4417,7 +5053,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4453,6 +5089,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4462,7 +5106,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4480,7 +5124,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Pod"
        }
       ],
       "produces": [
@@ -4499,6 +5143,14 @@
       "nickname": "deletePod",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
         "name": "body",
@@ -4509,7 +5161,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4540,7 +5192,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/pods/{name}",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/pods/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -4549,6 +5201,14 @@
       "summary": "watch changes to an object of kind Pod",
       "nickname": "watchPod",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -4584,7 +5244,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4615,43 +5275,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/redirect/namespaces/{namespaces}/pods/{name}",
-    "description": "API at /api/v1beta3 version v1beta3",
-    "operations": [
-     {
-      "type": "string",
-      "method": "GET",
-      "summary": "redirect GET request to Pod",
-      "nickname": "redirectPod",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespaces",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Pod",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta3/proxy/namespaces/{namespaces}/pods/{name}/{path:*}",
+    "path": "/api/v1beta3/proxy/namespaces/{namespace}/pods/{name}/{path:*}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -4663,7 +5287,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4701,7 +5325,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4739,7 +5363,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4777,7 +5401,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4815,7 +5439,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4846,14 +5470,14 @@
      },
      {
       "type": "string",
-      "method": "TRACE",
-      "summary": "proxy TRACE requests to Pod",
-      "nickname": "proxyTRACEPod",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Pod",
+      "nickname": "proxyOPTIONSPod",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4885,7 +5509,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/proxy/namespaces/{namespaces}/pods/{name}",
+    "path": "/api/v1beta3/proxy/namespaces/{namespace}/pods/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -4897,7 +5521,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4927,7 +5551,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4957,7 +5581,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -4987,7 +5611,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5017,7 +5641,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5040,14 +5664,14 @@
      },
      {
       "type": "string",
-      "method": "TRACE",
-      "summary": "proxy TRACE requests to Pod",
-      "nickname": "proxyTRACEPod",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Pod",
+      "nickname": "proxyOPTIONSPod",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5080,6 +5704,14 @@
       "summary": "list or watch objects of kind Pod",
       "nickname": "listPod",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -5134,6 +5766,14 @@
       "nickname": "createPod",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Pod",
         "paramType": "body",
         "name": "body",
@@ -5155,35 +5795,6 @@
       "consumes": [
        "*/*"
       ]
-     },
-     {
-      "type": "v1beta3.Binding",
-      "method": "POST",
-      "summary": "create a Binding",
-      "nickname": "createBinding",
-      "parameters": [
-       {
-        "type": "v1beta3.Binding",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta3.Binding"
-       }
-      ],
-      "produces": [
-       "application/json"
-      ],
-      "consumes": [
-       "*/*"
-      ]
      }
     ]
    },
@@ -5195,8 +5806,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Pod",
-      "nickname": "watchPodlist",
+      "nickname": "watchPodList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -5247,15 +5866,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/pods/{name}/binding",
+    "path": "/api/v1beta3/namespaces/{namespace}/pods/{name}/binding",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "v1beta3.Binding",
       "method": "POST",
-      "summary": "create a Binding",
-      "nickname": "createBinding",
+      "summary": "create binding of a Binding",
+      "nickname": "createBindingBinding",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Binding",
         "paramType": "body",
@@ -5267,7 +5894,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5298,15 +5925,32 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/pods/{name}/exec",
+    "path": "/api/v1beta3/namespaces/{namespace}/pods/{name}/exec",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "string",
       "method": "GET",
-      "summary": "connect GET requests to Pod",
-      "nickname": "connectGETPod",
-      "parameters": [],
+      "summary": "connect GET requests to exec of Pod",
+      "nickname": "connectGetPodExec",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5317,19 +5961,27 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/pods/{name}/log",
+    "path": "/api/v1beta3/namespaces/{namespace}/pods/{name}/log",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "v1beta3.Pod",
       "method": "GET",
-      "summary": "read the specified Pod",
-      "nickname": "readPod",
+      "summary": "read log of the specified Pod",
+      "nickname": "readPodLog",
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5360,15 +6012,32 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/pods/{name}/portforward",
+    "path": "/api/v1beta3/namespaces/{namespace}/pods/{name}/portforward",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "string",
       "method": "GET",
-      "summary": "connect GET requests to Pod",
-      "nickname": "connectGETPod",
-      "parameters": [],
+      "summary": "connect GET requests to portforward of Pod",
+      "nickname": "connectGetPodPortforward",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5379,15 +6048,32 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/pods/{name}/proxy",
+    "path": "/api/v1beta3/namespaces/{namespace}/pods/{name}/proxy",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "string",
       "method": "GET",
-      "summary": "connect GET requests to Pod",
-      "nickname": "connectGETPod",
-      "parameters": [],
+      "summary": "connect GET requests to proxy of Pod",
+      "nickname": "connectGetPodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5398,9 +6084,26 @@
      {
       "type": "string",
       "method": "POST",
-      "summary": "connect POST requests to Pod",
-      "nickname": "connectPOSTPod",
-      "parameters": [],
+      "summary": "connect POST requests to proxy of Pod",
+      "nickname": "connectPostPodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5411,9 +6114,26 @@
      {
       "type": "string",
       "method": "PUT",
-      "summary": "connect PUT requests to Pod",
-      "nickname": "connectPUTPod",
-      "parameters": [],
+      "summary": "connect PUT requests to proxy of Pod",
+      "nickname": "connectPutPodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5424,9 +6144,26 @@
      {
       "type": "string",
       "method": "DELETE",
-      "summary": "connect DELETE requests to Pod",
-      "nickname": "connectDELETEPod",
-      "parameters": [],
+      "summary": "connect DELETE requests to proxy of Pod",
+      "nickname": "connectDeletePodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5437,9 +6174,26 @@
      {
       "type": "string",
       "method": "HEAD",
-      "summary": "connect HEAD requests to Pod",
-      "nickname": "connectHEADPod",
-      "parameters": [],
+      "summary": "connect HEAD requests to proxy of Pod",
+      "nickname": "connectHeadPodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5450,9 +6204,26 @@
      {
       "type": "string",
       "method": "OPTIONS",
-      "summary": "connect OPTIONS requests to Pod",
-      "nickname": "connectOPTIONSPod",
-      "parameters": [],
+      "summary": "connect OPTIONS requests to proxy of Pod",
+      "nickname": "connectOptionsPodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5463,15 +6234,40 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/pods/{name}/proxy/{path:*}",
+    "path": "/api/v1beta3/namespaces/{namespace}/pods/{name}/proxy/{path:*}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "string",
       "method": "GET",
-      "summary": "connect GET requests to Pod",
-      "nickname": "connectGETPod",
-      "parameters": [],
+      "summary": "connect GET requests to proxy of Pod",
+      "nickname": "connectGetPodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5482,9 +6278,34 @@
      {
       "type": "string",
       "method": "POST",
-      "summary": "connect POST requests to Pod",
-      "nickname": "connectPOSTPod",
-      "parameters": [],
+      "summary": "connect POST requests to proxy of Pod",
+      "nickname": "connectPostPodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5495,9 +6316,34 @@
      {
       "type": "string",
       "method": "PUT",
-      "summary": "connect PUT requests to Pod",
-      "nickname": "connectPUTPod",
-      "parameters": [],
+      "summary": "connect PUT requests to proxy of Pod",
+      "nickname": "connectPutPodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5508,9 +6354,34 @@
      {
       "type": "string",
       "method": "DELETE",
-      "summary": "connect DELETE requests to Pod",
-      "nickname": "connectDELETEPod",
-      "parameters": [],
+      "summary": "connect DELETE requests to proxy of Pod",
+      "nickname": "connectDeletePodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5521,9 +6392,34 @@
      {
       "type": "string",
       "method": "HEAD",
-      "summary": "connect HEAD requests to Pod",
-      "nickname": "connectHEADPod",
-      "parameters": [],
+      "summary": "connect HEAD requests to proxy of Pod",
+      "nickname": "connectHeadPodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5534,9 +6430,34 @@
      {
       "type": "string",
       "method": "OPTIONS",
-      "summary": "connect OPTIONS requests to Pod",
-      "nickname": "connectOPTIONSPod",
-      "parameters": [],
+      "summary": "connect OPTIONS requests to proxy of Pod",
+      "nickname": "connectOptionsPodProxy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "*/*"
       ],
@@ -5547,15 +6468,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/pods/{name}/status",
+    "path": "/api/v1beta3/namespaces/{namespace}/pods/{name}/status",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "v1beta3.Pod",
       "method": "PUT",
-      "summary": "replace the specified Pod",
-      "nickname": "replacePod",
+      "summary": "replace status of the specified Pod",
+      "nickname": "replacePodStatus",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.Pod",
         "paramType": "body",
@@ -5567,7 +6496,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5598,7 +6527,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/podtemplates",
+    "path": "/api/v1beta3/namespaces/{namespace}/podtemplates",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -5607,6 +6536,14 @@
       "summary": "list or watch objects of kind PodTemplate",
       "nickname": "listPodTemplate",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -5642,7 +6579,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5669,6 +6606,14 @@
       "nickname": "createPodTemplate",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PodTemplate",
         "paramType": "body",
         "name": "body",
@@ -5679,7 +6624,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5702,15 +6647,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/podtemplates",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/podtemplates",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PodTemplate",
-      "nickname": "watchPodTemplatelist",
+      "nickname": "watchPodTemplateList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -5746,7 +6699,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5769,7 +6722,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/podtemplates/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/podtemplates/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -5780,8 +6733,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5816,6 +6777,14 @@
       "nickname": "replacePodTemplate",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PodTemplate",
         "paramType": "body",
         "name": "body",
@@ -5826,7 +6795,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5862,6 +6831,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5871,7 +6848,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5889,7 +6866,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.PodTemplate"
        }
       ],
       "produces": [
@@ -5908,6 +6885,14 @@
       "nickname": "deletePodTemplate",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
         "name": "body",
@@ -5918,7 +6903,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -5949,7 +6934,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/podtemplates/{name}",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/podtemplates/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -5958,6 +6943,14 @@
       "summary": "watch changes to an object of kind PodTemplate",
       "nickname": "watchPodTemplate",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -5993,7 +6986,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6036,6 +7029,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -6087,6 +7088,14 @@
       "nickname": "createPodTemplate",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.PodTemplate",
         "paramType": "body",
         "name": "body",
@@ -6119,8 +7128,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PodTemplate",
-      "nickname": "watchPodTemplatelist",
+      "nickname": "watchPodTemplateList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6171,7 +7188,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/replicationcontrollers",
+    "path": "/api/v1beta3/namespaces/{namespace}/replicationcontrollers",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -6180,6 +7197,14 @@
       "summary": "list or watch objects of kind ReplicationController",
       "nickname": "listReplicationController",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6215,7 +7240,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6242,6 +7267,14 @@
       "nickname": "createReplicationController",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ReplicationController",
         "paramType": "body",
         "name": "body",
@@ -6252,7 +7285,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6275,15 +7308,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/replicationcontrollers",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/replicationcontrollers",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicationController",
-      "nickname": "watchReplicationControllerlist",
+      "nickname": "watchReplicationControllerList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6319,7 +7360,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6342,7 +7383,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/replicationcontrollers/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/replicationcontrollers/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -6353,8 +7394,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6389,6 +7438,14 @@
       "nickname": "replaceReplicationController",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ReplicationController",
         "paramType": "body",
         "name": "body",
@@ -6399,7 +7456,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6435,6 +7492,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6444,7 +7509,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6462,7 +7527,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.ReplicationController"
        }
       ],
       "produces": [
@@ -6481,6 +7546,14 @@
       "nickname": "deleteReplicationController",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
         "name": "body",
@@ -6491,7 +7564,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6522,7 +7595,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/replicationcontrollers/{name}",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/replicationcontrollers/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -6531,6 +7604,14 @@
       "summary": "watch changes to an object of kind ReplicationController",
       "nickname": "watchReplicationController",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6566,7 +7647,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6609,6 +7690,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -6660,6 +7749,14 @@
       "nickname": "createReplicationController",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ReplicationController",
         "paramType": "body",
         "name": "body",
@@ -6692,8 +7789,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicationController",
-      "nickname": "watchReplicationControllerlist",
+      "nickname": "watchReplicationControllerList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6744,7 +7849,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/resourcequotas",
+    "path": "/api/v1beta3/namespaces/{namespace}/resourcequotas",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -6753,6 +7858,14 @@
       "summary": "list or watch objects of kind ResourceQuota",
       "nickname": "listResourceQuota",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6788,7 +7901,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6815,6 +7928,14 @@
       "nickname": "createResourceQuota",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ResourceQuota",
         "paramType": "body",
         "name": "body",
@@ -6825,7 +7946,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6848,15 +7969,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/resourcequotas",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/resourcequotas",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ResourceQuota",
-      "nickname": "watchResourceQuotalist",
+      "nickname": "watchResourceQuotaList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6892,7 +8021,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6915,7 +8044,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/resourcequotas/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/resourcequotas/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -6926,8 +8055,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -6962,6 +8099,14 @@
       "nickname": "replaceResourceQuota",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ResourceQuota",
         "paramType": "body",
         "name": "body",
@@ -6972,7 +8117,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7008,6 +8153,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7017,7 +8170,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7035,7 +8188,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.ResourceQuota"
        }
       ],
       "produces": [
@@ -7054,6 +8207,14 @@
       "nickname": "deleteResourceQuota",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
         "name": "body",
@@ -7064,7 +8225,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7095,7 +8256,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/resourcequotas/{name}",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/resourcequotas/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -7104,6 +8265,14 @@
       "summary": "watch changes to an object of kind ResourceQuota",
       "nickname": "watchResourceQuota",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7139,7 +8308,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7182,6 +8351,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -7233,6 +8410,14 @@
       "nickname": "createResourceQuota",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ResourceQuota",
         "paramType": "body",
         "name": "body",
@@ -7265,8 +8450,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ResourceQuota",
-      "nickname": "watchResourceQuotalist",
+      "nickname": "watchResourceQuotaList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7317,15 +8510,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/resourcequotas/{name}/status",
+    "path": "/api/v1beta3/namespaces/{namespace}/resourcequotas/{name}/status",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "v1beta3.ResourceQuota",
       "method": "PUT",
-      "summary": "replace the specified ResourceQuota",
-      "nickname": "replaceResourceQuota",
+      "summary": "replace status of the specified ResourceQuota",
+      "nickname": "replaceResourceQuotaStatus",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "v1beta3.ResourceQuota",
         "paramType": "body",
@@ -7337,7 +8538,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7368,7 +8569,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/secrets",
+    "path": "/api/v1beta3/namespaces/{namespace}/secrets",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -7377,6 +8578,14 @@
       "summary": "list or watch objects of kind Secret",
       "nickname": "listSecret",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7412,7 +8621,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7439,6 +8648,14 @@
       "nickname": "createSecret",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Secret",
         "paramType": "body",
         "name": "body",
@@ -7449,7 +8666,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7472,15 +8689,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/secrets",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/secrets",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
-      "nickname": "watchSecretlist",
+      "nickname": "watchSecretList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7516,7 +8741,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7539,7 +8764,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/secrets/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/secrets/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -7550,8 +8775,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7586,6 +8819,14 @@
       "nickname": "replaceSecret",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Secret",
         "paramType": "body",
         "name": "body",
@@ -7596,7 +8837,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7632,6 +8873,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -7641,7 +8890,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7659,7 +8908,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Secret"
        }
       ],
       "produces": [
@@ -7678,6 +8927,14 @@
       "nickname": "deleteSecret",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
         "name": "body",
@@ -7688,7 +8945,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7719,7 +8976,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/secrets/{name}",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/secrets/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -7728,6 +8985,14 @@
       "summary": "watch changes to an object of kind Secret",
       "nickname": "watchSecret",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7763,7 +9028,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -7806,6 +9071,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -7857,6 +9130,14 @@
       "nickname": "createSecret",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Secret",
         "paramType": "body",
         "name": "body",
@@ -7889,8 +9170,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
-      "nickname": "watchSecretlist",
+      "nickname": "watchSecretList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7941,7 +9230,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/serviceaccounts",
+    "path": "/api/v1beta3/namespaces/{namespace}/serviceaccounts",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -7950,6 +9239,14 @@
       "summary": "list or watch objects of kind ServiceAccount",
       "nickname": "listServiceAccount",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -7985,7 +9282,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8012,6 +9309,14 @@
       "nickname": "createServiceAccount",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ServiceAccount",
         "paramType": "body",
         "name": "body",
@@ -8022,7 +9327,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8045,15 +9350,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/serviceaccounts",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/serviceaccounts",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ServiceAccount",
-      "nickname": "watchServiceAccountlist",
+      "nickname": "watchServiceAccountList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -8089,7 +9402,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8112,7 +9425,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/serviceaccounts/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/serviceaccounts/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -8123,8 +9436,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8159,6 +9480,14 @@
       "nickname": "replaceServiceAccount",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ServiceAccount",
         "paramType": "body",
         "name": "body",
@@ -8169,7 +9498,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8205,6 +9534,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -8214,7 +9551,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8232,7 +9569,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.ServiceAccount"
        }
       ],
       "produces": [
@@ -8251,6 +9588,14 @@
       "nickname": "deleteServiceAccount",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.DeleteOptions",
         "paramType": "body",
         "name": "body",
@@ -8261,7 +9606,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8292,7 +9637,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/serviceaccounts/{name}",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/serviceaccounts/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -8301,6 +9646,14 @@
       "summary": "watch changes to an object of kind ServiceAccount",
       "nickname": "watchServiceAccount",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -8336,7 +9689,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8379,6 +9732,14 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "labelSelector",
         "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
         "required": false,
@@ -8430,6 +9791,14 @@
       "nickname": "createServiceAccount",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.ServiceAccount",
         "paramType": "body",
         "name": "body",
@@ -8462,8 +9831,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ServiceAccount",
-      "nickname": "watchServiceAccountlist",
+      "nickname": "watchServiceAccountList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -8514,7 +9891,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/services",
+    "path": "/api/v1beta3/namespaces/{namespace}/services",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -8523,6 +9900,14 @@
       "summary": "list or watch objects of kind Service",
       "nickname": "listService",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -8558,7 +9943,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8585,6 +9970,14 @@
       "nickname": "createService",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Service",
         "paramType": "body",
         "name": "body",
@@ -8595,7 +9988,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8618,15 +10011,23 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/services",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/services",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
-      "nickname": "watchServicelist",
+      "nickname": "watchServiceList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -8662,7 +10063,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8685,7 +10086,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/namespaces/{namespaces}/services/{name}",
+    "path": "/api/v1beta3/namespaces/{namespace}/services/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -8696,8 +10097,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8732,6 +10141,14 @@
       "nickname": "replaceService",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Service",
         "paramType": "body",
         "name": "body",
@@ -8742,7 +10159,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8778,6 +10195,14 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -8787,7 +10212,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8805,7 +10230,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1beta3.Service"
        }
       ],
       "produces": [
@@ -8825,8 +10250,16 @@
       "parameters": [
        {
         "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8857,7 +10290,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/watch/namespaces/{namespaces}/services/{name}",
+    "path": "/api/v1beta3/watch/namespaces/{namespace}/services/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -8866,6 +10299,14 @@
       "summary": "watch changes to an object of kind Service",
       "nickname": "watchService",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -8901,7 +10342,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -8932,43 +10373,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/redirect/namespaces/{namespaces}/services/{name}",
-    "description": "API at /api/v1beta3 version v1beta3",
-    "operations": [
-     {
-      "type": "string",
-      "method": "GET",
-      "summary": "redirect GET request to Service",
-      "nickname": "redirectService",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespaces",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Service",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "produces": [
-       "*/*"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/api/v1beta3/proxy/namespaces/{namespaces}/services/{name}/{path:*}",
+    "path": "/api/v1beta3/proxy/namespaces/{namespace}/services/{name}/{path:*}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -8980,7 +10385,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9018,7 +10423,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9056,7 +10461,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9094,7 +10499,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9132,7 +10537,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9163,14 +10568,14 @@
      },
      {
       "type": "string",
-      "method": "TRACE",
-      "summary": "proxy TRACE requests to Service",
-      "nickname": "proxyTRACEService",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Service",
+      "nickname": "proxyOPTIONSService",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9202,7 +10607,7 @@
     ]
    },
    {
-    "path": "/api/v1beta3/proxy/namespaces/{namespaces}/services/{name}",
+    "path": "/api/v1beta3/proxy/namespaces/{namespace}/services/{name}",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
@@ -9214,7 +10619,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9244,7 +10649,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9274,7 +10679,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9304,7 +10709,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9334,7 +10739,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9357,14 +10762,14 @@
      },
      {
       "type": "string",
-      "method": "TRACE",
-      "summary": "proxy TRACE requests to Service",
-      "nickname": "proxyTRACEService",
+      "method": "OPTIONS",
+      "summary": "proxy OPTIONS requests to Service",
+      "nickname": "proxyOPTIONSService",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -9397,6 +10802,14 @@
       "summary": "list or watch objects of kind Service",
       "nickname": "listService",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -9451,6 +10864,14 @@
       "nickname": "createService",
       "parameters": [
        {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "v1beta3.Service",
         "paramType": "body",
         "name": "body",
@@ -9483,8 +10904,16 @@
       "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
-      "nickname": "watchServicelist",
+      "nickname": "watchServiceList",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -9586,6 +11015,11 @@
      "resourceVersion": {
       "type": "string",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "generation": {
+      "type": "integer",
+      "format": "int64",
+      "description": "a sequence number representing a specific generation of the desired state; populated by the system; read-only"
      },
      "creationTimestamp": {
       "type": "string",
@@ -9849,6 +11283,10 @@
       "description": "the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"
      }
     }
+   },
+   "api.Patch": {
+    "id": "api.Patch",
+    "properties": {}
    },
    "v1beta3.Status": {
     "id": "v1beta3.Status",
@@ -10600,6 +12038,10 @@
      "claimRef": {
       "$ref": "v1beta3.ObjectReference",
       "description": "when bound, a reference to the bound claim"
+     },
+     "persistentVolumeReclaimPolicy": {
+      "type": "string",
+      "description": "what happens to a volume when released from its claim; Valid options are Retain (default) and Recycle.  Recyling must be supported by the volume plugin underlying this persistent volume."
      }
     }
    },
@@ -10804,6 +12246,14 @@
      "phase": {
       "type": "string",
       "description": "the current phase of a persistent volume"
+     },
+     "message": {
+      "type": "string",
+      "description": "human-readable message indicating details about why the volume is in this state"
+     },
+     "reason": {
+      "type": "string",
+      "description": "(brief) reason the volume is not is not available"
      }
     }
    },
@@ -11127,7 +12577,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"
+      "description": "name for the port that can be referred to by services; must be a IANA_SVC_NAME and unique within the pod"
      },
      "hostPort": {
       "type": "integer",
@@ -11269,11 +12719,15 @@
      },
      "port": {
       "type": "string",
-      "description": "number or name of the port to access on the container"
+      "description": "number or name of the port to access on the container; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"
      },
      "host": {
       "type": "string",
       "description": "hostname to connect to; defaults to pod IP"
+     },
+     "scheme": {
+      "type": "string",
+      "description": "scheme to connect with, must be HTTP or HTTPS, defaults to HTTP"
      }
     }
    },
@@ -11285,7 +12739,7 @@
     "properties": {
      "port": {
       "type": "string",
-      "description": "number of name of the port to access on the container"
+      "description": "number or name of the port to access on the container; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"
      }
     }
    },
@@ -11402,6 +12856,10 @@
      "message": {
       "type": "string",
       "description": "human readable message indicating details about why the pod is in this condition"
+     },
+     "reason": {
+      "type": "string",
+      "description": "(brief-CamelCase) reason indicating details about why the pod is in this condition"
      },
      "hostIP": {
       "type": "string",
@@ -11700,6 +13158,11 @@
       "type": "integer",
       "format": "int32",
       "description": "most recently oberved number of replicas"
+     },
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "reflects the generation of the most recently observed replication controller"
      }
     }
    },
@@ -12003,7 +13466,7 @@
      },
      "targetPort": {
       "type": "string",
-      "description": "the port to access on the pods targeted by the service; defaults to the service port"
+      "description": "number or name of the port to access on the pods targeted by the service; defaults to the service port; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"
      },
      "nodePort": {
       "type": "integer",
