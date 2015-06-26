@@ -31,4 +31,6 @@ Docs in this directory relate to developing Kubernetes.
 
 * **Faster PR reviews** ([faster_reviews.md](faster_reviews.md)): How to get faster PR reviews.
 
+* **Getting Recent Builds** ([getting-builds.md](getting-builds.md)): How to get recent builds including the latest builds to pass CI.
+
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/README.md?pixel)]()
