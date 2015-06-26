@@ -18,7 +18,10 @@ package prober
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -200,13 +203,19 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 		return pb.exec.Probe(pb.newExecInContainer(pod, container, containerID, p.Exec.Command))
 	}
 	if p.HTTPGet != nil {
+		scheme := strings.ToLower(string(p.HTTPGet.Scheme))
+		host := p.HTTPGet.Host
+		if host == "" {
+			host = status.PodIP
+		}
 		port, err := extractPort(p.HTTPGet.Port, container)
 		if err != nil {
 			return probe.Unknown, "", err
 		}
-		host, port, path := extractGetParams(p.HTTPGet, status, port)
-		glog.V(4).Infof("HTTP-Probe Host: %v, Port: %v, Path: %v", host, port, path)
-		return pb.http.Probe(host, port, path, timeout)
+		path := p.HTTPGet.Path
+		glog.V(4).Infof("HTTP-Probe Host: %v://%v, Port: %v, Path: %v", scheme, host, port, path)
+		url := formatURL(scheme, host, port, path)
+		return pb.http.Probe(url, timeout)
 	}
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)
@@ -220,50 +229,45 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 	return probe.Unknown, "", nil
 }
 
-func extractGetParams(action *api.HTTPGetAction, status api.PodStatus, port int) (string, int, string) {
-	host := action.Host
-	if host == "" {
-		host = status.PodIP
-	}
-	return host, port, action.Path
-}
-
 func extractPort(param util.IntOrString, container api.Container) (int, error) {
 	port := -1
 	var err error
 	switch param.Kind {
 	case util.IntstrInt:
-		port := param.IntVal
-		if port > 0 && port < 65536 {
-			return port, nil
-		}
-		return port, fmt.Errorf("invalid port number: %v", port)
+		port = param.IntVal
 	case util.IntstrString:
-		port = findPortByName(container, param.StrVal)
-		if port == -1 {
+		if port, err = findPortByName(container, param.StrVal); err != nil {
 			// Last ditch effort - maybe it was an int stored as string?
 			if port, err = strconv.Atoi(param.StrVal); err != nil {
 				return port, err
 			}
 		}
-		if port > 0 && port < 65536 {
-			return port, nil
-		}
-		return port, fmt.Errorf("invalid port number: %v", port)
 	default:
 		return port, fmt.Errorf("IntOrString had no kind: %+v", param)
 	}
+	if port > 0 && port < 65536 {
+		return port, nil
+	}
+	return port, fmt.Errorf("invalid port number: %v", port)
 }
 
 // findPortByName is a helper function to look up a port in a container by name.
-// Returns the HostPort if found, -1 if not found.
-func findPortByName(container api.Container, portName string) int {
+func findPortByName(container api.Container, portName string) (int, error) {
 	for _, port := range container.Ports {
 		if port.Name == portName {
-			return port.HostPort
+			return port.HostPort, nil
 		}
 	}
-	return -1
+	return 0, fmt.Errorf("port %s not found", portName)
+}
+
+// formatURL formats a URL from args.  For testability.
+func formatURL(scheme string, host string, port int, path string) *url.URL {
+	return &url.URL{
+		Scheme: scheme,
+		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
+		Path:   path,
+	}
 }
 
 type execInContainer struct {

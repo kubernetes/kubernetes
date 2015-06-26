@@ -522,6 +522,7 @@ func deepCopy_v1beta3_HTTPGetAction(in HTTPGetAction, out *HTTPGetAction, c *con
 		return err
 	}
 	out.Host = in.Host
+	out.Scheme = in.Scheme
 	return nil
 }
 

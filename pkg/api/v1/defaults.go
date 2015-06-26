@@ -137,6 +137,9 @@ func addDefaultingFuncs() {
 			if obj.Path == "" {
 				obj.Path = "/"
 			}
+			if obj.Scheme == "" {
+				obj.Scheme = URISchemeHTTP
+			}
 		},
 		func(obj *NamespaceStatus) {
 			if obj.Phase == "" {

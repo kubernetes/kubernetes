@@ -713,9 +713,9 @@ func TestValidateProbe(t *testing.T) {
 func TestValidateHandler(t *testing.T) {
 	successCases := []api.Handler{
 		{Exec: &api.ExecAction{Command: []string{"echo"}}},
-		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: util.NewIntOrStringFromInt(1), Host: ""}},
-		{HTTPGet: &api.HTTPGetAction{Path: "/foo", Port: util.NewIntOrStringFromInt(65535), Host: "host"}},
-		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: util.NewIntOrStringFromString("port"), Host: ""}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: util.NewIntOrStringFromInt(1), Host: "", Scheme: "HTTP"}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/foo", Port: util.NewIntOrStringFromInt(65535), Host: "host", Scheme: "HTTP"}},
+		{HTTPGet: &api.HTTPGetAction{Path: "/", Port: util.NewIntOrStringFromString("port"), Host: "", Scheme: "HTTP"}},
 	}
 	for _, h := range successCases {
 		if errs := validateHandler(&h); len(errs) != 0 {

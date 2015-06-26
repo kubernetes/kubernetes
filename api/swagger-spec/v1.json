@@ -12722,6 +12722,10 @@
      "host": {
       "type": "string",
       "description": "hostname to connect to; defaults to pod IP"
+     },
+     "scheme": {
+      "type": "string",
+      "description": "scheme to connect with, must be HTTP or HTTPS, defaults to HTTP"
      }
     }
    },

@@ -252,8 +252,9 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			s.Phase = api.NamespaceActive
 		},
 		func(http *api.HTTPGetAction, c fuzz.Continue) {
-			c.FuzzNoCustom(http)        // fuzz self without calling this function again
-			http.Path = "/" + http.Path // can't be blank
+			c.FuzzNoCustom(http)            // fuzz self without calling this function again
+			http.Path = "/" + http.Path     // can't be blank
+			http.Scheme = "x" + http.Scheme // can't be blank
 		},
 		func(ss *api.ServiceSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(ss) // fuzz self without calling this function again
