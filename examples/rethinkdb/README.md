@@ -105,7 +105,7 @@ type: LoadBalancer
 
 The external load balancer allows us to access the service from outside via an external IP, which is 104.197.19.120 in this case. 
 
-Note that you may need to create a firewall rule to allow the traffic, assuming you are using GCE:
+Note that you may need to create a firewall rule to allow the traffic, assuming you are using Google Compute Engine:
 ```
 $ gcloud compute firewall-rules create rethinkdb --allow=tcp:8080
 ```

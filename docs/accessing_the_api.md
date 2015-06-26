@@ -38,7 +38,7 @@ these configurations the secure port is typically set to 6443.
 
 A firewall rule is typically configured to allow external HTTPS access to port 443.
 
-The above are defaults and reflect how Kubernetes is deployed to GCE using
+The above are defaults and reflect how Kubernetes is deployed to Google Compute Engine using
 kube-up.sh.  Other cloud providers may vary.
 
 ## Use Cases vs IP:Ports

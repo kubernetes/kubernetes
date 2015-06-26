@@ -1,6 +1,6 @@
 # Cluster Level Logging with Elasticsearch and Kibana
 
-On the GCE platform the default cluster level logging support targets
+On the Google Compute Engine (GCE) platform the default cluster level logging support targets
 [Google Cloud Logging](https://cloud.google.com/logging/docs/) as described at the [Logging](logging.md) getting
 started page. Here we describe how to set up a cluster to ingest logs into Elasticsearch and view them using Kibana as an
 alternative to Google Cloud Logging.

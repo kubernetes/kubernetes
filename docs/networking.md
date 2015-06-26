@@ -85,7 +85,7 @@ as an introduction to various technologies and serves as a jumping-off point.
 If some techniques become vastly preferable to others, we might detail them more
 here.
 
-### Google Compute Engine
+### Google Compute Engine (GCE)
 
 For the Google Compute Engine cluster configuration scripts, we use [advanced
 routing](https://developers.google.com/compute/docs/networking#routing) to

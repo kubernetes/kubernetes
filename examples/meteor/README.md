@@ -34,8 +34,8 @@ Next, start up a Kubernetes cluster:
 wget -q -O - https://get.k8s.io | bash
 ```
 
-Please see the [GCE getting started
-guide](http://docs.k8s.io/getting-started-guides/gce.md) for full
+Please see the [Google Compute Engine getting started
+guide](../../docs/getting-started-guides/gce.md) for full
 details and other options for starting a cluster.
 
 Build a container for your Meteor app
@@ -139,7 +139,7 @@ kubectl get services/meteor --template="{{range .status.loadBalancer.ingress}} {
 ```
 
 You will have to open up port 80 if it's not open yet in your
-environment. On GCE, you may run the below command.
+environment. On Google Compute Engine, you may run the below command.
 ```
 gcloud compute firewall-rules create meteor-80 --allow=tcp:80 --target-tags kubernetes-minion
 ```

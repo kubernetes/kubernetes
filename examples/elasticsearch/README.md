@@ -159,7 +159,7 @@ music-server   name=music-db   name=music-db   10.0.138.61      9200/TCP
 NAME               TYPE      DATA
 apiserver-secret   Opaque    2
 ```
-This shows 4 instances of Elasticsearch running. After making sure that port 9200 is accessible for this cluster (e.g. using a firewall rule for GCE) we can make queries via the service which will be fielded by the matching Elasticsearch pods.
+This shows 4 instances of Elasticsearch running. After making sure that port 9200 is accessible for this cluster (e.g. using a firewall rule for Google Compute Engine) we can make queries via the service which will be fielded by the matching Elasticsearch pods.
 ```
 $ curl 104.197.12.157:9200
 {
