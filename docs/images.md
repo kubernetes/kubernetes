@@ -13,6 +13,7 @@ you must set a pull image policy of `PullAlways` or specify a `:latest` tag on
 your image.
 
 ## Using a Private Registry
+
 Private registries may require keys to read images from them.
 Credentials can be provided in several ways:
   - Using Google Container Registry
@@ -25,10 +26,10 @@ Credentials can be provided in several ways:
   - Pre-pulling Images
     - all pods can use any images cached on a node
     - requires root access to all nodes to setup
-  - Specifying ImagePullKeys on a Pod
+  - Specifying ImagePullSecrets on a Pod
     - only pods which provide own keys can access the private registry
 Each option is described in more detail below.
-   
+  
 
 ### Using Google Container Registry
 
@@ -44,18 +45,76 @@ Google service account.  The service account on the instance
 will have a `https://www.googleapis.com/auth/devstorage.read_only`,
 so it can pull from the project's GCR, but not push.
 
-### Configuring Nodes to Authenticate to a Private Registry 
-Docker stores keys for private registries in a `.dockercfg` file.  Create a config file by running
-`docker login <registry>.<domain>` and then copy the resulting `.dockercfg` file to the root user's
-`$HOME` directory (e.g. `/root/.dockercfg`) on each node in the cluster.
+### Configuring Nodes to Authenticate to a Private Repository
+
+**Note:** if you are running on Google Container Engine (GKE), there will already be a `.dockercfg` on each node
+with credentials for Google Container Registry.  You cannot use this approach.
+
+**Note:** this approach is suitable if you can control node configuration.  It
+will not work reliably on GCE, and any other cloud provider that does automatic
+node replacement.
+ 
+Docker stores keys for private registries in the `$HOME/.dockercfg` file.  If you put this
+in the `$HOME` of `root` on a kubelet, then docker will use it.
+
+Here are the recommended steps to configuring your nodes to use a private registry.  In this
+example, run these on your desktop/laptop:
+   1. run `docker login [server]` for each set of credentials you want to use.
+   1. view `$HOME/.dockercfg` in an editor to ensure it contains just the credentials you want to use.
+   1. get a list of your nodes 
+      - for example: `nodes=$(kubectl get nodes -o template --template='{{range.items}}{{.metadata.name}} {{end}}')`
+   1. copy your local `.dockercfg` to the home directory of roon on each node.
+      - for example: `for n in $nodes; do scp ~/.dockercfg root@$n:/root/.dockercfg`
+
+Verify by creating a pod that uses a private image, e.g.:
+```
+$ cat <<EOF > private-image-test-1.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: private-image-test-1
+spec:
+  containers:
+    - name: uses-private-image
+      image: $PRIVATE_IMAGE_NAME
+      command: [ "echo", "SUCCESS" ]
+  imagePullPolicy: Always
+EOF
+$ kubectl create -f private-image-test-1.yaml
+pods/private-image-test-1
+$
+```
+If everything is working, then, after a few moments, you should see:
+```
+$ kubectl logs private-image-test-1
+SUCCESS
+```
+
+If it failed, then you will see:
+```
+$ kubectl describe pods/private-image-test-1 | grep "Failed"
+  Fri, 26 Jun 2015 15:36:13 -0700	Fri, 26 Jun 2015 15:39:13 -0700	19	{kubelet node-i2hq}	spec.containers{uses-private-image}	failed		Failed to pull image "user/privaterepo:v1": Error: image user/privaterepo:v1 not found
+```
+
 
 You must ensure all nodes in the cluster have the same `.dockercfg`.  Otherwise, pods will run on
 some nodes and fail to run on others.  For example, if you use node autoscaling, then each instance
 template needs to include the `.dockercfg` or mount a drive that contains it.
 
-All pods will have read access to images in any private registry with keys in the `.dockercfg`.
+All pods will have read access to images in any private registry once private
+registry keys are added to the `.dockercfg`.
+
+**This was tested with a private docker repository as of 26 June with Kubernetes version v0.19.3.
+It should also work for a private registry such as quay.io, but that has not been tested.**
 
 ### Pre-pulling Images
+
+**Note:** if you are running on Google Container Engine (GKE), there will already be a `.dockercfg` on each node
+with credentials for Google Container Registry.  You cannot use this approach.
+
+**Note:** this approach is suitable if you can control node configuration.  It
+will not work reliably on GCE, and any other cloud provider that does automatic
+node replacement.
 
 Be default, the kubelet will try to pull each image from the specified registry.
 However, if the `imagePullPolicy` property of the container is set to `IfNotPresent` or `Never`,
@@ -69,6 +128,10 @@ This can be used to preload certain images for speed or as an alternative to aut
 All pods will have read access to any pre-pulled images.
 
 ### Specifying ImagePullSecrets on a Pod
+
+**Note:** This approach is currently the recommended approach for GKE, GCE, and any cloud-providers
+where node creation is automated.
+
 Kubernetes supports specifying registry keys on a pod.
 
 First, create a `.dockercfg`, such as running `docker login <registry.domain>`.
@@ -127,6 +190,9 @@ Currently, all pods will potentially have read access to any images which were
 pulled using imagePullSecrets.  That is, imagePullSecrets does *NOT* protect your
 images from being seen by other users in the cluster.  Our intent
 is to fix that.
+
+You can use this in conjunction with a per-node `.dockerfile`.  The credentials
+will be merged.  This approach will work on Google Container Engine (GKE).
 
 ### Use Cases
 There are a number of solutions for configuring private registries.  Here are some
