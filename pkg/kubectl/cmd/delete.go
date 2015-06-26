@@ -75,7 +75,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
 	cmd.Flags().Bool("ignore-not-found", false, "Treat \"resource not found\" as a successful delete.")
-	cmd.Flags().Bool("cascade", true, "If true, cascade the delete resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
+	cmd.Flags().Bool("cascade", true, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
 	cmd.Flags().Int("grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
 	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
 	return cmd
