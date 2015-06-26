@@ -43,6 +43,10 @@ docker:
     - repl: '# net.ipv4.ip_forward=0'
 {% endif %}
 
+# Work around Salt #18089: https://github.com/saltstack/salt/issues/18089
+/etc/sysctl.d/99-salt.conf:
+  file.touch
+
 # TODO: This should really be based on network strategy instead of os_family
 net.ipv4.ip_forward:
   sysctl.present:
