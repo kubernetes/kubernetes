@@ -451,7 +451,7 @@ func TestExecutorStaticPods(t *testing.T) {
 				"enabled": true,
 				"type": "http",
 				"initialDelaySeconds": 30,
-				"httpGet": { "path": "/", "port": "80" }
+				"httpGet": { "path": "/", "port": 80 }
 			}
 		}]
 	}

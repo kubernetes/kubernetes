@@ -12577,7 +12577,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"
+      "description": "name for the port that can be referred to by services; must be a IANA_SVC_NAME and unique within the pod"
      },
      "hostPort": {
       "type": "integer",
@@ -12719,7 +12719,7 @@
      },
      "port": {
       "type": "string",
-      "description": "number or name of the port to access on the container"
+      "description": "number or name of the port to access on the container; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"
      },
      "host": {
       "type": "string",
@@ -12735,7 +12735,7 @@
     "properties": {
      "port": {
       "type": "string",
-      "description": "number of name of the port to access on the container"
+      "description": "number or name of the port to access on the container; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"
      }
     }
    },
@@ -13462,7 +13462,7 @@
      },
      "targetPort": {
       "type": "string",
-      "description": "the port to access on the pods targeted by the service; defaults to the service port"
+      "description": "number or name of the port to access on the pods targeted by the service; defaults to the service port; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"
      },
      "nodePort": {
       "type": "integer",

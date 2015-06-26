@@ -76,8 +76,9 @@ func TestServiceRegistryCreate(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		},
 	}
@@ -118,8 +119,9 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
-					Port:     6502,
-					Protocol: api.ProtocolTCP,
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: util.NewIntOrStringFromInt(6502),
 				}},
 			},
 		},
@@ -130,6 +132,18 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
+					Protocol: api.ProtocolTCP,
+				}},
+			},
+		},
+		"missing targetPort": {
+			ObjectMeta: api.ObjectMeta{Name: "foo"},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				Ports: []api.ServicePort{{
+					Port:     6502,
 					Protocol: api.ProtocolTCP,
 				}},
 			},
@@ -155,8 +169,9 @@ func TestServiceRegistryUpdate(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz1"},
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		},
 	})
@@ -173,8 +188,9 @@ func TestServiceRegistryUpdate(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		},
 	})
@@ -217,8 +233,9 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
-					Port:     6502,
-					Protocol: api.ProtocolTCP,
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: util.NewIntOrStringFromInt(6502),
 				}},
 			},
 		},
@@ -229,8 +246,9 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
-					Port:     6502,
-					Protocol: api.ProtocolTCP,
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: util.NewIntOrStringFromInt(6502),
 				}},
 			},
 		},
@@ -256,8 +274,9 @@ func TestServiceRegistryExternalService(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeLoadBalancer,
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		},
 	}
@@ -330,8 +349,9 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		},
 	}
@@ -366,13 +386,15 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeLoadBalancer,
 			Ports: []api.ServicePort{{
-				Name:     "p",
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Name:       "p",
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}, {
-				Name:     "q",
-				Port:     8086,
-				Protocol: api.ProtocolTCP,
+				Name:       "q",
+				Port:       8086,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(8086),
 			}},
 		},
 	}
@@ -506,8 +528,9 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		},
 	}
@@ -528,8 +551,9 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		}}
 	ctx = api.NewDefaultContext()
@@ -558,8 +582,9 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		},
 	}
@@ -584,8 +609,9 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		},
 	}
@@ -611,8 +637,9 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		},
 	}
@@ -637,8 +664,9 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		},
 	}
@@ -681,8 +709,9 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeLoadBalancer,
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: util.NewIntOrStringFromInt(6502),
 			}},
 		},
 	}
@@ -754,8 +783,9 @@ func TestCreate(t *testing.T) {
 				SessionAffinity: "None",
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
-					Port:     6502,
-					Protocol: api.ProtocolTCP,
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: util.NewIntOrStringFromInt(6502),
 				}},
 			},
 		},
@@ -771,8 +801,9 @@ func TestCreate(t *testing.T) {
 				SessionAffinity: "None",
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
-					Port:     6502,
-					Protocol: api.ProtocolTCP,
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: util.NewIntOrStringFromInt(6502),
 				}},
 			},
 		},
