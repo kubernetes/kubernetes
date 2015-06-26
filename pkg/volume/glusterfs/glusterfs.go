@@ -39,6 +39,7 @@ type glusterfsPlugin struct {
 }
 
 var _ volume.VolumePlugin = &glusterfsPlugin{}
+var _ volume.PersistentVolumePlugin = &glusterfsPlugin{}
 
 const (
 	glusterfsPluginName = "kubernetes.io/glusterfs"
@@ -65,7 +66,7 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode
 }
 
 func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
-	source := plugin.getGlusterVolumeSource(spec)
+	source, _ := plugin.getGlusterVolumeSource(spec)
 	ep_name := source.EndpointsName
 	ns := pod.Namespace
 	ep, err := plugin.host.GetKubeClient().Endpoints(ns).Get(ep_name)
@@ -77,16 +78,18 @@ func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ vol
 	return plugin.newBuilderInternal(spec, ep, pod, mounter, exec.New())
 }
 
-func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) *api.GlusterfsVolumeSource {
+func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*api.GlusterfsVolumeSource, bool) {
+	// Glusterfs volumes used directly in a pod have a ReadOnly flag set by the pod author.
+	// Glusterfs volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	if spec.VolumeSource.Glusterfs != nil {
-		return spec.VolumeSource.Glusterfs
+		return spec.VolumeSource.Glusterfs, spec.VolumeSource.Glusterfs.ReadOnly
 	} else {
-		return spec.PersistentVolumeSource.Glusterfs
+		return spec.PersistentVolumeSource.Glusterfs, spec.ReadOnly
 	}
 }
 
 func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.Endpoints, pod *api.Pod, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
-	source := plugin.getGlusterVolumeSource(spec)
+	source, readOnly := plugin.getGlusterVolumeSource(spec)
 	return &glusterfsBuilder{
 		glusterfs: &glusterfs{
 			volName: spec.Name,
@@ -96,7 +99,7 @@ func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.End
 		},
 		hosts:    ep,
 		path:     source.Path,
-		readonly: source.ReadOnly,
+		readonly: readOnly,
 		exe:      exe}, nil
 }
 
