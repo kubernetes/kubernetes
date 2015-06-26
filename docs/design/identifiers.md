@@ -20,6 +20,8 @@ Name
 [rfc4122](http://www.ietf.org/rfc/rfc4122.txt) universally unique identifier (UUID)
 : A 128 bit generated value that is extremely unlikely to collide across time and space and requires no central coordination
 
+[rfc6335](https://tools.ietf.org/rfc/rfc6335.txt) port name (IANA_SVC_NAME)
+: An alphanumeric (a-z, and 0-9) string, with a maximum length of 15 characters, with the '-' character allowed anywhere except the first or the last character or adjacent to another '-' character, it must contain at least a (a-z) character
 
 ## Objectives for names and UIDs
 
