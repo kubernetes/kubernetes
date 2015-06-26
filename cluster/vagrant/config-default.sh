@@ -52,9 +52,6 @@ MASTER_PASSWD=vagrant
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
 
-# Optional: Install node monitoring.
-ENABLE_NODE_MONITORING=true
-
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=elasticsearch

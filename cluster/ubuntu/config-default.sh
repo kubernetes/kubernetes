@@ -32,9 +32,6 @@ export FLANNEL_NET=172.16.0.0/16
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ServiceAccount,ResourceQuota
 
-# Optional: Install node monitoring.
-ENABLE_NODE_MONITORING=true
-
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=elasticsearch

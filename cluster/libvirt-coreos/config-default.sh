@@ -48,9 +48,6 @@ MINION_CONTAINER_SUBNETS[$NUM_MINIONS]=$MASTER_CONTAINER_SUBNET
 
 SERVICE_CLUSTER_IP_RANGE=10.11.0.0/16  # formerly PORTAL_NET
 
-# Optional: Install node monitoring.
-ENABLE_NODE_MONITORING=true
-
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=elasticsearch
