@@ -104,7 +104,7 @@ echo "Conformance test checking conformance with Kubernetes version 1.0"
 #  Volumes: contained only skipped tests.
 export CONFORMANCE_TEST_SKIP_REGEX="Cadvisor|MasterCerts|Density|Cluster\slevel\slogging.*|Etcd\sfailure.*|Load\sCapacity|Monitoring|Namespaces.*seconds|Pod\sdisks|Reboot|Restart|Nodes|Scale|Services.*load\sbalancer|Services.*NodePort|Shell|SSH|Volumes"
 
-declare -x KUBERNETES_CONFORMANCE_TEST="1"
+declare -x KUBERNETES_CONFORMANCE_TEST="y"
 declare -x NUM_MINIONS=4
 hack/ginkgo-e2e.sh
 exit $?
