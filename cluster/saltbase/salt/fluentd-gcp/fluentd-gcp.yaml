@@ -2,6 +2,7 @@ apiVersion: v1beta3
 kind: Pod
 metadata:
   name: fluentd-cloud-logging
+  namespace: kube-system
 spec:
   containers:
   - name: fluentd-cloud-logging

@@ -21,6 +21,33 @@ KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 
 ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-600}
 
+SYSTEM_NAMESPACE=kube-system
+
+function delete-if-present() {
+  local -r rsrc=$1
+  local -r name=$2
+  local tries=$3
+  local -r sleep=$4
+  local -r namespace=$5
+
+  while [ ${tries} -gt 0 ]; do
+    # If we can't get the resource, either it doesn't exist, or its a transient failure.
+    if ! ${KUBECTL} get ${rsrc} ${name}; then
+       local count=$(${KUBECTL} get ${rsrc} ${name} 2> /dev/null | grep -c "not found")
+       # It was not found, return
+       if [ "${count}" != 0 ]; then
+	 return
+       fi
+    fi
+    if ${KUBECTL} stop ${rsrc} ${name}; then
+      return
+    fi
+    echo "Failed to delete, waiting."
+    sleep 5
+    let tries=tries-1;
+  done
+}
+
 function create-kubeconfig-secret() {
   local -r token=$1
   local -r username=$2
@@ -47,6 +74,7 @@ contexts:
 - context:
     cluster: local
     user: ${username}
+    namespace: ${SYSTEM_NAMESPACE} 
   name: service-account-context
 current-context: service-account-context
 EOF
@@ -67,6 +95,7 @@ contexts:
 - context:
     cluster: local
     user: ${username}
+    namespace: ${SYSTEM_NAMESPACE}
   name: service-account-context
 current-context: service-account-context
 EOF
@@ -82,32 +111,34 @@ metadata:
   name: token-${safe_username}
 type: Opaque
 EOF
-  create-resource-from-string "${secretyaml}" 100 10 "Secret-for-token-for-user-${username}" &
+  create-resource-from-string "${secretyaml}" 100 10 "Secret-for-token-for-user-${username}" "${SYSTEM_NAMESPACE}" &
 # TODO: label the secrets with special label so kubectl does not show these?
 }
 
 # $1 filename of addon to start.
 # $2 count of tries to start the addon.
 # $3 delay in seconds between two consecutive tries
+# $4 namespace
 function start_addon() {
   local -r addon_filename=$1;
   local -r tries=$2;
   local -r delay=$3;
 
-  create-resource-from-string "$(cat ${addon_filename})" "${tries}" "${delay}" "${addon_filename}"
+  create-resource-from-string "$(cat ${addon_filename})" "${tries}" "${delay}" "${addon_filename}" $4
 }
 
 # $1 string with json or yaml.
 # $2 count of tries to start the addon.
 # $3 delay in seconds between two consecutive tries
-# $3 name of this object to use when logging about it.
+# $4 name of this object to use when logging about it.
+# $5 namespace for this object
 function create-resource-from-string() {
   local -r config_string=$1;
   local tries=$2;
   local -r delay=$3;
   local -r config_name=$4;
   while [ ${tries} -gt 0 ]; do
-    echo "${config_string}" | ${KUBECTL} create -f - && \
+    echo "${config_string}" | ${KUBECTL} --namespace=$5 create -f - && \
         echo "== Successfully started ${config_name} at $(date -Is)" && \
         return 0;
     let tries=tries-1;
@@ -134,6 +165,22 @@ for k,v in yaml.load(sys.stdin).iteritems():
 ''' < "${kube_env_yaml}")
 fi
 
+# Delete old default namespaced resources.  Necessary for update
+# TODO Needs testing
+#for name in elasticsearch-logging-v1 kibana-logging-v1 kube-dns-v3 monitoring-heapster-v4 monitoring-influx-grafana-v1; do
+#  delete-if-present rc ${name} 5 5 default
+#done
+
+#for name in elasticsearch-logging kibana-logging kube-dns monitoring-grafana monitoring-heapster monitoring-influxdb; do
+#  delete-if-present service ${name} 5 5 default
+#done
+
+#for name in token-system-dns token-system-logging token-system-monitoring; do
+#  delete-if-present secrets ${name} 5 5 default
+#done
+
+start_addon /etc/kubernetes/addons/namespace.yaml 100 10 default &
+
 # Generate secrets for "internal service accounts".
 # TODO(etune): move to a completely yaml/object based
 # workflow so that service accounts can be created
@@ -152,7 +199,7 @@ while read line; do
   else
     # Set the server to https://kubernetes. Pods/components that
     # do not have DNS available will have to override the server.
-    create-kubeconfig-secret "${token}" "${username}" "https://kubernetes"
+    create-kubeconfig-secret "${token}" "${username}" "https://kubernetes.default.svc.cluster.local"
   fi
 done < /srv/kubernetes/known_tokens.csv
 
@@ -160,7 +207,7 @@ done < /srv/kubernetes/known_tokens.csv
 # are defined in a namespace other than default, we should still create the limits for the
 # default namespace.
 for obj in $(find /etc/kubernetes/admission-controls \( -name \*.yaml -o -name \*.json \)); do
-  start_addon ${obj} 100 10 &
+  start_addon ${obj} 100 10 default &
   echo "++ obj ${obj} is created ++"
 done
 

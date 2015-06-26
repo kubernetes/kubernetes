@@ -2,7 +2,7 @@ apiVersion: v1beta3
 kind: ReplicationController
 metadata:
   name: kube-dns-v3
-  namespace: default
+  namespace: kube-system
   labels:
     k8s-app: kube-dns-v3
     kubernetes.io/cluster-service: "true"

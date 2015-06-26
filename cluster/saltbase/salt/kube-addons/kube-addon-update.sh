@@ -234,7 +234,7 @@ function create-object() {
     local -r obj_type=$1
     local -r file_path=$2
     log INFO "Creating new ${obj_type} from file ${file_path}"
-    run-until-success "${KUBECTL} create -f ${file_path}" ${NUM_TRIES_FOR_CREATE} ${DELAY_AFTER_CREATE_ERROR_SEC}
+    run-until-success "${KUBECTL} --namespace=kube-system create -f ${file_path}" ${NUM_TRIES_FOR_CREATE} ${DELAY_AFTER_CREATE_ERROR_SEC}
 }
 
 function update-object() {
