@@ -59,23 +59,11 @@ The kube-controller-manager has several options.
 **--logtostderr**=true
 	log to standard error instead of files
 
-**--machines**=[]
-	List of machines to schedule onto, comma separated.
-
 **--master**=""
 	The address of the Kubernetes API server (overrides any value in kubeconfig)
 
-**--minion-regexp**=""
-	If non empty, and --cloud-provider is specified, a regular expression for matching minion VMs.
-
 **--namespace-sync-period**=5m0s
 	The period for syncing namespace life-cycle updates
-
-**--node-memory**=3Gi
-	The amount of memory (in bytes) provisioned on each node
-
-**--node-milli-cpu**=1000
-	The amount of MilliCPU provisioned on each node
 
 **--node-monitor-grace-period**=40s
 	Amount of time which we allow running Node to be unresponsive before marking it unhealty. Must be N times more than kubelet's nodeStatusUpdateFrequency, where N means number of retries allowed for kubelet to post node status.
@@ -113,9 +101,6 @@ The kube-controller-manager has several options.
 **--stderrthreshold**=2
 	logs at or above this threshold go to stderr
 
-**--sync-nodes**=true
-	If true, and --cloud-provider is specified, sync nodes from the cloud provider. Default true.
-
 **--v**=0
 	log level for V logs
 
@@ -127,7 +112,7 @@ The kube-controller-manager has several options.
 
 # EXAMPLES
 ```
-/usr/bin/kube-controller-manager --logtostderr=true --v=0 --master=127.0.0.1:8080 --machines=127.0.0.1 
+/usr/bin/kube-controller-manager --logtostderr=true --v=0 --master=127.0.0.1:8080
 ```
 
 # HISTORY
