@@ -24,3 +24,16 @@ kube_manifest_dir: "{{ kube_config_dir }}/manifests"
 # This is the group that the cert creation scripts chgrp the
 # cert files to. Not really changable...
 kube_cert_group: kube-cert
+
+# Internal DNS domain name.
+# This domain must not be used in your network. Services will be discoverable
+# under <service-name>.<namespace>.<domainname>, e.g.
+# myservice.default.cluster.local
+dns_domain: "{{ cluster_name }}"
+
+# IP address of the DNS server.
+# Kubernetes will create a pod with several containers, serving as the DNS
+# server and expose it under this IP address. The IP address must be from
+# the range specified as kube_service_addresses. This magic will actually
+# pick the 10th ip address in the kube_service_addresses range and use that.
+dns_server: "{{ kube_service_addresses|ipaddr('net')|ipaddr(10)|ipaddr('address') }}"
