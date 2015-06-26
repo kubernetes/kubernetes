@@ -1,0 +1,35 @@
+---
+- include: generic-install.yml
+  when: not is_atomic
+
+- name: Turn down docker logging
+  lineinfile: dest=/etc/sysconfig/docker regexp=^OPTIONS= line=OPTIONS="--selinux-enabled --log-level=warn"
+  notify:
+    - restart docker
+
+- name: Install http_proxy into docker-network
+  lineinfile: dest=/etc/sysconfig/docker-network regexp=^HTTP_PROXY= line=HTTP_PROXY="{{ http_proxy }}"
+  when: http_proxy is defined
+  notify:
+    - restart docker
+
+- name: Install https_proxy into docker-network
+  lineinfile: dest=/etc/sysconfig/docker-network regexp=^HTTPS_PROXY= line=HTTPS_PROXY="{{ https_proxy }}"
+  when: https_proxy is defined
+  notify:
+    - restart docker
+
+- name: Install no-proxy into docker-network
+  lineinfile: dest=/etc/sysconfig/docker-network regexp=^NO_PROXY= line=NO_PROXY="{{ no_proxy }}"
+  when: no_proxy is defined
+  notify:
+    - restart docker
+
+- name: Add any insecure registrys to docker config
+  lineinfile: dest=/etc/sysconfig/docker regexp=^INSECURE_REGISTRY= line=INSECURE_REGISTRY='{% for reg in insecure_registrys %}--insecure-registry="{{ reg }}" {% endfor %}'
+  when: insecure_registrys is defined and insecure_registrys > 0
+  notify:
+    - restart docker
+
+- name: Enable Docker
+  service: name=docker enabled=yes state=started

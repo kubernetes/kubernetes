@@ -1,0 +1,7 @@
+- name: Install kubernetes
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+    name: kubernetes-master
+    state: latest
+  notify:
+    - restart daemons

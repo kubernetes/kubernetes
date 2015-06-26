@@ -1,0 +1,5 @@
+- name: Install PyYAML
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+    name: PyYAML
+    state: latest

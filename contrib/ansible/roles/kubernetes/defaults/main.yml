@@ -1,0 +1,20 @@
+# This directory is where all the additional scripts go
+# that Kubernetes normally puts in /srv/kubernetes.
+# This puts them in a sane location
+kube_script_dir: /usr/libexec/kubernetes
+
+# This directory is where all the additional config stuff goes
+# the kubernetes normally puts in /srv/kubernets.
+# This puts them in a sane location.
+# Editting this value will almost surely break something. Don't
+# change it. Things like the systemd scripts are hard coded to
+# look in here. Don't do it.
+kube_config_dir: /etc/kubernetes
+
+# This is where all the cert scripts and certs will be located
+kube_cert_dir: "{{ kube_config_dir }}/certs"
+
+
+# This is the group that the cert creation scripts chgrp the
+# cert files to. Not really changable...
+kube_cert_group: kube-cert
