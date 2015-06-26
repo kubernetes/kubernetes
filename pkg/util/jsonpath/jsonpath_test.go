@@ -75,6 +75,8 @@ var jsonpathTests = []jsonpathTest{
 	{"filter", "${[?(@<5)]}", []int{2, 6, 3, 7}, "2 3"},
 	{"recursive", "${..}", []int{1, 2, 3}, "[1, 2, 3]"},
 	{"recurfileds", "${..Price}", storeData, "8.95 12.99 8.99 19.95"},
+	{"lastarray", "${.Book[-1:]}", storeData,
+		"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
 	{"recurarray", "${..Book[2]}", storeData,
 		"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
 	{"union", "${[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4"},

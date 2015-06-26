@@ -142,16 +142,25 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
 			return input, fmt.Errorf("%v is not array or slice", value)
 		}
-		if !node.Params[0].Exists {
-			node.Params[0].Value = 0
+		params := node.Params
+		if !params[0].Exists {
+			params[0].Value = 0
 		}
-		if !node.Params[1].Exists {
-			node.Params[1].Value = value.Len()
+		if params[0].Value < 0 {
+			params[0].Value += value.Len()
 		}
-		if !node.Params[2].Exists {
-			value = value.Slice(node.Params[0].Value, node.Params[1].Value)
+		if !params[1].Exists {
+			params[1].Value = value.Len()
+		}
+
+		if params[1].Value < 0 {
+			params[1].Value += value.Len()
+		}
+
+		if !params[2].Exists {
+			value = value.Slice(params[0].Value, params[1].Value)
 		} else {
-			value = value.Slice3(node.Params[0].Value, node.Params[1].Value, node.Params[2].Value)
+			value = value.Slice3(params[0].Value, params[1].Value, params[2].Value)
 		}
 		for i := 0; i < value.Len(); i++ {
 			result = append(result, value.Index(i))
