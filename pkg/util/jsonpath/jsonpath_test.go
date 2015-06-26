@@ -44,6 +44,7 @@ type store struct {
 	Book    []book
 	Bicycle bicycle
 	Name    string
+	Labels  map[string]int
 }
 
 var storeData store = store{
@@ -54,12 +55,18 @@ var storeData store = store{
 		{"fiction", "Herman Melville", "Moby Dick", 8.99},
 	},
 	Bicycle: bicycle{"red", 19.95},
+	Labels: map[string]int{
+		"engieer":  10,
+		"web/html": 15,
+		"k8s-app":  20,
+	},
 }
 
 var jsonpathTests = []jsonpathTest{
 	{"plain", "hello jsonpath", nil, "hello jsonpath"},
 	{"variable", "hello ${.Name}", storeData, "hello jsonpath"},
-	{"dict", "${.key}", map[string]string{"key": "value"}, "value"},
+	{"dict/", "${.Labels.web/html}", storeData, "15"},
+	{"dict-", "${.Labels.k8s-app}", storeData, "20"},
 	{"nest", "${.Bicycle.Color}", storeData, "red"},
 	{"quote", `${"${"}`, nil, "${"},
 	{"array", "${[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday"},

@@ -315,19 +315,16 @@ Loop:
 	return p.parseInsideAction(cur)
 }
 
-// parseField scans a field: .Alphanumeric or .*
+// parseField scans a field until a terminator
 func (p *Parser) parseField(cur *ListNode) error {
 	p.consumeText()
 	var r rune
 	for {
 		r = p.next()
-		if r != '*' && !isAlphaNumeric(r) {
+		if isTerminator(r) {
 			p.backup()
 			break
 		}
-	}
-	if r := p.peek(); !isTerminator(r) {
-		return fmt.Errorf("bad character %#U", r)
 	}
 	value := p.consumeText()
 	if value == "*" {
@@ -344,13 +341,7 @@ func isTerminator(r rune) bool {
 		return true
 	}
 	switch r {
-	case eof, '.', ',', '|', ':', ')', '(', '[', ']':
-		return true
-	}
-	// Does r start the delimiter? This can be ambiguous (with delim=="//", $x/2 will
-	// succeed but should fail) but only in extremely rare cases caused by willfully
-	// bad choice of delimiter.
-	if rd, _ := utf8.DecodeRuneInString(rightDelim); rd == r {
+	case eof, '.', ',', '[', ']', '$', '@':
 		return true
 	}
 	return false
