@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
+	"strings"
 
+	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/ginkgo/testsuite"
 )
 
@@ -96,6 +99,43 @@ func (n *Notifier) SendNotification(title string, subtitle string) {
 				exec.Command("notify-send", args...).Run()
 			}
 
+		}
+	}
+}
+
+func (n *Notifier) RunCommand(suite testsuite.TestSuite, suitePassed bool) {
+
+	command := n.commandFlags.AfterSuiteHook
+	if command != "" {
+
+		// Allow for string replacement to pass input to the command
+		passed := "[FAIL]"
+		if suitePassed {
+			passed = "[PASS]"
+		}
+		command = strings.Replace(command, "(ginkgo-suite-passed)", passed, -1)
+		command = strings.Replace(command, "(ginkgo-suite-name)", suite.PackageName, -1)
+
+		// Must break command into parts
+		splitArgs := regexp.MustCompile(`'.+'|".+"|\S+`)
+		parts := splitArgs.FindAllString(command, -1)
+
+		output, err := exec.Command(parts[0], parts[1:]...).CombinedOutput()
+		if err != nil {
+			fmt.Println("Post-suite command failed:")
+			if config.DefaultReporterConfig.NoColor {
+				fmt.Printf("\t%s\n", output)
+			} else {
+				fmt.Printf("\t%s%s%s\n", redColor, string(output), defaultStyle)
+			}
+			n.SendNotification("Ginkgo [ERROR]", fmt.Sprintf(`After suite command "%s" failed`, n.commandFlags.AfterSuiteHook))
+		} else {
+			fmt.Println("Post-suite command succeeded:")
+			if config.DefaultReporterConfig.NoColor {
+				fmt.Printf("\t%s\n", output)
+			} else {
+				fmt.Printf("\t%s%s%s\n", greenColor, string(output), defaultStyle)
+			}
 		}
 	}
 }

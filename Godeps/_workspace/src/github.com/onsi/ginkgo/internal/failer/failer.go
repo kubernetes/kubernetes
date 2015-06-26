@@ -77,3 +77,16 @@ func (f *Failer) Drain(componentType types.SpecComponentType, componentIndex int
 
 	return failure, outcome
 }
+
+func (f *Failer) Skip(message string, location types.CodeLocation) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if f.state == types.SpecStatePassed {
+		f.state = types.SpecStateSkipped
+		f.failure = types.SpecFailure{
+			Message:  message,
+			Location: location,
+		}
+	}
+}

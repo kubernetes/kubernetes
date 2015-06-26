@@ -65,7 +65,7 @@ func (reporter *DefaultReporter) SpecDidComplete(specSummary *types.SpecSummary)
 	case types.SpecStatePending:
 		reporter.stenographer.AnnouncePendingSpec(specSummary, reporter.config.NoisyPendings && !reporter.config.Succinct)
 	case types.SpecStateSkipped:
-		reporter.stenographer.AnnounceSkippedSpec(specSummary)
+		reporter.stenographer.AnnounceSkippedSpec(specSummary, reporter.config.Succinct, reporter.config.FullTrace)
 	case types.SpecStateTimedOut:
 		reporter.stenographer.AnnounceSpecTimedOut(specSummary, reporter.config.Succinct, reporter.config.FullTrace)
 	case types.SpecStatePanicked:

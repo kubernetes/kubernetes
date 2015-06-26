@@ -100,9 +100,28 @@ func (t *TestRunner) CompileTo(path string) error {
 		return fmt.Errorf("Failed to compile %s", t.Suite.PackageName)
 	}
 
+	if fileExists(path) == false {
+		compiledFile := filepath.Join(t.Suite.Path, t.Suite. PackageName+".test")
+		if fileExists(compiledFile) {
+			// seems like we are on an old go version that does not support the -o flag on go test
+			// move the compiled test file to the desired location by hand
+			err = os.Rename(compiledFile, path)
+			if err != nil {
+				return fmt.Errorf("Failed to move compiled file: %s", err)
+			}
+		} else {
+			return fmt.Errorf("Failed to compile %s: output file %q could not be found", t.Suite.PackageName, path)
+		}
+	}
+
 	t.compiled = true
 
 	return nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil || os.IsNotExist(err) == false
 }
 
 /*

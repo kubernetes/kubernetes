@@ -240,11 +240,11 @@ var _ = Describe("Skipped", func() {
 		})
 
 		Describe("kube-push", func() {
+			BeforeEach(func() {
+				SkipUnlessProviderIs("gce")
+			})
+
 			It("of master should maintain responsive services", func() {
-				if !providerIs("gce") {
-					By(fmt.Sprintf("Skipping kube-push test, which is not implemented for %s", testContext.Provider))
-					return
-				}
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")
@@ -255,11 +255,11 @@ var _ = Describe("Skipped", func() {
 		})
 
 		Describe("upgrade-master", func() {
+			BeforeEach(func() {
+				SkipUnlessProviderIs("gce", "gke")
+			})
+
 			It("should maintain responsive services", func() {
-				if !providerIs("gce", "gke") {
-					By(fmt.Sprintf("Skipping upgrade test, which is not implemented for %s", testContext.Provider))
-					return
-				}
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")
@@ -315,10 +315,8 @@ var _ = Describe("Skipped", func() {
 			})
 
 			It("should maintain a functioning cluster", func() {
-				if !providerIs("gce", "gke") {
-					By(fmt.Sprintf("Skipping upgrade test, which is not implemented for %s", testContext.Provider))
-					return
-				}
+				SkipUnlessProviderIs("gce", "gke")
+
 				By("Validating cluster before master upgrade")
 				expectNoError(validate(f, svcName, rcName, ingress, replicas))
 				By("Performing a master upgrade")

@@ -109,16 +109,15 @@ var _ = Describe("Kubectl client", func() {
 
 	Describe("Guestbook application", func() {
 		var guestbookPath string
+
 		BeforeEach(func() {
 			guestbookPath = filepath.Join(testContext.RepoRoot, "examples/guestbook")
+
+			// requires ExternalLoadBalancer support
+			SkipUnlessProviderIs("gce", "gke", "aws")
 		})
 
 		It("should create and stop a working application", func() {
-			if !providerIs("gce", "gke", "aws") {
-				By(fmt.Sprintf("Skipping guestbook, uses createExternalLoadBalancer, a (gce|gke|aws) feature"))
-				return
-			}
-
 			defer cleanup(guestbookPath, ns, frontendSelector, redisMasterSelector, redisSlaveSelector)
 
 			By("creating all guestbook components")

@@ -33,17 +33,12 @@ var _ = Describe("SSH", func() {
 		var err error
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
+
+		// When adding more providers here, also implement their functionality in util.go's getSigner(...).
+		SkipUnlessProviderIs("gce", "gke")
 	})
 
 	It("should SSH to all nodes and run commands", func() {
-		// When adding more providers here, also implement their functionality
-		// in util.go's getSigner(...).
-		provider := testContext.Provider
-		if !providerIs("gce", "gke") {
-			By(fmt.Sprintf("Skipping SSH test, which is not implemented for %s", provider))
-			return
-		}
-
 		// Get all nodes' external IPs.
 		By("Getting all nodes' SSH-able IP addresses")
 		hosts, err := NodeSSHHosts(c)
@@ -70,7 +65,7 @@ var _ = Describe("SSH", func() {
 		for _, testCase := range testCases {
 			By(fmt.Sprintf("SSH'ing to all nodes and running %s", testCase.cmd))
 			for _, host := range hosts {
-				stdout, stderr, code, err := SSH(testCase.cmd, host, provider)
+				stdout, stderr, code, err := SSH(testCase.cmd, host, testContext.Provider)
 				stdout, stderr = strings.TrimSpace(stdout), strings.TrimSpace(stderr)
 				if err != testCase.expectedError {
 					Failf("Ran %s on %s, got error %v, expected %v", testCase.cmd, host, err, testCase.expectedError)
@@ -96,7 +91,7 @@ var _ = Describe("SSH", func() {
 
 		// Quickly test that SSH itself errors correctly.
 		By("SSH'ing to a nonexistent host")
-		if _, _, _, err = SSH(`echo "hello"`, "i.do.not.exist", provider); err == nil {
+		if _, _, _, err = SSH(`echo "hello"`, "i.do.not.exist", testContext.Provider); err == nil {
 			Failf("Expected error trying to SSH to nonexistent host.")
 		}
 	})
