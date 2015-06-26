@@ -255,8 +255,8 @@ func (*SimpleRoot) IsAnAPIObject() {}
 
 type SimpleGetOptions struct {
 	api.TypeMeta `json:",inline"`
-	Param1       string `json:"param1"`
-	Param2       string `json:"param2"`
+	Param1       string `json:"param1" description:"description for param1"`
+	Param2       string `json:"param2" description:"description for param2"`
 	Path         string `json:"atAPath"`
 }
 
@@ -1078,6 +1078,47 @@ func TestGetBinary(t *testing.T) {
 	}
 }
 
+func validateSimpleGetOptionsParams(t *testing.T, route *restful.Route) {
+	// Validate name and description
+	expectedParams := map[string]string{
+		"param1":  "description for param1",
+		"param2":  "description for param2",
+		"atAPath": "",
+	}
+	for _, p := range route.ParameterDocs {
+		data := p.Data()
+		if desc, exists := expectedParams[data.Name]; exists {
+			if desc != data.Description {
+				t.Errorf("unexpected description for parameter %s: %s\n", data.Name, data.Description)
+			}
+			delete(expectedParams, data.Name)
+		}
+	}
+	if len(expectedParams) > 0 {
+		t.Errorf("did not find all expected parameters: %#v", expectedParams)
+	}
+}
+
+func TestGetWithOptionsRouteParams(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := GetWithOptionsRESTStorage{
+		SimpleRESTStorage: &SimpleRESTStorage{},
+	}
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	ws := handler.(*defaultAPIServer).container.RegisteredWebServices()
+	if len(ws) == 0 {
+		t.Fatal("no web services registered")
+	}
+	routes := ws[0].Routes()
+	for i := range routes {
+		if routes[i].Method == "GET" && routes[i].Operation == "readNamespacedSimple" {
+			validateSimpleGetOptionsParams(t, &routes[i])
+			break
+		}
+	}
+}
+
 func TestGetWithOptions(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := GetWithOptionsRESTStorage{
@@ -1289,6 +1330,33 @@ func TestConnect(t *testing.T) {
 	}
 	if string(body) != responseText {
 		t.Errorf("Unexpected response. Expected: %s. Actual: %s.", responseText, string(body))
+	}
+}
+
+func TestConnectWithOptionsRouteParams(t *testing.T) {
+	connectStorage := &ConnecterRESTStorage{
+		connectHandler:      &SimpleConnectHandler{},
+		emptyConnectOptions: &SimpleGetOptions{},
+	}
+	storage := map[string]rest.Storage{
+		"simple":         &SimpleRESTStorage{},
+		"simple/connect": connectStorage,
+	}
+	handler := handle(storage)
+	ws := handler.(*defaultAPIServer).container.RegisteredWebServices()
+	if len(ws) == 0 {
+		t.Fatal("no web services registered")
+	}
+	routes := ws[0].Routes()
+	for i := range routes {
+		switch routes[i].Operation {
+		case "connectGetNamespacedSimpleConnect":
+		case "connectPostNamespacedSimpleConnect":
+		case "connectPutNamespacedSimpleConnect":
+		case "connectDeleteNamespacedSimpleConnect":
+			validateSimpleGetOptionsParams(t, &routes[i])
+
+		}
 	}
 }
 
