@@ -38,9 +38,6 @@ MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
 KUBE_NETWORK="10.240.0.0/16"
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 
-# Optional: Install node monitoring.
-ENABLE_NODE_MONITORING=true
-
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
 LOGGING_DESTINATION=elasticsearch

@@ -203,7 +203,6 @@ rax-boot-minions() {
         -e "s|DNS_SERVER_IP|${DNS_SERVER_IP:-}|" \
         -e "s|DNS_DOMAIN|${DNS_DOMAIN:-}|" \
         -e "s|ENABLE_CLUSTER_DNS|${ENABLE_CLUSTER_DNS:-false}|" \
-        -e "s|ENABLE_NODE_MONITORING|${ENABLE_NODE_MONITORING:-false}|" \
         -e "s|ENABLE_NODE_LOGGING|${ENABLE_NODE_LOGGING:-false}|" \
         -e "s|INDEX|$((i + 1))|g" \
         -e "s|KUBELET_TOKEN|${KUBELET_TOKEN}|" \

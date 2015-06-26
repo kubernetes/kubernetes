@@ -47,9 +47,6 @@ MINION_SCOPES=("storage-ro" "compute-rw" "https://www.googleapis.com/auth/loggin
 POLL_SLEEP_INTERVAL=3
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
 
-# Optional: Install node monitoring.
-ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
-
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none     - No cluster monitoring setup
 #   influxdb - Heapster, InfluxDB, and Grafana
