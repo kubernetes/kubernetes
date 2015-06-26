@@ -12350,7 +12350,7 @@
       "description": "DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"
      },
      "nodeSelector": {
-      "type": "any",
+      "type": "string",
       "description": "selector which must match a node's labels for the pod to be scheduled on that node"
      },
      "serviceAccountName": {

@@ -902,7 +902,7 @@ type PodSpec struct {
 	// Required: Set DNS policy.
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	NodeSelector string `json:"nodeSelector,omitempty"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod
 	// The pod will be allowed to use secrets referenced by the ServiceAccount

@@ -1299,14 +1299,7 @@ func deepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 		out.ActiveDeadlineSeconds = nil
 	}
 	out.DNSPolicy = in.DNSPolicy
-	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
-		}
-	} else {
-		out.NodeSelector = nil
-	}
+	out.NodeSelector = in.NodeSelector
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork

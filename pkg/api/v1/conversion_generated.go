@@ -1510,14 +1510,7 @@ func convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 		out.ActiveDeadlineSeconds = nil
 	}
 	out.DNSPolicy = DNSPolicy(in.DNSPolicy)
-	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
-		}
-	} else {
-		out.NodeSelector = nil
-	}
+	out.NodeSelector = in.NodeSelector
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
@@ -3822,14 +3815,7 @@ func convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 		out.ActiveDeadlineSeconds = nil
 	}
 	out.DNSPolicy = api.DNSPolicy(in.DNSPolicy)
-	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
-		}
-	} else {
-		out.NodeSelector = nil
-	}
+	out.NodeSelector = in.NodeSelector
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork

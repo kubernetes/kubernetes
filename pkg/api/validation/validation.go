@@ -67,6 +67,15 @@ func ValidateLabels(labels map[string]string, field string) errs.ValidationError
 	return allErrs
 }
 
+// ValidateSelector validates label selector.
+func ValidateSelector(selector string, field string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if _, err := labels.Parse(selector); err != nil {
+		allErrs = append(allErrs, errs.NewFieldInvalid(field, selector, "must be a valid label selector"))
+	}
+	return allErrs
+}
+
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, field string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -947,7 +956,7 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	allErrs = append(allErrs, validateContainers(spec.Containers, allVolumes).Prefix("containers")...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy).Prefix("restartPolicy")...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy).Prefix("dnsPolicy")...)
-	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, "nodeSelector")...)
+	allErrs = append(allErrs, ValidateSelector(spec.NodeSelector, "nodeSelector")...)
 	allErrs = append(allErrs, validateHostNetwork(spec.HostNetwork, spec.Containers).Prefix("hostNetwork")...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets).Prefix("imagePullSecrets")...)
 	if len(spec.ServiceAccountName) > 0 {

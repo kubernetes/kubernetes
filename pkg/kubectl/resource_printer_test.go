@@ -805,9 +805,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 							},
 							RestartPolicy: api.RestartPolicyAlways,
 							DNSPolicy:     api.DNSDefault,
-							NodeSelector: map[string]string{
-								"baz": "blah",
-							},
+							NodeSelector:  "baz=blah",
 						},
 					},
 				},
