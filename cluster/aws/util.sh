@@ -836,7 +836,7 @@ function kube-up {
       wait-for-instance-running $master_id
 
       # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
-      # TODO: Wait for volume to be ready in setup-master-pd.sh
+      # To work around this, we wait for volume to be ready in setup-master-pd.sh
       echo "Attaching peristent data volume (${MASTER_DISK_ID}) to master"
       $AWS_CMD attach-volume --volume-id ${MASTER_DISK_ID} --device /dev/sdb --instance-id ${master_id}
 

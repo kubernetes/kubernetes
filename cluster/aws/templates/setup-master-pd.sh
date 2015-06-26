@@ -17,6 +17,18 @@
 # Format and mount the disk, create directories on it for all of the master's
 # persistent data, and link them to where they're used.
 
+echo "Waiting for master pd to be attached"
+attempt=0
+while true; do
+  echo Attempt "$(($attempt+1))" to check for /dev/xvdb
+  if [[ -e /dev/xvdb ]]; then
+    echo "Found /dev/xvdb"
+    break
+  fi
+  attempt=$(($attempt+1))
+  sleep 1
+done
+
 # Mount Master Persistent Disk
 echo "Mounting master-pd"
 mkdir -p /mnt/master-pd
