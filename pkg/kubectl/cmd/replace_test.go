@@ -25,7 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
-func TestUpdateObject(t *testing.T) {
+func TestReplaceObject(t *testing.T) {
 	_, _, rc := testData()
 
 	f, tf, codec := NewAPIFactory()
@@ -47,7 +47,7 @@ func TestUpdateObject(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdUpdate(f, buf)
+	cmd := NewCmdReplace(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
@@ -66,7 +66,7 @@ func TestUpdateObject(t *testing.T) {
 	}
 }
 
-func TestUpdateMultipleObject(t *testing.T) {
+func TestReplaceMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
 	f, tf, codec := NewAPIFactory()
@@ -92,7 +92,7 @@ func TestUpdateMultipleObject(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdUpdate(f, buf)
+	cmd := NewCmdReplace(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
 	cmd.Run(cmd, []string{})
@@ -111,7 +111,7 @@ func TestUpdateMultipleObject(t *testing.T) {
 	}
 }
 
-func TestUpdateDirectory(t *testing.T) {
+func TestReplaceDirectory(t *testing.T) {
 	_, svc, rc := testData()
 
 	f, tf, codec := NewAPIFactory()
@@ -137,7 +137,7 @@ func TestUpdateDirectory(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdUpdate(f, buf)
+	cmd := NewCmdReplace(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
 	cmd.Flags().Set("namespace", "test")
 	cmd.Run(cmd, []string{})
@@ -157,7 +157,7 @@ func TestUpdateDirectory(t *testing.T) {
 	}
 }
 
-func TestForceUpdateObjectNotFound(t *testing.T) {
+func TestForceReplaceObjectNotFound(t *testing.T) {
 	_, _, rc := testData()
 
 	f, tf, codec := NewAPIFactory()
@@ -179,7 +179,7 @@ func TestForceUpdateObjectNotFound(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdUpdate(f, buf)
+	cmd := NewCmdReplace(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
 	cmd.Flags().Set("force", "true")
 	cmd.Flags().Set("cascade", "false")

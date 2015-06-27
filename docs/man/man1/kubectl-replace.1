@@ -3,17 +3,17 @@
 
 .SH NAME
 .PP
-kubectl update \- Update a resource by filename or stdin.
+kubectl replace \- Replace a resource by filename or stdin.
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl update\fP [OPTIONS]
+\fBkubectl replace\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-Update a resource by filename or stdin.
+Replace a resource by filename or stdin.
 
 .PP
 JSON and YAML formats are accepted.
@@ -22,11 +22,11 @@ JSON and YAML formats are accepted.
 .SH OPTIONS
 .PP
 \fB\-\-cascade\fP=false
-    Only relevant during a force update. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.
+    Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.
 
 .PP
 \fB\-f\fP, \fB\-\-filename\fP=[]
-    Filename, directory, or URL to file to use to update the resource.
+    Filename, directory, or URL to file to use to replace the resource.
 
 .PP
 \fB\-\-force\fP=false
@@ -34,19 +34,15 @@ JSON and YAML formats are accepted.
 
 .PP
 \fB\-\-grace\-period\fP=\-1
-    Only relevant during a force update. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.
+    Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.
 
 .PP
 \fB\-h\fP, \fB\-\-help\fP=false
-    help for update
-
-.PP
-\fB\-\-patch\fP=""
-    A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.
+    help for replace
 
 .PP
 \fB\-\-timeout\fP=0
-    Only relevant during a force update. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object
+    Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -152,17 +148,14 @@ JSON and YAML formats are accepted.
 .RS
 
 .nf
-// Update a pod using the data in pod.json.
-$ kubectl update \-f pod.json
+// Replace a pod using the data in pod.json.
+$ kubectl replace \-f pod.json
 
-// Update a pod based on the JSON passed into stdin.
-$ cat pod.json | kubectl update \-f \-
+// Replace a pod based on the JSON passed into stdin.
+$ cat pod.json | kubectl replace \-f \-
 
-// Partially update a node using strategic merge patch
-kubectl \-\-api\-version=v1 update node k8s\-node\-1 \-\-patch='\{"spec":\{"unschedulable":true\}\}'
-
-// Force update, delete and then re\-create the resource
-kubectl update \-\-force \-f pod.json
+// Force replace, delete and then re\-create the resource
+kubectl replace \-\-force \-f pod.json
 
 .fi
 .RE

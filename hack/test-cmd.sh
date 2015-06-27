@@ -377,21 +377,13 @@ for version in "${kube_api_versions[@]}"; do
   kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
-
-  ## --patch update pod can change image
-  # Pre-condition: valid-pod POD is running
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+ 
+  ## --force replace pod can change other field, e.g., spec.container.name
   # Command
-  kubectl update "${kube_flags[@]}" pod valid-pod --patch='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
-  # Post-condition: valid-pod POD has image nginx
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
-
-  ## --force update pod can change other field, e.g., spec.container.name
-  # Command
-  kubectl get "${kube_flags[@]}" pod valid-pod -o json | sed 's/"kubernetes-serve-hostname"/"update-k8s-serve-hostname"/g' > tmp-valid-pod.json
-  kubectl update "${kube_flags[@]}" --force -f tmp-valid-pod.json
-  # Post-condition: spec.container.name = "update-k8s-serve-hostname"
-  kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'update-k8s-serve-hostname'
+  kubectl get "${kube_flags[@]}" pod valid-pod -o json | sed 's/"kubernetes-serve-hostname"/"replaced-k8s-serve-hostname"/g' > tmp-valid-pod.json
+  kubectl replace "${kube_flags[@]}" --force -f tmp-valid-pod.json
+  # Post-condition: spec.container.name = "replaced-k8s-serve-hostname"
+  kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'replaced-k8s-serve-hostname'
 
   ### Overwriting an existing label is not permitted
   # Pre-condition: name is valid-pod
@@ -528,7 +520,7 @@ __EOF__
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:service-.*-test:'
 
   ### Identity
-  kubectl get service "${kube_flags[@]}" service-${version}-test -o json | kubectl update "${kube_flags[@]}" -f -
+  kubectl get service "${kube_flags[@]}" service-${version}-test -o json | kubectl replace "${kube_flags[@]}" -f -
 
   ### Delete services by id
   # Pre-condition: redis-master-service service is running
@@ -710,16 +702,6 @@ __EOF__
   kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
 
   kube::test::describe_object_assert nodes "127.0.0.1" "Name:" "Labels:" "CreationTimestamp:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
-
-  ### --patch update can mark node unschedulable
-  # Pre-condition: node is schedulable
-  kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
-  kubectl update "${kube_flags[@]}" nodes "127.0.0.1" --patch='{"spec":{"unschedulable":true}}'
-  # Post-condition: node is unschedulable
-  kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" 'true'
-  kubectl update "${kube_flags[@]}" nodes "127.0.0.1" --patch='{"spec":{"unschedulable":null}}'
-  # Post-condition: node is schedulable
-  kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
 
   ###########
   # Nodes #

@@ -44,7 +44,7 @@ pods are replicated, upgrades can be done without special coordination.
 
 If you want more control over the upgrading process, you may use the following workflow:
   1. Mark the node to be rebooted as unschedulable:
-    `kubectl update nodes $NODENAME --patch='{"apiVersion": "v1", "spec": {"unschedulable": true}}'`. 
+    `kubectl replace nodes $NODENAME --patch='{"apiVersion": "v1", "spec": {"unschedulable": true}}'`. 
     This keeps new pods from landing on the node while you are trying to get them off.
   1. Get the pods off the machine, via any of the following strategies:
     1. wait for finite-duration pods to complete
@@ -53,7 +53,7 @@ If you want more control over the upgrading process, you may use the following w
     1. for pods with no replication controller, you need to bring up a new copy of the pod, and assuming it is not part of a service, redirect clients to it.
   1. Work on the node
   1. Make the node schedulable again:
-    `kubectl update nodes $NODENAME --patch='{"apiVersion": "v1", "spec": {"unschedulable": false}}'`.  
+    `kubectl replace nodes $NODENAME --patch='{"apiVersion": "v1", "spec": {"unschedulable": false}}'`.  
     If you deleted the node's VM instance and created a new one, then a new schedulable node resource will
     be created automatically when you create a new VM instance (if you're using a cloud provider that supports
     node discovery; currently this is only Google Compute Engine, not including CoreOS on Google Compute Engine using kube-register). See [Node](node.md).

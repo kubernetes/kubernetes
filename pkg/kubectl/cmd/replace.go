@@ -19,10 +19,10 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
@@ -31,47 +31,47 @@ import (
 )
 
 const (
-	update_long = `Update a resource by filename or stdin.
+	replace_long = `Replace a resource by filename or stdin.
 
 JSON and YAML formats are accepted.`
-	update_example = `// Update a pod using the data in pod.json.
-$ kubectl update -f pod.json
+	replace_example = `// Replace a pod using the data in pod.json.
+$ kubectl replace -f pod.json
 
-// Update a pod based on the JSON passed into stdin.
-$ cat pod.json | kubectl update -f -
+// Replace a pod based on the JSON passed into stdin.
+$ cat pod.json | kubectl replace -f -
 
-// Partially update a node using strategic merge patch
-kubectl --api-version=v1 update node k8s-node-1 --patch='{"spec":{"unschedulable":true}}'
-
-// Force update, delete and then re-create the resource
-kubectl update --force -f pod.json`
+// Force replace, delete and then re-create the resource
+kubectl replace --force -f pod.json`
 )
 
-func NewCmdUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	var filenames util.StringList
 	cmd := &cobra.Command{
-		Use:     "update -f FILENAME",
-		Short:   "Update a resource by filename or stdin.",
-		Long:    update_long,
-		Example: update_example,
+		Use: "replace -f FILENAME",
+		// update is deprecated.
+		Aliases: []string{"update"},
+		Short:   "Replace a resource by filename or stdin.",
+		Long:    replace_long,
+		Example: replace_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunUpdate(f, out, cmd, args, filenames)
-			cmdutil.CheckCustomErr("Update failed", err)
+			err := RunReplace(f, out, cmd, args, filenames)
+			cmdutil.CheckCustomErr("Replace failed", err)
 		},
 	}
-	usage := "Filename, directory, or URL to file to use to update the resource."
+	usage := "Filename, directory, or URL to file to use to replace the resource."
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmd.MarkFlagRequired("filename")
-	cmd.Flags().String("patch", "", "A JSON document to override the existing resource. The resource is downloaded, patched with the JSON, then updated.")
-	cmd.MarkFlagRequired("patch")
 	cmd.Flags().Bool("force", false, "Delete and re-create the specified resource")
-	cmd.Flags().Bool("cascade", false, "Only relevant during a force update. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
-	cmd.Flags().Int("grace-period", -1, "Only relevant during a force update. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.")
-	cmd.Flags().Duration("timeout", 0, "Only relevant during a force update. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object")
+	cmd.Flags().Bool("cascade", false, "Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
+	cmd.Flags().Int("grace-period", -1, "Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.")
+	cmd.Flags().Duration("timeout", 0, "Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object")
 	return cmd
 }
 
-func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
+func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
+	if os.Args[1] == "update" {
+		printDeprecationWarning("replace", "update")
+	}
 	schema, err := f.Validator()
 	if err != nil {
 		return err
@@ -83,32 +83,12 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	force := cmdutil.GetFlagBool(cmd, "force")
-	patch := cmdutil.GetFlagString(cmd, "patch")
-	if len(filenames) == 0 && len(patch) == 0 {
-		return cmdutil.UsageError(cmd, "Must specify --filename or --patch to update")
-	}
-	if len(filenames) != 0 && len(patch) != 0 {
-		return cmdutil.UsageError(cmd, "Can not specify both --filename and --patch")
-	}
-	if len(filenames) == 0 && force {
-		return cmdutil.UsageError(cmd, "--force can only be used with --filename")
-	}
-
-	// TODO: Make patching work with -f, updating with patched JSON input files
 	if len(filenames) == 0 {
-		name, err := updateWithPatch(cmd, args, f, patch)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(out, "%s\n", name)
-		return nil
-	}
-	if len(filenames) == 0 {
-		return cmdutil.UsageError(cmd, "Must specify --filename to update")
+		return cmdutil.UsageError(cmd, "Must specify --filename to replace")
 	}
 
 	if force {
-		return forceUpdate(f, out, cmd, args, filenames)
+		return forceReplace(f, out, cmd, args, filenames)
 	}
 
 	mapper, typer := f.Object()
@@ -127,11 +107,11 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	return r.Visit(func(info *resource.Info) error {
 		data, err := info.Mapping.Codec.Encode(info.Object)
 		if err != nil {
-			return cmdutil.AddSourceToErr("updating", info.Source, err)
+			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Update(info.Namespace, info.Name, true, data)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, true, data)
 		if err != nil {
-			return cmdutil.AddSourceToErr("updating", info.Source, err)
+			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
 		info.Refresh(obj, true)
 		printObjectSpecificMessage(obj, out)
@@ -140,44 +120,7 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	})
 }
 
-func updateWithPatch(cmd *cobra.Command, args []string, f *cmdutil.Factory, patch string) (string, error) {
-	cmdNamespace, err := f.DefaultNamespace()
-	if err != nil {
-		return "", err
-	}
-
-	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
-		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		ResourceTypeOrNameArgs(false, args...).
-		Flatten().
-		Do()
-	err = r.Err()
-	if err != nil {
-		return "", err
-	}
-	mapping, err := r.ResourceMapping()
-	if err != nil {
-		return "", err
-	}
-	client, err := f.RESTClient(mapping)
-	if err != nil {
-		return "", err
-	}
-
-	infos, err := r.Infos()
-	if err != nil {
-		return "", err
-	}
-	name, namespace := infos[0].Name, infos[0].Namespace
-
-	helper := resource.NewHelper(client, mapping)
-	_, err = helper.Patch(namespace, name, api.StrategicMergePatchType, []byte(patch))
-	return name, err
-}
-
-func forceUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
+func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
 	schema, err := f.Validator()
 	if err != nil {
 		return err
@@ -200,7 +143,7 @@ func forceUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	if err != nil {
 		return err
 	}
-	//Update will create a resource if it doesn't exist already, so ignore not found error
+	//Replace will create a resource if it doesn't exist already, so ignore not found error
 	ignoreNotFound := true
 	// By default use a reaper to delete all related resources.
 	if cmdutil.GetFlagBool(cmd, "cascade") {
@@ -245,7 +188,7 @@ func forceUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		return err
 	}
 	if count == 0 {
-		return fmt.Errorf("no objects passed to update")
+		return fmt.Errorf("no objects passed to replace")
 	}
 	return nil
 }

@@ -20,9 +20,9 @@ kubectl_logs.md
 kubectl_namespace.md
 kubectl_port-forward.md
 kubectl_proxy.md
+kubectl_replace.md
 kubectl_rolling-update.md
 kubectl_run.md
 kubectl_scale.md
 kubectl_stop.md
-kubectl_update.md
 kubectl_version.md
