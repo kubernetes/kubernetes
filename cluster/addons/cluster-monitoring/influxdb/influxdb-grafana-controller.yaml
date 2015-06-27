@@ -22,10 +22,6 @@ spec:
       containers: 
         - image: gcr.io/google_containers/heapster_influxdb:v0.3
           name: influxdb
-          resources:
-            limits:
-              cpu: 300m
-              memory: 2Gi
           ports: 
             - containerPort: 8083
               hostPort: 8083
