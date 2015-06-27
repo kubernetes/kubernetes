@@ -27,5 +27,5 @@ spec:
             value: "http://elasticsearch-logging:9200"
         ports:
         - containerPort: 5601
-          name: kibana-port
+          name: ui
           protocol: TCP
