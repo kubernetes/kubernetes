@@ -109,7 +109,7 @@ Create a file named busybox.yaml with the
 following contents:
 
 ```yaml
-apiVersion: v1beta3
+apiVersion: v1
 kind: Pod
 metadata:
   name: busybox
