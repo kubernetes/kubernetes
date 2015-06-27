@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
 )
@@ -45,6 +46,9 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	version, kind, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from %q: %v", source, err)
+	}
+	if ok := registered.IsRegisteredAPIVersion(version); !ok {
+		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", version, source, registered.RegisteredVersions)
 	}
 	if kind == "" {
 		return nil, fmt.Errorf("kind not set in %q", source)
