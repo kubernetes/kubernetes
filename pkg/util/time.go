@@ -59,6 +59,11 @@ func (t Time) Before(u Time) bool {
 	return t.Time.Before(u.Time)
 }
 
+// Equal reports whether the time instant t is equal to u.
+func (t Time) Equal(u Time) bool {
+	return t.Time.Equal(u.Time)
+}
+
 // Unix returns the local time corresponding to the given Unix time
 // by wrapping time.Unix.
 func Unix(sec int64, nsec int64) Time {
