@@ -5,11 +5,11 @@ specific to AWS are documented here, for cross-provider options see [this docume
 
 This is a work-in-progress; not all options are documented yet!
 
-## ZONE
+**KUBE_AWS_ZONE**
 
 The AWS availability zone to deploy to.  Defaults to us-west-2a.
 
-## AWS_IMAGE
+**AWS_IMAGE**
 
 The AMI to use.  If not specified, the image will be selected based on the AWS region.
 
@@ -50,7 +50,7 @@ Please note: Do not set this to "false" unless you...
 - ... already configured a route for "YOUR_IP/32" to an AWS internet gateway (for the master instance to reach your
   client directly during setup)
 
-## DOCKER_STORAGE
+**DOCKER_STORAGE**
 
 Choose the docker storage driver to use.  This is an advanced option; most people should leave it as the default aufs
 for parity with GCE.
