@@ -13403,8 +13403,7 @@
    "v1.ServiceSpec": {
     "id": "v1.ServiceSpec",
     "required": [
-     "ports",
-     "clusterIP"
+     "ports"
     ],
     "properties": {
      "ports": {
@@ -13419,7 +13418,8 @@
       "description": "label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"
      },
      "clusterIP": {
-      "type": "string"
+      "type": "string",
+      "description": "IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail; cannot be updated; 'None' can be specified for a headless service when proxying is not required"
      },
      "type": {
       "type": "string",
@@ -13465,7 +13465,7 @@
      "nodePort": {
       "type": "integer",
       "format": "int32",
-      "description": "the port on each node on which this service is exposed"
+      "description": "the port on each node on which this service is exposed when type=NodePort or LoadBalancer; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail"
      }
     }
    },
