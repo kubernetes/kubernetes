@@ -43,37 +43,28 @@ To show the health check is actually working, first create the pods:
 Check the status of the pods once they are created:
 ```
 # kubectl get pods
-POD             IP           CONTAINER(S)   IMAGE(S)                            HOST                                     LABELS          STATUS    CREATED     MESSAGE
-liveness-exec   10.244.3.7                                                      kubernetes-minion-f08h/130.211.122.180   test=liveness   Running   3 seconds
-                             liveness       gcr.io/google_containers/busybox                                                             Running   2 seconds
-liveness-http   10.244.0.8                                                      kubernetes-minion-0bks/104.197.10.10     test=liveness   Running   3 seconds
-                             liveness       gcr.io/google_containers/liveness                                                            Running   2 seconds
+NAME                                           READY     REASON       RESTARTS   AGE
+[...]
+liveness-exec                                  1/1       Running      0          13s
+liveness-http                                  1/1       Running      0          13s
 ```
-
-Check the status half a minute later, you will see the termination messages:
+Check the status half a minute later, you will see the container restart count being incremented:
 ```
 # kubectl get pods
-POD             IP           CONTAINER(S)   IMAGE(S)                            HOST                                     LABELS          STATUS    CREATED      MESSAGE
-liveness-exec   10.244.3.7                                                      kubernetes-minion-f08h/130.211.122.180   test=liveness   Running   34 seconds
-                             liveness       gcr.io/google_containers/busybox                                                             Running   3 seconds    last termination: exit code 137
-liveness-http   10.244.0.8                                                      kubernetes-minion-0bks/104.197.10.10     test=liveness   Running   34 seconds
-                             liveness       gcr.io/google_containers/liveness                                                            Running   13 seconds   last termination: exit code 2
+mwielgus@mwielgusd:~/test/k2/kubernetes/examples/liveness$ kubectl get pods
+NAME                                           READY     REASON       RESTARTS   AGE
+[...]
+liveness-exec                                  1/1       Running      1          36s
+liveness-http                                  1/1       Running      1          36s
 ```
-The termination messages indicate that the liveness probes have failed, and the containers have been killed and recreated.
+At the bottom of the *kubectl describe* output there are messages indicating that the liveness probes have failed, and the containers have been killed and recreated.
 
-You can also see the container restart count being incremented by running `kubectl describe`.
 ```
-# kubectl describe pods liveness-exec | grep "Restart Count"
-Restart Count:      8
+# kubectl describe pods liveness-exec
+[...]
+Sat, 27 Jun 2015 13:43:03 +0200    Sat, 27 Jun 2015 13:44:34 +0200    4    {kubelet kubernetes-minion-6fbi}    spec.containers{liveness}    unhealthy  Liveness probe failed: cat: can't open '/tmp/health': No such file or directory
+Sat, 27 Jun 2015 13:44:44 +0200    Sat, 27 Jun 2015 13:44:44 +0200    1    {kubelet kubernetes-minion-6fbi}    spec.containers{liveness}    killing    Killing with docker id 65b52d62c635
+Sat, 27 Jun 2015 13:44:44 +0200    Sat, 27 Jun 2015 13:44:44 +0200    1    {kubelet kubernetes-minion-6fbi}    spec.containers{liveness}    created    Created with docker id ed6bb004ee10
+Sat, 27 Jun 2015 13:44:44 +0200    Sat, 27 Jun 2015 13:44:44 +0200    1    {kubelet kubernetes-minion-6fbi}    spec.containers{liveness}    started    Started with docker id ed6bb004ee10
 ```
-
-You would also see the killing and creating events at the bottom of the *kubectl describe* output:
-```
-  Thu, 14 May 2015 15:23:25 -0700       Thu, 14 May 2015 15:23:25 -0700 1       {kubelet kubernetes-minion-0uzf}        spec.containers{liveness}               killing      Killing 88c8b717d8b0940d52743c086b43c3fad0d725a36300b9b5f0ad3a1c8cef2d3e
-  Thu, 14 May 2015 15:23:25 -0700       Thu, 14 May 2015 15:23:25 -0700 1       {kubelet kubernetes-minion-0uzf}        spec.containers{liveness}               created      Created with docker id b254a9810073f9ee9075bb38ac29a4b063647176ad9eabd9184078ca98a60062
-  Thu, 14 May 2015 15:23:25 -0700       Thu, 14 May 2015 15:23:25 -0700 1       {kubelet kubernetes-minion-0uzf}        spec.containers{liveness}               started      Started with docker id b254a9810073f9ee9075bb38ac29a4b063647176ad9eabd9184078ca98a60062
-  ...
-```
-
-
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/liveness/README.md?pixel)]()
