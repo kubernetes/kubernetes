@@ -284,7 +284,7 @@ Loop:
 		if err != nil {
 			return err
 		}
-		cur.append(newFilter(parser.Root, nil, "exist"))
+		cur.append(newFilter(parser.Root, newList(), "exists"))
 	} else {
 		leftParser, err := Parse("left", fmt.Sprintf("${%s}", value[1]))
 		if err != nil {

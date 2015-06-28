@@ -104,7 +104,7 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 	}
 }
 
-// evalInt evalutes IntNode
+// evalInt evaluates IntNode
 func (j *JSONPath) evalInt(input []reflect.Value, node *IntNode) ([]reflect.Value, error) {
 	result := []reflect.Value{}
 	for range input {
@@ -113,7 +113,7 @@ func (j *JSONPath) evalInt(input []reflect.Value, node *IntNode) ([]reflect.Valu
 	return result, nil
 }
 
-// evalFloat evalutes FloatNode
+// evalFloat evaluates FloatNode
 func (j *JSONPath) evalFloat(input []reflect.Value, node *FloatNode) ([]reflect.Value, error) {
 	result := []reflect.Value{}
 	for range input {
@@ -188,6 +188,9 @@ func (j *JSONPath) evalField(input []reflect.Value, node *FieldNode) ([]reflect.
 	results := []reflect.Value{}
 	for _, value := range input {
 		var result reflect.Value
+		if value.Kind() == reflect.Interface {
+			value = reflect.ValueOf(value.Interface())
+		}
 		if value.Kind() == reflect.Struct {
 			result = value.FieldByName(node.Value)
 		} else if value.Kind() == reflect.Map {
@@ -203,7 +206,7 @@ func (j *JSONPath) evalField(input []reflect.Value, node *FieldNode) ([]reflect.
 	return results, nil
 }
 
-// evalWildcard extrac all contents of the given value
+// evalWildcard extract all contents of the given value
 func (j *JSONPath) evalWildcard(input []reflect.Value, node *WildcardNode) ([]reflect.Value, error) {
 	results := []reflect.Value{}
 	for _, value := range input {
@@ -260,21 +263,22 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
 			return input, fmt.Errorf("%v is not array or slice", value)
 		}
-		temp := []reflect.Value{}
 		for i := 0; i < value.Len(); i++ {
-			temp = append(temp, value.Index(i))
-		}
-		lefts, err := j.evalList(temp, node.Left)
-		if err != nil {
-			return input, err
-		}
-		rights, err := j.evalList(temp, node.Right)
-		if err != nil {
-			return input, err
-		}
-		for i := 0; i < value.Len(); i++ {
-			left := lefts[i]
-			right := rights[i]
+			temp := []reflect.Value{value.Index(i)}
+			lefts, err := j.evalList(temp, node.Left)
+			if err != nil {
+				if node.Operator == "exists" {
+					lefts = []reflect.Value{{}}
+				} else {
+					return input, err
+				}
+			}
+			left := lefts[0]
+			rights, err := j.evalList(temp, node.Right)
+			if err != nil {
+				return input, err
+			}
+			right := rights[0]
 			pass := false
 			switch node.Operator {
 			case "<":
@@ -307,26 +311,29 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 
 // evalToText translates reflect value to corresponding text
 func (j *JSONPath) evalToText(v reflect.Value) ([]byte, error) {
-	var text string
+	if v.Kind() == reflect.Interface {
+		v = reflect.ValueOf(v.Interface())
+	}
+	var buffer bytes.Buffer
 	switch v.Kind() {
 	case reflect.Invalid:
 		//pass
 	case reflect.Bool:
 		if variable := v.Bool(); variable {
-			text = "True"
+			buffer.WriteString("True")
 		} else {
-			text = "False"
+			buffer.WriteString("False")
 		}
 	case reflect.Float32:
-		text = strconv.FormatFloat(v.Float(), 'f', -1, 32)
+		buffer.WriteString(strconv.FormatFloat(v.Float(), 'f', -1, 32))
 	case reflect.Float64:
-		text = strconv.FormatFloat(v.Float(), 'f', -1, 64)
+		buffer.WriteString(strconv.FormatFloat(v.Float(), 'f', -1, 64))
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		text = strconv.FormatInt(v.Int(), 10)
+		buffer.WriteString(strconv.FormatInt(v.Int(), 10))
 	case reflect.String:
-		text = v.String()
+		buffer.WriteString(v.String())
 	case reflect.Array, reflect.Slice:
-		buffer := bytes.NewBufferString("[")
+		buffer.WriteString("[")
 		for i := 0; i < v.Len(); i++ {
 			text, err := j.evalToText(v.Index(i))
 			if err != nil {
@@ -338,9 +345,8 @@ func (j *JSONPath) evalToText(v reflect.Value) ([]byte, error) {
 			}
 		}
 		buffer.WriteString("]")
-		return buffer.Bytes(), nil
 	case reflect.Struct:
-		buffer := bytes.NewBufferString("{")
+		buffer.WriteString("{")
 		for i := 0; i < v.NumField(); i++ {
 			text, err := j.evalToText(v.Field(i))
 			if err != nil {
@@ -353,9 +359,23 @@ func (j *JSONPath) evalToText(v reflect.Value) ([]byte, error) {
 			}
 		}
 		buffer.WriteString("}")
-		return buffer.Bytes(), nil
+	case reflect.Map:
+		buffer.WriteString("{")
+		for i, key := range v.MapKeys() {
+			text, err := j.evalToText(v.MapIndex(key))
+			if err != nil {
+				return nil, err
+			}
+			pair := fmt.Sprintf("%s: %s", key, text)
+			buffer.WriteString(pair)
+			if i != len(v.MapKeys())-1 {
+				buffer.WriteString(", ")
+			}
+		}
+		buffer.WriteString("}")
+
 	default:
 		return nil, fmt.Errorf("%v is not printable", v.Kind())
 	}
-	return []byte(text), nil
+	return buffer.Bytes(), nil
 }
