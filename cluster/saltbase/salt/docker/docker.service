@@ -1,0 +1,20 @@
+[Unit]
+Description=Docker Application Container Engine
+Documentation=http://docs.docker.com
+After=network.target docker.socket
+Requires=docker.socket
+
+[Service]
+EnvironmentFile={{ environment_file }}
+ExecStart=/usr/bin/docker -d -H fd:// "$DOCKER_OPTS"
+MountFlags=slave
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+Restart=always
+RestartSec=2s
+StartLimitInterval=0
+
+[Install]
+WantedBy=multi-user.target
+

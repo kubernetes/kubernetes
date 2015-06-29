@@ -119,13 +119,17 @@ addon-dir-create:
     - group: root
     - mode: 755
 
-{% if grains['os_family'] == 'RedHat' %}
+{% if pillar.get('is_systemd') %}
 
-/usr/lib/systemd/system/kube-addons.service:
+{{ pillar.get('systemd_system_path') }}/kube-addons.service:
   file.managed:
     - source: salt://kube-addons/kube-addons.service
     - user: root
     - group: root
+  cmd.wait:
+    - name: /opt/kubernetes/helpers/services bounce kube-addons
+    - watch:
+      - file: {{ pillar.get('systemd_system_path') }}/kube-addons.service
 
 {% else %}
 
@@ -135,8 +139,6 @@ addon-dir-create:
     - user: root
     - group: root
     - mode: 755
-
-{% endif %}
 
 # Stop kube-addons service each time salt is executed, just in case
 # there was a modification of addons.
@@ -151,3 +153,5 @@ kube-addons:
     - enable: True
     - require:
         - service: service-kube-addon-stop
+
+{% endif %}
