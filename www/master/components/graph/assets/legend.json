@@ -1,0 +1,140 @@
+{
+  "nodes": {
+    "Container": {
+      "style": {
+        "size": [24, 24],
+        "radius": 12,
+        "icon": "components/graph/img/icons/Container.svg",
+        "fill": "cornflowerblue",
+        "stroke": "dimgray"
+      },
+      "selected": true,
+      "available": true
+    },
+    "Cluster": {
+      "style": {
+        "size": [34, 34],
+        "radius": 17,
+        "icon": "components/graph/img/icons/Cluster.svg",
+        "fill": "#D32F2F",
+        "stroke": "dimgray"
+      },
+      "selected": false,
+      "available": true
+    },
+    "Node": {
+      "style": {
+        "size": [34, 34],
+        "radius": 17,
+        "icon": "components/graph/img/icons/Node.svg",
+        "fill": "#FF4D81",
+        "stroke": "dimgray"
+      },
+      "selected": false,
+      "available": true
+    },
+    "Process": {
+      "style": {
+        "size": [24, 24],
+        "radius": 12,
+        "icon": "components/graph/img/icons/Process.svg",
+        "fill": "#FF9800",
+        "stroke": "dimgray"
+      },
+      "selected": false,
+      "available": true
+    },
+    "Service": {
+      "style": {
+        "size": [30, 30],
+        "radius": 15,
+        "icon": "components/graph/img/icons/Service.svg",
+        "fill": "#7C4DFF",
+        "stroke": "dimgray"
+      },
+      "selected": true,
+      "available": true
+    },
+    "ReplicationController": {
+      "displayName": "Replication Controller",
+      "style": {
+        "size": [30, 30],
+        "radius": 15,
+        "icon": "components/graph/img/icons/ReplicationController.svg",
+        "fill": "#DE2AFB",
+        "stroke": "dimgray"
+      },
+      "selected": true,
+      "available": true
+    },
+    "Pod": {
+      "style": {
+        "size": [30, 30],
+        "radius": 15,
+        "icon": "components/graph/img/icons/Pod.svg",
+        "fill": "#E91E63",
+        "stroke": "dimgray"
+      },
+      "selected": true,
+      "available": true
+    },
+    "Image": {
+      "style": {
+        "size": [24, 24],
+        "radius": 12,
+        "icon": "components/graph/img/icons/Image.svg",
+        "fill": "#D1C4E9",
+        "stroke": "dimgray"
+      },
+      "selected": false,
+      "available": true
+    }
+  },
+  "links": {
+    "contains": {
+      "available": true,
+      "style": {
+        "dash": "1, 1",
+        "width": 1,
+        "stroke": "gray",
+        "distance": 10
+      }
+    },
+    "runs": {
+      "available": true,
+      "style": {
+        "dash": "5, 5",
+        "width": 1,
+        "stroke": "#FF4D81",
+        "distance": 10
+      }
+    },
+    "balances": {
+      "available": true,
+      "style": {
+        "width": 1,
+        "stroke": "#7C4DFF",
+        "dash": "5, 5",
+        "distance": 15
+      }
+    },
+    "uses": {
+      "available": true,
+      "style": {
+        "width": 1,
+        "stroke": "#D1C4E9",
+        "dash": "5, 5",
+        "distance": 15
+      }
+    },
+    "monitors": {
+      "available": true,
+      "style": {
+        "width": 1,
+        "stroke": "#DE2AFB",
+        "dash": "5, 5",
+        "distance": 15
+      }
+    }
+  }
+}

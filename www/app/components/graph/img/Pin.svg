@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="12px" height="22px" viewBox="0 0 12 22" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:sketch="http://www.bohemiancoding.com/sketch/ns">
+    <!-- Generator: Sketch 3.2.2 (9983) - http://www.bohemiancoding.com/sketch -->
+    <title>pin6</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" sketch:type="MSPage">
+        <path d="M10.99,4 L11,0 L1,0 L1,4 L2,4 L2,8.61224365 L0,10.5531616 L0,14 L4,14 L4,20 L6,21.388855 L8,20 L8,14 L12,14 L12,10.6164551 L10,8.61224365 L10,4 L10.99,4 Z" id="stroke" fill="#FFFFFF" sketch:type="MSShapeGroup"></path>
+        <path d="M9.99,3 L10,1 L2,1 L2,3 L3,3 L3,9 L1,11 L1,13 L5,13 L5,19 L6,20 L7,19 L7,13 L11,13 L11,11 L9,9 L9,3 L9.99,3 Z" id="pin" fill="#010101" sketch:type="MSShapeGroup"></path>
+    </g>
+</svg>

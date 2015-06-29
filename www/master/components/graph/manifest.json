@@ -1,0 +1,16 @@
+{
+  "description": "Force-directed graph for visualizing the Kubernetes cluster configuration and scheduling.",
+  "routes": [
+    {
+      "description": "Force-directed graph visualization.",
+      "url": "/",
+      "templateUrl": "components/graph/pages/home.html"
+    },
+    {
+      "description": "Inspection panel with detailed information about Kubernetes cluster entities.",
+      "url": "/inspect",
+      "templateUrl": "components/graph/pages/inspect.html",
+      "css": "components/graph/css/show-details-table.css"
+    }
+  ]
+}

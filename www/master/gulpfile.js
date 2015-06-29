@@ -73,7 +73,10 @@ var source = {
       'shared/js/modules/controllers/*.js',
       'shared/js/modules/directives/*.js',
       'shared/js/modules/services/*.js',
-      'components/**/js/**/*.js'
+      'components/**/js/modules/*.js',
+      'components/**/js/modules/controllers/*.js',
+      'components/**/js/modules/directives/*.js',
+      'components/**/js/modules/services/*.js'
     ],
     dest: {
       name: 'app.js', 
@@ -290,7 +293,7 @@ gulp.task('styles:app', function() {
 gulp.task('config', gulpsync.sync(['config:base', 'config:copy']));
 
 gulp.task('config:base', function() {
-  return stringSrc('generated-config.js', 'angular.module("kubernetesApp.config", [])' +
+  return stringSrc('generated-config.js', 'angular.module("kubernetesApp.config")' +
                                               '\n' +
                                               '.constant("ENV", {})').pipe(gulp.dest(source.config.dest));
 });
@@ -374,11 +377,13 @@ gulp.task('content:html:views', function() {
 gulp.task('watch', function() {
   livereload.listen();
 
-  gulp.watch(source.html.watch, ['content:html']);
-  gulp.watch(source.scripts.watch, ['scripts:app']);
-  gulp.watch(source.styles.app.watch, ['styles:app']);
-  gulp.watch(source.components.watch, ['copy:components']);
-  gulp.watch(source.assets.watch, ['copy:shared-assets']);
+  gulp.watch([
+    source.assets.watch,
+    source.components.watch, 
+    source.html.watch, 
+    source.scripts.watch, 
+    source.styles.app.watch
+    ], ['compile']);
 
   gulp.watch(['../app/**'])
       .on('change', function(event) {
