@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -115,7 +116,7 @@ func (o createAuthInfoOptions) run() error {
 	authInfo := o.modifyAuthInfo(*startingStanza)
 	config.AuthInfos[o.name] = &authInfo
 
-	if err := ModifyConfig(o.configAccess, *config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
 		return err
 	}
 
@@ -134,6 +135,7 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 			modifiedAuthInfo.ClientCertificateData, _ = ioutil.ReadFile(certPath)
 			modifiedAuthInfo.ClientCertificate = ""
 		} else {
+			certPath, _ = filepath.Abs(certPath)
 			modifiedAuthInfo.ClientCertificate = certPath
 			if len(modifiedAuthInfo.ClientCertificate) > 0 {
 				modifiedAuthInfo.ClientCertificateData = nil
@@ -146,6 +148,7 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 			modifiedAuthInfo.ClientKeyData, _ = ioutil.ReadFile(keyPath)
 			modifiedAuthInfo.ClientKey = ""
 		} else {
+			keyPath, _ = filepath.Abs(keyPath)
 			modifiedAuthInfo.ClientKey = keyPath
 			if len(modifiedAuthInfo.ClientKey) > 0 {
 				modifiedAuthInfo.ClientKeyData = nil

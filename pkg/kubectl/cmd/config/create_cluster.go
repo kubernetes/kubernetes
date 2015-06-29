@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -101,7 +102,7 @@ func (o createClusterOptions) run() error {
 	cluster := o.modifyCluster(*startingStanza)
 	config.Clusters[o.name] = &cluster
 
-	if err := ModifyConfig(o.configAccess, *config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
 		return err
 	}
 
@@ -133,6 +134,7 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 			modifiedCluster.InsecureSkipTLSVerify = false
 			modifiedCluster.CertificateAuthority = ""
 		} else {
+			caPath, _ = filepath.Abs(caPath)
 			modifiedCluster.CertificateAuthority = caPath
 			// Specifying a certificate authority file clears certificate authority data and insecure mode
 			if caPath != "" {

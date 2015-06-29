@@ -187,8 +187,9 @@ func (o *PathOptions) GetExplicitFile() string {
 // uses the default destination file to write the results into.  This results in multiple file reads, but it's very easy to follow.
 // Preferences and CurrentContext should always be set in the default destination file.  Since we can't distinguish between empty and missing values
 // (no nil strings), we're forced have separate handling for them.  In the kubeconfig cases, newConfig should have at most one difference,
-// that means that this code will only write into a single file.
-func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) error {
+// that means that this code will only write into a single file.  If you want to relativizePaths, you must provide a fully qualified path in any
+// modified element.
+func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, relativizePaths bool) error {
 	startingConfig, err := configAccess.GetStartingConfig()
 	if err != nil {
 		return err
@@ -223,7 +224,14 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) erro
 			}
 
 			configToWrite := getConfigFromFileOrDie(destinationFile)
-			configToWrite.Clusters[key] = cluster
+			t := *cluster
+			configToWrite.Clusters[key] = &t
+			configToWrite.Clusters[key].LocationOfOrigin = destinationFile
+			if relativizePaths {
+				if err := clientcmd.RelativizeClusterLocalPaths(configToWrite.Clusters[key]); err != nil {
+					return err
+				}
+			}
 
 			if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
 				return err
@@ -257,7 +265,14 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) erro
 			}
 
 			configToWrite := getConfigFromFileOrDie(destinationFile)
-			configToWrite.AuthInfos[key] = authInfo
+			t := *authInfo
+			configToWrite.AuthInfos[key] = &t
+			configToWrite.AuthInfos[key].LocationOfOrigin = destinationFile
+			if relativizePaths {
+				if err := clientcmd.RelativizeAuthInfoLocalPaths(configToWrite.AuthInfos[key]); err != nil {
+					return err
+				}
+			}
 
 			if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
 				return err

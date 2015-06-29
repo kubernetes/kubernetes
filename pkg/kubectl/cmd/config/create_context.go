@@ -88,7 +88,7 @@ func (o createContextOptions) run() error {
 	context := o.modifyContext(*startingStanza)
 	config.Contexts[o.name] = &context
 
-	if err := ModifyConfig(o.configAccess, *config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
 		return err
 	}
 
