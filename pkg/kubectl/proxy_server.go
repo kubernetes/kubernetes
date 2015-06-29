@@ -152,6 +152,12 @@ func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string,
 		// Require user to explicitly request this behavior rather than
 		// serving their working directory by default.
 		mux.Handle(staticPrefix, newFileHandler(staticPrefix, filebase))
+	} else {
+		if !strings.HasPrefix(staticPrefix, "/static") {
+			proxyServer = stripLeaveSlash(staticPrefix, proxyServer)
+		}
+
+		mux.Handle(staticPrefix, proxyServer)
 	}
 	return &ProxyServer{handler: mux}, nil
 }
