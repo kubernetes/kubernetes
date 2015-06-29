@@ -64,6 +64,13 @@ func isStatusEqual(oldStatus, status *api.PodStatus) bool {
 }
 
 func (s *statusManager) Start() {
+	// Don't start the status manager if we don't have a client. This will happen
+	// on the master, where the kubelet is responsible for bootstrapping the pods
+	// of the master components.
+	if s.kubeClient == nil {
+		glog.Infof("Kubernetes client is nil, not starting status manager.")
+		return
+	}
 	// syncBatch blocks when no updates are available, we can run it in a tight loop.
 	glog.Info("Starting to sync pod status with apiserver")
 	go util.Forever(func() {
@@ -142,10 +149,6 @@ func (s *statusManager) RemoveOrphanedStatuses(podFullNames map[string]bool) {
 
 // syncBatch syncs pods statuses with the apiserver.
 func (s *statusManager) syncBatch() error {
-	if s.kubeClient == nil {
-		glog.V(4).Infof("Kubernetes client is nil, skipping pod status updates")
-		return nil
-	}
 	syncRequest := <-s.podStatusChannel
 	pod := syncRequest.pod
 	podFullName := kubecontainer.GetPodFullName(pod)
