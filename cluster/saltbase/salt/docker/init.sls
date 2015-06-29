@@ -112,6 +112,8 @@ lxc-docker-{{ override_docker_ver }}:
   pkg.installed:
     - sources:
       - lxc-docker-{{ override_docker_ver }}: /var/cache/docker-install/{{ override_deb }}
+    - require:
+      - file: /var/cache/docker-install/{{ override_deb }}
 {% endif %}
 
 docker:
