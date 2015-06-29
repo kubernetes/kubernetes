@@ -45,7 +45,7 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
 
 .PP
 \fB\-o\fP, \fB\-\-output\fP=""
-    Output format. One of: json|yaml|template|templatefile.
+    Output format. One of: json|yaml|template|templatefile|wide.
 
 .PP
 \fB\-\-output\-version\fP=""
@@ -175,6 +175,9 @@ of the \-\-template flag, you can filter the attributes of the fetched resource(
 // List all pods in ps output format.
 $ kubectl get pods
 
+// List all pods in ps output format with more information (such as node name).
+$ kubectl get pods \-o wide
+
 // List a single replication controller with specified NAME in ps output format.
 $ kubectl get replicationcontroller web
 
@@ -187,7 +190,7 @@ $ kubectl get \-o template web\-pod\-13je7 \-\-template=\{\{.status.phase\}\} \-
 // List all replication controllers and services together in ps output format.
 $ kubectl get rc,services
 
-// List one or more resources by their type and names
+// List one or more resources by their type and names.
 $ kubectl get rc/web service/frontend pods/web\-pod\-13je7
 
 .fi

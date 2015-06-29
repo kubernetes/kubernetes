@@ -275,6 +275,15 @@ func GetFlagStringList(cmd *cobra.Command, flag string) util.StringList {
 	return *f.Value.(*util.StringList)
 }
 
+// GetWideFlag is used to determine if "-o wide" is used
+func GetWideFlag(cmd *cobra.Command) bool {
+	f := cmd.Flags().Lookup("output")
+	if f.Value.String() == "wide" {
+		return true
+	}
+	return false
+}
+
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	f := getFlag(cmd, flag)
 	result, err := strconv.ParseBool(f.Value.String())

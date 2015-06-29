@@ -140,7 +140,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func() (validation.Schema, error) {
@@ -194,7 +194,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
 		},
 		Validator: func() (validation.Schema, error) {
@@ -243,7 +243,7 @@ func stringBody(body string) io.ReadCloser {
 
 func ExamplePrintReplicationController() {
 	f, tf, codec := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, []string{})
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, false, []string{})
 	tf.Client = &client.FakeRESTClient{
 		Codec:  codec,
 		Client: nil,
@@ -279,6 +279,38 @@ func ExamplePrintReplicationController() {
 	// Output:
 	// CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS
 	// foo          foo            someimage   foo=bar    1
+}
+
+func ExamplePrintPodWithWideFormat() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false, false, true, []string{})
+	tf.Client = &client.FakeRESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	nodeName := "kubernetes-minion-abcd"
+	cmd := NewCmdRun(f, os.Stdout)
+	ctrl := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "test1"},
+		Spec: api.PodSpec{
+			Containers: make([]api.Container, 2),
+			NodeName:   nodeName,
+		},
+		Status: api.PodStatus{
+			Phase: "podPhase",
+			ContainerStatuses: []api.ContainerStatus{
+				{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				{RestartCount: 3},
+			},
+		},
+	}
+	err := f.PrintObject(cmd, ctrl, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      READY     REASON     RESTARTS   AGE       NODE
+	// test1     1/2       podPhase   6          292y      kubernetes-minion-abcd
 }
 
 func TestNormalizationFuncGlobalExistance(t *testing.T) {
