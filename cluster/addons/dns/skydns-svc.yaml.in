@@ -1,4 +1,4 @@
-apiVersion: v1beta3
+apiVersion: v1
 kind: Service
 metadata:
   name: kube-dns
@@ -10,7 +10,7 @@ metadata:
 spec:
   selector:
     k8s-app: kube-dns
-  portalIP:  {{ pillar['dns_server'] }}
+  clusterIP:  {{ pillar['dns_server'] }}
   ports:
   - name: dns
     port: 53

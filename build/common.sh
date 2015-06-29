@@ -648,9 +648,6 @@ function kube::release::create_docker_images_for_server() {
 
         kube::log::status "Deleting docker image ${docker_image_tag}"
         "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
-
-        # Now, that we have created docker images we can safely delete raw binary.
-        rm -f $1/${binary_name}
       ) &
     done
 
