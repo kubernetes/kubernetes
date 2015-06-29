@@ -196,6 +196,11 @@ var _ = Describe("Addon update", func() {
 	var namespace *api.Namespace
 
 	BeforeEach(func() {
+		// This test requires SSH, so the provider check should be identical to
+		// those tests.
+		if !providerIs("gce") {
+			return
+		}
 		var err error
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
@@ -211,6 +216,11 @@ var _ = Describe("Addon update", func() {
 	})
 
 	AfterEach(func() {
+		// This test requires SSH, so the provider check should be identical to
+		// those tests.
+		if !providerIs("gce") {
+			return
+		}
 		if sshClient != nil {
 			// restart addon_update with the default options
 			sshExec(sshClient, "sudo /etc/init.d/kube-addons restart")
@@ -226,13 +236,13 @@ var _ = Describe("Addon update", func() {
 
 	// WARNING: the test is not parallel-friendly!
 	It("should propagate add-on file changes", func() {
-		//these tests are long, so I squeezed several cases in one scenario
-		Expect(sshClient).NotTo(BeNil())
-		dir = namespace.Name // we use it only to give a unique string for each test execution
-
 		// This test requires SSH, so the provider check should be identical to
 		// those tests.
 		SkipUnlessProviderIs("gce")
+
+		//these tests are long, so I squeezed several cases in one scenario
+		Expect(sshClient).NotTo(BeNil())
+		dir = namespace.Name // we use it only to give a unique string for each test execution
 
 		temporaryRemotePathPrefix := "addon-test-dir"
 		temporaryRemotePath := temporaryRemotePathPrefix + "/" + dir                  // in home directory on kubernetes-master
