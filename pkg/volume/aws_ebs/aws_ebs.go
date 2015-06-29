@@ -73,7 +73,7 @@ func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, pod *api
 	return plugin.newBuilderInternal(spec, pod.UID, &AWSDiskUtil{}, mounter)
 }
 
-func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Builder, error) {
 	var ebs *api.AWSElasticBlockStoreVolumeSource
 	if spec.VolumeSource.AWSElasticBlockStore != nil {
 		ebs = spec.VolumeSource.AWSElasticBlockStore
@@ -108,7 +108,7 @@ func (plugin *awsElasticBlockStorePlugin) NewCleaner(volName string, podUID type
 	return plugin.newCleanerInternal(volName, podUID, &AWSDiskUtil{}, mounter)
 }
 
-func (plugin *awsElasticBlockStorePlugin) newCleanerInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *awsElasticBlockStorePlugin) newCleanerInternal(volName string, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Cleaner, error) {
 	return &awsElasticBlockStore{
 		podUID:      podUID,
 		volName:     volName,
@@ -120,7 +120,7 @@ func (plugin *awsElasticBlockStorePlugin) newCleanerInternal(volName string, pod
 }
 
 // Abstract interface to PD operations.
-type pdManager interface {
+type ebsManager interface {
 	// Attaches the disk to the kubelet's host machine.
 	AttachAndMountDisk(ebs *awsElasticBlockStore, globalPDPath string) error
 	// Detaches the disk from the kubelet's host machine.
@@ -141,7 +141,7 @@ type awsElasticBlockStore struct {
 	// Specifies whether the disk will be attached as read-only.
 	readOnly bool
 	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager pdManager
+	manager ebsManager
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	// diskMounter provides the interface that is used to mount the actual block device.
