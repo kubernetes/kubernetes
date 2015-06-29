@@ -85,7 +85,7 @@ $ ./bin/km apiserver \
   --address=${servicehost} \
   --mesos_master=${mesos_master} \
   --etcd_servers=http://${servicehost}:4001 \
-  --service-cluster-ip-range=10.10.10.0/24 \
+  --portal_net=10.10.10.0/24 \
   --port=8888 \
   --cloud_provider=mesos \
   --v=1 >apiserver.log 2>&1 &
