@@ -39,20 +39,32 @@ If you want to use custom binaries or pure open source Kubernetes, please contin
 
 ### Starting a cluster
 
-You can install a client and start a cluster with this command:
+You can install a client and start a cluster with either one of these commands (we list both in case only one is installed on your machine):
+
+
+ ```bash
+ curl -sS https://get.k8s.io | bash
+ ```
+
+or
 
 ```bash
-curl -sS https://get.k8s.io | bash
+wget -q -O - https://get.k8s.io | bash
 ```
 
-Once this command completes, you will have a master VM and four worker VMs, running as a Kubernetes cluster. By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](../logging.md), while `heapster` provides [monitoring](../../cluster/addons/cluster-monitoring/README.md) services.
+Once this command completes, you will have a master VM and four worker VMs, running as a Kubernetes cluster.
 
-Alternately, if you prefer, you can download and install the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
+By default, some containers will already be running on your cluster. Containers like `kibana` and `elasticsearch` provide [logging](../logging.md), while `heapster` provides [monitoring](../../cluster/addons/cluster-monitoring/README.md) services.
+
+The script run by the commands above creates a cluster with the name/prefix "kubernetes". It defines one specific cluster config, so you can't run it more than once.
+
+Alternately, you can download and install the latest Kubernetes release from [this page](https://github.com/GoogleCloudPlatform/kubernetes/releases), then run the `<kubernetes>/cluster/kube-up.sh` script to start the cluster:
 
 ```bash
 cd kubernetes
 cluster/kube-up.sh
 ```
+If you want more than one cluster running in your project, want to use a different name, or want a different number of worker nodes, see the `<kubernetes>/cluster/gce/config-default.sh` file for more fine-grained configuration before you start up your cluster.
 
 If you run into trouble, please see the section on [troubleshooting](gce.md#troubleshooting), post to the
 [google-containers group](https://groups.google.com/forum/#!forum/google-containers), or come ask questions on IRC at #google-containers on freenode.
