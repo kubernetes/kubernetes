@@ -31,6 +31,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
+	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
+	schedulerapilatest "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/latest"
 	"github.com/golang/glog"
 )
 
@@ -198,8 +200,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"http-liveness": &api.Pod{},
 		},
 		"../examples": {
-			"pod":         &api.Pod{},
-			"replication": &api.ReplicationController{},
+			"pod":                     &api.Pod{},
+			"replication":             &api.ReplicationController{},
+			"scheduler-policy-config": &schedulerapi.Policy{},
 		},
 		"../examples/rbd/secret": {
 			"ceph-secret": &api.Secret{},
@@ -336,12 +339,20 @@ func TestExampleObjectSchemas(t *testing.T) {
 				t.Logf("skipping : %s/%s\n", path, name)
 				return
 			}
-			if err := latest.Codec.DecodeInto(data, expectedType); err != nil {
-				t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
-				return
-			}
-			if errors := validateObject(expectedType); len(errors) > 0 {
-				t.Errorf("%s did not validate correctly: %v", path, errors)
+			if name == "scheduler-policy-config" {
+				if err := schedulerapilatest.Codec.DecodeInto(data, expectedType); err != nil {
+					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
+					return
+				}
+				//TODO: Add validate method for &schedulerapi.Policy
+			} else {
+				if err := latest.Codec.DecodeInto(data, expectedType); err != nil {
+					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
+					return
+				}
+				if errors := validateObject(expectedType); len(errors) > 0 {
+					t.Errorf("%s did not validate correctly: %v", path, errors)
+				}
 			}
 		})
 		if err != nil {
