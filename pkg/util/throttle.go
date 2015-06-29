@@ -90,20 +90,20 @@ func (t *tickRateLimiter) Stop() {
 	close(t.stop)
 }
 
-func (r *tickRateLimiter) run() {
+func (t *tickRateLimiter) run() {
 	for {
-		if !r.step() {
+		if !t.step() {
 			break
 		}
 	}
 }
 
-func (r *tickRateLimiter) step() bool {
+func (t *tickRateLimiter) step() bool {
 	select {
-	case <-r.ticker:
-		r.increment()
+	case <-t.ticker:
+		t.increment()
 		return true
-	case <-r.stop:
+	case <-t.stop:
 		return false
 	}
 }
