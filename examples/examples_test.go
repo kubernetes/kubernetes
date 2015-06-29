@@ -200,6 +200,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"http-liveness": &api.Pod{},
 		},
 		"../examples": {
+			"multi-pod":               nil,
 			"pod":                     &api.Pod{},
 			"replication":             &api.ReplicationController{},
 			"scheduler-policy-config": &schedulerapi.Policy{},
