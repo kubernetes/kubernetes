@@ -18,6 +18,7 @@ package util
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 // TODO(ArtfulCoder)
@@ -39,4 +40,21 @@ func (at *AtomicValue) Load() interface{} {
 	at.valueMutex.RLock()
 	defer at.valueMutex.RUnlock()
 	return at.value
+}
+
+// HighWaterMark is a thread-safe object for tracking the maximum value seen
+// for some quantity.
+type HighWaterMark int64
+
+// Check returns true iff 'current' is the highest value ever seen.
+func (hwm *HighWaterMark) Check(current int64) bool {
+	for {
+		old := atomic.LoadInt64((*int64)(hwm))
+		if current <= old {
+			return false
+		}
+		if atomic.CompareAndSwapInt64((*int64)(hwm), old, current) {
+			return true
+		}
+	}
 }

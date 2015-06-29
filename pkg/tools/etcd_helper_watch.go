@@ -168,10 +168,11 @@ func newEtcdWatcher(list bool, include includeFunc, filter FilterFunc, encoding 
 		// object. Basically, we see a lot of "401 window exceeded"
 		// errors from etcd, and that's due to the client not streaming
 		// results but rather getting them one at a time. So we really
-		// want to never block the etcd client, if possible. The 50 is
-		// arbitrary; there's a V(4) log message that prints the length
-		// so we can monitor how much of this buffer is actually used.
-		etcdIncoming: make(chan *etcd.Response, 50),
+		// want to never block the etcd client, if possible. The 100 is
+		// mostly arbitrary--we know it goes as high as 50, though.
+		// There's a V(2) log message that prints the length so we can
+		// monitor how much of this buffer is actually used.
+		etcdIncoming: make(chan *etcd.Response, 100),
 		etcdError:    make(chan error, 1),
 		etcdStop:     make(chan bool),
 		outgoing:     make(chan watch.Event),
@@ -235,6 +236,10 @@ func convertRecursiveResponse(node *etcd.Node, response *etcd.Response, incoming
 	incoming <- &copied
 }
 
+var (
+	watchChannelHWM util.HighWaterMark
+)
+
 // translate pulls stuff from etcd, converts, and pushes out the outgoing channel. Meant to be
 // called as a goroutine.
 func (w *etcdWatcher) translate() {
@@ -259,9 +264,9 @@ func (w *etcdWatcher) translate() {
 			return
 		case res, ok := <-w.etcdIncoming:
 			if ok {
-				if curLen := len(w.etcdIncoming); curLen > 0 {
+				if curLen := int64(len(w.etcdIncoming)); watchChannelHWM.Check(curLen) {
 					// Monitor if this gets backed up, and how much.
-					glog.V(4).Infof("watch: %v objects queued in channel.", curLen)
+					glog.V(2).Infof("watch: %v objects queued in channel.", curLen)
 				}
 				w.sendResult(res)
 			}
