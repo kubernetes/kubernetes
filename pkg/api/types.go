@@ -551,7 +551,7 @@ type RBDVolumeSource struct {
 
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
-	// Optional: If specified, this must be a IANA_SVC_NAME  Each named port
+	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
 	// in a pod must have a unique name.
 	Name string `json:"name,omitempty"`
 	// Optional: If specified, this must be a valid port number, 0 < x < 65536.

@@ -529,9 +529,9 @@ type ISCSIVolumeSource struct {
 
 // ContainerPort represents a network port in a single container.
 type ContainerPort struct {
-	// Optional: If specified, this must be a IANA_SVC_NAME  Each named port
+	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
 	// in a pod must have a unique name.
-	Name string `json:"name,omitempty" description:"name for the port that can be referred to by services; must be a IANA_SVC_NAME and unique within the pod"`
+	Name string `json:"name,omitempty" description:"name for the port that can be referred to by services; must be an IANA_SVC_NAME and unique within the pod"`
 	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
 	// If HostNetwork is specified, this must match ContainerPort.
 	HostPort int `json:"hostPort,omitempty" description:"number of port to expose on the host; most containers do not need this"`
@@ -589,7 +589,7 @@ type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `json:"path,omitempty" description:"path to access on the HTTP server"`
 	// Required: Name or number of the port to access on the container.
-	Port util.IntOrString `json:"port" description:"number or name of the port to access on the container; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"`
+	Port util.IntOrString `json:"port" description:"number or name of the port to access on the container; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME"`
 	// Optional: Host name to connect to, defaults to the pod IP.
 	Host string `json:"host,omitempty" description:"hostname to connect to; defaults to pod IP"`
 	// Optional: Scheme to use for connecting to the host, defaults to HTTP.
@@ -609,7 +609,7 @@ const (
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {
 	// Required: Port to connect to.
-	Port util.IntOrString `json:"port" description:"number of name of the port to access on the container; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"`
+	Port util.IntOrString `json:"port" description:"number of name of the port to access on the container; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME"`
 }
 
 // ExecAction describes a "run in container" action.
@@ -1120,7 +1120,7 @@ type ServicePort struct {
 	// If this is a string, it will be looked up as a named port in the
 	// target Pod's container ports.  If this is not specified, the value
 	// of Port is used (an identity map).
-	TargetPort util.IntOrString `json:"targetPort,omitempty" description:"number or name of the port to access on the pods targeted by the service; defaults to the service port; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"`
+	TargetPort util.IntOrString `json:"targetPort,omitempty" description:"number or name of the port to access on the pods targeted by the service; defaults to the service port; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME"`
 
 	// The port on each node on which this service is exposed.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
