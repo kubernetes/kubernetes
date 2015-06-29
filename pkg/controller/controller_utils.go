@@ -31,8 +31,7 @@ import (
 )
 
 const (
-	CreatedByAnnotation = "kubernetes.io/created-by"
-	updateRetries       = 1
+	updateRetries = 1
 )
 
 // Expectations are a way for replication controllers to tell the rc manager what they expect. eg:
@@ -231,7 +230,7 @@ func (r RealPodControl) createReplica(namespace string, controller *api.Replicat
 		return fmt.Errorf("unable to serialize controller reference: %v", err)
 	}
 
-	desiredAnnotations[CreatedByAnnotation] = string(createdByRefJson)
+	desiredAnnotations[api.CreatedByAnnotation] = string(createdByRefJson)
 
 	// use the dash (if the name isn't too long) to make the pod name a bit prettier
 	prefix := fmt.Sprintf("%s-", controller.Name)
@@ -298,6 +297,18 @@ func filterActivePods(pods []api.Pod) []*api.Pod {
 			result = append(result, &pods[i])
 		}
 	}
+	return result
+}
+
+// filterPodsOnMatching returns pods that match the RC
+func filterPodsOnMatching(pods []*api.Pod, rc *api.ReplicationController) []*api.Pod {
+	var result []*api.Pod
+	for i := range pods {
+		if cache.PodMatchesRC(pods[i], rc) {
+			result = append(result, pods[i])
+		}
+	}
+
 	return result
 }
 
