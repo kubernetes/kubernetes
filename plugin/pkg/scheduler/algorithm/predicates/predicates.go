@@ -169,12 +169,15 @@ func NewSelectorMatchPredicate(info NodeInfo) algorithm.FitPredicate {
 	return selector.PodSelectorMatches
 }
 
-func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
+func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) (bool, error) {
 	if len(pod.Spec.NodeSelector) == 0 {
-		return true
+		return true, nil
 	}
-	selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
-	return selector.Matches(labels.Set(node.Labels))
+	selector, err := labels.Parse(pod.Spec.NodeSelector)
+	if err != nil {
+		return false, err
+	}
+	return selector.Matches(labels.Set(node.Labels)), nil
 }
 
 type NodeSelector struct {
@@ -186,7 +189,7 @@ func (n *NodeSelector) PodSelectorMatches(pod *api.Pod, existingPods []*api.Pod,
 	if err != nil {
 		return false, err
 	}
-	return PodMatchesNodeLabels(pod, minion), nil
+	return PodMatchesNodeLabels(pod, minion)
 }
 
 func PodFitsHost(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
@@ -258,61 +261,45 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 
 // CheckServiceAffinity ensures that only the minions that match the specified labels are considered for scheduling.
 // The set of labels to be considered are provided to the struct (ServiceAffinity).
-// The pod is checked for the labels and any missing labels are then checked in the minion
-// that hosts the service pods (peers) for the given pod.
+// The pod is checked for the labels in the minion that hosts the service pods (peers).
 //
 // We add an implicit selector requiring some particular value V for label L to a pod, if:
 // - L is listed in the ServiceAffinity object that is passed into the function
-// - the pod does not have any NodeSelector for L
 // - some other pod from the same service is already scheduled onto a minion that has value V for label L
 func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	var affinitySelector labels.Selector
 
-	// check if the pod being scheduled has the affinity labels specified in its NodeSelector
+	// Note: NewSelectorMatchPredicate handles any affinity labels specified in pod NodeSelector
 	affinityLabels := map[string]string{}
-	nodeSelector := labels.Set(pod.Spec.NodeSelector)
-	labelsExist := true
-	for _, l := range s.labels {
-		if nodeSelector.Has(l) {
-			affinityLabels[l] = nodeSelector.Get(l)
-		} else {
-			// the current pod does not specify all the labels, look in the existing service pods
-			labelsExist = false
+	services, err := s.serviceLister.GetPodServices(pod)
+	if err == nil {
+		// just use the first service and get the other pods within the service
+		// TODO: a separate predicate can be created that tries to handle all services for the pod
+		selector := labels.SelectorFromSet(services[0].Spec.Selector)
+		servicePods, err := s.podLister.List(selector)
+		if err != nil {
+			return false, err
 		}
-	}
-
-	// skip looking at other pods in the service if the current pod defines all the required affinity labels
-	if !labelsExist {
-		services, err := s.serviceLister.GetPodServices(pod)
-		if err == nil {
-			// just use the first service and get the other pods within the service
-			// TODO: a separate predicate can be created that tries to handle all services for the pod
-			selector := labels.SelectorFromSet(services[0].Spec.Selector)
-			servicePods, err := s.podLister.List(selector)
+		// consider only the pods that belong to the same namespace
+		nsServicePods := []*api.Pod{}
+		for _, nsPod := range servicePods {
+			if nsPod.Namespace == pod.Namespace {
+				nsServicePods = append(nsServicePods, nsPod)
+			}
+		}
+		if len(nsServicePods) > 0 {
+			// consider any service pod and fetch the minion its hosted on
+			otherMinion, err := s.nodeInfo.GetNodeInfo(nsServicePods[0].Spec.NodeName)
 			if err != nil {
 				return false, err
 			}
-			// consider only the pods that belong to the same namespace
-			nsServicePods := []*api.Pod{}
-			for _, nsPod := range servicePods {
-				if nsPod.Namespace == pod.Namespace {
-					nsServicePods = append(nsServicePods, nsPod)
+			for _, l := range s.labels {
+				// If the pod being scheduled has the label value specified, do not override it
+				if _, exists := affinityLabels[l]; exists {
+					continue
 				}
-			}
-			if len(nsServicePods) > 0 {
-				// consider any service pod and fetch the minion its hosted on
-				otherMinion, err := s.nodeInfo.GetNodeInfo(nsServicePods[0].Spec.NodeName)
-				if err != nil {
-					return false, err
-				}
-				for _, l := range s.labels {
-					// If the pod being scheduled has the label value specified, do not override it
-					if _, exists := affinityLabels[l]; exists {
-						continue
-					}
-					if labels.Set(otherMinion.Labels).Has(l) {
-						affinityLabels[l] = labels.Set(otherMinion.Labels).Get(l)
-					}
+				if labels.Set(otherMinion.Labels).Has(l) {
+					affinityLabels[l] = labels.Set(otherMinion.Labels).Get(l)
 				}
 			}
 		}

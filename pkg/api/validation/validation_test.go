@@ -173,6 +173,50 @@ func TestValidateLabels(t *testing.T) {
 	}
 }
 
+func TestValidateSelector(t *testing.T) {
+	successCases := []string{
+		"",
+		"simple=bar",
+		"now-with-dashes=bar",
+		"1-starts-with-num=bar",
+		"1234=bar",
+		"simple/simple=bar",
+		"now-with.dashes-and.dots/simple=bar",
+		"1-num.2-num/3-num=bar",
+		"1234/5678=bar",
+		"1.2.3.4/5678=bar",
+		"UpperCaseAreOK123=bar",
+		"goodvalue=123_-.BaR",
+		" check-spaces = bar ,multipleLabels == true ",
+		"check-not-equal!=bar, foo=Bar",
+		"check-in-op in (foo,bar)",
+		"check-notin notin (x,y)",
+		"check-exists-op, bar",
+	}
+	for i := range successCases {
+		errs := ValidateSelector(successCases[i], "field")
+		if len(errs) != 0 {
+			t.Errorf("case[%d] expected success, got %#v", i, errs)
+		}
+	}
+
+	errorCases := []string{
+		"nospecialchars^=@ = bar",
+		"only/one/slash=bar",
+		"strangecharsinvalue= ?#$notsogood",
+		"two-equalities==a==b",
+		"or-operator=a||y=b",
+		"x nott in (y)",
+		"x ,, y",
+	}
+	for i := range errorCases {
+		errs := ValidateSelector(errorCases[i], "field")
+		if len(errs) == 0 {
+			t.Errorf("case[%d] expected failure", i)
+		}
+	}
+}
+
 func TestValidateAnnotations(t *testing.T) {
 	successCases := []map[string]string{
 		{"simple": "bar"},
@@ -1045,11 +1089,9 @@ func TestValidatePodSpec(t *testing.T) {
 			Volumes: []api.Volume{
 				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			RestartPolicy: api.RestartPolicyAlways,
-			NodeSelector: map[string]string{
-				"key": "value",
-			},
+			Containers:            []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy:         api.RestartPolicyAlways,
+			NodeSelector:          "key=value",
 			NodeName:              "foobar",
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
@@ -1119,11 +1161,9 @@ func TestValidatePodSpec(t *testing.T) {
 			Volumes: []api.Volume{
 				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			RestartPolicy: api.RestartPolicyAlways,
-			NodeSelector: map[string]string{
-				"key": "value",
-			},
+			Containers:            []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy:         api.RestartPolicyAlways,
+			NodeSelector:          "key=value",
 			NodeName:              "foobar",
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
@@ -1156,10 +1196,8 @@ func TestValidatePod(t *testing.T) {
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				NodeSelector: map[string]string{
-					"key": "value",
-				},
-				NodeName: "foobar",
+				NodeSelector:  "key=value",
+				NodeName:      "foobar",
 			},
 		},
 	}

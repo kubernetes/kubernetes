@@ -450,9 +450,7 @@ func TestPodFitsSelector(t *testing.T) {
 		{
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
+					NodeSelector: "foo=bar",
 				},
 			},
 			fits: false,
@@ -461,9 +459,7 @@ func TestPodFitsSelector(t *testing.T) {
 		{
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
+					NodeSelector: "foo=bar",
 				},
 			},
 			labels: map[string]string{
@@ -475,9 +471,7 @@ func TestPodFitsSelector(t *testing.T) {
 		{
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
+					NodeSelector: "foo=bar",
 				},
 			},
 			labels: map[string]string{
@@ -490,10 +484,7 @@ func TestPodFitsSelector(t *testing.T) {
 		{
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
+					NodeSelector: "foo=bar, baz=blah",
 				},
 			},
 			labels: map[string]string{
@@ -615,20 +606,6 @@ func TestServiceAffinity(t *testing.T) {
 			fits:   true,
 			labels: []string{"region"},
 			test:   "nothing scheduled",
-		},
-		{
-			pod:    &api.Pod{Spec: api.PodSpec{NodeSelector: map[string]string{"region": "r1"}}},
-			node:   "machine1",
-			fits:   true,
-			labels: []string{"region"},
-			test:   "pod with region label match",
-		},
-		{
-			pod:    &api.Pod{Spec: api.PodSpec{NodeSelector: map[string]string{"region": "r2"}}},
-			node:   "machine1",
-			fits:   false,
-			labels: []string{"region"},
-			test:   "pod with region label mismatch",
 		},
 		{
 			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},

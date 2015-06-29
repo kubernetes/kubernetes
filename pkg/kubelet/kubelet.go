@@ -1623,7 +1623,12 @@ func (kl *Kubelet) checkNodeSelectorMatching(pods []*api.Pod) (fitting []*api.Po
 		return pods, nil
 	}
 	for _, pod := range pods {
-		if !predicates.PodMatchesNodeLabels(pod, node) {
+		match, err := predicates.PodMatchesNodeLabels(pod, node)
+		if err != nil {
+			glog.Errorf("error matching node selector: %v", err)
+			return pods, nil
+		}
+		if !match {
 			notFitting = append(notFitting, pod)
 			continue
 		}

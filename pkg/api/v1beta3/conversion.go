@@ -19,6 +19,8 @@ package v1beta3
 import (
 	"fmt"
 	"reflect"
+	"regexp"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
@@ -486,12 +488,10 @@ func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s con
 	}
 	out.DNSPolicy = api.DNSPolicy(in.DNSPolicy)
 	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
 		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
+			out.NodeSelector += fmt.Sprintf("%s=%s,", key, val)
 		}
-	} else {
-		out.NodeSelector = nil
+		out.NodeSelector = out.NodeSelector[:len(out.NodeSelector)-1]
 	}
 	out.ServiceAccountName = in.ServiceAccount
 	out.NodeName = in.Host
@@ -547,10 +547,17 @@ func convert_api_PodSpec_To_v1beta3_PodSpec(in *api.PodSpec, out *PodSpec, s con
 		out.ActiveDeadlineSeconds = nil
 	}
 	out.DNSPolicy = DNSPolicy(in.DNSPolicy)
-	if in.NodeSelector != nil {
+	if len(in.NodeSelector) > 0 {
 		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
+		labelStrings := strings.Split(in.NodeSelector, ",")
+		labelPattern := regexp.MustCompile("^\\s*(\\S+)\\s*=\\s*(\\S+)\\s*$")
+		for _, ls := range labelStrings {
+			matches := labelPattern.FindStringSubmatch(ls)
+			if len(matches) != 3 {
+				return fmt.Errorf("failed to convert pod NodeSelector: %s, v1beta3 only supports key=value label selector", in.NodeSelector)
+			} else {
+				out.NodeSelector[matches[1]] = matches[2]
+			}
 		}
 	} else {
 		out.NodeSelector = nil

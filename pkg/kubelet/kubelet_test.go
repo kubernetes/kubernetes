@@ -2065,7 +2065,7 @@ func TestHandleNodeSelector(t *testing.T) {
 				Name:      "podA",
 				Namespace: "foo",
 			},
-			Spec: api.PodSpec{NodeSelector: map[string]string{"key": "A"}},
+			Spec: api.PodSpec{NodeSelector: "key=A"},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -2073,7 +2073,7 @@ func TestHandleNodeSelector(t *testing.T) {
 				Name:      "podB",
 				Namespace: "foo",
 			},
-			Spec: api.PodSpec{NodeSelector: map[string]string{"key": "B"}},
+			Spec: api.PodSpec{NodeSelector: "key=B"},
 		},
 	}
 	// The first pod should be rejected.
