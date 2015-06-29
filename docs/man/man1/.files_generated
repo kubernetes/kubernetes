@@ -19,10 +19,10 @@ kubectl-logs.1
 kubectl-namespace.1
 kubectl-port-forward.1
 kubectl-proxy.1
+kubectl-replace.1
 kubectl-rolling-update.1
 kubectl-run.1
 kubectl-scale.1
 kubectl-stop.1
-kubectl-update.1
 kubectl-version.1
 kubectl.1

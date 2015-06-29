@@ -83,7 +83,7 @@ func updateObject(info *resource.Info, updateFn func(runtime.Object) (runtime.Ob
 		return nil, err
 	}
 
-	_, err = helper.Update(info.Namespace, info.Name, true, data)
+	_, err = helper.Replace(info.Namespace, info.Name, true, data)
 	if err != nil {
 		return nil, err
 	}
