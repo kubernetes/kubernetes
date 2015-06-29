@@ -30,29 +30,29 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&ISCSIPlugin{nil, exec.New()}}
+	return []volume.VolumePlugin{&iscsiPlugin{nil, exec.New()}}
 }
 
-type ISCSIPlugin struct {
+type iscsiPlugin struct {
 	host volume.VolumeHost
 	exe  exec.Interface
 }
 
-var _ volume.VolumePlugin = &ISCSIPlugin{}
+var _ volume.VolumePlugin = &iscsiPlugin{}
 
 const (
-	ISCSIPluginName = "kubernetes.io/iscsi"
+	iscsiPluginName = "kubernetes.io/iscsi"
 )
 
-func (plugin *ISCSIPlugin) Init(host volume.VolumeHost) {
+func (plugin *iscsiPlugin) Init(host volume.VolumeHost) {
 	plugin.host = host
 }
 
-func (plugin *ISCSIPlugin) Name() string {
-	return ISCSIPluginName
+func (plugin *iscsiPlugin) Name() string {
+	return iscsiPluginName
 }
 
-func (plugin *ISCSIPlugin) CanSupport(spec *volume.Spec) bool {
+func (plugin *iscsiPlugin) CanSupport(spec *volume.Spec) bool {
 	if spec.VolumeSource.ISCSI == nil && spec.PersistentVolumeSource.ISCSI == nil {
 		return false
 	}
@@ -67,19 +67,19 @@ func (plugin *ISCSIPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *ISCSIPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+func (plugin *iscsiPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
 		api.ReadOnlyMany,
 	}
 }
 
-func (plugin *ISCSIPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *iscsiPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newBuilderInternal(spec, pod.UID, &ISCSIUtil{}, mounter)
 }
 
-func (plugin *ISCSIPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *iscsiPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
 	var iscsi *api.ISCSIVolumeSource
 	if spec.VolumeSource.ISCSI != nil {
 		iscsi = spec.VolumeSource.ISCSI
@@ -103,12 +103,12 @@ func (plugin *ISCSIPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 	}, nil
 }
 
-func (plugin *ISCSIPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *iscsiPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newCleanerInternal(volName, podUID, &ISCSIUtil{}, mounter)
 }
 
-func (plugin *ISCSIPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
+func (plugin *iscsiPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
 	return &iscsiDisk{
 		podUID:  podUID,
 		volName: volName,
@@ -118,7 +118,7 @@ func (plugin *ISCSIPlugin) newCleanerInternal(volName string, podUID types.UID, 
 	}, nil
 }
 
-func (plugin *ISCSIPlugin) execCommand(command string, args []string) ([]byte, error) {
+func (plugin *iscsiPlugin) execCommand(command string, args []string) ([]byte, error) {
 	cmd := plugin.exe.Command(command, args...)
 	return cmd.CombinedOutput()
 }
@@ -131,14 +131,14 @@ type iscsiDisk struct {
 	readOnly bool
 	lun      string
 	fsType   string
-	plugin   *ISCSIPlugin
+	plugin   *iscsiPlugin
 	mounter  mount.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 }
 
 func (iscsi *iscsiDisk) GetPath() string {
-	name := ISCSIPluginName
+	name := iscsiPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
 	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, util.EscapeQualifiedNameForDisk(name), iscsi.volName)
 }

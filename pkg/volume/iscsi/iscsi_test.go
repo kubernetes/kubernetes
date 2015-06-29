@@ -106,7 +106,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 	fakeManager := &fakeDiskManager{}
 	fakeMounter := &mount.FakeMounter{}
-	builder, err := plug.(*ISCSIPlugin).newBuilderInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
+	builder, err := plug.(*iscsiPlugin).newBuilderInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -141,7 +141,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 
 	fakeManager = &fakeDiskManager{}
-	cleaner, err := plug.(*ISCSIPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
+	cleaner, err := plug.(*iscsiPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
