@@ -108,8 +108,12 @@ func (o createAuthInfoOptions) run() error {
 		return err
 	}
 
-	authInfo := o.modifyAuthInfo(config.AuthInfos[o.name])
-	config.AuthInfos[o.name] = authInfo
+	startingStanza, exists := config.AuthInfos[o.name]
+	if !exists {
+		startingStanza = clientcmdapi.NewAuthInfo()
+	}
+	authInfo := o.modifyAuthInfo(*startingStanza)
+	config.AuthInfos[o.name] = &authInfo
 
 	if err := ModifyConfig(o.configAccess, *config); err != nil {
 		return err

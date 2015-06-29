@@ -38,13 +38,13 @@ func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caConte
 	}
 
 	return Config{
-		AuthInfos: map[string]AuthInfo{
+		AuthInfos: map[string]*AuthInfo{
 			"red-user":  {Token: "red-token", ClientCertificateData: []byte(certContent), ClientKeyData: []byte(keyContent)},
 			"blue-user": {Token: "blue-token", ClientCertificate: certFile, ClientKey: keyFile}},
-		Clusters: map[string]Cluster{
+		Clusters: map[string]*Cluster{
 			"cow-cluster":     {Server: "http://cow.org:8080", CertificateAuthorityData: []byte(caContent)},
 			"chicken-cluster": {Server: "http://chicken.org:8080", CertificateAuthority: caFile}},
-		Contexts: map[string]Context{
+		Contexts: map[string]*Context{
 			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster"},
 			"shaker-context":  {AuthInfo: "blue-user", Cluster: "chicken-cluster"}},
 		CurrentContext: "federal-context",

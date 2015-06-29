@@ -81,8 +81,12 @@ func (o createContextOptions) run() error {
 		return err
 	}
 
-	context := o.modifyContext(config.Contexts[o.name])
-	config.Contexts[o.name] = context
+	startingStanza, exists := config.Contexts[o.name]
+	if !exists {
+		startingStanza = clientcmdapi.NewContext()
+	}
+	context := o.modifyContext(*startingStanza)
+	config.Contexts[o.name] = &context
 
 	if err := ModifyConfig(o.configAccess, *config); err != nil {
 		return err

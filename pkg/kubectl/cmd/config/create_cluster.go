@@ -94,8 +94,12 @@ func (o createClusterOptions) run() error {
 		return err
 	}
 
-	cluster := o.modifyCluster(config.Clusters[o.name])
-	config.Clusters[o.name] = cluster
+	startingStanza, exists := config.Clusters[o.name]
+	if !exists {
+		startingStanza = clientcmdapi.NewCluster()
+	}
+	cluster := o.modifyCluster(*startingStanza)
+	config.Clusters[o.name] = &cluster
 
 	if err := ModifyConfig(o.configAccess, *config); err != nil {
 		return err

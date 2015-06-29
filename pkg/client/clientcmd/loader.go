@@ -226,14 +226,14 @@ func ResolveLocalPaths(filename string, config *clientcmdapi.Config) error {
 		return fmt.Errorf("Could not determine the absolute path of config file %s: %v", filename, err)
 	}
 
-	resolvedClusters := make(map[string]clientcmdapi.Cluster)
+	resolvedClusters := make(map[string]*clientcmdapi.Cluster)
 	for key, cluster := range config.Clusters {
 		cluster.CertificateAuthority = resolveLocalPath(configDir, cluster.CertificateAuthority)
 		resolvedClusters[key] = cluster
 	}
 	config.Clusters = resolvedClusters
 
-	resolvedAuthInfos := make(map[string]clientcmdapi.AuthInfo)
+	resolvedAuthInfos := make(map[string]*clientcmdapi.AuthInfo)
 	for key, authInfo := range config.AuthInfos {
 		authInfo.ClientCertificate = resolveLocalPath(configDir, authInfo.ClientCertificate)
 		authInfo.ClientKey = resolveLocalPath(configDir, authInfo.ClientKey)
