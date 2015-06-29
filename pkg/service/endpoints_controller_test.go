@@ -405,7 +405,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 			Selector: map[string]string{"foo": "bar"},
 			Ports: []api.ServicePort{
 				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)},
-				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
+				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8081)},
 			},
 		},
 	})
@@ -418,7 +418,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		},
 		Ports: []api.EndpointPort{
 			{Name: "port0", Port: 8080, Protocol: "TCP"},
-			{Name: "port1", Port: 8088, Protocol: "TCP"},
+			{Name: "port1", Port: 8081, Protocol: "TCP"},
 		},
 	}}
 	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
@@ -451,7 +451,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 			Selector: map[string]string{"foo": "bar"},
 			Ports: []api.ServicePort{
 				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)},
-				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
+				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8081)},
 			},
 		},
 	})
@@ -464,7 +464,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 		},
 		Ports: []api.EndpointPort{
 			{Name: "port0", Port: 8080, Protocol: "TCP"},
-			{Name: "port1", Port: 8088, Protocol: "TCP"},
+			{Name: "port1", Port: 8081, Protocol: "TCP"},
 		},
 	}}
 	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
