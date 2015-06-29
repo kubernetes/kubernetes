@@ -386,12 +386,21 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 		},
 		Status: api.NamespaceStatus{},
 	}
-	got, err := c.Namespaces().Create(namespaceObj)
-	if err != nil {
-		return got, err
+	// Be robust about making the namespace creation call.
+	var got *api.Namespace
+	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+		var err error
+		got, err = c.Namespaces().Create(namespaceObj)
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, err
 	}
+
 	if err := waitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
-		return got, err
+		return nil, err
 	}
 	return got, nil
 }
