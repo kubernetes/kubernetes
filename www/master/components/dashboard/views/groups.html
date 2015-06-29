@@ -6,14 +6,14 @@
       <div class="header" layout="row">
           <div class="">Group by: </div>
 
-          <md-select placeholder="{{routeParams.grouping}}" class="select-group-by" ng-model="selectedGroupBy" ng-change="changeGroupBy()">
+          <md-select placeholder="{{selectedGroupByName}}" class="select-group-by" ng-model="selectedGroupBy" ng-change="changeGroupBy()">
               <md-option ng-value="g.value" ng-repeat="g in groupByOptions">{{g.name}}</md-option>
           </md-select>
 
           <div ng-if="selector" layout="row" class="selector-area">
             <div class="filter-label">Filter:</div>
 
-            <div class="filter-text">{{selector}}</div>
+            <div class="filter-text">{{selectorName}}</div>
             <div class="filter-area" ng-if="selector && selector.length > 0">
 
               <button ng-click="clearSelector(routeParams.grouping)" class="md-button cancel-button">
@@ -27,6 +27,7 @@
           </div>
 
       </div>
+
       <div class="group-item" ng-repeat="(groupName,group) in groups.items" ng-include="'components/dashboard/views/partials/groupBox.html'"></div>
     </md-content>
   </div>
