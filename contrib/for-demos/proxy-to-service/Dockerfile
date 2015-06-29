@@ -3,6 +3,7 @@ FROM progrium/busybox
 MAINTAINER Tim Hockin "thockin@google.com"
 
 RUN opkg-install socat
+ADD start.sh start.sh
 
-# Usage: docker run -p <host-port>:<port> <this-container> <tcp|udp> <port> <service-name>
-ENTRYPOINT [ "sh", "-c", "PROTO=$(echo $0 | tr a-z A-Z); exec socat ${PROTO}-LISTEN:$1,reuseaddr,fork ${PROTO}:$2:$1" ]
+# Usage: docker run -p <host-port>:<port> <this-container> <tcp|udp> <port> <service-name> [timeout]
+ENTRYPOINT ["/start.sh"]
