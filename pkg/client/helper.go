@@ -145,12 +145,14 @@ func New(c *Config) (*Client, error) {
 // MatchesServerVersion queries the server to compares the build version
 // (git hash) of the client with the server's build version. It returns an error
 // if it failed to contact the server or if the versions are not an exact match.
-func MatchesServerVersion(c *Config) error {
-	client, err := New(c)
-	if err != nil {
-		return err
+func MatchesServerVersion(client *Client, c *Config) error {
+	var err error
+	if client == nil {
+		client, err = New(c)
+		if err != nil {
+			return err
+		}
 	}
-
 	clientVersion := version.Get()
 	serverVersion, err := client.ServerVersion()
 	if err != nil {
@@ -165,17 +167,20 @@ func MatchesServerVersion(c *Config) error {
 
 // NegotiateVersion queries the server's supported api versions to find
 // a version that both client and server support.
-// - If no version is provided, try the client's registered versions in order of
+// - If no version is provided, try registered client versions in order of
 //   preference.
 // - If version is provided, but not default config (explicitly requested via
 //   commandline flag), and is unsupported by the server, print a warning to
 //   stderr and try client's registered versions in order of preference.
 // - If version is config default, and the server does not support it,
 //   return an error.
-func NegotiateVersion(c *Config, version string) (string, error) {
-	client, err := New(c)
-	if err != nil {
-		return "", err
+func NegotiateVersion(client *Client, c *Config, version string) (string, error) {
+	var err error
+	if client == nil {
+		client, err = New(c)
+		if err != nil {
+			return "", err
+		}
 	}
 	clientVersions := util.StringSet{}
 	for _, v := range registered.RegisteredVersions {
