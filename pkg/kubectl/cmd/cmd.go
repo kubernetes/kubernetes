@@ -116,6 +116,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdCreate(f, out))
 	cmds.AddCommand(NewCmdUpdate(f, out))
 	cmds.AddCommand(NewCmdDelete(f, out))
+	cmds.AddCommand(NewCmdEdit(f, out))
 
 	cmds.AddCommand(NewCmdNamespace(out))
 	cmds.AddCommand(NewCmdLog(f, out))
