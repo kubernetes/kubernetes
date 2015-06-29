@@ -74,7 +74,7 @@ func TestFindPort(t *testing.T) {
 		containers: []api.Container{{}},
 		port:       util.NewIntOrStringFromInt(93),
 		expected:   93,
-		pass:       true,
+		pass:       false,
 	}, {
 		name: "valid int, with ports",
 		containers: []api.Container{{Ports: []api.ContainerPort{{
@@ -88,7 +88,7 @@ func TestFindPort(t *testing.T) {
 		}}}},
 		port:     util.NewIntOrStringFromInt(93),
 		expected: 93,
-		pass:     true,
+		pass:     false,
 	}, {
 		name:       "valid str, no ports",
 		containers: []api.Container{{}},
@@ -142,7 +142,7 @@ func TestFindPort(t *testing.T) {
 		if err == nil && !tc.pass {
 			t.Errorf("unexpected non-error for %s: %d", tc.name, port)
 		}
-		if port != tc.expected {
+		if err == nil && port != tc.expected {
 			t.Errorf("wrong result for %s: expected %d, got %d", tc.name, tc.expected, port)
 		}
 	}
