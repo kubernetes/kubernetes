@@ -99,7 +99,7 @@ func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.End
 		},
 		hosts:    ep,
 		path:     source.Path,
-		readonly: readOnly,
+		readOnly: readOnly,
 		exe:      exe}, nil
 }
 
@@ -128,7 +128,8 @@ type glusterfsBuilder struct {
 	*glusterfs
 	hosts    *api.Endpoints
 	path     string
-	readonly bool
+	readOnly bool
+	mounter  mount.Interface
 	exe      exec.Interface
 }
 
@@ -159,6 +160,10 @@ func (b *glusterfsBuilder) SetUpAt(dir string) error {
 	c := &glusterfsCleaner{b.glusterfs}
 	c.cleanup(dir)
 	return err
+}
+
+func (glusterfsVolume *glusterfs) IsReadOnly() bool {
+	return glusterfsVolume.readOnly
 }
 
 func (glusterfsVolume *glusterfs) GetPath() string {
@@ -212,7 +217,7 @@ func (b *glusterfsBuilder) setUpAtInternal(dir string) error {
 	var errs error
 
 	options := []string{}
-	if b.readonly {
+	if glusterfsVolume.readOnly {
 		options = append(options, "ro")
 	}
 

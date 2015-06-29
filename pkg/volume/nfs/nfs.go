@@ -188,6 +188,15 @@ type nfsCleaner struct {
 	*nfs
 }
 
+func (nfsVolume *nfs) IsReadOnly() bool {
+	return nfsVolume.readOnly
+}
+
+func (nfsVolume *nfs) GetPath() string {
+	name := nfsPluginName
+	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, util.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
+}
+
 var _ volume.Cleaner = &nfsCleaner{}
 
 func (c *nfsCleaner) TearDown() error {

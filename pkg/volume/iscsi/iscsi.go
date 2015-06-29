@@ -183,6 +183,10 @@ type iscsiDiskCleaner struct {
 
 var _ volume.Cleaner = &iscsiDiskCleaner{}
 
+func (b *iscsiDiskBuilder) IsReadOnly() bool {
+	return b.readOnly
+}
+
 // Unmounts the bind mount, and detaches the disk only if the disk
 // resource was the last reference to that disk on the kubelet.
 func (c *iscsiDiskCleaner) TearDown() error {

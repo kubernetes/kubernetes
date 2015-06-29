@@ -119,6 +119,14 @@ func (b *hostPathBuilder) SetUpAt(dir string) error {
 	return fmt.Errorf("SetUpAt() does not make sense for host paths")
 }
 
+func (b *hostPathBuilder) IsReadOnly() bool {
+	return false
+}
+
+func (b *hostPathBuilder) GetPath() string {
+	return b.path
+}
+
 type hostPathCleaner struct {
 	*hostPath
 }

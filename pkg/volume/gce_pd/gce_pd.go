@@ -229,6 +229,10 @@ func (b *gcePersistentDiskBuilder) SetUpAt(dir string) error {
 	return nil
 }
 
+func (pd *gcePersistentDisk) IsReadOnly() bool {
+	return pd.readOnly
+}
+
 func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 	return path.Join(host.GetPluginDir(gcePersistentDiskPluginName), "mounts", devName)
 }

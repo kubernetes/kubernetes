@@ -240,6 +240,10 @@ func (ebs *awsElasticBlockStore) SetUpAt(dir string) error {
 	return nil
 }
 
+func (pd *awsElasticBlockStore) IsReadOnly() bool {
+	return pd.readOnly
+}
+
 func makeGlobalPDPath(host volume.VolumeHost, volumeID string) string {
 	// Clean up the URI to be more fs-friendly
 	name := volumeID

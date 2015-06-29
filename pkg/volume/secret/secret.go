@@ -168,6 +168,10 @@ func (b *secretVolumeBuilder) SetUpAt(dir string) error {
 	return nil
 }
 
+func (sv *secretVolume) IsReadOnly() bool {
+	return false
+}
+
 func totalSecretBytes(secret *api.Secret) int {
 	totalSize := 0
 	for _, bytes := range secret.Data {

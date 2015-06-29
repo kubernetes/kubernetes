@@ -123,7 +123,7 @@ func (recycler *PersistentVolumeRecycler) handleRecycle(pv *api.PersistentVolume
 	currentPhase := pv.Status.Phase
 	nextPhase := currentPhase
 
-	spec := volume.NewSpecFromPersistentVolume(pv)
+	spec := volume.NewSpecFromPersistentVolume(pv, false)
 	plugin, err := recycler.pluginMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		return fmt.Errorf("Could not find recyclable volume plugin for spec: %+v", err)

@@ -26,11 +26,12 @@ import (
 )
 
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&persistentClaimPlugin{nil}}
+	return []volume.VolumePlugin{&persistentClaimPlugin{host: nil}}
 }
 
 type persistentClaimPlugin struct {
-	host volume.VolumeHost
+	host     volume.VolumeHost
+	readOnly bool
 }
 
 var _ volume.VolumePlugin = &persistentClaimPlugin{}
@@ -52,6 +53,7 @@ func (plugin *persistentClaimPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+	plugin.readOnly = spec.ReadOnly
 	claim, err := plugin.host.GetKubeClient().PersistentVolumeClaims(pod.Namespace).Get(spec.VolumeSource.PersistentVolumeClaim.ClaimName)
 	if err != nil {
 		glog.Errorf("Error finding claim: %+v\n", spec.VolumeSource.PersistentVolumeClaim.ClaimName)
@@ -85,6 +87,10 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod,
 	}
 
 	return builder, nil
+}
+
+func (plugin *persistentClaimPlugin) IsReadOnly() bool {
+	return plugin.readOnly
 }
 
 func (plugin *persistentClaimPlugin) NewCleaner(_ string, _ types.UID, _ mount.Interface) (volume.Cleaner, error) {
