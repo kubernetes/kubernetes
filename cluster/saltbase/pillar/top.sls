@@ -5,3 +5,4 @@ base:
     - logging
     - docker-images
     - privilege
+    - systemd
