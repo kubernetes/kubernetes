@@ -56,7 +56,7 @@ func addPods(store cache.Store, namespace string, nPods int, nPorts int) {
 		}
 		for j := 0; j < nPorts; j++ {
 			p.Spec.Containers[0].Ports = append(p.Spec.Containers[0].Ports,
-				api.ContainerPort{Name: fmt.Sprintf("port%d", i), ContainerPort: 8080 + j})
+				api.ContainerPort{Name: fmt.Sprintf("port%d", i), ContainerPort: 8080 + j, Protocol: "TCP"})
 		}
 		store.Add(p)
 	}
