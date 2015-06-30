@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
@@ -317,12 +318,20 @@ func waitForPodsRunningReady(ns string, minPods int, timeout time.Duration) erro
 func waitForServiceAccountInNamespace(c *client.Client, ns, serviceAccountName string, timeout time.Duration) error {
 	Logf("Waiting up to %v for service account %s to be provisioned in ns %s", timeout, serviceAccountName, ns)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		_, err := c.ServiceAccounts(ns).Get(serviceAccountName)
-		if err != nil {
+		sa, err := c.ServiceAccounts(ns).Get(serviceAccountName)
+		if apierrs.IsNotFound(err) {
 			Logf("Get service account %s in ns %s failed, ignoring for %v: %v", serviceAccountName, ns, poll, err)
 			continue
 		}
-		Logf("Service account %s in ns %s found. (%v)", serviceAccountName, ns, time.Since(start))
+		if err != nil {
+			Logf("Get service account %s in ns %s failed: %v", serviceAccountName, ns, err)
+			return err
+		}
+		if len(sa.Secrets) == 0 {
+			Logf("Service account %s in ns %s had 0 secrets, ignoring for %v: %v", serviceAccountName, ns, poll, err)
+			continue
+		}
+		Logf("Service account %s in ns %s with secrets found. (%v)", serviceAccountName, ns, time.Since(start))
 		return nil
 	}
 	return fmt.Errorf("Service account %s in namespace %s not ready within %v", serviceAccountName, ns, timeout)
