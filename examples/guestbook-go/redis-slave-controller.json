@@ -26,12 +26,7 @@
             "containers":[
                {
                   "name":"redis-slave",
-                  "image":"gurpartap/redis",
-                  "command":[
-                     "sh",
-                     "-c",
-                     "redis-server /etc/redis/redis.conf --slaveof redis-master 6379"
-                  ],
+                  "image":"kubernetes/redis-slave:v2",
                   "ports":[
                      {
                         "name":"redis-server",
