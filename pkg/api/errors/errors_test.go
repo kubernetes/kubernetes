@@ -149,7 +149,7 @@ func TestNewInvalid(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		vErr, expected := testCase.Err, testCase.Details
-		expected.Causes[0].Message = vErr.Error()
+		expected.Causes[0].Message = vErr.ErrorBody()
 		err := NewInvalid("kind", "name", fielderrors.ValidationErrorList{vErr})
 		status := err.(*StatusError).ErrStatus
 		if status.Code != 422 || status.Reason != api.StatusReasonInvalid {
