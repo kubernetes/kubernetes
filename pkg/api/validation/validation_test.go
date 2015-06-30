@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -556,7 +557,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: "v1beta3",
+					APIVersion: testapi.Version(),
 					FieldPath:  "metadata.name",
 				},
 			},
@@ -588,7 +589,7 @@ func TestValidateEnv(t *testing.T) {
 				Value: "foo",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: "v1beta3",
+						APIVersion: testapi.Version(),
 						FieldPath:  "metadata.name",
 					},
 				},
@@ -601,7 +602,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: "v1beta3",
+						APIVersion: testapi.Version(),
 					},
 				},
 			}},
@@ -626,7 +627,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "metadata.whoops",
-						APIVersion: "v1beta3",
+						APIVersion: testapi.Version(),
 					},
 				},
 			}},
@@ -639,7 +640,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "status.phase",
-						APIVersion: "v1beta3",
+						APIVersion: testapi.Version(),
 					},
 				},
 			}},

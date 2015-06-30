@@ -26,9 +26,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/davecgh/go-spew/spew"
@@ -88,13 +87,10 @@ func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
 	set := util.NewStringSet(except...)
 	seed := rand.Int63()
 	fuzzInternalObject(t, "", item, seed)
-	if !set.Has("v1beta3") {
-		fuzzInternalObject(t, "v1beta3", item, seed)
-		roundTrip(t, v1beta3.Codec, item)
-	}
-	if !set.Has("v1") {
-		fuzzInternalObject(t, "v1", item, seed)
-		roundTrip(t, v1.Codec, item)
+	version := testapi.Version()
+	if !set.Has(version) {
+		fuzzInternalObject(t, version, item, seed)
+		roundTrip(t, testapi.Codec(), item)
 	}
 }
 

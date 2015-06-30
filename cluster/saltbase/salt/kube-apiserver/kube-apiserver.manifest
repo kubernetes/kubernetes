@@ -89,7 +89,7 @@
 {% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure_port=" + secure_port + " " + token_auth_file + " " + bind_address + " " + pillar['log_level'] + " " + advertise_address  + " " + proxy_ssh_options -%}
 
 {
-"apiVersion": "v1beta3",
+"apiVersion": "v1",
 "kind": "Pod",
 "metadata": {"name":"kube-apiserver"},
 "spec":{

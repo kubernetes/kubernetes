@@ -46,14 +46,14 @@ KUBELET_PORT=${KUBELET_PORT:-10250}
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
-"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+KUBE_API_VERSIONS="v1,v1beta3" "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public_address_override="127.0.0.1" \
   --port="${API_PORT}" \
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --public_address_override="127.0.0.1" \
   --kubelet_port=${KUBELET_PORT} \
-  --runtime_config=api/legacy=false \
+  --runtime_config=api/v1beta3 \
   --service-cluster-ip-range="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
