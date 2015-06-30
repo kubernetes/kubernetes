@@ -205,16 +205,16 @@ func (r *RecursiveNode) String() string {
 	return fmt.Sprintf("%s", r.Type())
 }
 
-// UnionNode is union of array indexes
+// UnionNode is union of ListNode
 type UnionNode struct {
 	NodeType
-	Value []int
+	Nodes []*ListNode
 }
 
-func newUnion(value []int) *UnionNode {
-	return &UnionNode{NodeType: NodeUnion, Value: value}
+func newUnion(nodes []*ListNode) *UnionNode {
+	return &UnionNode{NodeType: NodeUnion, Nodes: nodes}
 }
 
 func (u *UnionNode) String() string {
-	return fmt.Sprintf("%s: %v", u.Type(), u.Value)
+	return fmt.Sprintf("%s", u.Type())
 }

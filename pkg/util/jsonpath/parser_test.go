@@ -33,8 +33,8 @@ var parserTests = []parserTest{
 	{"arrayfiled", `hello ${['jsonpath']}`,
 		[]Node{newText("hello "), newList(), newField("jsonpath")}},
 	{"quote", `${"${"}`, []Node{newList(), newText("${")}},
-	{"array", `${[1:3]}`,
-		[]Node{newList(), newArray([3]ParamsEntry{{1, true}, {3, true}, {0, false}})}},
+	{"array", `${[1:3]}`, []Node{newList(),
+		newArray([3]ParamsEntry{{1, true}, {3, true}, {0, false}})}},
 	{"allarray", `${.book[*].author}`,
 		[]Node{newList(), newField("book"),
 			newArray([3]ParamsEntry{{0, false}, {0, false}, {0, false}}), newField("author")}},
@@ -46,7 +46,14 @@ var parserTests = []parserTest{
 	{"recursive", `${..}`, []Node{newList(), newRecursive()}},
 	{"recurField", `${..price}`,
 		[]Node{newList(), newRecursive(), newField("price")}},
-	{"union", `${[1,3,5]}`, []Node{newList(), newUnion([]int{1, 3, 5})}},
+	{"arraydict", `${['book.price']}`, []Node{newList(),
+		newField("book"), newField("price"),
+	}},
+	{"union", `${['bicycle.price', 3, 'book.price']}`, []Node{newList(), newUnion([]*ListNode{}),
+		newList(), newField("bicycle"), newField("price"),
+		newList(), newArray([3]ParamsEntry{{3, true}, {4, true}, {0, false}}),
+		newList(), newField("book"), newField("price"),
+	}},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {
@@ -58,6 +65,10 @@ func collectNode(nodes []Node, cur Node) []Node {
 	} else if cur.Type() == NodeFilter {
 		nodes = collectNode(nodes, cur.(*FilterNode).Left)
 		nodes = collectNode(nodes, cur.(*FilterNode).Right)
+	} else if cur.Type() == NodeUnion {
+		for _, node := range cur.(*UnionNode).Nodes {
+			nodes = collectNode(nodes, node)
+		}
 	}
 	return nodes
 }
@@ -71,6 +82,7 @@ func TestParser(t *testing.T) {
 		result := collectNode([]Node{}, parser.Root)[1:]
 		if len(result) != len(test.nodes) {
 			t.Errorf("in %s, expect to get %d nodes, got %d nodes", test.name, len(test.nodes), len(result))
+			t.Error(result)
 		}
 		for i, expect := range test.nodes {
 			if result[i].String() != expect.String() {

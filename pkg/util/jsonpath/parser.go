@@ -50,6 +50,13 @@ func Parse(name, text string) (*Parser, error) {
 	return p, p.Parse(text)
 }
 
+// ParseAction parsed the expression inside delimiter
+func ParseAction(name, text string) (*Parser, error) {
+	p, err := Parse(name, fmt.Sprintf("${%s}", text))
+	p.Root = p.Root.Nodes[0].(*ListNode)
+	return p, err
+}
+
 func NewParser(name string) *Parser {
 	return &Parser{
 		Name: name,
@@ -220,15 +227,15 @@ Loop:
 	//union operator
 	strs := strings.Split(text, ",")
 	if len(strs) > 1 {
-		value := make([]int, len(strs))
-		var err error
-		for i, str := range strs {
-			value[i], err = strconv.Atoi(str)
+		union := []*ListNode{}
+		for _, str := range strs {
+			parser, err := ParseAction("union", fmt.Sprintf("[%s]", strings.Trim(str, " ")))
 			if err != nil {
-				return fmt.Errorf("union of non-intergers")
+				return err
 			}
+			union = append(union, parser.Root)
 		}
-		cur.append(newUnion(value))
+		cur.append(newUnion(union))
 		return p.parseInsideAction(cur)
 	}
 
@@ -236,11 +243,12 @@ Loop:
 	reg := regexp.MustCompile(`^'([^']*)'$`)
 	value := reg.FindStringSubmatch(text)
 	if value != nil {
-		text := value[1]
-		if text == "*" {
-			cur.append(newWildcard())
-		} else {
-			cur.append(newField(text))
+		parser, err := ParseAction("arraydict", fmt.Sprintf(".%s", value[1]))
+		if err != nil {
+			return err
+		}
+		for _, node := range parser.Root.Nodes {
+			cur.append(node)
 		}
 		return p.parseInsideAction(cur)
 	}
@@ -249,7 +257,7 @@ Loop:
 	reg = regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:[\d]*)?$`)
 	value = reg.FindStringSubmatch(text)
 	if value == nil {
-		return fmt.Errorf("incorrect array index")
+		return fmt.Errorf("incorrect array index %s", text)
 	}
 	value = value[1:]
 	params := [3]ParamsEntry{}

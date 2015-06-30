@@ -88,7 +88,7 @@ func TestStoreData(t *testing.T) {
 		{"recursive", "${..}", []int{1, 2, 3}, "[1, 2, 3]"},
 		{"filter", "${[?(@<5)]}", []int{2, 6, 3, 7}, "2 3"},
 		{"quote", `${"${"}`, nil, "${"},
-		{"union", "${[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4"},
+		{"union", "${[1,3,4]}", []int{0, 1, 2, 3, 4}, "[1, 3, 4]"},
 		{"array", "${[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday"},
 		{"variable", "hello ${.Name}", storeData, "hello jsonpath"},
 		{"dict/", "${.Labels.web/html}", storeData, "15"},
@@ -119,10 +119,43 @@ func TestPoints(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	t.Log(pointsData)
 	pointsTests := []jsonpathTest{
 		{"existsfilter", "${[?(@.z)].id}", pointsData, "i2 i5"},
 		{"arrayfield", "${[0]['id']}", pointsData, "i1"},
 	}
 	testJSONPath(pointsTests, t)
+}
+
+func TestKubenatesNodes(t *testing.T) {
+	var input = []byte(`{
+	  "kind": "List",
+	  "items":[
+		{
+		  "kind":"None",
+		  "metadata":{"name":"127.0.0.1"},
+		  "status":{
+			"capacity":{"cpu":"4"},
+			"addresses":[{"type": "LegacyHostIP", "address":"127.0.0.1"}]
+		  }
+		},
+		{
+		  "kind":"None",
+		  "metadata":{"name":"127.0.0.2"},
+		  "status":{
+			"capacity":{"cpu":"8"},
+			"addresses":[{"type": "LegacyHostIP", "address":"127.0.0.2"}]
+		  }
+		}
+	  ]
+	}`)
+	var nodesData interface{}
+	err := json.Unmarshal(input, &nodesData)
+	if err != nil {
+		t.Error(err)
+	}
+	nodesTests := []jsonpathTest{
+		{"nodes capacity", "${.items[*]['metadata.name', 'status.capacity']}", nodesData,
+			`[127.0.0.1, {cpu: 4}] [127.0.0.2, {cpu: 8}]`},
+	}
+	testJSONPath(nodesTests, t)
 }

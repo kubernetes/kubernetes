@@ -139,6 +139,9 @@ func (j *JSONPath) evalList(value []reflect.Value, node *ListNode) ([]reflect.Va
 func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.Value, error) {
 	result := []reflect.Value{}
 	for _, value := range input {
+		if value.Kind() == reflect.Interface {
+			value = reflect.ValueOf(value.Interface())
+		}
 		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
 			return input, fmt.Errorf("%v is not array or slice", value)
 		}
@@ -173,12 +176,15 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 func (j *JSONPath) evalUnion(input []reflect.Value, node *UnionNode) ([]reflect.Value, error) {
 	result := []reflect.Value{}
 	for _, value := range input {
-		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
-			return input, fmt.Errorf("%v is not array or slice", value)
+		unionValue := []interface{}{}
+		for _, listNode := range node.Nodes {
+			temp, err := j.evalList([]reflect.Value{value}, listNode)
+			if err != nil {
+				return input, err
+			}
+			unionValue = append(unionValue, temp[0].Interface())
 		}
-		for _, i := range node.Value {
-			result = append(result, value.Index(i))
-		}
+		result = append(result, reflect.ValueOf(unionValue))
 	}
 	return result, nil
 }
@@ -318,6 +324,12 @@ func (j *JSONPath) evalToText(v reflect.Value) ([]byte, error) {
 	switch v.Kind() {
 	case reflect.Invalid:
 		//pass
+	case reflect.Ptr:
+		text, err := j.evalToText(reflect.Indirect(v))
+		if err != nil {
+			return nil, err
+		}
+		buffer.Write(text)
 	case reflect.Bool:
 		if variable := v.Bool(); variable {
 			buffer.WriteString("True")
