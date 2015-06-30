@@ -432,6 +432,43 @@ func TestSyncEndpointsItems(t *testing.T) {
 	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, ""), "POST", &data)
 }
 
+func TestSyncDeprecatedUndeclaredEndpointsItems(t *testing.T) {
+	ns := "other"
+	testServer, endpointsHandler := makeTestServer(t, ns,
+		serverResponse{http.StatusOK, &api.Endpoints{}})
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	endpoints := NewEndpointController(client)
+	addPods(endpoints.podStore.Store, ns, 1, 0)
+	endpoints.serviceStore.Store.Add(&api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{"foo": "bar"},
+			Ports: []api.ServicePort{
+				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
+			},
+		},
+	})
+	endpoints.syncService("other/foo")
+	expectedSubsets := []api.EndpointSubset{{
+		Addresses: []api.EndpointAddress{
+			{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
+		},
+		Ports: []api.EndpointPort{
+			{Name: "port0", Port: 8088, Protocol: "TCP"},
+		},
+	}}
+	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			ResourceVersion: "",
+		},
+		Subsets: endptspkg.SortSubsets(expectedSubsets),
+	})
+	// endpointsHandler should get 2 requests - one for "GET" and the next for "POST".
+	endpointsHandler.ValidateRequestCount(t, 2)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, ""), "POST", &data)
+}
+
 func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns,
