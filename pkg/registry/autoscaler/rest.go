@@ -78,6 +78,10 @@ func (autoScalerStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Objec
 	return validation.ValidateAutoScalerUpdate(obj.(*api.AutoScaler), old.(*api.AutoScaler))
 }
 
+func (autoScalerStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
 type autoScalerStatusStrategy struct {
 	autoScalerStrategy
 }

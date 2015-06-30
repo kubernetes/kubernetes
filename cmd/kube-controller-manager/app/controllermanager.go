@@ -31,7 +31,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	asmanager "github.com/GoogleCloudPlatform/kubernetes/pkg/autoscaler/manager"
 	asgenericplugin "github.com/GoogleCloudPlatform/kubernetes/pkg/autoscaler/plugins/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"

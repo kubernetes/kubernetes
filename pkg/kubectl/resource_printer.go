@@ -1006,7 +1006,7 @@ func formatWideHeaders(wide bool, t reflect.Type) []string {
 	return nil
 }
 
-func printAutoScalerStatus(item *api.AutoScaler, w io.Writer, withNamespace bool) error {
+func printAutoScalerStatus(item *api.AutoScaler, w io.Writer, withNamespace bool, columnLabels []string) error {
 	status := "Unknown"
 	by := ""
 	at := ""
@@ -1016,13 +1016,17 @@ func printAutoScalerStatus(item *api.AutoScaler, w io.Writer, withNamespace bool
 		at = fmt.Sprintf("%v", item.Status.LastActionTimestamp)
 	}
 
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", item.Name, status, by, at)
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", item.Name, status, by, at); err != nil {
+		return err
+	}
+
+	_, err := fmt.Fprint(w, appendLabels(item.Labels, columnLabels))
 	return err
 }
 
-func printAutoScalerStatusList(list *api.AutoScalerList, w io.Writer, withNamespace bool) error {
+func printAutoScalerStatusList(list *api.AutoScalerList, w io.Writer, withNamespace bool, columnLabels []string) error {
 	for _, item := range list.Items {
-		if err := printAutoScalerStatus(&item, w, withNamespace); err != nil {
+		if err := printAutoScalerStatus(&item, w, withNamespace, columnLabels); err != nil {
 			return err
 		}
 	}
