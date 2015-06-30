@@ -31,6 +31,7 @@ package runtime
 // your own with the same fields.
 //
 type TypeMeta struct {
+	APIGroup   string `json:"apiGroup,omitempty" yaml:"apiVersion,omitempty"`
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
 }

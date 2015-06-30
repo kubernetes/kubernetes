@@ -60,11 +60,11 @@ func (*EmbeddedTest) IsAnAPIObject()         {}
 func (*EmbeddedTestExternal) IsAnAPIObject() {}
 
 func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
-	s := runtime.NewScheme()
-	s.AddKnownTypes("", &ObjectTest{})
-	s.AddKnownTypeWithName("v1test", "ObjectTest", &ObjectTestExternal{})
+	s := runtime.NewScheme("api")
+	s.AddKnownTypes("api", "", &ObjectTest{})
+	s.AddKnownTypeWithName("api", "v1test", "ObjectTest", &ObjectTestExternal{})
 
-	obj, err := s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","items":[{}]}`))
+	obj, err := s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","apiGroup":"api","items":[{}]}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 		t.Fatalf("unexpected object: %#v", test.Items[0])
 	}
 
-	obj, err = s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","items":[{"kind":"Other","apiVersion":"v1"}]}`))
+	obj, err = s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","apiGroup":"api","items":[{"kind":"Other","apiVersion":"v1"}]}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,11 +84,11 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 }
 
 func TestArrayOfRuntimeObject(t *testing.T) {
-	s := runtime.NewScheme()
-	s.AddKnownTypes("", &EmbeddedTest{})
-	s.AddKnownTypeWithName("v1test", "EmbeddedTest", &EmbeddedTestExternal{})
-	s.AddKnownTypes("", &ObjectTest{})
-	s.AddKnownTypeWithName("v1test", "ObjectTest", &ObjectTestExternal{})
+	s := runtime.NewScheme("api")
+	s.AddKnownTypes("api", "", &EmbeddedTest{})
+	s.AddKnownTypeWithName("api", "v1test", "EmbeddedTest", &EmbeddedTestExternal{})
+	s.AddKnownTypes("api", "", &ObjectTest{})
+	s.AddKnownTypeWithName("api", "v1test", "ObjectTest", &ObjectTestExternal{})
 
 	internal := &ObjectTest{
 		Items: []runtime.Object{
@@ -146,9 +146,9 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 }
 
 func TestEmbeddedObject(t *testing.T) {
-	s := runtime.NewScheme()
-	s.AddKnownTypes("", &EmbeddedTest{})
-	s.AddKnownTypeWithName("v1test", "EmbeddedTest", &EmbeddedTestExternal{})
+	s := runtime.NewScheme("api")
+	s.AddKnownTypes("api", "", &EmbeddedTest{})
+	s.AddKnownTypeWithName("api", "v1test", "EmbeddedTest", &EmbeddedTestExternal{})
 
 	outer := &EmbeddedTest{
 		ID: "outer",
@@ -205,9 +205,9 @@ func TestEmbeddedObject(t *testing.T) {
 
 // TestDeepCopyOfEmbeddedObject checks to make sure that EmbeddedObject's can be passed through DeepCopy with fidelity
 func TestDeepCopyOfEmbeddedObject(t *testing.T) {
-	s := runtime.NewScheme()
-	s.AddKnownTypes("", &EmbeddedTest{})
-	s.AddKnownTypeWithName("v1test", "EmbeddedTest", &EmbeddedTestExternal{})
+	s := runtime.NewScheme("api")
+	s.AddKnownTypes("api", "", &EmbeddedTest{})
+	s.AddKnownTypeWithName("api", "v1test", "EmbeddedTest", &EmbeddedTestExternal{})
 
 	original := &EmbeddedTest{
 		ID: "outer",

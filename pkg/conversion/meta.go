@@ -26,53 +26,58 @@ import (
 // information for all objects in a scheme.
 type MetaFactory interface {
 	// Update sets the given version and kind onto the object.
-	Update(version, kind string, obj interface{}) error
+	Update(group, version, kind string, obj interface{}) error
 	// Interpret should return the version and kind of the wire-format of
 	// the object.
-	Interpret(data []byte) (version, kind string, err error)
+	Interpret(data []byte) (group, version, kind string, err error)
 }
 
 // DefaultMetaFactory is a default factory for versioning objects in JSON. The object
 // in memory and in the default JSON serialization will use the "kind" and "apiVersion"
 // fields.
-var DefaultMetaFactory = SimpleMetaFactory{KindField: "Kind", VersionField: "APIVersion"}
+var DefaultMetaFactory = SimpleMetaFactory{GroupField: "APIGroup", VersionField: "APIVersion", KindField: "Kind"}
 
 // SimpleMetaFactory provides default methods for retrieving the type and version of objects
 // that are identified with an "apiVersion" and "kind" fields in their JSON
 // serialization. It may be parameterized with the names of the fields in memory, or an
 // optional list of base structs to search for those fields in memory.
 type SimpleMetaFactory struct {
-	// The name of the API version field in memory of the struct
+	// The names of the API group, version, and kind fields in memory of the struct
+	GroupField   string
 	VersionField string
-	// The name of the kind field in memory of the struct.
-	KindField string
+	KindField    string
 	// Optional, if set will look in the named inline structs to find the fields to set.
 	BaseFields []string
 }
 
 // Interpret will return the APIVersion and Kind of the JSON wire-format
 // encoding of an object, or an error.
-func (SimpleMetaFactory) Interpret(data []byte) (version, kind string, err error) {
-	findKind := struct {
+func (SimpleMetaFactory) Interpret(data []byte) (group, version, kind string, err error) {
+	findMeta := struct {
+		APIGroup   string `json:"apiGroup,omitempty"`
 		APIVersion string `json:"apiVersion,omitempty"`
 		Kind       string `json:"kind,omitempty"`
 	}{}
-	err = json.Unmarshal(data, &findKind)
+	err = json.Unmarshal(data, &findMeta)
 	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind; json parse error: %v", err)
+		return "", "", "", fmt.Errorf("couldn't get version/kind; json parse error: %v", err)
 	}
-	return findKind.APIVersion, findKind.Kind, nil
+	return findMeta.APIGroup, findMeta.APIVersion, findMeta.Kind, nil
 }
 
-func (f SimpleMetaFactory) Update(version, kind string, obj interface{}) error {
-	return UpdateVersionAndKind(f.BaseFields, f.VersionField, version, f.KindField, kind, obj)
+func (f SimpleMetaFactory) Update(group, version, kind string, obj interface{}) error {
+	return UpdateTypeMeta(f.BaseFields,
+		f.GroupField, group,
+		f.VersionField, version,
+		f.KindField, kind,
+		obj)
 }
 
 // UpdateVersionAndKind uses reflection to find and set the versionField and kindField fields
 // on a pointer to a struct to version and kind. Provided as a convenience for others
 // implementing MetaFactory. Pass an array to baseFields to check one or more nested structs
 // for the named fields. The version field is treated as optional if it is not present in the struct.
-func UpdateVersionAndKind(baseFields []string, versionField, version, kindField, kind string, obj interface{}) error {
+func UpdateTypeMeta(baseFields []string, groupField, group, versionField, version, kindField, kind string, obj interface{}) error {
 	v, err := EnforcePtr(obj)
 	if err != nil {
 		return err
@@ -99,6 +104,10 @@ func UpdateVersionAndKind(baseFields []string, versionField, version, kindField,
 
 	if field := v.FieldByName(versionField); field.IsValid() {
 		field.SetString(version)
+	}
+
+	if field := v.FieldByName(groupField); field.IsValid() {
+		field.SetString(group)
 	}
 
 	return nil

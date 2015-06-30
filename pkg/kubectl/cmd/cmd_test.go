@@ -63,11 +63,11 @@ func (*externalType) IsAnAPIObject()  {}
 func (*ExternalType2) IsAnAPIObject() {}
 
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Type", &internalType{})
-	scheme.AddKnownTypeWithName("unlikelyversion", "Type", &externalType{})
+	scheme := runtime.NewScheme(api.Group)
+	scheme.AddKnownTypeWithName(api.Group, "", "Type", &internalType{})
+	scheme.AddKnownTypeWithName(api.Group, "unlikelyversion", "Type", &externalType{})
 	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
-	scheme.AddKnownTypeWithName(testapi.Version(), "Type", &ExternalType2{})
+	scheme.AddKnownTypeWithName(api.Group, testapi.Version(), "Type", &ExternalType2{})
 
 	codec := runtime.CodecFor(scheme, "unlikelyversion")
 	validVersion := testapi.Version()
@@ -79,7 +79,7 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 		}, (version == validVersion || version == "unlikelyversion")
 	})
 	for _, version := range []string{"unlikelyversion", validVersion} {
-		for kind := range scheme.KnownTypes(version) {
+		for kind := range scheme.KnownTypes(api.Group, version) {
 			mixedCase := false
 			scope := meta.RESTScopeNamespace
 			mapper.Add(scope, kind, version, mixedCase)

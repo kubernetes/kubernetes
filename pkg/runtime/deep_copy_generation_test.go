@@ -40,7 +40,7 @@ func generateDeepCopies(t *testing.T, version string) bytes.Buffer {
 	if version == "api" {
 		testedVersion = api.Scheme.Raw().InternalVersion
 	}
-	for _, knownType := range api.Scheme.KnownTypes(testedVersion) {
+	for _, knownType := range api.Scheme.KnownTypes(api.Group, testedVersion) {
 		if err := g.AddType(knownType); err != nil {
 			glog.Errorf("error while generating deep-copy functions for %v: %v", knownType, err)
 		}

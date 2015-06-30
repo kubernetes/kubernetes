@@ -39,7 +39,7 @@ func init() {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes() {
-	api.Scheme.AddKnownTypes("v1",
+	api.Scheme.AddKnownTypes(api.Group, "v1",
 		&Pod{},
 		&PodList{},
 		&PodStatusResult{},
@@ -83,8 +83,8 @@ func addKnownTypes() {
 		&RangeAllocation{},
 	)
 	// Legacy names are supported
-	api.Scheme.AddKnownTypeWithName("v1", "Minion", &Node{})
-	api.Scheme.AddKnownTypeWithName("v1", "MinionList", &NodeList{})
+	api.Scheme.AddKnownTypeWithName(api.Group, "v1", "Minion", &Node{})
+	api.Scheme.AddKnownTypeWithName(api.Group, "v1", "MinionList", &NodeList{})
 }
 
 func (*Pod) IsAnAPIObject()                       {}

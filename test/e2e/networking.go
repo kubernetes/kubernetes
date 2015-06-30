@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
@@ -55,7 +56,7 @@ var _ = Describe("Networking", func() {
 		podName := "wget-test"
 		contName := "wget-test-container"
 		pod := &api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: runtime.TypeMeta{
 				Kind: "Pod",
 			},
 			ObjectMeta: api.ObjectMeta{

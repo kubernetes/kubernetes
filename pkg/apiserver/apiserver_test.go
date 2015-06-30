@@ -103,25 +103,25 @@ func newMapper() *meta.DefaultRESTMapper {
 func addTestTypes() {
 	type ListOptions struct {
 		runtime.Object
-		api.TypeMeta    `json:",inline"`
-		LabelSelector   string `json:"labels,omitempty"`
-		FieldSelector   string `json:"fields,omitempty"`
-		Watch           bool   `json:"watch,omitempty"`
-		ResourceVersion string `json:"resourceVersion,omitempty"`
+		runtime.TypeMeta `json:",inline"`
+		LabelSelector    string `json:"labels,omitempty"`
+		FieldSelector    string `json:"fields,omitempty"`
+		Watch            bool   `json:"watch,omitempty"`
+		ResourceVersion  string `json:"resourceVersion,omitempty"`
 	}
-	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &api.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+	api.Scheme.AddKnownTypes(api.Group, testVersion, &Simple{}, &SimpleList{}, &api.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
 }
 
 func addNewTestTypes() {
 	type ListOptions struct {
 		runtime.Object
-		api.TypeMeta    `json:",inline"`
-		LabelSelector   string `json:"labelSelector,omitempty"`
-		FieldSelector   string `json:"fieldSelector,omitempty"`
-		Watch           bool   `json:"watch,omitempty"`
-		ResourceVersion string `json:"resourceVersion,omitempty"`
+		runtime.TypeMeta `json:",inline"`
+		LabelSelector    string `json:"labelSelector,omitempty"`
+		FieldSelector    string `json:"fieldSelector,omitempty"`
+		Watch            bool   `json:"watch,omitempty"`
+		ResourceVersion  string `json:"resourceVersion,omitempty"`
 	}
-	api.Scheme.AddKnownTypes(newVersion, &Simple{}, &SimpleList{}, &api.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+	api.Scheme.AddKnownTypes(api.Group, newVersion, &Simple{}, &SimpleList{}, &api.Status{}, &ListOptions{}, &api.DeleteOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
 }
 
 func init() {
@@ -129,7 +129,7 @@ func init() {
 	// api.Status is returned in errors
 
 	// "internal" version
-	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{}, &api.Status{}, &api.ListOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
+	api.Scheme.AddKnownTypes(api.Group, "", &Simple{}, &SimpleList{}, &api.Status{}, &api.ListOptions{}, &SimpleGetOptions{}, &SimpleRoot{})
 	addTestTypes()
 	addNewTestTypes()
 
@@ -138,7 +138,7 @@ func init() {
 	// enumerate all supported versions, get the kinds, and register with
 	// the mapper how to address our resources
 	for _, version := range versions {
-		for kind := range api.Scheme.KnownTypes(version) {
+		for kind := range api.Scheme.KnownTypes(api.Group, version) {
 			root := kind == "SimpleRoot"
 			if root {
 				nsMapper.Add(meta.RESTScopeRoot, kind, version, false)
@@ -153,12 +153,12 @@ func init() {
 	admissionControl = admit.NewAlwaysAdmit()
 	requestContextMapper = api.NewRequestContextMapper()
 
-	api.Scheme.AddFieldLabelConversionFunc(testVersion, "Simple",
+	api.Scheme.AddFieldLabelConversionFunc(api.Group, testVersion, "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	api.Scheme.AddFieldLabelConversionFunc(newVersion, "Simple",
+	api.Scheme.AddFieldLabelConversionFunc(api.Group, newVersion, "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
@@ -236,36 +236,36 @@ func handleInternal(legacy bool, storage map[string]rest.Storage, admissionContr
 }
 
 type Simple struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata"`
-	Other          string            `json:"other,omitempty"`
-	Labels         map[string]string `json:"labels,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	api.ObjectMeta   `json:"metadata"`
+	Other            string            `json:"other,omitempty"`
+	Labels           map[string]string `json:"labels,omitempty"`
 }
 
 func (*Simple) IsAnAPIObject() {}
 
 type SimpleRoot struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata"`
-	Other          string            `json:"other,omitempty"`
-	Labels         map[string]string `json:"labels,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	api.ObjectMeta   `json:"metadata"`
+	Other            string            `json:"other,omitempty"`
+	Labels           map[string]string `json:"labels,omitempty"`
 }
 
 func (*SimpleRoot) IsAnAPIObject() {}
 
 type SimpleGetOptions struct {
-	api.TypeMeta `json:",inline"`
-	Param1       string `json:"param1"`
-	Param2       string `json:"param2"`
-	Path         string `json:"atAPath"`
+	runtime.TypeMeta `json:",inline"`
+	Param1           string `json:"param1"`
+	Param2           string `json:"param2"`
+	Path             string `json:"atAPath"`
 }
 
 func (*SimpleGetOptions) IsAnAPIObject() {}
 
 type SimpleList struct {
-	api.TypeMeta `json:",inline"`
-	api.ListMeta `json:"metadata,inline"`
-	Items        []Simple `json:"items,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	api.ListMeta     `json:"metadata,inline"`
+	Items            []Simple `json:"items,omitempty"`
 }
 
 func (*SimpleList) IsAnAPIObject() {}

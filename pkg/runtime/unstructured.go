@@ -32,8 +32,8 @@ type unstructuredJSONScheme struct{}
 
 // Recognizes returns true for any version or kind that is specified (internal
 // versions are specifically excluded).
-func (unstructuredJSONScheme) Recognizes(version, kind string) bool {
-	return len(version) > 0 && len(kind) > 0
+func (unstructuredJSONScheme) Recognizes(tm TypeMeta) bool {
+	return len(tm.APIVersion) > 0 && len(tm.Kind) > 0
 }
 
 func (s unstructuredJSONScheme) Decode(data []byte) (Object, error) {
@@ -74,16 +74,17 @@ func (unstructuredJSONScheme) DecodeInto(data []byte, obj Object) error {
 	return nil
 }
 
-func (unstructuredJSONScheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
+func (unstructuredJSONScheme) DataTypeMeta(data []byte) (TypeMeta, error) {
 	obj := TypeMeta{}
 	if err := json.Unmarshal(data, &obj); err != nil {
-		return "", "", err
+		return TypeMeta{}, err
 	}
-	if len(obj.APIVersion) == 0 {
-		return "", "", conversion.NewMissingVersionErr(string(data))
+	// Check that version and kind exist. Group has a default value.
+	if obj.APIVersion == "" {
+		return TypeMeta{}, conversion.NewMissingVersionErr(string(data))
 	}
-	if len(obj.Kind) == 0 {
-		return "", "", conversion.NewMissingKindErr(string(data))
+	if obj.Kind == "" {
+		return TypeMeta{}, conversion.NewMissingKindErr(string(data))
 	}
-	return obj.APIVersion, obj.Kind, nil
+	return obj, nil
 }

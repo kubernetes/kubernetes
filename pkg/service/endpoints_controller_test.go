@@ -35,7 +35,7 @@ import (
 func addPods(store cache.Store, namespace string, nPods int, nPorts int) {
 	for i := 0; i < nPods; i++ {
 		p := &api.Pod{
-			TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+			TypeMeta: runtime.TypeMeta{APIVersion: testapi.Version()},
 			ObjectMeta: api.ObjectMeta{
 				Namespace: namespace,
 				Name:      fmt.Sprintf("pod%d", i),

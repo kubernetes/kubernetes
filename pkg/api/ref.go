@@ -57,7 +57,8 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	// if we are building an object reference to something not yet persisted, we should fallback to scheme
 	kind := meta.Kind()
 	if kind == "" {
-		_, kind, err = Scheme.ObjectVersionAndKind(obj)
+		tm, err := Scheme.ObjectTypeMeta(obj)
+		kind = tm.Kind
 		if err != nil {
 			return nil, err
 		}

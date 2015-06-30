@@ -129,7 +129,7 @@ func NewObjects(scheme runtime.ObjectScheme, decoder runtime.ObjectDecoder) Obje
 }
 
 func (o objects) Kind(kind, name string) (runtime.Object, error) {
-	empty, _ := o.scheme.New("", kind)
+	empty, _ := o.scheme.New(api.Group, "", kind)
 	nilValue := reflect.Zero(reflect.TypeOf(empty)).Interface().(runtime.Object)
 
 	arr, ok := o.types[kind]
@@ -140,7 +140,7 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 			if !ok {
 				return empty, nil
 			}
-			out, err := o.scheme.New("", kind)
+			out, err := o.scheme.New(api.Group, "", kind)
 			if err != nil {
 				return nilValue, err
 			}
@@ -181,10 +181,11 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 }
 
 func (o objects) Add(obj runtime.Object) error {
-	_, kind, err := o.scheme.ObjectVersionAndKind(obj)
+	tm, err := o.scheme.ObjectTypeMeta(obj)
 	if err != nil {
 		return err
 	}
+	kind := tm.Kind
 
 	switch {
 	case runtime.IsListType(obj):

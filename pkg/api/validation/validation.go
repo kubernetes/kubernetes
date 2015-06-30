@@ -669,7 +669,7 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector) errs.ValidationErr
 	} else if fs.FieldPath == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("fieldPath"))
 	} else {
-		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
+		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(api.Group, fs.APIVersion, "Pod", fs.FieldPath, "")
 		if err != nil {
 			allErrs = append(allErrs, errs.NewFieldInvalid("fieldPath", fs.FieldPath, "error converting fieldPath"))
 		} else if !validFieldPathExpressions.Has(internalFieldPath) {

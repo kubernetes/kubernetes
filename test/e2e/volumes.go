@@ -35,6 +35,7 @@ import (
 	"fmt"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -77,7 +78,7 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 	privileged := new(bool)
 	*privileged = true
 	serverPod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: runtime.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -135,7 +136,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 	podClient := client.Pods(config.namespace)
 
 	clientPod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: runtime.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -280,7 +281,7 @@ var _ = Describe("Volumes", func() {
 
 			// create Endpoints for the server
 			endpoints := api.Endpoints{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: runtime.TypeMeta{
 					Kind:       "Endpoints",
 					APIVersion: "v1",
 				},

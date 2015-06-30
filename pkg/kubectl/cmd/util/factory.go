@@ -266,15 +266,15 @@ type clientSwaggerSchema struct {
 }
 
 func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
-	version, _, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
+	tm, err := runtime.UnstructuredJSONScheme.DataTypeMeta(data)
 	if err != nil {
 		return err
 	}
-	if ok := registered.IsRegisteredAPIVersion(version); !ok {
-		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredVersions)
+	if ok := registered.IsRegisteredAPIVersion(tm.APIVersion); !ok {
+		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", tm.APIVersion, registered.RegisteredVersions)
 	}
 	schemaData, err := c.c.RESTClient.Get().
-		AbsPath("/swaggerapi/api", version).
+		AbsPath("/swaggerapi/api", tm.APIVersion).
 		Do().
 		Raw()
 	if err != nil {
@@ -344,12 +344,12 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 // PrintObject prints an api object given command line flags to modify the output format
 func (f *Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error {
 	mapper, _ := f.Object()
-	_, kind, err := api.Scheme.ObjectVersionAndKind(obj)
+	tm, err := api.Scheme.ObjectTypeMeta(obj)
 	if err != nil {
 		return err
 	}
 
-	mapping, err := mapper.RESTMapping(kind)
+	mapping, err := mapper.RESTMapping(tm.Kind)
 	if err != nil {
 		return err
 	}

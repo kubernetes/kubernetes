@@ -50,7 +50,7 @@ func addConversionFuncs() {
 	}
 
 	// Add field conversion funcs.
-	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Pod",
+	err = api.Scheme.AddFieldLabelConversionFunc(api.Group, "v1beta3", "Pod",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -67,7 +67,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Node",
+	err = api.Scheme.AddFieldLabelConversionFunc(api.Group, "v1beta3", "Node",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name":
@@ -82,7 +82,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "ReplicationController",
+	err = api.Scheme.AddFieldLabelConversionFunc(api.Group, "v1beta3", "ReplicationController",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -96,7 +96,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Event",
+	err = api.Scheme.AddFieldLabelConversionFunc(api.Group, "v1beta3", "Event",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "involvedObject.kind",
@@ -117,7 +117,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Namespace",
+	err = api.Scheme.AddFieldLabelConversionFunc(api.Group, "v1beta3", "Namespace",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "status.phase":
@@ -130,7 +130,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Secret",
+	err = api.Scheme.AddFieldLabelConversionFunc(api.Group, "v1beta3", "Secret",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "type":
@@ -143,7 +143,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "ServiceAccount",
+	err = api.Scheme.AddFieldLabelConversionFunc(api.Group, "v1beta3", "ServiceAccount",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name":
@@ -156,7 +156,7 @@ func addConversionFuncs() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1beta3", "Endpoints",
+	err = api.Scheme.AddFieldLabelConversionFunc(api.Group, "v1beta3", "Endpoints",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name":

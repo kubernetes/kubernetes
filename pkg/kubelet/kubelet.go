@@ -1037,7 +1037,11 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 }
 
 func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, pod *api.Pod) (string, error) {
-	internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
+	tm, err := api.Scheme.ObjectTypeMeta(pod)
+	if err != nil {
+		return "", err
+	}
+	internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(tm.APIGroup, fs.APIVersion, tm.Kind, fs.FieldPath, "")
 	if err != nil {
 		return "", err
 	}

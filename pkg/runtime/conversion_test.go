@@ -45,10 +45,10 @@ func (*InternalComplex) IsAnAPIObject() {}
 func (*ExternalComplex) IsAnAPIObject() {}
 
 func TestStringMapConversion(t *testing.T) {
-	scheme := runtime.NewScheme()
+	scheme := runtime.NewScheme("api")
 	scheme.Log(t)
-	scheme.AddKnownTypeWithName("", "Complex", &InternalComplex{})
-	scheme.AddKnownTypeWithName("external", "Complex", &ExternalComplex{})
+	scheme.AddKnownTypeWithName("api", "", "Complex", &InternalComplex{})
+	scheme.AddKnownTypeWithName("api", "external", "Complex", &ExternalComplex{})
 
 	testCases := map[string]struct {
 		input    map[string][]string

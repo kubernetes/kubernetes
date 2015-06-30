@@ -27,6 +27,7 @@ import (
 type TypeMeta struct {
 	Kind       string `json:"kind,omitempty"`
 	APIVersion string `json:"apiVersion,omitempty"`
+	APIGroup   string `json:"apiGroup,omitempty"`
 }
 
 type InternalSimple struct {
@@ -43,9 +44,9 @@ func (*InternalSimple) IsAnAPIObject() {}
 func (*ExternalSimple) IsAnAPIObject() {}
 
 func TestScheme(t *testing.T) {
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
-	scheme.AddKnownTypeWithName("externalVersion", "Simple", &ExternalSimple{})
+	scheme := runtime.NewScheme("api")
+	scheme.AddKnownTypeWithName("api", "", "Simple", &InternalSimple{})
+	scheme.AddKnownTypeWithName("api", "externalVersion", "Simple", &ExternalSimple{})
 
 	// test that scheme is an ObjectTyper
 	var _ runtime.ObjectTyper = scheme
@@ -127,13 +128,13 @@ func TestScheme(t *testing.T) {
 }
 
 func TestInvalidObjectValueKind(t *testing.T) {
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
+	scheme := runtime.NewScheme("api")
+	scheme.AddKnownTypeWithName("api", "", "Simple", &InternalSimple{})
 
 	embedded := &runtime.EmbeddedObject{}
 	switch obj := embedded.Object.(type) {
 	default:
-		_, _, err := scheme.ObjectVersionAndKind(obj)
+		_, err := scheme.ObjectTypeMeta(obj)
 		if err == nil {
 			t.Errorf("Expected error on invalid kind")
 		}
@@ -141,7 +142,7 @@ func TestInvalidObjectValueKind(t *testing.T) {
 }
 
 func TestBadJSONRejection(t *testing.T) {
-	scheme := runtime.NewScheme()
+	scheme := runtime.NewScheme("api")
 	badJSONMissingKind := []byte(`{ }`)
 	if _, err := scheme.Decode(badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
@@ -194,9 +195,9 @@ func (*ExternalOptionalExtensionType) IsAnAPIObject() {}
 func (*InternalOptionalExtensionType) IsAnAPIObject() {}
 
 func TestExternalToInternalMapping(t *testing.T) {
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "OptionalExtensionType", &InternalOptionalExtensionType{})
-	scheme.AddKnownTypeWithName("testExternal", "OptionalExtensionType", &ExternalOptionalExtensionType{})
+	scheme := runtime.NewScheme("api")
+	scheme.AddKnownTypeWithName("api", "", "OptionalExtensionType", &InternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName("api", "testExternal", "OptionalExtensionType", &ExternalOptionalExtensionType{})
 
 	table := []struct {
 		obj     runtime.Object
@@ -204,7 +205,7 @@ func TestExternalToInternalMapping(t *testing.T) {
 	}{
 		{
 			&InternalOptionalExtensionType{Extension: runtime.EmbeddedObject{nil}},
-			`{"kind":"OptionalExtensionType","apiVersion":"testExternal"}`,
+			`{"kind":"OptionalExtensionType","apiVersion":"testExternal","apiGroup":"api"}`,
 		},
 	}
 
@@ -226,15 +227,15 @@ func TestExternalToInternalMapping(t *testing.T) {
 }
 
 func TestExtensionMapping(t *testing.T) {
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "ExtensionType", &InternalExtensionType{})
-	scheme.AddKnownTypeWithName("", "OptionalExtensionType", &InternalOptionalExtensionType{})
-	scheme.AddKnownTypeWithName("", "A", &ExtensionA{})
-	scheme.AddKnownTypeWithName("", "B", &ExtensionB{})
-	scheme.AddKnownTypeWithName("testExternal", "ExtensionType", &ExternalExtensionType{})
-	scheme.AddKnownTypeWithName("testExternal", "OptionalExtensionType", &ExternalOptionalExtensionType{})
-	scheme.AddKnownTypeWithName("testExternal", "A", &ExtensionA{})
-	scheme.AddKnownTypeWithName("testExternal", "B", &ExtensionB{})
+	scheme := runtime.NewScheme("api")
+	scheme.AddKnownTypeWithName("api", "", "ExtensionType", &InternalExtensionType{})
+	scheme.AddKnownTypeWithName("api", "", "OptionalExtensionType", &InternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName("api", "", "A", &ExtensionA{})
+	scheme.AddKnownTypeWithName("api", "", "B", &ExtensionB{})
+	scheme.AddKnownTypeWithName("api", "testExternal", "ExtensionType", &ExternalExtensionType{})
+	scheme.AddKnownTypeWithName("api", "testExternal", "OptionalExtensionType", &ExternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName("api", "testExternal", "A", &ExtensionA{})
+	scheme.AddKnownTypeWithName("api", "testExternal", "B", &ExtensionB{})
 
 	table := []struct {
 		obj     runtime.Object
@@ -242,13 +243,13 @@ func TestExtensionMapping(t *testing.T) {
 	}{
 		{
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionA{TestString: "foo"}}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"A","testString":"foo"}}`,
+			`{"kind":"ExtensionType","apiVersion":"testExternal","apiGroup":"api","extension":{"kind":"A","testString":"foo"}}`,
 		}, {
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionB{TestString: "bar"}}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"B","testString":"bar"}}`,
+			`{"kind":"ExtensionType","apiVersion":"testExternal","apiGroup":"api","extension":{"kind":"B","testString":"bar"}}`,
 		}, {
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{nil}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":null}`,
+			`{"kind":"ExtensionType","apiVersion":"testExternal","apiGroup":"api","extension":null}`,
 		},
 	}
 
@@ -277,9 +278,9 @@ func TestExtensionMapping(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
-	scheme.AddKnownTypeWithName("externalVersion", "Simple", &ExternalSimple{})
+	scheme := runtime.NewScheme("api")
+	scheme.AddKnownTypeWithName("api", "", "Simple", &InternalSimple{})
+	scheme.AddKnownTypeWithName("api", "externalVersion", "Simple", &ExternalSimple{})
 	codec := runtime.CodecFor(scheme, "externalVersion")
 	test := &InternalSimple{
 		TestString: "I'm the same",

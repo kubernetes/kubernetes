@@ -94,9 +94,9 @@ func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*api.Obje
 	if err != nil {
 		return nil, "", errors.NewInternalError(err)
 	}
-	_, kind, err := typer.ObjectVersionAndKind(obj)
+	tm, err := typer.ObjectTypeMeta(obj)
 	if err != nil {
 		return nil, "", errors.NewInternalError(err)
 	}
-	return objectMeta, kind, nil
+	return objectMeta, tm.Kind, nil
 }

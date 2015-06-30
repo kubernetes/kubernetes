@@ -21,19 +21,28 @@ import (
 	"reflect"
 )
 
+type groupVersion struct {
+	Group   string
+	Version string
+}
+
 // Scheme defines an entire encoding and decoding scheme.
 type Scheme struct {
 	// versionMap allows one to figure out the go type of an object with
-	// the given version and name.
-	versionMap map[string]map[string]reflect.Type
+	// the given groupVersion and name.
+	groupVersionMap map[groupVersion]map[string]reflect.Type
 
-	// typeToVersion allows one to figure out the version for a given go object.
+	// typeToGroup allows one to figure out the group for a given go object.
 	// The reflect.Type we index by should *not* be a pointer. If the same type
-	// is registered for multiple versions, the last one wins.
+	// is registered for multiple groups, the last one wins.
+	typeToGroup map[reflect.Type]string
+
+	// typeToVersion allows one to figure out the desired "apiVersion" field for a given
+	// go object. Requirements and caveats are the same as typeToGroup.
 	typeToVersion map[reflect.Type]string
 
 	// typeToKind allows one to figure out the desired "kind" field for a given
-	// go object. Requirements and caveats are the same as typeToVersion.
+	// go object. Requirements and caveats are the same as typeToGroup.
 	typeToKind map[reflect.Type][]string
 
 	// converter stores all registered conversion functions. It also has
@@ -43,6 +52,9 @@ type Scheme struct {
 	// cloner stores all registered copy functions. It also has default
 	// deep copy behavior.
 	cloner *Cloner
+
+	// defaulGroup is the assumed api group when no such field is present.
+	defaultGroup string
 
 	// Indent will cause the JSON output from Encode to be indented, iff it is true.
 	Indent bool
@@ -58,13 +70,15 @@ type Scheme struct {
 }
 
 // NewScheme manufactures a new scheme.
-func NewScheme() *Scheme {
+func NewScheme(defaultGroup string) *Scheme {
 	s := &Scheme{
-		versionMap:      map[string]map[string]reflect.Type{},
+		groupVersionMap: map[groupVersion]map[string]reflect.Type{},
+		typeToGroup:     map[reflect.Type]string{},
 		typeToVersion:   map[reflect.Type]string{},
 		typeToKind:      map[reflect.Type][]string{},
 		converter:       NewConverter(),
 		cloner:          NewCloner(),
+		defaultGroup:    defaultGroup,
 		InternalVersion: "",
 		MetaFactory:     DefaultMetaFactory,
 	}
@@ -85,7 +99,8 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 	if !ok {
 		return t.Name()
 	}
-	if internal, ok := s.versionMap[""]; ok {
+	group := s.typeToGroup[t] // must be in a group since we know a kind for t
+	if internal, ok := s.groupVersionMap[groupVersion{group, ""}]; ok {
 		for _, name := range names {
 			if t, ok := internal[name]; ok {
 				return s.typeToKind[t][0]
@@ -99,11 +114,12 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 // Encode() will refuse objects unless their type has been registered with AddKnownTypes.
 // All objects passed to types should be pointers to structs. The name that go reports for
 // the struct becomes the "kind" field when encoding.
-func (s *Scheme) AddKnownTypes(version string, types ...interface{}) {
-	knownTypes, found := s.versionMap[version]
+func (s *Scheme) AddKnownTypes(group string, version string, types ...interface{}) {
+	gv := groupVersion{group, version}
+	knownTypes, found := s.groupVersionMap[gv]
 	if !found {
 		knownTypes = map[string]reflect.Type{}
-		s.versionMap[version] = knownTypes
+		s.groupVersionMap[gv] = knownTypes
 	}
 	for _, obj := range types {
 		t := reflect.TypeOf(obj)
@@ -115,6 +131,7 @@ func (s *Scheme) AddKnownTypes(version string, types ...interface{}) {
 			panic("All types must be pointers to structs.")
 		}
 		knownTypes[t.Name()] = t
+		s.typeToGroup[t] = group
 		s.typeToVersion[t] = version
 		s.typeToKind[t] = append(s.typeToKind[t], t.Name())
 	}
@@ -123,11 +140,12 @@ func (s *Scheme) AddKnownTypes(version string, types ...interface{}) {
 // AddKnownTypeWithName is like AddKnownTypes, but it lets you specify what this type should
 // be encoded as. Useful for testing when you don't want to make multiple packages to define
 // your structs.
-func (s *Scheme) AddKnownTypeWithName(version, kind string, obj interface{}) {
-	knownTypes, found := s.versionMap[version]
+func (s *Scheme) AddKnownTypeWithName(group, version, kind string, obj interface{}) {
+	gv := groupVersion{group, version}
+	knownTypes, found := s.groupVersionMap[gv]
 	if !found {
 		knownTypes = map[string]reflect.Type{}
-		s.versionMap[version] = knownTypes
+		s.groupVersionMap[gv] = knownTypes
 	}
 	t := reflect.TypeOf(obj)
 	if t.Kind() != reflect.Ptr {
@@ -138,13 +156,14 @@ func (s *Scheme) AddKnownTypeWithName(version, kind string, obj interface{}) {
 		panic("All types must be pointers to structs.")
 	}
 	knownTypes[kind] = t
+	s.typeToGroup[t] = group
 	s.typeToVersion[t] = version
 	s.typeToKind[t] = append(s.typeToKind[t], kind)
 }
 
 // KnownTypes returns an array of the types that are known for a particular version.
-func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
-	all, ok := s.versionMap[version]
+func (s *Scheme) KnownTypes(group, version string) map[string]reflect.Type {
+	all, ok := s.groupVersionMap[groupVersion{group, version}]
 	if !ok {
 		return map[string]reflect.Type{}
 	}
@@ -157,14 +176,14 @@ func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
 
 // NewObject returns a new object of the given version and name,
 // or an error if it hasn't been registered.
-func (s *Scheme) NewObject(versionName, kind string) (interface{}, error) {
-	if types, ok := s.versionMap[versionName]; ok {
+func (s *Scheme) NewObject(group, version, kind string) (interface{}, error) {
+	if types, ok := s.groupVersionMap[groupVersion{group, version}]; ok {
 		if t, ok := types[kind]; ok {
 			return reflect.New(t).Interface(), nil
 		}
-		return nil, &notRegisteredErr{kind: kind, version: versionName}
+		return nil, &notRegisteredErr{group: group, version: version, kind: kind}
 	}
-	return nil, &notRegisteredErr{kind: kind, version: versionName}
+	return nil, &notRegisteredErr{group: group, version: version, kind: kind}
 }
 
 // AddConversionFuncs adds functions to the list of conversion functions. The given
@@ -273,8 +292,11 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 
 // Recognizes returns true if the scheme is able to handle the provided version and kind
 // of an object.
-func (s *Scheme) Recognizes(version, kind string) bool {
-	m, ok := s.versionMap[version]
+func (s *Scheme) Recognizes(group, version, kind string) bool {
+	if group == "" {
+		group = s.defaultGroup
+	}
+	m, ok := s.groupVersionMap[groupVersion{group, version}]
 	if !ok {
 		return false
 	}
@@ -304,11 +326,11 @@ func (s *Scheme) DeepCopy(in interface{}) (interface{}, error) {
 func (s *Scheme) Convert(in, out interface{}) error {
 	inVersion := "unknown"
 	outVersion := "unknown"
-	if v, _, err := s.ObjectVersionAndKind(in); err == nil {
-		inVersion = v
+	if _, version, _, err := s.ObjectTypeMeta(in); err == nil {
+		inVersion = version
 	}
-	if v, _, err := s.ObjectVersionAndKind(out); err == nil {
-		outVersion = v
+	if _, version, _, err := s.ObjectTypeMeta(out); err == nil {
+		outVersion = version
 	}
 	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
 	if flags == 0 {
@@ -336,12 +358,12 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 	}
 	outKind := kinds[0]
 
-	inVersion, _, err := s.ObjectVersionAndKind(in)
+	inGroup, inVersion, _, err := s.ObjectTypeMeta(in)
 	if err != nil {
 		return nil, err
 	}
 
-	out, err := s.NewObject(outVersion, outKind)
+	out, err := s.NewObject(inGroup, outVersion, outKind)
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +373,7 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 		return nil, err
 	}
 
-	if err := s.SetVersionAndKind(outVersion, outKind, out); err != nil {
+	if err := s.SetTypeMeta(inGroup, outVersion, outKind, out); err != nil {
 		return nil, err
 	}
 
@@ -373,35 +395,41 @@ func (s *Scheme) generateConvertMeta(srcVersion, destVersion string, in interfac
 	}
 }
 
-// DataVersionAndKind will return the APIVersion and Kind of the given wire-format
+// DataTypeMeta will return the APIVersion and Kind of the given wire-format
 // encoding of an API Object, or an error.
-func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
-	return s.MetaFactory.Interpret(data)
+func (s *Scheme) DataTypeMeta(data []byte) (group, version, kind string, err error) {
+	group, version, kind, err = s.MetaFactory.Interpret(data)
+	if err != nil {
+		return
+	}
+	if group == "" {
+		group = s.defaultGroup
+	}
+	return
 }
 
-// ObjectVersionAndKind returns the API version and kind of the go object,
+// ObjectTypeMeta returns the API version and kind of the go object,
 // or an error if it's not a pointer or is unregistered.
-func (s *Scheme) ObjectVersionAndKind(obj interface{}) (apiVersion, kind string, err error) {
+func (s *Scheme) ObjectTypeMeta(obj interface{}) (group, version, kind string, err error) {
 	v, err := EnforcePtr(obj)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	t := v.Type()
+	group, gOK := s.typeToGroup[t]
 	version, vOK := s.typeToVersion[t]
 	kinds, kOK := s.typeToKind[t]
-	if !vOK || !kOK {
-		return "", "", &notRegisteredErr{t: t}
+	if !gOK || !vOK || !kOK {
+		return "", "", "", &notRegisteredErr{t: t}
 	}
-	apiVersion = version
-	kind = kinds[0]
-	return
+	return group, version, kinds[0], nil
 }
 
 // SetVersionAndKind sets the version and kind fields (with help from
 // MetaInsertionFactory). Returns an error if this isn't possible. obj
 // must be a pointer.
-func (s *Scheme) SetVersionAndKind(version, kind string, obj interface{}) error {
-	return s.MetaFactory.Update(version, kind, obj)
+func (s *Scheme) SetTypeMeta(group, version, kind string, obj interface{}) error {
+	return s.MetaFactory.Update(group, version, kind, obj)
 }
 
 // maybeCopy copies obj if it is not a pointer, to get a settable/addressable

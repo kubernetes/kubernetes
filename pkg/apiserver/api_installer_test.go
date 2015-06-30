@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/emicklei/go-restful"
 )
@@ -43,7 +44,7 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 			Name:      "foo",
 			Namespace: "other",
 		},
-		TypeMeta: api.TypeMeta{
+		TypeMeta: runtime.TypeMeta{
 			Kind: "Service",
 		},
 	}

@@ -46,7 +46,7 @@ func (fakeConvertor) ConvertToVersion(in runtime.Object, _ string) (runtime.Obje
 	return in, nil
 }
 
-func (fakeConvertor) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
+func (fakeConvertor) ConvertFieldLabel(group, version, kind, label, value string) (string, string, error) {
 	return label, value, nil
 }
 

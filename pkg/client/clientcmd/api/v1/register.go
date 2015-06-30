@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -25,7 +26,7 @@ import (
 var Codec = runtime.CodecFor(api.Scheme, "v1")
 
 func init() {
-	api.Scheme.AddKnownTypes("v1",
+	api.Scheme.AddKnownTypes(kapi.Group, "v1",
 		&Config{},
 	)
 }

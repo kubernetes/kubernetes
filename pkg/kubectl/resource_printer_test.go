@@ -35,19 +35,19 @@ import (
 )
 
 type testStruct struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata,omitempty"`
-	Key            string         `json:"Key"`
-	Map            map[string]int `json:"Map"`
-	StringList     []string       `json:"StringList"`
-	IntList        []int          `json:"IntList"`
+	runtime.TypeMeta `json:",inline"`
+	api.ObjectMeta   `json:"metadata,omitempty"`
+	Key              string         `json:"Key"`
+	Map              map[string]int `json:"Map"`
+	StringList       []string       `json:"StringList"`
+	IntList          []int          `json:"IntList"`
 }
 
 func (ts *testStruct) IsAnAPIObject() {}
 
 func init() {
-	api.Scheme.AddKnownTypes("", &testStruct{})
-	api.Scheme.AddKnownTypes(testapi.Version(), &testStruct{})
+	api.Scheme.AddKnownTypes(api.Group, "", &testStruct{})
+	api.Scheme.AddKnownTypes(api.Group, testapi.Version(), &testStruct{})
 }
 
 var testData = testStruct{

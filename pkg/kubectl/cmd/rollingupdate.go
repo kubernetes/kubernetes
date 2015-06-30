@@ -175,8 +175,8 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		}
 		newRc, ok = obj.(*api.ReplicationController)
 		if !ok {
-			if _, kind, err := typer.ObjectVersionAndKind(obj); err == nil {
-				return cmdutil.UsageError(cmd, "%s contains a %s not a ReplicationController", filename, kind)
+			if tm, err := typer.ObjectTypeMeta(obj); err == nil {
+				return cmdutil.UsageError(cmd, "%s contains a %s not a ReplicationController", filename, tm.Kind)
 			}
 			glog.V(4).Infof("Object %#v is not a ReplicationController", obj)
 			return cmdutil.UsageError(cmd, "%s does not specify a valid ReplicationController", filename)
