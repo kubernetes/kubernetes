@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,10 @@ source "$KUBE_ROOT/build/common.sh"
 KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
 
 kube::build::verify_prereqs
+
+kube::build::build_ui_image
+kube::build::run_build_ui_command hack/ui/build-www.sh
+
 kube::build::build_image
 kube::build::run_build_command hack/build-cross.sh
 

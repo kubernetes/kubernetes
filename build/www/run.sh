@@ -14,22 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script sets up a go workspace locally and builds all for all appropriate
-# platforms.
+# Run a command in the Docker ui build container.  Typically this will be one of
+# the commands in `hack/ui`.  When running in the ui build container the user is sure
+# to have a consistent reproducible build environment.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/build/common.sh"
 
-kube::ui::build_ui
-
-KUBE_BUILD_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
-kube::golang::build_binaries "${KUBE_SERVER_TARGETS[@]}"
-
-KUBE_BUILD_PLATFORMS=("${KUBE_CLIENT_PLATFORMS[@]}")
-kube::golang::build_binaries "${KUBE_CLIENT_TARGETS[@]}" "${KUBE_TEST_TARGETS[@]}"
-
-kube::golang::place_bins
+kube::build::verify_prereqs
+kube::build::build_image_www
+kube::build::run_www_build_command "$@"

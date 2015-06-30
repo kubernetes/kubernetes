@@ -34,6 +34,7 @@ find_files() {
         -o -wholename './.git' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/Godeps/*' \
+        -o -wholename '*/node_modules/*' \
       \) -prune \
     \) -name "*.${ext}"
 }
