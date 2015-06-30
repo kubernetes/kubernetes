@@ -64,3 +64,4 @@ www/test_out
 # precommit temporary directories created by ./hack/verify-gendocs.sh and ./hack/lib/util.sh
 _tmp/
 doc_tmp/
+cmd/gendocs/hack/cmd_generated.go 
