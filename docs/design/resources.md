@@ -1,4 +1,9 @@
-**Note that the model described in this document has not yet been implemented. The tracking issue for implementation of this model is [#168](https://github.com/GoogleCloudPlatform/kubernetes/issues/168). Currently, only memory and cpu limits on containers (not pods) are supported. "memory" is in bytes and "cpu" is in milli-cores.**
+**Note: this is a design doc, which describes features that have not been completely implemented.
+User documentation of the current state is [here](../resources.md).  The tracking issue for
+implementation of this model is
+[#168](https://github.com/GoogleCloudPlatform/kubernetes/issues/168).  Currently, only memory and
+cpu limits on containers (not pods) are supported.  "memory" is in bytes and "cpu" is in
+milli-cores.**
 
 # The Kubernetes resource model
 
@@ -208,4 +213,4 @@ This is the amount of time a container spends accessing disk, including actuator
   * Compressible? yes
 
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/resources.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/resources.md?pixel)]()

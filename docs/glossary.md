@@ -33,7 +33,7 @@ can be created/destroyed together.  See [pods](./pods.md).
 for easy scaling of replicated systems, and handles restarting of a Pod when the machine it is on reboots or otherwise fails.
 
 **Resource**
-: CPU, memory, and other things that a pod can request.   See [resources](resources.md).
+: CPU, memory, and other things that a pod can request.   See [compute resources](compute_resources.md).
 
 **Secret**
 : An object containing sensitive information, such as authentication tokens, which can be made available to containers upon request. See [secrets](secrets.md).
