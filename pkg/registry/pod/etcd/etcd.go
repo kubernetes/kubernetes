@@ -203,9 +203,6 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 	return r.store.Update(ctx, obj)
 }
 
-// Implement GetterWithOptions
-var _ = rest.GetterWithOptions(&LogREST{})
-
 // LogREST implements the log endpoint for a Pod
 type LogREST struct {
 	store       *etcdgeneric.Etcd

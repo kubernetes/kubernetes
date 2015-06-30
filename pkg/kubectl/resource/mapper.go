@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
 )
@@ -46,6 +48,9 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from %q: %v", source, err)
 	}
+	if ok := registered.IsRegisteredAPIVersion(version); !ok {
+		return nil, fmt.Errorf("API version %q in %q isn't supported, only supports API versions %q", version, source, registered.RegisteredVersions)
+	}
 	if kind == "" {
 		return nil, fmt.Errorf("kind not set in %q", source)
 	}
@@ -64,13 +69,19 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	name, _ := mapping.MetadataAccessor.Name(obj)
 	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
 	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
-	return &Info{
-		Mapping:   mapping,
-		Client:    client,
-		Namespace: namespace,
-		Name:      name,
-		Source:    source,
 
+	var versionedObject interface{}
+
+	if vo, _, _, err := api.Scheme.Raw().DecodeToVersionedObject(data); err == nil {
+		versionedObject = vo
+	}
+	return &Info{
+		Mapping:         mapping,
+		Client:          client,
+		Namespace:       namespace,
+		Name:            name,
+		Source:          source,
+		VersionedObject: versionedObject,
 		Object:          obj,
 		ResourceVersion: resourceVersion,
 	}, nil

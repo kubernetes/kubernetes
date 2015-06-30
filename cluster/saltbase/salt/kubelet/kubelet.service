@@ -1,8 +1,6 @@
 [Unit]
 Description=Kubernetes Kubelet Server
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-After=docker.service
-Requires=docker.service
 
 [Service]
 EnvironmentFile=/etc/sysconfig/kubelet

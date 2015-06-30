@@ -183,6 +183,28 @@ func Failf(format string, a ...interface{}) {
 	Fail(fmt.Sprintf(format, a...), 1)
 }
 
+func Skipf(format string, args ...interface{}) {
+	Skip(fmt.Sprintf(format, args...))
+}
+
+func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
+	if testContext.CloudConfig.NumNodes < minNodeCount {
+		Skipf("Requires at least %d nodes (not %d)", minNodeCount, testContext.CloudConfig.NumNodes)
+	}
+}
+
+func SkipIfProviderIs(unsupportedProviders ...string) {
+	if providerIs(unsupportedProviders...) {
+		Skipf("Not supported for providers %v (found %s)", unsupportedProviders, testContext.Provider)
+	}
+}
+
+func SkipUnlessProviderIs(supportedProviders ...string) {
+	if !providerIs(supportedProviders...) {
+		Skipf("Only supported for providers %v (not %s)", supportedProviders, testContext.Provider)
+	}
+}
+
 func providerIs(providers ...string) bool {
 	for _, provider := range providers {
 		if strings.ToLower(provider) == strings.ToLower(testContext.Provider) {
@@ -364,12 +386,21 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 		},
 		Status: api.NamespaceStatus{},
 	}
-	got, err := c.Namespaces().Create(namespaceObj)
-	if err != nil {
-		return got, err
+	// Be robust about making the namespace creation call.
+	var got *api.Namespace
+	if err := wait.Poll(poll, singleCallTimeout, func() (bool, error) {
+		var err error
+		got, err = c.Namespaces().Create(namespaceObj)
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, err
 	}
+
 	if err := waitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
-		return got, err
+		return nil, err
 	}
 	return got, nil
 }
@@ -493,7 +524,7 @@ func waitForRCPodOnNode(c *client.Client, ns, rcName, node string) (*api.Pod, er
 	return p, err
 }
 
-// waitForRCPodOnNode returns nil if the pod from the given replication controller (decribed by rcName) no longer exists.
+// waitForRCPodToDisappear returns nil if the pod from the given replication controller (decribed by rcName) no longer exists.
 // In case of failure or too long waiting time, an error is returned.
 func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
@@ -518,9 +549,9 @@ func waitForRCPodToDisappear(c *client.Client, ns, rcName, podName string) error
 	})
 }
 
-// waits until the service appears (exists == true), or disappears (exists == false)
+// waitForService waits until the service appears (exist == true), or disappears (exist == false)
 func waitForService(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	return wait.Poll(interval, timeout, func() (bool, error) {
+	err := wait.Poll(interval, timeout, func() (bool, error) {
 		_, err := c.Services(namespace).Get(name)
 		if err != nil {
 			Logf("Get service %s in namespace %s failed (%v).", name, namespace, err)
@@ -530,11 +561,16 @@ func waitForService(c *client.Client, namespace, name string, exist bool, interv
 			return exist, nil
 		}
 	})
+	if err != nil {
+		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
+		return fmt.Errorf("error waiting for service %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+	}
+	return nil
 }
 
-// waits until the RC appears (exists == true), or disappears (exists == false)
+// waitForReplicationController waits until the RC appears (exist == true), or disappears (exist == false)
 func waitForReplicationController(c *client.Client, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	return wait.Poll(interval, timeout, func() (bool, error) {
+	err := wait.Poll(interval, timeout, func() (bool, error) {
 		_, err := c.ReplicationControllers(namespace).Get(name)
 		if err != nil {
 			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
@@ -544,6 +580,11 @@ func waitForReplicationController(c *client.Client, namespace, name string, exis
 			return exist, nil
 		}
 	})
+	if err != nil {
+		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
+		return fmt.Errorf("error waiting for ReplicationController %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+	}
+	return nil
 }
 
 // Context for checking pods responses by issuing GETs to them and verifying if the answer with pod name.

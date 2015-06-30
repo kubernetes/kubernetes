@@ -125,7 +125,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			fielderrors.NewFieldNotSupported("field[0].name", "bar"),
+			fielderrors.NewFieldValueNotSupported("field[0].name", "bar", nil),
 			&api.StatusDetails{
 				Kind: "kind",
 				Name: "name",

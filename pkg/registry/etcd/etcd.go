@@ -26,19 +26,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-
-	"github.com/golang/glog"
 )
 
 const (
-	// ControllerPath is the path to controller resources in etcd
-	ControllerPath string = "/controllers"
 	// ServicePath is the path to service resources in etcd
 	ServicePath string = "/services/specs"
 )
+
+// TODO(wojtek-t): Change it to use rest.StandardStorage (as everything else)
+// and move it to service/ directory.
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
 //       kubelet (and vice versa)
@@ -83,105 +81,6 @@ func MakeEtcdItemKey(ctx api.Context, prefix string, id string) (string, error) 
 	}
 	key = key + "/" + id
 	return key, nil
-}
-
-// ListControllers obtains a list of ReplicationControllers.
-func (r *Registry) ListControllers(ctx api.Context) (*api.ReplicationControllerList, error) {
-	controllers := &api.ReplicationControllerList{}
-	key := makeControllerListKey(ctx)
-	err := r.ExtractToList(key, controllers)
-	return controllers, err
-}
-
-// WatchControllers begins watching for new, changed, or deleted controllers.
-func (r *Registry) WatchControllers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	if !field.Empty() {
-		return nil, fmt.Errorf("field selectors are not supported on replication controllers")
-	}
-	version, err := tools.ParseWatchResourceVersion(resourceVersion, "replicationControllers")
-	if err != nil {
-		return nil, err
-	}
-	key := makeControllerListKey(ctx)
-	return r.WatchList(key, version, func(obj runtime.Object) bool {
-		controller, ok := obj.(*api.ReplicationController)
-		if !ok {
-			// Must be an error: return true to propagate to upper level.
-			return true
-		}
-		match := label.Matches(labels.Set(controller.Labels))
-		if match {
-			pods, err := r.pods.ListPods(ctx, labels.Set(controller.Spec.Selector).AsSelector())
-			if err != nil {
-				glog.Warningf("Error listing pods: %v", err)
-				// No object that's useable so drop it on the floor
-				return false
-			}
-			if pods == nil {
-				glog.Warningf("Pods list is nil.  This should never happen...")
-				// No object that's useable so drop it on the floor
-				return false
-			}
-			controller.Status.Replicas = len(pods.Items)
-		}
-		return match
-	})
-}
-
-// makeControllerListKey constructs etcd paths to controller directories enforcing namespace rules.
-func makeControllerListKey(ctx api.Context) string {
-	return MakeEtcdListKey(ctx, ControllerPath)
-}
-
-// makeControllerKey constructs etcd paths to controller items enforcing namespace rules.
-func makeControllerKey(ctx api.Context, id string) (string, error) {
-	return MakeEtcdItemKey(ctx, ControllerPath, id)
-}
-
-// GetController gets a specific ReplicationController specified by its ID.
-func (r *Registry) GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error) {
-	var controller api.ReplicationController
-	key, err := makeControllerKey(ctx, controllerID)
-	if err != nil {
-		return nil, err
-	}
-	err = r.ExtractObj(key, &controller, false)
-	if err != nil {
-		return nil, etcderr.InterpretGetError(err, "replicationController", controllerID)
-	}
-	return &controller, nil
-}
-
-// CreateController creates a new ReplicationController.
-func (r *Registry) CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
-	key, err := makeControllerKey(ctx, controller.Name)
-	if err != nil {
-		return nil, err
-	}
-	out := &api.ReplicationController{}
-	err = r.CreateObj(key, controller, out, 0)
-	return out, etcderr.InterpretCreateError(err, "replicationController", controller.Name)
-}
-
-// UpdateController replaces an existing ReplicationController.
-func (r *Registry) UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
-	key, err := makeControllerKey(ctx, controller.Name)
-	if err != nil {
-		return nil, err
-	}
-	out := &api.ReplicationController{}
-	err = r.SetObj(key, controller, out, 0)
-	return out, etcderr.InterpretUpdateError(err, "replicationController", controller.Name)
-}
-
-// DeleteController deletes a ReplicationController specified by its ID.
-func (r *Registry) DeleteController(ctx api.Context, controllerID string) error {
-	key, err := makeControllerKey(ctx, controllerID)
-	if err != nil {
-		return err
-	}
-	err = r.Delete(key, false)
-	return etcderr.InterpretDeleteError(err, "replicationController", controllerID)
 }
 
 // makePodListKey constructs etcd paths to service directories enforcing namespace rules.

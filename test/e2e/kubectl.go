@@ -101,24 +101,22 @@ var _ = Describe("Kubectl client", func() {
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			By("rolling-update to new replication controller")
 			runKubectl("rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", kittenPath, fmt.Sprintf("--namespace=%v", ns))
-			// TODO: revisit the expected replicas once #9645 is resolved
-			validateController(c, kittenImage, 4, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
+			validateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
 			// Everything will hopefully be cleaned up when the namespace is deleted.
 		})
 	})
 
 	Describe("Guestbook application", func() {
 		var guestbookPath string
+
 		BeforeEach(func() {
 			guestbookPath = filepath.Join(testContext.RepoRoot, "examples/guestbook")
+
+			// requires ExternalLoadBalancer support
+			SkipUnlessProviderIs("gce", "gke", "aws")
 		})
 
 		It("should create and stop a working application", func() {
-			if !providerIs("gce", "gke", "aws") {
-				By(fmt.Sprintf("Skipping guestbook, uses createExternalLoadBalancer, a (gce|gke|aws) feature"))
-				return
-			}
-
 			defer cleanup(guestbookPath, ns, frontendSelector, redisMasterSelector, redisSlaveSelector)
 
 			By("creating all guestbook components")

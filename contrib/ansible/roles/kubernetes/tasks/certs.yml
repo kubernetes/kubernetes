@@ -1,0 +1,52 @@
+---
+- name: Create system kube-cert groups
+  group: name={{ kube_cert_group }} state=present system=yes
+
+- name: Create system kube user
+  user:
+    name=kube
+    comment="Kubernetes user"
+    shell=/sbin/nologin
+    state=present
+    system=yes
+    groups={{ kube_cert_group }}
+
+- name: make sure the certificate directory exits
+  file:
+    path={{ kube_cert_dir }}
+    state=directory
+    mode=o-rwx
+    group={{ kube_cert_group }}
+
+- name: Install rsync to push certs around
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+    name: rsync
+    state: latest
+  when: not is_atomic
+
+- name: Generating RSA key for cert node to push to others
+  user: name=root generate_ssh_key=yes
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+
+- name: Downloading pub key
+  fetch:
+    src=/root/.ssh/id_rsa.pub
+    dest=/tmp/id_rsa.pub
+    flat=yes
+    fail_on_missing=true
+  run_once: true
+  delegate_to: "{{ groups['masters'][0] }}"
+  changed_when: false
+
+- include: gen_certs.yml
+  when: inventory_hostname == groups['masters'][0]
+
+- include: place_certs.yml
+
+- name: Delete the downloaded pub key
+  local_action: file path=/tmp/id_rsa.pub state=absent
+  sudo: false
+  run_once: true
+  changed_when: false

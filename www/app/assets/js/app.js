@@ -378,7 +378,7 @@ app.controller('TabCtrl', [
       .service('cAdvisorService', ["$http", "$q", "ENV", function($http, $q, ENV) {
         var _baseUrl = function(minionIp) {
           var minionPort = ENV['/']['cAdvisorPort'] || "8081";
-          var proxy = ENV['/']['cAdvisorProxy'] || "/api/v1beta3/proxy/nodes/";
+          var proxy = ENV['/']['cAdvisorProxy'] || "/api/v1/proxy/nodes/";
 
           return proxy + minionIp + ':' + minionPort + '/api/v1.0/';
         };
@@ -961,7 +961,7 @@ app.controller('cAdvisorController', [
         var f = fsDataArray[i];
 
         items.push({
-          label: 'FS #' + f.filesystemNumber,
+          label: 'Filesystem #' + f.filesystemNumber,
           stats: f.usageDescription + ' / ' + f.capacityDescription,
           value: f.totalUsage,
           classNames: getColorForIndex(2 + i, f.totalUsage),
@@ -1967,7 +1967,7 @@ app.controller('ServiceCtrl', [
 
                   var label_legend_area = legendSvg.append("svg:g")
                                               .attr("class", "label_legend_area")
-                                              .attr("transform", "translate(" + ((w - 185) / 2) + "," + 35 + ")");
+                                              .attr("transform", "translate(" + ((w - 215) / 2) + "," + 35 + ")");
 
                   var legend_group = label_legend_area.append("svg:g").attr("class", "legend_group");
 
@@ -1977,7 +1977,7 @@ app.controller('ServiceCtrl', [
 
                   var stats_group = label_legend_area.append("svg:g")
                                         .attr("class", "stats_group")
-                                        .attr("transform", "translate(" + 85 + "," + 11 + ")");
+                                        .attr("transform", "translate(" + 115 + "," + 11 + ")");
 
                   var path_group = chart.append("svg:g")
                                        .attr("class", "path_group")
@@ -2134,9 +2134,7 @@ app.controller('ServiceCtrl', [
                   valueLabels.enter()
                       .append("svg:text")
                       .attr("class", "value")
-                      .attr(
-                           "transform", function(d) { return "translate(" + (getRadiusRing(ir, counts - 1)) + ", 0)"; })
-                      .attr("dx", function(d, i) { return 0; })
+                      .attr("dx", function(d, i) { return 68; })
                       .attr("dy", function(d, i) { return (thickness + 3) * i; })
                       .attr("text-anchor", function(d) { return "start"; })
                       .text(function(d) { return d.value; });
@@ -2219,7 +2217,8 @@ app.controller('ServiceCtrl', [
                     return;
                   }
 
-                  svg.selectAll("*").remove();
+                  d3.select(element[0]).select("svg.chart").remove();
+                  d3.select(element[0]).select("svg.legend").remove();
 
                   var graph = $(element[0]);
                   var w = scope.graphWidth;

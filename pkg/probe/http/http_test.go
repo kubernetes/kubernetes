@@ -29,24 +29,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 )
 
-func TestFormatURL(t *testing.T) {
-	testCases := []struct {
-		host   string
-		port   int
-		path   string
-		result string
-	}{
-		{"localhost", 93, "", "http://localhost:93"},
-		{"localhost", 93, "/path", "http://localhost:93/path"},
-	}
-	for _, test := range testCases {
-		url := formatURL(test.host, test.port, test.path)
-		if url != test.result {
-			t.Errorf("Expected %s, got %s", test.result, url)
-		}
-	}
-}
-
 func TestHTTPProbeChecker(t *testing.T) {
 	handleReq := func(s int, body string) func(w http.ResponseWriter) {
 		return func(w http.ResponseWriter) {
@@ -74,15 +56,15 @@ func TestHTTPProbeChecker(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		host, port, err := net.SplitHostPort(u.Host)
+		_, port, err := net.SplitHostPort(u.Host)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		p, err := strconv.Atoi(port)
+		_, err = strconv.Atoi(port)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		health, output, err := prober.Probe(host, p, "", 1*time.Second)
+		health, output, err := prober.Probe(u, 1*time.Second)
 		if test.health == probe.Unknown && err == nil {
 			t.Errorf("Expected error")
 		}

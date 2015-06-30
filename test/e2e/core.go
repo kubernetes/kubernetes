@@ -36,6 +36,8 @@ func coreDump(dir string) {
 		return
 	}
 	provider := testContext.Provider
+
+	// requires ssh
 	if !providerIs("gce", "gke") {
 		fmt.Printf("Skipping SSH core dump, which is not implemented for %s", provider)
 		return

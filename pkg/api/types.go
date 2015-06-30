@@ -551,7 +551,7 @@ type RBDVolumeSource struct {
 
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
-	// Optional: If specified, this must be a IANA_SVC_NAME  Each named port
+	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
 	// in a pod must have a unique name.
 	Name string `json:"name,omitempty"`
 	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
@@ -616,7 +616,19 @@ type HTTPGetAction struct {
 	Port util.IntOrString `json:"port,omitempty"`
 	// Optional: Host name to connect to, defaults to the pod IP.
 	Host string `json:"host,omitempty"`
+	// Optional: Scheme to use for connecting to the host, defaults to HTTP.
+	Scheme URIScheme `json:"scheme,omitempty"`
 }
+
+// URIScheme identifies the scheme used for connection to a host for Get actions
+type URIScheme string
+
+const (
+	// URISchemeHTTP means that the scheme used will be http://
+	URISchemeHTTP URIScheme = "HTTP"
+	// URISchemeHTTPS means that the scheme used will be https://
+	URISchemeHTTPS URIScheme = "HTTPS"
+)
 
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {

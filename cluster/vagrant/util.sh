@@ -133,7 +133,6 @@ function create-provision-scripts {
     echo "MASTER_PASSWD='${MASTER_PASSWD}'"
     echo "KUBE_USER='${KUBE_USER}'"
     echo "KUBE_PASSWORD='${KUBE_PASSWORD}'"
-    echo "ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
     echo "ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
     echo "LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
     echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"

@@ -57,7 +57,7 @@ func TestHTTPKubeletClient(t *testing.T) {
 
 	c := &HTTPKubeletClient{
 		Client: http.DefaultClient,
-		Port:   uint(port),
+		Config: &KubeletConfig{Port: uint(port)},
 	}
 	gotObj, _, err := c.HealthCheck(parts[0])
 	if err != nil {
@@ -91,7 +91,7 @@ func TestHTTPKubeletClientError(t *testing.T) {
 
 	c := &HTTPKubeletClient{
 		Client: http.DefaultClient,
-		Port:   uint(port),
+		Config: &KubeletConfig{Port: uint(port)},
 	}
 	gotObj, _, err := c.HealthCheck(parts[0])
 	if gotObj != expectObj {

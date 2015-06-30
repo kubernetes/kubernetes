@@ -113,9 +113,13 @@ func NewFieldInvalid(field string, value interface{}, detail string) *Validation
 	return &ValidationError{ValidationErrorTypeInvalid, field, value, detail}
 }
 
-// NewFieldNotSupported returns a *ValidationError indicating "unsupported value"
-func NewFieldNotSupported(field string, value interface{}) *ValidationError {
-	return &ValidationError{ValidationErrorTypeNotSupported, field, value, ""}
+// NewFieldValueNotSupported returns a *ValidationError indicating "unsupported value"
+func NewFieldValueNotSupported(field string, value interface{}, validValues []string) *ValidationError {
+	detail := ""
+	if validValues != nil && len(validValues) > 0 {
+		detail = "supported values: " + strings.Join(validValues, ", ")
+	}
+	return &ValidationError{ValidationErrorTypeNotSupported, field, value, detail}
 }
 
 // NewFieldForbidden returns a *ValidationError indicating "forbidden"

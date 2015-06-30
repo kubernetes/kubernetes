@@ -7,8 +7,8 @@ This guide assumes knowledge of Kubernetes fundamentals and that you have a clus
 
 ## Provisioning
 
-A PersistentVolume in Kubernetes represents a real piece of underlying storage capacity in the infrastructure.  Cluster administrators
-must first create storage (create their GCE disks, export their NFS shares, etc.) in order for Kubernetes to mount it.
+A Persistent Volume (PV) in Kubernetes represents a real piece of underlying storage capacity in the infrastructure.  Cluster administrators
+must first create storage (create their Google Compute Engine (GCE) disks, export their NFS shares, etc.) in order for Kubernetes to mount it.
 
 PVs are intended for "network volumes" like GCE Persistent Disks, NFS shares, and AWS ElasticBlockStore volumes.  ```HostPath``` was included
 for ease of development and testing.  You'll create a local ```HostPath``` for this example.

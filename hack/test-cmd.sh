@@ -143,7 +143,6 @@ kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
 # Start controller manager
 kube::log::status "Starting controller-manager"
 "${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
-  --machines="127.0.0.1" \
   --port="${CTLRMGR_PORT}" \
   --master="127.0.0.1:${API_PORT}" 1>&2 &
 CTLRMGR_PID=$!
@@ -378,14 +377,20 @@ for version in "${kube_api_versions[@]}"; do
   kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
-
-  ## --patch update pod can change image
-  # Pre-condition: valid-pod POD is running
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+ 
+  ## Patch pod can change image
   # Command
-  kubectl update "${kube_flags[@]}" pod valid-pod --patch='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
+  kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
   # Post-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
+
+  ## --force replace pod can change other field, e.g., spec.container.name
+  # Command
+  kubectl get "${kube_flags[@]}" pod valid-pod -o json | sed 's/"kubernetes-serve-hostname"/"replaced-k8s-serve-hostname"/g' > tmp-valid-pod.json
+  kubectl replace "${kube_flags[@]}" --force -f tmp-valid-pod.json
+  # Post-condition: spec.container.name = "replaced-k8s-serve-hostname"
+  kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'replaced-k8s-serve-hostname'
+  rm tmp-valid-pod.json
 
   ### Overwriting an existing label is not permitted
   # Pre-condition: name is valid-pod
@@ -411,6 +416,21 @@ for version in "${kube_api_versions[@]}"; do
   # Post-condition: no POD is running
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  ### Create two PODs from 1 yaml file
+  # Pre-condition: no POD is running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f examples/multi-pod.yaml "${kube_flags[@]}"
+  # Post-condition: valid-pod and redis-proxy PODs are running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:redis-proxy:'
+
+  ### Delete two PODs from 1 yaml file
+  # Pre-condition: redis-master and redis-proxy PODs are running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-master:redis-proxy:'
+  # Command
+  kubectl delete -f examples/multi-pod.yaml "${kube_flags[@]}"
+  # Post-condition: no PODs are running
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
   ##############
   # Namespaces #
@@ -522,7 +542,7 @@ __EOF__
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:service-.*-test:'
 
   ### Identity
-  kubectl get service "${kube_flags[@]}" service-${version}-test -o json | kubectl update "${kube_flags[@]}" -f -
+  kubectl get service "${kube_flags[@]}" service-${version}-test -o json | kubectl replace "${kube_flags[@]}" -f -
 
   ### Delete services by id
   # Pre-condition: redis-master-service service is running
@@ -705,13 +725,13 @@ __EOF__
 
   kube::test::describe_object_assert nodes "127.0.0.1" "Name:" "Labels:" "CreationTimestamp:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
 
-  ### --patch update can mark node unschedulable
+  ### kubectl patch update can mark node unschedulable
   # Pre-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
-  kubectl update "${kube_flags[@]}" nodes "127.0.0.1" --patch='{"spec":{"unschedulable":true}}'
+  kubectl patch "${kube_flags[@]}" nodes "127.0.0.1" -p='{"spec":{"unschedulable":true}}'
   # Post-condition: node is unschedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" 'true'
-  kubectl update "${kube_flags[@]}" nodes "127.0.0.1" --patch='{"spec":{"unschedulable":null}}'
+  kubectl patch "${kube_flags[@]}" nodes "127.0.0.1" -p='{"spec":{"unschedulable":null}}'
   # Post-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
 

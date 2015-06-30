@@ -1,0 +1,21 @@
+###
+# kubernetes kubelet (node) config
+
+# The address for the info server to serve on (set to 0.0.0.0 or "" for all interfaces)
+KUBELET_ADDRESS="--address=0.0.0.0"
+
+# The port for the info server to serve on
+# KUBELET_PORT="--port=10250"
+
+# You may leave this blank to use the actual hostname
+KUBELET_HOSTNAME="--hostname_override={{ inventory_hostname }}"
+
+# location of the api-server
+KUBELET_API_SERVER="--api_servers=https://{{ groups['masters'][0]}}:443"
+
+# Add your own!
+{% if dns_setup %}
+KUBELET_ARGS="--cluster_dns={{ dns_server }} --cluster_domain={{ dns_domain }} --kubeconfig={{ kube_config_dir}}/kubelet.kubeconfig"
+{% else %}
+KUBELET_ARGS="--kubeconfig={{ kube_config_dir}}/kubelet.kubeconfig"
+{% endif %}

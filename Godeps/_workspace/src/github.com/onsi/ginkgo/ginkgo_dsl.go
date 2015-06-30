@@ -222,6 +222,17 @@ func buildDefaultReporter() Reporter {
 	}
 }
 
+//Skip notifies Ginkgo that the current spec should be skipped.
+func Skip(message string, callerSkip ...int) {
+	skip := 0
+	if len(callerSkip) > 0 {
+		skip = callerSkip[0]
+	}
+
+	globalFailer.Skip(message, codelocation.New(skip+1))
+	panic(GINKGO_PANIC)
+}
+
 //Fail notifies Ginkgo that the current spec has failed. (Gomega will call Fail for you automatically when an assertion fails.)
 func Fail(message string, callerSkip ...int) {
 	skip := 0

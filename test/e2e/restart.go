@@ -53,27 +53,32 @@ const (
 var _ = Describe("Restart", func() {
 	var c *client.Client
 	var ps *podStore
+	var skipped bool
 
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
+
+		// This test requires the ability to restart all nodes, so the provider
+		// check must be identical to that call.
+		skipped = true
+		SkipUnlessProviderIs("gce")
+		skipped = false
+
 		ps = newPodStore(c, api.NamespaceDefault, labels.Everything(), fields.Everything())
 	})
 
 	AfterEach(func() {
+		if skipped {
+			return
+		}
+
 		ps.Stop()
 	})
 
 	It("should restart all nodes and ensure all nodes and pods recover", func() {
-		// This test requires the ability to restart all nodes, so the provider
-		// check must be identical to that call.
-		provider := testContext.Provider
 		nn := testContext.CloudConfig.NumNodes
-		if !providerIs("gce") {
-			By(fmt.Sprintf("Skipping reboot test, which is not implemented for %s", provider))
-			return
-		}
 
 		By("ensuring all nodes are ready")
 		nodeNamesBefore, err := checkNodesReady(c, nodeReadyInitialTimeout, nn)
@@ -92,7 +97,7 @@ var _ = Describe("Restart", func() {
 		}
 
 		By("restarting all of the nodes")
-		err = restartNodes(provider, restartPerNodeTimeout)
+		err = restartNodes(testContext.Provider, restartPerNodeTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("ensuring all nodes are ready after the restart")

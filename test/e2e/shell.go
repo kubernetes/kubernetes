@@ -26,15 +26,9 @@ import (
 )
 
 var _ = Describe("Shell", func() {
-	defer GinkgoRecover()
+	It("should pass tests for services.sh", func() {
+		SkipUnlessProviderIs("gce", "gke")
 
-	It(fmt.Sprintf("should pass tests for services.sh"), func() {
-		// The services script only works on gce/gke
-		if !providerIs("gce", "gke") {
-			By(fmt.Sprintf("Skipping Shell test services.sh, which is only supported for provider gce and gke (not %s)",
-				testContext.Provider))
-			return
-		}
 		runCmdTest(filepath.Join(testContext.RepoRoot, "hack/e2e-suite/services.sh"))
 	})
 })
@@ -48,7 +42,5 @@ func runCmdTest(path string) {
 
 	if err := cmd.Run(); err != nil {
 		Fail(fmt.Sprintf("Error running %v:\nCommand output:\n%v\n", cmd, cmd.Stdout))
-		return
 	}
-	return
 }

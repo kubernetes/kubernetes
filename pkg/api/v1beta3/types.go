@@ -592,7 +592,19 @@ type HTTPGetAction struct {
 	Port util.IntOrString `json:"port" description:"number or name of the port to access on the container; number must be in the range 1 to 65535; name must be a IANA_SVC_NAME"`
 	// Optional: Host name to connect to, defaults to the pod IP.
 	Host string `json:"host,omitempty" description:"hostname to connect to; defaults to pod IP"`
+	// Optional: Scheme to use for connecting to the host, defaults to HTTP.
+	Scheme URIScheme `json:"scheme,omitempty" description:"scheme to connect with, must be HTTP or HTTPS, defaults to HTTP"`
 }
+
+// URIScheme identifies the scheme used for connection to a host for Get actions
+type URIScheme string
+
+const (
+	// URISchemeHTTP means that the scheme used will be http://
+	URISchemeHTTP URIScheme = "HTTP"
+	// URISchemeHTTPS means that the scheme used will be https://
+	URISchemeHTTPS URIScheme = "HTTPS"
+)
 
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {
@@ -963,8 +975,8 @@ type PodTemplateList struct {
 
 // ReplicationControllerSpec is the specification of a replication controller.
 type ReplicationControllerSpec struct {
-	// Replicas is the number of desired replicas.
-	Replicas int `json:"replicas,omitempty" description:"number of replicas desired"`
+	// Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified.
+	Replicas *int `json:"replicas,omitempty" description:"number of replicas desired"`
 
 	// Selector is a label query over pods that should match the Replicas count.
 	// If Selector is empty, it is defaulted to the labels present on the Pod template.

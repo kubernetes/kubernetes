@@ -47,6 +47,8 @@ Via a _label selector_, the client/user can identify a set of objects. The label
 The API currently supports two types of selectors: _equality-based_ and _set-based_.
 A label selector can be made of multiple _requirements_ which are comma-separated. In the case of multiple requirements, all must be satisfied so comma separator acts as an AND logical operator.
 
+An empty label selector (that is, one with zero requirements) selects every object in the collection.
+
 ### _Equality-based_ requirement
 
 _Equality-_ or _inequality-based_ requirements allow filtering by label keys and values. Matching objects must have all of the specified labels (both keys and values), though they may have additional labels as well.

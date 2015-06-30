@@ -230,10 +230,8 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should be able to create a functioning external load balancer", func() {
-		if !providerIs("gce", "gke", "aws") {
-			By(fmt.Sprintf("Skipping service external load balancer test; uses ServiceTypeLoadBalancer, a (gce|gke|aws) feature"))
-			return
-		}
+		// requires ExternalLoadBalancer
+		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		serviceName := "external-lb-test"
 		ns := namespaces[0]
@@ -741,10 +739,8 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
-		if !providerIs("gce", "gke", "aws") {
-			By(fmt.Sprintf("Skipping service namespace collision test; uses ServiceTypeLoadBalancer, a (gce|gke|aws) feature"))
-			return
-		}
+		// requires ExternalLoadBalancer
+		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		serviceNames := []string{"s0"} // Could add more here, but then it takes longer.
 		labels := map[string]string{
@@ -1008,9 +1004,10 @@ func testReachable(ip string, port int) {
 		Failf("Got port==0 for reachability check (%s)", url)
 	}
 
-	By(fmt.Sprintf("Waiting up to %v for %s to be reachable", podStartTimeout, url))
+	desc := fmt.Sprintf("the url %s to be reachable", url)
+	By(fmt.Sprintf("Waiting up to %v for %s", podStartTimeout, desc))
 	start := time.Now()
-	expectNoError(wait.Poll(poll, podStartTimeout, func() (bool, error) {
+	err := wait.Poll(poll, podStartTimeout, func() (bool, error) {
 		resp, err := httpGetNoConnectionPool(url)
 		if err != nil {
 			Logf("Got error waiting for reachability of %s: %v (%v)", url, err, time.Since(start))
@@ -1030,7 +1027,8 @@ func testReachable(ip string, port int) {
 		}
 		Logf("Successfully reached %v", url)
 		return true, nil
-	}))
+	})
+	Expect(err).NotTo(HaveOccurred(), "Error waiting for %s", desc)
 }
 
 func testNotReachable(ip string, port int) {
@@ -1042,11 +1040,12 @@ func testNotReachable(ip string, port int) {
 		Failf("Got port==0 for non-reachability check (%s)", url)
 	}
 
-	By(fmt.Sprintf("Waiting up to %v for %s to be *not* reachable", podStartTimeout, url))
-	expectNoError(wait.Poll(poll, podStartTimeout, func() (bool, error) {
+	desc := fmt.Sprintf("the url %s to be *not* reachable", url)
+	By(fmt.Sprintf("Waiting up to %v for %s", podStartTimeout, desc))
+	err := wait.Poll(poll, podStartTimeout, func() (bool, error) {
 		resp, err := httpGetNoConnectionPool(url)
 		if err != nil {
-			Logf("Successfully waited for the url %s to be unreachable.", url)
+			Logf("Successfully waited for %s", desc)
 			return true, nil
 		}
 		defer resp.Body.Close()
@@ -1057,7 +1056,8 @@ func testNotReachable(ip string, port int) {
 		}
 		Logf("Able to reach service %s when should no longer have been reachable, status:%d and body: %s", url, resp.Status, string(body))
 		return false, nil
-	}))
+	})
+	Expect(err).NotTo(HaveOccurred(), "Error waiting for %s", desc)
 }
 
 // Does an HTTP GET, but does not reuse TCP connections

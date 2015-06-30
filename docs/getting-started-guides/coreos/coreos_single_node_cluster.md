@@ -28,9 +28,9 @@ aws ec2 run-instances \
 --user-data file://standalone.yaml
 ```
 
-### GCE
+### Google Compute Engine (GCE)
 
-*Attention:* Replace ```<gce_image_id>``` bellow for a [suitable version of CoreOS image for GCE](https://coreos.com/docs/running-coreos/cloud-providers/google-compute-engine/).
+*Attention:* Replace ```<gce_image_id>``` bellow for a [suitable version of CoreOS image for Google Compute Engine](https://coreos.com/docs/running-coreos/cloud-providers/google-compute-engine/).
 
 ```
 gcloud compute instances create standalone \

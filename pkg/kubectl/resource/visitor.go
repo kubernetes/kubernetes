@@ -36,6 +36,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
+const constSTDINstr string = "STDIN"
+
 // Visitor lets clients walk a list of resources.
 // TODO: we should rethink how we handle errors in the visit loop
 // (See https://github.com/GoogleCloudPlatform/kubernetes/pull/9357#issuecomment-109600305)
@@ -69,6 +71,10 @@ type Info struct {
 	// Optional, Source is the filename or URL to template file (.json or .yaml),
 	// or stdin to use to handle the resource
 	Source string
+	// Optional, this is the provided object in a versioned type before defaulting
+	// and conversions into its corresponding internal type. This is useful for
+	// reflecting on user intent which may be lost after defaulting and conversions.
+	VersionedObject interface{}
 	// Optional, this is the most recent value returned by the server if available
 	runtime.Object
 	// Optional, this is the most recent resource version the server knows about for
@@ -198,101 +204,6 @@ func ValidateSchema(data []byte, schema validation.Schema) error {
 		return fmt.Errorf("error validating data: %v", err)
 	}
 	return nil
-}
-
-// PathVisitor visits a given path and returns an object representing the file
-// at that path.
-type PathVisitor struct {
-	*Mapper
-	// The file path to load
-	Path string
-	// Whether to ignore files that are not recognized as API objects
-	IgnoreErrors bool
-	// Schema for validation
-	Schema validation.Schema
-}
-
-func (v *PathVisitor) Visit(fn VisitorFunc) error {
-	data, err := ioutil.ReadFile(v.Path)
-	if err != nil {
-		return fmt.Errorf("unable to read %q: %v", v.Path, err)
-	}
-	if err := ValidateSchema(data, v.Schema); err != nil {
-		return fmt.Errorf("error validating %q: %v", v.Path, err)
-	}
-	info, err := v.Mapper.InfoForData(data, v.Path)
-	if err != nil {
-		if !v.IgnoreErrors {
-			return err
-		}
-		fmt.Fprintf(os.Stderr, "error: unable to load file %q: %v\n", v.Path, err)
-		return nil
-	}
-	return fn(info)
-}
-
-// DirectoryVisitor loads the specified files from a directory and passes them
-// to visitors.
-type DirectoryVisitor struct {
-	*Mapper
-	// The directory or file to start from
-	Path string
-	// Whether directories are recursed
-	Recursive bool
-	// The file extensions to include. If empty, all files are read.
-	Extensions []string
-	// Whether to ignore files that are not recognized as API objects
-	IgnoreErrors bool
-	// Schema for validation
-	Schema validation.Schema
-}
-
-func (v *DirectoryVisitor) ignoreFile(path string) bool {
-	if len(v.Extensions) == 0 {
-		return false
-	}
-	ext := filepath.Ext(path)
-	for _, s := range v.Extensions {
-		if s == ext {
-			return false
-		}
-	}
-	return true
-}
-
-func (v *DirectoryVisitor) Visit(fn VisitorFunc) error {
-	return filepath.Walk(v.Path, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if fi.IsDir() {
-			if path != v.Path && !v.Recursive {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if v.ignoreFile(path) {
-			return nil
-		}
-
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("unable to read %q: %v", path, err)
-		}
-		if err := ValidateSchema(data, v.Schema); err != nil {
-			return fmt.Errorf("error validating %q: %v", path, err)
-		}
-		info, err := v.Mapper.InfoForData(data, path)
-		if err != nil {
-			if !v.IgnoreErrors {
-				return err
-			}
-			fmt.Fprintf(os.Stderr, "error: unable to load file %q: %v\n", path, err)
-			return nil
-		}
-		return fn(info)
-	})
 }
 
 // URLVisitor downloads the contents of a URL, and if successful, returns
@@ -433,6 +344,85 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 	})
 }
 
+func ignoreFile(path string, extensions []string) bool {
+	if len(extensions) == 0 {
+		return false
+	}
+	ext := filepath.Ext(path)
+	for _, s := range extensions {
+		if s == ext {
+			return false
+		}
+	}
+	return true
+}
+
+// FileVisitorForSTDIN return a special FileVisitor just for STDIN
+func FileVisitorForSTDIN(mapper *Mapper, ignoreErrors bool, schema validation.Schema) Visitor {
+	return &FileVisitor{
+		Path:          constSTDINstr,
+		StreamVisitor: NewStreamVisitor(nil, mapper, constSTDINstr, ignoreErrors, schema),
+	}
+}
+
+// ExpandPathsToFileVisitors will return a slice of FileVisitors that will handle files from the provided path.
+// After FileVisitors open the files, they will pass a io.Reader to a StreamVisitor to do the reading. (stdin
+// is also taken care of). Paths argument also accepts a single file, and will return a single visitor
+func ExpandPathsToFileVisitors(mapper *Mapper, paths string, recursive bool, extensions []string, ignoreErrors bool, schema validation.Schema) ([]Visitor, error) {
+	var visitors []Visitor
+	err := filepath.Walk(paths, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if fi.IsDir() {
+			if path != paths && !recursive {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if ignoreFile(path, extensions) {
+			return nil
+		}
+
+		visitor := &FileVisitor{
+			Path:          path,
+			StreamVisitor: NewStreamVisitor(nil, mapper, path, ignoreErrors, schema),
+		}
+
+		visitors = append(visitors, visitor)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return visitors, nil
+}
+
+// FileVisitor is wrapping around a StreamVisitor, to handle open/close files
+type FileVisitor struct {
+	Path string
+	*StreamVisitor
+}
+
+// Visit in a FileVisitor is just taking care of opening/closing files
+func (v *FileVisitor) Visit(fn VisitorFunc) error {
+	var f *os.File
+	if v.Path == constSTDINstr {
+		f = os.Stdin
+	} else {
+		var err error
+		if f, err = os.Open(v.Path); err != nil {
+			return fmt.Errorf("unable to open %q: %v", v.Path, err)
+		}
+	}
+	defer f.Close()
+	v.StreamVisitor.Reader = f
+
+	return v.StreamVisitor.Visit(fn)
+}
+
 // StreamVisitor reads objects from an io.Reader and walks them. A stream visitor can only be
 // visited once.
 // TODO: depends on objects being in JSON format before being passed to decode - need to implement
@@ -446,16 +436,18 @@ type StreamVisitor struct {
 	Schema       validation.Schema
 }
 
-// NewStreamVisitor creates a visitor that will return resources that were encoded into the provided
-// stream. If ignoreErrors is set, unrecognized or invalid objects will be skipped and logged. An
-// empty stream is treated as an error for now.
-// TODO: convert ignoreErrors into a func(data, error, count) bool that consumers can use to decide
-// what to do with ignored errors.
-func NewStreamVisitor(r io.Reader, mapper *Mapper, schema validation.Schema, source string, ignoreErrors bool) Visitor {
-	return &StreamVisitor{r, mapper, source, ignoreErrors, schema}
+// NewStreamVisitor is a helper function that is useful when we want to change the fields of the struct but keep calls the same.
+func NewStreamVisitor(r io.Reader, mapper *Mapper, source string, ignoreErrors bool, schema validation.Schema) *StreamVisitor {
+	return &StreamVisitor{
+		Reader:       r,
+		Mapper:       mapper,
+		Source:       source,
+		IgnoreErrors: ignoreErrors,
+		Schema:       schema,
+	}
 }
 
-// Visit implements Visitor over a stream.
+// Visit implements Visitor over a stream. StreamVisitor is able to distinct multiple resources in one stream.
 func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 	d := yaml.NewYAMLOrJSONDecoder(v.Reader, 4096)
 	for {
@@ -486,7 +478,6 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 			return err
 		}
 	}
-	return nil
 }
 
 func UpdateObjectNamespace(info *Info) error {

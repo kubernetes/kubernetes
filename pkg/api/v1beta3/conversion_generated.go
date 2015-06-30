@@ -450,6 +450,7 @@ func convert_api_HTTPGetAction_To_v1beta3_HTTPGetAction(in *api.HTTPGetAction, o
 		return err
 	}
 	out.Host = in.Host
+	out.Scheme = URIScheme(in.Scheme)
 	return nil
 }
 
@@ -1536,30 +1537,6 @@ func convert_api_ReplicationControllerList_To_v1beta3_ReplicationControllerList(
 	return nil
 }
 
-func convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec(in *api.ReplicationControllerSpec, out *ReplicationControllerSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*api.ReplicationControllerSpec))(in)
-	}
-	out.Replicas = in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	if in.Template != nil {
-		out.Template = new(PodTemplateSpec)
-		if err := convert_api_PodTemplateSpec_To_v1beta3_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
-	}
-	return nil
-}
-
 func convert_api_ReplicationControllerStatus_To_v1beta3_ReplicationControllerStatus(in *api.ReplicationControllerStatus, out *ReplicationControllerStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*api.ReplicationControllerStatus))(in)
@@ -2515,6 +2492,7 @@ func convert_v1beta3_HTTPGetAction_To_api_HTTPGetAction(in *HTTPGetAction, out *
 		return err
 	}
 	out.Host = in.Host
+	out.Scheme = api.URIScheme(in.Scheme)
 	return nil
 }
 
@@ -3601,30 +3579,6 @@ func convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList(
 	return nil
 }
 
-func convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *ReplicationControllerSpec, out *api.ReplicationControllerSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*ReplicationControllerSpec))(in)
-	}
-	out.Replicas = in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
-	}
-	if in.Template != nil {
-		out.Template = new(api.PodTemplateSpec)
-		if err := convert_v1beta3_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
-	}
-	return nil
-}
-
 func convert_v1beta3_ReplicationControllerStatus_To_api_ReplicationControllerStatus(in *ReplicationControllerStatus, out *api.ReplicationControllerStatus, s conversion.Scope) error {
 	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
 		defaulting.(func(*ReplicationControllerStatus))(in)
@@ -4238,7 +4192,6 @@ func init() {
 		convert_api_RBDVolumeSource_To_v1beta3_RBDVolumeSource,
 		convert_api_RangeAllocation_To_v1beta3_RangeAllocation,
 		convert_api_ReplicationControllerList_To_v1beta3_ReplicationControllerList,
-		convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec,
 		convert_api_ReplicationControllerStatus_To_v1beta3_ReplicationControllerStatus,
 		convert_api_ReplicationController_To_v1beta3_ReplicationController,
 		convert_api_ResourceQuotaList_To_v1beta3_ResourceQuotaList,
@@ -4345,7 +4298,6 @@ func init() {
 		convert_v1beta3_RBDVolumeSource_To_api_RBDVolumeSource,
 		convert_v1beta3_RangeAllocation_To_api_RangeAllocation,
 		convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList,
-		convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
 		convert_v1beta3_ReplicationControllerStatus_To_api_ReplicationControllerStatus,
 		convert_v1beta3_ReplicationController_To_api_ReplicationController,
 		convert_v1beta3_ResourceQuotaList_To_api_ResourceQuotaList,

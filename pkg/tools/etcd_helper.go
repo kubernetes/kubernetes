@@ -102,6 +102,7 @@ func recordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 type EtcdHelper struct {
 	Client EtcdGetSet
 	Codec  runtime.Codec
+	Copier runtime.ObjectCopier
 	// optional, no atomic operations can be performed without this interface
 	Versioner EtcdVersioner
 	// prefix for all etcd keys
@@ -119,11 +120,13 @@ type EtcdHelper struct {
 
 // NewEtcdHelper creates a helper that works against objects that use the internal
 // Kubernetes API objects.
+// TODO: Refactor to take a runtiem.ObjectCopier
 func NewEtcdHelper(client EtcdGetSet, codec runtime.Codec, prefix string) EtcdHelper {
 	return EtcdHelper{
 		Client:     client,
 		Codec:      codec,
 		Versioner:  APIObjectVersioner{},
+		Copier:     api.Scheme,
 		PathPrefix: prefix,
 		cache:      util.NewCache(maxEtcdCacheEntries),
 	}
@@ -237,7 +240,7 @@ func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
 	if found {
 		// We should not return the object itself to avoid poluting the cache if someone
 		// modifies returned values.
-		objCopy, err := api.Scheme.DeepCopy(obj)
+		objCopy, err := h.Copier.Copy(obj.(runtime.Object))
 		if err != nil {
 			glog.Errorf("Error during DeepCopy of cached object: %q", err)
 			return nil, false
@@ -254,7 +257,7 @@ func (h *EtcdHelper) addToCache(index uint64, obj runtime.Object) {
 	defer func() {
 		cacheAddLatency.Observe(float64(time.Since(startTime) / time.Microsecond))
 	}()
-	objCopy, err := api.Scheme.DeepCopy(obj)
+	objCopy, err := h.Copier.Copy(obj)
 	if err != nil {
 		glog.Errorf("Error during DeepCopy of cached object: %q", err)
 		return

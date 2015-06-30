@@ -933,12 +933,12 @@ function check-resources {
   fi
 
   if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
-    KUBE_RESOURCE_FOUND="Firewal rules for ${MASTER_NAME}-https"
+    KUBE_RESOURCE_FOUND="Firewall rules for ${MASTER_NAME}-https"
     return 1
   fi
 
   if gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
-    KUBE_RESOURCE_FOUND="Firewal rules for ${MASTER_NAME}-all"
+    KUBE_RESOURCE_FOUND="Firewall rules for ${MASTER_NAME}-all"
     return 1
   fi
 

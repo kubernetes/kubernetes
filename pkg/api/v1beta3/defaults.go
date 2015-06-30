@@ -40,6 +40,10 @@ func addDefaultingFuncs() {
 					obj.Labels = labels
 				}
 			}
+			if obj.Spec.Replicas == nil {
+				obj.Spec.Replicas = new(int)
+				*obj.Spec.Replicas = 0
+			}
 		},
 		func(obj *Volume) {
 			if util.AllPtrFieldsNil(&obj.VolumeSource) {
@@ -140,6 +144,9 @@ func addDefaultingFuncs() {
 		func(obj *HTTPGetAction) {
 			if obj.Path == "" {
 				obj.Path = "/"
+			}
+			if obj.Scheme == "" {
+				obj.Scheme = URISchemeHTTP
 			}
 		},
 		func(obj *NamespaceStatus) {

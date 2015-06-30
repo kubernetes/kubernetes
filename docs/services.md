@@ -17,8 +17,8 @@ Enter `Services`.
 A Kubernetes `Service` is an abstraction which defines a logical set of `Pods`
 and a policy by which to access them - sometimes called a micro-service.  The
 set of `Pods` targeted by a `Service` is (usually) determined by a [`Label
-Selector`](labels.md#label-selectors) (see below for why you might want a `Service` without a
-selector).
+Selector`](labels.md#label-selectors) (see below for why you might want a
+`Service` without a selector).
 
 As an example, consider an image-processing backend which is running with 3
 replicas.  Those replicas are fungible - frontends do not care which backend
@@ -64,17 +64,17 @@ This specification will create a new `Service` object named "my-service" which
 targets TCP port 9376 on any `Pod` with the "app=MyApp" label.  This `Service`
 will also be assigned an IP address (sometimes called the "cluster IP"), which
 is used by the service proxies (see below).  The `Service`'s selector will be
-evaluated continuously and the results will be posted in an `Endpoints` object
+evaluated continuously and the results will be POSTed to an `Endpoints` object
 also named "my-service".
 
 Note that a `Service` can map an incoming port to any `targetPort`.  By default
-the `targetPort` is the same as the `port` field.  Perhaps more interesting is
-that `targetPort` can be a string, referring to the name of a port in the
-backend `Pods`.  The actual port number assigned to that name can be different
-in each backend `Pod`. This offers a lot of flexibility for deploying and
-evolving your `Services`.  For example, you can change the port number that
-pods expose in the next version of your backend software, without breaking
-clients.
+the `targetPort` will be set to the same value as the `port` field.  Perhaps
+more interesting is that `targetPort` can be a string, referring to the name of
+a port in the backend `Pods`.  The actual port number assigned to that name can
+be different in each backend `Pod`. This offers a lot of flexibility for
+deploying and evolving your `Services`.  For example, you can change the port
+number that pods expose in the next version of your backend software, without
+breaking clients.
 
 Kubernetes `Services` support `TCP` and `UDP` for protocols.  The default
 is `TCP`.
@@ -143,13 +143,12 @@ this example).
 
 Every node in a Kubernetes cluster runs a `kube-proxy`.  This application
 watches the Kubernetes master for the addition and removal of `Service`
-and `Endpoints` objects. For each `Service` it opens a port (random) on the
-local node.  Any connections made to that port will be proxied to one of the
-corresponding backend `Pods`.  Which backend to use is decided based on the
+and `Endpoints` objects. For each `Service` it opens a port (randomly chosen)
+on the local node.  Any connections made to that port will be proxied to one of
+the corresponding backend `Pods`.  Which backend to use is decided based on the
 `SessionAffinity` of the `Service`.  Lastly, it installs iptables rules which
-capture traffic to the `Service`'s `Port` on the `Service`'s cluster IP (which
-is entirely virtual) and redirects that traffic to the previously described
-port.
+capture traffic to the `Service`'s cluster IP (which is virtual) and `Port` and
+redirects that traffic to the previously described port.
 
 The net result is that any traffic bound for the `Service` is proxied to an
 appropriate backend without the clients knowing anything about Kubernetes or
@@ -202,14 +201,14 @@ disambiguated.  For example:
 
 ## Choosing your own IP address
 
-A user can specify their own cluster IP address as part of a `Service` creation
-request.  To do this, set the `spec.clusterIP` field. For example, if they
-already have an existing DNS entry that they wish to replace, or legacy systems
+You can specify your own cluster IP address as part of a `Service` creation
+request.  To do this, set the `spec.clusterIP` field. For example, if you
+already have an existing DNS entry that you wish to replace, or legacy systems
 that are configured for a specific IP address and difficult to re-configure.
 The IP address that a user chooses must be a valid IP address and within the
-service_cluster_ip_range CIDR range that is specified by flag to the API server.
-If the IP address value is invalid, the apiserver returns a 422 HTTP status code
-to indicate that the value is invalid.
+service_cluster_ip_range CIDR range that is specified by flag to the API
+server.  If the IP address value is invalid, the apiserver returns a 422 HTTP
+status code to indicate that the value is invalid.
 
 ### Why not use round-robin DNS?
 
@@ -273,16 +272,18 @@ a name lookup for "my-service".  `Pods` which exist in other `Namespaces` must
 qualify the name as "my-service.my-ns".  The result of these name lookups is the
 cluster IP.
 
-We will soon add DNS support for multi-port `Services` in the form of SRV
-records.
+Kubernetes also supports DNS SRV (service) records for named ports.  If the
+"my-service.my-ns" `Service` has a port named "http" with protocol `TCP`, you
+can do a DNS SRV query for "_http._tcp.my-service.my-ns" to discover the port
+number for "http".
 
 ## Headless services
 
 Sometimes you don't need or want load-balancing and a single service IP.  In
 this case, you can create "headless" services by specifying `"None"` for the
 cluster IP (`spec.clusterIP`).
-For such `Services`, a cluster IP is not allocated and service-specific
-environment variables for `Pods` are not created.  DNS is configured to return
+
+For such `Services`, a cluster IP is not allocated. DNS is configured to return
 multiple A records (addresses) for the `Service` name, which point directly to
 the `Pods` backing the `Service`.  Additionally, the kube proxy does not handle
 these services and there is no load balancing or proxying done by the platform
@@ -301,12 +302,13 @@ Service onto an external (outside of your cluster, maybe public internet) IP
 address.  Kubernetes supports two ways of doing this: `NodePort`s and
 `LoadBalancer`s.
 
-Every `Service` has a `Type` field which defines how the `Service` can be
+Every `Service` has a `type` field which defines how the `Service` can be
 accessed.  Valid values for this field are:
 
-   * `ClusterIP`: use a cluster-internal IP only - this is the default
+   * `ClusterIP`: use a cluster-internal IP only - this is the default and is
+     discussed above
    * `NodePort`: use a cluster IP, but also expose the service on a port on each
-     node of the cluster (the same port on each)
+     node of the cluster (the same port on each node)
    * `LoadBalancer`: use a ClusterIP and a NodePort, but also ask the cloud
      provider for a load balancer which forwards to the `Service`
 
@@ -316,11 +318,14 @@ as of Kubernetes 1.0.
 ### Type = NodePort
 
 If you set the `type` field to `"NodePort"`, the Kubernetes master will
-allocate you a port (from a flag-configured range, default: 30,000 - 32,767) 
-on each node for each port exposed by your `Service`.  That port will be 
-reported in your `Service`'s `spec.ports[*].nodePort` field.  If you specify 
-a value in that field, the system will allocate you that port or else will 
-fail the API transaction.
+allocate a port from a flag-configured range (default: 30000-32767), and each
+node will proxy that port (the same port number on every node) into your `Service`.
+That port will be reported in your `Service`'s `spec.ports[*].nodePort` field.
+
+If you want a specific port number, you can specify a value in the `nodePort`
+field, and the system will allocate you that port or else the API transaction
+will fail.  The value you specify must be in the configured range for node
+ports.
 
 This gives developers the freedom to set up their own load balancers, to
 configure cloud environments that are not fully supported by Kubernetes, or
@@ -385,7 +390,7 @@ This makes some kinds of firewalling impossible.
 LoadBalancers only support TCP, not UDP.
 
 The `Type` field is designed as nested functionality - each level adds to the
-previous.  This is not strictly required on all cloud providers (e.g. GCE does
+previous.  This is not strictly required on all cloud providers (e.g. Google Compute Engine does
 not need to allocate a `NodePort` to make `LoadBalancer` work, but AWS does)
 but the current API requires it.
 
