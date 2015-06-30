@@ -5,7 +5,7 @@
   "resourcePath": "/api/v1",
   "apis": [
    {
-    "path": "/api/v1/namespaces/{namespaces}/autoscalers",
+    "path": "/api/v1/namespaces/{namespace}/autoscalers",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -102,7 +102,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -125,7 +125,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespaces}/autoscalers",
+    "path": "/api/v1/watch/namespaces/{namespace}/autoscalers",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -200,7 +200,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespaces}/autoscalers/{name}",
+    "path": "/api/v1/namespaces/{namespace}/autoscalers/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -273,7 +273,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -316,7 +316,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -326,7 +326,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -344,7 +344,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.AutoScaler"
        }
       ],
       "produces": [
@@ -412,7 +412,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespaces}/autoscalers/{name}",
+    "path": "/api/v1/watch/namespaces/{namespace}/autoscalers/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -666,7 +666,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespaces}/autoscalers/{name}/status",
+    "path": "/api/v1/namespaces/{namespace}/autoscalers/{name}/status",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -725,7 +725,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespaces}/bindings",
+    "path": "/api/v1/namespaces/{namespace}/bindings",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -753,7 +753,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -828,7 +828,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -851,7 +851,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespaces}/componentstatuses/{name}",
+    "path": "/api/v1/namespaces/{namespace}/componentstatuses/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -871,7 +871,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -969,7 +969,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespaces}/endpoints",
+    "path": "/api/v1/namespaces/{namespace}/endpoints",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1089,7 +1089,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespaces}/endpoints",
+    "path": "/api/v1/watch/namespaces/{namespace}/endpoints",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1164,7 +1164,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespaces}/endpoints/{name}",
+    "path": "/api/v1/namespaces/{namespace}/endpoints/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1308,7 +1308,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Event"
+        "responseModel": "v1.Endpoints"
        }
       ],
       "produces": [
@@ -1376,7 +1376,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespaces}/endpoints/{name}",
+    "path": "/api/v1/watch/namespaces/{namespace}/endpoints/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1593,7 +1593,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespaces}/events",
+    "path": "/api/v1/namespaces/{namespace}/events",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1713,7 +1713,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespaces}/events",
+    "path": "/api/v1/watch/namespaces/{namespace}/events",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1788,7 +1788,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespaces}/events/{name}",
+    "path": "/api/v1/namespaces/{namespace}/events/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -1932,7 +1932,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.LimitRange"
+        "responseModel": "v1.Event"
        }
       ],
       "produces": [
@@ -1992,7 +1992,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespaces}/events/{name}",
+    "path": "/api/v1/watch/namespaces/{namespace}/events/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -2209,7 +2209,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespaces}/limitranges",
+    "path": "/api/v1/namespaces/{namespace}/limitranges",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -2261,7 +2261,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -2306,7 +2306,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -2329,7 +2329,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespaces}/limitranges",
+    "path": "/api/v1/watch/namespaces/{namespace}/limitranges",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -2381,7 +2381,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -2404,7 +2404,7 @@
     ]
    },
    {
-    "path": "/api/v1/namespaces/{namespaces}/limitranges/{name}",
+    "path": "/api/v1/namespaces/{namespace}/limitranges/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -2424,7 +2424,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -2477,7 +2477,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -2530,7 +2530,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -2548,7 +2548,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Namespace"
+        "responseModel": "v1.LimitRange"
        }
       ],
       "produces": [
@@ -2577,7 +2577,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -2608,7 +2608,7 @@
     ]
    },
    {
-    "path": "/api/v1/watch/namespaces/{namespaces}/limitranges/{name}",
+    "path": "/api/v1/watch/namespaces/{namespace}/limitranges/{name}",
     "description": "API at /api/v1 version v1",
     "operations": [
      {
@@ -2660,7 +2660,7 @@
        {
         "type": "string",
         "paramType": "path",
-        "name": "namespaces",
+        "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
@@ -3116,7 +3116,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Node"
+        "responseModel": "v1.Namespace"
        }
       ],
       "produces": [
@@ -3624,7 +3624,7 @@
         "allowMultiple": false
        },
        {
-        "type": "string",
+        "type": "api.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3644,7 +3644,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "string"
+        "responseModel": "v1.Node"
        }
       ],
       "produces": [
