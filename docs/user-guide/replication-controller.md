@@ -73,7 +73,7 @@ Pods created by a replication controller are intended to be fungible and semanti
 
 The population of pods that a replication controller is monitoring is defined with a [label selector](labels.md#label-selectors), which creates a loosely coupled relationship between the controller and the pods controlled, in contrast to pods, which are more tightly coupled to their definition. We deliberately chose not to represent the set of pods controlled using a fixed-length array of pod specifications, because our experience is that approach increases complexity of management operations, for both clients and the system.
 
-The replication controller should verify that the pods created from the specified template have labels that match its label selector. Though it isn't verified yet, you should also ensure that only one replication controller controls any given pod, by ensuring that the label selectors of replication controllers do not target overlapping sets.
+The replication controller should verify that the pods created from the specified template have labels that match its label selector. Though it isn't verified yet, you should also ensure that only one replication controller controls any given pod, by ensuring that the label selectors of replication controllers do not target overlapping sets. If you do end up with multiple controllers that have overlapping selectors, you will have to manage the deletion yourself with --cascade=false until there are no controllers with an overlapping superset of selectors.
 
 Note that replication controllers may themselves have labels and would generally carry the labels their corresponding pods have in common, but these labels do not affect the behavior of the replication controllers.
 

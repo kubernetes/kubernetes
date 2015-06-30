@@ -35,7 +35,7 @@ const (
 	UpdateControllerAction = "update-replicationController"
 	WatchControllerAction  = "watch-replicationController"
 	DeleteControllerAction = "delete-replicationController"
-	ListControllerAction   = "list-replicationControllers"
+	ListControllerAction   = "list-replicationController"
 	CreateControllerAction = "create-replicationController"
 )
 

@@ -18,11 +18,13 @@ package kubectl
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 const (
@@ -82,23 +84,81 @@ type objInterface interface {
 	Get(name string) (meta.Interface, error)
 }
 
+// getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.
+func getOverlappingControllers(c client.ReplicationControllerInterface, rc *api.ReplicationController) ([]api.ReplicationController, error) {
+	rcs, err := c.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("error getting replication controllers: %v", err)
+	}
+	var matchingRCs []api.ReplicationController
+	rcLabels := labels.Set(rc.Spec.Selector)
+	for _, controller := range rcs.Items {
+		newRCLabels := labels.Set(controller.Spec.Selector)
+		if labels.SelectorFromSet(newRCLabels).Matches(rcLabels) || labels.SelectorFromSet(rcLabels).Matches(newRCLabels) {
+			matchingRCs = append(matchingRCs, controller)
+		}
+	}
+	return matchingRCs, nil
+}
+
 func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) (string, error) {
 	rc := reaper.ReplicationControllers(namespace)
 	scaler, err := ScalerFor("ReplicationController", NewScalerClient(*reaper))
 	if err != nil {
 		return "", err
 	}
+	ctrl, err := rc.Get(name)
+	if err != nil {
+		return "", err
+	}
 	if timeout == 0 {
-		rc, err := rc.Get(name)
-		if err != nil {
+		timeout = Timeout + time.Duration(10*ctrl.Spec.Replicas)*time.Second
+	}
+
+	// The rc manager will try and detect all matching rcs for a pod's labels,
+	// and only sync the oldest one. This means if we have a pod with labels
+	// [(k1, v1)] and rcs with selectors [(k1, v2)] and [(k1, v1), (k2, v2)],
+	// the rc manager will sync the older of the two rcs.
+	//
+	// If there are rcs with a superset of labels, eg:
+	// deleting: (k1:v1), superset: (k2:v2, k1:v1)
+	//	- It isn't safe to delete the rc because there could be a pod with labels
+	//	  (k1:v1) that isn't managed by the superset rc. We can't scale it down
+	//	  either, because there could be a pod (k2:v2, k1:v1) that it deletes
+	//	  causing a fight with the superset rc.
+	// If there are rcs with a subset of labels, eg:
+	// deleting: (k2:v2, k1:v1), subset: (k1: v1), superset: (k2:v2, k1:v1, k3:v3)
+	//  - It's safe to delete this rc without a scale down because all it's pods
+	//	  are being controlled by the subset rc.
+	// In theory, creating overlapping controllers is user error, so the loop below
+	// tries to account for this logic only in the common case, where we end up
+	// with multiple rcs that have an exact match on selectors.
+
+	overlappingCtrls, err := getOverlappingControllers(rc, ctrl)
+	if err != nil {
+		return "", fmt.Errorf("error getting replication controllers: %v", err)
+	}
+	exactMatchRCs := []api.ReplicationController{}
+	overlapRCs := []string{}
+	for _, overlappingRC := range overlappingCtrls {
+		if len(overlappingRC.Spec.Selector) == len(ctrl.Spec.Selector) {
+			exactMatchRCs = append(exactMatchRCs, overlappingRC)
+		} else {
+			overlapRCs = append(overlapRCs, overlappingRC.Name)
+		}
+	}
+	if len(overlapRCs) > 0 {
+		return "", fmt.Errorf(
+			"Detected overlapping controllers for rc %v: %v, please manage deletion individually with --cascade=false.",
+			ctrl.Name, strings.Join(overlapRCs, ","))
+	}
+	if len(exactMatchRCs) == 1 {
+		// No overlapping controllers.
+		retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
+		waitForReplicas := NewRetryParams(reaper.pollInterval, timeout)
+		if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil {
 			return "", err
 		}
-		timeout = Timeout + time.Duration(10*rc.Spec.Replicas)*time.Second
-	}
-	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
-	waitForReplicas := NewRetryParams(reaper.pollInterval, timeout)
-	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil {
-		return "", err
 	}
 	if err := rc.Delete(name); err != nil {
 		return "", err
