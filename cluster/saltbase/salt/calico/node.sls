@@ -6,22 +6,22 @@ include:
 calicoctl:
   file.managed:
     - name: /home/vagrant/calicoctl
-    - source: https://github.com/Metaswitch/calico-docker/releases/download/v0.4.2/calicoctl
-    - source_hash: sha512=4fe30422bbf47fdade3ef7ba8927643cff8af578a81b4e6a101525229a583e18afbc3f7d5dee4d60b789139173a34fe15cb8c2c120014230ebd431b655a5fb1b
+    - source: https://github.com/Metaswitch/calico-docker/releases/download/v0.4.8/calicoctl
+    - source_hash: sha512=814fd7369ba395c67e35245115a5885d1722300301d32585f9003f63e94cd26f77e325ae765ba2f6cba2fddec5ffdb8e4f7bc1b326f9dc343cf03e96b77a679e
     - makedirs: True
     - mode: 744
 
 calico-network-plugin:
   file.managed:
     - name: /usr/libexec/kubernetes/kubelet-plugins/net/exec/calico/calico
-    - source: https://github.com/Metaswitch/calico-docker/releases/download/v0.4.2/calico_kubernetes
-    - source_hash: sha512=eb3a7b35668b4d8d180cc10f9937ed44752f7185907ef0559e0ea52eb55e837b0dca3a1a6ad75d52aa1481d2f63e3c5a09314222fa72e5d5c43c004d7283bac8
+    - source: https://github.com/Metaswitch/calico-docker/releases/download/v0.4.8/calico_kubernetes
+    - source_hash: sha512=98b26a15918e9ab42ab083e0368d9442581e234d3214ce5c39054ff118eed6436da72bbe8d801beed91e30a603e0c802cdd23e629cb11876767381d56dc31c32
     - makedirs: True
     - mode: 744
 
 calico-node:
   cmd.run:
-    - name: /home/vagrant/calicoctl node --ip={{ grains.node_ip }} --node-image=calico/node:v0.4.2
+    - name: /home/vagrant/calicoctl node --ip={{ grains.node_ip }} --node-image=calico/node:v0.4.8
     - env:
       - ETCD_AUTHORITY: "{{ grains.api_servers }}:6666"
     - require:
