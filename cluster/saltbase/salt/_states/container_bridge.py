@@ -17,7 +17,7 @@
 import re
 
 import salt.exceptions
-import salt.utils.ipaddr as ipaddr
+import salt.ext.ipaddr as ipaddr
 
 def ensure(name, cidr, mtu=1460):
     '''
@@ -39,7 +39,7 @@ def ensure(name, cidr, mtu=1460):
     # This is a little hacky.  I should probably import a real library for this
     # but this'll work for now.
     try:
-        cidr_network = ipaddr.IPNetwork(cidr, strict=True)
+        cidr_network = ipaddr.ip_network(cidr, strict=True)
     except Exception:
         raise salt.exceptions.SaltInvocationError(
             'Invalid CIDR \'{0}\''.format(cidr))
