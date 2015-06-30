@@ -48,11 +48,16 @@ type basicAuthRoundTripper struct {
 	rt       http.RoundTripper
 }
 
+// NewBasicAuthRoundTripper will apply a BASIC auth authorization header to a request unless it has
+// already been set.
 func NewBasicAuthRoundTripper(username, password string, rt http.RoundTripper) http.RoundTripper {
 	return &basicAuthRoundTripper{username, password, rt}
 }
 
 func (rt *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(req.Header.Get("Authorization")) != 0 {
+		return rt.rt.RoundTrip(req)
+	}
 	req = cloneRequest(req)
 	req.SetBasicAuth(rt.username, rt.password)
 	return rt.rt.RoundTrip(req)
@@ -63,11 +68,17 @@ type bearerAuthRoundTripper struct {
 	rt     http.RoundTripper
 }
 
+// NewBearerAuthRoundTripper adds the provided bearer token to a request unless the authorization
+// header has already been set.
 func NewBearerAuthRoundTripper(bearer string, rt http.RoundTripper) http.RoundTripper {
 	return &bearerAuthRoundTripper{bearer, rt}
 }
 
 func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(req.Header.Get("Authorization")) != 0 {
+		return rt.rt.RoundTrip(req)
+	}
+
 	req = cloneRequest(req)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.bearer))
 	return rt.rt.RoundTrip(req)
