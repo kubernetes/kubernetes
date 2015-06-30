@@ -136,12 +136,12 @@ fi
 
 # Wait for the default service account
 token_found=""
-while [ -z "${token_made}" ]; do
+while [ -z "${token_found}" ]; do
   sleep .5
-  token_found=$(${KUBECTL} get serviceaccount default -o template -t "{{with index .secrets 0}}{{.name}}{{end}}" || echo "")
+  token_found=$(${KUBECTL} get serviceaccount default -o template -t "{{with index .secrets 0}}{{.name}}{{end}}" || true)
 done
 
-echo "default service account has token ${token_found}"
+echo "== default service account has token ${token_found} =="
 
 # Generate secrets for "internal service accounts".
 # TODO(etune): move to a completely yaml/object based
@@ -180,6 +180,3 @@ while true; do
   `dirname $0`/kube-addon-update.sh /etc/kubernetes/addons
   sleep $ADDON_CHECK_INTERVAL_SEC
 done
-
-
-
