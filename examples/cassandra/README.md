@@ -13,7 +13,8 @@ This example also has a few code and configuration files needed.  To avoid typin
 This is a somewhat long tutorial.  If you want to jump straight to the "do it now" commands, please see the [tl; dr](#tl-dr) at the end.
 
 ### Simple Single Pod Cassandra Node
-In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.  In this simple case, we define a single container running Cassandra for our pod:
+In Kubernetes, the atomic unit of an application is a [_Pod_](../../docs/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.
+In this simple case, we define a single container running Cassandra for our pod:
 
 ```yaml
 apiVersion: v1
@@ -53,22 +54,9 @@ There are a few things to note in this description.  First is that we are runnin
 
 You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```).  We also tell Kubernetes that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 0.5 cpu (0.5 core).
 
-Given this configuration, we can create the pod from a file specification as follows
+In theory could create a single Cassandra pod right now but since `KubernetesSeedProvider` needs to learn what nodes are in the Cassandra deployment we need to create a service first.
 
-```sh
-$ kubectl create -f cassandra.yaml
-```
-
-After a few moments, you should be able to see the pod running, plus its single container:
-
-```sh
-$ kubectl get pods cassandra
-NAME        READY     REASON    RESTARTS   AGE
-cassandra   1/1       Running   0          55s
-```
-
-
-### Adding a Cassandra Service
+### Cassandra Service
 In Kubernetes a _[Service](../../docs/services.md)_ describes a set of Pods that perform the same task.  For example, the set of Pods in a Cassandra cluster can be a Kubernetes Service, or even just the single Pod we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set of Pods.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.  This is the way that we use initially use Services with Cassandra.
 
 Here is the service description:
@@ -93,7 +81,22 @@ Create this service as follows:
 $ kubectl create -f cassandra-service.yaml
 ```
 
-Once the service is created, you can query it's endpoints:
+Now, as the service is running, we can create the first Cassandra pod using the mentioned specification.
+
+```sh
+$ kubectl create -f cassandra.yaml
+```
+
+After a few moments, you should be able to see the pod running, plus its single container:
+
+```sh
+$ kubectl get pods cassandra
+NAME        READY     REASON    RESTARTS   AGE
+cassandra   1/1       Running   0          55s
+```
+
+You can also query the service endpoints to check if the pod has been correctly selected.
+
 ```sh
 $ kubectl get endpoints cassandra -o yaml
 apiVersion: v1
@@ -120,8 +123,6 @@ subsets:
   - port: 9042
     protocol: TCP
 ```
-
-You can see that the _Service_ has found the pod we created in step one.
 
 ### Adding replicated nodes
 Of course, a single node cluster isn't particularly interesting.  The real power of Kubernetes and Cassandra lies in easily building a replicated, scalable Cassandra cluster.
@@ -234,11 +235,12 @@ UN  10.244.3.3  51.28 KB   256     51.0%             dafe3154-1d67-42e1-ac1d-78e
 For those of you who are impatient, here is the summary of the commands we ran in this tutorial.
 
 ```sh
-# create a single cassandra node
-kubectl create -f cassandra.yaml
 
 # create a service to track all cassandra nodes
 kubectl create -f cassandra-service.yaml
+
+# create a single cassandra node
+kubectl create -f cassandra.yaml
 
 # create a replication controller to replicate cassandra nodes
 kubectl create -f cassandra-controller.yaml
