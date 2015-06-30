@@ -165,7 +165,7 @@ func NewInvalid(kind, name string, errs fielderrors.ValidationErrorList) error {
 		if err, ok := errs[i].(*fielderrors.ValidationError); ok {
 			causes = append(causes, api.StatusCause{
 				Type:    api.CauseType(err.Type),
-				Message: err.Error(),
+				Message: err.ErrorBody(),
 				Field:   err.Field,
 			})
 		}

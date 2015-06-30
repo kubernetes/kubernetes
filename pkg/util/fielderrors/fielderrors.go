@@ -90,12 +90,16 @@ type ValidationError struct {
 var _ error = &ValidationError{}
 
 func (v *ValidationError) Error() string {
+	return fmt.Sprintf("%s: %s", v.Field, v.ErrorBody())
+}
+
+func (v *ValidationError) ErrorBody() string {
 	var s string
 	switch v.Type {
 	case ValidationErrorTypeRequired, ValidationErrorTypeTooLong:
-		s = spew.Sprintf("%s: %s", v.Field, v.Type)
+		s = spew.Sprintf("%s", v.Type)
 	default:
-		s = spew.Sprintf("%s: %s '%+v'", v.Field, v.Type, v.BadValue)
+		s = spew.Sprintf("%s '%+v'", v.Type, v.BadValue)
 	}
 	if len(v.Detail) != 0 {
 		s += fmt.Sprintf(": %s", v.Detail)
