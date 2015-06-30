@@ -43,6 +43,7 @@ func expectHTTP(url string, code int, t *testing.T) {
 	r, err := http.Get(url)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+		return
 	}
 	if r.StatusCode != code {
 		t.Errorf("unexpected response: %v", r.StatusCode)
