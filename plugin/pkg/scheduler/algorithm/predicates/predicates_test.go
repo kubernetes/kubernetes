@@ -718,7 +718,7 @@ func TestServiceAffinity(t *testing.T) {
 	}
 }
 
-func TestPodLabelConflicts(t *testing.T) {
+func TestPodAntiAffinitySelectors(t *testing.T) {
 	podLabels := map[string]string{"key1": "val1", "key2": "val2"}
 	conflict1, _ := labels.Parse("key1=val1")
 	conflict2, _ := labels.Parse("key2==val2")
@@ -750,109 +750,109 @@ func TestPodLabelConflicts(t *testing.T) {
 		},
 		{
 			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: podLabels}},
-			existingPods: []*api.Pod{{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{nonConflict1.(labels.LabelSelector)}}}},
+			existingPods: []*api.Pod{{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{nonConflict1.(labels.LabelSelector)}}}},
 			fits:         true,
 			test:         "non conflicting label",
 		},
 		{
-			pod:          &api.Pod{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{nonConflict1.(labels.LabelSelector)}}},
+			pod:          &api.Pod{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{nonConflict1.(labels.LabelSelector)}}},
 			existingPods: []*api.Pod{{ObjectMeta: api.ObjectMeta{Labels: podLabels}}},
 			fits:         true,
 			test:         "non conflicting Equals conflict",
 		},
 		{
-			pod:          &api.Pod{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{nonConflict2.(labels.LabelSelector)}}},
+			pod:          &api.Pod{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{nonConflict2.(labels.LabelSelector)}}},
 			existingPods: []*api.Pod{{ObjectMeta: api.ObjectMeta{Labels: podLabels}}},
 			fits:         true,
 			test:         "non conflicting DoubleEquals conflict",
 		},
 		{
-			pod:          &api.Pod{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{nonConflict3.(labels.LabelSelector)}}},
+			pod:          &api.Pod{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{nonConflict3.(labels.LabelSelector)}}},
 			existingPods: []*api.Pod{{ObjectMeta: api.ObjectMeta{Labels: podLabels}}},
 			fits:         true,
 			test:         "non conflicting And conflict",
 		},
 		{
-			pod:          &api.Pod{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{nonConflict4.(labels.LabelSelector)}}},
+			pod:          &api.Pod{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{nonConflict4.(labels.LabelSelector)}}},
 			existingPods: []*api.Pod{{ObjectMeta: api.ObjectMeta{Labels: podLabels}}},
 			fits:         true,
 			test:         "non conflicting In conflict",
 		},
 		{
-			pod:          &api.Pod{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict1.(labels.LabelSelector)}}},
+			pod:          &api.Pod{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict1.(labels.LabelSelector)}}},
 			existingPods: []*api.Pod{{ObjectMeta: api.ObjectMeta{Labels: podLabels}}},
 			fits:         false,
 			test:         "new Equals conflict",
 		},
 		{
-			pod:          &api.Pod{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict2.(labels.LabelSelector)}}},
+			pod:          &api.Pod{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict2.(labels.LabelSelector)}}},
 			existingPods: []*api.Pod{{ObjectMeta: api.ObjectMeta{Labels: podLabels}}},
 			fits:         false,
 			test:         "new DoubleEquals conflict",
 		},
 		{
-			pod:          &api.Pod{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict3.(labels.LabelSelector)}}},
+			pod:          &api.Pod{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict3.(labels.LabelSelector)}}},
 			existingPods: []*api.Pod{{ObjectMeta: api.ObjectMeta{Labels: podLabels}}},
 			fits:         false,
 			test:         "new Exists conflict",
 		},
 		{
-			pod:          &api.Pod{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict4.(labels.LabelSelector)}}},
+			pod:          &api.Pod{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict4.(labels.LabelSelector)}}},
 			existingPods: []*api.Pod{{ObjectMeta: api.ObjectMeta{Labels: podLabels}}},
 			fits:         false,
 			test:         "new And conflict",
 		},
 		{
-			pod:          &api.Pod{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict5.(labels.LabelSelector)}}},
+			pod:          &api.Pod{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict5.(labels.LabelSelector)}}},
 			existingPods: []*api.Pod{{ObjectMeta: api.ObjectMeta{Labels: podLabels}}},
 			fits:         false,
 			test:         "new In conflict",
 		},
 		{
-			pod:          &api.Pod{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict1.(labels.LabelSelector), nonConflict1.(labels.LabelSelector)}}},
+			pod:          &api.Pod{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict1.(labels.LabelSelector), nonConflict1.(labels.LabelSelector)}}},
 			existingPods: []*api.Pod{{ObjectMeta: api.ObjectMeta{Labels: podLabels}}},
 			fits:         false,
 			test:         "new Or conflict",
 		},
 		{
 			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: podLabels}},
-			existingPods: []*api.Pod{{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict1.(labels.LabelSelector)}}}},
+			existingPods: []*api.Pod{{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict1.(labels.LabelSelector)}}}},
 			fits:         false,
 			test:         "existing Equals conflict",
 		},
 		{
 			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: podLabels}},
-			existingPods: []*api.Pod{{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict2.(labels.LabelSelector)}}}},
+			existingPods: []*api.Pod{{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict2.(labels.LabelSelector)}}}},
 			fits:         false,
 			test:         "existing DoubleEquals conflict",
 		},
 		{
 			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: podLabels}},
-			existingPods: []*api.Pod{{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict3.(labels.LabelSelector)}}}},
+			existingPods: []*api.Pod{{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict3.(labels.LabelSelector)}}}},
 			fits:         false,
 			test:         "existing Exists conflict",
 		},
 		{
 			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: podLabels}},
-			existingPods: []*api.Pod{{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict4.(labels.LabelSelector)}}}},
+			existingPods: []*api.Pod{{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict4.(labels.LabelSelector)}}}},
 			fits:         false,
 			test:         "existing And conflict",
 		},
 		{
 			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: podLabels}},
-			existingPods: []*api.Pod{{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict5.(labels.LabelSelector)}}}},
+			existingPods: []*api.Pod{{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict5.(labels.LabelSelector)}}}},
 			fits:         false,
 			test:         "existing In conflict",
 		},
 		{
 			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: podLabels}},
-			existingPods: []*api.Pod{{Spec: api.PodSpec{Conflicts: []labels.LabelSelector{conflict1.(labels.LabelSelector), nonConflict1.(labels.LabelSelector)}}}},
+			existingPods: []*api.Pod{{Spec: api.PodSpec{AntiAffinitySelectors: []labels.LabelSelector{conflict1.(labels.LabelSelector), nonConflict1.(labels.LabelSelector)}}}},
 			fits:         false,
 			test:         "existing Or conflict",
 		},
 	}
 	for _, test := range tests {
-		fits, err := NoPodLabelConflict(test.pod, test.existingPods, "machine")
+		fits, err := NoPodAntiAffinitySelectorsMatch(test.pod, test.existingPods, "machine")
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

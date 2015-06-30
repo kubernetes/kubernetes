@@ -505,15 +505,15 @@ func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s con
 	} else {
 		out.ImagePullSecrets = nil
 	}
-	if in.Conflicts != nil {
-		out.Conflicts = make([]labels.LabelSelector, len(in.Conflicts))
-		for i := range in.Conflicts {
-			if err := s.Convert(&in.Conflicts[i], &out.Conflicts[i], 0); err != nil {
+	if in.AntiAffinitySelectors != nil {
+		out.AntiAffinitySelectors = make([]labels.LabelSelector, len(in.AntiAffinitySelectors))
+		for i := range in.AntiAffinitySelectors {
+			if err := s.Convert(&in.AntiAffinitySelectors[i], &out.AntiAffinitySelectors[i], 0); err != nil {
 				return err
 			}
 		}
 	} else {
-		out.Conflicts = nil
+		out.AntiAffinitySelectors = nil
 	}
 	return nil
 }
@@ -577,15 +577,15 @@ func convert_api_PodSpec_To_v1beta3_PodSpec(in *api.PodSpec, out *PodSpec, s con
 	} else {
 		out.ImagePullSecrets = nil
 	}
-	if in.Conflicts != nil {
-		out.Conflicts = make([]labels.LabelSelector, len(in.Conflicts))
-		for i := range in.Conflicts {
-			if err := s.Convert(&in.Conflicts[i], &out.Conflicts[i], 0); err != nil {
+	if in.AntiAffinitySelectors != nil {
+		out.AntiAffinitySelectors = make([]labels.LabelSelector, len(in.AntiAffinitySelectors))
+		for i := range in.AntiAffinitySelectors {
+			if err := s.Convert(&in.AntiAffinitySelectors[i], &out.AntiAffinitySelectors[i], 0); err != nil {
 				return err
 			}
 		}
 	} else {
-		out.Conflicts = nil
+		out.AntiAffinitySelectors = nil
 	}
 
 	return nil

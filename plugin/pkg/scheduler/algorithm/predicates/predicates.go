@@ -177,21 +177,21 @@ func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
 	return selector.Matches(labels.Set(node.Labels))
 }
 
-// NoPodLabelConflict evaluates if a pod fits a node by:
-// 1) Comparing the pod's conflict label selector against labels of all the other pods.
-// 2) Comparing all the other pods conflict label selector with labels of this pod.
-func NoPodLabelConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+// NoPodAntiAffinitySelectorsMatch evaluates if a pod fits a node by:
+// 1) Comparing the pod's anti affinity selectors against labels of all existing pods.
+// 2) Comparing existing pods anti affinity selectors with labels of this pod.
+func NoPodAntiAffinitySelectorsMatch(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	for podIx := range existingPods {
 		if existingPods[podIx].Labels != nil {
-			for ii, _ := range pod.Spec.Conflicts {
-				if pod.Spec.Conflicts[ii].Matches(labels.Set(existingPods[podIx].Labels)) {
+			for ii, _ := range pod.Spec.AntiAffinitySelectors {
+				if pod.Spec.AntiAffinitySelectors[ii].Matches(labels.Set(existingPods[podIx].Labels)) {
 					return false, nil
 				}
 			}
 		}
 		if pod.Labels != nil {
-			for ii, _ := range existingPods[podIx].Spec.Conflicts {
-				if existingPods[podIx].Spec.Conflicts[ii].Matches(labels.Set(pod.Labels)) {
+			for ii, _ := range existingPods[podIx].Spec.AntiAffinitySelectors {
+				if existingPods[podIx].Spec.AntiAffinitySelectors[ii].Matches(labels.Set(pod.Labels)) {
 					return false, nil
 				}
 			}

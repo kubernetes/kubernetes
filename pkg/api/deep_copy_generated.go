@@ -1306,6 +1306,18 @@ func deepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 	} else {
 		out.NodeSelector = nil
 	}
+	if in.AntiAffinitySelectors != nil {
+		out.AntiAffinitySelectors = make([]labels.LabelSelector, len(in.AntiAffinitySelectors))
+		for i := range in.AntiAffinitySelectors {
+			if newVal, err := c.DeepCopy(in.AntiAffinitySelectors[i]); err != nil {
+				return err
+			} else {
+				out.AntiAffinitySelectors[i] = newVal.(labels.LabelSelector)
+			}
+		}
+	} else {
+		out.AntiAffinitySelectors = nil
+	}
 	out.ServiceAccountName = in.ServiceAccountName
 	out.NodeName = in.NodeName
 	out.HostNetwork = in.HostNetwork
@@ -1318,18 +1330,6 @@ func deepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 		}
 	} else {
 		out.ImagePullSecrets = nil
-	}
-	if in.Conflicts != nil {
-		out.Conflicts = make([]labels.LabelSelector, len(in.Conflicts))
-		for i := range in.Conflicts {
-			if newVal, err := c.DeepCopy(in.Conflicts[i]); err != nil {
-				return err
-			} else {
-				out.Conflicts[i] = newVal.(labels.LabelSelector)
-			}
-		}
-	} else {
-		out.Conflicts = nil
 	}
 	return nil
 }

@@ -1314,6 +1314,18 @@ func deepCopy_v1beta3_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) er
 	} else {
 		out.NodeSelector = nil
 	}
+	if in.AntiAffinitySelectors != nil {
+		out.AntiAffinitySelectors = make([]labels.LabelSelector, len(in.AntiAffinitySelectors))
+		for i := range in.AntiAffinitySelectors {
+			if newVal, err := c.DeepCopy(in.AntiAffinitySelectors[i]); err != nil {
+				return err
+			} else {
+				out.AntiAffinitySelectors[i] = newVal.(labels.LabelSelector)
+			}
+		}
+	} else {
+		out.AntiAffinitySelectors = nil
+	}
 	out.ServiceAccount = in.ServiceAccount
 	out.Host = in.Host
 	out.HostNetwork = in.HostNetwork
@@ -1326,18 +1338,6 @@ func deepCopy_v1beta3_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) er
 		}
 	} else {
 		out.ImagePullSecrets = nil
-	}
-	if in.Conflicts != nil {
-		out.Conflicts = make([]labels.LabelSelector, len(in.Conflicts))
-		for i := range in.Conflicts {
-			if newVal, err := c.DeepCopy(in.Conflicts[i]); err != nil {
-				return err
-			} else {
-				out.Conflicts[i] = newVal.(labels.LabelSelector)
-			}
-		}
-	} else {
-		out.Conflicts = nil
 	}
 	return nil
 }

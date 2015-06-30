@@ -56,8 +56,8 @@ func defaultPredicates() util.StringSet {
 		),
 		// Fit is determined by the presence of the Host parameter and a string match
 		factory.RegisterFitPredicate("HostName", predicates.PodFitsHost),
-		// Fit is determined by non-conflicting pods.
-		factory.RegisterFitPredicate("NoPodLabelConflict", predicates.NoPodLabelConflict),
+		// Fit is determined by anti affinity selectors not matching.
+		factory.RegisterFitPredicate("NoPodAntiAffinitySelectorsMatch", predicates.NoPodAntiAffinitySelectorsMatch),
 	)
 }
 
