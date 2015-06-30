@@ -20,7 +20,9 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -197,32 +199,70 @@ func (s *StoreToControllerLister) List() (controllers []api.ReplicationControlle
 
 // GetPodControllers returns a list of controllers managing a pod. Returns an error only if no matching controllers are found.
 func (s *StoreToControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
-	var selector labels.Selector
-	var rc api.ReplicationController
-
-	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("No controllers found for pod %v because it has no labels", pod.Name)
-		return
-	}
-
 	for _, m := range s.Store.List() {
-		rc = *m.(*api.ReplicationController)
-		if rc.Namespace != pod.Namespace {
-			continue
-		}
-		labelSet := labels.Set(rc.Spec.Selector)
-		selector = labels.Set(rc.Spec.Selector).AsSelector()
+		// make a copy and point a ref to the copy.  We don't want to change the original
+		t := *m.(*api.ReplicationController)
+		rc := &t
 
-		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
-		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
-			continue
+		if PodMatchesRC(pod, rc) {
+			controllers = append(controllers, *rc)
 		}
-		controllers = append(controllers, rc)
 	}
+
 	if len(controllers) == 0 {
 		err = fmt.Errorf("Could not find controllers for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
+
 	return
+}
+
+// PodMatchesRC indicates whether or not a pod matches the RC selector.  It only returns true if the RC's selector matches.
+// If the Pod has a CreatedByAnnotation, that annotation MUST match the RC UID
+func PodMatchesRC(pod *api.Pod, rc *api.ReplicationController) bool {
+	// RCs can only match pods in the namespace
+	if pod.Namespace != rc.Namespace {
+		return false
+	}
+
+	// if a pod has no labels, it can't match
+	if len(pod.Labels) == 0 {
+		return false
+	}
+
+	rcSelector := labels.Set(rc.Spec.Selector).AsSelector()
+
+	// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
+	if rcSelector.Empty() || !rcSelector.Matches(labels.Set(pod.Labels)) {
+		return false
+	}
+
+	// check the createdBy annotation
+	createdByRef, exists := pod.Annotations[api.CreatedByAnnotation]
+	// if there is no created by annotation, then match just based on selector, which already passed
+	if !exists {
+		return true
+	}
+
+	obj, err := latest.Codec.Decode([]byte(createdByRef))
+	if err != nil {
+		// we can't interpret the createdBy, but the selector matched so return true
+		util.HandleError(err)
+		return true
+	}
+
+	// check the created by reference.  If we don't understand it, return true based on the selector match
+	rcRef, ok := obj.(*api.SerializedReference)
+	if !ok {
+		return true
+	}
+
+	// we have a reference and it is NOT our RC, return false because it doesn't belong to this RC
+	if rcRef.Reference.UID != rc.UID {
+		return false
+	}
+
+	// the selector AND the created by matched, return true
+	return true
 }
 
 // StoreToServiceLister makes a Store that has the List method of the client.ServiceInterface
