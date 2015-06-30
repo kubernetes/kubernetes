@@ -11,6 +11,7 @@ base:
 {% endif %}
     - helpers
     - cadvisor
+    - kube-client-tools
     - kubelet
     - kube-proxy
 {% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
