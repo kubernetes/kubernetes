@@ -118,7 +118,6 @@ func NewAPIServer() *APIServer {
 		AuthorizationMode:      "AlwaysAllow",
 		AdmissionControl:       "AlwaysAdmit",
 		EtcdPathPrefix:         master.DefaultEtcdPathPrefix,
-		OldEtcdPathPrefix:      master.DefaultEtcdPathPrefix,
 		EnableLogsSupport:      true,
 		MasterServiceNamespace: api.NamespaceDefault,
 		ClusterName:            "kubernetes",
