@@ -209,6 +209,7 @@ func (rm *ReplicationManager) getPodControllers(pod *api.Pod) *api.ReplicationCo
 		glog.V(4).Infof("No controllers found for pod %v, replication manager will avoid syncing", pod.Name)
 		return nil
 	}
+	sort.Sort(overlappingControllers(controllers))
 	return &controllers[0]
 }
 

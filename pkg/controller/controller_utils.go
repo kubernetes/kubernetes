@@ -289,6 +289,19 @@ func (s activePods) Less(i, j int) bool {
 	return false
 }
 
+// overlappingControllers sorts a list of controllers by creation timestamp, using their names as a tie breaker.
+type overlappingControllers []api.ReplicationController
+
+func (o overlappingControllers) Len() int      { return len(o) }
+func (o overlappingControllers) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+
+func (o overlappingControllers) Less(i, j int) bool {
+	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+		return o[i].Name < o[j].Name
+	}
+	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+}
+
 // filterActivePods returns pods that have not terminated.
 func filterActivePods(pods []api.Pod) []*api.Pod {
 	var result []*api.Pod
