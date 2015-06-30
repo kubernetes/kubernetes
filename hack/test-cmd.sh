@@ -388,19 +388,21 @@ for version in "${kube_api_versions[@]}"; do
 
   ## --force update pod can change other field, e.g., spec.container.name
   # Command
-  kubectl get "${kube_flags[@]}" pod valid-pod -o json | sed 's/"kubernetes-serve-hostname"/"update-k8s-serve-hostname"/g' > tmp-valid-pod.json
-  kubectl update "${kube_flags[@]}" --force -f tmp-valid-pod.json
+  kubectl get "${kube_flags[@]}" pod valid-pod -o json | sed 's/"kubernetes-serve-hostname"/"update-k8s-serve-hostname"/g' > /tmp/tmp-valid-pod.json
+  kubectl update "${kube_flags[@]}" --force -f /tmp/tmp-valid-pod.json
   # Post-condition: spec.container.name = "update-k8s-serve-hostname"
   kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'update-k8s-serve-hostname'
+  #cleaning
+  rm /tmp/tmp-valid-pod.json
 
   ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
-  echo -e '#!/bin/bash\nsed -i "s/nginx/gcr.io\/google_containers\/serve_hostname/g" $1' > tmp-editor.sh
-  chmod +x tmp-editor.sh
-  OSC_EDITOR=$(pwd)/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod
+  echo -e '#!/bin/bash\nsed -i "s/nginx/gcr.io\/google_containers\/serve_hostname/g" $1' > /tmp/tmp-editor.sh
+  chmod +x /tmp/tmp-editor.sh
+  EDITOR=/tmp/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod
   # Post-condition: valid-pod POD has image gcr.io/google_containers/serve_hostname
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google_containers/serve_hostname:'
   # cleaning
-  rm tmp-editor.sh
+  rm /tmp/tmp-editor.sh
 
   ### Overwriting an existing label is not permitted
   # Pre-condition: name is valid-pod

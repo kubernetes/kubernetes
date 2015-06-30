@@ -20,17 +20,13 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-
-	//	"github.com/openshift/origin/pkg/cmd/util/clientcmd"
-	//	"github.com/openshift/origin/pkg/cmd/util/editor"
-	//"github.com/openshift/origin/pkg/util/jsonmerge"
 )
 
 const (
 	editLong = `Edit a resource from the default editor.
 
 The edit command allows you to directly edit any API resource you can retrieve via the
-command line tools. It will open the editor defined by your OSC_EDITOR, GIT_EDITOR,
+command line tools. It will open the editor defined by your KUBE_EDITOR, GIT_EDITOR,
 or EDITOR environment variables, or fall back to 'vi'. You can edit multiple objects,
 although changes are applied one at a time. The command accepts filenames as well as
 command line arguments, although the files you point to must be previously saved
@@ -53,10 +49,10 @@ saved copy to include the latest resource version.`
   $ kubectl edit dc/my-deployment
 
   // Use an alternative editor
-  $ OSC_EDITOR="nano" kubectl edit dc/my-deployment
+  $ KUBE_EDITOR="nano" kubectl edit dc/my-deployment
 
-  // Edit the service 'docker-registry' in JSON using the v1beta3 API format:
-  $ kubectl edit svc/docker-registry --output-version=v1beta3 -o json`
+  // Edit the service 'docker-registry' in JSON using the v1 API format:
+  $ kubectl edit svc/docker-registry --output-version=v1 -o json`
 )
 
 var errExit = fmt.Errorf("exit directly")
@@ -109,23 +105,23 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		ClientMapper: f.ClientMapperForCommand(),
 	}
 
-	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(filenames...).
-		//SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).
-		Latest()
+		Latest().
+		Flatten().
+		Do()
+	if r.err != nil {
+		return r.err
+	}
+
+	infos, err := r.Infos()
 	if err != nil {
 		return err
 	}
 
 	clientConfig, err := f.ClientConfig()
-	if err != nil {
-		return err
-	}
-
-	r := b.Flatten().Do()
-	infos, err := r.Infos()
 	if err != nil {
 		return err
 	}
@@ -153,7 +149,7 @@ func RunEdit(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 
 		// launch the editor
 		edit := editor.NewDefaultEditor()
-		edited, file, err := edit.LaunchTempFile("oc-edit-", ext, buf)
+		edited, file, err := edit.LaunchTempFile("kubectl-edit-", ext, buf)
 		if err != nil {
 			return preservedFile(err, results.file, cmd.Out())
 		}

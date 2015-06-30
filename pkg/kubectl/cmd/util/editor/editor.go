@@ -26,12 +26,11 @@ type Editor struct {
 	Shell bool
 }
 
-// NewDefaultEditor creates an Editor that uses the OS environment to
-// locate the editor program, looking at OSC_EDITOR, GIT_EDITOR, and
-// EDITOR in order to find the proper command line. If the provided
-// editor has no spaces, or no quotes, it is treated as a bare command
-// to be loaded. Otherwise, the string will be passed to the user's
-// shell for execution.
+// NewDefaultEditor creates a struct Editor that uses the OS environment to
+// locate the editor program, looking at EDITOR environment variable to find
+// the proper command line. If the provided editor has no spaces, or no quotes,
+// it is treated as a bare command to be loaded. Otherwise, the string will
+// be passed to the user's shell for execution.
 func NewDefaultEditor() Editor {
 	args, shell := defaultEnvEditor()
 	return Editor{
@@ -49,13 +48,7 @@ func defaultEnvShell() []string {
 }
 
 func defaultEnvEditor() ([]string, bool) {
-	editor := os.Getenv("OSC_EDITOR")
-	if len(editor) == 0 {
-		editor = os.Getenv("GIT_EDITOR")
-	}
-	if len(editor) == 0 {
-		editor = os.Getenv("EDITOR")
-	}
+	editor := os.Getenv("EDITOR")
 	if len(editor) == 0 {
 		editor = defaultEditor
 	}
