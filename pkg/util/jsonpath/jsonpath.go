@@ -143,13 +143,13 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 			return input, fmt.Errorf("%v is not array or slice", value)
 		}
 		params := node.Params
-		if !params[0].Exists {
+		if !params[0].Known {
 			params[0].Value = 0
 		}
 		if params[0].Value < 0 {
 			params[0].Value += value.Len()
 		}
-		if !params[1].Exists {
+		if !params[1].Known {
 			params[1].Value = value.Len()
 		}
 
@@ -157,7 +157,7 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 			params[1].Value += value.Len()
 		}
 
-		if !params[2].Exists {
+		if !params[2].Known {
 			value = value.Slice(params[0].Value, params[1].Value)
 		} else {
 			value = value.Slice3(params[0].Value, params[1].Value, params[2].Value)

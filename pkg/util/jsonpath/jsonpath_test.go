@@ -119,8 +119,10 @@ func TestPoints(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	t.Log(pointsData)
 	pointsTests := []jsonpathTest{
 		{"existsfilter", "${[?(@.z)].id}", pointsData, "i2 i5"},
+		{"arrayfield", "${[0]['id']}", pointsData, "i1"},
 	}
 	testJSONPath(pointsTests, t)
 }

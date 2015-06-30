@@ -122,7 +122,6 @@ func (p *Parser) parseLeftDelim(cur *ListNode) error {
 }
 
 func (p *Parser) parseInsideAction(cur *ListNode) error {
-
 	prefixMap := map[string]func(*ListNode) error{
 		rightDelim: p.parseRightDelim,
 		"[?(":      p.parseFilter,
@@ -233,26 +232,46 @@ Loop:
 		return p.parseInsideAction(cur)
 	}
 
-	//slice operator
-	reg := regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:[\d]*)?$`)
+	// dict key
+	reg := regexp.MustCompile(`^'([^']*)'$`)
 	value := reg.FindStringSubmatch(text)
+	if value != nil {
+		text := value[1]
+		if text == "*" {
+			cur.append(newWildcard())
+		} else {
+			cur.append(newField(text))
+		}
+		return p.parseInsideAction(cur)
+	}
+
+	//slice operator
+	reg = regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:[\d]*)?$`)
+	value = reg.FindStringSubmatch(text)
 	if value == nil {
 		return fmt.Errorf("incorrect array index")
 	}
 	value = value[1:]
-	for i := 1; i < 3; i++ {
-		if value[i] != "" {
-			value[i] = value[i][1:]
-		}
-	}
 	params := [3]ParamsEntry{}
 	for i := 0; i < 3; i++ {
 		if value[i] != "" {
-			params[i].Exists = true
-			params[i].Value, _ = strconv.Atoi(value[i])
+			if i > 0 {
+				value[i] = value[i][1:]
+			}
+			if i > 0 && value[i] == "" {
+				params[i].Known = false
+			} else {
+				params[i].Known = true
+				params[i].Value, _ = strconv.Atoi(value[i])
+			}
 		} else {
-			params[i].Exists = false
-			params[i].Value = 0
+			if i == 1 {
+				params[i].Known = true
+				params[i].Value = params[0].Value + 1
+			} else {
+				params[i].Known = false
+				params[i].Value = 0
+			}
 		}
 	}
 	cur.append(newArray(params))

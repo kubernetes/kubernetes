@@ -30,6 +30,8 @@ var parserTests = []parserTest{
 	{"plain", `hello jsonpath`, []Node{newText("hello jsonpath")}},
 	{"variable", `hello ${.jsonpath}`,
 		[]Node{newText("hello "), newList(), newField("jsonpath")}},
+	{"arrayfiled", `hello ${['jsonpath']}`,
+		[]Node{newText("hello "), newList(), newField("jsonpath")}},
 	{"quote", `${"${"}`, []Node{newList(), newText("${")}},
 	{"array", `${[1:3]}`,
 		[]Node{newList(), newArray([3]ParamsEntry{{1, true}, {3, true}, {0, false}})}},
