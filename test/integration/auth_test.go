@@ -275,6 +275,16 @@ func getTestRequests() []struct {
 		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), aPod, code201},
 		{"PUT", timeoutPath("pods", api.NamespaceDefault, "a"), aPod, code200},
 		{"GET", path("pods", api.NamespaceDefault, "a"), "", code200},
+		// GET and POST for /exec should return Bad Request (400) since the pod has not been assigned a node yet.
+		{"GET", path("pods", api.NamespaceDefault, "a") + "/exec", "", code400},
+		{"POST", path("pods", api.NamespaceDefault, "a") + "/exec", "", code400},
+		// PUT for /exec should return Method Not Allowed (405).
+		{"PUT", path("pods", api.NamespaceDefault, "a") + "/exec", "", code405},
+		// GET and POST for /portforward should return Bad Request (400) since the pod has not been assigned a node yet.
+		{"GET", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code400},
+		{"POST", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code400},
+		// PUT for /portforward should return Method Not Allowed (405).
+		{"PUT", path("pods", api.NamespaceDefault, "a") + "/portforward", "", code405},
 		{"PATCH", path("pods", api.NamespaceDefault, "a"), "{%v}", code200},
 		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), deleteNow, code200},
 

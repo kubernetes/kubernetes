@@ -5957,6 +5957,36 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "string",
+      "method": "POST",
+      "summary": "connect POST requests to exec of Pod",
+      "nickname": "connectPostPodExec",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -6020,6 +6050,36 @@
       "method": "GET",
       "summary": "connect GET requests to portforward of Pod",
       "nickname": "connectGetPodPortforward",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Pod",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "POST",
+      "summary": "connect POST requests to portforward of Pod",
+      "nickname": "connectPostPodPortforward",
       "parameters": [
        {
         "type": "string",
