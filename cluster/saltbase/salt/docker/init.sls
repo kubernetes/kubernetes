@@ -32,11 +32,10 @@ docker:
       - pkg: docker-io
 {% if grains.network_mode == "calico" and 'kubernetes-pool' in grains.roles %}
       - container_bridge: cbr0
-      - file: {{ environment_file }}
 
 cbr0:
   container_bridge.ensure:
-    - cidr: {{ grains.container_subnet }}
+    - cidr: {{ grains.['cbr-cidr'] }}
     - mtu: 1460
 
 {% endif %}

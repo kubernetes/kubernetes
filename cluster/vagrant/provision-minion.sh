@@ -142,7 +142,7 @@ grains:
   networkInterfaceName: eth1
   roles:
     - kubernetes-pool
-  cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
+  cbr-cidr: '$(echo "$MINION_CONTAINER_CIDR" | sed -e "s/'/''/g")'
   container_subnet: '$(echo "$MINION_CONTAINER_SUBNET" | sed -e "s/'/''/g")'
   hostname_override: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
