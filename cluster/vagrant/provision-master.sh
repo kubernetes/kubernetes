@@ -72,7 +72,12 @@ echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' 
 echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 
 # Configure the openvswitch network
-provision-network
+if [ $NETWORK_MODE != "calico" ]; then
+  echo "Provisioning openvswitch network"
+  provision-network
+else
+  echo "Calico network mode selected. Deferring network configuration to salt."
+fi
 
 # Update salt configuration
 mkdir -p /etc/salt/minion.d
@@ -91,7 +96,7 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   publicAddressOverride: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
-  network_mode: calico
+  network_mode: '$(echo "$NETWORK_MODE" | sed -e "s/'/''/g")'
   networkInterfaceName: eth1
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   cloud: vagrant

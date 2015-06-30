@@ -98,8 +98,13 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
   fi
 done
 
-# Configure network
-provision-network
+# Configure the openvswitch network
+if [ $NETWORK_MODE != "calico" ]; then
+  echo "Provisioning openvswitch network"
+  provision-network
+else
+  echo "Calico network mode selected. Deferring network configuration to salt."
+fi
 
 # Placeholder for any other manifests that may be per-node.
 mkdir -p /etc/kubernetes/manifests
@@ -136,7 +141,7 @@ EOF
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   cloud: vagrant
-  network_mode: calico
+  network_mode: '$(echo "$NETWORK_MODE" | sed -e "s/'/''/g")'
   node_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   networkInterfaceName: eth1
