@@ -39,6 +39,7 @@ install:
   - go get golang.org/x/tools/cmd/cover
   - go get github.com/mattn/goveralls
   - go get github.com/tools/godep
+  - go get github.com/jstemmer/go-junit-report
   - ./hack/build-go.sh
   - godep go install ./...
   - ./hack/travis/install-etcd.sh
@@ -56,7 +57,7 @@ install:
 
 script:
   # Disable coverage collection on pull requests
-  - KUBE_RACE="-race" KUBE_COVER=$([[ "$PULL_REQUEST" =~ ^[0-9]+$ ]] && echo "n" || echo "y") KUBE_GOVERALLS_BIN="$GOPATH/bin/goveralls" KUBE_TIMEOUT='-timeout 300s' KUBE_COVERPROCS=8 KUBE_TEST_ETCD_PREFIXES="${KUBE_TEST_ETCD_PREFIXES}" KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS}" ./hack/test-go.sh -- -p=2
+  - KUBE_RACE="-race" KUBE_COVER=$([[ "$PULL_REQUEST" =~ ^[0-9]+$ ]] && echo "n" || echo "y") KUBE_GOVERALLS_BIN="$GOPATH/bin/goveralls" KUBE_TIMEOUT='-timeout 300s' KUBE_COVERPROCS=8 KUBE_TEST_ETCD_PREFIXES="${KUBE_TEST_ETCD_PREFIXES}" KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS}" KUBE_JUNIT_REPORT_DIR="$(pwd)/shippable/testresults" ./hack/test-go.sh -- -p=2
   - ./hack/test-cmd.sh
   - KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS}" KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4 LOG_LEVEL=4 ./hack/test-integration.sh
   - ./hack/test-update-storage-objects.sh

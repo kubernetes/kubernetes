@@ -57,6 +57,8 @@ KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1"}
 # Run tests with the standard (registry) and a custom etcd prefix
 # (kubernetes.io/registry).
 KUBE_TEST_ETCD_PREFIXES=${KUBE_TEST_ETCD_PREFIXES:-"registry,kubernetes.io/registry"}
+# Create a junit-style XML test report in this directory if set.
+KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -103,6 +105,12 @@ shift $((OPTIND - 1))
 eval "goflags=(${KUBE_GOFLAGS:-})"
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
+# The go-junit-report tool needs full test case information to produce a
+# meaningful report.
+if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
+  goflags+=(-v)
+fi
+
 # Filter out arguments that start with "-" and move them to goflags.
 testcases=()
 for arg; do
@@ -116,6 +124,35 @@ if [[ ${#testcases[@]} -eq 0 ]]; then
   testcases=($(kube::test::find_dirs))
 fi
 set -- "${testcases[@]+${testcases[@]}}"
+
+junitFilenamePrefix() {
+  if [[ -z "${KUBE_JUNIT_REPORT_DIR}" ]]; then
+    echo ""
+    return
+  fi
+  mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
+  echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_API_VERSION}_$(kube::util::sortable_date)"
+}
+
+produceJUnitXMLReport() {
+  local -r junit_filename_prefix=$1
+  if [[ -z "${junit_filename_prefix}" ]]; then
+    return
+  fi
+
+  local test_stdout_filenames
+  local junit_xml_filename
+  test_stdout_filenames=$(ls ${junit_filename_prefix}*.stdout)
+  junit_xml_filename="${junit_filename_prefix}.xml"
+  if ! command -v go-junit-report >/dev/null 2>&1; then
+    kube::log::error "go-junit-report not found; please install with " \
+      "go get -u github.com/jstemmer/go-junit-report"
+    return
+  fi
+  cat ${test_stdout_filenames} | go-junit-report > "${junit_xml_filename}"
+  rm ${test_stdout_filenames}
+  kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
+}
 
 runTests() {
   # TODO: this should probably be refactored to avoid code duplication with the
@@ -152,14 +189,19 @@ runTests() {
     fi
   fi
 
+  local junit_filename_prefix
+  junit_filename_prefix=$(junitFilenamePrefix)
+
   # If we're not collecting coverage, run all requested tests with one 'go test'
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
-    kube::log::status "Running unit tests without code coverage"
+    kube::log::status "Running tests without code coverage"
     go test "${goflags[@]:+${goflags[@]}}" \
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
-     "${testargs[@]:+${testargs[@]}}"
-    return 0
+     "${testargs[@]:+${testargs[@]}}" \
+     | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} && rc=$? || rc=$?
+    produceJUnitXMLReport "${junit_filename_prefix}"
+    return ${rc}
   fi
 
   # Create coverage report directories.
@@ -173,15 +215,23 @@ runTests() {
   # separate 'go test' commands for each package and then combine at the end.
   # To speed things up considerably, we can at least use xargs -P to run multiple
   # 'go test' commands at once.
+  # To properly parse the test results if generating a JUnit test report, we
+  # must make sure the output from parallel runs is not mixed. To achieve this,
+  # we spawn a subshell for each parallel process, redirecting the output to
+  # separate files.
   printf "%s\n" "${@}" | xargs -I{} -n1 -P${KUBE_COVERPROCS} \
-      go test "${goflags[@]:+${goflags[@]}}" \
+    bash -c "set -o pipefail; _pkg=\"{}\"; _pkg_out=\${_pkg//\//_}; \
+        go test ${goflags[@]:+${goflags[@]}} \
           ${KUBE_RACE} \
           ${KUBE_TIMEOUT} \
-          -cover -covermode="${KUBE_COVERMODE}" \
-          -coverprofile="${cover_report_dir}/{}/${cover_profile}" \
-          "${cover_params[@]+${cover_params[@]}}" \
-          "${KUBE_GO_PACKAGE}/{}" \
-          "${testargs[@]:+${testargs[@]}}"
+          -cover -covermode=\"${KUBE_COVERMODE}\" \
+          -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
+          \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
+          ${testargs[@]:+${testargs[@]}} \
+        | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"}" \
+      && test_result=$? || test_result=$?
+
+  produceJUnitXMLReport "${junit_filename_prefix}"
 
   COMBINED_COVER_PROFILE="${cover_report_dir}/combined-coverage.out"
   {
@@ -201,6 +251,8 @@ runTests() {
   coverage_html_file="${cover_report_dir}/combined-coverage.html"
   go tool cover -html="${COMBINED_COVER_PROFILE}" -o="${coverage_html_file}"
   kube::log::status "Combined coverage report: ${coverage_html_file}"
+
+  return ${test_result}
 }
 
 reportCoverageToCoveralls() {
