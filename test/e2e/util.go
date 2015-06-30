@@ -19,6 +19,7 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -830,6 +831,20 @@ func runKubectl(args ...string) string {
 	Logf(stdout.String())
 	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
 	return strings.TrimSpace(stdout.String())
+}
+
+func startCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
+	stdout, err = cmd.StdoutPipe()
+	if err != nil {
+		return
+	}
+	stderr, err = cmd.StderrPipe()
+	if err != nil {
+		return
+	}
+	Logf("Asyncronously running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
+	err = cmd.Start()
+	return
 }
 
 // testContainerOutput runs testContainerOutputInNamespace with the default namespace.
