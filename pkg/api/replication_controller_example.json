@@ -54,7 +54,7 @@
                                 "protocol": "TCP"
                             },
                             {
-                                "name": "es-transport-port",
+                                "name": "es-trans-port",
                                 "containerPort": 9300,
                                 "protocol": "TCP"
                             }
