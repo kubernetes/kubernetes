@@ -275,7 +275,6 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	// "api/legacy=false" allows users to disable legacy api versions.
-	// Right now, v1beta1 and v1beta2 are considered legacy.
 	disableLegacyAPIs := false
 	legacyAPIFlagValue, ok := s.RuntimeConfig["api/legacy"]
 	if ok && legacyAPIFlagValue == "false" {
@@ -283,10 +282,8 @@ func (s *APIServer) Run(_ []string) error {
 	}
 	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
 
-	// "api/v1beta3={true|false} allows users to enable/disable v1beta3 API.
-	// This takes preference over api/all and api/legacy, if specified.
-	disableV1beta3 := disableAllAPIs
-	disableV1beta3 = !s.getRuntimeConfigValue("api/v1beta3", !disableV1beta3)
+	// v1beta3 is disabled by default. Users can enable it using "api/v1beta3=true"
+	enableV1beta3 := s.getRuntimeConfigValue("api/v1beta3", false)
 
 	// "api/v1={true|false} allows users to enable/disable v1 API.
 	// This takes preference over api/all and api/legacy, if specified.
@@ -387,7 +384,7 @@ func (s *APIServer) Run(_ []string) error {
 		SupportsBasicAuth:      len(s.BasicAuthFile) > 0,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
-		DisableV1Beta3:         disableV1beta3,
+		EnableV1Beta3:          enableV1beta3,
 		DisableV1:              disableV1,
 		MasterServiceNamespace: s.MasterServiceNamespace,
 		ClusterName:            s.ClusterName,

@@ -95,8 +95,8 @@ type Config struct {
 	EnableUISupport       bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
-	// allow v1beta3 to be conditionally disabled
-	DisableV1Beta3 bool
+	// allow v1beta3 to be conditionally enabled
+	EnableV1Beta3 bool
 	// allow v1 to be conditionally disabled
 	DisableV1 bool
 	// allow downstream consumers to disable the index route
@@ -332,7 +332,7 @@ func New(c *Config) *Master {
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
 		admissionControl:      c.AdmissionControl,
-		v1beta3:               !c.DisableV1Beta3,
+		v1beta3:               c.EnableV1Beta3,
 		v1:                    !c.DisableV1,
 		requestContextMapper:  c.RequestContextMapper,
 

@@ -139,6 +139,7 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 			EnableProfiling:   true,
 			EnableUISupport:   false,
 			APIPrefix:         "/api",
+			EnableV1Beta3:     true,
 			Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 			AdmissionControl:  admit.NewAlwaysAdmit(),
 		}
@@ -270,6 +271,7 @@ func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
 		EnableProfiling:   true,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
+		EnableV1Beta3:     true,
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
