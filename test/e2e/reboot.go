@@ -171,11 +171,21 @@ func rebootNode(c *client.Client, provider, name, rebootCmd string, result chan 
 		return
 	}
 
-	// Get all the pods on the node.
+	// Get all the pods on the node that don't have liveness probe set.
+	// Liveness probe may cause restart of a pod during node reboot, and the pod may not be running.
 	pods := ps.List()
-	podNames := make([]string, len(pods))
-	for i, p := range pods {
-		podNames[i] = p.ObjectMeta.Name
+	podNames := []string{}
+	for _, p := range pods {
+		probe := false
+		for _, c := range p.Spec.Containers {
+			if c.LivenessProbe != nil {
+				probe = true
+				break
+			}
+		}
+		if !probe {
+			podNames = append(podNames, p.ObjectMeta.Name)
+		}
 	}
 	Logf("Node %s has %d pods: %v", name, len(podNames), podNames)
 
