@@ -244,7 +244,7 @@ func InClusterConfig() (*Config, error) {
 	tlsClientConfig := TLSClientConfig{}
 	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
 	if _, err := util.CertPoolFromFile(rootCAFile); err != nil {
-		glog.Errorf("expected to load root ca config from %s, but got err: %v", rootCAFile, err)
+		glog.Errorf("expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
 		tlsClientConfig.CAFile = rootCAFile
 	}
@@ -252,7 +252,6 @@ func InClusterConfig() (*Config, error) {
 	return &Config{
 		// TODO: switch to using cluster DNS.
 		Host:            "https://" + net.JoinHostPort(os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")),
-		Version:         "v1beta3",
 		BearerToken:     string(token),
 		TLSClientConfig: tlsClientConfig,
 	}, nil
