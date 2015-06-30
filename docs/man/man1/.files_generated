@@ -17,6 +17,7 @@ kubectl-get.1
 kubectl-label.1
 kubectl-logs.1
 kubectl-namespace.1
+kubectl-patch.1
 kubectl-port-forward.1
 kubectl-proxy.1
 kubectl-replace.1
