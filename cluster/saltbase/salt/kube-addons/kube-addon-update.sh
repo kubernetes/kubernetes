@@ -26,8 +26,6 @@
 # 1. controllers are not updated unless their name is changed
 # 3. Services will not be updated unless their name is changed,
 #    but for services we acually want updates without name change.
-# 4. Json files are not handled at all. Currently addons must be
-#    in yaml files
 # 5. exit code is probably not always correct (I haven't checked
 #    carefully if it works in 100% cases)
 # 6. There are no unittests
@@ -45,6 +43,7 @@
 
 # global config
 KUBECTL=${TEST_KUBECTL:-/usr/local/bin/kubectl}   # substitute for tests
+RESOURCE_QUERY=${TEST_RESOURCE_QUERY:=/usr/local/bin/resource-query}
 NUM_TRIES_FOR_CREATE=${TEST_NUM_TRIES:-100}
 DELAY_AFTER_CREATE_ERROR_SEC=${TEST_DELAY_AFTER_ERROR_SEC:=10}
 NUM_TRIES_FOR_STOP=${TEST_NUM_TRIES:-100}
@@ -56,7 +55,7 @@ if [[ ! -x ${KUBECTL} ]]; then
 fi
 
 
-# remember that you can't log from functions that print some output (because
+# remember that you cannot log from functions that print some output (because
 # logs are also printed on stdout)
 # $1 level
 # $2 message
@@ -89,57 +88,54 @@ function log() {
   esac
 }
 
-#$1 yaml file path
-function get-object-kind-from-file() {
+
+#$1 yaml/json file
+#$2 go template for formatting the output
+function query-addon-resource() {
+    local -r file=$1
+    local -r template=$2
     # prints to stdout, so log cannot be used
-    #WARNING: only yaml is supported
-    cat $1 | python -c '''
-try:
-        import pipes,sys,yaml
-        y = yaml.load(sys.stdin)
-        labels = y["metadata"]["labels"]
-        if ("kubernetes.io/cluster-service", "true") not in labels.iteritems():
-            # all add-ons must have the label "kubernetes.io/cluster-service".
-            # Otherwise we are ignoring them (the update will not work anyway)
-            print "ERROR"
-        else:
-            print y["kind"]
-except Exception, ex:
-        print "ERROR"
-    '''
+    local name
+    local result
+
+    # the newline must be included in the template, below, so that grep can work
+    # in individual lines
+    ${RESOURCE_QUERY} -f $1 -t "{{ range \$key, \$value := \$.metadata.labels }}{{\$key}}={{\$value}}
+{{end}}" | grep "^kubernetes.io/cluster-service=true\$" > /dev/null
+    result=$?
+    if [[ $result -ne 0 ]]; then
+        echo "ERROR"
+        return
+    fi
+    value=$(${RESOURCE_QUERY} -f $1 -t "$2")
+    result=$?
+    if [[ $result -ne 0 ]]; then
+        echo "ERROR"
+        return
+    fi
+    echo $value
 }
 
-# $1 yaml file path
+#$1 yaml/json file path
+function get-object-kind-from-file() {
+    query-addon-resource $1 "{{.kind}}"
+}
+
+# $1 yaml/json file path
 function get-object-name-from-file() {
-    # prints to stdout, so log cannot be used
-    #WARNING: only yaml is supported
-    cat $1 | python -c '''
-try:
-        import pipes,sys,yaml
-        y = yaml.load(sys.stdin)
-        labels = y["metadata"]["labels"]
-        if ("kubernetes.io/cluster-service", "true") not in labels.iteritems():
-            # all add-ons must have the label "kubernetes.io/cluster-service".
-            # Otherwise we are ignoring them (the update will not work anyway)
-            print "ERROR"
-        else:
-            print y["metadata"]["name"]
-except Exception, ex:
-        print "ERROR"
-    '''
+    query-addon-resource $1 "{{.metadata.name}}"
 }
 
 # $1 addon directory path
 # $2 addon type (e.g. ReplicationController)
 # echoes the string with paths to files containing addon for the given type
-# works only for yaml files (!) (ignores json files)
 function get-addons-from-disk() {
     # prints to stdout, so log cannot be used
     local -r addon_dir=$1
     local -r obj_type=$2
     local kind
     local file_path
-    for file_path in $(find ${addon_dir} -name \*.yaml); do
+    for file_path in $(find ${addon_dir} \( -name \*.yaml -o -name \*.json \)); do
         kind=$(get-object-kind-from-file ${file_path})
         # WARNING: assumption that the topmost indentation is zero (I'm not sure yaml allows for topmost indentation)
         if [[ "${kind}" == "${obj_type}" ]]; then
