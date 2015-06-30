@@ -15,7 +15,7 @@ The kube-scheduler can take several options.
 *       **--algorithm-provider="DefaultProvider"**: The scheduling algorithm provider to use, one of: DefaultProvider
 *       **--alsologtostderr=false**: log to standard error as well as files
 *       **--kubeconfig=""**: Path to kubeconfig file with authorization and master location information.
-*       **--log-backtrace-at=**:0: when logging hits line file:N, emit a stack trace
+*       **--log-backtrace-at=:0**: when logging hits line file:N, emit a stack trace
 *       **--log-dir=**: If non-empty, write log files in this directory
 *       **--log-flush-frequency=5s**: Maximum number of seconds between log flushes
 *       **--logtostderr=true**: log to standard error instead of files

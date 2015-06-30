@@ -24,7 +24,7 @@ The kube-controller-manager has several options.
 *       **--deleting-pods-qps=0.1**: Number of nodes per second on which pods are deleted in case of node failure.
 *       **--httptest.serve=**: if non-empty, httptest.NewServer serves on this address and blocks
 *       **--kubeconfig=""**: Path to kubeconfig file with authorization and master location information.
-*       **--log-backtrace-at=**:0: when logging hits line file:N, emit a stack trace
+*       **--log-backtrace-at=:0**: when logging hits line file:N, emit a stack trace
 *       **--log-dir=**: If non-empty, write log files in this directory
 *       **--log-flush-frequency=5s**: Maximum number of seconds between log flushes
 *       **--logtostderr=true**: log to standard error instead of files

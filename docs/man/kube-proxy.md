@@ -1,4 +1,4 @@
-#NAME
+# NAME
 kube-proxy \- Provides network proxy services.
 
 # SYNOPSIS
@@ -16,7 +16,7 @@ The kube-proxy takes several options.
 *       **--healthz-bind-address=127.0.0.1**: The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)
 *       **--healthz-port=10249**: The port to bind the health check server. Use 0 to disable.
 *       **--kubeconfig=""**: Path to kubeconfig file with authorization information (the master location is set by the master flag).
-*       **--log-backtrace-at=**:0: when logging hits line file:N, emit a stack trace
+*       **--log-backtrace-at=:0**: when logging hits line file:N, emit a stack trace
 *       **--log-dir=**: If non-empty, write log files in this directory
 *       **--log-flush-frequency=5s**: Maximum number of seconds between log flushes
 *       **--logtostderr=true**: log to standard error instead of files

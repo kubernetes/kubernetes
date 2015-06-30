@@ -44,7 +44,7 @@ The the kube-apiserver several options.
 *       **--kubelet-https=true**: Use https for kubelet connections
 *       **--kubelet-port=10250**: Kubelet port
 *       **--kubelet-timeout=5s**: Timeout for kubelet operations
-*       **--log-backtrace-at=**:0: when logging hits line file:N, emit a stack trace
+*       **--log-backtrace-at=:0**: when logging hits line file:N, emit a stack trace
 *       **--log-dir=**: If non-empty, write log files in this directory
 *       **--log-flush-frequency=5s**: Maximum number of seconds between log flushes
 *       **--logtostderr=true**: log to standard error instead of files
