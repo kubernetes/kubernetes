@@ -19,6 +19,7 @@ package e2e
 import (
 	"flag"
 	"fmt"
+	"os"
 	"path"
 	"strings"
 	"testing"
@@ -32,7 +33,6 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
-	"github.com/onsi/ginkgo/types"
 	"github.com/onsi/gomega"
 )
 
@@ -48,22 +48,6 @@ var (
 
 	reportDir = flag.String("report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 )
-
-type failReporter struct {
-	failed bool
-}
-
-func (f *failReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
-}
-func (f *failReporter) BeforeSuiteDidRun(setupSummary *types.SetupSummary) {}
-func (f *failReporter) SpecWillRun(specSummary *types.SpecSummary)         {}
-func (f *failReporter) SpecDidComplete(specSummary *types.SpecSummary) {
-	if specSummary.Failed() {
-		f.failed = true
-	}
-}
-func (f *failReporter) AfterSuiteDidRun(setupSummary *types.SetupSummary) {}
-func (f *failReporter) SpecSuiteDidEnd(summary *types.SuiteSummary)       {}
 
 func init() {
 	// Turn on verbose by default to get spec names
@@ -102,6 +86,12 @@ func TestE2E(t *testing.T) {
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
+	if *reportDir != "" {
+		if err := os.MkdirAll(*reportDir, 0755); err != nil {
+			glog.Errorf("Failed creating report directory: %v", err)
+		}
+		defer coreDump(*reportDir)
+	}
 
 	if testContext.Provider == "" {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
@@ -137,19 +127,13 @@ func TestE2E(t *testing.T) {
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
 	if err := waitForPodsRunningReady(api.NamespaceDefault, testContext.MinStartupPods, podStartupTimeout); err != nil {
-		glog.Fatalf("Error waiting for all pods to be running and ready: %v", err)
+		t.Errorf("Error waiting for all pods to be running and ready: %v", err)
+		return
 	}
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	var r []ginkgo.Reporter
 	if *reportDir != "" {
 		r = append(r, reporters.NewJUnitReporter(path.Join(*reportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
-		failReport := &failReporter{}
-		r = append(r, failReport)
-		defer func() {
-			if failReport.failed {
-				coreDump(*reportDir)
-			}
-		}()
 	}
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
