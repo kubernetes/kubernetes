@@ -15,7 +15,7 @@ KUBELET_API_SERVER="--api_servers=https://{{ groups['masters'][0]}}:443"
 
 # Add your own!
 {% if dns_setup %}
-KUBELET_ARGS="--cluster_dns={{ dns_server }} --cluster_domain={{ dns_domain }} --kubeconfig={{ kube_config_dir}}/kubelet.kubeconfig"
+KUBELET_ARGS="--cluster_dns={{ dns_server }} --cluster_domain={{ dns_domain }} --kubeconfig={{ kube_config_dir}}/kubelet.kubeconfig --config={{ kube_manifest_dir }}"
 {% else %}
-KUBELET_ARGS="--kubeconfig={{ kube_config_dir}}/kubelet.kubeconfig"
+KUBELET_ARGS="--kubeconfig={{ kube_config_dir}}/kubelet.kubeconfig --config={{ kube_manifest_dir }}"
 {% endif %}

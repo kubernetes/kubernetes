@@ -18,6 +18,6 @@
   notify:
     - restart daemons
 
-- include: certs.yml
+- include: secrets.yml
   tags:
-    certs
+    secrets

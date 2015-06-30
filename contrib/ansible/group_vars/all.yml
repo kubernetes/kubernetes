@@ -1,6 +1,7 @@
-# Only used for the location to store flannel info in etcd, but may be used
-# for dns purposes and cluster id purposes in the future.
-cluster_name: kube.local
+# will be used as the Internal dns domain name if DNS is enabled. Services
+# will be discoverable under <service-name>.<namespace>.svc.<domainname>, e.g.
+# myservice.default.svc.cluster.local
+cluster_name: cluster.local
 
 # Account name of remote user. Ansible will use this user account to ssh into
 # the managed machines. The user must be able to use sudo without asking
@@ -43,21 +44,17 @@ flannel_prefix: 12
 # room for 4096 nodes with 254 pods per node.
 flannel_host_prefix: 24
 
+# Set to false to disable logging with elasticsearch
+cluster_logging: true
+
+# Turn to false to disable cluster monitoring with heapster and influxdb
+cluster_monitoring: true
+
 # Turn this varable to 'false' to disable whole DNS configuration.
 dns_setup: true
 # How many replicas in the Replication Controller
 dns_replicas: 1
 
-# Internal DNS domain name.
-# This domain must not be used in your network. Services will be discoverable
-# under <service-name>.<namespace>.<domainname>, e.g.
-# myservice.default.kube.local
-dns_domain: kube.local
-
-# IP address of the DNS server.
-# Kubernetes will create a pod with several containers, serving as the DNS
-# server and expose it under this IP address. The IP address must be from
-# the range specified as kube_service_addresses above.
-# And this is the IP address you should use as address of the DNS server
-# in your containers.
-dns_server: 10.254.0.10
+# There are other variable in roles/kubernetes/defaults/main.yml but changing
+# them comes with a much higher risk to your cluster. So proceed over there
+# with caution.
