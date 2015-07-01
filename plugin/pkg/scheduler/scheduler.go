@@ -125,7 +125,7 @@ func (s *Scheduler) scheduleOne() {
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %v", pod)
-		s.config.Recorder.Eventf(pod, "failedScheduling", "Error scheduling: %v", err)
+		s.config.Recorder.Eventf(pod, "failedScheduling", "%v", err)
 		s.config.Error(pod, err)
 		return
 	}
