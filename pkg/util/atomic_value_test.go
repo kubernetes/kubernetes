@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"math/rand"
+	"sync"
 	"testing"
 	"time"
 )
@@ -47,4 +49,35 @@ func TestAtomicValue(t *testing.T) {
 	ExpectValue(t, atomicValue, nil)
 	atomicValue.Store(10)
 	ExpectValue(t, atomicValue, 10)
+}
+
+func TestHighWaterMark(t *testing.T) {
+	var h HighWaterMark
+
+	for i := int64(10); i < 20; i++ {
+		if !h.Check(i) {
+			t.Errorf("unexpected false for %v", i)
+		}
+		if h.Check(i - 1) {
+			t.Errorf("unexpected true for %v", i-1)
+		}
+	}
+
+	m := int64(0)
+	wg := sync.WaitGroup{}
+	for i := 0; i < 300; i++ {
+		wg.Add(1)
+		v := rand.Int63()
+		go func(v int64) {
+			defer wg.Done()
+			h.Check(v)
+		}(v)
+		if v > m {
+			m = v
+		}
+	}
+	wg.Wait()
+	if m != int64(h) {
+		t.Errorf("unexpected value, wanted %v, got %v", m, int64(h))
+	}
 }
