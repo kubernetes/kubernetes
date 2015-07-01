@@ -124,6 +124,40 @@ func TestKindToResource(t *testing.T) {
 	}
 }
 
+func TestRESTMapperResourceSingularizer(t *testing.T) {
+	testCases := []struct {
+		Kind, APIVersion string
+		MixedCase        bool
+		Plural           string
+		Singular         string
+	}{
+		{Kind: "Pod", APIVersion: "test", MixedCase: true, Plural: "pods", Singular: "pod"},
+		{Kind: "Pod", APIVersion: "test", MixedCase: false, Plural: "pods", Singular: "pod"},
+
+		{Kind: "ReplicationController", APIVersion: "test", MixedCase: true, Plural: "replicationControllers", Singular: "replicationController"},
+		{Kind: "ReplicationController", APIVersion: "test", MixedCase: false, Plural: "replicationcontrollers", Singular: "replicationcontroller"},
+
+		{Kind: "ImageRepository", APIVersion: "test", MixedCase: true, Plural: "imageRepositories", Singular: "imageRepository"},
+		{Kind: "ImageRepository", APIVersion: "test", MixedCase: false, Plural: "imagerepositories", Singular: "imagerepository"},
+
+		{Kind: "Status", APIVersion: "test", MixedCase: true, Plural: "statuses", Singular: "status"},
+		{Kind: "Status", APIVersion: "test", MixedCase: false, Plural: "statuses", Singular: "status"},
+
+		{Kind: "lowercase", APIVersion: "test", MixedCase: false, Plural: "lowercases", Singular: "lowercase"},
+		// Don't add extra s if the original object is already plural
+		{Kind: "lowercases", APIVersion: "test", MixedCase: false, Plural: "lowercases", Singular: "lowercases"},
+	}
+	for i, testCase := range testCases {
+		mapper := NewDefaultRESTMapper([]string{"test"}, fakeInterfaces)
+		// create singular/plural mapping
+		mapper.Add(RESTScopeNamespace, testCase.Kind, testCase.APIVersion, testCase.MixedCase)
+		singular, _ := mapper.ResourceSingularizer(testCase.Plural)
+		if singular != testCase.Singular {
+			t.Errorf("%d: mismatched singular: %s, should be %s", i, singular, testCase.Singular)
+		}
+	}
+}
+
 func TestRESTMapperRESTMapping(t *testing.T) {
 	testCases := []struct {
 		Kind            string

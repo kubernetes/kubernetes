@@ -56,7 +56,9 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    replace_long,
 		Example: replace_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunReplace(f, out, cmd, args, filenames)
+			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
+			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
+			err := RunReplace(f, out, cmd, args, filenames, shortOutput)
 			cmdutil.CheckCustomErr("Replace failed", err)
 		},
 	}
@@ -67,10 +69,11 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("cascade", false, "Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
 	cmd.Flags().Int("grace-period", -1, "Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.")
 	cmd.Flags().Duration("timeout", 0, "Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object")
+	cmdutil.AddOutputFlagsForMutation(cmd)
 	return cmd
 }
 
-func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
+func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList, shortOutput bool) error {
 	if len(os.Args) > 1 && os.Args[1] == "update" {
 		printDeprecationWarning("replace", "update")
 	}
@@ -90,7 +93,7 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	}
 
 	if force {
-		return forceReplace(f, out, cmd, args, filenames)
+		return forceReplace(f, out, cmd, args, filenames, shortOutput)
 	}
 
 	mapper, typer := f.Object()
@@ -117,12 +120,12 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		}
 		info.Refresh(obj, true)
 		printObjectSpecificMessage(obj, out)
-		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
+		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "replaced")
 		return nil
 	})
 }
 
-func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
+func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList, shortOutput bool) error {
 	schema, err := f.Validator()
 	if err != nil {
 		return err
@@ -166,9 +169,9 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	// By default use a reaper to delete all related resources.
 	if cmdutil.GetFlagBool(cmd, "cascade") {
 		glog.Warningf("\"cascade\" is set, kubectl will delete and re-create all resources managed by this resource (e.g. Pods created by a ReplicationController). Consider using \"kubectl rolling-update\" if you want to update a ReplicationController together with its Pods.")
-		err = ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"))
+		err = ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"), shortOutput, mapper)
 	} else {
-		err = DeleteResult(r, out, ignoreNotFound)
+		err = DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
 	}
 	if err != nil {
 		return err
@@ -199,7 +202,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		count++
 		info.Refresh(obj, true)
 		printObjectSpecificMessage(obj, out)
-		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
+		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "replaced")
 		return nil
 	})
 	if err != nil {

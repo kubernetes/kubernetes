@@ -71,6 +71,7 @@ $ kubectl stop -f path/to/resources
       --grace-period=-1: Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.
   -h, --help=false: help for stop
       --ignore-not-found=false: Treat "resource not found" as a successful stop.
+  -o, --output="": Output mode. Use "-o name" for shorter output (resource/name).
   -l, --selector="": Selector (label query) to filter on.
       --timeout=0: The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object
 ```

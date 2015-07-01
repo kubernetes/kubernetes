@@ -77,6 +77,8 @@ type DefaultRESTMapper struct {
 	reverse        map[typeMeta]string
 	scopes         map[typeMeta]RESTScope
 	versions       []string
+	plurals        map[string]string
+	singulars      map[string]string
 	interfacesFunc VersionInterfacesFunc
 }
 
@@ -93,6 +95,8 @@ func NewDefaultRESTMapper(versions []string, f VersionInterfacesFunc) *DefaultRE
 	mapping := make(map[string]typeMeta)
 	reverse := make(map[typeMeta]string)
 	scopes := make(map[typeMeta]RESTScope)
+	plurals := make(map[string]string)
+	singulars := make(map[string]string)
 	// TODO: verify name mappings work correctly when versions differ
 
 	return &DefaultRESTMapper{
@@ -100,12 +104,16 @@ func NewDefaultRESTMapper(versions []string, f VersionInterfacesFunc) *DefaultRE
 		reverse:        reverse,
 		scopes:         scopes,
 		versions:       versions,
+		plurals:        plurals,
+		singulars:      singulars,
 		interfacesFunc: f,
 	}
 }
 
 func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, version string, mixedCase bool) {
 	plural, singular := kindToResource(kind, mixedCase)
+	m.plurals[singular] = plural
+	m.singulars[plural] = singular
 	meta := typeMeta{APIVersion: version, Kind: kind}
 	_, ok1 := m.mapping[plural]
 	_, ok2 := m.mapping[strings.ToLower(plural)]
@@ -133,7 +141,7 @@ func kindToResource(kind string, mixedCase bool) (plural, singular string) {
 		singular = strings.ToLower(kind)
 	}
 	if strings.HasSuffix(singular, "status") {
-		plural = strings.TrimSuffix(singular, "status") + "statuses"
+		plural = singular + "es"
 	} else {
 		switch string(singular[len(singular)-1]) {
 		case "s":
@@ -145,6 +153,16 @@ func kindToResource(kind string, mixedCase bool) (plural, singular string) {
 		}
 	}
 	return
+}
+
+// ResourceSingularizer implements RESTMapper
+// It converts a resource name from plural to singular (e.g., from pods to pod)
+func (m *DefaultRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	singular, ok := m.singulars[resource]
+	if !ok {
+		return resource, fmt.Errorf("no singular of resource %q has been defined", resource)
+	}
+	return singular, nil
 }
 
 // VersionAndKindForResource implements RESTMapper
@@ -248,6 +266,18 @@ func (m *DefaultRESTMapper) AliasesForResource(alias string) ([]string, bool) {
 
 // MultiRESTMapper is a wrapper for multiple RESTMappers.
 type MultiRESTMapper []RESTMapper
+
+// ResourceSingularizer converts a REST resource name from plural to singular (e.g., from pods to pod)
+// This implementation supports multiple REST schemas and return the first match.
+func (m MultiRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	for _, t := range m {
+		singular, err = t.ResourceSingularizer(resource)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
 
 // VersionAndKindForResource provides the Version and Kind  mappings for the
 // REST resources. This implementation supports multiple REST schemas and return

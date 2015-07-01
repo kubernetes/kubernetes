@@ -52,7 +52,9 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    scale_long,
 		Example: scale_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunScale(f, out, cmd, args)
+			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
+			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
+			err := RunScale(f, out, cmd, args, shortOutput)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -60,11 +62,12 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int("current-replicas", -1, "Precondition for current size. Requires that the current size of the replication controller match this value in order to scale.")
 	cmd.Flags().Int("replicas", -1, "The new desired number of replicas. Required.")
 	cmd.MarkFlagRequired("replicas")
+	cmdutil.AddOutputFlagsForMutation(cmd)
 	return cmd
 }
 
 // RunScale executes the scaling
-func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool) error {
 	if len(os.Args) > 1 && os.Args[1] == "resize" {
 		printDeprecationWarning("scale", "resize")
 	}
@@ -117,6 +120,6 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
 		return err
 	}
-	fmt.Fprint(out, "scaled\n")
+	cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "scaled")
 	return nil
 }
