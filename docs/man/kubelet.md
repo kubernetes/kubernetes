@@ -36,7 +36,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API (u
 *       **--container-hints=/etc/cadvisor/container_hints.json**: location of the container hints file
 *       **--container-runtime="docker"**: The container runtime to use. Possible values: 'docker', 'rkt'. Default: 'docker'.
 *       **--containerized=false**: Experimental support for running kubelet in a container.  Intended for testing. [default=false]
-*       **--docker=unix**:///var/run/docker.sock: docker endpoint
+*       **--docker=unix:///var/run/docker.sock**: docker endpoint
 *       **--docker-endpoint=""**: If non-empty, use this for the docker endpoint to communicate with
 *       **--docker-exec-handler="native"**: Handler to use when executing a command in a container. Valid values are 'native' and 'nsenter'. Defaults to 'native'.
 *       **--docker-only=false**: Only report docker containers in addition to root stats
@@ -60,7 +60,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API (u
 *       **--image-gc-high-threshold=90**: The percent of disk usage after which image garbage collection is always run. Default: 90%%
 *       **--image-gc-low-threshold=80**: The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to. Default: 80%%
 *       **--kubeconfig=/var/lib/kubelet/kubeconfig**: Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).
-*       **--log-backtrace-at=**:0: when logging hits line file:N, emit a stack trace
+*       **--log-backtrace-at=:0**: when logging hits line file:N, emit a stack trace
 *       **--log-cadvisor-usage=false**: Whether to log the usage of the cAdvisor container
 *       **--log-dir=**: If non-empty, write log files in this directory
 *       **--log-flush-frequency=5s**: Maximum number of seconds between log flushes
@@ -78,7 +78,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API (u
 *       **--node-status-update-frequency=10s**: Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s
 *       **--oom-score-adj=-900**: The oom_score_adj value for kubelet process. Values must be within the range [-1000, 1000]
 *       **--pod-cidr=""**: The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.
-*       **--pod-infra-container-image="gcr.io/google_containers/pause**:0.8.0": The image whose network/ipc namespaces containers in each pod will use.
+*       **--pod-infra-container-image="gcr.io/google_containers/pause:0.8.0"**: The image whose network/ipc namespaces containers in each pod will use.
 *       **--port=10250**: The port for the Kubelet to serve on. Note that "kubectl logs" will not work if you set this flag.
 *       **--read-only-port=10255**: The read-only port for the Kubelet to serve on (set to 0 to disable)
 *       **--really-crash-for-testing=false**: If true, when panics occur crash. Intended for testing.
