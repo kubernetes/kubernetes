@@ -43,7 +43,7 @@ Now, you can access the service `wget 10.0.1.89:9090`, and build graphs.
 
 ## How it works
 
-This is a v1beta3 based, containerized prometheus ReplicationController, which scrapes endpoints which are readable on the KUBERNETES service (the internal kubernetes service running in the default namespace, which is visible to all pods).
+This is a v1 api based, containerized prometheus ReplicationController, which scrapes endpoints which are readable on the KUBERNETES service (the internal kubernetes service running in the default namespace, which is visible to all pods).
 
 1. Use kubectl to handle auth & proxy the kubernetes API locally, emulating the old KUBERNETES_RO service.
 

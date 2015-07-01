@@ -1,9 +1,9 @@
 {
     "kind": "Node",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
         "name": "e2e-test-wojtekt-minion-etd6",
-        "selfLink": "/api/v1beta3/nodes/e2e-test-wojtekt-minion-etd6",
+        "selfLink": "/api/v1/nodes/e2e-test-wojtekt-minion-etd6",
         "uid": "a7e89222-e8e5-11e4-8fde-42010af09327",
         "resourceVersion": "379",
         "creationTimestamp": "2015-04-22T11:49:39Z"

@@ -97,7 +97,7 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	if c.DeleteEtcdKeys {
 		DeleteAllEtcdKeys()
 	}
-	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: "v1beta3", QPS: c.QPS, Burst: c.Burst})
+	restClient := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version(), QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
 	controllerManager := controller.NewReplicationManager(restClient, c.Burst)
 

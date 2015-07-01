@@ -37,12 +37,12 @@ class TestRegistrator():
     @patch('json.loads')
     @patch('httplib.HTTPConnection')
     def test_register(self, httplibmock, jsonmock):
-        result = self.r.register('foo', 80, '/v1beta3/test')
+        result = self.r.register('foo', 80, '/v1/test')
 
         httplibmock.assert_called_with('foo', 80)
         requestmock = httplibmock().request
         requestmock.assert_called_with(
-                "POST", "/v1beta3/test",
+                "POST", "/v1/test",
                 json.dumps(self.r.data),
                 {"Content-type": "application/json",
                  "Accept": "application/json"})
@@ -50,7 +50,7 @@ class TestRegistrator():
 
     def test_command_succeeded(self):
         response = MagicMock()
-        result = json.loads('{"status": "Failure", "kind": "Status", "code": 409, "apiVersion": "v1beta2", "reason": "AlreadyExists", "details": {"kind": "minion", "id": "10.200.147.200"}, "message": "minion \\"10.200.147.200\\" already exists", "creationTimestamp": null}')
+        result = json.loads('{"status": "Failure", "kind": "Status", "code": 409, "apiVersion": "v1", "reason": "AlreadyExists", "details": {"kind": "node", "name": "10.200.147.200"}, "message": "node \\"10.200.147.200\\" already exists", "creationTimestamp": null}')
         response.status = 200
         self.r.command_succeeded(response, result)
         response.status = 500

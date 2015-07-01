@@ -1,10 +1,10 @@
 {
     "kind": "Pod",
-    "apiVersion": "v1beta3",
+    "apiVersion": "v1",
     "metadata": {
         "name": "etcd-server-e2e-test-wojtekt-master",
         "namespace": "default",
-        "selfLink": "/api/v1beta3/namespaces/default/pods/etcd-server-e2e-test-wojtekt-master",
+        "selfLink": "/api/v1/namespaces/default/pods/etcd-server-e2e-test-wojtekt-master",
         "uid": "a671734a-e8e5-11e4-8fde-42010af09327",
         "resourceVersion": "22",
         "creationTimestamp": "2015-04-22T11:49:36Z",
@@ -71,12 +71,12 @@
         ],
         "restartPolicy": "Always",
         "dnsPolicy": "ClusterFirst",
-        "host": "e2e-test-wojtekt-master",
+        "nodeName": "e2e-test-wojtekt-master",
         "hostNetwork": true
     },
     "status": {
         "phase": "Running",
-        "Condition": [
+        "conditions": [
             {
                 "type": "Ready",
                 "status": "True"

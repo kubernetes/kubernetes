@@ -61,8 +61,8 @@ ENABLE_CLUSTER_LOGGING=false
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none     - No cluster monitoring setup 
-#   influxdb - Heapster, InfluxDB, and Grafana 
+#   none     - No cluster monitoring setup
+#   influxdb - Heapster, InfluxDB, and Grafana
 #   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
@@ -81,4 +81,4 @@ DNS_REPLICAS=1
 
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
 #RUNTIME_CONFIG=""
-RUNTIME_CONFIG="api/v1beta3"
+RUNTIME_CONFIG="api/v1"
