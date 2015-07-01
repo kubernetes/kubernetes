@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
   - name: fluentd-elasticsearch
-    image: gcr.io/google_containers/fluentd-elasticsearch:1.5
+    image: gcr.io/google_containers/fluentd-elasticsearch:1.6
     resources:
       limits:
         cpu: 100m
