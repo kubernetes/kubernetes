@@ -28,6 +28,9 @@ $minion_ips = $num_minion.times.collect { |n| $minion_ip_base + "#{n+3}" }
 # Determine the OS platform to use
 $kube_os = ENV['KUBERNETES_OS'] || "fedora"
 
+# Determine whether vagrant should use nfs to sync folders
+$use_nfs = ENV['KUBERNETES_VAGRANT_USE_NFS'] == 'true'
+
 # To override the vagrant provider, use (e.g.):
 #   KUBERNETES_PROVIDER=vagrant VAGRANT_DEFAULT_PROVIDER=... .../cluster/kube-up.sh
 # To override the box, use (e.g.):
@@ -130,6 +133,11 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   end
 
   def customize_vm(config, vm_mem)
+
+    if $use_nfs then
+      config.vm.synced_folder ".", "/vagrant", nfs: true
+    end
+
     # Try VMWare Fusion first (see
     # https://docs.vagrantup.com/v2/providers/basic_usage.html)
     config.vm.provider :vmware_fusion do |v, override|
