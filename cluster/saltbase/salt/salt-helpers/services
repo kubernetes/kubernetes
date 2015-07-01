@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
 ACTION=${1}
 SERVICE=${2}
